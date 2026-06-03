@@ -30,6 +30,7 @@ import {
   Eye,
   Download,
   ShoppingCart,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +39,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { BottomSheet, ActionMenu } from "@/components/mobile";
 import {
@@ -730,7 +740,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
 
           {!isCliente && (
             <SidebarSection title="Documentos" defaultOpen>
-              <DocumentosSidebar pedidoId={pedido.id} />
+              <DocumentosSidebar pedidoId={pedido.id} clienteEmail={pedido.cliente_email ?? ""} />
             </SidebarSection>
           )}
 
@@ -1344,21 +1354,23 @@ function PagosSidebar({
 // Documentos sidebar
 // ─────────────────────────────────────────────────────────────────────────
 
-function DocumentosSidebar({ pedidoId }: { pedidoId: number }) {
-  const docs: {
-    kind: "pdf" | "albaran" | "contrato" | "packing-list";
-    label: string;
-    icon: React.ReactNode;
-  }[] = [
-    { kind: "contrato", label: "Contrato", icon: <FileSignature className="h-4 w-4" /> },
-    { kind: "pdf", label: "Presupuesto", icon: <FileText className="h-4 w-4" /> },
-    { kind: "albaran", label: "Albarán", icon: <Truck className="h-4 w-4" /> },
-    { kind: "packing-list", label: "Packing List", icon: <ClipboardList className="h-4 w-4" /> },
-  ];
+const DOCS_PEDIDO: {
+  kind: "pdf" | "albaran" | "contrato" | "packing-list";
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  { kind: "contrato", label: "Contrato", icon: <FileSignature className="h-4 w-4" /> },
+  { kind: "pdf", label: "Presupuesto", icon: <FileText className="h-4 w-4" /> },
+  { kind: "albaran", label: "Albarán", icon: <Truck className="h-4 w-4" /> },
+  { kind: "packing-list", label: "Packing List", icon: <ClipboardList className="h-4 w-4" /> },
+];
+
+function DocumentosSidebar({ pedidoId, clienteEmail }: { pedidoId: number; clienteEmail: string }) {
+  const [mailOpen, setMailOpen] = useState(false);
 
   return (
     <div className="space-y-1.5">
-      {docs.map((d) => (
+      {DOCS_PEDIDO.map((d) => (
         <div key={d.kind} className="flex items-center gap-2 rounded-md border hairline px-3 py-2">
           <span className="text-muted-foreground shrink-0">{d.icon}</span>
           <span className="flex-1 text-sm text-ink">{d.label}</span>
@@ -1382,7 +1394,129 @@ function DocumentosSidebar({ pedidoId }: { pedidoId: number }) {
           </div>
         </div>
       ))}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full mt-1"
+        onClick={() => setMailOpen(true)}
+      >
+        <Mail className="h-4 w-4 mr-1.5" />
+        Enviar por mail
+      </Button>
+
+      <EnviarDocsDialog
+        pedidoId={pedidoId}
+        clienteEmail={clienteEmail}
+        open={mailOpen}
+        onOpenChange={setMailOpen}
+      />
     </div>
+  );
+}
+
+function EnviarDocsDialog({
+  pedidoId,
+  clienteEmail,
+  open,
+  onOpenChange,
+}: {
+  pedidoId: number;
+  clienteEmail: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const [seleccion, setSeleccion] = useState<Record<string, boolean>>({ pdf: true });
+  const [to, setTo] = useState(clienteEmail);
+  const [mensaje, setMensaje] = useState("");
+
+  // Re-sincroniza el destinatario al abrir (por si cambió el cliente).
+  useEffect(() => {
+    if (open) setTo(clienteEmail);
+  }, [open, clienteEmail]);
+
+  const enviarMut = useMutation({
+    mutationFn: () => {
+      const docs = DOCS_PEDIDO.filter((d) => seleccion[d.kind]).map((d) => d.kind);
+      return adminApi.enviarDocumentos(pedidoId, {
+        docs,
+        to: to.trim() || undefined,
+        mensaje: mensaje.trim() || undefined,
+      });
+    },
+    onSuccess: (r) => {
+      toast.success(`Mail enviado a ${r.to}`);
+      onOpenChange(false);
+      setMensaje("");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const algunoElegido = DOCS_PEDIDO.some((d) => seleccion[d.kind]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Enviar documentos por mail</DialogTitle>
+          <DialogDescription>
+            Se mandan adjuntos en PDF al email del cliente. Elegí qué documentos incluir.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="space-y-2">
+            {DOCS_PEDIDO.map((d) => (
+              <label key={d.kind} className="flex items-center gap-2 text-sm text-ink">
+                <Checkbox
+                  checked={!!seleccion[d.kind]}
+                  onCheckedChange={(v) =>
+                    setSeleccion((prev) => ({ ...prev, [d.kind]: v === true }))
+                  }
+                />
+                <span className="text-muted-foreground">{d.icon}</span>
+                {d.label}
+              </label>
+            ))}
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="enviar-docs-to">Para</Label>
+            <Input
+              id="enviar-docs-to"
+              type="email"
+              value={to}
+              placeholder="email del cliente"
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="enviar-docs-msg">Mensaje (opcional)</Label>
+            <Textarea
+              id="enviar-docs-msg"
+              value={mensaje}
+              placeholder="Una nota para el cliente…"
+              rows={3}
+              onChange={(e) => setMensaje(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => enviarMut.mutate()}
+            disabled={!algunoElegido || !to.trim() || enviarMut.isPending}
+          >
+            {enviarMut.isPending ? "Enviando…" : "Enviar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

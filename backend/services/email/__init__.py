@@ -12,14 +12,16 @@ from __future__ import annotations
 
 import os
 
-from .base import EmailBackend, EmailBackendError, SendResult
-from .service import send_email, render_template
+from .base import Attachment, EmailBackend, EmailBackendError, SendResult
+from .service import send_email, send_raw_email, render_template
 
 __all__ = [
+    "Attachment",
     "EmailBackend",
     "EmailBackendError",
     "SendResult",
     "send_email",
+    "send_raw_email",
     "render_template",
     "get_backend",
 ]

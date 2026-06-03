@@ -150,6 +150,72 @@ def render_template(
         conn.close()
 
 
+def send_raw_email(
+    to: str,
+    subject: str,
+    body_html: str,
+    text: str,
+    *,
+    attachments: Optional[list] = None,
+    alquiler_id: Optional[int] = None,
+    log_key: str = "(raw)",
+) -> dict[str, Any]:
+    """Envía un mail transaccional one-off (sin plantilla de DB), con adjuntos
+    opcionales. El `body_html` se envuelve en el layout branded común. Loggea
+    SIEMPRE en `emails_log` y NUNCA propaga excepciones del provider — mismo
+    contrato que `send_email`."""
+    from . import get_backend
+    from .base import EmailBackendError
+
+    if not to or "@" not in to:
+        logger.warning("send_raw_email: 'to' inválido (%r), abortando", to)
+        return {"ok": False, "error": "destinatario inválido"}
+
+    conn = get_db()
+    try:
+        from_addr = _resolve_from(conn)
+        html = _wrap_email_html(body_html, conn)
+        backend = get_backend()
+        try:
+            result = backend.send(
+                to=to, subject=subject, html=html, text=text,
+                from_addr=from_addr, attachments=attachments,
+            )
+        except EmailBackendError as e:
+            logger.error("Envío raw falló (%s → %s): %s", log_key, to, e)
+            log_id = _insert_log(
+                conn, to=to, subject=subject, template_key=log_key,
+                alquiler_id=alquiler_id, status="failed", provider=backend.name,
+                provider_id=None, error=str(e),
+            )
+            conn.commit()
+            return {"ok": False, "error": str(e), "provider": backend.name, "log_id": log_id}
+        log_id = _insert_log(
+            conn, to=to, subject=subject, template_key=log_key,
+            alquiler_id=alquiler_id, status="sent", provider=result.provider,
+            provider_id=result.provider_id, error=None,
+        )
+        conn.commit()
+        logger.info(
+            "send_raw_email ok: to=%s provider=%s id=%s", to, result.provider, result.provider_id
+        )
+        return {
+            "ok": True,
+            "provider": result.provider,
+            "provider_id": result.provider_id,
+            "log_id": log_id,
+        }
+    except Exception as e:
+        logger.exception("send_raw_email: error inesperado: %s", e)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {"ok": False, "error": f"error interno: {e}"}
+    finally:
+        conn.close()
+
+
 def send_email(
     template_key: str,
     to: str,
