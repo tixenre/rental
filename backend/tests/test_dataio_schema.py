@@ -69,7 +69,7 @@ class TestEquipo:
         e = schema.Equipo(slug="sony-fx3", nombre="Sony FX3")
         assert e.cantidad == 1
         assert e.visible_catalogo == 1
-        assert e.estado == "ok"
+        assert e.estado == "operativo"
         assert e.categorias == []
         assert e.etiquetas == []
 

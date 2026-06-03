@@ -344,7 +344,7 @@ def export_equipos(conn) -> list[dict]:
                 bh_url=r["bh_url"],
                 dueno=r["dueno"],
                 visible_catalogo=int(r["visible_catalogo"] or 0),
-                estado=r["estado"] or "ok",
+                estado=r["estado"] or "operativo",
                 ficha_completa=bool(r["ficha_completa"]),
                 eliminado_at=_to_iso(r["eliminado_at"]),
                 nombre_publico_override=r["nombre_publico_override"],
