@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { SITE_URL } from "@/lib/site";
+
+const ESTUDIO_IMG = `${SITE_URL}/estudio/Rambla_Estudio_S7V9519-HDR.jpg`;
+
 export const Route = createFileRoute("/estudio")({
   head: () => ({
     meta: [
@@ -10,7 +14,7 @@ export const Route = createFileRoute("/estudio")({
           "Estudio de foto y video en Mar del Plata. Reservá por hora con pack de luces y griperías opcional.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://ramblarental.com/estudio" },
+      { property: "og:url", content: `${SITE_URL}/estudio` },
       { property: "og:title", content: "El Estudio — Rambla Rental" },
       {
         property: "og:description",
@@ -19,7 +23,7 @@ export const Route = createFileRoute("/estudio")({
       },
       {
         property: "og:image",
-        content: "https://ramblarental.com/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
+        content: ESTUDIO_IMG,
       },
       { property: "og:locale", content: "es_AR" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -27,9 +31,9 @@ export const Route = createFileRoute("/estudio")({
       { name: "twitter:description", content: "Estudio de foto y video · Mar del Plata" },
       {
         name: "twitter:image",
-        content: "https://ramblarental.com/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
+        content: ESTUDIO_IMG,
       },
     ],
-    links: [{ rel: "canonical", href: "https://ramblarental.com/estudio" }],
+    links: [{ rel: "canonical", href: `${SITE_URL}/estudio` }],
   }),
 });

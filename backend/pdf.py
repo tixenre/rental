@@ -603,7 +603,7 @@ def _pedido_html(pedido: dict) -> str:
   <div class="footer">
     <span class="footer-brand">Rambla Rental</span>
     <span>Alquiler de equipos audiovisuales · Buenos Aires</span>
-    <span>ramblarental.com</span>
+    <span>ramblarental.com.ar</span>
   </div>
 
 </div>
@@ -885,7 +885,7 @@ def _albaran_html(pedido: dict) -> str:
 </div>
 
 <div class="footer">
-  Rambla Rental · ramblarental.com · Documento generado el {fecha_doc}
+  Rambla Rental · ramblarental.com.ar · Documento generado el {fecha_doc}
 </div>
 
 </body>
@@ -1326,7 +1326,7 @@ def _contrato_html(pedido: dict) -> str:
 </div>
 
 <div class="footer">
-  Rambla Rental · ramblarental.com
+  Rambla Rental · ramblarental.com.ar
 </div>
 
 </div>
@@ -1632,7 +1632,7 @@ def _packing_list_html(pedido: dict) -> str:
 </div>
 
 <div class="footer">
-  Rambla Rental · ramblarental.com · Documento generado el {fecha_doc}
+  Rambla Rental · ramblarental.com.ar · Documento generado el {fecha_doc}
 </div>
 
 </div><!-- /.doc -->
