@@ -17,6 +17,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # equipo_fotos puede preexistir SIN la columna `url` (en prod la creó un
+    # init_db viejo; k1l2m3n4o5p6 usa CREATE TABLE IF NOT EXISTS y no la
+    # parchea). La migración n1o2p3q4r5s6 (head) agrega `url` idempotente, pero
+    # corre DESPUÉS de este backfill → en prod este INSERT abortaba con
+    # "column url does not exist". Garantizamos la columna acá, antes de usarla.
+    op.execute(sa.text("""
+        ALTER TABLE equipo_fotos ADD COLUMN IF NOT EXISTS url TEXT
+    """))
     op.execute(sa.text("""
         INSERT INTO equipo_fotos (equipo_id, url, media_id, orden, es_principal)
         SELECT e.id, e.foto_url, NULL, 0, TRUE
