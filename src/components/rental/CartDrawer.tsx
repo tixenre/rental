@@ -80,6 +80,13 @@ export function CartDrawer({
   // descuento ni IVA — es solo referencia; el submit exige fechas válidas).
   const hayFechas = !!(startDate && endDate);
 
+  const hayNoDisponible =
+    !!startDate &&
+    list.some(({ it, qty }) => {
+      const cap = getDisponible?.(it) ?? it.cantidad ?? Infinity;
+      return getDisponible?.(it) !== undefined && cap < qty;
+    });
+
   const { data: clienteSession } = useClienteSession();
 
   // Total calculado por el BACKEND (fuente única, /api/cotizar). El front no
@@ -503,7 +510,7 @@ export function CartDrawer({
                 )}
                 <button
                   type="button"
-                  disabled={submitting || list.length === 0}
+                  disabled={submitting || list.length === 0 || hayNoDisponible}
                   onClick={handleSubmit}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
                 >
@@ -516,7 +523,12 @@ export function CartDrawer({
                   )}
                 </button>
 
-                {!startDate || !endDate ? (
+                {hayNoDisponible ? (
+                  <p className="flex items-center justify-center gap-1.5 text-center text-xs text-destructive">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    Hay ítems sin stock en estas fechas — cambiá las fechas o quitá los ítems
+                  </p>
+                ) : !startDate || !endDate ? (
                   <p className="flex items-center justify-center gap-1.5 text-center text-xs text-amber">
                     <AlertCircle className="h-3.5 w-3.5" />
                     Elegí fechas para confirmar
