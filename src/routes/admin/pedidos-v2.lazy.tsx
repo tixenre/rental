@@ -29,7 +29,7 @@ import {
   FAB,
 } from "@/components/mobile";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { formatARS, formatFechaDisplay, formatFechaCorta } from "@/lib/format";
+import { formatARS, formatFechaCorta } from "@/lib/format";
 
 export const Route = createLazyFileRoute("/admin/pedidos-v2")({
   component: PedidosV2Page,
@@ -421,8 +421,8 @@ function MasterList({
               onClick={() => onSelect(p.id)}
               onDoubleClick={() => onOpen(p.id)}
               className={cn(
-                "w-full text-left px-4 py-3 transition-colors border-l-2",
-                sel ? "border-amber bg-surface" : "border-transparent hover:bg-surface/60",
+                "w-full text-left px-3.5 py-2.5 transition-colors border-l-2",
+                sel ? "border-amber bg-amber-soft" : "border-transparent hover:bg-surface",
               )}
             >
               <div className="flex items-start justify-between gap-2">
@@ -498,7 +498,7 @@ function PreviewPane({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="font-display text-2xl text-ink truncate">
+            <h2 className="text-2xl font-bold text-ink truncate">
               {p.cliente_nombre || "Sin cliente"}
             </h2>
             <EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />
@@ -536,14 +536,14 @@ function PreviewPane({
 
       {/* Siguiente paso — abre el editor v1 donde vive la máquina de estados real. */}
       {!["finalizado", "cancelado"].includes(p.estado) && (
-        <div className="mt-4 rounded-xl border border-amber/50 bg-amber-soft/40 px-4 py-3 flex items-center justify-between gap-3">
+        <div className="mt-4 rounded-lg border border-amber bg-amber-soft px-4 py-3 flex items-center justify-between gap-3">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Siguiente paso
             </div>
             <div className="font-medium text-ink">{siguientePasoLabel(p.estado)}</div>
           </div>
-          <Button onClick={() => onOpen(p.id)} className="shrink-0">
+          <Button variant="amber" onClick={() => onOpen(p.id)} className="shrink-0">
             <ArrowRight className="h-4 w-4 mr-1" /> Gestionar
           </Button>
         </div>
@@ -556,7 +556,7 @@ function PreviewPane({
             Fechas
           </div>
           <div className="mt-1 text-ink font-medium tabular-nums">
-            {formatFechaDisplay(p.fecha_desde)} → {formatFechaDisplay(p.fecha_hasta)}
+            {formatFechaCorta(p.fecha_desde)} → {formatFechaCorta(p.fecha_hasta)}
           </div>
           <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
             {jornadas} jornada{jornadas !== 1 ? "s" : ""}
@@ -566,7 +566,9 @@ function PreviewPane({
           <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Total neto
           </div>
-          <div className="mt-1 font-display text-2xl tabular text-ink">{fmtArs(total)}</div>
+          <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
+            {fmtArs(total)}
+          </div>
           <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
             {pagado >= total && total > 0
               ? "pagado"
