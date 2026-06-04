@@ -202,6 +202,3 @@ def get_estadisticas(request: Request):
         }
     finally:
         conn.close()
-
-
-

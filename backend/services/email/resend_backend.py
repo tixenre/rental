@@ -6,11 +6,10 @@ from __future__ import annotations
 
 import base64
 import os
-from typing import Optional, Sequence
 
 import httpx
 
-from .base import EmailAttachment, EmailBackend, EmailBackendError, SendResult
+from .base import Attachment, EmailBackend, EmailBackendError, SendResult
 
 
 class ResendBackend(EmailBackend):
@@ -29,7 +28,7 @@ class ResendBackend(EmailBackend):
         html: str,
         text: str,
         from_addr: str,
-        attachments: Optional[Sequence[EmailAttachment]] = None,
+        attachments: list[Attachment] | None = None,
     ) -> SendResult:
         payload = {
             "from": from_addr,
@@ -39,13 +38,11 @@ class ResendBackend(EmailBackend):
             "text": text,
         }
         if attachments:
-            # Resend espera el contenido en base64 (string). Ver
-            # https://resend.com/docs/api-reference/emails/send-email
             payload["attachments"] = [
                 {
                     "filename": a.filename,
                     "content": base64.b64encode(a.content).decode("ascii"),
-                    "content_type": a.content_type,
+                    "content_type": a.mimetype,
                 }
                 for a in attachments
             ]
@@ -57,7 +54,7 @@ class ResendBackend(EmailBackend):
                     "Content-Type": "application/json",
                 },
                 json=payload,
-                timeout=15.0,
+                timeout=30.0,
             )
         except httpx.HTTPError as e:
             raise EmailBackendError(f"Resend HTTP error: {e}") from e

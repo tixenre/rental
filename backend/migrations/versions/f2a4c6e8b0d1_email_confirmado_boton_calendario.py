@@ -22,7 +22,10 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "f2a4c6e8b0d1"
-down_revision: Union[str, Sequence[str], None] = "p1q2r3s4t5u6"
+# Reparentada sobre q1r2s3t4u5v6 (dev) al integrar `dev`: ambas colgaban de
+# p1q2r3s4t5u6 → habrían quedado dos heads. Son independientes (esta toca
+# email_templates; q1r2... crea liquidacion_cierres), así que linealizar es seguro.
+down_revision: Union[str, Sequence[str], None] = "q1r2s3t4u5v6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

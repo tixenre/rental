@@ -1,0 +1,194 @@
+"""Liquidación: cuánto entró y cómo se reparte entre dueños (#88).
+
+Reglas (decididas con el dueño):
+- Solo cuentan pedidos **100% pagados** (`monto_pagado >= monto_total`).
+- Cada pedido se atribuye al **día en que quedó saldado** (la fecha del pago con
+  el que el acumulado cruzó `monto_total`) — NO por fecha de alquiler. Si se pagó
+  en otro mes, cuenta para ese mes.
+- El `monto_total` se prorratea entre los equipos del pedido por su participación
+  en el `subtotal`, y la plata de cada equipo se reparte según su `dueno`
+  (`comisiones.repartir`).
+
+El pipeline es SQL → filas planas → `agregar` (puro), para poder testear la
+matemática (prorrateo + reparto + buckets) sin DB.
+"""
+
+from collections import defaultdict
+
+from .comisiones import cargar_modelo, repartir
+
+# Arranque limpio de la liquidación (clean start, 2026-06). Los pedidos cuyo
+# ALQUILER (`fecha_desde`) es anterior a esta fecha NO cuentan para el reporte —
+# el reparto entre dueños arranca de cero en junio 2026, sin arrastrar el
+# histórico. Es una decisión de una sola vez, FIJA en el código a propósito (no
+# administrable desde el back-office). El corte es por fecha del alquiler (cuándo
+# fue el pedido), NO por fecha de pago: un alquiler de mayo pagado en junio no
+# cuenta. Aplica solo a la liquidación (la solapa Reportes); el Resumen general
+# de estadísticas sigue mostrando el histórico completo.
+LIQUIDACION_INICIO = "2026-06-01"
+
+# Fragmento SQL compartido (#88, #721): define cuándo un pedido quedó "saldado"
+# — el día en que el acumulado de pagos cruzó su `monto_total`, con el corte del
+# clean start aplicado (solo pedidos con `fecha_desde >= LIQUIDACION_INICIO`). Es
+# lógica de plata, así que vive en UN solo lugar y se compone como CTE tanto por
+# el reporte (`filas_atribucion`) como por la reconciliación (chequeo de mes
+# cerrado), para que las dos no puedan divergir. Expone las CTEs `acum` y
+# `saldado(pedido_id, fecha_saldado)`. Se inserta justo después de `WITH`.
+SALDADO_CTE = f"""
+        acum AS (
+            SELECT ap.pedido_id,
+                   ap.fecha,
+                   SUM(ap.monto) OVER (
+                       PARTITION BY ap.pedido_id ORDER BY ap.fecha, ap.id
+                   ) AS acumulado
+            FROM alquiler_pagos ap
+        ),
+        saldado AS (
+            SELECT a.pedido_id, MIN(a.fecha) AS fecha_saldado
+            FROM acum a
+            JOIN alquileres al ON al.id = a.pedido_id
+            WHERE al.estado <> 'cancelado'
+              AND al.monto_total > 0
+              AND al.fecha_desde >= '{LIQUIDACION_INICIO}'
+              AND a.acumulado >= al.monto_total
+            GROUP BY a.pedido_id
+        )
+"""
+
+
+def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
+    """Filas `(fecha, dueno, equipo, monto)`: el monto prorrateado que cada equipo
+    aportó, fechado en el día en que su pedido quedó saldado, dentro del rango."""
+    from database import row_to_dict
+    sql = f"""
+        WITH {SALDADO_CTE},
+        en_rango AS (
+            SELECT pedido_id, fecha_saldado
+            FROM saldado
+            WHERE fecha_saldado::date BETWEEN ?::date AND ?::date
+        ),
+        tot AS (
+            SELECT pedido_id, SUM(subtotal) AS suma_items
+            FROM alquiler_items
+            GROUP BY pedido_id
+        )
+        SELECT r.fecha_saldado::date                              AS fecha,
+               al.id                                              AS pedido_id,
+               COALESCE(e.dueno, 'Rambla')                        AS dueno,
+               e.nombre                                           AS equipo,
+               al.monto_total * pi.subtotal::numeric / NULLIF(t.suma_items, 0) AS monto
+        FROM en_rango r
+        JOIN alquileres al ON al.id = r.pedido_id
+        JOIN alquiler_items pi ON pi.pedido_id = al.id
+        JOIN equipos e ON e.id = pi.equipo_id
+        JOIN tot t ON t.pedido_id = al.id
+    """
+    rows = conn.execute(sql, (desde, hasta)).fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
+def agregar(filas: list[dict], modelo: dict) -> dict:
+    """Agrega filas planas en el reporte. Puro (sin DB). Aplica el reparto de
+    comisiones por fila y arma resumen + serie mensual + serie diaria + detalle
+    por dueño. Los montos se redondean a enteros ARS al serializar."""
+    total = 0.0
+    por_benef: dict[str, float] = defaultdict(float)
+    mes_total: dict[str, float] = defaultdict(float)
+    mes_benef: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    dia_total: dict[str, float] = defaultdict(float)
+    dia_benef: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    dueno_generado: dict[str, float] = defaultdict(float)
+    dueno_reparto: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    dueno_equipos: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    # Conteo de "veces alquilado" = pedidos DISTINTOS (solo cobrados), para el
+    # resumen mensual por dueño.
+    pedidos_global: set = set()
+    dueno_pedidos: dict[str, set] = defaultdict(set)
+    equipo_pedidos: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
+
+    for f in filas:
+        monto = float(f["monto"] or 0)
+        if monto == 0:
+            continue
+        dueno = f["dueno"]
+        equipo = f["equipo"]
+        fecha = str(f["fecha"])
+        mes, dia = fecha[:7], fecha[:10]
+
+        total += monto
+        mes_total[mes] += monto
+        dia_total[dia] += monto
+        dueno_generado[dueno] += monto
+        dueno_equipos[dueno][equipo] += monto
+
+        pid = f.get("pedido_id")
+        if pid is not None:
+            pedidos_global.add(pid)
+            dueno_pedidos[dueno].add(pid)
+            equipo_pedidos[dueno][equipo].add(pid)
+
+        for benef, m in repartir(dueno, monto, modelo).items():
+            por_benef[benef] += m
+            mes_benef[mes][benef] += m
+            dia_benef[dia][benef] += m
+            dueno_reparto[dueno][benef] += m
+
+    def rd(d: dict) -> dict:
+        return {k: int(round(v)) for k, v in d.items()}
+
+    por_mes = [
+        {"mes": m, "total": int(round(mes_total[m])), "por_beneficiario": rd(mes_benef[m])}
+        for m in sorted(mes_total)
+    ]
+    por_dia = [
+        {"dia": d, "total": int(round(dia_total[d])), "por_beneficiario": rd(dia_benef[d])}
+        for d in sorted(dia_total)
+    ]
+    por_dueno = [
+        {
+            "dueno": dn,
+            "monto_generado": int(round(dueno_generado[dn])),
+            "pedidos": len(dueno_pedidos[dn]),
+            "reparto": rd(dueno_reparto[dn]),
+            "equipos": sorted(
+                (
+                    {
+                        "equipo": e,
+                        "monto": int(round(v)),
+                        "veces": len(equipo_pedidos[dn][e]),
+                    }
+                    for e, v in dueno_equipos[dn].items()
+                ),
+                key=lambda x: x["monto"],
+                reverse=True,
+            ),
+        }
+        for dn in sorted(dueno_generado, key=lambda k: dueno_generado[k], reverse=True)
+    ]
+
+    return {
+        "resumen": {
+            "total": int(round(total)),
+            "pedidos": len(pedidos_global),
+            "por_beneficiario": rd(por_benef),
+        },
+        "por_mes": por_mes,
+        "por_dia": por_dia,
+        "por_dueno": por_dueno,
+    }
+
+
+def liquidar(conn, desde: str, hasta: str) -> dict:
+    """Reporte completo de liquidación para el rango. Carga el modelo de comisiones,
+    atribuye y agrega. Devuelve también el `modelo` aplicado (para mostrarlo)."""
+    modelo = cargar_modelo(conn)
+    data = agregar(filas_atribucion(conn, desde, hasta), modelo)
+    data["modelo"] = modelo
+    # Lista ordenada de beneficiarios que aparecen en el modelo (para la UI).
+    beneficiarios: list[str] = []
+    for reglas in modelo.values():
+        for b in reglas:
+            if b not in beneficiarios:
+                beneficiarios.append(b)
+    data["beneficiarios"] = beneficiarios
+    return data
