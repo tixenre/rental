@@ -1,0 +1,67 @@
+"""Tests puros del reporte de liquidación en PDF + envío por mail (#88).
+
+No tocan DB ni Playwright: validan el armado del HTML branded (a partir del
+dict del motor) y el parseo de destinatarios. El render real a PDF y el envío
+se validan en staging (igual que el resto de la infra de mail).
+"""
+
+from pdf import _liquidacion_html
+from routes.reportes import _split_emails, _periodo_label
+
+
+_DATA = {
+    "beneficiarios": ["Rambla", "Pablo"],
+    "resumen": {"por_beneficiario": {"Rambla": 120000, "Pablo": 80000}, "total": 200000},
+    "por_mes": [
+        {"mes": "2026-06", "por_beneficiario": {"Rambla": 120000, "Pablo": 80000}, "total": 200000},
+    ],
+    "por_dueno": [
+        {
+            "dueno": "Pablo",
+            "equipos": [{"equipo": "Cámara A", "veces": 3, "monto": 80000}],
+            "monto_generado": 80000,
+            "pedidos": 2,
+        },
+    ],
+}
+
+
+def test_html_incluye_beneficiarios_y_total():
+    html = _liquidacion_html(_DATA, "junio de 2026")
+    assert "Rambla" in html
+    assert "Pablo" in html
+    assert "Cámara A" in html
+    assert "junio de 2026" in html
+    # Total formateado en pesos (con separador de miles).
+    assert "$200.000" in html
+    assert html.lstrip().startswith("<!DOCTYPE html>")
+
+
+def test_html_periodo_vacio_no_rompe():
+    html = _liquidacion_html(
+        {"beneficiarios": [], "resumen": {}, "por_mes": [], "por_dueno": []},
+        "mayo de 2026",
+    )
+    assert "No hay pedidos saldados" in html
+
+
+def test_html_escapa_nombres():
+    data = dict(_DATA, por_dueno=[{"dueno": "<script>x</script>", "equipos": [], "monto_generado": 0, "pedidos": 0}])
+    html = _liquidacion_html(data, "junio de 2026")
+    assert "<script>x</script>" not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_split_emails_separadores():
+    assert _split_emails("a@x.com, b@y.com;c@z.com\nd@w.com") == [
+        "a@x.com", "b@y.com", "c@z.com", "d@w.com",
+    ]
+    assert _split_emails("  ") == []
+    assert _split_emails("") == []
+
+
+def test_periodo_label_mes_calendario():
+    # Un mes calendario exacto → rótulo en español.
+    assert _periodo_label("2026-06-01", "2026-06-30") == "junio de 2026"
+    # Rango arbitrario → fallback con fechas.
+    assert _periodo_label("2026-01-01", "2026-12-31") == "2026-01-01 a 2026-12-31"

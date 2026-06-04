@@ -1370,6 +1370,25 @@ export const adminApi = {
     authedFetch(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}&formato=csv`).then(
       (r) => r.blob(),
     ),
+  // Reporte en PDF branded + envío por mail (misma maquinaria que los documentos
+  // de pedido). El preview se trae como HTML y se muestra con iframe srcDoc para
+  // no depender de cookies cross-origin en un iframe.
+  liquidacionPreviewHtml: (desde: string, hasta: string) =>
+    authedFetch(
+      `/api/admin/reportes/liquidacion/pdf?desde=${desde}&hasta=${hasta}&format=html`,
+    ).then((r) => r.text()),
+  getReporteDestinatarios: () =>
+    authedJson<{ destinatarios: string[] }>("/api/admin/reportes/liquidacion/destinatarios"),
+  enviarReporteMail: (payload: {
+    desde: string;
+    hasta: string;
+    destinatarios: string[];
+    mensaje?: string;
+  }) =>
+    authedPostJson<{ enviados: string[]; fallidos: string[] }>(
+      "/api/admin/reportes/liquidacion/enviar-mail",
+      payload,
+    ),
   getReconciliacion: () => authedJson<ReconciliacionData>("/api/admin/reportes/reconciliacion"),
   // Cierre de mes (#721): congelar/reabrir la foto inmutable de un mes liquidado.
   cerrarMes: (mes: string) =>

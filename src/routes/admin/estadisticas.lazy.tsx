@@ -1,6 +1,6 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Lock,
   LockOpen,
+  Mail,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -31,6 +32,18 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export const Route = createLazyFileRoute("/admin/estadisticas")({
   component: EstadisticasPage,
@@ -266,6 +279,7 @@ function LiquidacionReporte() {
   const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const [anchor, setAnchor] = useState(() => new Date());
   const [downloading, setDownloading] = useState(false);
+  const [mailOpen, setMailOpen] = useState(false);
 
   const y = anchor.getFullYear();
   const m = anchor.getMonth();
@@ -405,6 +419,13 @@ function LiquidacionReporte() {
           )}
           <button
             type="button"
+            onClick={() => setMailOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+          >
+            <Mail className="h-4 w-4" /> Enviar por mail
+          </button>
+          <button
+            type="button"
             onClick={descargarCsv}
             disabled={downloading}
             className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
@@ -413,6 +434,14 @@ function LiquidacionReporte() {
           </button>
         </div>
       </div>
+
+      <EnviarReporteDialog
+        open={mailOpen}
+        onOpenChange={setMailOpen}
+        desde={mesDesde}
+        hasta={mesHasta}
+        periodoLabel={mesLabel}
+      />
 
       {cerrado && (
         <div className="flex items-center gap-2 rounded-md border hairline border-ink/15 bg-ink/[0.03] px-3 py-2 text-sm text-ink">
@@ -767,5 +796,138 @@ function RankList({
         </div>
       ))}
     </div>
+  );
+}
+
+// Diálogo para enviar el reporte del mes por mail (PDF adjunto branded). Espeja
+// el flujo del mail de documentos del pedido: preview + destinatarios editables.
+function EnviarReporteDialog({
+  open,
+  onOpenChange,
+  desde,
+  hasta,
+  periodoLabel,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  desde: string;
+  hasta: string;
+  periodoLabel: string;
+}) {
+  const [to, setTo] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [touched, setTouched] = useState(false);
+
+  // Lista guardada de mails (se prefilla una vez; el usuario puede editar).
+  const destQ = useQuery({
+    queryKey: ["admin", "reporte-destinatarios"],
+    queryFn: () => adminApi.getReporteDestinatarios(),
+    enabled: open,
+  });
+  useEffect(() => {
+    if (open && !touched && destQ.data) {
+      setTo(destQ.data.destinatarios.join(", "));
+    }
+  }, [open, touched, destQ.data]);
+
+  // Preview del reporte (HTML traído con auth y mostrado inline via srcDoc).
+  const previewQ = useQuery({
+    queryKey: ["admin", "reporte-preview", desde, hasta],
+    queryFn: () => adminApi.liquidacionPreviewHtml(desde, hasta),
+    enabled: open,
+  });
+
+  const parseMails = (raw: string) =>
+    raw
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  const enviarMut = useMutation({
+    mutationFn: () =>
+      adminApi.enviarReporteMail({
+        desde,
+        hasta,
+        destinatarios: parseMails(to),
+        mensaje: mensaje.trim() || undefined,
+      }),
+    onSuccess: (r) => {
+      toast.success(
+        r.fallidos.length
+          ? `Enviado a ${r.enviados.length}. No salió a: ${r.fallidos.join(", ")}`
+          : `Reporte enviado a ${r.enviados.length} ${
+              r.enviados.length === 1 ? "destinatario" : "destinatarios"
+            }.`,
+      );
+      onOpenChange(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const hayDestino = parseMails(to).length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Enviar reporte por mail</DialogTitle>
+          <DialogDescription>
+            Se manda el reporte de <strong className="capitalize">{periodoLabel}</strong> en PDF
+            adjunto. El CSV seguís pudiendo exportarlo aparte.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="rounded-md border hairline overflow-hidden bg-white">
+          {previewQ.isLoading ? (
+            <div className="p-8 text-sm text-muted-foreground text-center">Generando preview…</div>
+          ) : previewQ.error ? (
+            <div className="p-8 text-sm text-destructive text-center">
+              No se pudo generar el preview del reporte.
+            </div>
+          ) : (
+            <iframe
+              title="Preview del reporte de liquidación"
+              srcDoc={previewQ.data ?? ""}
+              className="w-full h-72 border-0"
+            />
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="reporte-to">Para (uno o más mails, separados por coma)</Label>
+          <Textarea
+            id="reporte-to"
+            rows={2}
+            value={to}
+            onChange={(e) => {
+              setTouched(true);
+              setTo(e.target.value);
+            }}
+            placeholder="dueño1@mail.com, dueño2@mail.com"
+            className="resize-none"
+          />
+          <p className="text-xs text-muted-foreground">Se guardan para la próxima vez.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="reporte-msg">Mensaje (opcional)</Label>
+          <Input
+            id="reporte-msg"
+            value={mensaje}
+            onChange={(e) => setMensaje(e.target.value)}
+            placeholder="Va arriba del reporte en el cuerpo del mail"
+          />
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={() => enviarMut.mutate()} disabled={!hayDestino || enviarMut.isPending}>
+            {enviarMut.isPending ? "Enviando…" : "Enviar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
