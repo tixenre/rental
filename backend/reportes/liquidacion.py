@@ -17,13 +17,24 @@ from collections import defaultdict
 
 from .comisiones import cargar_modelo, repartir
 
+# Arranque limpio de la liquidación (clean start, 2026-06). Los pedidos cuyo
+# ALQUILER (`fecha_desde`) es anterior a esta fecha NO cuentan para el reporte —
+# el reparto entre dueños arranca de cero en junio 2026, sin arrastrar el
+# histórico. Es una decisión de una sola vez, FIJA en el código a propósito (no
+# administrable desde el back-office). El corte es por fecha del alquiler (cuándo
+# fue el pedido), NO por fecha de pago: un alquiler de mayo pagado en junio no
+# cuenta. Aplica solo a la liquidación (la solapa Reportes); el Resumen general
+# de estadísticas sigue mostrando el histórico completo.
+LIQUIDACION_INICIO = "2026-06-01"
+
 # Fragmento SQL compartido (#88, #721): define cuándo un pedido quedó "saldado"
-# — el día en que el acumulado de pagos cruzó su `monto_total`. Es lógica de
-# plata, así que vive en UN solo lugar y se compone como CTE tanto por el reporte
-# (`filas_atribucion`) como por la reconciliación (chequeo de mes cerrado), para
-# que las dos no puedan divergir. Expone las CTEs `acum` y `saldado(pedido_id,
-# fecha_saldado)`. Se inserta justo después de `WITH`.
-SALDADO_CTE = """
+# — el día en que el acumulado de pagos cruzó su `monto_total`, con el corte del
+# clean start aplicado (solo pedidos con `fecha_desde >= LIQUIDACION_INICIO`). Es
+# lógica de plata, así que vive en UN solo lugar y se compone como CTE tanto por
+# el reporte (`filas_atribucion`) como por la reconciliación (chequeo de mes
+# cerrado), para que las dos no puedan divergir. Expone las CTEs `acum` y
+# `saldado(pedido_id, fecha_saldado)`. Se inserta justo después de `WITH`.
+SALDADO_CTE = f"""
         acum AS (
             SELECT ap.pedido_id,
                    ap.fecha,
@@ -38,6 +49,7 @@ SALDADO_CTE = """
             JOIN alquileres al ON al.id = a.pedido_id
             WHERE al.estado <> 'cancelado'
               AND al.monto_total > 0
+              AND al.fecha_desde >= '{LIQUIDACION_INICIO}'
               AND a.acumulado >= al.monto_total
             GROUP BY a.pedido_id
         )

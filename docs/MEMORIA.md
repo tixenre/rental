@@ -355,6 +355,29 @@
   `monto_pagado` sin registrar el pago en `alquiler_pagos` → ese cobro no aparecería en el reporte
   (el front actual cobra por la vía que sí registra).
 
+### 2026-06-03 — Cierre de mes + clean start de la liquidación (junio 2026)
+- **Contexto:** la liquidación (#88) se calcula en vivo → editar el modelo de comisiones o un pedido
+  viejo reescribe el pasado. Y al arrancar el reparto formal entre dueños no se quiere arrastrar el
+  histórico previo.
+- **Decisión — Cerrar mes (foto inmutable, #721):** cerrar un mes guarda una **foto inmutable** del
+  reporte de ese mes (números **+** modelo de comisiones con que se calculó) en `liquidacion_cierres`;
+  mientras está cerrado el reporte se sirve de la foto, inmune a cambios posteriores. **Reabrir** la
+  borra y vuelve a vivo. Editar un pedido de un mes cerrado **se permite**, pero el semáforo de
+  reconciliación **avisa** que la foto quedó vieja (chequeo `mes_cerrado_desactualizado`). Motor en
+  `backend/reportes/cierres.py`; tabla en `init_db()` **+** migración (esquema en dos capas).
+- **Decisión — Clean start (junio 2026):** los pedidos cuyo **alquiler (`fecha_desde`) es anterior al
+  `2026-06-01` no cuentan** para la liquidación, aunque se paguen después. El corte es por **fecha del
+  alquiler** (NO de pago — la atribución temporal sigue siendo por fecha de saldado; esto es un filtro
+  de elegibilidad, ortogonal). Aplica **solo a la liquidación** (Reportes + sus chequeos de
+  reconciliación); el **Resumen general de estadísticas sigue mostrando el histórico completo**. Es una
+  constante única **`LIQUIDACION_INICIO`** en `backend/reportes/liquidacion.py`, embebida en el CTE
+  compartido `SALDADO_CTE` y derivada en la reconciliación (`_CLEAN_START`) — **fija en el código a
+  propósito, NO administrable** (decisión de una sola vez).
+- **Quién hace cumplir:** el supervisor marca como hallazgo (1) cualquier tabla/columna de cierres sin
+  su espejo en `init_db()`; (2) duplicar el valor de corte fuera de `LIQUIDACION_INICIO`; (3) filtrar
+  el Resumen general con el clean start; (4) reintroducir expansión/atribución de plata ad-hoc fuera de
+  `backend/reportes/`. Extiende la decisión *2026-06-03 — `backend/reportes/` = motor único*.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
