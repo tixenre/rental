@@ -3,6 +3,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   LayoutDashboard,
+  LayoutGrid,
   Package,
   ClipboardList,
   Users,
@@ -75,6 +76,7 @@ const items: NavItem[] = [
   },
   { title: "Estudio", url: "/admin/estudio", icon: Clapperboard },
   { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
+  { title: "Pedidos v2", url: "/admin/pedidos-v2", icon: LayoutGrid },
   { title: "Solicitudes", url: "/admin/solicitudes", icon: Inbox },
   { title: "Clientes", url: "/admin/clientes", icon: Users },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
