@@ -57,6 +57,7 @@ from routes.marcas           import router as marcas_router
 from routes.specs            import router as specs_router
 from routes.unidades         import router as unidades_router
 from routes.seo              import router as seo_router
+from routes.calendar         import router as calendar_router
 from routes.inventario       import router as inventario_router
 from routes.email_templates  import router as email_templates_router
 from routes.dataio           import router as dataio_router
@@ -150,6 +151,7 @@ app.include_router(email_templates_router, prefix="/api")
 app.include_router(dataio_router,         prefix="/api")
 app.include_router(estudio_router,        prefix="/api")
 app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
+app.include_router(calendar_router)  # /calendar/feed.ics (root) + /api/admin/calendar/*
 app.include_router(cliente_portal_router)
 
 # ── Health Check ─────────────────────────────────────────────────────────────

@@ -1067,6 +1067,14 @@ def init_db():
         VALUES ('hero_taglines', '[["rental, estudio,","rambla."],["en rambla,","en mardel."],["en rambla,","tu proyecto."],["en rambla,","tu rodaje."]]', 'system-seed')
         ON CONFLICT (key) DO NOTHING
     """)
+    # Token del feed iCal de reservas (routes/calendar.py). Vacío = feed
+    # deshabilitado; el admin lo genera desde /admin/settings (no se expone
+    # por el GET /settings/{key} público).
+    conn.execute("""
+        INSERT INTO app_settings (key, value, updated_by)
+        VALUES ('ical_feed_token', '', 'system-seed')
+        ON CONFLICT (key) DO NOTHING
+    """)
 
     # Sugerencias automáticas ignoradas (#352). Cuando el admin descarta una
     # sugerencia, la persistimos por (tipo, ref) para no volver a mostrarla.

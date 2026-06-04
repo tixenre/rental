@@ -1,0 +1,134 @@
+"""Tests del endpoint público del feed iCal (`routes/calendar.py`).
+
+Patrón FakeConn + monkeypatch de `get_db` (como `test_email_service.py`). El
+filtrado real de estados ocurre en SQL; acá verificamos el contrato del endpoint
+(token, headers, contenido) y que la query pida SOLO los estados confirmados.
+"""
+import pytest
+
+from routes import calendar as cal_mod
+
+pytestmark = pytest.mark.unit
+
+
+class FakeRow(dict):
+    pass
+
+
+class FakeCursor:
+    def __init__(self, rows):
+        self._rows = list(rows)
+
+    def fetchall(self):
+        return self._rows
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+
+class FakeConn:
+    def __init__(self, token, reservas=(), items=()):
+        self.token = token
+        self.reservas = reservas
+        self.items = items
+        self.reservas_params = None
+        self.closed = False
+
+    def execute(self, sql, params=()):
+        s = " ".join(sql.split()).upper()
+        if "FROM APP_SETTINGS" in s:
+            return FakeCursor([FakeRow(value=self.token)] if self.token is not None else [])
+        if "FROM ALQUILERES" in s:
+            self.reservas_params = params
+            return FakeCursor(self.reservas)
+        if "FROM ALQUILER_ITEMS" in s:
+            return FakeCursor(self.items)
+        return FakeCursor([])
+
+    def close(self):
+        self.closed = True
+
+
+def _reserva(**over):
+    base = {
+        "id": 1, "numero_pedido": 50, "cliente_nombre": "Juan",
+        "estado": "confirmado", "tipo": "diaria",
+        "fecha_desde": "2026-06-10T00:00:00", "fecha_hasta": "2026-06-12T00:00:00",
+    }
+    base.update(over)
+    return FakeRow(**base)
+
+
+def _patch_db(monkeypatch, conn):
+    monkeypatch.setattr("routes.calendar.get_db", lambda: conn)
+
+
+# ── Token ─────────────────────────────────────────────────────────────────────
+
+class TestToken:
+    def test_token_correcto_devuelve_200_con_evento(self, monkeypatch):
+        conn = FakeConn(token="secreto", reservas=[_reserva()])
+        _patch_db(monkeypatch, conn)
+        resp = cal_mod.feed_ical(token="secreto")
+        assert resp.status_code == 200
+        body = resp.body.decode("utf-8")
+        assert "BEGIN:VCALENDAR" in body
+        assert "UID:alquiler-1@ramblarental.com.ar" in body
+        assert "Pedido #50" in body
+        assert conn.closed
+
+    def test_token_incorrecto_es_404(self, monkeypatch):
+        conn = FakeConn(token="secreto", reservas=[_reserva()])
+        _patch_db(monkeypatch, conn)
+        resp = cal_mod.feed_ical(token="otro")
+        assert resp.status_code == 404
+
+    def test_token_vacio_es_404(self, monkeypatch):
+        conn = FakeConn(token="secreto")
+        _patch_db(monkeypatch, conn)
+        assert cal_mod.feed_ical(token="").status_code == 404
+
+    def test_sin_token_configurado_es_404(self, monkeypatch):
+        # app_settings con value '' → feed deshabilitado.
+        conn = FakeConn(token="")
+        _patch_db(monkeypatch, conn)
+        assert cal_mod.feed_ical(token="cualquiera").status_code == 404
+
+
+# ── Contenido / contrato ──────────────────────────────────────────────────────
+
+class TestContenido:
+    def test_headers_de_calendario(self, monkeypatch):
+        conn = FakeConn(token="t", reservas=[_reserva()])
+        _patch_db(monkeypatch, conn)
+        resp = cal_mod.feed_ical(token="t")
+        assert resp.media_type == "text/calendar; charset=utf-8"
+        assert "max-age" in resp.headers.get("Cache-Control", "")
+
+    def test_query_pide_solo_estados_confirmados(self, monkeypatch):
+        conn = FakeConn(token="t", reservas=[_reserva()])
+        _patch_db(monkeypatch, conn)
+        cal_mod.feed_ical(token="t")
+        estados_en_query = [p for p in conn.reservas_params if isinstance(p, str)]
+        assert "presupuesto" not in estados_en_query
+        assert "cancelado" not in estados_en_query
+        assert "confirmado" in estados_en_query
+
+    def test_evento_incluye_equipos(self, monkeypatch):
+        conn = FakeConn(
+            token="t", reservas=[_reserva()],
+            items=[FakeRow(pedido_id=1, nombre="FX3", marca="Sony", cantidad=2)],
+        )
+        _patch_db(monkeypatch, conn)
+        body = cal_mod.feed_ical(token="t").body.decode("utf-8")
+        assert "2× Sony FX3" in body
+
+    def test_db_caida_devuelve_calendario_vacio_no_500(self, monkeypatch):
+        def boom():
+            raise RuntimeError("db down")
+        monkeypatch.setattr("routes.calendar.get_db", boom)
+        resp = cal_mod.feed_ical(token="t")
+        assert resp.status_code == 200
+        body = resp.body.decode("utf-8")
+        assert "BEGIN:VCALENDAR" in body
+        assert "BEGIN:VEVENT" not in body
