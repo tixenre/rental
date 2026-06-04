@@ -1783,16 +1783,17 @@ def _liquidacion_html(data: dict, titulo: str) -> str:
 <style>
   {_a4_page(margin="0")}
   * {{ box-sizing: border-box; }}
-  html {{ background: #f1efe9; }}
   body {{ font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
           color: #2a251e; margin: 0; padding: 0; font-size: 13px; }}
-  /* La hoja A4: en pantalla (preview) se ve como una página centrada; en el
-     PDF llena la hoja A4 con el padding como margen. */
-  .sheet {{ width: 210mm; min-height: 297mm; margin: 16px auto; padding: 16mm 15mm;
-            background: #fff; box-shadow: 0 1px 10px rgba(0,0,0,.12); box-sizing: border-box; }}
-  @media print {{
-    html {{ background: #fff; }}
-    .sheet {{ width: auto; min-height: 0; margin: 0; box-shadow: none; }}
+  /* La hoja: en el PDF es A4 (llena la hoja, el padding hace de margen). En
+     pantalla (preview del modal) se adapta al ancho del iframe para verse
+     completa — Chromium rasteriza el PDF con media `print`, así que el override
+     `screen` no afecta al PDF. */
+  .sheet {{ width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm 15mm;
+            background: #fff; box-sizing: border-box; }}
+  @media screen {{
+    html {{ background: #f1efe9; }}
+    .sheet {{ width: 100%; min-height: 0; margin: 0; padding: 28px 30px; }}
   }}
   .head {{ display: flex; justify-content: space-between; align-items: flex-end;
            border-bottom: 3px solid #FAB428; padding-bottom: 14px; margin-bottom: 22px; }}
