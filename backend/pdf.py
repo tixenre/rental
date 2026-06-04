@@ -1479,8 +1479,10 @@ def _packing_list_html(pedido: dict) -> str:
   @media print {{ #progress-bar {{ display: none; }} }}
 
   /* ── Documento ──────────────────────────────────────────── */
-  .doc {{ padding: 20px 24px; max-width: 900px; margin: 0 auto; }}
-  @media print {{ .doc {{ padding: 0; }} }}
+  /* Ancho A4 (≈794px) — consistente con el resto de los documentos; antes era
+     900px y la hoja se veía más ancha que un A4. */
+  .doc {{ padding: 20px 24px; max-width: 794px; margin: 0 auto; }}
+  @media print {{ .doc {{ padding: 0; max-width: none; }} }}
 
   .header {{
     display: flex; justify-content: space-between; align-items: flex-start;
