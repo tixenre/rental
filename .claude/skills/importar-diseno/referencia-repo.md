@@ -6,7 +6,12 @@
 
 ## 1. Catálogo de componentes canónicos (reusar antes que crear)
 
-| Necesitás… | Usá | Dónde |
+> **Fuente canónica = la librería `@rambla/design-system`** (`packages/design-system/src/components/*`)
+> + su styleguide (`packages/design-system/styleguide/`). La app **hoy** importa estas piezas desde
+> `@/components/*` (un espejo, hasta que las pantallas migren a consumir el paquete — "capa 3"). La
+> columna "Dónde" apunta al path que **resuelve hoy** en la app.
+
+| Necesitás… | Usá | Dónde (hoy, en la app) |
 |---|---|---|
 | Botón (variants: default, amber, **primary**, outline, ghost…) | `Button` | `src/components/ui/button.tsx` |
 | Badge de estado de pedido | `EstadoBadge` | `src/components/kit/EstadoBadge.tsx` |
@@ -22,9 +27,10 @@
 | shadcn primitives (dialog, card, accordion, calendar, dropdown…) | varios | `src/components/ui/*` |
 | `cn()` classnames | `cn` | `src/lib/utils.ts` |
 
-**Librería visual canónica:** `src/components/rental/equipment/shared/*` (StepperPill, PriceBlock,
-FavButton) — registrada en MEMORIA como librería de assets visuales. Si un diseño trae un primitivo
-nuevo reutilizable, **extraelo acá** (o a `kit/`), no lo inlinees en la página.
+**Librería canónica:** el paquete `@rambla/design-system` (tokens + primitivos + kit). Si un diseño trae
+un primitivo nuevo reutilizable, **va a la librería** (`packages/design-system/src/components/{ui,kit}`),
+no inline en la página. Ver/mantener/consumir la librería: skill [`design-system`](../design-system/SKILL.md).
+Las pantallas cableadas (carrito, topbar…) **se quedan en la app** y consumen la librería.
 
 ## 2. Data layer (cómo conecta datos una pantalla)
 
