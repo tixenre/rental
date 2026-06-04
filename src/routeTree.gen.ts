@@ -37,6 +37,7 @@ const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSpecsLazyRouteImport = createFileRoute('/admin/specs')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
+const AdminPedidosV2LazyRouteImport = createFileRoute('/admin/pedidos-v2')()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
@@ -150,6 +151,13 @@ const AdminSettingsLazyRoute = AdminSettingsLazyRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any).lazy(() =>
   import('./routes/admin/settings.lazy').then((d) => d.Route),
+)
+const AdminPedidosV2LazyRoute = AdminPedidosV2LazyRouteImport.update({
+  id: '/pedidos-v2',
+  path: '/pedidos-v2',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/pedidos-v2.lazy').then((d) => d.Route),
 )
 const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
   id: '/estadisticas',
@@ -349,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/pedidos-v2': typeof AdminPedidosV2LazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
@@ -389,6 +398,7 @@ export interface FileRoutesByTo {
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/pedidos-v2': typeof AdminPedidosV2LazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
@@ -434,6 +444,7 @@ export interface FileRoutesById {
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/pedidos-v2': typeof AdminPedidosV2LazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
@@ -480,6 +491,7 @@ export interface FileRouteTypes {
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
+    | '/admin/pedidos-v2'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/specs'
@@ -520,6 +532,7 @@ export interface FileRouteTypes {
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
+    | '/admin/pedidos-v2'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/specs'
@@ -564,6 +577,7 @@ export interface FileRouteTypes {
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
+    | '/admin/pedidos-v2'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/specs'
@@ -696,6 +710,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pedidos-v2': {
+      id: '/admin/pedidos-v2'
+      path: '/pedidos-v2'
+      fullPath: '/admin/pedidos-v2'
+      preLoaderRoute: typeof AdminPedidosV2LazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/estadisticas': {
@@ -955,6 +976,7 @@ interface AdminRouteChildren {
   AdminDisenoLazyRoute: typeof AdminDisenoLazyRoute
   AdminEmailTemplatesLazyRoute: typeof AdminEmailTemplatesLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
+  AdminPedidosV2LazyRoute: typeof AdminPedidosV2LazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
   AdminSolicitudesLazyRoute: typeof AdminSolicitudesLazyRoute
   AdminSpecsLazyRoute: typeof AdminSpecsLazyRouteWithChildren
@@ -975,6 +997,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDisenoLazyRoute: AdminDisenoLazyRoute,
   AdminEmailTemplatesLazyRoute: AdminEmailTemplatesLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
+  AdminPedidosV2LazyRoute: AdminPedidosV2LazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
   AdminSolicitudesLazyRoute: AdminSolicitudesLazyRoute,
   AdminSpecsLazyRoute: AdminSpecsLazyRouteWithChildren,
