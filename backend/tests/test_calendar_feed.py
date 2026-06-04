@@ -5,10 +5,37 @@ filtrado real de estados ocurre en SQL; acá verificamos el contrato del endpoin
 (token, headers, contenido) y que la query pida SOLO los estados confirmados.
 """
 import pytest
+from starlette.requests import Request as StarletteRequest
 
 from routes import calendar as cal_mod
 
 pytestmark = pytest.mark.unit
+
+
+# slowapi valida con isinstance(request, StarletteRequest) → necesita una
+# instancia real (mismo patrón que test_cotizar_endpoint).
+_SCOPE = {
+    "type": "http",
+    "method": "GET",
+    "path": "/calendar/feed.ics",
+    "headers": [],
+    "query_string": b"",
+    "client": ("127.0.0.1", 1234),
+    "app": type("_App", (), {"state": type("_State", (), {})()})(),
+}
+
+
+def _req() -> StarletteRequest:
+    return StarletteRequest(_SCOPE)
+
+
+@pytest.fixture(autouse=True)
+def _no_ratelimit_headers(monkeypatch):
+    # feed_ical devuelve un Response, pero homogeneizamos con el resto de la
+    # suite: el rate-limit sigue activo, solo no inyecta headers en el test.
+    import rate_limit
+
+    monkeypatch.setattr(rate_limit.limiter, "_inject_headers", lambda *a, **kw: None)
 
 
 class FakeRow(dict):
@@ -69,7 +96,7 @@ class TestToken:
     def test_token_correcto_devuelve_200_con_evento(self, monkeypatch):
         conn = FakeConn(token="secreto", reservas=[_reserva()])
         _patch_db(monkeypatch, conn)
-        resp = cal_mod.feed_ical(token="secreto")
+        resp = cal_mod.feed_ical(_req(), token="secreto")
         assert resp.status_code == 200
         body = resp.body.decode("utf-8")
         assert "BEGIN:VCALENDAR" in body
@@ -80,19 +107,19 @@ class TestToken:
     def test_token_incorrecto_es_404(self, monkeypatch):
         conn = FakeConn(token="secreto", reservas=[_reserva()])
         _patch_db(monkeypatch, conn)
-        resp = cal_mod.feed_ical(token="otro")
+        resp = cal_mod.feed_ical(_req(), token="otro")
         assert resp.status_code == 404
 
     def test_token_vacio_es_404(self, monkeypatch):
         conn = FakeConn(token="secreto")
         _patch_db(monkeypatch, conn)
-        assert cal_mod.feed_ical(token="").status_code == 404
+        assert cal_mod.feed_ical(_req(), token="").status_code == 404
 
     def test_sin_token_configurado_es_404(self, monkeypatch):
         # app_settings con value '' → feed deshabilitado.
         conn = FakeConn(token="")
         _patch_db(monkeypatch, conn)
-        assert cal_mod.feed_ical(token="cualquiera").status_code == 404
+        assert cal_mod.feed_ical(_req(), token="cualquiera").status_code == 404
 
 
 # ── Contenido / contrato ──────────────────────────────────────────────────────
@@ -101,14 +128,14 @@ class TestContenido:
     def test_headers_de_calendario(self, monkeypatch):
         conn = FakeConn(token="t", reservas=[_reserva()])
         _patch_db(monkeypatch, conn)
-        resp = cal_mod.feed_ical(token="t")
+        resp = cal_mod.feed_ical(_req(), token="t")
         assert resp.media_type == "text/calendar; charset=utf-8"
         assert "max-age" in resp.headers.get("Cache-Control", "")
 
     def test_query_pide_solo_estados_confirmados(self, monkeypatch):
         conn = FakeConn(token="t", reservas=[_reserva()])
         _patch_db(monkeypatch, conn)
-        cal_mod.feed_ical(token="t")
+        cal_mod.feed_ical(_req(), token="t")
         estados_en_query = [p for p in conn.reservas_params if isinstance(p, str)]
         assert "presupuesto" not in estados_en_query
         assert "cancelado" not in estados_en_query
@@ -120,14 +147,14 @@ class TestContenido:
             items=[FakeRow(pedido_id=1, nombre="FX3", marca="Sony", cantidad=2)],
         )
         _patch_db(monkeypatch, conn)
-        body = cal_mod.feed_ical(token="t").body.decode("utf-8")
+        body = cal_mod.feed_ical(_req(), token="t").body.decode("utf-8")
         assert "2× Sony FX3" in body
 
     def test_db_caida_devuelve_calendario_vacio_no_500(self, monkeypatch):
         def boom():
             raise RuntimeError("db down")
         monkeypatch.setattr("routes.calendar.get_db", boom)
-        resp = cal_mod.feed_ical(token="t")
+        resp = cal_mod.feed_ical(_req(), token="t")
         assert resp.status_code == 200
         body = resp.body.decode("utf-8")
         assert "BEGIN:VCALENDAR" in body

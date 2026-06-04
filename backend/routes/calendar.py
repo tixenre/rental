@@ -22,6 +22,7 @@ from fastapi import APIRouter, Request, Response
 
 from config import SITE_URL
 from database import get_db, now_ar, MARCA_NOMBRE_EXPR
+from rate_limit import limiter
 from services.ical import build_vcalendar, reserva_to_vevent
 from routes.settings import require_admin
 
@@ -79,12 +80,13 @@ def _feed_url(token: str) -> str:
 # ── Endpoint público (suscripción) ───────────────────────────────────────────
 
 @router.get("/calendar/feed.ics", include_in_schema=False)
-def feed_ical(token: str = ""):
+@limiter.limit("30/minute")
+def feed_ical(request: Request, token: str = ""):
     """Feed iCal de reservas confirmadas. Protegido por token en la query.
 
     Token inválido/ausente → 404 (no 401: no revelamos que el recurso existe).
     Si la BD falla, devolvemos un VCALENDAR vacío válido (no 500), como degrada
-    el sitemap.
+    el sitemap. Rate-limit por IP (defensa ante scraping del endpoint público).
     """
     vevents: list[str] = []
     try:
@@ -111,8 +113,10 @@ def feed_ical(token: str = ""):
 
             items_por_pedido = _items_por_pedido(conn, [r["id"] for r in reservas])
             for r in reservas:
+                # El feed es del dueño → link al back-office del pedido.
                 ve = reserva_to_vevent(
-                    r, items_por_pedido.get(r["id"], []), site_url=SITE_URL
+                    r, items_por_pedido.get(r["id"], []),
+                    link=f"{SITE_URL}/admin/pedidos/{r['id']}",
                 )
                 if ve:
                     vevents.append(ve)
