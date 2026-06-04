@@ -1,6 +1,6 @@
 ---
 name: importar-diseno
-description: Importa un handoff de Claude Design (carpeta design_handoff_<feature>/ con un HTML de referencia visual + uno o más .tsx que espejan rutas/componentes reales del repo + README de specs) y lo convierte en front-end real de este repo. Úsalo cuando el usuario pase una carpeta de handoff de Claude Design (o diga "importá este diseño / handoff / pantalla de Claude Design", "implementá este TSX", "conectá este diseño con datos reales"). El skill orienta TODO el recorrido: ver el render, leer el README, reusar la librería de componentes del repo, implementar, conectar el backend y verificar contra la referencia. Incluye un motor visual (render.mjs) que rasteriza el HTML/ruta a PNG para que Claude pueda VER el resultado. Solo local (necesita el browser de Playwright).
+description: Importa un handoff de Claude Design (carpeta design_handoff_<feature>/ con un HTML de referencia visual + uno o más .tsx que espejan rutas/componentes reales del repo + README de specs) y lo convierte en front-end real de este repo. Úsalo cuando el usuario pase una carpeta de handoff de Claude Design (o diga "importá este diseño / handoff / pantalla de Claude Design", "implementá este TSX", "conectá este diseño con datos reales"). El skill orienta TODO el recorrido: ver el render, leer el README, reusar la librería de componentes del repo, implementar, conectar el backend y verificar contra la referencia. Incluye un motor visual (render.mjs) que rasteriza el HTML/ruta a PNG para que Claude pueda VER el resultado (sirve los .html por HTTP; anda local y en la nube).
 ---
 
 # importar-diseno — del handoff de Claude Design al front real del repo
@@ -76,9 +76,10 @@ son referencia, pero el repo manda.
    node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html
    node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html --mobile
    ```
-   El `.html` puede **no ser self-contained** (depende de hermanos como su css/js). Renderizalo
-   **dentro de su carpeta** (rutas relativas intactas), no lo copies suelto. Si sale en blanco, subí
-   la espera (`--wait 2500`) — algunos prototipos montan el DOM por JS.
+   El `.html` puede **no ser self-contained** (depende de hermanos: css/js/`.jsx`/CDN). render.mjs ya
+   lo **sirve por HTTP local** y le sube la espera, así que prototipos con React/Babel por CDN + scripts
+   `text/babel` montan bien (no en blanco). Si igual sale en blanco, subí más la espera (`--wait 5000`)
+   o revisá la consola del prototipo.
 4. **Reuse-first (obligatorio).** Antes de escribir nada, mirá el **catálogo de componentes canónicos**
    en [`referencia-repo.md`](./referencia-repo.md). Si el primitivo ya existe (`StepperPill`,
    `PriceBlock`, `EstadoBadge`, `StatCard`, `Button`, `FavButton`…) → **reusalo**. Si el diseño trae un
@@ -87,6 +88,9 @@ son referencia, pero el repo manda.
 5. **Implementar.** Partiendo del `.tsx`: traducí el markup a componentes/tokens reales, aplicá los
    `// CAMBIO N:` si es patch, y conectá cada `TODO:` con el dato real (ver backend). Mobile-first.
 6. **Conectar el backend** (política híbrida — detalle en [`referencia-repo.md`](./referencia-repo.md)):
+   - **Chequeá primero el data layer EXISTENTE** (`src/lib/api.ts`, `src/lib/admin/api.ts`, `src/hooks/*`).
+     El README suele listar "hooks a implementar", pero muchas veces **ya existen** en el repo (caso
+     testigo: `adminApi` ya tenía todos los endpoints de `alquileres`). Reusá, no recrees.
    - **Existe el endpoint** → conectá con el molde del repo (`useQuery`+hook, `authedFetch`, tipos de
      `src/lib/api.ts`, `formatARS`).
    - **Falta un endpoint de SOLO LECTURA simple** → crealo full-stack (router en `backend/routes/*.py`
@@ -100,6 +104,19 @@ son referencia, pero el repo manda.
    ```bash
    node .claude/skills/importar-diseno/render.mjs /cliente/portal --mobile
    ```
+   **Rutas autenticadas (admin / portal con login + datos):** el render-compare en vivo puede **no ser
+   posible** (necesita sesión + backend + datos reales — imposible en la nube efímera). Ahí: construí
+   **fiel al render del prototipo** (que sí podés rasterizar) y verificá con **screenshots del dueño en
+   staging** (su captura vs el render del prototipo). Funciona igual de bien.
+
+## Patrones útiles
+
+- **Handoff grande o sensible → por fases + v2 al lado de v1.** Si la pantalla es grande (lista +
+  editor + modales) o toca **escritura sensible** (estados, pagos, permisos), implementá **por fases**
+  (ej. Fase 1 = lista read-only; Fase 2 = editor/mutaciones) en una **ruta nueva** (`/x-v2`) dejando la
+  **vieja intacta como fallback** hasta confirmar. Las acciones mutantes de la Fase 1 pueden **delegar
+  en la pantalla existente** (no reimplementes la máquina de estados en paralelo). La Fase 2 va con
+  rama + PR dedicada y aviso antes de mergear (por tocar escritura sensible).
 
 ## Motor visual (render.mjs)
 
@@ -126,9 +143,11 @@ Para revisar mobile-first, renderizá **las dos** vistas y compará. (`DISENO_BA
 
 ## Requisitos / errores comunes
 
-- **Solo local.** En la nube el entorno es efímero y la red no deja bajar el browser (MEMORIA
-  *2026-05-26 — Sesión local para trabajo visual*). Si el browser no está y no se puede instalar →
-  **avisá y frená**, no inventes cómo se ve un render que no produjiste.
+- **Render del prototipo: anda también en la nube.** El browser se baja con
+  `npx playwright install chromium`; render.mjs sirve el `.html` por HTTP y usa `ignoreHTTPSErrors`
+  (proxy TLS de la nube). Si el browser **no está y no se puede instalar** → **avisá y frená**, no
+  inventes cómo se ve un render que no produjiste. (El render-compare de la **ruta real autenticada**
+  sí puede necesitar local/staging — ver paso 7.)
 - **`npm install`** hecho en la raíz (para `@playwright/test`).
 - **Browser:** si no puede lanzar Chromium → `npx playwright install chromium`.
 - **Para verificar la ruta real:** `npm run dev` corriendo (puerto 3000).
