@@ -19,7 +19,7 @@ from routes.auth import get_session
 from services.email import send_email
 from services.email.base import EmailAttachment
 from services.email.service import get_admin_to
-from services.ical import build_vcalendar, reserva_to_vevent
+from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
 from services.precios import calcular_total, jornadas_periodo, precio_combo
 from config import SITE_URL
 
@@ -621,6 +621,12 @@ def _pedido_email_context(pedido: dict) -> dict:
         # URLs absolutas: en un cliente de mail un link relativo no resuelve.
         "admin_url": f"{SITE_URL}/admin/pedidos/{pedido.get('id')}",
         "portal_url": f"{SITE_URL}/cliente/portal",
+        # Link "Agregar a Google Calendar" para el cuerpo del mail (complementa
+        # al adjunto .ics). Vacío si la reserva no tiene fecha → el template lo
+        # renderiza como string vacía (Jinja Undefined) sin romper.
+        "gcal_url": google_calendar_url(
+            pedido, pedido.get("items") or [], link=f"{SITE_URL}/cliente/portal"
+        ),
     }
 
 
@@ -632,7 +638,10 @@ def _ics_adjunto_pedido(pedido: dict) -> Optional[list[EmailAttachment]]:
     Usa el generador canónico de `services/ical.py` — el mismo que el feed.
     """
     try:
-        vevent = reserva_to_vevent(pedido, pedido.get("items") or [], site_url=SITE_URL)
+        # Link al portal del cliente (NO al back-office) — el .ics se lo lleva él.
+        vevent = reserva_to_vevent(
+            pedido, pedido.get("items") or [], link=f"{SITE_URL}/cliente/portal"
+        )
         if not vevent:
             return None
         ics = build_vcalendar([vevent], method="PUBLISH")

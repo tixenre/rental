@@ -18,11 +18,13 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Mapping, Sequence
+from urllib.parse import urlencode
 
 from database import to_datetime
 
 PRODID = "-//Rambla Rental//Reservas//ES"
 _UID_DOMAIN = "ramblarental.com.ar"
+_TZID = "America/Argentina/Buenos_Aires"
 
 
 # ── Primitivas de formato (RFC 5545) ─────────────────────────────────────────
@@ -149,17 +151,44 @@ def build_vcalendar(
 
 # ── Adaptador de dominio: una reserva → un VEVENT ────────────────────────────
 
+def _resumen(reserva: Mapping) -> tuple[str, bool]:
+    """`SUMMARY` del evento + si es reserva de estudio. Compartido por el VEVENT
+    y el link de Google Calendar para que el título sea idéntico en ambos."""
+    numero = reserva.get("numero_pedido") or reserva.get("id")
+    cliente = (reserva.get("cliente_nombre") or "Cliente").strip()
+    es_estudio = (reserva.get("tipo") or "diaria") == "estudio"
+    prefijo = "🎬 Estudio: " if es_estudio else ""
+    return f"{prefijo}Pedido #{numero} — {cliente}", es_estudio
+
+
+def _equipos_str(items: Sequence[Mapping] | None) -> str:
+    """Lista de equipos legible ("2× Sony FX3, Aputure 600d") o ""."""
+    if not items:
+        return ""
+    equipos = []
+    for it in items:
+        etiqueta = f"{it.get('marca') or ''} {it.get('nombre') or ''}".strip()
+        if not etiqueta:
+            continue
+        cant = it.get("cantidad") or 1
+        equipos.append(f"{cant}× {etiqueta}" if cant and cant != 1 else etiqueta)
+    return ", ".join(equipos)
+
+
 def reserva_to_vevent(
     reserva: Mapping,
     items: Sequence[Mapping] | None = None,
     *,
-    site_url: str = "",
+    link: str = "",
 ) -> str:
     """Mapea una fila de `alquileres` (+ sus items opcionales) a un `VEVENT`.
 
     `reserva` necesita: `id`, `fecha_desde`, `fecha_hasta`, y opcionalmente
     `numero_pedido`, `cliente_nombre`, `estado`, `tipo`. `items` (si se pasan)
-    necesitan `nombre`/`marca`/`cantidad` para listar los equipos.
+    necesitan `nombre`/`marca`/`cantidad` para listar los equipos. `link` es la
+    URL que va en la descripción — el caller elige (back-office para el feed del
+    dueño; portal del cliente para el adjunto del mail) para no filtrar el link
+    interno a quien no corresponde.
 
     UID estable (`alquiler-{id}@…`) → editar una reserva **actualiza** su evento,
     no lo duplica. Devuelve `""` si la reserva no tiene fecha de inicio.
@@ -170,27 +199,15 @@ def reserva_to_vevent(
         return ""
     d1 = to_datetime(reserva.get("fecha_hasta")) or d0
 
-    numero = reserva.get("numero_pedido") or rid
-    cliente = (reserva.get("cliente_nombre") or "Cliente").strip()
     estado = reserva.get("estado") or ""
-    es_estudio = (reserva.get("tipo") or "diaria") == "estudio"
-
-    prefijo = "🎬 Estudio: " if es_estudio else ""
-    summary = f"{prefijo}Pedido #{numero} — {cliente}"
+    summary, es_estudio = _resumen(reserva)
 
     desc_parts = [f"Estado: {estado}"] if estado else []
-    if items:
-        equipos = []
-        for it in items:
-            etiqueta = f"{it.get('marca') or ''} {it.get('nombre') or ''}".strip()
-            if not etiqueta:
-                continue
-            cant = it.get("cantidad") or 1
-            equipos.append(f"{cant}× {etiqueta}" if cant and cant != 1 else etiqueta)
-        if equipos:
-            desc_parts.append("Equipos: " + ", ".join(equipos))
-    if site_url and rid:
-        desc_parts.append(f"{site_url}/admin/pedidos/{rid}")
+    equipos = _equipos_str(items)
+    if equipos:
+        desc_parts.append("Equipos: " + equipos)
+    if link:
+        desc_parts.append(link)
     description = "\n".join(desc_parts)
 
     uid = f"alquiler-{rid}@{_UID_DOMAIN}"
@@ -207,3 +224,45 @@ def reserva_to_vevent(
         dtstart=d0, dtend=d1 + timedelta(days=1),
         all_day=True,
     )
+
+
+def google_calendar_url(
+    reserva: Mapping,
+    items: Sequence[Mapping] | None = None,
+    *,
+    link: str = "",
+) -> str:
+    """Link "Agregar a Google Calendar" (`action=TEMPLATE`) para el cuerpo del
+    mail — complementa al adjunto `.ics` para clientes que no renderizan la
+    tarjeta. Reusa la MISMA distinción diaria/estudio y el mismo título que
+    `reserva_to_vevent`, así el evento sale idéntico por las dos vías.
+
+    Devuelve `""` si la reserva no tiene fecha de inicio.
+    """
+    rid = reserva.get("id")
+    d0 = to_datetime(reserva.get("fecha_desde"))
+    if d0 is None or rid is None:
+        return ""
+    d1 = to_datetime(reserva.get("fecha_hasta")) or d0
+    summary, es_estudio = _resumen(reserva)
+
+    params = {"action": "TEMPLATE", "text": summary}
+    if es_estudio:
+        # Con hora: tiempo local + ctz (Google lo ancla a esa zona).
+        end = d1 if d1 > d0 else d0 + timedelta(hours=1)
+        params["dates"] = f"{_fmt_dt_floating(d0)}/{_fmt_dt_floating(end)}"
+        params["ctz"] = _TZID
+    else:
+        # All-day: fin exclusivo (día siguiente).
+        params["dates"] = f"{_fmt_date(d0)}/{_fmt_date(d1 + timedelta(days=1))}"
+
+    detalles = []
+    equipos = _equipos_str(items)
+    if equipos:
+        detalles.append(f"Equipos: {equipos}")
+    if link:
+        detalles.append(link)
+    if detalles:
+        params["details"] = "\n".join(detalles)
+
+    return "https://calendar.google.com/calendar/render?" + urlencode(params)

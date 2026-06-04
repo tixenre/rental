@@ -5,9 +5,12 @@ que su correctitud se cubre acá una sola vez.
 """
 import pytest
 
+from urllib.parse import parse_qs, urlparse
+
 from services.ical import (
     build_vcalendar,
     build_vevent,
+    google_calendar_url,
     reserva_to_vevent,
     _escape,
     _fold,
@@ -111,7 +114,7 @@ class TestReservaToVevent:
         ve = reserva_to_vevent(
             self._diaria(),
             [{"nombre": "FX3", "marca": "Sony", "cantidad": 2}],
-            site_url="https://r.com",
+            link="https://r.com/admin/pedidos/5",
         )
         # Des-plegamos las continuaciones (CRLF+espacio) antes de comparar: una
         # línea larga como la descripción se pliega por RFC 5545.
@@ -119,6 +122,14 @@ class TestReservaToVevent:
         assert "Equipos:" in plano
         assert "2× Sony FX3" in plano
         assert "https://r.com/admin/pedidos/5" in plano
+
+    def test_link_es_el_que_pasa_el_caller(self):
+        # El caller elige el link (no lo arma reserva_to_vevent) → no se filtra
+        # el back-office al cliente.
+        ve = reserva_to_vevent(self._diaria(), link="https://r.com/cliente/portal")
+        plano = ve.replace("\r\n ", "")
+        assert "https://r.com/cliente/portal" in plano
+        assert "/admin/" not in plano
 
     def test_numero_pedido_fallback_a_id(self):
         ve = reserva_to_vevent(self._diaria(numero_pedido=None))
@@ -153,3 +164,46 @@ class TestBuildVcalendar:
         assert "BEGIN:VCALENDAR" in cal
         assert "END:VCALENDAR" in cal
         assert "BEGIN:VEVENT" not in cal
+
+
+# ── google_calendar_url ──────────────────────────────────────────────────────
+
+class TestGoogleCalendarUrl:
+    def _diaria(self, **over):
+        base = {
+            "id": 5, "numero_pedido": 123, "cliente_nombre": "Juan",
+            "tipo": "diaria",
+            "fecha_desde": "2026-06-10T00:00:00", "fecha_hasta": "2026-06-12T00:00:00",
+        }
+        base.update(over)
+        return base
+
+    def test_diaria_all_day_dates_exclusivo(self):
+        url = google_calendar_url(self._diaria())
+        q = parse_qs(urlparse(url).query)
+        assert q["action"] == ["TEMPLATE"]
+        assert q["dates"] == ["20260610/20260613"]  # fin exclusivo
+        assert "Pedido #123" in q["text"][0]
+        assert "ctz" not in q  # all-day no lleva timezone
+
+    def test_estudio_con_hora_y_ctz(self):
+        url = google_calendar_url(self._diaria(
+            tipo="estudio", fecha_desde="2026-06-10T14:00:00",
+            fecha_hasta="2026-06-10T16:00:00",
+        ))
+        q = parse_qs(urlparse(url).query)
+        assert q["dates"] == ["20260610T140000/20260610T160000"]
+        assert q["ctz"] == ["America/Argentina/Buenos_Aires"]
+
+    def test_incluye_equipos_y_link_en_details(self):
+        url = google_calendar_url(
+            self._diaria(),
+            [{"nombre": "FX3", "marca": "Sony", "cantidad": 2}],
+            link="https://r.com/cliente/portal",
+        )
+        q = parse_qs(urlparse(url).query)
+        assert "2× Sony FX3" in q["details"][0]
+        assert "https://r.com/cliente/portal" in q["details"][0]
+
+    def test_sin_fecha_devuelve_vacio(self):
+        assert google_calendar_url(self._diaria(fecha_desde=None)) == ""
