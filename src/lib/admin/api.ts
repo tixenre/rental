@@ -892,6 +892,18 @@ export const adminApi = {
         body: JSON.stringify({ value: String(value) }),
       },
     ),
+
+  // ── Feed iCal de reservas (calendario suscribible) ────────────────────
+  /** URL del feed iCal para suscribir en Google/Apple Calendar. Genera el
+   *  token la primera vez que se consulta. */
+  getCalendarFeed: () =>
+    authedJson<{ url: string; token: string; enabled: boolean }>("/api/admin/calendar/feed"),
+  /** Rota el token → invalida la URL anterior. */
+  regenerateCalendarFeed: () =>
+    authedPostJson<{ url: string; token: string; enabled: boolean }>(
+      "/api/admin/calendar/feed/regenerate",
+      {},
+    ),
   /** Modos: "missing" (sin precio), "auto" (respeta manuales — default),
    *  "all" (todos), "ids" (solo los listados). */
   recalcularPrecios: (args: {

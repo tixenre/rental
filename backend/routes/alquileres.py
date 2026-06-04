@@ -18,6 +18,7 @@ from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
 from services.email import send_email, send_raw_email, Attachment
 from services.email.service import get_admin_to
+from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
 from services.precios import calcular_total, jornadas_periodo, precio_combo
 from config import SITE_URL
 
@@ -535,6 +536,26 @@ def get_disponibilidad(
         conn.close()
 
 
+@router.post("/admin/recordatorios/retiro/run")
+def run_recordatorios_retiro(request: Request, dry_run: bool = Query(True)):
+    """Dispara on-demand el barrido de recordatorios de retiro — para probar en
+    staging sin esperar al scheduler diario. `dry_run=true` (default) NO manda
+    nada: solo devuelve qué pedidos recibirían el recordatorio mañana. Pasar
+    `dry_run=false` manda de verdad (gateado igual por el canal de mail activo).
+
+    Import perezoso de `jobs.recordatorios` para no crear ciclo (ese módulo
+    importa helpers de este).
+    """
+    require_admin(request)
+    from jobs.recordatorios import enviar_recordatorios_retiro
+
+    conn = get_db()
+    try:
+        return enviar_recordatorios_retiro(conn, dry_run=dry_run)
+    finally:
+        conn.close()
+
+
 # ── Rutas de pedidos ─────────────────────────────────────────────────────────
 
 def _fmt_ars(monto) -> str:
@@ -619,7 +640,43 @@ def _pedido_email_context(pedido: dict) -> dict:
         # URLs absolutas: en un cliente de mail un link relativo no resuelve.
         "admin_url": f"{SITE_URL}/admin/pedidos/{pedido.get('id')}",
         "portal_url": f"{SITE_URL}/cliente/portal",
+        # Link "Agregar a Google Calendar" para el cuerpo del mail (complementa
+        # al adjunto .ics). Vacío si la reserva no tiene fecha → el template lo
+        # renderiza como string vacía (Jinja Undefined) sin romper.
+        "gcal_url": google_calendar_url(
+            pedido, pedido.get("items") or [], link=f"{SITE_URL}/cliente/portal"
+        ),
     }
+
+
+def _ics_adjunto_pedido(pedido: dict) -> Optional[list[Attachment]]:
+    """Genera el adjunto `.ics` de la reserva para el mail (estilo "pasaje de
+    avión": el cliente toca "Agregar al calendario"). Best-effort: si algo
+    falla, devuelve None y el mail igual sale (la confirmación no se rompe).
+
+    Usa el generador canónico de `services/ical.py` — el mismo que el feed.
+    """
+    try:
+        # Link al portal del cliente (NO al back-office) — el .ics se lo lleva él.
+        # with_reminders: su calendario le avisa solo antes del retiro.
+        vevent = reserva_to_vevent(
+            pedido, pedido.get("items") or [],
+            link=f"{SITE_URL}/cliente/portal", with_reminders=True,
+        )
+        if not vevent:
+            return None
+        ics = build_vcalendar([vevent], method="PUBLISH")
+        numero = pedido.get("numero_pedido") or pedido.get("id")
+        return [
+            Attachment(
+                filename=f"pedido-{numero}.ics",
+                content=ics.encode("utf-8"),
+                mimetype="text/calendar; method=PUBLISH; charset=utf-8",
+            )
+        ]
+    except Exception:
+        logger.warning("No se pudo generar el .ics del pedido %s", pedido.get("id"), exc_info=True)
+        return None
 
 
 def _dispatch_pedido_creado_emails(background: Optional[BackgroundTasks], pedido: dict):
@@ -1122,6 +1179,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
         background.add_task(
             send_email, "pedido_confirmado_cliente",
             pedido["cliente_email"], ctx, pedido.get("id"),
+            attachments=_ics_adjunto_pedido(pedido),
         )
     return pedido
 
