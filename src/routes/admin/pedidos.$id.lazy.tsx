@@ -1,3 +1,5 @@
+// LEGACY — editor v1 de Pedidos. Reemplazo en curso por /admin/pedidos-v2/$id (ver #744).
+// No agregar features nuevas acá. Se elimina cuando la v2 alcance paridad y esté confirmada en prod.
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { PedidoPage } from "@/components/admin/pedido/PedidoPage";
 import { useDocumentTitle } from "@/lib/use-document-title";

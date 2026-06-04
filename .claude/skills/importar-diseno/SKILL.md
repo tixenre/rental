@@ -126,6 +126,13 @@ son referencia, pero el repo manda.
   **vieja intacta como fallback** hasta confirmar. Las acciones mutantes de la Fase 1 pueden **delegar
   en la pantalla existente** (no reimplementes la máquina de estados en paralelo). La Fase 2 va con
   rama + PR dedicada y aviso antes de mergear (por tocar escritura sensible).
+- **Al crear una v2, marcá la v1 como legacy y anotala en el tracker de cleanup** (si no, la v1 queda
+  para siempre). Cada archivo v1 superado lleva arriba un banner grep-able:
+  `// LEGACY — <qué es> v1. Reemplazo en curso por <ruta v2> (ver #<tracker>). … Se elimina cuando la
+v2 alcance paridad y esté confirmada en prod.` Listalas con `grep -rn "LEGACY —" src/`. Sumá el par
+  v1→v2 al **issue tracker único de cleanup (#744)**. **No marques** lo que la v2 **reusa** (ej.
+  `usePedidoDraft`) ni lo que aún **no tiene** equivalente v2 (no está superado). La v1 se borra recién
+  cuando la v2 confirma paridad + prod — el banner lo dice para que nadie borre antes de tiempo.
 - **La Fase 2 (el editor) es piel nueva sobre el MISMO core de escritura.** Si la v1 ya encapsula su
   lógica sensible en un hook (caso testigo: `usePedidoDraft` = autosave de datos/items + mutación de
   estado), la v2 **reusa ese hook tal cual** — no reescribe la mutación ni la máquina de estados en

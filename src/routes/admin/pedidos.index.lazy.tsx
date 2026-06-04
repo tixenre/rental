@@ -1,3 +1,5 @@
+// LEGACY — lista v1 de Pedidos. Reemplazo en curso por Pedidos v2 (/admin/pedidos-v2 · ver #744).
+// No agregar features nuevas acá. Se elimina cuando la v2 alcance paridad y esté confirmada en prod.
 import { createLazyFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
