@@ -142,6 +142,24 @@ class TestReservaToVevent:
         ve = reserva_to_vevent(self._diaria(cliente_nombre="Pérez, Juan; SA"))
         assert "Pérez\\, Juan\\; SA" in ve
 
+    def test_sin_recordatorio_por_defecto(self):
+        ve = reserva_to_vevent(self._diaria())
+        assert "BEGIN:VALARM" not in ve
+
+    def test_recordatorio_diaria_dia_antes(self):
+        ve = reserva_to_vevent(self._diaria(), with_reminders=True)
+        assert "BEGIN:VALARM" in ve and "END:VALARM" in ve
+        assert "ACTION:DISPLAY" in ve
+        assert "TRIGGER:-PT15H" in ve  # ~9am del día anterior
+
+    def test_recordatorio_estudio_dos_horas_antes(self):
+        ve = reserva_to_vevent(
+            self._diaria(tipo="estudio", fecha_desde="2026-06-10T14:00:00",
+                         fecha_hasta="2026-06-10T16:00:00"),
+            with_reminders=True,
+        )
+        assert "TRIGGER:-PT2H" in ve
+
 
 # ── build_vcalendar ──────────────────────────────────────────────────────────
 

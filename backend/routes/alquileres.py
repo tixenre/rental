@@ -639,8 +639,10 @@ def _ics_adjunto_pedido(pedido: dict) -> Optional[list[EmailAttachment]]:
     """
     try:
         # Link al portal del cliente (NO al back-office) — el .ics se lo lleva él.
+        # with_reminders: su calendario le avisa solo antes del retiro.
         vevent = reserva_to_vevent(
-            pedido, pedido.get("items") or [], link=f"{SITE_URL}/cliente/portal"
+            pedido, pedido.get("items") or [],
+            link=f"{SITE_URL}/cliente/portal", with_reminders=True,
         )
         if not vevent:
             return None

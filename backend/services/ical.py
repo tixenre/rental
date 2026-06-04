@@ -96,11 +96,16 @@ def build_vevent(
     description: str = "",
     location: str = "",
     dtstamp: datetime | None = None,
+    reminders: Sequence[str] = (),
 ) -> str:
     """Construye un `VEVENT` (líneas plegadas, unidas con CRLF).
 
     `all_day=True` → `DTSTART;VALUE=DATE`/`DTEND;VALUE=DATE` (el caller pasa el
     `dtend` ya exclusivo). `all_day=False` → fecha-hora en tiempo flotante.
+    `reminders` son valores `TRIGGER` (ej. `-PT15H`, `-PT2H`): por cada uno se
+    agrega un `VALARM` de tipo DISPLAY. Útil en el `.ics` que el cliente agrega
+    a su calendario (su app le avisa sola); en feeds suscritos los clientes los
+    ignoran, así que ahí no se pasan.
     """
     dtstamp = dtstamp or datetime.utcnow()
     lines = [
@@ -119,6 +124,14 @@ def build_vevent(
         lines.append(f"DESCRIPTION:{_escape(description)}")
     if location:
         lines.append(f"LOCATION:{_escape(location)}")
+    for trigger in reminders:
+        lines.extend([
+            "BEGIN:VALARM",
+            "ACTION:DISPLAY",
+            f"TRIGGER:{trigger}",
+            f"DESCRIPTION:{_escape(summary)}",
+            "END:VALARM",
+        ])
     lines.append("END:VEVENT")
     return "\r\n".join(_fold(ln) for ln in lines)
 
@@ -180,6 +193,7 @@ def reserva_to_vevent(
     items: Sequence[Mapping] | None = None,
     *,
     link: str = "",
+    with_reminders: bool = False,
 ) -> str:
     """Mapea una fila de `alquileres` (+ sus items opcionales) a un `VEVENT`.
 
@@ -188,7 +202,9 @@ def reserva_to_vevent(
     necesitan `nombre`/`marca`/`cantidad` para listar los equipos. `link` es la
     URL que va en la descripción — el caller elige (back-office para el feed del
     dueño; portal del cliente para el adjunto del mail) para no filtrar el link
-    interno a quien no corresponde.
+    interno a quien no corresponde. `with_reminders=True` agrega un recordatorio
+    (alquiler diario: ~1 día antes del retiro; estudio: 2h antes) — se usa en el
+    `.ics` que el cliente agrega a su calendario, no en el feed suscrito.
 
     UID estable (`alquiler-{id}@…`) → editar una reserva **actualiza** su evento,
     no lo duplica. Devuelve `""` si la reserva no tiene fecha de inicio.
@@ -213,16 +229,21 @@ def reserva_to_vevent(
     uid = f"alquiler-{rid}@{_UID_DOMAIN}"
     if es_estudio:
         # Evento con hora; si las horas coinciden, garantizamos 1h de duración.
+        # Recordatorio 2h antes (reserva por horas).
         return build_vevent(
             uid=uid, summary=summary, description=description,
             dtstart=d0, dtend=d1 if d1 > d0 else d0 + timedelta(hours=1),
             all_day=False,
+            reminders=("-PT2H",) if with_reminders else (),
         )
     # Alquiler diario → all-day; DTEND es exclusivo → día siguiente al fin.
+    # Recordatorio -PT15H = 09:00 del día anterior al retiro (el evento all-day
+    # arranca a medianoche → -15h cae a las 9am del día previo).
     return build_vevent(
         uid=uid, summary=summary, description=description,
         dtstart=d0, dtend=d1 + timedelta(days=1),
         all_day=True,
+        reminders=("-PT15H",) if with_reminders else (),
     )
 
 

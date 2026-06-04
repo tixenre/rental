@@ -150,6 +150,13 @@ class TestContenido:
         body = cal_mod.feed_ical(_req(), token="t").body.decode("utf-8")
         assert "2× Sony FX3" in body
 
+    def test_feed_no_lleva_recordatorios(self, monkeypatch):
+        # Los clientes ignoran VALARM de feeds suscritos → no los incluimos.
+        conn = FakeConn(token="t", reservas=[_reserva()])
+        _patch_db(monkeypatch, conn)
+        body = cal_mod.feed_ical(_req(), token="t").body.decode("utf-8")
+        assert "BEGIN:VALARM" not in body
+
     def test_db_caida_devuelve_calendario_vacio_no_500(self, monkeypatch):
         def boom():
             raise RuntimeError("db down")
