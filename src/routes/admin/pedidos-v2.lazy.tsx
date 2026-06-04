@@ -41,6 +41,14 @@ const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 const todayYmd = () => new Date().toISOString().slice(0, 10);
 const esHoy = (s: string | null) => !!s && s.slice(0, 10) === todayYmd();
 
+const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+/** "lun 1 jun" — día de semana + fecha corta (matchea el prototipo). */
+function fechaDia(s: string | null): string {
+  if (!s) return "—";
+  const d = new Date(s.slice(0, 10) + "T12:00:00");
+  return `${DIAS[d.getDay()]} ${formatFechaCorta(s)}`;
+}
+
 /** "creado hace 2 h" — relativo simple desde created_at. */
 function creadoHace(iso?: string): string | null {
   if (!iso) return null;
@@ -261,31 +269,40 @@ function PedidosV2Page() {
       <div className="flex-1 min-h-0 hidden md:flex border-t hairline">
         <div
           className={cn(
-            "shrink-0 overflow-y-auto border-r hairline",
+            "shrink-0 flex flex-col min-h-0 border-r hairline",
             panelOpen ? "w-[360px]" : "flex-1",
           )}
         >
-          <MasterList
-            items={items}
-            loading={pedidosQ.isLoading}
-            selId={selId}
-            onSelect={setSelectedId}
-            onOpen={openV1}
-          />
+          {!panelOpen && (
+            <div className="flex items-center gap-2 px-4 py-2 border-b hairline bg-surface-elevated shrink-0">
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                {items.length} pedido{items.length !== 1 ? "s" : ""}
+              </span>
+              <div className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setPanelOpen(true)}
+                aria-label="Mostrar detalle"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
+              >
+                <PanelLeft className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+          <div className="flex-1 overflow-y-auto">
+            <MasterList
+              items={items}
+              loading={pedidosQ.isLoading}
+              selId={selId}
+              onSelect={setSelectedId}
+              onOpen={openV1}
+            />
+          </div>
         </div>
         {panelOpen && (
           <div className="flex-1 min-w-0 overflow-y-auto bg-surface/40">
             <PreviewPane id={selId} onOpen={openV1} onTogglePanel={() => setPanelOpen(false)} />
           </div>
-        )}
-        {!panelOpen && (
-          <button
-            type="button"
-            onClick={() => setPanelOpen(true)}
-            className="self-start m-3 inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs text-muted-foreground hover:text-ink"
-          >
-            <PanelLeft className="h-3.5 w-3.5" /> Mostrar panel
-          </button>
         )}
       </div>
 
@@ -309,7 +326,7 @@ function PedidosV2Page() {
             <AdminCardMeta>
               {hoyTag(p) ?? (
                 <>
-                  {formatFechaCorta(p.fecha_desde)} → {formatFechaCorta(p.fecha_hasta)}
+                  {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
                 </>
               )}
             </AdminCardMeta>
@@ -436,7 +453,7 @@ function MasterList({
                 <span>·</span>
                 {hoyTag(p) ?? (
                   <span className="tabular-nums">
-                    {formatFechaCorta(p.fecha_desde)} → {formatFechaCorta(p.fecha_hasta)}
+                    {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
                   </span>
                 )}
               </div>
@@ -556,7 +573,7 @@ function PreviewPane({
             Fechas
           </div>
           <div className="mt-1 text-ink font-medium tabular-nums">
-            {formatFechaCorta(p.fecha_desde)} → {formatFechaCorta(p.fecha_hasta)}
+            {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
           </div>
           <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
             {jornadas} jornada{jornadas !== 1 ? "s" : ""}
