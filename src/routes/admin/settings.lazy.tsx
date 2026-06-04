@@ -400,6 +400,9 @@ function CalendarFeedSection() {
   });
 
   const url = feedQ.data?.url ?? "";
+  // webcal:// abre directo el diálogo de suscripción del calendario (un clic),
+  // sin copiar-pegar. Mismo enlace, solo cambia el esquema.
+  const webcalUrl = url.replace(/^https?:\/\//, "webcal://");
 
   const copiar = async () => {
     if (!url) return;
@@ -450,6 +453,9 @@ function CalendarFeedSection() {
             <Button size="sm" onClick={copiar} disabled={!url}>
               Copiar
             </Button>
+            <Button size="sm" variant="outline" asChild>
+              <a href={webcalUrl}>Suscribir</a>
+            </Button>
             <Button
               size="sm"
               variant="ghost"
@@ -460,6 +466,10 @@ function CalendarFeedSection() {
             </Button>
           </div>
         )}
+        <p className="text-[11px] text-muted-foreground">
+          <strong>Suscribir</strong> abre tu app de calendario directo; o copiá la URL y pegala a
+          mano (Google Calendar: <em>Otros calendarios → Suscribirse con URL</em>).
+        </p>
         <p className="text-[11px] text-muted-foreground">
           La URL es secreta: cualquiera que la tenga puede ver tus reservas. Si se filtró,
           regenerala (se corta el acceso anterior y hay que volver a suscribir el calendario).
