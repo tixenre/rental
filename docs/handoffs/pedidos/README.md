@@ -14,10 +14,9 @@ comunicaciones (WhatsApp / Email con adjuntos PDF). Diseño hi-fi sobre el
 ## Qué hay en este bundle
 
 ```
-design_handoff_pedidos/
+design_handoff_pedidos/                ← lo que quedó commiteado en el repo
 ├── README.md                          ← este archivo
-├── Pedidos Back-Office.html           ← referencia visual interactiva (CANÓNICA — abrir en browser)
-├── proto/                             ← sources del prototipo (referencia, no producción)
+├── proto/                             ← sources del prototipo = referencia de CONDUCTA (se LEE, no es producción)
 │   ├── data.js        ← mock de pedidos + helpers (espeja el modelo de alquileres)
 │   ├── icons.jsx      ← set de íconos (en prod: lucide-react import individual)
 │   ├── ui.jsx         ← primitivas + máquina de estados (transiciones, blockReason, nextStep)
@@ -26,26 +25,29 @@ design_handoff_pedidos/
 │   ├── comms.jsx      ← CommsModal: plantillas WhatsApp / Email + adjuntos PDF
 │   ├── app.jsx        ← shell: sidebar, topbar, ruteo list⇄editor, PagoModal, toasts, tweaks
 │   └── tweaks-panel.jsx ← panel de Tweaks (solo pantalla)
-├── assets/                            ← para que el HTML renderice standalone
-│   ├── colors_and_type.css · proto.css · rambla-wordmark.svg
-│   └── fonts/         ← TT Commons + Champ Black (vendoreadas)
 └── src/                               ← scaffolds TSX que espejan los paths reales del repo
     ├── routes/admin/pedidos.tsx       ← ruta TanStack Router (scaffold)
     └── components/admin/PedidosBackoffice.tsx ← componente principal (tipos + máquina de estados + TODOs)
+
+# NO commiteados — eran import-time y viven en el bundle original de Claude Design:
+#   Pedidos Back-Office.html   ← referencia visual interactiva (se rasterizaba al importar)
+#   assets/ (proto.css · fonts vendoreadas · wordmark) ← render-deps del .html (~1 MB, fuentes licenciadas)
 ```
 
-> **Importante:** los archivos `.html` / `proto/*.jsx` son **referencias de diseño
-> hechas en HTML/JS** — muestran el look & feel y el comportamiento final, no son el
-> código a copiar tal cual. El target real de producción es el repo `tixenre/rental`
-> (React + Tailwind v4). `src/` son scaffolds de partida con los `TODO:` marcados.
-> Abrí `Pedidos Back-Office.html` para ver el resultado exacto (incluye panel de
-> **Tweaks** para densidad, panel de detalle, cobranza en filas y modo oscuro).
+> **Importante:** los `proto/*.jsx` son **referencias de diseño hechas en JS** — muestran
+> el look & feel y el comportamiento final, no son el código a copiar tal cual. El target
+> real de producción es el repo `tixenre/rental` (React + Tailwind v4); `src/` son
+> scaffolds de partida con los `TODO:` marcados. El `.html` interactivo (panel de **Tweaks**
+> de densidad, panel de detalle, cobranza en filas, modo oscuro) era **import-time y NO está
+> commiteado** — para verlo, rasterizá el bundle original con `render.mjs`
+> (`--both`, y `--eval`/`--click` para llegar a editor / modales / dark).
 
 ## Fidelidad
 
 **Hi-fi.** Colores, tipografía, spacing, composición e interacciones finales.
-Reproducir con los tokens del DS (`src/styles.css` del repo). El HTML es la
-referencia canónica de layout y comportamiento.
+Reproducir con los tokens del DS (`src/styles.css` del repo). La **referencia canónica de
+layout y comportamiento** es el render del prototipo (`proto/*`); el `.html` que lo
+empaquetaba era import-time y no se commiteó.
 
 ---
 
