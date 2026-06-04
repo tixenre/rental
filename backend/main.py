@@ -517,3 +517,10 @@ def _maybe_run_initial_ranking() -> None:
 
 db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
 db_init_thread.start()
+
+# Scheduler in-process de recordatorios de retiro (opt-in por REMINDERS_ENABLED).
+# Decisión 2026-06-04 / issue #735: corre dentro de este proceso, no es un
+# servicio aparte. Apagado por default → no manda nada en staging/test.
+from jobs.scheduler import start_scheduler
+
+start_scheduler()

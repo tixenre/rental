@@ -537,6 +537,26 @@ def get_disponibilidad(
         conn.close()
 
 
+@router.post("/admin/recordatorios/retiro/run")
+def run_recordatorios_retiro(request: Request, dry_run: bool = Query(True)):
+    """Dispara on-demand el barrido de recordatorios de retiro — para probar en
+    staging sin esperar al scheduler diario. `dry_run=true` (default) NO manda
+    nada: solo devuelve qué pedidos recibirían el recordatorio mañana. Pasar
+    `dry_run=false` manda de verdad (gateado igual por el canal de mail activo).
+
+    Import perezoso de `jobs.recordatorios` para no crear ciclo (ese módulo
+    importa helpers de este).
+    """
+    require_admin(request)
+    from jobs.recordatorios import enviar_recordatorios_retiro
+
+    conn = get_db()
+    try:
+        return enviar_recordatorios_retiro(conn, dry_run=dry_run)
+    finally:
+        conn.close()
+
+
 # ── Rutas de pedidos ─────────────────────────────────────────────────────────
 
 def _fmt_ars(monto) -> str:
