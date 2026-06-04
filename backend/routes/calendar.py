@@ -157,11 +157,19 @@ def _items_por_pedido(conn, pedido_ids: list[int]) -> dict[int, list[dict]]:
 
 # ── Endpoints admin (gestión del token / URL) ────────────────────────────────
 
+def _actor(session) -> str:
+    """Quién hizo el cambio, para `app_settings.updated_by`. Mismo idiom que
+    `routes/settings.py` (trunca a 255 — la columna es VARCHAR(255))."""
+    if not isinstance(session, dict):
+        return "admin"
+    return (session.get("email") or session.get("user_id") or "admin")[:255]
+
+
 @router.get("/api/admin/calendar/feed")
 def get_calendar_feed(request: Request):
     """Devuelve la URL del feed (genera el token la primera vez)."""
     session = require_admin(request)
-    actor = session.get("email", "admin") if isinstance(session, dict) else "admin"
+    actor = _actor(session)
     conn = get_db()
     try:
         token = _ensure_token(conn, actor)
@@ -174,7 +182,7 @@ def get_calendar_feed(request: Request):
 def regenerate_calendar_feed(request: Request):
     """Rota el token → la URL anterior deja de funcionar."""
     session = require_admin(request)
-    actor = session.get("email", "admin") if isinstance(session, dict) else "admin"
+    actor = _actor(session)
     conn = get_db()
     try:
         token = secrets.token_urlsafe(32)
