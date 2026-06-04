@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Sequence, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .base import EmailAttachment
 
 import jinja2
 
@@ -155,9 +158,14 @@ def send_email(
     to: str,
     context: dict[str, Any],
     alquiler_id: Optional[int] = None,
+    attachments: Optional[Sequence["EmailAttachment"]] = None,
 ) -> dict[str, Any]:
     """Envía un mail renderizando una plantilla. Loggea SIEMPRE en
     `emails_log`. NUNCA propaga excepciones del provider.
+
+    `attachments` (opcional): lista de `EmailAttachment` que el backend adjunta
+    al mail (ej. el `.ics` de la reserva en la confirmación). Es la única boca
+    de envío — no se crea un segundo camino para adjuntar.
 
     Devuelve un dict {ok, provider, provider_id?, error?, log_id} útil para
     el endpoint de test del admin.
@@ -212,6 +220,7 @@ def send_email(
                 html=rendered["html"],
                 text=rendered["text"],
                 from_addr=from_addr,
+                attachments=attachments,
             )
         except EmailBackendError as e:
             logger.error("Envío falló (%s → %s): %s", template_key, to, e)

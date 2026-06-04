@@ -8,9 +8,9 @@ no rompa.
 from __future__ import annotations
 
 import uuid
-from typing import List
+from typing import List, Optional, Sequence
 
-from .base import EmailBackend, SendResult
+from .base import EmailAttachment, EmailBackend, SendResult
 
 # Lista compartida — tests la pueden inspeccionar y limpiar con .clear().
 SENT_MAILS: List[dict] = []
@@ -31,6 +31,7 @@ class InMemoryBackend(EmailBackend):
         html: str,
         text: str,
         from_addr: str,
+        attachments: Optional[Sequence[EmailAttachment]] = None,
     ) -> SendResult:
         if self.fail:
             from .base import EmailBackendError
@@ -42,6 +43,7 @@ class InMemoryBackend(EmailBackend):
             "html": html,
             "text": text,
             "from_addr": from_addr,
+            "attachments": list(attachments or ()),
             "provider_id": message_id,
         })
         return SendResult(provider="test", provider_id=message_id)

@@ -7,6 +7,19 @@ instanciar según la env var `EMAIL_PROVIDER`.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional, Sequence
+
+
+@dataclass
+class EmailAttachment:
+    """Un adjunto de mail. `content` son los bytes crudos; cada backend lo
+    codifica según su transporte (Resend: base64 en el JSON; SMTP: parte MIME).
+
+    Caso de uso inicial: el `.ics` de la reserva en el mail de confirmación
+    (estilo "pasaje de avión") — ver `services/ical.py`."""
+    filename: str
+    content: bytes
+    content_type: str = "application/octet-stream"
 
 
 @dataclass
@@ -36,5 +49,6 @@ class EmailBackend:
         html: str,
         text: str,
         from_addr: str,
+        attachments: Optional[Sequence[EmailAttachment]] = None,
     ) -> SendResult:
         raise NotImplementedError

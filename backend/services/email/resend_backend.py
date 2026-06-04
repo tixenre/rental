@@ -4,11 +4,13 @@ API HTTP simple: POST a /emails con Bearer token. Devuelve `{ id: "uuid" }`.
 """
 from __future__ import annotations
 
+import base64
 import os
+from typing import Optional, Sequence
 
 import httpx
 
-from .base import EmailBackend, EmailBackendError, SendResult
+from .base import EmailAttachment, EmailBackend, EmailBackendError, SendResult
 
 
 class ResendBackend(EmailBackend):
@@ -27,7 +29,26 @@ class ResendBackend(EmailBackend):
         html: str,
         text: str,
         from_addr: str,
+        attachments: Optional[Sequence[EmailAttachment]] = None,
     ) -> SendResult:
+        payload = {
+            "from": from_addr,
+            "to": [to],
+            "subject": subject,
+            "html": html,
+            "text": text,
+        }
+        if attachments:
+            # Resend espera el contenido en base64 (string). Ver
+            # https://resend.com/docs/api-reference/emails/send-email
+            payload["attachments"] = [
+                {
+                    "filename": a.filename,
+                    "content": base64.b64encode(a.content).decode("ascii"),
+                    "content_type": a.content_type,
+                }
+                for a in attachments
+            ]
         try:
             resp = httpx.post(
                 "https://api.resend.com/emails",
@@ -35,13 +56,7 @@ class ResendBackend(EmailBackend):
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
                 },
-                json={
-                    "from": from_addr,
-                    "to": [to],
-                    "subject": subject,
-                    "html": html,
-                    "text": text,
-                },
+                json=payload,
                 timeout=15.0,
             )
         except httpx.HTTPError as e:
