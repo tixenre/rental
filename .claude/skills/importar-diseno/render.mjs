@@ -95,9 +95,15 @@ try {
   process.exit(3);
 }
 
-const contextOpts = opts.mobile
-  ? { ...devices["Pixel 5"], viewport: { width: 375, height: 667 } }
-  : { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } };
+const contextOpts = {
+  // El entorno cloud sale por un proxy TLS con cert propio que Chromium no
+  // confía → sin esto, los assets de un prototipo (React/Babel por CDN) fallan
+  // con ERR_CERT_AUTHORITY_INVALID y el render sale en blanco.
+  ignoreHTTPSErrors: true,
+  ...(opts.mobile
+    ? { ...devices["Pixel 5"], viewport: { width: 375, height: 667 } }
+    : { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } }),
+};
 
 const context = await browser.newContext(contextOpts);
 const page = await context.newPage();
