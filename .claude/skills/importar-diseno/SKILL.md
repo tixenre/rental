@@ -71,15 +71,21 @@ son referencia, pero el repo manda.
    el `.html` y el `README.md`. Detectá el **tipo** (ruta / patch / módulo). Reportá en una línea.
 2. **Leer.** README del handoff de punta a punta + el/los `.tsx` completos. Si es patch, leé también el
    archivo existente del repo que se va a tocar.
-3. **VER la referencia.** Rasterizá el `.html` en **desktop y mobile** y leé los PNG:
+3. **VER la referencia.** Rasterizá el `.html` en **desktop y mobile** (`--both` saca las dos de una) y
+   leé los PNG:
    ```bash
-   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html
-   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html --mobile
+   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html --both
    ```
    El `.html` puede **no ser self-contained** (depende de hermanos: css/js/`.jsx`/CDN). render.mjs ya
    lo **sirve por HTTP local** y le sube la espera, así que prototipos con React/Babel por CDN + scripts
    `text/babel` montan bien (no en blanco). Si igual sale en blanco, subí más la espera (`--wait 5000`)
    o revisá la consola del prototipo.
+   - **Estados no-default (editor, modales, dark mode).** Un prototipo interactivo suele rutear por
+     **estado interno de React, no por URL** → render.mjs captura solo el estado inicial (la lista). Para
+     llegar al **editor / un modal / dark** antes del screenshot, manejá el prototipo con
+     `--click "<selector>"` o `--eval "<js>"` (ej. dark: `--eval "document.documentElement.classList.add('dark')"`).
+     Sin esto te perdés justo las vistas que vas a construir (caso testigo: el editor de Pedidos no era
+     rasterizable sin driver → se construyó "a ciegas" contra el código del proto, no contra su render).
 4. **Reuse-first (obligatorio).** Antes de escribir nada, mirá el **catálogo de componentes canónicos**
    en [`referencia-repo.md`](./referencia-repo.md). Si el primitivo ya existe (`StepperPill`,
    `PriceBlock`, `EstadoBadge`, `StatCard`, `Button`, `FavButton`…) → **reusalo**. Si el diseño trae un
@@ -106,8 +112,11 @@ son referencia, pero el repo manda.
    ```
    **Rutas autenticadas (admin / portal con login + datos):** el render-compare en vivo puede **no ser
    posible** (necesita sesión + backend + datos reales — imposible en la nube efímera). Ahí: construí
-   **fiel al render del prototipo** (que sí podés rasterizar) y verificá con **screenshots del dueño en
-   staging** (su captura vs el render del prototipo). Funciona igual de bien.
+   **fiel al render del prototipo** (que sí podés rasterizar — usá `--click`/`--eval` para alcanzar los
+   estados internos, ver paso 3) y verificá con **screenshots del dueño en staging** (su captura vs el
+   render del prototipo). Funciona igual de bien. El agujero conocido —no poder auto-render-comparar el
+   **componente real** de una ruta autenticada— se cierra con un harness de preview con mocks: tracking
+   en **#743**.
 
 ## Patrones útiles
 
@@ -130,6 +139,13 @@ son referencia, pero el repo manda.
   valida **estado-válido + precondición**, NO un grafo de transiciones). El flujo "feliz" (qué botón
   de avance mostrar) lo guía la UI espejando la v1; el backend es la red que rechaza lo inválido. No
   hardcodees un grafo nuevo que pueda divergir de cualquiera de las dos.
+- **Qué del handoff se commitea (y qué no).** El registro durable en el repo = `README.md` + `proto/*`
+  (la conducta de referencia, que se **lee**) + los scaffolds `src/`. El **`.html` de referencia y su
+  `assets/` (fuentes vendoreadas + `proto.css`) son de import-time y NO se commitean** — pesan y traen
+  fuentes licenciadas (~1 MB), y los tokens/reglas reales viven en el repo, no en el bundle. Se
+  rasterizan desde el bundle del dueño **durante** el import y listo. **No commitees un `.html` huérfano**
+  (sin sus assets queda irrenderizable = peso muerto); si querés dejarlo igual, tiene que ser
+  self-contained.
 
 ## Motor visual (render.mjs)
 
@@ -146,13 +162,18 @@ Flags:
 
 - `--mobile` viewport Pixel 5 (375×667, touch) · `--desktop` 1280×900 (default). Matchean
   `playwright.config.ts`.
+- `--both` renderiza **desktop Y mobile** en una sola corrida (dos PNG; a `--out` se le sufija
+  `-desktop`/`-mobile`).
+- `--click "<css>"` clickea ese selector tras cargar · `--eval "<js>"` corre JS en la página tras
+  cargar. **Drivers de estado**: llevan un prototipo interactivo (que rutea por estado interno) al
+  editor / un modal / dark mode **antes** del screenshot.
 - `--fold` solo lo visible (above-the-fold). Default: **página completa**.
 - `--selector "<css>"` recorta a un componente puntual.
 - `--wait <ms>` espera extra para fuentes/animaciones (default 300).
 - `--out <path>` ruta de salida (default `/tmp/diseno-<ts>-<viewport>.png`).
 
-El script imprime `PNG: /tmp/...` en la última línea → Claude **lee ese PNG** con la tool de imágenes.
-Para revisar mobile-first, renderizá **las dos** vistas y compará. (`DISENO_BASE_URL` overridea el
+El script imprime una línea `PNG: /tmp/...` por cada render → Claude **lee ese/esos PNG** con la tool de
+imágenes. Para revisar mobile-first, usá `--both` y compará. (`DISENO_BASE_URL` overridea el
 `http://localhost:3000` por defecto.)
 
 ## Requisitos / errores comunes
