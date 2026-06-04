@@ -17,7 +17,9 @@ from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html,
 from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
 from services.email import send_email
+from services.email.base import EmailAttachment
 from services.email.service import get_admin_to
+from services.ical import build_vcalendar, reserva_to_vevent
 from services.precios import calcular_total, jornadas_periodo, precio_combo
 from config import SITE_URL
 
@@ -622,6 +624,31 @@ def _pedido_email_context(pedido: dict) -> dict:
     }
 
 
+def _ics_adjunto_pedido(pedido: dict) -> Optional[list[EmailAttachment]]:
+    """Genera el adjunto `.ics` de la reserva para el mail (estilo "pasaje de
+    avión": el cliente toca "Agregar al calendario"). Best-effort: si algo
+    falla, devuelve None y el mail igual sale (la confirmación no se rompe).
+
+    Usa el generador canónico de `services/ical.py` — el mismo que el feed.
+    """
+    try:
+        vevent = reserva_to_vevent(pedido, pedido.get("items") or [], site_url=SITE_URL)
+        if not vevent:
+            return None
+        ics = build_vcalendar([vevent], method="PUBLISH")
+        numero = pedido.get("numero_pedido") or pedido.get("id")
+        return [
+            EmailAttachment(
+                filename=f"pedido-{numero}.ics",
+                content=ics.encode("utf-8"),
+                content_type="text/calendar; method=PUBLISH; charset=utf-8",
+            )
+        ]
+    except Exception:
+        logger.warning("No se pudo generar el .ics del pedido %s", pedido.get("id"), exc_info=True)
+        return None
+
+
 def _dispatch_pedido_creado_emails(background: Optional[BackgroundTasks], pedido: dict):
     """Encola los mails de 'pedido creado' (cliente + admin) como
     background tasks. Si no hay BackgroundTasks (llamada desde script),
@@ -1122,6 +1149,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
         background.add_task(
             send_email, "pedido_confirmado_cliente",
             pedido["cliente_email"], ctx, pedido.get("id"),
+            attachments=_ics_adjunto_pedido(pedido),
         )
     return pedido
 
