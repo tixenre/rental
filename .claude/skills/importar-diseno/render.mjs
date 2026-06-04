@@ -24,9 +24,10 @@
 //
 // Salida: imprime "PNG: <ruta-absoluta>" en stdout (la última línea siempre es la ruta).
 
-import { resolve, isAbsolute } from "node:path";
-import { existsSync } from "node:fs";
+import { resolve, isAbsolute, extname, basename, dirname, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { createServer } from "node:http";
 
 let chromium, devices;
 try {
@@ -79,7 +80,68 @@ function toUrl(t) {
   return pathToFileURL(abs).href;
 }
 
-const url = toUrl(target);
+// ── server estático local (para HTMLs de prototipo) ──────────────────────────
+// Un .html de Claude Design suele cargar React/Babel por CDN y sus `.jsx` con
+// <script type="text/babel" src="...">. Eso NO funciona por file:// (Babel no
+// puede fetchear los .jsx — CORS) y el render sale en blanco. Por eso, si el
+// target es un .html local, lo servimos por http://127.0.0.1 en vez de file://.
+const MIME = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".jsx": "text/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".ttf": "font/ttf",
+  ".otf": "font/otf",
+};
+function serveDir(root) {
+  const server = createServer((req, res) => {
+    try {
+      const rel = decodeURIComponent((req.url || "/").split("?")[0]);
+      const fp = join(root, rel);
+      if (!fp.startsWith(root)) {
+        res.statusCode = 403;
+        return res.end("forbidden");
+      }
+      const data = readFileSync(fp);
+      res.setHeader("Content-Type", MIME[extname(fp).toLowerCase()] || "application/octet-stream");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.end(data);
+    } catch {
+      res.statusCode = 404;
+      res.end("not found");
+    }
+  });
+  return new Promise((ok) =>
+    server.listen(0, "127.0.0.1", () => ok({ server, port: server.address().port })),
+  );
+}
+
+let httpServer = null;
+let url;
+const _absTarget = isAbsolute(target) ? target : resolve(process.cwd(), target);
+const _looksLocalHtml =
+  !/^https?:\/\//.test(target) &&
+  !target.startsWith("file://") &&
+  extname(target).toLowerCase() === ".html" &&
+  existsSync(_absTarget);
+if (_looksLocalHtml) {
+  const served = await serveDir(dirname(_absTarget));
+  httpServer = served.server;
+  url = `http://127.0.0.1:${served.port}/${encodeURIComponent(basename(_absTarget))}`;
+  if (opts.wait < 2000) opts.wait = 2500; // Babel transpila los .jsx en el browser → dar tiempo a montar
+} else {
+  url = toUrl(target);
+}
 const viewport = opts.mobile ? "mobile" : "desktop";
 const out = opts.out || `/tmp/diseno-${Date.now()}-${viewport}.png`;
 
@@ -112,6 +174,7 @@ try {
   await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
 } catch (e) {
   await browser.close();
+  httpServer?.close();
   if (url.startsWith("http") && /ERR_CONNECTION_REFUSED|net::|Timeout/.test(e.message)) {
     console.error(
       `✗ No pude abrir ${url}.\n  ¿Está corriendo la app? Levantá el dev server con \`npm run dev\` (puerto 3000).`,
@@ -143,6 +206,7 @@ try {
   }
 } finally {
   await browser.close();
+  httpServer?.close();
 }
 
 console.error(`✓ ${viewport} · ${url}`);
