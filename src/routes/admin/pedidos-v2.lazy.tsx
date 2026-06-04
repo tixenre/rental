@@ -29,7 +29,7 @@ import {
   FAB,
 } from "@/components/mobile";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { formatARS, formatFechaDisplay, formatFechaCorta } from "@/lib/format";
+import { formatARS, formatFechaCorta } from "@/lib/format";
 
 export const Route = createLazyFileRoute("/admin/pedidos-v2")({
   component: PedidosV2Page,
@@ -40,6 +40,14 @@ export const Route = createLazyFileRoute("/admin/pedidos-v2")({
 const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 const todayYmd = () => new Date().toISOString().slice(0, 10);
 const esHoy = (s: string | null) => !!s && s.slice(0, 10) === todayYmd();
+
+const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+/** "lun 1 jun" — día de semana + fecha corta (matchea el prototipo). */
+function fechaDia(s: string | null): string {
+  if (!s) return "—";
+  const d = new Date(s.slice(0, 10) + "T12:00:00");
+  return `${DIAS[d.getDay()]} ${formatFechaCorta(s)}`;
+}
 
 /** "creado hace 2 h" — relativo simple desde created_at. */
 function creadoHace(iso?: string): string | null {
@@ -261,31 +269,40 @@ function PedidosV2Page() {
       <div className="flex-1 min-h-0 hidden md:flex border-t hairline">
         <div
           className={cn(
-            "shrink-0 overflow-y-auto border-r hairline",
+            "shrink-0 flex flex-col min-h-0 border-r hairline",
             panelOpen ? "w-[360px]" : "flex-1",
           )}
         >
-          <MasterList
-            items={items}
-            loading={pedidosQ.isLoading}
-            selId={selId}
-            onSelect={setSelectedId}
-            onOpen={openV1}
-          />
+          {!panelOpen && (
+            <div className="flex items-center gap-2 px-4 py-2 border-b hairline bg-surface-elevated shrink-0">
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                {items.length} pedido{items.length !== 1 ? "s" : ""}
+              </span>
+              <div className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setPanelOpen(true)}
+                aria-label="Mostrar detalle"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
+              >
+                <PanelLeft className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+          <div className="flex-1 overflow-y-auto">
+            <MasterList
+              items={items}
+              loading={pedidosQ.isLoading}
+              selId={selId}
+              onSelect={setSelectedId}
+              onOpen={openV1}
+            />
+          </div>
         </div>
         {panelOpen && (
           <div className="flex-1 min-w-0 overflow-y-auto bg-surface/40">
             <PreviewPane id={selId} onOpen={openV1} onTogglePanel={() => setPanelOpen(false)} />
           </div>
-        )}
-        {!panelOpen && (
-          <button
-            type="button"
-            onClick={() => setPanelOpen(true)}
-            className="self-start m-3 inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-xs text-muted-foreground hover:text-ink"
-          >
-            <PanelLeft className="h-3.5 w-3.5" /> Mostrar panel
-          </button>
         )}
       </div>
 
@@ -309,7 +326,7 @@ function PedidosV2Page() {
             <AdminCardMeta>
               {hoyTag(p) ?? (
                 <>
-                  {formatFechaCorta(p.fecha_desde)} → {formatFechaCorta(p.fecha_hasta)}
+                  {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
                 </>
               )}
             </AdminCardMeta>
@@ -421,8 +438,8 @@ function MasterList({
               onClick={() => onSelect(p.id)}
               onDoubleClick={() => onOpen(p.id)}
               className={cn(
-                "w-full text-left px-4 py-3 transition-colors border-l-2",
-                sel ? "border-amber bg-surface" : "border-transparent hover:bg-surface/60",
+                "w-full text-left px-3.5 py-2.5 transition-colors border-l-2",
+                sel ? "border-amber bg-amber-soft" : "border-transparent hover:bg-surface",
               )}
             >
               <div className="flex items-start justify-between gap-2">
@@ -436,7 +453,7 @@ function MasterList({
                 <span>·</span>
                 {hoyTag(p) ?? (
                   <span className="tabular-nums">
-                    {formatFechaCorta(p.fecha_desde)} → {formatFechaCorta(p.fecha_hasta)}
+                    {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
                   </span>
                 )}
               </div>
@@ -498,7 +515,7 @@ function PreviewPane({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="font-display text-2xl text-ink truncate">
+            <h2 className="text-2xl font-bold text-ink truncate">
               {p.cliente_nombre || "Sin cliente"}
             </h2>
             <EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />
@@ -536,14 +553,14 @@ function PreviewPane({
 
       {/* Siguiente paso — abre el editor v1 donde vive la máquina de estados real. */}
       {!["finalizado", "cancelado"].includes(p.estado) && (
-        <div className="mt-4 rounded-xl border border-amber/50 bg-amber-soft/40 px-4 py-3 flex items-center justify-between gap-3">
+        <div className="mt-4 rounded-lg border border-amber bg-amber-soft px-4 py-3 flex items-center justify-between gap-3">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Siguiente paso
             </div>
             <div className="font-medium text-ink">{siguientePasoLabel(p.estado)}</div>
           </div>
-          <Button onClick={() => onOpen(p.id)} className="shrink-0">
+          <Button variant="amber" onClick={() => onOpen(p.id)} className="shrink-0">
             <ArrowRight className="h-4 w-4 mr-1" /> Gestionar
           </Button>
         </div>
@@ -556,7 +573,7 @@ function PreviewPane({
             Fechas
           </div>
           <div className="mt-1 text-ink font-medium tabular-nums">
-            {formatFechaDisplay(p.fecha_desde)} → {formatFechaDisplay(p.fecha_hasta)}
+            {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
           </div>
           <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
             {jornadas} jornada{jornadas !== 1 ? "s" : ""}
@@ -566,7 +583,9 @@ function PreviewPane({
           <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Total neto
           </div>
-          <div className="mt-1 font-display text-2xl tabular text-ink">{fmtArs(total)}</div>
+          <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
+            {fmtArs(total)}
+          </div>
           <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
             {pagado >= total && total > 0
               ? "pagado"
