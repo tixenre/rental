@@ -1123,6 +1123,22 @@ def init_db():
             updated_by TEXT
         )
     """)
+    # Seed idempotente de las 4 plantillas (esquema en dos capas, MEMORIA
+    # 2026-06-03): el contenido vivía SOLO en migraciones, así que con las
+    # migraciones trabadas la tabla quedaba vacía y la sección /admin/email-templates
+    # no tenía nada que abrir ni previsualizar. La fuente única forward del copy
+    # es services/email/default_templates.py. ON CONFLICT DO NOTHING respeta lo
+    # que ya exista (filas migradas o editadas por un admin).
+    from services.email.default_templates import DEFAULT_TEMPLATES
+    for _key, _tpl in DEFAULT_TEMPLATES.items():
+        conn.execute(
+            """
+            INSERT INTO email_templates (key, subject, body_html, body_text, updated_by)
+            VALUES (?, ?, ?, ?, 'system:migration')
+            ON CONFLICT (key) DO NOTHING
+            """,
+            (_key, _tpl["subject"], _tpl["body_html"], _tpl["body_text"]),
+        )
     conn.execute("""
         CREATE TABLE IF NOT EXISTS emails_log (
             id           BIGSERIAL PRIMARY KEY,
