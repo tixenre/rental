@@ -11,11 +11,11 @@ description: Importa un handoff de Claude Design (carpeta design_handoff_<featur
 Su flujo es **Leer el repo → Diseñar pensando en el backend → Exportar**. Te entrega un **handoff**:
 una carpeta `design_handoff_<feature>/` que **espeja los paths reales del repo**.
 
-| Pieza | Qué es | Cómo la tratás |
-|---|---|---|
-| `<Feature>.html` | **Referencia visual** (Tailwind CDN + mocks, todos los estados). | La **mirás** (rasterizada). Verdad de *cómo se ve*. |
-| `src/<path-real>.tsx` | **TSX base** (ruta o componente) que ya usa componentes/tokens del repo. | Tu **base de implementación**. Verdad de *cómo se construye*. |
-| `README.md` | Specs por pantalla: secciones, componentes a reusar, datos, checklist. | Tu **lista de tareas**. |
+| Pieza                 | Qué es                                                                   | Cómo la tratás                                                |
+| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `<Feature>.html`      | **Referencia visual** (Tailwind CDN + mocks, todos los estados).         | La **mirás** (rasterizada). Verdad de _cómo se ve_.           |
+| `src/<path-real>.tsx` | **TSX base** (ruta o componente) que ya usa componentes/tokens del repo. | Tu **base de implementación**. Verdad de _cómo se construye_. |
+| `README.md`           | Specs por pantalla: secciones, componentes a reusar, datos, checklist.   | Tu **lista de tareas**.                                       |
 
 > El contrato de entrega (lado Claude Design) y la fuente de verdad de este flujo viven en el repo:
 > [`INSTRUCCIONES_CLAUDE_DESIGN.md`](./INSTRUCCIONES_CLAUDE_DESIGN.md). El molde técnico para
@@ -27,7 +27,7 @@ una carpeta `design_handoff_<feature>/` que **espeja los paths reales del repo**
 - **El HTML manda para la fidelidad visual** — cómo se ve: layout, jerarquía, espaciados, estados,
   mobile. Es la intención de diseño aprobada.
 - **El TSX manda para estructura / lógica / implementación** — cómo se construye: qué componentes y
-  tokens del repo se usan, props, comportamiento. (Coherente con MEMORIA *2026-05-28*.)
+  tokens del repo se usan, props, comportamiento. (Coherente con MEMORIA _2026-05-28_.)
 
 No están en conflicto: son planos distintos. El markup/clases del HTML **no se copian** a producción
 (usa Tailwind CDN + mocks); se traduce a los componentes/tokens reales del repo.
@@ -35,15 +35,15 @@ No están en conflicto: son planos distintos. El markup/clases del HTML **no se 
 ## Marcadores en el TSX
 
 - **`TODO:`** → dónde conectar el dato/endpoint real (ver backend abajo).
-- **`// CAMBIO N:`** → en un handoff *patch*, el diff puntual a aplicar sobre el archivo existente.
+- **`// CAMBIO N:`** → en un handoff _patch_, el diff puntual a aplicar sobre el archivo existente.
 
 ## Tipos de handoff (detectalo y actuá distinto)
 
-| Tipo | Señal | Qué hacés |
-|---|---|---|
-| **Ruta nueva** | `src/routes/<ruta>.tsx` completo, ruta que no existe | Crear la ruta usando el TSX como base. |
-| **Patch** | comentarios `// CAMBIO N:`, "reemplaza partes de…" | Aplicar cada cambio sobre el archivo existente, sin tocar la lógica. |
-| **Módulo** | `src/components/<path>/` con varios `.tsx` + README clase-por-clase | Reemplazar/crear los componentes; el README es muy preciso, seguilo al pie. |
+| Tipo           | Señal                                                               | Qué hacés                                                                   |
+| -------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Ruta nueva** | `src/routes/<ruta>.tsx` completo, ruta que no existe                | Crear la ruta usando el TSX como base.                                      |
+| **Patch**      | comentarios `// CAMBIO N:`, "reemplaza partes de…"                  | Aplicar cada cambio sobre el archivo existente, sin tocar la lógica.        |
+| **Módulo**     | `src/components/<path>/` con varios `.tsx` + README clase-por-clase | Reemplazar/crear los componentes; el README es muy preciso, seguilo al pie. |
 
 ## Input: la carpeta del handoff
 
@@ -117,6 +117,19 @@ son referencia, pero el repo manda.
   **vieja intacta como fallback** hasta confirmar. Las acciones mutantes de la Fase 1 pueden **delegar
   en la pantalla existente** (no reimplementes la máquina de estados en paralelo). La Fase 2 va con
   rama + PR dedicada y aviso antes de mergear (por tocar escritura sensible).
+- **La Fase 2 (el editor) es piel nueva sobre el MISMO core de escritura.** Si la v1 ya encapsula su
+  lógica sensible en un hook (caso testigo: `usePedidoDraft` = autosave de datos/items + mutación de
+  estado), la v2 **reusa ese hook tal cual** — no reescribe la mutación ni la máquina de estados en
+  paralelo. Un solo camino de escritura para las dos pantallas → la garantía "escritura sensible
+  sagrada" se mantiene sola (hay una única dirección física de la mutación). Esto es el **reuse-first
+  del paso 4 aplicado a la lógica, no solo a los componentes visuales**: antes de escribir mutaciones,
+  buscá el hook/data-layer que la pantalla vieja ya usa.
+- **La máquina de estados de la UI se DERIVA, no se inventa.** El "próximo paso" / qué transición
+  ofrecer sale de dos fuentes: (a) lo que la pantalla vieja ya hace, y (b) las precondiciones que
+  valida el backend (caso testigo: `ESTADOS_VALIDOS` + checks en `routes/alquileres.py` — el backend
+  valida **estado-válido + precondición**, NO un grafo de transiciones). El flujo "feliz" (qué botón
+  de avance mostrar) lo guía la UI espejando la v1; el backend es la red que rechaza lo inválido. No
+  hardcodees un grafo nuevo que pueda divergir de cualquiera de las dos.
 
 ## Motor visual (render.mjs)
 
@@ -130,6 +143,7 @@ node .claude/skills/importar-diseno/render.mjs <target> [flags]
 (`/cliente/...` → `http://localhost:3000`).
 
 Flags:
+
 - `--mobile` viewport Pixel 5 (375×667, touch) · `--desktop` 1280×900 (default). Matchean
   `playwright.config.ts`.
 - `--fold` solo lo visible (above-the-fold). Default: **página completa**.
