@@ -32,6 +32,9 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npx tsc --noEmit
+      # La librería del DS se verifica además de forma independiente (su propio
+      # tsconfig) → gate modular: no puede romperse en silencio.
+      - run: npm run typecheck:ds
 
   lint:
     name: Lint + formato (eslint/prettier)

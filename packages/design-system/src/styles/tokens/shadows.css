@@ -1,11 +1,13 @@
 /* ============================================================
    Rambla Rental — Shadow tokens  (CANONICAL)
    Brand-tinted: usan oklch del ink (cálido) en vez de negro puro.
-   Tailwind v4 @theme → shadow-sm / shadow-md / shadow-lg / shadow-xl.
+   Viven en :root (NO @theme) a propósito: las utilities shadow-sm/md/lg/xl
+   siguen siendo las default de Tailwind; el tint de marca es opt-in con
+   box-shadow: var(--shadow-md) o shadow-[var(--shadow-md)].
    Uso: cards reposo → sm · dropdowns/hover → md · toasts/FAB → lg · modales → xl.
    ============================================================ */
 
-@theme {
+:root {
   --shadow-sm: 0 1px 2px oklch(0.18 0.01 60 / 6%);
   --shadow-md: 0 4px 12px oklch(0.18 0.01 60 / 8%),  0 1px 3px oklch(0.18 0.01 60 / 5%);
   --shadow-lg: 0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
