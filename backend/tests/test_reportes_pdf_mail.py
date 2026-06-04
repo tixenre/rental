@@ -37,6 +37,14 @@ def test_html_incluye_beneficiarios_y_total():
     assert html.lstrip().startswith("<!DOCTYPE html>")
 
 
+def test_html_es_hoja_a4():
+    # Requisito: todo documento que se manda por mail es A4 (hoja + HTML).
+    html = _liquidacion_html(_DATA, "junio de 2026")
+    assert "@page { size: A4;" in html
+    assert 'class="sheet"' in html
+    assert "210mm" in html  # ancho A4 de la hoja en pantalla/PDF
+
+
 def test_html_periodo_vacio_no_rompe():
     html = _liquidacion_html(
         {"beneficiarios": [], "resumen": {}, "por_mes": [], "por_dueno": []},

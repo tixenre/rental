@@ -211,6 +211,17 @@ async def _render_pdf(html: str) -> bytes:
     return pdf_bytes
 
 
+def _a4_page(margin: str = "18mm 14mm") -> str:
+    """CSS `@page` que fija la hoja en **A4** para TODOS los documentos.
+
+    El tamaño A4 es la regla compartida (requisito: todo PDF que se manda es A4);
+    el margen es lo único por-documento. Fuente única — no declarar `@page` /
+    tamaños de hoja ad-hoc en cada template (modularidad: una sola verdad de la
+    hoja). `_render_pdf` ya rasteriza en A4; esto alinea el HTML con esa hoja para
+    que el preview y la paginación coincidan."""
+    return f"@page {{ size: A4; margin: {margin}; }}"
+
+
 # ── Templates HTML ───────────────────────────────────────────────────────────
 
 def _pedido_html(pedido: dict) -> str:
@@ -358,6 +369,8 @@ def _pedido_html(pedido: dict) -> str:
 <meta charset="UTF-8">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Space+Mono:wght@400;700&display=swap');
+
+  {_a4_page(margin="0")}
 
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
@@ -732,7 +745,7 @@ def _albaran_html(pedido: dict) -> str:
 <head>
 <meta charset="UTF-8">
 <style>
-  @page {{ size: A4; margin: 18mm 14mm; }}
+  {_a4_page()}
   * {{ box-sizing: border-box; }}
   body {{
     font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
@@ -1014,6 +1027,7 @@ def _contrato_html(pedido: dict) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contrato</title>
 <style>
+  {_a4_page(margin="0")}
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
   body {{
     font-family: 'Space Mono', 'Courier New', monospace;
@@ -1436,7 +1450,7 @@ def _packing_list_html(pedido: dict) -> str:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  @page {{ size: A4; margin: 18mm 14mm; }}
+  {_a4_page()}
   * {{ box-sizing: border-box; }}
   body {{
     font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
@@ -1465,8 +1479,10 @@ def _packing_list_html(pedido: dict) -> str:
   @media print {{ #progress-bar {{ display: none; }} }}
 
   /* ── Documento ──────────────────────────────────────────── */
-  .doc {{ padding: 20px 24px; max-width: 900px; margin: 0 auto; }}
-  @media print {{ .doc {{ padding: 0; }} }}
+  /* Ancho A4 (≈794px) — consistente con el resto de los documentos; antes era
+     900px y la hoja se veía más ancha que un A4. */
+  .doc {{ padding: 20px 24px; max-width: 794px; margin: 0 auto; }}
+  @media print {{ .doc {{ padding: 0; max-width: none; }} }}
 
   .header {{
     display: flex; justify-content: space-between; align-items: flex-start;
@@ -1767,9 +1783,20 @@ def _liquidacion_html(data: dict, titulo: str) -> str:
 <meta charset="utf-8">
 <title>Liquidación — {html.escape(titulo)}</title>
 <style>
+  {_a4_page(margin="0")}
   * {{ box-sizing: border-box; }}
   body {{ font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-          color: #2a251e; margin: 0; padding: 32px 36px; font-size: 13px; }}
+          color: #2a251e; margin: 0; padding: 0; font-size: 13px; }}
+  /* La hoja: en el PDF es A4 (llena la hoja, el padding hace de margen). En
+     pantalla (preview del modal) se adapta al ancho del iframe para verse
+     completa — Chromium rasteriza el PDF con media `print`, así que el override
+     `screen` no afecta al PDF. */
+  .sheet {{ width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm 15mm;
+            background: #fff; box-sizing: border-box; }}
+  @media screen {{
+    html {{ background: #f1efe9; }}
+    .sheet {{ width: 100%; min-height: 0; margin: 0; padding: 28px 30px; }}
+  }}
   .head {{ display: flex; justify-content: space-between; align-items: flex-end;
            border-bottom: 3px solid #FAB428; padding-bottom: 14px; margin-bottom: 22px; }}
   .head h1 {{ font-size: 22px; margin: 0; }}
@@ -1807,24 +1834,26 @@ def _liquidacion_html(data: dict, titulo: str) -> str:
 </style>
 </head>
 <body>
-  <div class="head">
-    <div>
-      <h1>Liquidación</h1>
-      <div class="sub">{html.escape(titulo)} · ingreso 100% pagado, repartido</div>
+  <div class="sheet">
+    <div class="head">
+      <div>
+        <h1>Liquidación</h1>
+        <div class="sub">{html.escape(titulo)} · ingreso 100% pagado, repartido</div>
+      </div>
+      <div class="brand">
+        <strong>Rambla Rental</strong>
+        Reporte generado el {fecha_doc}
+      </div>
     </div>
-    <div class="brand">
-      <strong>Rambla Rental</strong>
-      Reporte generado el {fecha_doc}
+
+    <div class="cards">{cards}</div>
+    {grilla}
+    <h2>Detalle por dueño</h2>
+    {detalle}
+
+    <div class="foot">
+      Rambla Rental · alquiler de equipos audiovisuales · reporte interno de liquidación
     </div>
-  </div>
-
-  <div class="cards">{cards}</div>
-  {grilla}
-  <h2>Detalle por dueño</h2>
-  {detalle}
-
-  <div class="foot">
-    Rambla Rental · alquiler de equipos audiovisuales · reporte interno de liquidación
   </div>
 </body>
 </html>"""
