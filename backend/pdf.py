@@ -1678,3 +1678,153 @@ def _packing_list_html(pedido: dict) -> str:
 
 </body>
 </html>"""
+
+
+# ── Reporte de liquidación (#88) ──────────────────────────────────────────────
+# Espeja el patrón de los documentos de pedido: un builder de HTML branded que
+# `_render_pdf` convierte a PDF A4. La data viene del motor `backend/reportes/`
+# (vía `liquidar`); acá solo se presenta — no se calcula nada.
+
+def _liquidacion_html(data: dict, titulo: str) -> str:
+    """HTML branded del reporte de liquidación para un período (PDF / preview).
+
+    `data` es el dict que devuelve `reportes.liquidacion.liquidar`
+    (beneficiarios, por_mes, resumen, por_dueno). `titulo` es el rótulo del
+    período (ej. 'junio de 2026')."""
+    fmt = lambda n: _fmt_ars(n, zero_dash=False)
+    beneficiarios = data.get("beneficiarios", [])
+    res = data.get("resumen", {}) or {}
+    por_mes = data.get("por_mes", []) or []
+    por_dueno = data.get("por_dueno", []) or []
+    res_pb = res.get("por_beneficiario", {}) or {}
+    fecha_doc = _es_month(datetime.now().strftime("%-d de %B de %Y"))
+
+    # Tarjetas de resumen por beneficiario (lo que le toca a cada uno).
+    cards = ""
+    for b in beneficiarios:
+        cards += f"""
+        <div class="card">
+          <div class="card-label">{html.escape(str(b))}</div>
+          <div class="card-value">{fmt(res_pb.get(b, 0))}</div>
+        </div>"""
+    cards += f"""
+        <div class="card card-total">
+          <div class="card-label">Total del período</div>
+          <div class="card-value">{fmt(res.get("total", 0))}</div>
+        </div>"""
+
+    # Grilla mes × beneficiario (solo si hay más de un mes en el rango).
+    grilla = ""
+    if len(por_mes) > 1:
+        head = "".join(f"<th class='right'>{html.escape(str(b))}</th>" for b in beneficiarios)
+        body = ""
+        for fila in por_mes:
+            pb = fila.get("por_beneficiario", {}) or {}
+            celdas = "".join(f"<td class='right'>{fmt(pb.get(b, 0))}</td>" for b in beneficiarios)
+            body += (
+                f"<tr><td>{html.escape(_es_month(str(fila.get('mes', ''))))}</td>"
+                f"{celdas}<td class='right strong'>{fmt(fila.get('total', 0))}</td></tr>"
+            )
+        tot = "".join(f"<td class='right'>{fmt(res_pb.get(b, 0))}</td>" for b in beneficiarios)
+        grilla = f"""
+        <h2>Por mes</h2>
+        <table class="grid">
+          <thead><tr><th>Mes</th>{head}<th class="right">Total</th></tr></thead>
+          <tbody>{body}</tbody>
+          <tfoot><tr><td class="strong">TOTAL</td>{tot}<td class="right strong">{fmt(res.get('total', 0))}</td></tr></tfoot>
+        </table>"""
+
+    # Detalle por dueño: equipos + cuánto generó cada uno.
+    detalle = ""
+    for d in por_dueno:
+        filas = ""
+        for eq in d.get("equipos", []):
+            veces = eq.get("veces")
+            veces_txt = f"{veces}" if veces not in (None, "") else "—"
+            filas += (
+                f"<tr><td>{html.escape(str(eq.get('equipo', '')))}</td>"
+                f"<td class='center'>{veces_txt}</td>"
+                f"<td class='right'>{fmt(eq.get('monto', 0))}</td></tr>"
+            )
+        detalle += f"""
+        <div class="dueno">
+          <div class="dueno-head">
+            <span class="dueno-name">{html.escape(str(d.get("dueno", "")))}</span>
+            <span class="dueno-tot">{fmt(d.get("monto_generado", 0))}
+              <span class="dueno-sub">· {d.get("pedidos", 0)} alquileres</span></span>
+          </div>
+          <table class="detail">
+            <thead><tr><th>Equipo</th><th class="center">Veces</th><th class="right">Generado</th></tr></thead>
+            <tbody>{filas or '<tr><td colspan="3" class="empty">Sin equipos con ingreso en el período.</td></tr>'}</tbody>
+          </table>
+        </div>"""
+
+    if not por_dueno:
+        detalle = '<p class="empty">No hay pedidos saldados en este período.</p>'
+
+    return f"""<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<title>Liquidación — {html.escape(titulo)}</title>
+<style>
+  * {{ box-sizing: border-box; }}
+  body {{ font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+          color: #2a251e; margin: 0; padding: 32px 36px; font-size: 13px; }}
+  .head {{ display: flex; justify-content: space-between; align-items: flex-end;
+           border-bottom: 3px solid #FAB428; padding-bottom: 14px; margin-bottom: 22px; }}
+  .head h1 {{ font-size: 22px; margin: 0; }}
+  .head .sub {{ color: #8a8378; font-size: 12px; margin-top: 4px; }}
+  .head .brand {{ text-align: right; font-size: 12px; color: #6b6457; }}
+  .head .brand strong {{ display: block; color: #2a251e; font-size: 15px; }}
+  h2 {{ font-size: 14px; margin: 24px 0 10px; color: #2a251e; }}
+  .cards {{ display: flex; flex-wrap: wrap; gap: 10px; }}
+  .card {{ flex: 1 1 140px; border: 1px solid #e5e1d8; border-radius: 10px; padding: 12px 14px; }}
+  .card-label {{ font-size: 11px; color: #8a8378; text-transform: uppercase; letter-spacing: .04em; }}
+  .card-value {{ font-size: 19px; font-weight: 700; margin-top: 4px; }}
+  .card-total {{ background: #2a251e; border-color: #2a251e; }}
+  .card-total .card-label {{ color: #d8d2c6; }}
+  .card-total .card-value {{ color: #fff; }}
+  table {{ width: 100%; border-collapse: collapse; }}
+  .grid th, .grid td {{ padding: 7px 9px; border-bottom: 1px solid #eee; }}
+  .grid thead th {{ background: #faf8f3; font-size: 11px; text-transform: uppercase;
+                    letter-spacing: .03em; color: #6b6457; }}
+  .grid tfoot td {{ border-top: 2px solid #d8d2c6; font-weight: 700; }}
+  .dueno {{ border: 1px solid #e5e1d8; border-radius: 10px; margin-bottom: 12px;
+            overflow: hidden; page-break-inside: avoid; }}
+  .dueno-head {{ display: flex; justify-content: space-between; align-items: baseline;
+                 background: #faf8f3; padding: 10px 14px; border-bottom: 1px solid #e5e1d8; }}
+  .dueno-name {{ font-weight: 700; font-size: 14px; }}
+  .dueno-tot {{ font-weight: 700; font-size: 14px; }}
+  .dueno-sub {{ font-weight: 400; font-size: 11px; color: #8a8378; }}
+  .detail th, .detail td {{ padding: 6px 14px; border-bottom: 1px solid #f0ede6; font-size: 12px; }}
+  .detail thead th {{ font-size: 10px; text-transform: uppercase; color: #8a8378; text-align: left; }}
+  .right {{ text-align: right; }}
+  .center {{ text-align: center; }}
+  .strong {{ font-weight: 700; }}
+  .empty {{ color: #8a8378; font-style: italic; padding: 10px 14px; }}
+  .foot {{ margin-top: 26px; padding-top: 12px; border-top: 1px solid #e5e1d8;
+           font-size: 11px; color: #8a8378; text-align: center; }}
+</style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <h1>Liquidación</h1>
+      <div class="sub">{html.escape(titulo)} · ingreso 100% pagado, repartido</div>
+    </div>
+    <div class="brand">
+      <strong>Rambla Rental</strong>
+      Reporte generado el {fecha_doc}
+    </div>
+  </div>
+
+  <div class="cards">{cards}</div>
+  {grilla}
+  <h2>Detalle por dueño</h2>
+  {detalle}
+
+  <div class="foot">
+    Rambla Rental · alquiler de equipos audiovisuales · reporte interno de liquidación
+  </div>
+</body>
+</html>"""
