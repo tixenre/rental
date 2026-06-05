@@ -34,7 +34,6 @@ import { Route as ClientePedidosIdEditarRouteImport } from './routes/cliente.ped
 
 const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
 const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
-const AdminSpecsLazyRouteImport = createFileRoute('/admin/specs')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
@@ -46,6 +45,7 @@ const AdminEmailTemplatesLazyRouteImport = createFileRoute(
 const AdminDisenoLazyRouteImport = createFileRoute('/admin/diseno')()
 const AdminDataioLazyRouteImport = createFileRoute('/admin/dataio')()
 const AdminClientesLazyRouteImport = createFileRoute('/admin/clientes')()
+const AdminSpecsIndexLazyRouteImport = createFileRoute('/admin/specs/')()
 const AdminPedidosIndexLazyRouteImport = createFileRoute('/admin/pedidos/')()
 const AdminPedidosV2IndexLazyRouteImport =
   createFileRoute('/admin/pedidos-v2/')()
@@ -140,11 +140,6 @@ const AdminUnidadesLazyRoute = AdminUnidadesLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/unidades.lazy').then((d) => d.Route),
 )
-const AdminSpecsLazyRoute = AdminSpecsLazyRouteImport.update({
-  id: '/specs',
-  path: '/specs',
-  getParentRoute: () => AdminRoute,
-} as any).lazy(() => import('./routes/admin/specs.lazy').then((d) => d.Route))
 const AdminSolicitudesLazyRoute = AdminSolicitudesLazyRouteImport.update({
   id: '/solicitudes',
   path: '/solicitudes',
@@ -240,6 +235,13 @@ const AdminEquiposRoute = AdminEquiposRouteImport.update({
   path: '/equipos',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSpecsIndexLazyRoute = AdminSpecsIndexLazyRouteImport.update({
+  id: '/specs/',
+  path: '/specs/',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/specs.index.lazy').then((d) => d.Route),
+)
 const AdminPedidosIndexLazyRoute = AdminPedidosIndexLazyRouteImport.update({
   id: '/pedidos/',
   path: '/pedidos/',
@@ -270,9 +272,9 @@ const AdminEquiposIndexLazyRoute = AdminEquiposIndexLazyRouteImport.update({
 )
 const AdminSpecsDefinitionsLazyRoute =
   AdminSpecsDefinitionsLazyRouteImport.update({
-    id: '/definitions',
-    path: '/definitions',
-    getParentRoute: () => AdminSpecsLazyRoute,
+    id: '/specs/definitions',
+    path: '/specs/definitions',
+    getParentRoute: () => AdminRoute,
   } as any).lazy(() =>
     import('./routes/admin/specs.definitions.lazy').then((d) => d.Route),
   )
@@ -380,7 +382,6 @@ export interface FileRoutesByFullPath {
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
-  '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
@@ -398,6 +399,7 @@ export interface FileRoutesByFullPath {
   '/admin/estudio/': typeof AdminEstudioIndexLazyRoute
   '/admin/pedidos-v2/': typeof AdminPedidosV2IndexLazyRoute
   '/admin/pedidos/': typeof AdminPedidosIndexLazyRoute
+  '/admin/specs/': typeof AdminSpecsIndexLazyRoute
   '/cliente/pedidos/$id/editar': typeof ClientePedidosIdEditarRoute
   '/admin/equipos/$id/editar': typeof AdminEquiposIdEditarLazyRoute
 }
@@ -423,7 +425,6 @@ export interface FileRoutesByTo {
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
-  '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente': typeof ClienteIndexRoute
   '/admin': typeof AdminIndexLazyRoute
@@ -441,6 +442,7 @@ export interface FileRoutesByTo {
   '/admin/estudio': typeof AdminEstudioIndexLazyRoute
   '/admin/pedidos-v2': typeof AdminPedidosV2IndexLazyRoute
   '/admin/pedidos': typeof AdminPedidosIndexLazyRoute
+  '/admin/specs': typeof AdminSpecsIndexLazyRoute
   '/cliente/pedidos/$id/editar': typeof ClientePedidosIdEditarRoute
   '/admin/equipos/$id/editar': typeof AdminEquiposIdEditarLazyRoute
 }
@@ -471,7 +473,6 @@ export interface FileRoutesById {
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
-  '/admin/specs': typeof AdminSpecsLazyRouteWithChildren
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
@@ -489,6 +490,7 @@ export interface FileRoutesById {
   '/admin/estudio/': typeof AdminEstudioIndexLazyRoute
   '/admin/pedidos-v2/': typeof AdminPedidosV2IndexLazyRoute
   '/admin/pedidos/': typeof AdminPedidosIndexLazyRoute
+  '/admin/specs/': typeof AdminSpecsIndexLazyRoute
   '/cliente/pedidos/$id/editar': typeof ClientePedidosIdEditarRoute
   '/admin/equipos/$id/editar': typeof AdminEquiposIdEditarLazyRoute
 }
@@ -520,7 +522,6 @@ export interface FileRouteTypes {
     | '/admin/estadisticas'
     | '/admin/settings'
     | '/admin/solicitudes'
-    | '/admin/specs'
     | '/admin/unidades'
     | '/cliente/'
     | '/admin/'
@@ -538,6 +539,7 @@ export interface FileRouteTypes {
     | '/admin/estudio/'
     | '/admin/pedidos-v2/'
     | '/admin/pedidos/'
+    | '/admin/specs/'
     | '/cliente/pedidos/$id/editar'
     | '/admin/equipos/$id/editar'
   fileRoutesByTo: FileRoutesByTo
@@ -563,7 +565,6 @@ export interface FileRouteTypes {
     | '/admin/estadisticas'
     | '/admin/settings'
     | '/admin/solicitudes'
-    | '/admin/specs'
     | '/admin/unidades'
     | '/cliente'
     | '/admin'
@@ -581,6 +582,7 @@ export interface FileRouteTypes {
     | '/admin/estudio'
     | '/admin/pedidos-v2'
     | '/admin/pedidos'
+    | '/admin/specs'
     | '/cliente/pedidos/$id/editar'
     | '/admin/equipos/$id/editar'
   id:
@@ -610,7 +612,6 @@ export interface FileRouteTypes {
     | '/admin/estadisticas'
     | '/admin/settings'
     | '/admin/solicitudes'
-    | '/admin/specs'
     | '/admin/unidades'
     | '/cliente/'
     | '/admin/'
@@ -628,6 +629,7 @@ export interface FileRouteTypes {
     | '/admin/estudio/'
     | '/admin/pedidos-v2/'
     | '/admin/pedidos/'
+    | '/admin/specs/'
     | '/cliente/pedidos/$id/editar'
     | '/admin/equipos/$id/editar'
   fileRoutesById: FileRoutesById
@@ -722,13 +724,6 @@ declare module '@tanstack/react-router' {
       path: '/unidades'
       fullPath: '/admin/unidades'
       preLoaderRoute: typeof AdminUnidadesLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/specs': {
-      id: '/admin/specs'
-      path: '/specs'
-      fullPath: '/admin/specs'
-      preLoaderRoute: typeof AdminSpecsLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/solicitudes': {
@@ -850,6 +845,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEquiposRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/specs/': {
+      id: '/admin/specs/'
+      path: '/specs'
+      fullPath: '/admin/specs/'
+      preLoaderRoute: typeof AdminSpecsIndexLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/pedidos/': {
       id: '/admin/pedidos/'
       path: '/pedidos'
@@ -880,10 +882,10 @@ declare module '@tanstack/react-router' {
     }
     '/admin/specs/definitions': {
       id: '/admin/specs/definitions'
-      path: '/definitions'
+      path: '/specs/definitions'
       fullPath: '/admin/specs/definitions'
       preLoaderRoute: typeof AdminSpecsDefinitionsLazyRouteImport
-      parentRoute: typeof AdminSpecsLazyRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/pedidos/nuevo': {
       id: '/admin/pedidos/nuevo'
@@ -1001,18 +1003,6 @@ const AdminEstudioRouteWithChildren = AdminEstudioRoute._addFileChildren(
   AdminEstudioRouteChildren,
 )
 
-interface AdminSpecsLazyRouteChildren {
-  AdminSpecsDefinitionsLazyRoute: typeof AdminSpecsDefinitionsLazyRoute
-}
-
-const AdminSpecsLazyRouteChildren: AdminSpecsLazyRouteChildren = {
-  AdminSpecsDefinitionsLazyRoute: AdminSpecsDefinitionsLazyRoute,
-}
-
-const AdminSpecsLazyRouteWithChildren = AdminSpecsLazyRoute._addFileChildren(
-  AdminSpecsLazyRouteChildren,
-)
-
 interface AdminRouteChildren {
   AdminEquiposRoute: typeof AdminEquiposRouteWithChildren
   AdminEstudioRoute: typeof AdminEstudioRouteWithChildren
@@ -1025,15 +1015,16 @@ interface AdminRouteChildren {
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
   AdminSolicitudesLazyRoute: typeof AdminSolicitudesLazyRoute
-  AdminSpecsLazyRoute: typeof AdminSpecsLazyRouteWithChildren
   AdminUnidadesLazyRoute: typeof AdminUnidadesLazyRoute
   AdminIndexLazyRoute: typeof AdminIndexLazyRoute
   AdminPedidosV2IdLazyRoute: typeof AdminPedidosV2IdLazyRoute
   AdminPedidosV2NuevoLazyRoute: typeof AdminPedidosV2NuevoLazyRoute
   AdminPedidosIdLazyRoute: typeof AdminPedidosIdLazyRoute
   AdminPedidosNuevoLazyRoute: typeof AdminPedidosNuevoLazyRoute
+  AdminSpecsDefinitionsLazyRoute: typeof AdminSpecsDefinitionsLazyRoute
   AdminPedidosV2IndexLazyRoute: typeof AdminPedidosV2IndexLazyRoute
   AdminPedidosIndexLazyRoute: typeof AdminPedidosIndexLazyRoute
+  AdminSpecsIndexLazyRoute: typeof AdminSpecsIndexLazyRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -1048,15 +1039,16 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
   AdminSolicitudesLazyRoute: AdminSolicitudesLazyRoute,
-  AdminSpecsLazyRoute: AdminSpecsLazyRouteWithChildren,
   AdminUnidadesLazyRoute: AdminUnidadesLazyRoute,
   AdminIndexLazyRoute: AdminIndexLazyRoute,
   AdminPedidosV2IdLazyRoute: AdminPedidosV2IdLazyRoute,
   AdminPedidosV2NuevoLazyRoute: AdminPedidosV2NuevoLazyRoute,
   AdminPedidosIdLazyRoute: AdminPedidosIdLazyRoute,
   AdminPedidosNuevoLazyRoute: AdminPedidosNuevoLazyRoute,
+  AdminSpecsDefinitionsLazyRoute: AdminSpecsDefinitionsLazyRoute,
   AdminPedidosV2IndexLazyRoute: AdminPedidosV2IndexLazyRoute,
   AdminPedidosIndexLazyRoute: AdminPedidosIndexLazyRoute,
+  AdminSpecsIndexLazyRoute: AdminSpecsIndexLazyRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

@@ -38,7 +38,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { authedJson } from "@/lib/authedFetch";
 
-export const Route = createLazyFileRoute("/admin/specs")({
+export const Route = createLazyFileRoute("/admin/specs/")({
   component: SpecsConsolidadasPage,
 });
 

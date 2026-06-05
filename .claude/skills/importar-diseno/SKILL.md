@@ -126,6 +126,14 @@ son referencia, pero el repo manda.
   **vieja intacta como fallback** hasta confirmar. Las acciones mutantes de la Fase 1 pueden **delegar
   en la pantalla existente** (no reimplementes la máquina de estados en paralelo). La Fase 2 va con
   rama + PR dedicada y aviso antes de mergear (por tocar escritura sensible).
+- **Ruteo: la LISTA de una pantalla con sub-rutas va como ruta `.index`.** Si una pantalla v2 tiene
+  lista + sub-rutas (`/x-v2/$id`, `/x-v2/nuevo`), la lista debe ser `x-v2.index.lazy.tsx`
+  (`createLazyFileRoute("/admin/x-v2/")`, con barra final), NO `x-v2.lazy.tsx`. Si es `x-v2.lazy.tsx`,
+  TanStack la convierte en el **route-parent** de sus sub-rutas, y como su componente (la lista) no
+  renderiza `<Outlet/>`, **navegar al editor cambia la URL pero la pantalla hija no aparece** (bug
+  silencioso — caso testigo #752, Pedidos v2). Mirá cómo lo hace la v1 (`pedidos.index.lazy.tsx`). Lo
+  hace cumplir el CI: `npm run check:routes` (`scripts/check-route-outlets.mjs`) falla si una ruta
+  parent no provee `<Outlet/>`.
 - **Al crear una v2, marcá la v1 como legacy y anotala en el tracker de cleanup** (si no, la v1 queda
   para siempre). Cada archivo v1 superado lleva arriba un banner grep-able:
   `// LEGACY — <qué es> v1. Reemplazo en curso por <ruta v2> (ver #<tracker>). … Se elimina cuando la
