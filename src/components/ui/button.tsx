@@ -22,13 +22,11 @@ export const buttonVariants = cva(
 
         // primary — la jugada signature de marca: fondo ink, hover invierte a amber.
         // CTA principal del catálogo, carrito y flows de reserva.
-        // Source: docs/design-kit/kit/components/button.tsx (variant "primary").
         primary: "bg-ink text-background shadow-sm hover:bg-amber hover:text-ink",
 
         // amber — siempre amber, sin inversión. Para CTAs sobre fondos oscuros
         // (hero estudio, banners, etc.) o cuando el primario no tiene suficiente
         // contraste con el fondo.
-        // Source: docs/design-kit/kit/components/button.tsx (variant "amber").
         amber: "bg-amber text-ink shadow-sm hover:bg-amber-hot",
       },
       size: {

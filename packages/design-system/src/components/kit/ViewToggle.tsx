@@ -11,14 +11,8 @@ interface Option<T extends string> {
 /**
  * ViewToggle — segmented control con pill deslizante.
  *
- * Source: `docs/design-kit/kit/components/view-toggle.tsx` (lógica) +
- * `docs/design-kit/index.html` y `docs/design-kit/preview/components-view-toggle.html`
- * (look visual canónico).
- *
- * Nota de drift: el JSX original del kit usaba `rounded-full` pero el
- * showcase y el specimen del kit lo dibujan más "boxy" (radius-lg outer,
- * radius-md inner). Alineamos con el visual canónico — el kit/.tsx queda
- * para corregir en una próxima regeneración de Claude Design.
+ * Nota: el JSX original usaba `rounded-full` pero el look canónico
+ * es más "boxy" (radius-lg outer, radius-md inner). Usamos el visual canónico.
  *
  * Usado en la sub-toolbar del catálogo (Grid / Lista) y donde sea que
  * haya 2-3 opciones mutuamente excluyentes. El label activo va en

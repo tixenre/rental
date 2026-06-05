@@ -20,7 +20,7 @@ export function StatCard({
       </div>
       <div
         className={cn(
-          // text-3xl (30px) alineado con el showcase de docs/design-kit (era text-2xl).
+          // text-3xl (30px) — era text-2xl antes.
           "mt-1.5 font-display text-3xl font-black leading-none tracking-[-0.01em] tabular-nums text-ink",
           valueClassName,
         )}

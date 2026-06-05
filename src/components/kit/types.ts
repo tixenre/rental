@@ -1,10 +1,8 @@
 /**
  * Tipos compartidos por los componentes del kit Rambla.
  *
- * Origen: `docs/design-kit/kit/types/equipment.ts`. Los duplico acá para
- * que `src/components/kit/*` sean drop-in sin acoplarse al snapshot del
- * design-kit. Mantenelos en sync con el repo de producción (`src/data/*`)
- * si crecen.
+ * Duplicados acá para que `src/components/kit/*` sean drop-in.
+ * Mantenelos en sync con el repo de producción (`src/data/*`) si crecen.
  */
 
 export type EquipmentCategory =

@@ -8,7 +8,7 @@
 > chico y vigente. El "append-only / nada se pierde" lo cumple el **historial de git** (inmutable);
 > acá vive solo lo que sigue valiendo hoy. Una decisión que se reemplaza se **actualiza o retira en
 > el lugar** (no se apilan contradicciones); su versión vieja queda en git. Ver decisión
-> *2026-05-26 — Curación de la memoria*.
+> _2026-05-26 — Curación de la memoria_.
 >
 > Las **decisiones de arquitectura fundacionales** viven en [`MANIFIESTO.md`](../MANIFIESTO.md) §6
 > (baseline congelado). Acá van las **nuevas**. El **trabajo pendiente** vive en GitHub Issues;
@@ -23,6 +23,7 @@
 ## Decisiones (ADR-lite)
 
 ### 2026-05-25 — Branch + PR siempre (se deprecá local-first sobre main)
+
 - **Contexto:** el manifiesto documentaba un flujo local-first commiteando directo a `main`, que
   ya no es como se trabaja (las sesiones corren en la nube desde apps Mac/iPhone).
 - **Decisión:** todo cambio va en una rama dedicada y se mergea por PR. No se commitea directo a
@@ -30,10 +31,11 @@
 - **Consecuencias:** trazabilidad uniforme corra Claude donde corra; se descarta el modo
   local-first.
 - **Matiz (2026-06-03):** el "rama+PR siempre" se relajó **solo para bugfixes chicos**, que pueden
-  ir **directo a `dev`** sin PR por feature (ver decisión *2026-06-03 — Bugfixes chicos*). Lo
+  ir **directo a `dev`** sin PR por feature (ver decisión _2026-06-03 — Bugfixes chicos_). Lo
   inamovible es **nunca commitear directo a `main`** — eso no cambió.
 
 ### 2026-05-25 — Merge según tamaño
+
 - **Contexto:** auto-merge para todo era riesgoso para cambios sensibles; bloquear todo era lento.
 - **Decisión:** trivial/small con CI verde + supervisor OK → auto-merge. Sensible / arquitectónico
   / grande, o que toca lo que ve el usuario → PR draft + el dueño prueba antes de mergear.
@@ -41,9 +43,10 @@
 - **Matiz (2026-06-03):** en el flujo de dos etapas, el "el dueño prueba antes de mergear" se
   **reubica** — el dueño prueba en **staging** (después del merge a `dev`), no antes; lo que el dueño
   mergea con su criterio es la **promoción `dev → main`** (la puerta a prod). El merge a `dev` lo
-  hace la **sesión** (ver decisión *2026-06-03 — Quién clickea el merge*).
+  hace la **sesión** (ver decisión _2026-06-03 — Quién clickea el merge_).
 
 ### 2026-05-25 — Modus operandi durable, sesión efímera
+
 - **Contexto:** las sesiones son efímeras; el plan de una iniciativa larga no puede vivir solo en
   la conversación o se pierde.
 - **Decisión:** el cómo-se-trabaja vive en docs durables (MANIFIESTO + esta memoria + `CLAUDE.md`),
@@ -53,13 +56,15 @@
 - **Consecuencias:** una sesión nueva retoma una iniciativa larga sin contexto perdido.
 
 ### 2026-05-25 — Memoria en capas
-- **Contexto:** "todo en GitHub Issues" enterraba el *por qué* en issues cerrados, imposible de
+
+- **Contexto:** "todo en GitHub Issues" enterraba el _por qué_ en issues cerrados, imposible de
   hacer cumplir por un agente.
 - **Decisión:** Issues = cola de trabajo; commits/PRs = registro de cambios; `docs/MEMORIA.md` =
   decisiones de criterio + preferencias (curado, enforceable por el supervisor).
 - **Consecuencias:** el criterio del proyecto queda cargado en cada sesión y revisable.
 
 ### 2026-06-01 — Staging → Prod: flujo desde v1.0.0 (reemplaza "producción = ambiente de prueba")
+
 - **Contexto:** v1.0.0 en prod. Se creó un ambiente Railway `dev` (rama `dev`) como staging.
   El disparador ⏰ de la entrada anterior se cumplió — hay staging, no se prueba en prod.
 - **Decisión:** **prod es sagrado — no se prueba ahí.** El flujo es:
@@ -71,6 +76,7 @@
   de `dev` corren en staging y no tocan prod hasta el merge.
 
 ### 2026-05-25 — Gate de estilo en CI: formato bloquea, lógica de React avisa
+
 - **Contexto:** el repo tenía `eslint.config.js` pero el tooling nunca se instaló ni corría; al
   medir, ~98% de la deuda era formato auto-arreglable (prettier), no bugs.
 - **Decisión:** el CI bloquea por **formato (prettier)** — es automático y sin criterio, mantiene el
@@ -83,6 +89,7 @@
   issue de tracking **#476**.
 
 ### 2026-05-26 — Convención de alias `e` para `equipos` en queries SQL
+
 - **Contexto:** la migración `d5a8f2c4b6e9` dropeó `equipos.marca` (TEXT). El nombre se resuelve
   por subquery contra `marcas.nombre` vía `e.brand_id`. La subquery estaba copiada literal en >15
   lugares; algunas quedaron sin migrar → 500s en producción (#499). Se extrajo a un helper único
@@ -97,6 +104,7 @@
   sin alias.
 
 ### 2026-05-26 — Curación de la memoria (no es append-only puro)
+
 - **Contexto:** el doc era "append-only", pero eso lo hace crecer indefinidamente y deja entradas
   obsoletas escritas como si fueran ciertas. Caso testigo: la entrada de "minutos de Actions" quedó
   falsa en horas (el repo volvió a público) y hubo que editarla en el lugar para no mentirle a una
@@ -112,6 +120,7 @@
 - **Consecuencias:** la memoria se mantiene chica y verdadera; el log completo vive en git.
 
 ### 2026-05-27 — El Estudio: producto aparte que reusa el motor de reservas
+
 - **Contexto:** el **Estudio** es un espacio físico que se alquila — parte del inventario pero **fuera
   de categorías/specs**. Se reserva **por horas** (no por día, mín 2h, tarifa plana), con un **pack
   opcional curado** (lista de equipos elegida en el back-office, tabla `estudio_pack_equipos`; los
@@ -133,6 +142,7 @@
   (distribución proporcional del pack → rental; espacio/slot → estudio — es contabilidad, iniciativa aparte).
 
 ### 2026-05-27 — Notificaciones canal-agnósticas; mail construido-no-activado; confirmación = redirect al portal
+
 - **Contexto:** al solicitar un pedido (carrito o estudio) el feedback era pobre; y la infra de mails
   ya estaba **construida pero apagada** (caía al backend `test`), no inexistente.
 - **Decisión:** (1) el feedback de "pedido solicitado" es un **redirect al portal del cliente** con la
@@ -148,6 +158,7 @@
   pre-aprobadas → cuando se encare, va como iniciativa propia.
 
 ### 2026-05-29 — Módulo `equipment/shared/` = librería canónica de assets visuales (reusar, no recrear)
+
 - **Contexto:** el design handoff de las vistas de equipos introdujo `StepperPill`, `PriceBlock` y
   `FavButton` como componentes compartidos. El handoff ya los define como tokens usados en las tres
   vistas del catálogo **y** en el CartDrawer.
@@ -160,6 +171,7 @@
   marca como hallazgo cualquier stepper/precio/favorito ad-hoc que duplique estos componentes.
 
 ### 2026-05-29 — `RentalDateModal` = base única de selección de fechas (desktop + mobile)
+
 - **Contexto:** el catálogo mobile (`CatalogoMovil`) tenía su propio `DateSheet` (bottom-sheet con
   `<input type=date>` nativo + `<select>` de horas) y un **estado de fechas local paralelo** al
   carrito, mientras desktop usaba `RentalDateModal`. Dos UIs y dos estados para la misma decisión.
@@ -174,6 +186,7 @@
   ad-hoc o estado de fechas local que duplique la fuente única.
 
 ### 2026-05-30 — `backend/reservas/` = motor único de reservas (fuente única; el core sagrado tiene dirección física)
+
 - **Contexto:** la lógica de disponibilidad y el gate `_check_stock` vivían dispersos y duplicados en
   `routes/alquileres.py`. La iniciativa #501 (PR #623) los unificó en el paquete `backend/reservas/`
   (`estados.py`, `semantics.py`, `disponibilidad.py`, `gate.py`).
@@ -183,14 +196,15 @@
   core tiene **una dirección física única**.
 - **Consecuencias:** el supervisor marca como hallazgo cualquier chequeo de stock/overlap/disponibilidad
   ad-hoc en un route que debería llamar al paquete. Cambios al paquete son de **alto radio de
-  explosión** → Opus (ver *Eficiencia de sesión: modelo según tarea*). El test de concurrencia con
+  explosión** → Opus (ver _Eficiencia de sesión: modelo según tarea_). El test de concurrencia con
   Postgres real (`test_reservas_concurrency_db.py`, opt-in) es la prueba definitiva del `FOR UPDATE`.
 
 ### 2026-05-31 — Expansión recursiva del motor de reservas (C4 #635)
+
 - **Contexto:** la lectura y el gate expandían la composición a **1 nivel**. Un combo **anidado**
   (combo→kit→hoja) se contaba de menos en AMBAS direcciones → overbooking (reproducido contra
-  Postgres real antes de tocar nada). El conteo *backward* (`reservado_via_kit`, 1 nivel) era tan
-  culpable como el *forward*: no alcanzaba con recursar solo la expansión del pedido.
+  Postgres real antes de tocar nada). El conteo _backward_ (`reservado_via_kit`, 1 nivel) era tan
+  culpable como el _forward_: no alcanzaba con recursar solo la expansión del pedido.
 - **Decisión:** toda expansión de composición del motor —demanda hacia abajo y consumo hacia
   arriba— es **recursiva hasta las hojas**, vía una pieza ÚNICA `_expandir_mult` en
   `backend/reservas/semantics.py` (agnóstica de dirección: `componentes_de` baja, `parientes_de`
@@ -203,11 +217,12 @@
   expansión inline de 1 nivel en routes ni "otra función parecida" — todo pasa por `_expandir_mult`.
   El supervisor marca como hallazgo cualquier conteo de stock/expansión/overlap ad-hoc. El **batch
   O(N)→1** (perf, no correctitud) queda **diferido** a #626. Materializa y extiende la decisión
-  *2026-05-30* (`backend/reservas/` = motor único). Red de seguridad: caracterización diferencial
+  _2026-05-30_ (`backend/reservas/` = motor único). Red de seguridad: caracterización diferencial
   (`test_gate_caracterizacion_c4.py`) + correctitud/concurrencia anidada real
   (`test_reservas_nested_db.py`, opt-in).
 
 ### 2026-06-01 — Método de merge según etapa del flujo (squash a `dev`, merge-commit a `main`)
+
 - **Contexto:** el flujo es de dos etapas (`rama → dev → main`, decisión 2026-06-01 Staging→Prod).
   Las ramas de feature suelen tener commits de ruido ("wip", "fix lint") que no aportan al historial.
 - **Decisión:** el método de merge depende de la etapa:
@@ -215,18 +230,19 @@
     cambio entendible, con su `#PR`). El detalle commit-por-commit no se pierde: vive en la PR.
   - **`dev → main` = merge commit** (NO squash). Así cada PR ya squasheada en `dev` fluye a `main`
     como **su propio commit**, preservando la trazabilidad PR-por-PR en prod.
-- **Why:** el *registro de cambios vive en el commit history* (decisión Memoria en capas) y *prod es
-  sagrado*. Squashear `dev → main` aplastaría N PRs en un commit gigante → se pierde poder revertir
+- **Why:** el _registro de cambios vive en el commit history_ (decisión Memoria en capas) y _prod es
+  sagrado_. Squashear `dev → main` aplastaría N PRs en un commit gigante → se pierde poder revertir
   **una PR puntual** en prod. El patrón (squash en feature, merge en promoción) mantiene `dev`
   prolijo **y** `main` con revert quirúrgico.
 - **How to apply:** al mergear una rama a `dev`, usar squash con título `tipo: desc (#PR)`. Al promover
   `dev → main`, usar merge commit. No squashear nunca la PR de promoción a prod.
 - **Alcance (2026-06-03):** el `rama → dev = squash` aplica a las PRs que **sí** pasan por rama —es
   decir, lo grande/sensible/arquitectónico. Los **bugfixes chicos van directo a `dev`** sin PR
-  (ver decisión *2026-06-03 — Bugfixes chicos*); ahí no hay squash. El `dev → main = merge commit`
+  (ver decisión _2026-06-03 — Bugfixes chicos_); ahí no hay squash. El `dev → main = merge commit`
   no cambia: sigue siendo la única vía a prod y conserva el revert por unidad.
 
 ### 2026-06-01 — Gotcha de Railway: fork de ambiente desincroniza la contraseña del Postgres
+
 - **Contexto:** el backend de staging (`dev`) tiraba 500 en cascada con
   `psycopg2.OperationalError: FATAL: password authentication failed for user "postgres"`.
   No era bug de código: al **forkear** el ambiente `dev` desde prod, el **volumen** del Postgres
@@ -249,6 +265,7 @@
 - **Consecuencias:** receta directa para la próxima sesión que forkee un ambiente con DB.
 
 ### 2026-06-02 — Google Analytics: sin consent, solo catálogo público, ID administrado desde el back-office
+
 - **Contexto:** se integró GA4 al front. Decisiones del dueño: sin banner de consentimiento (GA
   carga directo), medir páginas vistas + 3 eventos de negocio (`add_to_cart`, `solicitar_pedido`,
   `reservar_estudio`), cobertura **solo catálogo público** (`/admin` y `/cliente` quedan fuera del
@@ -273,6 +290,7 @@
   (con rutas sanitizadas) quedan como follow-ups si se piden.
 
 ### 2026-06-03 — Esquema en dos capas: `init_db()` (bootstrap) + Alembic; toda tabla nueva va TAMBIÉN en `init_db()`
+
 - **Contexto:** el 500 de "Qué busca la gente" (#687) destapó que las migraciones de prod no llegaban
   al head: la tabla `search_queries` vivía solo en una migración Alembic y nunca se creó. Causa raíz
   (#690): el arranque corre `alembic upgrade head` y, si una migración **aborta por los datos** (ej.
@@ -296,13 +314,14 @@
   pendiente en #690.
 
 ### 2026-06-03 — Bugfixes chicos: push directo a `dev`; rama+PR solo para lo grande
+
 - **Contexto:** abrir un PR a `dev` por cada bug chico, solo para verlo en staging, era pura fricción
   cuando hay **varios fixes en paralelo** (el modo de trabajo habitual del dueño). El paso "PR para
   previsualizar" no aportaba: el dueño no revisa diffs y prod no se toca en esa etapa.
 - **Decisión:** los **bugfixes chicos van directo a `dev`** (sin PR por feature). Se ven juntos en
   staging y se abre **un** PR `dev → main` cuando el lote está listo. Lo **grande / sensible /
   arquitectónico / que toca el core de reservas o lo que ve el usuario** sigue en **rama + PR
-  dedicada** — la regla *Merge según tamaño* (2026-05-25) queda intacta; esto solo define el camino
+  dedicada** — la regla _Merge según tamaño_ (2026-05-25) queda intacta; esto solo define el camino
   del caso chico. El triage honesto es la pieza que carga el peso: en el momento en que un fix deja
   de ser trivial, gradúa a rama+PR.
 - **Why (es seguro):** **prod es sagrado y no se toca acá** — solo se alcanza por el PR `dev → main`,
@@ -314,10 +333,11 @@
   aunque no se agrupe por PR; (2) el **supervisor corre antes de promover `dev → main`** (sobre el
   lote); (3) **mantener `dev` cerca de `main`** (promover seguido, no dejar laburo a medias en `dev`
   al promover) para no perder el todo-o-nada de la promoción.
-- **Consecuencias:** matiza *Branch + PR siempre* (2026-05-25) y *Método de merge según etapa*
+- **Consecuencias:** matiza _Branch + PR siempre_ (2026-05-25) y _Método de merge según etapa_
   (2026-06-01) — ver las notas agregadas ahí. Lo inamovible: **nunca directo a `main`**.
 
 ### 2026-06-03 — Quién clickea el merge: la sesión mergea a `dev`; el dueño gatea staging + promoción
+
 - **Contexto:** el dueño no quiere ser el botón de merge de cambios que la sesión ya aprobó
   (supervisor OK) y con CI verde. El criterio de "el código está bien" lo cubren supervisor + CI;
   clickear merge es trabajo mecánico sin valor.
@@ -331,11 +351,12 @@
 - **Los gates del dueño** (donde sí aporta criterio) quedan en: (1) **probar la conducta en
   staging**, y (2) **aprobar la promoción `dev → main`** — esa es la puerta a prod (sagrada),
   siempre manual del dueño. Nunca se mergea con **CI en rojo**.
-- **Consecuencias:** refina *Merge según tamaño* (2026-05-25). Cada PR a `dev` llega con su plan de
+- **Consecuencias:** refina _Merge según tamaño_ (2026-05-25). Cada PR a `dev` llega con su plan de
   prueba en lenguaje claro para que el dueño sepa qué tocar en staging. El supervisor sigue corriendo
   antes de cada merge a `dev` (chico/mediano) y antes de la promoción.
 
 ### 2026-06-03 — `backend/reportes/` = motor único de reportes financieros (espeja `backend/reservas/`)
+
 - **Contexto:** el generador de reportes (#88) introdujo la liquidación por dueño: atribución por
   fecha de pago (solo pedidos 100% pagados), prorrateo del total entre los equipos del pedido y
   reparto entre beneficiarios según un modelo de comisiones editable (`app_settings.comisiones_modelo`).
@@ -344,7 +365,7 @@
   agregación) vive en el paquete **`backend/reportes/`** (`comisiones.py` = modelo + reparto +
   validación; `liquidacion.py` = SQL de pedidos saldados + prorrateo + `agregar` pura). El route
   (`routes/reportes.py`) es **solo transporte HTTP + CSV**. Materializa el mismo principio que
-  *2026-05-30* (`backend/reservas/` = motor único): el dinero tiene una **dirección física única**.
+  _2026-05-30_ (`backend/reservas/` = motor único): el dinero tiene una **dirección física única**.
 - **Cómo aplica / quién hace cumplir:** el supervisor marca como hallazgo cualquier cálculo de
   reporte/reparto/atribución ad-hoc en un route en vez de pasar por `backend/reportes/`. El pipeline
   se parte SQL→filas→`agregar` para que la matemática (prorrateo + comisiones + buckets mes/día) se
@@ -356,6 +377,7 @@
   (el front actual cobra por la vía que sí registra).
 
 ### 2026-06-03 — Cierre de mes + clean start de la liquidación (junio 2026)
+
 - **Contexto:** la liquidación (#88) se calcula en vivo → editar el modelo de comisiones o un pedido
   viejo reescribe el pasado. Y al arrancar el reparto formal entre dueños no se quiere arrastrar el
   histórico previo.
@@ -376,13 +398,14 @@
 - **Quién hace cumplir:** el supervisor marca como hallazgo (1) cualquier tabla/columna de cierres sin
   su espejo en `init_db()`; (2) duplicar el valor de corte fuera de `LIQUIDACION_INICIO`; (3) filtrar
   el Resumen general con el clean start; (4) reintroducir expansión/atribución de plata ad-hoc fuera de
-  `backend/reportes/`. Extiende la decisión *2026-06-03 — `backend/reportes/` = motor único*.
+  `backend/reportes/`. Extiende la decisión _2026-06-03 — `backend/reportes/` = motor único_.
 
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
 
 ### 2026-05-25 — El dueño testea, no revisa código
+
 - **What:** el gate humano del dueño es **probar la conducta**, no leer diffs (no es programador).
 - **Why:** la corrección del código la cubren el supervisor + tests automáticos + CI; el dueño
   aporta lo que esos no pueden: ¿hace lo que quería?
@@ -390,6 +413,7 @@
   ("andá a /X, hacé Y, tenés que ver Z"). El supervisor y los PRs hablan sin jerga.
 
 ### 2026-05-25 — La conversación es para decisiones, no para el ruido de commits
+
 - **What:** la sesión con el dueño gira en torno a decisiones y a la forma de hacer las cosas, no
   al detalle mecánico de cada diff/commit.
 - **Why:** mantener la atención del dueño en lo que aporta valor (criterio), no en mecánica.
@@ -397,6 +421,7 @@
   a la conversación llega el veredicto en claro + el plan de prueba.
 
 ### 2026-05-25 — Barra de calidad de ingeniería (cómo construimos)
+
 - **What:** el estándar de calidad del código del proyecto. El supervisor lo hace cumplir en cada PR.
   1. **Modularidad a prueba de balas.** Lógica que se repite (caso testigo: las fechas de reserva
      estaban implementadas distinto en ~5 lugares) se extrae a un módulo/función único y robusto.
@@ -417,31 +442,35 @@
   estilo ad-hoc, o toca reservas sin cuidar el overlap.
 
 ### 2026-05-25 — Protocolo de brain-dumps del dueño
+
 - **What:** el dueño tira ideas en lotes grandes y desordenados (varias cosas mezcladas, a mitad de
   otra tarea, sin terminar el plan de la anterior). Eso está bien — la sesión lo ordena.
 - **Why:** que nada se pierda y que el desorden al pedir no se traduzca en desorden en el proyecto.
 - **How to apply:** la sesión **triagea cada ítem en el acto** y devuelve un mapa corto de dónde fue
   cada cosa. Cada ítem cae en: **principio durable** → propuesta a esta memoria (con aprobación del
   dueño); **trabajo** (bug/feature/iniciativa) → GitHub Issue (lo que no es para ahora queda
-  `priority:low`; la cola *es* el backlog); **pregunta** → respuesta; **idea cruda / "más adelante"**
+  `priority:low`; la cola _es_ el backlog); **pregunta** → respuesta; **idea cruda / "más adelante"**
   → igual va a issue. **Nada se borra.** Si la sesión nota algo y no lo arregla en el momento, lo
   deja como issue, no lo descarta.
 
 ### 2026-05-25 — Minutos de GitHub Actions: cuota a cuidar SOLO si el repo vuelve a privado ⏰
+
 - **Estado:** en **público** (hoy) Actions es **ilimitado** — regla **dormida**. Buena higiene que
   vale siempre igual: batch de commits (cada push = corrida completa), y los cambios solo-docs ya no
   disparan CI (`paths-ignore` de `*.md`/`docs/**`) — afinado mayor pendiente en #487. `concurrency:
-  cancel-in-progress` ya cancela corridas viejas.
+cancel-in-progress` ya cancela corridas viejas.
 - **⏰ Disparador:** si el repo vuelve a privado, el plan Free da 2.000 min/mes y el CI corre 6 jobs
   por push → ahí sí hay que cuidar la cuota (sacar `compileall`, cachear `npm ci`, terminar #487).
 
-### 2026-05-26 — Sesión local para trabajo visual/testeable *(reemplazada 2026-06-01)*
-- *(Reemplazada por la decisión 2026-06-01 — Staging → Prod. El staging de Railway cubre
+### 2026-05-26 — Sesión local para trabajo visual/testeable _(reemplazada 2026-06-01)_
+
+- _(Reemplazada por la decisión 2026-06-01 — Staging → Prod. El staging de Railway cubre
   la necesidad de ver cambios en vivo. Ya no hace falta arrancar local para validar UX/flujos;
   se pushea a `dev` y se ve en staging. La sesión local sigue siendo válida para debugging
-  muy específico sin acceso a Railway, pero no es el flujo default.)*
+  muy específico sin acceso a Railway, pero no es el flujo default.)_
 
 ### 2026-05-26 — Al actualizar gobernanza, barrer todo el sistema de supervisión
+
 - **What:** cada vez que se edita un doc de gobernanza (`MEMORIA.md`, `CLAUDE.md`, `MANIFIESTO.md`,
   `PROTOCOLO.md`, el agente `supervisor`, demás docs de `docs/`), hacer una **lectura comprensiva
   del sistema de supervisión completo** en la misma pasada, para mantenerlo consistente — cazar
@@ -451,23 +480,11 @@
   decía "MANIFIESTO 671 líneas" cuando tiene 287 (#516); `SISTEMA_SPECS.md` citaba `registry.py`
   que ya no existe. Una edición aislada deja mentiras escritas como ciertas.
 - **How to apply:** quien toca un doc de gobernanza revisa el resto en la misma pasada; el
-  **supervisor** lo verifica en su revisión. Extiende la decisión *2026-05-26 — Curación de la
-  memoria* (que cura *dentro* de MEMORIA) a la **consistencia ENTRE docs**.
-
-### 2026-05-28 — Handoffs de Claude Design: el TSX manda, el HTML es solo para visualizar
-- **What:** los bundles de handoff (`HANDOFF.md` + `src/routes/*.tsx`) incluyen el `.tsx` como
-  contrato de implementación. El `-preview.html` es solo una simulación visual para entender el
-  diseño — no es source of truth. Si hay diferencias entre el `.tsx` y su preview HTML, el **`.tsx`
-  manda**. Si el `.tsx` tiene un bug, se corrige **en el `.tsx`**, no mirando el HTML.
-- **Aplica también al kit en `docs/design-kit/`:** los componentes `.tsx` de `kit/components/*.tsx`
-  son el contrato; el HTML showcase/specimen es referencia visual de apoyo, no override.
-- **How to apply:** al implementar un handoff, leer el `.tsx` de punta a punta. Bugs evidentes (ej.
-  un valor de default que no matchea el tipo declarado) se corrigen en el `.tsx` directamente.
-  No "arreglar" el `.tsx` hacia el HTML — el HTML puede estar desfasado.
-- **Consecuencias:** consistencia entre el archivo fuente y lo que se porta a `src/`. El HTML queda
-  como referencia visual útil pero no vinculante.
+  **supervisor** lo verifica en su revisión. Extiende la decisión _2026-05-26 — Curación de la
+  memoria_ (que cura _dentro_ de MEMORIA) a la **consistencia ENTRE docs**.
 
 ### 2026-05-26 — Eficiencia de sesión: modelo según tarea + limpiar contexto
+
 - **What:**
   - **Auditar / planificar / decidir / arquitectura** → Opus (effort alto).
   - **Ejecutar** (implementar un prompt bien especificado, bug fixes con tests, trabajo mecánico) →
@@ -488,6 +505,7 @@
   issues + PRs, así que limpiar es de bajo riesgo (una sesión nueva retoma sola).
 
 ### 2026-06-05 — Apple HIG como guía de UX mobile/táctil (enforceable)
+
 - **What:** la referencia por default para las decisiones de **UX mobile/táctil** que el design system
   no resuelve ya es **Apple Human Interface Guidelines (HIG)** — el estándar de usabilidad táctil que
   seguimos al decidir un tamaño, gesto o espaciado de interacción. Es una **guía general**, no la regla
@@ -499,7 +517,7 @@
   `.safe-*` cerca de notch/home-bar.
 - **Why:** la mayoría del tráfico entra desde el celular (label `mobile` = trato prioritario); apoyarse
   en un estándar táctil reconocido y estable evita discutir cada número caso por caso y mantiene
-  coherencia. Nombra y refuerza el punto 3 de la *Barra de calidad* (mobile-first).
+  coherencia. Nombra y refuerza el punto 3 de la _Barra de calidad_ (mobile-first).
 - **How to apply / quién hace cumplir:** ante una decisión de UX táctil sin resolver, se sigue HIG y el
   valor concreto se documenta en el design system (acá vive el **criterio**, no la tabla de números). El
   **supervisor lo hace cumplir**: marca como hallazgo un tap target nuevo < 44px, o una decisión táctil

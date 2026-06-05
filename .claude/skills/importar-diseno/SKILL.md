@@ -11,6 +11,14 @@ description: Importa un handoff de Claude Design (carpeta design_handoff_<featur
 Su flujo es **Leer el repo → Diseñar pensando en el backend → Exportar**. Te entrega un **handoff**:
 una carpeta `design_handoff_<feature>/` que **espeja los paths reales del repo**.
 
+> **El loop completo arranca con un BRIEF.** Antes del handoff, el dueño escribe un **brief**
+> (`docs/design-brief-<feature>.md`): _qué_ rediseñar + contexto + objetivo (no _cómo_ se ve — eso
+> lo decide Claude Design). Lo abre en Claude Design, que con eso produce el handoff. Flujo de punta
+> a punta: **brief → Claude Design (handoff) → implementar (este skill) → borrar el handoff** (ciclo
+> de vida en _Patrones útiles_). El **brief se queda mientras el rediseño esté pendiente**; se retira
+> cuando se implementa. (Vigente hoy: [`docs/design-brief-documentos.md`](../../../docs/design-brief-documentos.md)
+> — rediseño de los 5 PDF de documentos.)
+
 | Pieza                 | Qué es                                                                   | Cómo la tratás                                                |
 | --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | `<Feature>.html`      | **Referencia visual** (Tailwind CDN + mocks, todos los estados).         | La **mirás** (rasterizada). Verdad de _cómo se ve_.           |
@@ -27,7 +35,7 @@ una carpeta `design_handoff_<feature>/` que **espeja los paths reales del repo**
 - **El HTML manda para la fidelidad visual** — cómo se ve: layout, jerarquía, espaciados, estados,
   mobile. Es la intención de diseño aprobada.
 - **El TSX manda para estructura / lógica / implementación** — cómo se construye: qué componentes y
-  tokens del repo se usan, props, comportamiento. (Coherente con MEMORIA _2026-05-28_.)
+  tokens del repo se usan, props, comportamiento.
 
 No están en conflicto: son planos distintos. El markup/clases del HTML **no se copian** a producción
 (usa Tailwind CDN + mocks); se traduce a los componentes/tokens reales del repo.
@@ -165,6 +173,12 @@ v2 alcance paridad y esté confirmada en prod.` Listalas con `grep -rn "LEGACY �
   rasterizan desde el bundle del dueño **durante** el import y listo. **No commitees un `.html` huérfano**
   (sin sus assets queda irrenderizable = peso muerto); si querés dejarlo igual, tiene que ser
   self-contained.
+- **Ciclo de vida: un handoff implementado se borra — no se acumulan.** Una vez que el handoff está
+  **implementado en el front real y confirmado en prod**, la fuente de verdad pasa a ser el código +
+  el design system, no el handoff. Borrá la carpeta `docs/handoffs/<feature>/` — era input de import, ya
+  cumplió. (Caso testigo: el handoff de Pedidos se retiró tras implementar Pedidos v2.) Un brief que
+  **todavía no** se implementó (ej. `docs/design-brief-*.md`) **se queda** — es trabajo futuro que entra
+  por este loop.
 
 ## Motor visual (render.mjs)
 
