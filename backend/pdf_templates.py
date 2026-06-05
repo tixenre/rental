@@ -7,7 +7,7 @@ DROP-IN para `backend/pdf.py`. Reemplazá las cuatro funciones de template
 por las de este módulo. El resto de `pdf.py` queda IGUAL:
 `_render_pdf`, `_get_browser`, `_abs_image_url`, `_pedido_filename`,
 y los helpers de `services.precios` (`jornadas_periodo`,
-`es_responsable_inscripto`, `IVA_PCT`).
+`es_responsable_inscripto`).
 
 Qué cambia respecto del template anterior
 ------------------------------------------
@@ -47,9 +47,8 @@ from datetime import datetime, date
 
 # Helpers de precios del repo — mismos imports que el pdf.py original.
 try:
-    from services.precios import jornadas_periodo, es_responsable_inscripto, IVA_PCT
+    from services.precios import jornadas_periodo, es_responsable_inscripto
 except Exception:  # pragma: no cover — fallback para correr el módulo aislado
-    IVA_PCT = 21
     def jornadas_periodo(d1, d2):
         try:
             return max(1, (d2 - d1).days)
@@ -209,6 +208,12 @@ body{font-family:var(--font-sans);color:var(--ink);background:#fff;
 .spec-list li::before{content:"·";position:absolute;left:2px;font-weight:700;
   color:color-mix(in oklch,var(--amber) 65%,var(--ink))}
 
+/* Línea "INCLUYE …" del presupuesto: accesorios inline bajo el nombre. */
+.incluye{font-family:var(--font-mono);font-size:9px;line-height:1.55;
+  color:var(--muted);margin-top:3px}
+.incluye-lbl{font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  margin-right:5px;color:color-mix(in oklch,var(--amber) 65%,var(--ink))}
+
 /* Totales (ink) */
 .total-section{display:flex;justify-content:flex-end;margin-top:22px}
 .total-box{min-width:300px;background:var(--ink);color:#fff;border-radius:var(--r-lg);
@@ -230,7 +235,11 @@ body{font-family:var(--font-sans);color:var(--ink);background:#fff;
 .total-box--light .total-row .tv{color:var(--ink)}
 .total-box--light .total-row.grand{border-top-color:var(--ink)}
 .total-box--light .total-row.grand .tl{color:var(--ink)}
+.total-box--light .total-row.grand .tv{color:var(--ink)}
 .total-box--light .total-foot{color:var(--muted)}
+/* Sufijo "+ IVA" del total cuando el IVA va aparte (no sumado al número). */
+.iva-suffix{font-family:var(--font-mono);font-size:12px;font-weight:600;
+  color:var(--muted);margin-left:7px;letter-spacing:0}
 
 /* Notas */
 .notas{margin-top:26px;padding:14px 18px;background:var(--amber-soft);
@@ -366,6 +375,17 @@ def _nombre_rich(item, formal=False, mark=False):
     return out
 
 
+def _nombre_con_incluye(item):
+    """Nombre en negrita + una sub-línea 'INCLUYE accesorio · accesorio …'
+    (los specs vienen como ' · ' en el nombre). Para el presupuesto."""
+    parts = _nombre_para_pdf(item).split(" · ")
+    out = f'<div class="eq-name">{html.escape(parts[0])}</div>'
+    if len(parts) > 1:
+        specs = " · ".join(html.escape(p) for p in parts[1:])
+        out += f'<div class="incluye"><span class="incluye-lbl">Incluye</span>{specs}</div>'
+    return out
+
+
 def _thumb(item, sm=False):
     cls = "eq-thumb sm" if sm else "eq-thumb"
     # Resolvé foto_url con el helper canónico de pdf.py (absolutiza paths
@@ -460,7 +480,7 @@ def _pedido_html(pedido):
         sub = (it.get("precio_jornada") or 0) * it.get("cantidad", 1) * j
         rows.append(
             f'<tr><td style="width:58px">{_thumb(it)}</td>'
-            f'<td><div class="eq-name">{html.escape(_nombre_para_pdf(it))}</div></td>'
+            f'<td>{_nombre_con_incluye(it)}</td>'
             f'<td class="c num">{it.get("cantidad", 1)}</td>'
             f'<td class="r num">{_fmt_ars(it.get("precio_jornada"))}</td>'
             f'<td class="r num">{_fmt_ars(sub)}</td></tr>'
@@ -476,9 +496,10 @@ def _pedido_html(pedido):
                 f'<td class="r num">{_fmt_ars(csub) if csub else "—"}</td></tr>'
             )
 
-    # Desglose — usa el precomputado por services.precios (igual que el original)
+    # Desglose — usa el precomputado por services.precios (igual que el original).
+    # El IVA no se suma al total del presupuesto (va aparte, ver abajo), así que
+    # acá solo necesitamos bruto / descuento / neto y si el cliente es RI.
     es_ri = es_responsable_inscripto(pedido.get("cliente_perfil_impuestos"))
-    iva_pct = int(pedido.get("iva_pct") or IVA_PCT)
     neto = int(pedido["monto_neto"] if pedido.get("monto_neto") is not None
                else (pedido.get("monto_total") or _sum_bruto(items, j)))
     bruto = int(pedido.get("bruto") or _sum_bruto(items, j) or neto)
@@ -487,19 +508,18 @@ def _pedido_html(pedido):
                else max(0, bruto - neto))
     if pedido.get("monto_neto") is None and desc:
         neto = bruto - desc
-    iva = int(pedido["iva_monto"] if pedido.get("iva_monto") is not None
-              else (round(neto * iva_pct / 100) if es_ri else 0))
-    total = neto + iva
 
+    # El IVA va APARTE en el presupuesto (decisión del dueño): el total grande es
+    # el neto (con descuento) y, si el cliente es responsable inscripto, se anota
+    # "+ IVA" al lado en vez de sumarlo. Para Factura A el IVA se discrimina en la
+    # factura, no en el presupuesto.
     tr = [f'<div class="total-row"><span class="tl">Subtotal</span><span class="tv">{_fmt_ars(bruto)}</span></div>']
     if desc > 0:
         pct = f" ({desc_pct:g}%)" if desc_pct else ""
         tr.append(f'<div class="total-row"><span class="tl">Descuento{pct}</span><span class="tv">− {_fmt_ars(desc)}</span></div>')
-    if es_ri:
-        if desc > 0:
-            tr.append(f'<div class="total-row"><span class="tl">Neto</span><span class="tv">{_fmt_ars(neto)}</span></div>')
-        tr.append(f'<div class="total-row"><span class="tl">IVA {iva_pct}%</span><span class="tv">{_fmt_ars(iva)}</span></div>')
-    tr.append(f'<div class="total-row grand"><span class="tl">Total</span><span class="tv">{_fmt_ars(total)}</span></div>')
+    iva_suffix = f'<span class="iva-suffix">+ IVA</span>' if es_ri else ""
+    tr.append(f'<div class="total-row grand"><span class="tl">Total</span>'
+              f'<span class="tv">{_fmt_ars(neto)}{iva_suffix}</span></div>')
 
     notas = ""
     if pedido.get("notas"):
@@ -517,7 +537,7 @@ def _pedido_html(pedido):
         + '<table class="items"><thead><tr><th></th><th>Equipo</th>'
           '<th class="c">Cant.</th><th class="r">Precio / jornada</th><th class="r">Subtotal</th></tr></thead>'
           f'<tbody>{"".join(rows)}</tbody></table>'
-        + '<div class="total-section"><div><div class="total-box">' + "".join(tr) + "</div>"
+        + '<div class="total-section"><div><div class="total-box total-box--light">' + "".join(tr) + "</div>"
         + f'<div class="total-foot">{j} jornada{"s" if j != 1 else ""} · '
           f'{len(items)} equipo{"s" if len(items) != 1 else ""}{" · Factura A" if es_ri else ""}</div></div></div>'
         + notas + _footer()
