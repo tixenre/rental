@@ -375,11 +375,13 @@ def _nombre_rich(item, formal=False, mark=False):
     return out
 
 
-def _nombre_con_incluye(item):
-    """Nombre en negrita + una sub-línea 'INCLUYE accesorio · accesorio …'
-    (los specs vienen como ' · ' en el nombre). Para el presupuesto."""
-    parts = _nombre_para_pdf(item).split(" · ")
-    out = f'<div class="eq-name">{html.escape(parts[0])}</div>'
+def _nombre_con_incluye(item, formal=False, mark=False):
+    """Nombre en negrita (con └ opcional para componentes) + una sub-línea
+    'INCLUYE accesorio · accesorio …' (los specs vienen como ' · ' en el nombre).
+    Estilo compartido por presupuesto, albarán y contrato."""
+    parts = _nombre_para_pdf(item, formal=formal).split(" · ")
+    mk = '<span class="comp-mark">└</span>' if mark else ""
+    out = f'<div class="eq-name">{mk}{html.escape(parts[0])}</div>'
     if len(parts) > 1:
         specs = " · ".join(html.escape(p) for p in parts[1:])
         out += f'<div class="incluye"><span class="incluye-lbl">Incluye</span>{specs}</div>'
@@ -574,7 +576,7 @@ def _albaran_html(pedido):
         rows.append(
             f'<tr><td class="c num" style="width:34px">{n}</td>'
             f'<td style="width:54px">{_thumb(it, True)}</td>'
-            f'<td>{_nombre_rich(it, formal=True)}</td>'
+            f'<td>{_nombre_con_incluye(it, formal=True)}</td>'
             f'<td class="c num">{cant}</td>'
             f'<td class="mono">{html.escape(it.get("serie") or "—")}</td>'
             f'<td class="r">{_valor(valor, cant)}</td></tr>'
@@ -585,7 +587,7 @@ def _albaran_html(pedido):
             rows.append(
                 f'<tr class="comp"><td class="c num">{n}</td>'
                 f'<td>{_thumb(c, True)}</td>'
-                f'<td>{_nombre_rich(c, formal=True, mark=True)}</td>'
+                f'<td>{_nombre_con_incluye(c, formal=True, mark=True)}</td>'
                 f'<td class="c num">{ccant}</td>'
                 f'<td class="mono">{html.escape(c.get("serie") or "—")}</td>'
                 f'<td class="r">{_valor(cvalor, ccant)}</td></tr>'
@@ -602,7 +604,7 @@ def _albaran_html(pedido):
         + '<table class="items"><thead><tr><th class="c">#</th><th></th><th>Equipo</th>'
           '<th class="c">Cant.</th><th>N° Serie</th><th class="r">Valor reposición</th></tr></thead>'
           f'<tbody>{"".join(rows)}</tbody></table>'
-        + '<div class="total-section"><div class="total-box" style="min-width:320px">'
+        + '<div class="total-section"><div class="total-box total-box--light" style="min-width:320px">'
           f'<div class="total-row"><span class="tl">Equipos entregados</span><span class="tv">{unidades} unidades</span></div>'
           f'<div class="total-row grand"><span class="tl">Valor total de reposición</span><span class="tv">{_fmt_ars(valor_total)}</span></div>'
           '<div class="total-foot">Suma de cantidad × valor unitario, incluyendo componentes de kits.</div></div></div>'
@@ -656,7 +658,7 @@ def _contrato_html(pedido):
         cant = it.get("cantidad", 1)
         rows.append(
             f'<tr><td class="c num">{i}</td>'
-            f'<td>{_nombre_rich(it, formal=True)}</td>'
+            f'<td>{_nombre_con_incluye(it, formal=True)}</td>'
             f'<td class="c num">{cant}</td>'
             f'<td class="mono">{html.escape(it.get("serie") or "—")}</td>'
             f'<td class="r num">{_fmt_ars(_parse_int(it.get("valor_reposicion")))}</td></tr>'
@@ -665,7 +667,7 @@ def _contrato_html(pedido):
             ccant = c.get("cantidad", 1) * cant
             rows.append(
                 f'<tr class="comp"><td class="c">—</td>'
-                f'<td>{_nombre_rich(c, formal=True, mark=True)}</td>'
+                f'<td>{_nombre_con_incluye(c, formal=True, mark=True)}</td>'
                 f'<td class="c num">{ccant}</td>'
                 f'<td class="mono">{html.escape(c.get("serie") or "—")}</td>'
                 f'<td class="r num">{_fmt_ars(_parse_int(c.get("valor_reposicion"))) if c.get("valor_reposicion") else "—"}</td></tr>'
