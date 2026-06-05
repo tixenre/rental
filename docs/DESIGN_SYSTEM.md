@@ -15,8 +15,7 @@
 ## Stack real
 
 - **Frontend:** Vite + React 19 + TanStack Router + Tailwind v4 +
-  shadcn/Radix UI + lucide-react. **NO Next.js**, aunque el CLAUDE.md del
-  kit lo diga.
+  shadcn/Radix UI + lucide-react. **NO Next.js.**
 - **Backend:** FastAPI + PostgreSQL en Railway.
 - **Fonts:** TT Commons (primary, full axis) + Champ Black (display only)
   vendoreadas en `src/assets/fonts/`. JetBrains Mono desde Google Fonts.

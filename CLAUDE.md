@@ -56,6 +56,8 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 | [`docs/ISSUE_LABELS.md`](docs/ISSUE_LABELS.md) | Labels (3 dimensiones obligatorias) |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Criterio mobile + status por ruta |
 | [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) | Design system canónico: tokens, componentes, mobile rules, voz/tono, patterns. Manda sobre el kit portable (`docs/design-kit/`) |
+| [`.claude/skills/importar-diseno/`](.claude/skills/importar-diseno/SKILL.md) | Implementar un handoff de Claude Design en el front real (ver el render, reusar la librería, conectar backend, verificar). Su contrato (`INSTRUCCIONES_CLAUDE_DESIGN.md`) es la fuente del flujo de handoff |
+| [`.claude/skills/design-system/`](.claude/skills/design-system/SKILL.md) | Mantener + consumir la librería `@rambla/design-system` (tokens + componentes canónicos) |
 | [`.claude/agents/supervisor.md`](.claude/agents/supervisor.md) | El agente revisor |
 
 @docs/MEMORIA.md

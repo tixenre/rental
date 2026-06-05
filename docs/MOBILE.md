@@ -162,7 +162,7 @@ No usar `useIsMobile()` para esto — Tailwind CSS puro evita hydration flash.
 ## Checklist al hacer una pantalla nueva mobile
 
 - [ ] Header usa `PageHeader` o tiene `safe-t` / `sticky top-0 backdrop-blur-xl`
-- [ ] Todos los botones táctiles son `h-10 w-10` mínimo (44px)
+- [ ] Todos los botones táctiles son `h-11 w-11` mínimo (44px)
 - [ ] Footer / FAB usa `safe-b` o `env(safe-area-inset-bottom)` manual
 - [ ] Listas usan `AdminCard` (admin) o diseño equivalente
 - [ ] Inputs/selects heredan el `font-size: max(16px, 1em)` global — no agregar zoom manual

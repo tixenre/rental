@@ -229,7 +229,7 @@ A consistent six-step ladder. Used loosely:
   letters, big air, no fancy grid.
 - **Mobile is a first-class layout, not a scaling.** Components ship
   dual-render: `md:hidden` mobile branch + `hidden md:block` desktop
-  branch (see Footer, TopBar). Tap targets are ≥40×40 on mobile.
+  branch (see Footer, TopBar). Tap targets are ≥44×44 on mobile.
 
 ### Transparency & blur
 
