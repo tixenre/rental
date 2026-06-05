@@ -1,6 +1,6 @@
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Search,
   FileText,
@@ -11,10 +11,22 @@ import {
   Mail,
   Box,
   ArrowRight,
+  Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
@@ -302,7 +314,12 @@ function PedidosV2Page() {
         </div>
         {panelOpen && (
           <div className="flex-1 min-w-0 overflow-y-auto bg-surface/40">
-            <PreviewPane id={selId} onOpen={openEditor} onTogglePanel={() => setPanelOpen(false)} />
+            <PreviewPane
+              id={selId}
+              onOpen={openEditor}
+              onTogglePanel={() => setPanelOpen(false)}
+              onDeleted={() => setSelectedId(null)}
+            />
           </div>
         )}
       </div>
@@ -476,10 +493,12 @@ function PreviewPane({
   id,
   onOpen,
   onTogglePanel,
+  onDeleted,
 }: {
   id: number | null;
   onOpen: (id: number) => void;
   onTogglePanel: () => void;
+  onDeleted: () => void;
 }) {
   const detalleQ = useQuery({
     queryKey: ["admin", "pedido", id],
@@ -487,6 +506,17 @@ function PreviewPane({
     enabled: id != null,
   });
   const p = detalleQ.data;
+  const qc = useQueryClient();
+  const [askDelete, setAskDelete] = useState(false);
+  const deleteMut = useMutation({
+    mutationFn: () => adminApi.deletePedido(id as number),
+    onSuccess: () => {
+      toast.success("Pedido eliminado");
+      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
+      onDeleted();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   if (id == null) {
     return (
@@ -543,6 +573,14 @@ function PreviewPane({
           </Button>
           <button
             type="button"
+            onClick={() => setAskDelete(true)}
+            aria-label="Eliminar pedido"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             onClick={onTogglePanel}
             aria-label="Ocultar panel"
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
@@ -552,7 +590,27 @@ function PreviewPane({
         </div>
       </div>
 
-      {/* Siguiente paso — abre el editor v1 donde vive la máquina de estados real. */}
+      <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar pedido #{p.numero_pedido ?? p.id}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borran también sus ítems y pagos. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMut.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Siguiente paso — abre el editor v2 (la máquina de estados real vive ahí). */}
       {!["finalizado", "cancelado"].includes(p.estado) && (
         <div className="mt-4 rounded-lg border border-amber bg-amber-soft px-4 py-3 flex items-center justify-between gap-3">
           <div>
