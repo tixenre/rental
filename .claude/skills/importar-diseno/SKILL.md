@@ -120,6 +120,10 @@ son referencia, pero el repo manda.
 
 ## Patrones útiles
 
+- **El tablero de la migración al DS vive en [#612](https://github.com/tixenre/rental/issues/612)**
+  (pantalla × estado de rediseño: ✅/🟡/⬜). Cada pantalla se migra por este loop; al migrar una,
+  **marcá su fila en #612 en la misma PR** (es cómo "sabemos dónde estamos" y elegimos la próxima por
+  prioridad). El progreso es página-por-página, no un sprint — cada PR deja el front más consistente.
 - **Handoff grande o sensible → por fases + v2 al lado de v1.** Si la pantalla es grande (lista +
   editor + modales) o toca **escritura sensible** (estados, pagos, permisos), implementá **por fases**
   (ej. Fase 1 = lista read-only; Fase 2 = editor/mutaciones) en una **ruta nueva** (`/x-v2`) dejando la
