@@ -1,5 +1,7 @@
-// LEGACY — cuerpo del editor v1 de Pedidos. Reemplazo en curso por la ruta /admin/pedidos-v2/$id (ver #744).
-// No agregar features nuevas acá. Se elimina cuando la v2 alcance paridad y esté confirmada en prod.
+// LEGACY parcial — era el editor v1 de Pedidos del back-office; el admin ahora usa /admin/pedidos/$id
+// (el editor canónico, ex-v2). Sobrevive solo como editor del portal del cliente
+// (/cliente/pedidos/$id/editar, mode="cliente"), HOY PAUSADO (#750). No agregar features nuevas acá;
+// se elimina cuando la modificación del cliente se retome/rediseñe o se descarte (#750).
 /**
  * PedidoPage — detalle de pedido.
  *
