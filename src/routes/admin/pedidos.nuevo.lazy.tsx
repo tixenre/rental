@@ -9,16 +9,17 @@ export const Route = createLazyFileRoute("/admin/pedidos/nuevo")({
   component: NuevoPedidoPage,
 });
 
+// Crea un borrador y abre el editor. Mismo endpoint `createPedido`, sin tocar backend.
 function NuevoPedidoPage() {
-  useDocumentTitle("Nuevo pedido · Back Office");
+  useDocumentTitle("Nuevo pedido · Back-office");
   const navigate = useNavigate();
   const started = useRef(false);
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    // El backend exige fecha_desde/fecha_hasta NOT NULL, así que arrancamos
-    // con hoy → mañana como placeholder editable desde la pestaña Info.
+    // El backend exige fecha_desde/fecha_hasta NOT NULL → arrancamos con
+    // hoy → mañana como placeholder editable desde el editor.
     const hoy = new Date();
     const manana = new Date(hoy);
     manana.setDate(manana.getDate() + 1);
