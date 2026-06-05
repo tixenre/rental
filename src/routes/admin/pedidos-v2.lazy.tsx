@@ -183,10 +183,10 @@ function PedidosV2Page() {
             </p>
           </div>
           <div className="hidden md:flex items-center gap-2">
-            <Button variant="outline" onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
+            <Button variant="outline" onClick={() => navigate({ to: "/admin/pedidos-v2/nuevo" })}>
               <FileText className="h-4 w-4 mr-1" /> Presupuesto
             </Button>
-            <Button onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
+            <Button onClick={() => navigate({ to: "/admin/pedidos-v2/nuevo" })}>
               <Plus className="h-4 w-4 mr-1" /> Nuevo pedido
             </Button>
           </div>
@@ -344,7 +344,7 @@ function PedidosV2Page() {
 
       <FAB
         className="md:hidden"
-        onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}
+        onClick={() => navigate({ to: "/admin/pedidos-v2/nuevo" })}
         label="Nuevo pedido"
       />
     </div>
