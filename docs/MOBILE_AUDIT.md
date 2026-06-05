@@ -13,7 +13,7 @@ Una ruta cumple el criterio cuando:
    (`md:hidden` / `hidden md:block`), sticky bar, sheet fullscreen, lista
    card-based, etc. *No alcanza* con un grid que colapse por default.
 2. **Pasa el checklist** de la sección "Checklist por checkpoint" abajo
-   (sin scroll horizontal, tap targets ≥ 40px, texto legible, inputs sin
+   (sin scroll horizontal, tap targets ≥ 44px, texto legible, inputs sin
    zoom iOS, modales que entran en `h-[100dvh]`, imágenes lazy).
 3. **Está validada manualmente** en viewport **375×667 (iPhone SE)** —
    el mínimo objetivo del proyecto.
@@ -105,7 +105,7 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 | | Checkpoint | Cómo verificarlo |
 |---|---|---|
 | ☐ | Sin scroll horizontal | El `scrollWidth` no excede el `innerWidth` |
-| ☐ | Todos los botones ≥ 40px | Tocar con el dedo sin precisión, fácil |
+| ☐ | Todos los botones ≥ 44px (`h-11 w-11`) | Tocar con el dedo sin precisión, fácil. Norma 2026-06-05 (Apple HIG); componentes legacy en 40px migran vía #745 |
 | ☐ | Textos legibles | Tamaño ≥ 14px para texto base, ≥ 16px para inputs |
 | ☐ | Inputs no zoomean al focus | iOS hace zoom si font-size < 16px |
 | ☐ | Imágenes escalan bien | `object-contain` o `object-cover`, no se distorsionan |

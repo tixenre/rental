@@ -99,7 +99,7 @@ Usar Chrome DevTools → toggle device toolbar (Cmd+Shift+M) y elegir el viewpor
 | | Checkpoint |
 |---|---|
 | ☐ | Sin scroll horizontal (el ancho del viewport no se excede) |
-| ☐ | Tap targets ≥ 40px (botones, links, CTA principales) |
+| ☐ | Tap targets ≥ 44px (botones, links, CTA principales) — Apple HIG; `h-11 w-11` |
 | ☐ | Inputs ≥ 16px para no disparar zoom en iOS |
 | ☐ | Imágenes con `loading="lazy"` |
 | ☐ | Modales y drawers caben en `100dvh` |

@@ -157,7 +157,8 @@ function PedidosV2Page() {
       : (items[0]?.id ?? null);
   const total = pedidosQ.data?.total ?? 0;
 
-  const openV1 = (id: number) => navigate({ to: "/admin/pedidos/$id", params: { id: String(id) } });
+  const openEditor = (id: number) =>
+    navigate({ to: "/admin/pedidos-v2/$id", params: { id: String(id) } });
 
   const smartChips: { id: SmartChip; label: string; n: number; dot: string }[] = [
     { id: "retiraHoy", label: "Retiran hoy", n: counts.retiraHoy, dot: "bg-amber" },
@@ -295,13 +296,13 @@ function PedidosV2Page() {
               loading={pedidosQ.isLoading}
               selId={selId}
               onSelect={setSelectedId}
-              onOpen={openV1}
+              onOpen={openEditor}
             />
           </div>
         </div>
         {panelOpen && (
           <div className="flex-1 min-w-0 overflow-y-auto bg-surface/40">
-            <PreviewPane id={selId} onOpen={openV1} onTogglePanel={() => setPanelOpen(false)} />
+            <PreviewPane id={selId} onOpen={openEditor} onTogglePanel={() => setPanelOpen(false)} />
           </div>
         )}
       </div>
@@ -316,7 +317,7 @@ function PedidosV2Page() {
           <div className="py-12 text-center text-sm text-muted-foreground">Sin pedidos.</div>
         )}
         {items.map((p) => (
-          <AdminCard key={p.id} onClick={() => openV1(p.id)}>
+          <AdminCard key={p.id} onClick={() => openEditor(p.id)}>
             <AdminCardHeader
               label={`#${p.numero_pedido ?? p.id}`}
               title={p.cliente_nombre || "Sin cliente"}

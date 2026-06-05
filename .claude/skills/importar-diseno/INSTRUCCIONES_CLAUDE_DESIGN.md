@@ -29,6 +29,7 @@ producción; se traduce a los componentes/tokens reales del repo.
 ## Fase 1 — Leer el repo antes de diseñar
 
 Antes de trazar un píxel, explorar `tixenre/rental` (con GitHub MCP):
+
 - **La librería del design system** `@rambla/design-system` (`packages/design-system/`) → la **fuente
   canónica** de tokens, primitivos y piezas reusables. Es lo que tenés que reusar. Mirá:
   - `packages/design-system/styleguide/index.html` → **referencia visual** de la librería (los ~46
@@ -47,19 +48,32 @@ Antes de trazar un píxel, explorar `tixenre/rental` (con GitHub MCP):
 ## Fase 2 — Diseñar pensando en el backend y en la librería
 
 ### Reuse-first (innegociable)
+
 - **Reusar antes que crear.** Si el primitivo ya existe en el repo (`Button`, `EstadoBadge`,
   `StatCard`, `PriceBlock`, `StepperPill`, `FavButton`, `formatARS()`, `cn()`…) → usarlo.
 - Si el diseño necesita un primitivo **nuevo reutilizable** → diseñarlo como **componente de librería**
   (no inline en la página) y documentarlo en el README del handoff.
 
 ### Datos
+
 - Usar solo campos que **ya existen** en los tipos del repo.
 - Si falta un dato/endpoint → marcar `TODO:` en el TSX y documentarlo en el README, indicando si es
   **lectura simple** (Claude Code lo crea full-stack) o **sensible** (migración de schema, escritura de
   pagos/estados/permisos, o disponibilidad/reservas) → en ese caso **el diseño se entrega marcado para
   PARAR y validar**, no se asume.
 
+### Máquina de estados / flujos (si la pantalla tiene)
+
+- Si el diseño tiene una máquina de estados (ej. estados de pedido), **copiá las reglas REALES del
+  backend**: leé `ESTADOS_VALIDOS` + las precondiciones en `backend/routes/*.py` y espejalas. **No
+  inventes un grafo de transiciones.** El backend valida _estado-válido + precondición_ (no un grafo);
+  un grafo inventado queda **más restrictivo** y desorienta al implementar (caso testigo: Pedidos).
+- Diseñá el **flujo feliz** —qué avance ofrecer en cada estado, qué deshabilitar y por qué
+  (`blockReason`)— y dejá explícito en el README que **la validación de transiciones la dueña es el
+  backend**, no la UI.
+
 ### Tokens / tipografía / copy (reglas duras del repo)
+
 - **Solo tokens del sistema**, nunca hex (`bg-amber`, `text-ink`, `border-hairline`, …). El guardrail
   ESLint rompe el CI con colores fuera del sistema.
 - **Champ Black (`font-display`) solo display/wordmark** — nunca UI funcional, IDs, labels, precios.
@@ -67,6 +81,11 @@ Antes de trazar un píxel, explorar `tixenre/rental` (con GitHub MCP):
 - Precios vía `formatARS()` (nunca `.toLocaleString()`). Iconos `lucide-react` import individual.
   `dvh` no `vh` + `.safe-*` en sticky bars. Targets táctiles ≥ 44px. Voz **"vos"** (reservá, elegí,
   confirmá). Precios `$ 24.500`. Fechas `lun 2 jun.`.
+- **Mapeá cada elemento a su token/fuente exactos en el README** — no solo "la paleta general". Una
+  mini-tabla elemento→token: "fila seleccionada = `bg-amber-soft`", "total = `font-mono`", "nombre del
+  cliente = `font-bold`", "eyebrow = `font-mono text-muted-foreground`". Claude Code traduce tu
+  `proto.css` a tokens del repo **a partir de ese mapa**; sin él lo infiere a ojo y se cuelan sutilezas
+  (caso testigo: una ronda entera de pulido de fidelidad en Pedidos por tokens no explicitados).
 
 ---
 
@@ -76,12 +95,18 @@ Una carpeta por feature. **Solo el diseño** — el repo ya tiene reglas, tokens
 
 ```
 design_handoff_<feature>/
-├── <Feature>.html          ← referencia visual (interactiva, todos los estados)
-├── src/<path-real>.tsx     ← TSX base; espeja el path real del repo
+├── <Feature>.html          ← referencia visual (interactiva, todos los estados) · import-time
+├── assets/                 ← (opcional) render-deps del .html: fuentes, proto.css · import-time, NO se commitea
+├── src/<path-real>.tsx     ← TSX base; espeja el path real del repo (file-based: una ruta = un archivo)
 │                              (varios .tsx si es módulo de componentes)
-└── README.md               ← qué es · secciones+tokens · componentes a reusar (tabla)
-                              · datos/TODO (tabla: marca → dato → endpoint → tipo) · checklist
+└── README.md               ← qué es · secciones + mapa elemento→token · componentes a reusar (tabla)
+                              · datos/TODO (tabla: marca → dato → endpoint → tipo) · máquina de estados
+                              (reglas del backend) · checklist
 ```
+
+> **Durable vs import-time:** lo que se commitea al repo y queda como registro = `README` + `src/`
+> scaffolds (+ `proto/*` si los hay). El `.html` + `assets/` son **solo para rasterizar durante el
+> import** — no se commitean (ver "Peso muerto vs. dependencias de render").
 
 `MASTER_HANDOFF.md` (orden de implementación + dependencias entre handoffs) va **una sola vez** en el
 root del export cuando se manda más de un handoff.
@@ -101,18 +126,33 @@ Claude Code rasteriza el `.html` (desktop + mobile), lee el README + los `.tsx`,
 la librería. **Pegar solo la URL del visor no alcanza** — los archivos tienen que aterrizar en el repo.
 
 ### Tipos de handoff
-- **Ruta nueva:** `src/routes/<ruta>.tsx` completo, con todos los `TODO:` marcados.
+
+- **Ruta nueva:** `src/routes/<ruta>.tsx` completo, con todos los `TODO:` marcados. **Espejá el patrón de
+  ruteo del repo: file-based (TanStack Router), una ruta = un archivo.** Una vista master/detail que en
+  realidad son dos rutas (lista + detalle/`$id`) se entrega como **dos archivos de ruta**, no como un
+  componente monolítico con ruteo interno por estado (caso testigo: Pedidos vino monolítico y hubo que
+  partirlo).
 - **Patch:** comentarios `// CAMBIO N:` con el diff exacto sobre el archivo existente (no reemplaza la
   lógica).
 - **Módulo:** `src/components/<path>/` con los `.tsx` + README **clase-por-clase** (mapa de tokens,
   anatomía por componente, tabla de errores comunes, checklist de 15-20 ítems).
 
-### NO embarcar (peso muerto / fuente de drift)
-- ❌ Reglas del repo duplicadas: **no** copiar `HANDOFF.md`/`CONTEXT.md` por carpeta — viven en el repo.
-- ❌ Snapshots de tokens: **no** mandar `colors_and_type.css` ni `CLAUDE_DESIGN_SYSTEM.md` — los tokens
-  canónicos viven en la librería (`packages/design-system/src/styles/tokens/*`) + `docs/DESIGN_SYSTEM.md`.
-- ❌ `fonts/`, `assets/`, `kit/`, `preview/`, HTML duplicados del root, screenshots.
-- Objetivo: un export de **<1 MB / decenas de archivos**, no cientos de MB.
+### Peso muerto vs. dependencias de render (la distinción que importa)
+
+La regla es por **intención**: ¿esto está acá para que Claude Code **lea reglas/tokens** de ahí, o solo
+para que el **`.html` renderice**?
+
+- ❌ **Como fuente de verdad** (drift): NO mandar reglas del repo duplicadas (`HANDOFF.md`/`CONTEXT.md`
+  por carpeta), NI snapshots de tokens (`colors_and_type.css`, `CLAUDE_DESIGN_SYSTEM.md`), NI el `kit/`,
+  NI `preview/`, HTML duplicados del root, screenshots. Los tokens/reglas canónicos viven en la librería
+  (`packages/design-system/src/styles/tokens/*`) + `docs/DESIGN_SYSTEM.md` — Claude Code los lee de ahí,
+  **nunca del bundle**.
+- ✅ **Como dependencia de render del `.html`** (fuentes vendoreadas, `proto.css`): pueden viajar en el
+  bundle bajo `assets/` si el `.html` las necesita para verse bien — pero son **import-time**: Claude
+  Code rasteriza con ellas y **NO las commitea al repo** (pesan y son fuentes licenciadas, ~1 MB). Lo
+  durable que se commitea es `README` + `proto/*` + scaffolds `src/`.
+- Objetivo: que la **señal de implementación** (README + proto + scaffolds) sea **<1 MB / decenas de
+  archivos**. Las fuentes pesadas son render-deps, no señal.
 
 ---
 
@@ -122,10 +162,14 @@ la librería. **Pegar solo la URL del visor no alcanza** — los archivos tienen
 - **`// CAMBIO N:`** → en un patch, el diff puntual a aplicar.
 
 ## Checklist pre-handoff
+
 - [ ] Leí la librería del DS (styleguide + `packages/design-system/`) y el código de la ruta/componente existente (si existe).
 - [ ] Apliqué reuse-first: identifiqué qué componentes del repo reuso; los nuevos son de librería.
 - [ ] Verifiqué que los datos ya los da la API; marqué `TODO:` lo que falta (lectura simple vs sensible).
+- [ ] Si hay máquina de estados, espeja las reglas **reales** del backend (`ESTADOS_VALIDOS` + precondiciones), sin inventar un grafo.
 - [ ] El HTML está completo (todos los estados) y se ve bien en **mobile (375) y desktop**.
+- [ ] El README mapea **elemento → token/fuente exactos** (no solo la paleta general).
 - [ ] El README tiene tabla de componentes a reusar + tabla de datos/TODO + checklist.
-- [ ] **NO embarqué** reglas del repo, snapshots de tokens, fuentes, assets, kit ni preview.
+- [ ] Las rutas nuevas espejan el **ruteo file-based** del repo (una ruta = un archivo), no un componente monolítico.
+- [ ] **NO embarqué como fuente de verdad** reglas del repo (`HANDOFF`/`CONTEXT`), snapshots de tokens (`colors_and_type.css`, `kit`), `preview` ni screenshots. (Fuentes/`proto.css` del `.html` van en `assets/` solo como render-deps.)
 - [ ] grep en los `.tsx`: `font-display` solo en display/wordmark · `toLocaleString` → 0 · hex → 0.

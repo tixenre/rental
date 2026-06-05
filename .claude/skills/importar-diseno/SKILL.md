@@ -11,11 +11,11 @@ description: Importa un handoff de Claude Design (carpeta design_handoff_<featur
 Su flujo es **Leer el repo → Diseñar pensando en el backend → Exportar**. Te entrega un **handoff**:
 una carpeta `design_handoff_<feature>/` que **espeja los paths reales del repo**.
 
-| Pieza | Qué es | Cómo la tratás |
-|---|---|---|
-| `<Feature>.html` | **Referencia visual** (Tailwind CDN + mocks, todos los estados). | La **mirás** (rasterizada). Verdad de *cómo se ve*. |
-| `src/<path-real>.tsx` | **TSX base** (ruta o componente) que ya usa componentes/tokens del repo. | Tu **base de implementación**. Verdad de *cómo se construye*. |
-| `README.md` | Specs por pantalla: secciones, componentes a reusar, datos, checklist. | Tu **lista de tareas**. |
+| Pieza                 | Qué es                                                                   | Cómo la tratás                                                |
+| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `<Feature>.html`      | **Referencia visual** (Tailwind CDN + mocks, todos los estados).         | La **mirás** (rasterizada). Verdad de _cómo se ve_.           |
+| `src/<path-real>.tsx` | **TSX base** (ruta o componente) que ya usa componentes/tokens del repo. | Tu **base de implementación**. Verdad de _cómo se construye_. |
+| `README.md`           | Specs por pantalla: secciones, componentes a reusar, datos, checklist.   | Tu **lista de tareas**.                                       |
 
 > El contrato de entrega (lado Claude Design) y la fuente de verdad de este flujo viven en el repo:
 > [`INSTRUCCIONES_CLAUDE_DESIGN.md`](./INSTRUCCIONES_CLAUDE_DESIGN.md). El molde técnico para
@@ -27,7 +27,7 @@ una carpeta `design_handoff_<feature>/` que **espeja los paths reales del repo**
 - **El HTML manda para la fidelidad visual** — cómo se ve: layout, jerarquía, espaciados, estados,
   mobile. Es la intención de diseño aprobada.
 - **El TSX manda para estructura / lógica / implementación** — cómo se construye: qué componentes y
-  tokens del repo se usan, props, comportamiento. (Coherente con MEMORIA *2026-05-28*.)
+  tokens del repo se usan, props, comportamiento. (Coherente con MEMORIA _2026-05-28_.)
 
 No están en conflicto: son planos distintos. El markup/clases del HTML **no se copian** a producción
 (usa Tailwind CDN + mocks); se traduce a los componentes/tokens reales del repo.
@@ -35,15 +35,15 @@ No están en conflicto: son planos distintos. El markup/clases del HTML **no se 
 ## Marcadores en el TSX
 
 - **`TODO:`** → dónde conectar el dato/endpoint real (ver backend abajo).
-- **`// CAMBIO N:`** → en un handoff *patch*, el diff puntual a aplicar sobre el archivo existente.
+- **`// CAMBIO N:`** → en un handoff _patch_, el diff puntual a aplicar sobre el archivo existente.
 
 ## Tipos de handoff (detectalo y actuá distinto)
 
-| Tipo | Señal | Qué hacés |
-|---|---|---|
-| **Ruta nueva** | `src/routes/<ruta>.tsx` completo, ruta que no existe | Crear la ruta usando el TSX como base. |
-| **Patch** | comentarios `// CAMBIO N:`, "reemplaza partes de…" | Aplicar cada cambio sobre el archivo existente, sin tocar la lógica. |
-| **Módulo** | `src/components/<path>/` con varios `.tsx` + README clase-por-clase | Reemplazar/crear los componentes; el README es muy preciso, seguilo al pie. |
+| Tipo           | Señal                                                               | Qué hacés                                                                   |
+| -------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **Ruta nueva** | `src/routes/<ruta>.tsx` completo, ruta que no existe                | Crear la ruta usando el TSX como base.                                      |
+| **Patch**      | comentarios `// CAMBIO N:`, "reemplaza partes de…"                  | Aplicar cada cambio sobre el archivo existente, sin tocar la lógica.        |
+| **Módulo**     | `src/components/<path>/` con varios `.tsx` + README clase-por-clase | Reemplazar/crear los componentes; el README es muy preciso, seguilo al pie. |
 
 ## Input: la carpeta del handoff
 
@@ -71,15 +71,21 @@ son referencia, pero el repo manda.
    el `.html` y el `README.md`. Detectá el **tipo** (ruta / patch / módulo). Reportá en una línea.
 2. **Leer.** README del handoff de punta a punta + el/los `.tsx` completos. Si es patch, leé también el
    archivo existente del repo que se va a tocar.
-3. **VER la referencia.** Rasterizá el `.html` en **desktop y mobile** y leé los PNG:
+3. **VER la referencia.** Rasterizá el `.html` en **desktop y mobile** (`--both` saca las dos de una) y
+   leé los PNG:
    ```bash
-   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html
-   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html --mobile
+   node .claude/skills/importar-diseno/render.mjs docs/handoffs/portal/*.html --both
    ```
    El `.html` puede **no ser self-contained** (depende de hermanos: css/js/`.jsx`/CDN). render.mjs ya
    lo **sirve por HTTP local** y le sube la espera, así que prototipos con React/Babel por CDN + scripts
    `text/babel` montan bien (no en blanco). Si igual sale en blanco, subí más la espera (`--wait 5000`)
    o revisá la consola del prototipo.
+   - **Estados no-default (editor, modales, dark mode).** Un prototipo interactivo suele rutear por
+     **estado interno de React, no por URL** → render.mjs captura solo el estado inicial (la lista). Para
+     llegar al **editor / un modal / dark** antes del screenshot, manejá el prototipo con
+     `--click "<selector>"` o `--eval "<js>"` (ej. dark: `--eval "document.documentElement.classList.add('dark')"`).
+     Sin esto te perdés justo las vistas que vas a construir (caso testigo: el editor de Pedidos no era
+     rasterizable sin driver → se construyó "a ciegas" contra el código del proto, no contra su render).
 4. **Reuse-first (obligatorio).** Antes de escribir nada, mirá el **catálogo de componentes canónicos**
    en [`referencia-repo.md`](./referencia-repo.md). Si el primitivo ya existe (`StepperPill`,
    `PriceBlock`, `EstadoBadge`, `StatCard`, `Button`, `FavButton`…) → **reusalo**. Si el diseño trae un
@@ -106,8 +112,11 @@ son referencia, pero el repo manda.
    ```
    **Rutas autenticadas (admin / portal con login + datos):** el render-compare en vivo puede **no ser
    posible** (necesita sesión + backend + datos reales — imposible en la nube efímera). Ahí: construí
-   **fiel al render del prototipo** (que sí podés rasterizar) y verificá con **screenshots del dueño en
-   staging** (su captura vs el render del prototipo). Funciona igual de bien.
+   **fiel al render del prototipo** (que sí podés rasterizar — usá `--click`/`--eval` para alcanzar los
+   estados internos, ver paso 3) y verificá con **screenshots del dueño en staging** (su captura vs el
+   render del prototipo). Funciona igual de bien. El agujero conocido —no poder auto-render-comparar el
+   **componente real** de una ruta autenticada— se cierra con un harness de preview con mocks: tracking
+   en **#743**.
 
 ## Patrones útiles
 
@@ -117,6 +126,33 @@ son referencia, pero el repo manda.
   **vieja intacta como fallback** hasta confirmar. Las acciones mutantes de la Fase 1 pueden **delegar
   en la pantalla existente** (no reimplementes la máquina de estados en paralelo). La Fase 2 va con
   rama + PR dedicada y aviso antes de mergear (por tocar escritura sensible).
+- **Al crear una v2, marcá la v1 como legacy y anotala en el tracker de cleanup** (si no, la v1 queda
+  para siempre). Cada archivo v1 superado lleva arriba un banner grep-able:
+  `// LEGACY — <qué es> v1. Reemplazo en curso por <ruta v2> (ver #<tracker>). … Se elimina cuando la
+v2 alcance paridad y esté confirmada en prod.` Listalas con `grep -rn "LEGACY —" src/`. Sumá el par
+  v1→v2 al **issue tracker único de cleanup (#744)**. **No marques** lo que la v2 **reusa** (ej.
+  `usePedidoDraft`) ni lo que aún **no tiene** equivalente v2 (no está superado). La v1 se borra recién
+  cuando la v2 confirma paridad + prod — el banner lo dice para que nadie borre antes de tiempo.
+- **La Fase 2 (el editor) es piel nueva sobre el MISMO core de escritura.** Si la v1 ya encapsula su
+  lógica sensible en un hook (caso testigo: `usePedidoDraft` = autosave de datos/items + mutación de
+  estado), la v2 **reusa ese hook tal cual** — no reescribe la mutación ni la máquina de estados en
+  paralelo. Un solo camino de escritura para las dos pantallas → la garantía "escritura sensible
+  sagrada" se mantiene sola (hay una única dirección física de la mutación). Esto es el **reuse-first
+  del paso 4 aplicado a la lógica, no solo a los componentes visuales**: antes de escribir mutaciones,
+  buscá el hook/data-layer que la pantalla vieja ya usa.
+- **La máquina de estados de la UI se DERIVA, no se inventa.** El "próximo paso" / qué transición
+  ofrecer sale de dos fuentes: (a) lo que la pantalla vieja ya hace, y (b) las precondiciones que
+  valida el backend (caso testigo: `ESTADOS_VALIDOS` + checks en `routes/alquileres.py` — el backend
+  valida **estado-válido + precondición**, NO un grafo de transiciones). El flujo "feliz" (qué botón
+  de avance mostrar) lo guía la UI espejando la v1; el backend es la red que rechaza lo inválido. No
+  hardcodees un grafo nuevo que pueda divergir de cualquiera de las dos.
+- **Qué del handoff se commitea (y qué no).** El registro durable en el repo = `README.md` + `proto/*`
+  (la conducta de referencia, que se **lee**) + los scaffolds `src/`. El **`.html` de referencia y su
+  `assets/` (fuentes vendoreadas + `proto.css`) son de import-time y NO se commitean** — pesan y traen
+  fuentes licenciadas (~1 MB), y los tokens/reglas reales viven en el repo, no en el bundle. Se
+  rasterizan desde el bundle del dueño **durante** el import y listo. **No commitees un `.html` huérfano**
+  (sin sus assets queda irrenderizable = peso muerto); si querés dejarlo igual, tiene que ser
+  self-contained.
 
 ## Motor visual (render.mjs)
 
@@ -130,15 +166,21 @@ node .claude/skills/importar-diseno/render.mjs <target> [flags]
 (`/cliente/...` → `http://localhost:3000`).
 
 Flags:
+
 - `--mobile` viewport Pixel 5 (375×667, touch) · `--desktop` 1280×900 (default). Matchean
   `playwright.config.ts`.
+- `--both` renderiza **desktop Y mobile** en una sola corrida (dos PNG; a `--out` se le sufija
+  `-desktop`/`-mobile`).
+- `--click "<css>"` clickea ese selector tras cargar · `--eval "<js>"` corre JS en la página tras
+  cargar. **Drivers de estado**: llevan un prototipo interactivo (que rutea por estado interno) al
+  editor / un modal / dark mode **antes** del screenshot.
 - `--fold` solo lo visible (above-the-fold). Default: **página completa**.
 - `--selector "<css>"` recorta a un componente puntual.
 - `--wait <ms>` espera extra para fuentes/animaciones (default 300).
 - `--out <path>` ruta de salida (default `/tmp/diseno-<ts>-<viewport>.png`).
 
-El script imprime `PNG: /tmp/...` en la última línea → Claude **lee ese PNG** con la tool de imágenes.
-Para revisar mobile-first, renderizá **las dos** vistas y compará. (`DISENO_BASE_URL` overridea el
+El script imprime una línea `PNG: /tmp/...` por cada render → Claude **lee ese/esos PNG** con la tool de
+imágenes. Para revisar mobile-first, usá `--both` y compará. (`DISENO_BASE_URL` overridea el
 `http://localhost:3000` por defecto.)
 
 ## Requisitos / errores comunes
