@@ -1,6 +1,6 @@
 import { createLazyFileRoute, useNavigate, useParams, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
   ChevronDown,
@@ -12,16 +12,24 @@ import {
   AlertTriangle,
   Lock,
   Coins,
-  Trash2,
   ArrowRight,
+  Plus,
+  Minus,
+  X,
+  Search,
+  Mail,
+  Eye,
+  Download,
+  ShoppingCart,
+  Info,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
-import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   adminApi,
@@ -29,10 +37,19 @@ import {
   pedidoPdfUrl,
   type Pedido,
   type PedidoEstado,
+  type Equipo,
 } from "@/lib/admin/api";
-import { usePedidoDraft } from "@/components/admin/pedido/usePedidoDraft";
+import {
+  usePedidoDraft,
+  jornadasEntre,
+  type DraftItem,
+} from "@/components/admin/pedido/usePedidoDraft";
+import { useCotizacion } from "@/lib/cotizacion";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaCorta } from "@/lib/format";
+import { EquipoSearchSheet } from "@/components/admin/pedido/EquipoSearchSheet";
+import { EnviarDocsDialog, DOCS_PEDIDO } from "@/components/admin/pedido/EnviarDocsDialog";
+import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
 
 export const Route = createLazyFileRoute("/admin/pedidos-v2/$id")({
   component: PedidoV2EditorPage,
@@ -108,6 +125,34 @@ function PedidoV2EditorPage() {
   const p = pedidoQ.data;
   const draft = usePedidoDraft(p, { mode: "admin" });
 
+  // Disponibilidad (stock) — enabled cuando hay ambas fechas
+  const dispoQ = useQuery({
+    queryKey: [
+      "admin",
+      "disponibilidad",
+      draft.datos?.fecha_desde,
+      draft.datos?.fecha_hasta,
+      pedidoId,
+    ],
+    queryFn: () =>
+      adminApi.getDisponibilidad(draft.datos!.fecha_desde, draft.datos!.fecha_hasta, pedidoId),
+    enabled: !!p && !!draft.datos?.fecha_desde && !!draft.datos?.fecha_hasta,
+  });
+
+  // Cotización en vivo (useCotizacion) — recalcula al editar items/fechas/descuento
+  const cotizacionQ = useCotizacion({
+    items: (draft.items ?? []).map((it) => ({ equipoId: it.equipo_id, cantidad: it.cantidad })),
+    fechaDesde: draft.datos?.fecha_desde || null,
+    fechaHasta: draft.datos?.fecha_hasta || null,
+    clienteId: p?.cliente_id ?? null,
+    descuentoPct: draft.datos?.descuento_pct ?? null,
+  });
+
+  // Modales
+  const [openPagoModal, setOpenPagoModal] = useState(false);
+  const [openMailDialog, setOpenMailDialog] = useState(false);
+  const [openSearchSheet, setOpenSearchSheet] = useState(false);
+
   if (pedidoQ.isError) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
@@ -132,17 +177,35 @@ function PedidoV2EditorPage() {
 
   const { datos, setDatos, items, setItems, saveStatus, estadoMut } = draft;
   const ns = nextStep(p);
-  const jornadas = p.cantidad_jornadas ?? 1;
+
+  // Jornadas desde el draft (vivo, no el valor estático del servidor)
+  const jornadas = jornadasEntre(datos.fecha_desde, datos.fecha_hasta);
+
+  // Totales vivos desde useCotizacion
+  const totales = cotizacionQ.data;
+  const total = totales.total;
   const pagadoMonto = p.monto_pagado ?? 0;
-  const total = p.total_con_iva ?? p.monto_total ?? 0;
   const restante = Math.max(0, total - pagadoMonto);
 
-  const setQty = (equipoId: number, delta: number) =>
+  // stockMap: { equipo_id → { cantidad: libres, reservado: 0 } }
+  const stockMap: Record<string, { cantidad: number; reservado: number }> = Object.fromEntries(
+    Object.entries(dispoQ.data ?? {}).map(([k, v]) => [
+      k,
+      { cantidad: Number(v) || 0, reservado: 0 },
+    ]),
+  );
+
+  const hasOverstock = items.some((it) => {
+    const s = stockMap[String(it.equipo_id)];
+    if (!s) return false;
+    return it.cantidad > Math.max(0, s.cantidad - s.reservado);
+  });
+
+  const updateItem = (equipoId: number, patch: Partial<DraftItem>) =>
     setItems((its) =>
-      (its ?? []).map((it) =>
-        it.equipo_id === equipoId ? { ...it, cantidad: Math.max(1, it.cantidad + delta) } : it,
-      ),
+      (its ?? []).map((it) => (it.equipo_id === equipoId ? { ...it, ...patch } : it)),
     );
+
   const removeItem = (equipoId: number) =>
     setItems((its) => (its ?? []).filter((it) => it.equipo_id !== equipoId));
 
@@ -171,6 +234,24 @@ function PedidoV2EditorPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-0 lg:gap-0 min-h-0">
         {/* ── Columna de trabajo ── */}
         <div className="px-4 md:px-6 py-5 space-y-5 lg:border-r hairline pb-28 lg:pb-5">
+          {/* Banner solicitud pendiente (deferido — solo aviso read-only) */}
+          {p.tiene_solicitud_pendiente && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber/40 bg-amber/5 px-3 py-2.5 text-sm">
+              <Info className="h-4 w-4 text-amber shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <span className="font-medium text-ink">Hay una solicitud de cambio pendiente.</span>{" "}
+                <Link
+                  to="/admin/pedidos/$id"
+                  params={{ id: String(p.id) }}
+                  className="underline text-muted-foreground"
+                >
+                  Revisarla en la vista clásica
+                </Link>
+                .
+              </div>
+            </div>
+          )}
+
           {/* Cliente */}
           <Section icon={User} title="Cliente">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -196,32 +277,57 @@ function PedidoV2EditorPage() {
             </div>
           </Section>
 
-          {/* Fechas (read-only en Sub-fase 1 — editar fechas re-valida stock, viene después) */}
+          {/* Fechas — editables con re-validación de stock */}
           <Section
             icon={Calendar}
             title="Fechas del alquiler"
             aside={
-              p.fecha_desde ? (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-verde">
-                  <Check className="h-3 w-3" /> stock OK
-                </span>
-              ) : (
+              !datos.fecha_desde || !datos.fecha_hasta ? (
                 <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-destructive">
                   <AlertTriangle className="h-3 w-3" /> sin fechas
+                </span>
+              ) : hasOverstock ? (
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-destructive">
+                  <AlertTriangle className="h-3 w-3" /> revisar stock
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-verde">
+                  <Check className="h-3 w-3" /> stock OK
                 </span>
               )
             }
           >
             <div className="flex items-end gap-3 flex-wrap">
               <FieldLabel label="Retiro">
-                <div className="h-9 px-3 flex items-center rounded-md border hairline bg-surface-elevated text-sm tabular-nums">
-                  {p.fecha_desde ? formatFechaCorta(p.fecha_desde) : "definir"}
-                </div>
+                <Input
+                  type="date"
+                  value={datos.fecha_desde}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (datos.fecha_hasta && datos.fecha_hasta < v) {
+                      setDatos((d) => d && { ...d, fecha_desde: v, fecha_hasta: v });
+                    } else {
+                      setDatos((d) => d && { ...d, fecha_desde: v });
+                    }
+                  }}
+                  className="h-11 sm:h-9 font-mono text-base sm:text-sm tabular-nums"
+                />
               </FieldLabel>
               <FieldLabel label="Devolución">
-                <div className="h-9 px-3 flex items-center rounded-md border hairline bg-surface-elevated text-sm tabular-nums">
-                  {p.fecha_hasta ? formatFechaCorta(p.fecha_hasta) : "definir"}
-                </div>
+                <Input
+                  type="date"
+                  value={datos.fecha_hasta}
+                  min={datos.fecha_desde || undefined}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (datos.fecha_desde && v < datos.fecha_desde) {
+                      setDatos((d) => d && { ...d, fecha_hasta: datos.fecha_desde });
+                    } else {
+                      setDatos((d) => d && { ...d, fecha_hasta: v });
+                    }
+                  }}
+                  className="h-11 sm:h-9 font-mono text-base sm:text-sm tabular-nums"
+                />
               </FieldLabel>
               <div className="rounded-lg border hairline bg-surface-elevated px-4 py-2 text-center shrink-0">
                 <div className="font-mono text-xl font-semibold leading-none">{jornadas}</div>
@@ -230,58 +336,162 @@ function PedidoV2EditorPage() {
                 </div>
               </div>
             </div>
-            <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-              Editar fechas (con re-validación de stock) se hace por ahora desde la{" "}
-              <Link to="/admin/pedidos/$id" params={{ id: String(p.id) }} className="underline">
-                vista clásica
-              </Link>
-              .
-            </p>
           </Section>
 
           {/* Equipos */}
           <Section icon={Box} title={`Equipos · ${items.length}`}>
+            {/* Trigger buscador */}
+            <button
+              type="button"
+              onClick={() => setOpenSearchSheet(true)}
+              className="flex w-full items-center gap-2.5 px-3 py-2.5 mb-2 rounded-md border hairline text-sm text-muted-foreground hover:bg-muted/30 transition"
+            >
+              <Search className="h-4 w-4 shrink-0" />
+              <span>Buscar para añadir equipos…</span>
+            </button>
+
             <ul className="divide-y hairline">
-              {items.map((it) => (
-                <li key={it.equipo_id} className="flex items-center gap-3 py-2.5">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-md border hairline text-muted-foreground shrink-0">
-                    <Box className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm text-ink truncate">
-                      {it.nombre_publico || it.nombre}
+              {items.map((it) => {
+                const stock = stockMap[String(it.equipo_id)];
+                const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
+                const disponible = max - it.cantidad;
+                const overstock = it.cantidad > max && !!stock;
+                const subtotal = it.precio_jornada * it.cantidad * Math.max(1, jornadas);
+
+                return (
+                  <li key={it.equipo_id} className="py-2.5 space-y-1.5">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-md border hairline text-muted-foreground shrink-0">
+                        <ShoppingCart className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-ink truncate">
+                          {it.nombre_publico || it.nombre}
+                        </div>
+                        <div className="font-mono text-[11px] text-muted-foreground flex items-center gap-1.5">
+                          <span>{fmtArs(it.precio_jornada)} / jornada</span>
+                          {stock && (
+                            <span
+                              className={cn(
+                                "inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
+                                disponible <= 0
+                                  ? "bg-destructive/10 text-destructive"
+                                  : "bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="font-mono text-sm font-semibold tabular-nums w-24 text-right shrink-0">
+                        {fmtArs(subtotal)}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(it.equipo_id)}
+                        aria-label="Quitar equipo"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                    <div className="font-mono text-[11px] text-muted-foreground">
-                      {fmtArs(it.precio_jornada)} / jornada
+                    {/* Stepper + precio editable */}
+                    <div className="flex items-center gap-2 pl-13">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-9 w-9"
+                          onClick={() =>
+                            updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })
+                          }
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={it.cantidad}
+                          onChange={(e) =>
+                            updateItem(it.equipo_id, {
+                              cantidad: parseInt(e.target.value) || 1,
+                            })
+                          }
+                          className={cn(
+                            "h-9 w-10 text-center text-sm p-0",
+                            overstock && "border-destructive text-destructive",
+                          )}
+                        />
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-9 w-9"
+                          onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          value={it.precio_jornada}
+                          onChange={(e) =>
+                            updateItem(it.equipo_id, {
+                              precio_jornada: parseInt(e.target.value) || 0,
+                            })
+                          }
+                          className="h-9 w-24 text-sm"
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          /día
+                        </span>
+                      </div>
+                      {overstock && (
+                        <div className="ml-auto text-[11px] text-destructive flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" /> Excede stock ({max})
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <StepperPill
-                    qty={it.cantidad}
-                    onIncrement={() => setQty(it.equipo_id, 1)}
-                    onDecrement={() => setQty(it.equipo_id, -1)}
-                  />
-                  <div className="font-mono text-sm font-semibold tabular-nums w-24 text-right">
-                    {fmtArs(it.precio_jornada * it.cantidad * jornadas)}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(it.equipo_id)}
-                    aria-label="Quitar equipo"
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
               {items.length === 0 && (
                 <li className="py-4 text-sm text-muted-foreground">
                   Sin equipos. Agregá al menos uno para confirmar.
                 </li>
               )}
             </ul>
-            <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-              Agregar equipos (buscador) llega en la próxima sub-fase.
-            </p>
+
+            <EquipoSearchSheet
+              open={openSearchSheet}
+              onOpenChange={setOpenSearchSheet}
+              existing={items}
+              stockMap={stockMap}
+              onAdd={(eq: Equipo) => {
+                const display = eq.nombre_publico || eq.nombre;
+                const existing = items.find((i) => i.equipo_id === eq.id);
+                if (existing) {
+                  updateItem(eq.id, { cantidad: existing.cantidad + 1 });
+                  toast.success(`+1 ${display}`);
+                } else {
+                  setItems((its) => [
+                    ...(its ?? []),
+                    {
+                      equipo_id: eq.id,
+                      cantidad: 1,
+                      precio_jornada: eq.precio_jornada ?? 0,
+                      nombre: eq.nombre,
+                      marca: eq.marca,
+                      nombre_publico: eq.nombre_publico ?? null,
+                    },
+                  ]);
+                  toast.success(`Agregado: ${display}`);
+                }
+                setOpenSearchSheet(false);
+              }}
+            />
           </Section>
 
           {/* Notas */}
@@ -295,8 +505,8 @@ function PedidoV2EditorPage() {
           </Section>
         </div>
 
-        {/* ── Rail ── */}
-        <aside className="px-4 md:px-5 py-5 space-y-4 bg-surface/40 hidden lg:block">
+        {/* ── Rail ── (visible en lg en el lado derecho; en mobile fluye debajo) */}
+        <aside className="px-4 md:px-5 py-5 space-y-4 bg-surface/40 lg:border-t-0 border-t hairline pb-28 lg:pb-5">
           {/* Estado */}
           <RailSection label="Estado del pedido">
             <EstadoDropdown
@@ -319,24 +529,24 @@ function PedidoV2EditorPage() {
             )}
           </RailSection>
 
-          {/* Desglose */}
-          <RailSection label="Desglose · lo calcula el backend">
+          {/* Desglose — vivo via useCotizacion */}
+          <RailSection label="Desglose">
             <div className="space-y-1 text-sm">
               <BdRow
                 l={`Bruto · ${jornadas} jornada${jornadas !== 1 ? "s" : ""}`}
-                v={fmtArs(p.bruto)}
+                v={fmtArs(totales.subtotal)}
               />
-              {(p.descuento_pct ?? 0) > 0 && (
+              {totales.descuentoPct > 0 && (
                 <BdRow
-                  l={`Descuento ${p.descuento_pct}%`}
-                  v={`– ${fmtArs(p.descuento_monto)}`}
+                  l={`Descuento ${totales.descuentoPct}%`}
+                  v={`– ${fmtArs(totales.descuentoMonto)}`}
                   neg
                 />
               )}
-              <BdRow l="Neto" v={fmtArs(p.monto_neto)} />
+              <BdRow l="Neto" v={fmtArs(totales.totalNeto)} />
               <BdRow
-                l={`IVA ${p.con_iva ? "21%" : ""}`}
-                v={p.con_iva ? fmtArs(p.iva_monto) : "— cons. final"}
+                l={`IVA ${totales.conIva ? "21%" : ""}`}
+                v={totales.conIva ? fmtArs(totales.iva) : "— cons. final"}
               />
               <div className="border-t hairline my-1" />
               <BdRow l="Total" v={fmtArs(total)} strong />
@@ -384,19 +594,14 @@ function PedidoV2EditorPage() {
               {pagadoMonto === 0 ? " · sin seña" : ""}
             </div>
             {(p.pagos ?? []).map((pago) => (
-              <div key={pago.id} className="flex items-center justify-between text-xs mt-1">
-                <span className="text-muted-foreground">
-                  {pago.concepto || "Pago"} · {formatFechaCorta(pago.fecha)}
-                </span>
-                <span className="font-mono">{fmtArs(pago.monto)}</span>
-              </div>
+              <PagoRow key={pago.id} pago={pago} pedidoId={p.id} />
             ))}
             <Button
               variant="outline"
               size="sm"
               className="w-full mt-2"
               disabled={p.estado === "cancelado"}
-              onClick={() => navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })}
+              onClick={() => setOpenPagoModal(true)}
             >
               <Coins className="h-4 w-4 mr-1" /> Registrar pago
             </Button>
@@ -405,26 +610,36 @@ function PedidoV2EditorPage() {
           {/* Documentos */}
           <RailSection label="Documentos">
             <div className="flex flex-wrap gap-1.5">
-              {(
-                [
-                  ["Remito", "albaran"],
-                  ["Contrato", "contrato"],
-                  ["Packing", "packing-list"],
-                  ["Presupuesto", "pdf"],
-                ] as const
-              ).map(([label, kind]) => (
-                <a
-                  key={kind}
-                  href={pedidoPdfUrl(p.id, kind)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 rounded-md border hairline px-2 py-1 font-mono text-[11px] text-muted-foreground hover:text-ink hover:border-ink"
-                >
-                  <FileText className="h-3 w-3" />
-                  {label}
-                </a>
+              {DOCS_PEDIDO.map((doc) => (
+                <div key={doc.kind} className="flex items-center gap-0.5">
+                  <a
+                    href={`${pedidoPdfUrl(p.id, doc.kind)}?format=html`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md border hairline px-2 py-1 font-mono text-[11px] text-muted-foreground hover:text-ink hover:border-ink"
+                    title={`Ver ${doc.label}`}
+                  >
+                    <Eye className="h-3 w-3" />
+                    {doc.label}
+                  </a>
+                  <a
+                    href={pedidoPdfUrl(p.id, doc.kind)}
+                    className="inline-flex items-center justify-center h-7 w-7 rounded-md border hairline text-muted-foreground hover:text-ink hover:border-ink"
+                    title={`Descargar ${doc.label} PDF`}
+                  >
+                    <Download className="h-3 w-3" />
+                  </a>
+                </div>
               ))}
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-2"
+              onClick={() => setOpenMailDialog(true)}
+            >
+              <Mail className="h-4 w-4 mr-1" /> Enviar por mail
+            </Button>
           </RailSection>
         </aside>
       </div>
@@ -451,6 +666,62 @@ function PedidoV2EditorPage() {
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Modales */}
+      <RegistrarPagoModal
+        pedidoId={p.id}
+        total={total}
+        pagado={pagadoMonto}
+        open={openPagoModal}
+        onOpenChange={setOpenPagoModal}
+      />
+      <EnviarDocsDialog
+        pedidoId={p.id}
+        clienteEmail={p.cliente_email ?? ""}
+        open={openMailDialog}
+        onOpenChange={setOpenMailDialog}
+      />
+    </div>
+  );
+}
+
+// ── PagoRow con delete ────────────────────────────────────────────────────────
+
+function PagoRow({
+  pago,
+  pedidoId,
+}: {
+  pago: { id: number; monto: number; concepto: string | null; fecha: string };
+  pedidoId: number;
+}) {
+  const qc = useQueryClient();
+  const delMut = useMutation({
+    mutationFn: () => adminApi.deletePago(pedidoId, pago.id),
+    onSuccess: () => {
+      toast.success("Pago eliminado");
+      qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
+      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="flex items-center justify-between text-xs mt-1">
+      <span className="text-muted-foreground">
+        {pago.concepto || "Pago"} · {formatFechaCorta(pago.fecha)}
+      </span>
+      <div className="flex items-center gap-1">
+        <span className="font-mono">{formatARS(pago.monto)}</span>
+        <button
+          type="button"
+          onClick={() => delMut.mutate()}
+          disabled={delMut.isPending}
+          className="rounded p-1 text-muted-foreground hover:text-destructive transition"
+          aria-label="Eliminar pago"
+        >
+          <X className="h-3 w-3" />
+        </button>
       </div>
     </div>
   );
