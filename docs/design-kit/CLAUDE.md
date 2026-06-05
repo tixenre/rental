@@ -1,7 +1,11 @@
-# Rambla Rental — Design System Reference for Claude Code
+# Rambla Rental — Design Kit (portable) — quick-reference
 
-This file is the authoritative quick-reference for everything UI/design in this repo.
-Read this before touching any component, page, or stylesheet.
+> **Esto es el quick-reference del KIT PORTABLE** (`docs/design-kit/`): un export del look
+> pensado para llevar a otros proyectos. **NO es la fuente de verdad de este repo.**
+> Para este repo, la fuente canónica es **`docs/DESIGN_SYSTEM.md` + `@rambla/design-system`
+> (`packages/design-system/`) + `src/styles.css`** — si algo de acá difiere, **mandan ellos**.
+> Mantener/consumir la librería: skill `.claude/skills/design-system/`. (Por eso parte del
+> contenido de abajo puede estar viejo respecto del repo — ante la duda, DESIGN_SYSTEM gana.)
 
 Full visual docs: `docs/design-kit/index.html` + `docs/design-kit/extended.html`.
 Pattern specimens: `docs/design-kit/patterns/*.html`.
@@ -13,7 +17,7 @@ Pattern specimens: `docs/design-kit/patterns/*.html`.
 **You touch:** design system, UI components, styles, layouts, copy in `.tsx` views, micro-interactions, Tailwind classes, `kit/` folder.
 
 **You do NOT touch:**
-- `backend/` (Express, Postgres, migrations, controllers)
+- `backend/` (FastAPI + Python, Postgres, migraciones Alembic)
 - `src/lib/api.ts`, `src/lib/auth.ts`, `src/lib/iva.ts`, `src/hooks/use*.ts` data layer
 - `/api/*` routes anywhere
 - `scripts/*`, `tools/*`, `playwright.config.ts`, `vite.config.ts`, `Dockerfile`
@@ -307,7 +311,7 @@ The `:root` and `.dark` blocks in `styles.css` swap `--background`, `--foregroun
 1. **Never substitute TT Commons / Champ Black with Google fonts.** They ship locally in `src/assets/fonts/`.
 2. **Champ Black is display-only** — never headings, never UI labels.
 3. **Never hardcode hex colors** in `.tsx` files. Use Tailwind utilities (`text-amber`, `bg-ink`) or CSS vars (`var(--amber)`).
-4. **`strokeWidth={1.5}` on all Lucide icons** unless overridden by `<Logo>` or a one-off intentional.
+4. **Lucide icons:** el kit recomienda `strokeWidth={1.5}`, pero en este repo `docs/DESIGN_SYSTEM.md` **no lo fuerza** (se mezcla con el `2` que usa shadcn; `1.5` en piezas branded). Seguí DESIGN_SYSTEM.
 5. **Import Lucide individually** — never `import * from "lucide-react"`.
 6. **All prices through `formatARS()`** — never `n.toLocaleString()` ad-hoc.
 7. **`dvh` not `vh`** for full-height panels on mobile.
