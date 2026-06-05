@@ -50,11 +50,11 @@ import {
   type PedidoEstado,
   type Equipo,
 } from "@/lib/admin/api";
-import {
-  usePedidoDraft,
-  jornadasEntre,
-  type DraftItem,
-} from "@/components/admin/pedido/usePedidoDraft";
+import { usePedidoDraft, type DraftItem } from "@/components/admin/pedido/usePedidoDraft";
+import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
+import { computeJornadas, parseDateTimeParts, toLocalISO } from "@/lib/rental-dates";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { useCotizacion } from "@/lib/cotizacion";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaCorta } from "@/lib/format";
@@ -134,7 +134,11 @@ function PedidoV2EditorPage() {
     queryFn: () => adminApi.getPedido(pedidoId),
   });
   const p = pedidoQ.data;
-  const draft = usePedidoDraft(p, { mode: "admin" });
+  // keepDateTime: el selector de fechas+horas escribe datetime (con hora) en
+  // fecha_desde/fecha_hasta; sin esto el draft las recortaría a date-only y se
+  // perdería la hora en el round-trip del autosave.
+  const draft = usePedidoDraft(p, { mode: "admin", keepDateTime: true });
+  const [openDateModal, setOpenDateModal] = useState(false);
 
   // Disponibilidad (stock) — enabled cuando hay ambas fechas
   const dispoQ = useQuery({
@@ -201,8 +205,38 @@ function PedidoV2EditorPage() {
   const { datos, setDatos, items, setItems, saveStatus, estadoMut } = draft;
   const ns = nextStep(p);
 
-  // Jornadas desde el draft (vivo, no el valor estático del servidor)
-  const jornadas = jornadasEntre(datos.fecha_desde, datos.fecha_hasta);
+  // Fechas+horas derivadas del draft (vivo). datos.fecha_desde/_hasta vienen
+  // como datetime ISO (keepDateTime) o, en pedidos viejos sin hora, date-only
+  // → default 09:00. El selector lee de acá y recombina al escribir.
+  const { date: startDate, time: startTime } = parseDateTimeParts(datos.fecha_desde);
+  const { date: endDate, time: endTime } = parseDateTimeParts(datos.fecha_hasta);
+
+  // Jornadas con el mismo criterio que el carrito (devolver más tarde = +1).
+  const jornadas = computeJornadas(startDate, endDate, startTime, endTime);
+
+  // ── Handlers del selector de fechas (modo admin) ──────────────────────
+  // Recombinan día+hora a datetime con toLocalISO y persisten vía autosave.
+  // Mantienen el clamp fecha_hasta ≥ fecha_desde.
+  const handleDatesChange = (start?: Date, end?: Date) => {
+    setDatos((d) => {
+      if (!d) return d;
+      const fecha_desde = start ? toLocalISO(start, startTime) : "";
+      let fecha_hasta = end ? toLocalISO(end, endTime) : "";
+      if (fecha_desde && fecha_hasta && fecha_hasta < fecha_desde) fecha_hasta = fecha_desde;
+      return { ...d, fecha_desde, fecha_hasta };
+    });
+  };
+  const handleStartTimeChange = (t: string) => {
+    setDatos((d) => (d && startDate ? { ...d, fecha_desde: toLocalISO(startDate, t) } : d));
+  };
+  const handleEndTimeChange = (t: string) => {
+    setDatos((d) => {
+      if (!d || !endDate) return d;
+      let fecha_hasta = toLocalISO(endDate, t);
+      if (datos.fecha_desde && fecha_hasta < datos.fecha_desde) fecha_hasta = datos.fecha_desde;
+      return { ...d, fecha_hasta };
+    });
+  };
 
   // Totales vivos desde useCotizacion
   const totales = cotizacionQ.data;
@@ -316,45 +350,42 @@ function PedidoV2EditorPage() {
               )
             }
           >
-            <div className="flex items-end gap-3 flex-wrap">
-              <FieldLabel label="Retiro">
-                <Input
-                  type="date"
-                  value={datos.fecha_desde}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (datos.fecha_hasta && datos.fecha_hasta < v) {
-                      setDatos((d) => d && { ...d, fecha_desde: v, fecha_hasta: v });
-                    } else {
-                      setDatos((d) => d && { ...d, fecha_desde: v });
-                    }
-                  }}
-                  className="h-11 sm:h-9 font-mono text-base sm:text-sm tabular-nums"
-                />
-              </FieldLabel>
-              <FieldLabel label="Devolución">
-                <Input
-                  type="date"
-                  value={datos.fecha_hasta}
-                  min={datos.fecha_desde || undefined}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (datos.fecha_desde && v < datos.fecha_desde) {
-                      setDatos((d) => d && { ...d, fecha_hasta: datos.fecha_desde });
-                    } else {
-                      setDatos((d) => d && { ...d, fecha_hasta: v });
-                    }
-                  }}
-                  className="h-11 sm:h-9 font-mono text-base sm:text-sm tabular-nums"
-                />
-              </FieldLabel>
-              <div className="rounded-lg border hairline bg-surface-elevated px-4 py-2 text-center shrink-0">
-                <div className="font-mono text-xl font-semibold leading-none">{jornadas}</div>
-                <div className="font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground mt-0.5">
-                  jornadas
-                </div>
-              </div>
-            </div>
+            {/* Píldora retiro→devolución — abre el selector de fechas+horas */}
+            <button
+              type="button"
+              onClick={() => setOpenDateModal(true)}
+              className="flex w-full items-center gap-3 rounded-lg border hairline bg-surface-elevated px-3.5 py-2.5 text-left transition hover:border-ink min-h-[44px]"
+            >
+              {startDate && endDate ? (
+                <>
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-sm tabular-nums text-ink">
+                      {format(startDate, "dd MMM yyyy", { locale: es })} · {startTime}
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="font-mono text-sm tabular-nums text-ink">
+                      {format(endDate, "dd MMM yyyy", { locale: es })} · {endTime}
+                    </span>
+                  </div>
+                  <span className="ml-auto rounded-md border hairline bg-background px-2.5 py-1 text-center shrink-0">
+                    <span className="font-mono text-base font-semibold leading-none">
+                      {jornadas}
+                    </span>
+                    <span className="font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground ml-1">
+                      {jornadas === 1 ? "jornada" : "jornadas"}
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-muted-foreground">
+                    Elegí las fechas de retiro y devolución…
+                  </span>
+                </>
+              )}
+            </button>
           </Section>
 
           {/* Equipos */}
@@ -700,6 +731,18 @@ function PedidoV2EditorPage() {
       </div>
 
       {/* Modales */}
+      <DateRangePickerModal
+        open={openDateModal}
+        onOpenChange={setOpenDateModal}
+        startDate={startDate}
+        endDate={endDate}
+        startTime={startTime}
+        endTime={endTime}
+        onDatesChange={handleDatesChange}
+        onStartTimeChange={handleStartTimeChange}
+        onEndTimeChange={handleEndTimeChange}
+        options={{ allowPast: true, respectHorarios: false }}
+      />
       <RegistrarPagoModal
         pedidoId={p.id}
         total={total}
