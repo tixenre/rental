@@ -486,3 +486,21 @@
 - **How to apply:** la sesión sugiere bajar a Sonnet cuando la tarea es de ejecución, y propone
   `/compact`/`/clear` al cambiar de PR/tarea. El contexto durable vive en `CLAUDE.md` + `MEMORIA` +
   issues + PRs, así que limpiar es de bajo riesgo (una sesión nueva retoma sola).
+
+### 2026-06-05 — Apple HIG como guía de UX mobile/táctil (enforceable)
+- **What:** la referencia por default para las decisiones de **UX mobile/táctil** que el design system
+  no resuelve ya es **Apple Human Interface Guidelines (HIG)** — el estándar de usabilidad táctil que
+  seguimos al decidir un tamaño, gesto o espaciado de interacción. Es una **guía general**, no la regla
+  de un componente puntual.
+- **Materialización concreta (lo que disparó esto):** **tap target mínimo 44×44px** (`h-11 w-11`) en
+  todo elemento interactivo — el número de HIG. El valor vive en los specs (`DESIGN_SYSTEM.md`,
+  `PROTOCOLO.md`, `MOBILE_AUDIT.md`, `MOBILE.md`), **no acá**; los componentes legacy en 40px migran
+  vía **#745**. Otros casos bajo la misma guía: inputs ≥ 16px (no zoom iOS), áreas de gesto cómodas,
+  `.safe-*` cerca de notch/home-bar.
+- **Why:** la mayoría del tráfico entra desde el celular (label `mobile` = trato prioritario); apoyarse
+  en un estándar táctil reconocido y estable evita discutir cada número caso por caso y mantiene
+  coherencia. Nombra y refuerza el punto 3 de la *Barra de calidad* (mobile-first).
+- **How to apply / quién hace cumplir:** ante una decisión de UX táctil sin resolver, se sigue HIG y el
+  valor concreto se documenta en el design system (acá vive el **criterio**, no la tabla de números). El
+  **supervisor lo hace cumplir**: marca como hallazgo un tap target nuevo < 44px, o una decisión táctil
+  que contradiga HIG sin justificación.
