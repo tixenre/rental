@@ -60,6 +60,12 @@ COPY backend/ ./backend/
 # extractores del backend via sys.path. Sin esta línea, el upload de HTML falla
 # con "No module named 'lentes_parser'" en producción.
 COPY tools/ ./tools/
+# Fuentes de marca para los PDFs: `pdf_templates._fonts_css()` las embebe en
+# runtime desde `src/assets/fonts` (FONTS_DIR = backend/../src/assets/fonts). El
+# runtime NO trae todo `src/` (solo el `dist` buildeado), así que copiamos
+# explícitamente las fuentes — sin esto los documentos PDF saldrían con la
+# tipografía del sistema en vez de la de Rambla (degrada silencioso, no rompe).
+COPY src/assets/fonts/ ./src/assets/fonts/
 COPY --from=frontend /app/dist ./dist
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
