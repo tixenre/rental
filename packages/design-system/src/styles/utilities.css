@@ -62,6 +62,7 @@
     line-height: 0.9;
     letter-spacing: -0.01em;
     text-transform: lowercase;
+    text-wrap: balance;
   }
   .t-display-2 {
     font-family: var(--font-display);
@@ -125,27 +126,56 @@
     padding-right: env(safe-area-inset-right);
   }
 
-  /* ── TopBar amber-on-scroll (snap ≥65% invierte logo/pills) ── */
-  .topbar-seal .seal-badge,
-  .topbar-seal .seal-r {
-    transition: opacity var(--duration-base) var(--ease-default),
-                filter var(--duration-base) var(--ease-default);
+  /* ── TopBar amber-on-scroll (snap ≥65% invierte logo/pills) ──
+     Rambla seal: badge amber + R bone por default. Al pasar 65% del
+     progreso (.topbar-snap) los colores se invierten. */
+  .topbar-seal .seal-badge {
+    fill: var(--color-amber);
+    transition: fill 0.12s;
   }
-  .topbar-snap .seal-badge,
-  .topbar-snap .wordmark {
-    filter: brightness(0) invert(1);
+  .topbar-seal .seal-r {
+    fill: var(--color-background);
+    transition: fill 0.12s;
+  }
+  .topbar-snap .topbar-seal .seal-badge {
+    fill: var(--color-background);
+  }
+  .topbar-snap .topbar-seal .seal-r {
+    fill: var(--color-amber);
+  }
+  /* date-pill y botón de sesión: se invierten a bone con ink al hacer snap. */
+  .topbar-snap .date-pill-snap,
+  .topbar-snap .user-btn-snap {
+    background: var(--color-background) !important;
+    border-color: var(--color-background) !important;
+    color: var(--color-ink);
   }
 
-  /* ── Calendar modifiers (react-day-picker) ─────────────── */
+  /* ── Calendar modifiers (react-day-picker) ───────────────
+     rdp-nostock: día sin stock → fondo rojo suave + punto destructive.
+     rdp-closed:  día cerrado (horarios/feriados) → rojo más tenue + tachado. */
   .rdp-nostock {
-    color: var(--color-destructive);
-    opacity: 0.55;
-    text-decoration: line-through;
+    position: relative;
+    background-color: color-mix(in oklch, var(--color-destructive) 12%, transparent) !important;
+    color: var(--color-destructive) !important;
+  }
+  .rdp-nostock::after {
+    content: "";
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--color-destructive);
+    pointer-events: none;
   }
   .rdp-closed {
-    color: var(--color-muted-foreground);
-    opacity: 0.4;
-    pointer-events: none;
+    background-color: color-mix(in oklch, var(--color-destructive) 8%, transparent) !important;
+    color: var(--color-destructive) !important;
+    text-decoration: line-through;
+    opacity: 0.7;
   }
 }
 

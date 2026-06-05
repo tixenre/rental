@@ -3,8 +3,7 @@ import { cn } from "@/lib/utils";
 /**
  * StatCard — el bloque de número grande usado en el dashboard admin.
  *
- * Source: `docs/design-kit/kit/components/stat-card.tsx`. Sin sombra, con
- * hairline. La grilla del admin las pone en filas de 3–4.
+ * Sin sombra, con hairline. La grilla del admin las pone en filas de 3–4.
  *
  *   ┌────────────────────────┐
  *   │ EYEBROW MONO           │  ← label

@@ -843,10 +843,11 @@ def create_pedido_endpoint(data: PedidoCreate, request: Request, background: Bac
     """Endpoint admin para crear pedido. La lógica está en `create_pedido`,
     así el portal cliente (cliente_portal.py) la reutiliza sin pasar por admin guard."""
     require_admin(request)
-    return create_pedido(data, background=background)
+    return create_pedido(data, background=background, es_admin=True)
 
 
-def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = None):
+def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = None,
+                  es_admin: bool = False):
     """Lógica interna de creación de pedido. Llamada por el endpoint admin
     (`create_pedido_endpoint`) y también por `cliente_portal.cliente_crear_pedido`
     que tiene su propio `require_cliente`."""
@@ -880,7 +881,9 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
 
             if d0 >= d1:
                 raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
-            if d0 < hoy:
+            # El admin puede crear pedidos con fecha pasada (carga retroactiva);
+            # el cliente no. La distinción la pasa `create_pedido_endpoint`.
+            if d0 < hoy and not es_admin:
                 raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
             jornadas = jornadas_periodo(d0, d1)
@@ -1093,12 +1096,12 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                 try:
                     d0 = to_datetime(p_row["fecha_desde"])
                     d1 = to_datetime(p_row["fecha_hasta"])
-                    hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
 
                     if d0 >= d1:
                         errores.append("fecha_hasta debe ser posterior a fecha_desde")
-                    if d0 < hoy:
-                        errores.append("fecha_desde no puede ser en el pasado")
+                    # Endpoint admin-only (require_admin arriba): el admin puede
+                    # avanzar pedidos con fecha de retiro pasada (carga
+                    # retroactiva), así que no se rechaza el pasado acá.
                 except ValueError:
                     errores.append("Las fechas tienen formato inválido")
 
@@ -1298,12 +1301,16 @@ def eliminar_pago(id: int, pago_id: int, request: Request):
         conn.close()
 
 
-def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
+def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = False) -> dict:
     """Aplica un cambio parcial de datos (cliente/fechas/notas/descuento) al pedido.
 
     Lógica compartida entre el endpoint admin (`update_pedido_datos`) y la
     aplicación de propuestas del cliente (cliente_portal). Recibe una conexión
     abierta; el caller hace commit/rollback y close.
+
+    `es_admin=True` permite fecha de retiro en el pasado (carga retroactiva del
+    back-office). Las propuestas del cliente (cliente_portal) usan el default
+    `False` → el cliente sigue sin poder fechar en el pasado.
     """
     p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
     if not p:
@@ -1338,7 +1345,9 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos") -> dict:
             # Históricos importados tienen fechas en el pasado por diseño. El
             # frontend manda fecha_desde junto con cualquier cambio (ej. solo
             # el descuento), así que sin este bypass no se podría editar nada.
-            if d0 < hoy and not _es_historico(p["fuente"]):
+            # El admin además puede fijar fechas pasadas a propósito (carga
+            # retroactiva); el cliente (es_admin=False) sigue sin poder.
+            if d0 < hoy and not es_admin and not _es_historico(p["fuente"]):
                 raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
     if not payload:
@@ -1455,7 +1464,7 @@ def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
     require_admin(request)
     conn = get_db()
     try:
-        pedido = _apply_pedido_datos(conn, id, data)
+        pedido = _apply_pedido_datos(conn, id, data, es_admin=True)
         conn.commit()
         return pedido
     except Exception:

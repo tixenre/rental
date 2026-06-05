@@ -8,8 +8,7 @@ export type { AddonItem };
 /**
  * AddonPills — listado horizontal de items "incluye" sobre la row de un equipo.
  *
- * Source: `docs/design-kit/kit/components/addon-pills.tsx`. Portado al repo
- * sin cambios funcionales — sólo se reescriben los imports.
+ * Portado al repo sin cambios funcionales.
  */
 export function AddonPills({
   items,

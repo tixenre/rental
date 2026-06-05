@@ -2,7 +2,8 @@
    Rambla Rental — Design System  ·  ENTRY (CANONICAL src/styles.css)
    ------------------------------------------------------------
    Fuente de verdad de tokens, tipografía y utilities de marca.
-   El repo `tixenre/rental` consume ESTE archivo como su src/styles.css.
+   El repo `tixenre/rental` consume ESTE archivo (vía
+   `@import "@rambla/design-system/styles.css"` en su entry).
 
    Orden de carga (importa para Tailwind v4):
      1. tailwindcss        → preflight + engine
@@ -13,7 +14,12 @@
    Modular a propósito: editá un token en su archivo, no acá.
    ============================================================ */
 
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+
+/* source(none) = allowlist explícito de fuentes (no se escanea el repo
+   entero, que metería bloat de docs/specimens). El paquete declara su
+   propio src; cada consumidor agrega el suyo (la app: `@source "../src"`). */
+@source ".";
 
 /* Modo oscuro por clase .dark en <html> (no media-query) */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -36,11 +42,13 @@
   * {
     border-color: var(--color-border);
   }
+  html,
   body {
     background: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overflow-x: clip; /* corta scroll horizontal accidental (mobile) */
   }
 }

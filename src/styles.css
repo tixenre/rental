@@ -1,545 +1,76 @@
-@import "tailwindcss" source(none);
-@source "../src";
-@source "../packages/design-system/src";
+/* ============================================================
+   Rambla Rental — App CSS entry
+   ------------------------------------------------------------
+   El design system canónico (tokens, tipografía, utilities, fuentes)
+   vive en el paquete del workspace @rambla/design-system y se consume
+   desde acá. Este archivo NO define tokens ni utilities: solo cablea.
+
+     1. importa el CSS del DS (Tailwind + tokens + utilities + @font-face)
+     2. tw-animate-css (animate-in/out de shadcn)
+     3. @source → qué escanea Tailwind v4 (no mira node_modules)
+     4. vars de runtime que setea el JS + alias planos transicionales
+
+   Para editar un token/utility: hacelo en packages/design-system/src/,
+   NO acá. Ver packages/design-system/ADOPT.md.
+   ============================================================ */
+
+@import "@rambla/design-system/styles.css";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
-
-/* ── Fuentes de marca (Rambla) ──────────────────────────────────────────
- * TT Commons (primaria: body + UI + headings) + Champ Black (display:
- * showpieces + wordmark). Familia completa 100-900 + italics shippeada
- * localmente. JetBrains Mono se carga en index.html.
- */
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Regular_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Italic_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Medium_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Medium_Italic_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_DemiBold_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 600;
-  font-style: italic;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_DemiBold_Italic_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Bold_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Bold_Italic_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Extrabold_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 800;
-  font-style: italic;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Extrabold_Italic_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Black_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "TT Commons";
-  font-weight: 900;
-  font-style: italic;
-  font-display: swap;
-  src: url("./assets/fonts/TT_Commons_Black_Italic_0.otf") format("opentype");
-}
-@font-face {
-  font-family: "Champ Black";
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-  src: url("./assets/fonts/Champ-Black.ttf") format("truetype");
-}
-
-/*
- * Rambla Rental — basado en el branding oficial (BATTI 2023)
- * Amarillo brand + blanco/hueso + negro tinta + paleta secundaria (rosa, azul, naranja, verde).
- * Tono: joven, amigable, comunidad, "un lugar donde pasan cosas".
- */
-
-@theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
-
-  --font-display: "Champ Black", "TT Commons", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "TT Commons", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-ring-offset-background: var(--background);
-  --color-surface: var(--surface);
-  --color-surface-elevated: var(--surface-elevated);
-  --color-hairline: var(--hairline);
-  --color-amber: var(--amber);
-  --color-amber-soft: var(--amber-soft);
-  --color-amber-hot: var(--amber-hot);
-  --color-ink: var(--ink);
-  --color-ink-pure: var(--ink-pure);
-  --color-rosa: var(--rosa);
-  --color-azul: var(--azul);
-  --color-naranja: var(--naranja);
-  --color-verde: var(--verde);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
+/* Tailwind v4 no escanea node_modules. El paquete se resuelve por el symlink
+   del workspace, así que apuntamos a su src real (y al de la app) para que no
+   purgue las clases de sus componentes. */
+@source "../src";
+@source "../packages/design-system/src";
 
 :root {
-  --radius: 0.75rem;
+  /* Vars de runtime: las setea el JS (scroll del topbar / alto del cart strip).
+     Acá solo el default para evitar flash antes de que monte el listener — no
+     son tokens de diseño, por eso viven en la app y no en el DS. */
+  --amber-pct: 0%;
+  --cart-strip-h: 0px;
 
-  /* Z-index scale */
-  --z-topbar: 50;
-  --z-topbar-amber: 49;
-  --z-cart-strip: 45;
-  --z-cat-bar: 40;
-  --z-sub-toolbar: 30;
-  --z-scrim: 60;
-  --z-drawer: 61;
-
-  /* Dynamic vars (set via JS) */
-  --amber-pct: 0%; /* topbar scroll progress 0%→100% */
-  --cart-strip-h: 0px; /* cart strip presence */
-
-  /* Shadows — tintadas con oklch del ink para mantener el tono cálido
-   * del sistema. Tailwind's shadow-* defaults siguen funcionando como antes;
-   * para opt-in al brand tint, usá `box-shadow: var(--shadow-md)` en CSS o
-   * `shadow-[var(--shadow-md)]` en JSX. Valores en docs/design-kit/PROPOSED_TOKENS.md. */
-  --shadow-sm: 0 1px 2px oklch(0.18 0.01 60 / 6%);
-  --shadow-md: 0 4px 12px oklch(0.18 0.01 60 / 8%), 0 1px 3px oklch(0.18 0.01 60 / 5%);
-  --shadow-lg: 0 12px 32px oklch(0.18 0.01 60 / 10%), 0 2px 8px oklch(0.18 0.01 60 / 6%);
-  --shadow-xl: 0 24px 56px oklch(0.18 0.01 60 / 12%), 0 6px 16px oklch(0.18 0.01 60 / 8%);
-
-  /* Motion — duraciones + easings canónicos del kit. Calibrados sobre
-   * patterns reales del repo (press states, drawer settle, fly-to-cart). */
-  --duration-fast: 120ms; /* press states, button bumps */
-  --duration-base: 200ms; /* hover transitions, color changes */
-  --duration-slow: 350ms; /* entry animations, slide-up */
-  --duration-xslow: 550ms; /* fly-to-cart, hero reveals */
-
-  --ease-default: cubic-bezier(0.32, 0.72, 0, 1); /* snappy settle, drawer */
-  --ease-out: cubic-bezier(0, 0, 0.2, 1); /* standard decel */
-  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoot, badge pop */
-
-  /* Brand light palette */
-  --background: oklch(0.985 0.005 90); /* hueso casi blanco */
-  --foreground: oklch(0.18 0.01 60); /* tinta negra cálida */
-  --ink: oklch(0.14 0.01 60); /* near-black cálido (UI) */
-  --ink-pure: #000; /* brand-exact: hero + print */
-
-  --surface: oklch(0.97 0.008 85);
-  --surface-elevated: oklch(1 0 0);
-  --hairline: oklch(0.18 0.01 60 / 12%);
-
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.01 60);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.01 60);
-
-  /* Amarillo brand · Pantone 1235 C · #FAB428 — exacto, NO ALTERAR (regla 1.8) */
-  --amber: #fab428;
-  --amber-soft: color-mix(in oklch, #fab428 18%, transparent);
-  --amber-hot: #ffcc55; /* paso claro para amber-tape */
-
-  --primary: oklch(0.18 0.01 60);
-  --primary-foreground: oklch(0.985 0.005 90);
-
-  --secondary: oklch(0.94 0.008 85);
-  --secondary-foreground: oklch(0.18 0.01 60);
-
-  --muted: oklch(0.94 0.008 85);
-  --muted-foreground: oklch(0.42 0.01 70);
-
-  --accent: #fab428;
-  --accent-foreground: oklch(0.18 0.01 60);
-
-  --destructive: oklch(0.62 0.22 27);
-  --destructive-foreground: oklch(0.98 0.005 80);
-
-  --border: oklch(0.18 0.01 60 / 12%);
-  --input: oklch(0.18 0.01 60 / 16%);
-  --ring: color-mix(in oklch, #fab428 60%, transparent);
-
-  /* Paleta secundaria (del manual) — hex exactos Pantone, usar sparingly */
-  --rosa: #ed7bad; /* PANTONE 211 C */
-  --azul: #1097db; /* PANTONE 299 C */
-  --naranja: #e9552f; /* PANTONE 172 C */
-  --verde: #009971; /* PANTONE 7724 C */
-
-  --chart-1: var(--amber);
-  --chart-2: var(--azul);
-  --chart-3: var(--naranja);
-  --chart-4: var(--verde);
-  --chart-5: var(--rosa);
-
-  --sidebar: oklch(0.985 0.005 90);
-  --sidebar-foreground: oklch(0.18 0.01 60);
-  --sidebar-primary: #fab428;
-  --sidebar-primary-foreground: oklch(0.18 0.01 60);
-  /* Item activo/hover del sidebar admin: amber soft + ink (como el mock). */
-  --sidebar-accent: var(--amber-soft);
-  --sidebar-accent-foreground: oklch(0.18 0.01 60);
-  --sidebar-border: oklch(0.18 0.01 60 / 12%);
-  --sidebar-ring: color-mix(in oklch, #fab428 50%, transparent);
-}
-
-.dark {
-  /* Variante invertida: tinta oscura + amarillo (igual que merch negro del brand) */
-  --background: oklch(0.16 0.01 60);
-  --foreground: oklch(0.97 0.008 85);
-  --surface: oklch(0.2 0.01 60);
-  --surface-elevated: oklch(0.24 0.01 60);
-  --hairline: oklch(1 0 0 / 12%);
-  --card: oklch(0.2 0.01 60);
-  --card-foreground: oklch(0.97 0.008 85);
-  --muted: oklch(0.24 0.01 60);
-  --muted-foreground: oklch(0.72 0.01 70);
-  --primary: oklch(0.82 0.16 78);
-  --primary-foreground: oklch(0.16 0.01 60);
-}
-
-@layer base {
-  * {
-    border-color: var(--color-border);
-  }
-
-  html,
-  body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    overflow-x: clip;
-  }
-
-  .font-display {
-    font-family: var(--font-display);
-    font-optical-sizing: auto;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-  }
-
-  .font-mono {
-    font-family: var(--font-mono);
-  }
-
-  .tabular {
-    font-variant-numeric: tabular-nums;
-  }
-
-  ::selection {
-    background-color: var(--amber);
-    color: var(--ink);
-  }
-
-  /* Mobile: forzar font-size mínimo 16px en inputs/textarea/select para
-   * evitar el zoom automático de iOS al hacer focus. iOS solo dispara
-   * el zoom si el font-size es menor a 16px. Desktop (≥ 768px) puede
-   * volver a ser más chico — algunas UIs del admin tienen muchos campos
-   * y se justifica el text-sm. */
-  @media (max-width: 767px) {
-    input,
-    textarea,
-    select {
-      font-size: max(16px, 1em);
-    }
-  }
-}
-
-@layer utilities {
-  .hairline {
-    border-color: var(--hairline);
-  }
-  .text-balance {
-    text-wrap: balance;
-  }
-  .bg-amber-tape {
-    background: repeating-linear-gradient(-45deg, var(--amber) 0 24px, var(--amber-hot) 24px 48px);
-  }
-  /* Wordmark "rambla" — Champ Black ya trae el peso chunky redondeado;
-   * solo lowercase + tracking leve para que respiren las letras. */
-  .wordmark {
-    font-family: var(--font-display);
-    font-weight: 900;
-    letter-spacing: 0.01em;
-    font-feature-settings: "ss01";
-    text-transform: lowercase;
-    line-height: 0.9;
-  }
-  .grain::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image: radial-gradient(oklch(0.18 0.01 60 / 0.05) 1px, transparent 1px);
-    background-size: 4px 4px;
-  }
-  .grain {
-    position: relative;
-  }
-
-  /* ── Recetas de tipografía (design system) ────────────────────────────
-   * Champ Black (--font-display) SOLO para showpieces: hero, openers,
-   * wordmark. Headings/body/labels usan TT Commons en distintos pesos. */
-  .t-display-1 {
-    font-family: var(--font-display);
-    font-weight: 900;
-    font-size: clamp(3.5rem, 9vw, 8.5rem);
-    line-height: 0.9;
-    letter-spacing: -0.01em;
-    text-transform: lowercase;
-    text-wrap: balance;
-  }
-  .t-display-2 {
-    font-family: var(--font-display);
-    font-weight: 900;
-    font-size: clamp(2.25rem, 5vw, 4rem);
-    line-height: 1;
-    letter-spacing: -0.01em;
-    text-transform: lowercase;
-  }
-  .t-h1 {
-    font-family: var(--font-sans);
-    font-weight: 700;
-    font-size: 1.875rem;
-    line-height: 1.15;
-    letter-spacing: -0.015em;
-  }
-  .t-h2 {
-    font-family: var(--font-sans);
-    font-weight: 700;
-    font-size: 1.5rem;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-  }
-  .t-h3 {
-    font-family: var(--font-sans);
-    font-weight: 600;
-    font-size: 1.125rem;
-    line-height: 1.3;
-  }
-  .t-body {
-    font-family: var(--font-sans);
-    font-size: 1rem;
-    line-height: 1.55;
-  }
-  .t-small {
-    font-family: var(--font-sans);
-    font-size: 0.875rem;
-    line-height: 1.5;
-    color: var(--muted-foreground);
-  }
-  .t-mono {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-  }
-  .t-eyebrow {
-    font-family: var(--font-mono);
-    font-weight: 500;
-    font-size: 0.625rem;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    color: var(--muted-foreground);
-  }
-
-  /* Safe area insets para iOS (notch, home indicator) */
-  .safe-t {
-    padding-top: env(safe-area-inset-top);
-  }
-  .safe-b {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .safe-x {
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-
-  /* Rambla seal: badge amber + R bone por default. En el topbar móvil
-     amber-on-scroll, al pasar 65% del progreso (.topbar-snap), los
-     colores se invierten — el badge se vuelve bone y la R amber. */
-  .topbar-seal .seal-badge {
-    fill: var(--amber);
-    transition: fill 0.12s;
-  }
-  .topbar-seal .seal-r {
-    fill: var(--background);
-    transition: fill 0.12s;
-  }
-  .topbar-snap .topbar-seal .seal-badge {
-    fill: var(--background);
-  }
-  .topbar-snap .topbar-seal .seal-r {
-    fill: var(--amber);
-  }
-
-  /* Topbar móvil snap: cuando el scroll-amber pasa 65%, el date-pill y
-     el botón de sesión se invierten a fondo bone con ink. */
-  .topbar-snap .date-pill-snap {
-    background: var(--background) !important;
-    border-color: var(--background) !important;
-    color: var(--ink);
-  }
-  .topbar-snap .user-btn-snap {
-    background: var(--background) !important;
-    border-color: var(--background) !important;
-    color: var(--ink);
-  }
-
-  /*
-   * Estados de días en el Calendar del RentalDateModal.
-   * react-day-picker aplica el className del modifier a la celda del día.
-   * Los prefijos rdp-* son clases custom — no colisionan con rdp internos.
-   */
-
-  /* rdp-nostock — día sin stock para el carrito actual.
-     Activado por modifiers={{ nostock: nostockDates }}.
-     Fondo rojo suave + punto destructive debajo del número. */
-  .rdp-nostock {
-    position: relative;
-    background-color: color-mix(in oklch, var(--destructive) 12%, transparent) !important;
-    color: var(--destructive) !important;
-  }
-  .rdp-nostock::after {
-    content: "";
-    position: absolute;
-    bottom: 2px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    background: var(--destructive);
-    pointer-events: none;
-  }
-
-  /* rdp-closed — día cerrado según horarios (domingos, feriados configurados).
-     Activado por modifiers={{ closed: closedDates }}.
-     Fondo rojo más tenue + texto destructive + tachado (cerrado != sin stock). */
-  .rdp-closed {
-    background-color: color-mix(in oklch, var(--destructive) 8%, transparent) !important;
-    color: var(--destructive) !important;
-    text-decoration: line-through;
-    opacity: 0.7;
-  }
-}
-
-/* Prevent iOS Safari from zooming in on input focus (font-size must be ≥ 16px) */
-@media (max-width: 640px) {
-  input:not([type="checkbox"]):not([type="radio"]),
-  textarea,
-  select {
-    font-size: max(16px, 1em);
-  }
-}
-
-/* ── Mobile catalog animations ────────────────────────────────────── */
-@keyframes expand-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes slide-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-@keyframes slide-in-right {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
+  /* COMPAT transicional: el código de la app referencia tokens con nombre
+     plano (var(--amber), var(--hairline)…). El DS canónico los expone como
+     --color-*. Estos alias mantienen el plano funcionando hasta migrar los
+     usos a --color-* (PR3/PR4). NO agregar usos nuevos de nombres planos. */
+  --amber: var(--color-amber);
+  --amber-soft: var(--color-amber-soft);
+  --amber-hot: var(--color-amber-hot);
+  --ink: var(--color-ink);
+  --ink-pure: var(--color-ink-pure);
+  --background: var(--color-background);
+  --foreground: var(--color-foreground);
+  --surface: var(--color-surface);
+  --surface-elevated: var(--color-surface-elevated);
+  --hairline: var(--color-hairline);
+  --border: var(--color-border);
+  --input: var(--color-input);
+  --muted: var(--color-muted);
+  --muted-foreground: var(--color-muted-foreground);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-primary-foreground);
+  --secondary: var(--color-secondary);
+  --secondary-foreground: var(--color-secondary-foreground);
+  --accent: var(--color-accent);
+  --accent-foreground: var(--color-accent-foreground);
+  --destructive: var(--color-destructive);
+  --destructive-foreground: var(--color-destructive-foreground);
+  --ring: var(--color-ring);
+  --card: var(--color-card);
+  --card-foreground: var(--color-card-foreground);
+  --popover: var(--color-popover);
+  --popover-foreground: var(--color-popover-foreground);
+  --rosa: var(--color-rosa);
+  --azul: var(--color-azul);
+  --naranja: var(--color-naranja);
+  --verde: var(--color-verde);
+  --sidebar: var(--color-sidebar);
+  --sidebar-foreground: var(--color-sidebar-foreground);
+  --sidebar-primary: var(--color-sidebar-primary);
+  --sidebar-primary-foreground: var(--color-sidebar-primary-foreground);
+  --sidebar-accent: var(--color-sidebar-accent);
+  --sidebar-accent-foreground: var(--color-sidebar-accent-foreground);
+  --sidebar-border: var(--color-sidebar-border);
+  --sidebar-ring: var(--color-sidebar-ring);
 }

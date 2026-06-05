@@ -4,9 +4,7 @@ import { formatARS } from "@/lib/format";
 /**
  * PriceBlock — el bloque "precio + tarifa" usado en cards, rows y fichas.
  *
- * Source: `docs/design-kit/kit/components/price-block.tsx`.
- *
- * Regla del specimen:
+ * Reglas:
  *   - 1 jornada → mostrar `$ 24.500` + `/ jornada` chico.
  *   - N jornadas → mostrar total grande + `3 J · $ 24.500/J` chico.
  */

@@ -7,13 +7,13 @@ on:
     # Si un PR toca código + docs, igual corre (paths-ignore solo saltea
     # cuando TODOS los archivos cambiados matchean estos globs).
     paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
+      - "**/*.md"
+      - "docs/**"
   push:
     branches: [main, dev]
     paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
+      - "**/*.md"
+      - "docs/**"
 
 # Cancela runs viejos del mismo branch al pushear de nuevo
 concurrency:
@@ -28,10 +28,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
       - run: npm ci
       - run: npx tsc --noEmit
+      # La librería del DS se verifica además de forma independiente (su propio
+      # tsconfig) → gate modular: no puede romperse en silencio.
+      - run: npm run typecheck:ds
+      # Guardrail de ruteo: una ruta "parent" (con sub-rutas) DEBE proveer <Outlet/>,
+      # si no las pantallas hijas no renderizan (bug silencioso — ver #752).
+      - run: npm run check:routes
 
   lint:
     name: Lint + formato (eslint/prettier)
@@ -40,8 +46,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
       - run: npm ci
       # eslint corre prettier embebido (formato = error, reglas de React = aviso)
       - run: npm run lint
@@ -53,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - name: Compile all Python files
         run: python -m compileall -q backend/
 
@@ -64,8 +70,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
@@ -106,8 +112,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
@@ -143,7 +149,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
       - run: npm ci
       - run: npm run build

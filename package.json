@@ -17,7 +17,9 @@
     "lint": "eslint . --cache --cache-location node_modules/.cache/eslint/",
     "lint:fix": "eslint . --fix --cache --cache-location node_modules/.cache/eslint/",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
+    "typecheck:ds": "tsc --noEmit -p packages/design-system/tsconfig.json",
+    "check:routes": "node scripts/check-route-outlets.mjs"
   },
   "dependencies": {
     "@rambla/design-system": "*",

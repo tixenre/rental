@@ -1,10 +1,16 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { PedidoPage } from "@/components/admin/pedido/PedidoPage";
+import { MODIFICAR_PEDIDOS_HABILITADO } from "@/lib/features";
 
 export const Route = createFileRoute("/cliente/pedidos/$id/editar")({
+  // Modificación de pedidos por el cliente PAUSADA (#750): con el flag en false,
+  // la ruta no es accesible ni por URL directa.
+  beforeLoad: () => {
+    if (!MODIFICAR_PEDIDOS_HABILITADO) throw redirect({ to: "/cliente/portal" });
+  },
   head: () => ({ meta: [{ title: "Modificar pedido — Rambla Rental" }] }),
   component: ClienteEditarPedido,
 });

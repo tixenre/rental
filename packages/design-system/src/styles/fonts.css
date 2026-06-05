@@ -4,6 +4,9 @@
    Google Fonts en producción (ver README → Fonts).
    Rutas relativas a este archivo (src/styles/fonts.css).
 
+   Familia TT Commons completa: 400/500/600/700/800/900 + italics.
+   Champ Black solo para display/wordmark.
+
    OPTIMIZACIÓN PENDIENTE (opcional): convertir .otf/.ttf → .woff2 subseteado
    (latin + es). Ver README → "Optimización de fuentes" para el comando exacto.
    ============================================================ */
@@ -17,10 +20,24 @@
 }
 @font-face {
   font-family: "TT Commons";
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  src: url("../assets/fonts/TT_Commons_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
   font-weight: 500;
   font-style: normal;
   font-display: swap;
   src: url("../assets/fonts/TT_Commons_Medium_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+  src: url("../assets/fonts/TT_Commons_Medium_Italic_0.otf") format("opentype");
 }
 @font-face {
   font-family: "TT Commons";
@@ -31,6 +48,13 @@
 }
 @font-face {
   font-family: "TT Commons";
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+  src: url("../assets/fonts/TT_Commons_DemiBold_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -38,10 +62,38 @@
 }
 @font-face {
   font-family: "TT Commons";
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+  src: url("../assets/fonts/TT_Commons_Bold_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+  src: url("../assets/fonts/TT_Commons_Extrabold_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+  src: url("../assets/fonts/TT_Commons_Extrabold_Italic_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
   font-weight: 900;
   font-style: normal;
   font-display: swap;
   src: url("../assets/fonts/TT_Commons_Black_0.otf") format("opentype");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+  src: url("../assets/fonts/TT_Commons_Black_Italic_0.otf") format("opentype");
 }
 @font-face {
   font-family: "Champ Black";
