@@ -71,6 +71,7 @@ import { Button } from "@/components/ui/button";
 import { useBusinessPhone } from "@/lib/business";
 import { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";
 import { whatsappLink } from "@/lib/whatsapp";
+import { MODIFICAR_PEDIDOS_HABILITADO } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { GoogleIcon } from "@/components/ui/GoogleIcon";
 import { formatARS } from "@/lib/format";
@@ -1053,7 +1054,12 @@ function PedidoCard({
     return desde - Date.now() >= ms;
   })();
 
-  const puedeModificar = MODIFICABLE_STATES.has(pedido.estado) && !pendiente && dentroVentana;
+  // Modificación de pedidos por el cliente: PAUSADA por feature flag (#750).
+  const puedeModificar =
+    MODIFICAR_PEDIDOS_HABILITADO &&
+    MODIFICABLE_STATES.has(pedido.estado) &&
+    !pendiente &&
+    dentroVentana;
 
   async function cancelarSolicitud() {
     if (!pendiente) return;
@@ -1360,7 +1366,8 @@ function PedidoCard({
               </section>
             )}
 
-            {!puedeModificar &&
+            {MODIFICAR_PEDIDOS_HABILITADO &&
+              !puedeModificar &&
               MODIFICABLE_STATES.has(pedido.estado) &&
               !pendiente &&
               !dentroVentana && (
