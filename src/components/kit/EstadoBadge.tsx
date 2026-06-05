@@ -6,8 +6,7 @@ export type { EstadoPedido };
 /**
  * EstadoBadge — chip de estado para pedidos, paleta de marca Rambla.
  *
- * Source: `docs/design-kit/kit/components/estado-badge.tsx`. Versión del kit
- * con paleta secundaria oficial (--rosa/azul/verde/naranja).
+ * Versión con paleta secundaria oficial (--rosa/azul/verde/naranja).
  *
  * Source of truth única del repo desde PR E1 — la versión vieja en
  * `src/components/rental/EstadoBadge.tsx` (que usaba `bg-blue-50` Tailwind

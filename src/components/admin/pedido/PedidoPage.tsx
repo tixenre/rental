@@ -1,3 +1,7 @@
+// LEGACY parcial — era el editor v1 de Pedidos del back-office; el admin ahora usa /admin/pedidos/$id
+// (el editor canónico, ex-v2). Sobrevive solo como editor del portal del cliente
+// (/cliente/pedidos/$id/editar, mode="cliente"), HOY PAUSADO (#750). No agregar features nuevas acá;
+// se elimina cuando la modificación del cliente se retome/rediseñe o se descarte (#750).
 /**
  * PedidoPage — detalle de pedido.
  *
@@ -5,7 +9,7 @@
  * Mobile: columna única con las mismas secciones apiladas.
  */
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useRouter, useBlocker } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,10 +23,6 @@ import {
   Trash2,
   AlertTriangle,
   Check,
-  FileText,
-  FileSignature,
-  Truck,
-  ClipboardList,
   MoreHorizontal,
   Loader2,
   CloudOff,
@@ -30,6 +30,7 @@ import {
   Eye,
   Download,
   ShoppingCart,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -64,7 +65,6 @@ import {
   ESTADO_LABEL,
   pedidoPdfUrl,
   type PedidoEstado,
-  type Equipo,
   type Cliente,
   type PedidoHistorialItem,
 } from "@/lib/admin/api";
@@ -80,6 +80,8 @@ import {
   type PedidoMode,
 } from "./usePedidoDraft";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { EquipoSearchSheet } from "./EquipoSearchSheet";
+import { EnviarDocsDialog, DOCS_PEDIDO } from "./EnviarDocsDialog";
 
 // ── Formatters ────────────────────────────────────────────────────────────
 
@@ -730,7 +732,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
 
           {!isCliente && (
             <SidebarSection title="Documentos" defaultOpen>
-              <DocumentosSidebar pedidoId={pedido.id} />
+              <DocumentosSidebar pedidoId={pedido.id} clienteEmail={pedido.cliente_email ?? ""} />
             </SidebarSection>
           )}
 
@@ -1344,23 +1346,14 @@ function PagosSidebar({
 // Documentos sidebar
 // ─────────────────────────────────────────────────────────────────────────
 
-function DocumentosSidebar({ pedidoId }: { pedidoId: number }) {
-  const docs: {
-    kind: "pdf" | "albaran" | "contrato" | "packing-list";
-    label: string;
-    icon: React.ReactNode;
-  }[] = [
-    { kind: "contrato", label: "Contrato", icon: <FileSignature className="h-4 w-4" /> },
-    { kind: "pdf", label: "Presupuesto", icon: <FileText className="h-4 w-4" /> },
-    { kind: "albaran", label: "Albarán", icon: <Truck className="h-4 w-4" /> },
-    { kind: "packing-list", label: "Packing List", icon: <ClipboardList className="h-4 w-4" /> },
-  ];
+function DocumentosSidebar({ pedidoId, clienteEmail }: { pedidoId: number; clienteEmail: string }) {
+  const [mailOpen, setMailOpen] = useState(false);
 
   return (
     <div className="space-y-1.5">
-      {docs.map((d) => (
+      {DOCS_PEDIDO.map((d) => (
         <div key={d.kind} className="flex items-center gap-2 rounded-md border hairline px-3 py-2">
-          <span className="text-muted-foreground shrink-0">{d.icon}</span>
+          <d.Icon className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="flex-1 text-sm text-ink">{d.label}</span>
           <div className="flex items-center gap-1 shrink-0">
             <a
@@ -1382,143 +1375,25 @@ function DocumentosSidebar({ pedidoId }: { pedidoId: number }) {
           </div>
         </div>
       ))}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full mt-1"
+        onClick={() => setMailOpen(true)}
+      >
+        <Mail className="h-4 w-4 mr-1.5" />
+        Enviar por mail
+      </Button>
+
+      <EnviarDocsDialog
+        pedidoId={pedidoId}
+        clienteEmail={clienteEmail}
+        open={mailOpen}
+        onOpenChange={setMailOpen}
+      />
     </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Buscar equipo (BottomSheet)
-// ─────────────────────────────────────────────────────────────────────────
-
-function EquipoSearchSheet({
-  open,
-  onOpenChange,
-  existing,
-  stockMap,
-  onAdd,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  existing: DraftItem[];
-  stockMap: Record<string, { cantidad: number; reservado: number }>;
-  onAdd: (eq: Equipo) => void;
-}) {
-  const [q, setQ] = useState("");
-  const equiposQ = useQuery({
-    queryKey: ["admin", "equipos", "all"],
-    queryFn: () => adminApi.listEquipos({ per_page: 500 }),
-  });
-  const categoriasQ = useQuery({
-    queryKey: ["categorias"],
-    queryFn: () => adminApi.listCategorias(),
-    staleTime: 60_000,
-  });
-
-  const lista = useMemo(() => {
-    const all = equiposQ.data?.items ?? [];
-    const ql = q.trim().toLowerCase();
-    return all
-      .filter((e) => e.estado !== "fuera_servicio")
-      .filter(
-        (e) =>
-          !ql ||
-          e.nombre.toLowerCase().includes(ql) ||
-          (e.nombre_publico ?? "").toLowerCase().includes(ql) ||
-          (e.marca ?? "").toLowerCase().includes(ql) ||
-          (e.modelo ?? "").toLowerCase().includes(ql),
-      );
-  }, [equiposQ.data, q]);
-
-  const grupos = useMemo(() => {
-    const SIN = "Sin categoría";
-    const map = new Map<string, Equipo[]>();
-    for (const eq of lista) {
-      const cat = eq.etiquetas?.[0] ?? SIN;
-      const arr = map.get(cat) ?? [];
-      arr.push(eq);
-      map.set(cat, arr);
-    }
-    const weight: Record<string, number> = {};
-    const tree = categoriasQ.data ?? [];
-    for (const root of tree) {
-      const rp = root.prioridad ?? 999;
-      weight[root.nombre] = rp * 1000;
-      for (const c of root.children ?? []) {
-        weight[c.nombre] = rp * 1000 + ((c as { prioridad?: number }).prioridad ?? 100);
-      }
-      (root.subtags ?? []).forEach((s, i) => {
-        if (weight[s.nombre] == null) weight[s.nombre] = rp * 1000 + (i + 1) * 10;
-      });
-    }
-    return Array.from(map.entries()).sort(([a], [b]) => {
-      if (a === SIN) return 1;
-      if (b === SIN) return -1;
-      return (weight[a] ?? 999_000) - (weight[b] ?? 999_000) || a.localeCompare(b, "es");
-    });
-  }, [lista, categoriasQ.data]);
-
-  return (
-    <BottomSheet open={open} onOpenChange={onOpenChange} title="Agregar equipo" showClose>
-      <div className="px-4 pt-3 pb-3 border-b hairline">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar…"
-            className="pl-9 text-base sm:text-sm"
-          />
-        </div>
-      </div>
-      <div className="px-4 pb-4">
-        {grupos.length === 0 && (
-          <div className="py-8 text-center text-sm text-muted-foreground">Sin equipos.</div>
-        )}
-        {grupos.map(([cat, equipos]) => (
-          <section key={cat} className="mb-2">
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-2 flex items-center justify-between border-b hairline">
-              <h4 className="font-display text-sm text-ink">{cat}</h4>
-              <span className="text-[11px] text-muted-foreground">{equipos.length}</span>
-            </div>
-            <ul className="divide-y hairline">
-              {equipos.map((eq) => {
-                const stock = stockMap[String(eq.id)];
-                const inCart = existing.find((i) => i.equipo_id === eq.id);
-                const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : eq.cantidad;
-                const disponible = max - (inCart?.cantidad ?? 0);
-                return (
-                  <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-ink truncate">
-                        {eq.nombre_publico || eq.nombre}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
-                        {" · "}
-                        <span className={disponible <= 0 ? "text-destructive" : ""}>
-                          {disponible} libres
-                        </span>
-                        {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
-                      </div>
-                    </div>
-                    <Button
-                      size="icon"
-                      className="h-10 w-10 shrink-0"
-                      disabled={disponible <= 0}
-                      onClick={() => onAdd(eq)}
-                      aria-label="Agregar"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
-      </div>
-    </BottomSheet>
   );
 }
 

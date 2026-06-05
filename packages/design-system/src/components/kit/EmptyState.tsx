@@ -5,8 +5,7 @@ import { cn } from "@/lib/utils";
 /**
  * EmptyState — pattern "nada para mostrar".
  *
- * Source: `docs/design-kit/kit/components/empty-state.tsx`. Card con
- * icono amber-soft + título display + subtítulo + acción opcional.
+ * Card con icono amber-soft + título display + subtítulo + acción opcional.
  *
  * Variantes típicas:
  *   - Search empty → chips de sugerencias como `children`

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, descuentosJornadaApi } from "@/lib/admin/api";
+import { DUENOS } from "@/lib/admin/duenos";
 import { formatARS } from "@/lib/format";
 import { interpolarDescuento } from "@/lib/api";
 import { FAQ_GROUPS, parseFaq, type FaqGroup } from "@/data/faq";
@@ -80,7 +81,136 @@ function SettingsPage() {
       <AdminSection title="Google Analytics" storageKey="settings:ga4" defaultOpen={false}>
         <GoogleAnalyticsSection />
       </AdminSection>
+
+      <AdminSection title="Calendario (feed iCal)" storageKey="settings:ical" defaultOpen={false}>
+        <CalendarFeedSection />
+      </AdminSection>
+
+      <AdminSection
+        title="Reparto de comisiones"
+        storageKey="settings:comisiones"
+        defaultOpen={false}
+      >
+        <ComisionesSection />
+      </AdminSection>
     </div>
+  );
+}
+
+// ── Reparto de comisiones por dueño (#88) ───────────────────────────────────
+
+const DEFAULT_COMISIONES: Record<string, Record<string, number>> = {
+  Rambla: { Rambla: 100, Pablo: 0, Tincho: 0 },
+  Pablo: { Pablo: 50, Rambla: 45, Tincho: 5 },
+  Tincho: { Tincho: 50, Rambla: 45, Pablo: 5 },
+};
+
+function ComisionesSection() {
+  const qc = useQueryClient();
+  const [model, setModel] = useState<Record<string, Record<string, number>> | null>(null);
+
+  const settingQ = useQuery({
+    queryKey: ["settings", "comisiones_modelo"],
+    queryFn: () => adminApi.getSetting("comisiones_modelo"),
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  // Inicializa desde el setting (o el default) una vez que el fetch terminó.
+  useEffect(() => {
+    if (model !== null || !settingQ.isFetched) return;
+    let parsed: Record<string, Record<string, number>> | null = null;
+    try {
+      parsed = settingQ.data?.value ? JSON.parse(settingQ.data.value) : null;
+    } catch {
+      parsed = null;
+    }
+    const base = parsed ?? DEFAULT_COMISIONES;
+    const next: Record<string, Record<string, number>> = {};
+    for (const d of DUENOS) {
+      next[d] = {};
+      for (const b of DUENOS) next[d][b] = Number(base[d]?.[b] ?? 0);
+    }
+    setModel(next);
+  }, [settingQ.data, settingQ.isFetched, model]);
+
+  const updateMut = useMutation({
+    mutationFn: (v: string) => adminApi.updateSetting("comisiones_modelo", v),
+    onSuccess: () => {
+      toast.success("Reparto de comisiones actualizado");
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      qc.invalidateQueries({ queryKey: ["admin", "liquidacion"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const setPct = (dueno: string, benef: string, v: number) =>
+    setModel((prev) => (prev ? { ...prev, [dueno]: { ...prev[dueno], [benef]: v } } : prev));
+
+  const sumOf = (dueno: string) =>
+    model ? DUENOS.reduce((s, b) => s + (model[dueno][b] || 0), 0) : 0;
+
+  const save = () => {
+    if (!model) return;
+    for (const d of DUENOS) {
+      if (Math.abs(sumOf(d) - 100) > 0.01) {
+        toast.error(`${d}: los porcentajes deben sumar 100 (suman ${sumOf(d)}).`);
+        return;
+      }
+    }
+    updateMut.mutate(JSON.stringify(model));
+  };
+
+  return (
+    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <div>
+        <h2 className="font-display text-lg text-ink">Reparto de comisiones por dueño</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Cuando un equipo de un dueño genera ingresos, así se reparte entre los beneficiarios. Los
+          porcentajes de cada dueño deben sumar 100. Se usa en el reporte de liquidación
+          (Estadísticas → Reportes).
+        </p>
+      </div>
+      <div className="border-t hairline pt-3 space-y-4">
+        {model &&
+          DUENOS.map((dueno) => {
+            const suma = sumOf(dueno);
+            const ok = Math.abs(suma - 100) <= 0.01;
+            return (
+              <div key={dueno} className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-ink">Equipos de {dueno}</span>
+                  <span
+                    className={`text-xs tabular-nums ${ok ? "text-muted-foreground" : "text-destructive"}`}
+                  >
+                    suma {suma}%
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {DUENOS.map((benef) => (
+                    <label key={benef} className="text-xs text-muted-foreground">
+                      {benef}
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={model[dueno][benef]}
+                        onChange={(e) => setPct(dueno, benef, Number(e.target.value))}
+                        className="mt-1"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        <div className="pt-1">
+          <Button size="sm" onClick={save} disabled={!model || updateMut.isPending}>
+            {updateMut.isPending ? "Guardando…" : "Guardar reparto"}
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -368,6 +498,133 @@ function GoogleAnalyticsSection() {
           </Button>
         )}
       </div>
+    </section>
+  );
+}
+
+// ── Calendario: feed iCal suscribible ───────────────────────────────────────
+
+function CalendarFeedSection() {
+  const qc = useQueryClient();
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  const feedQ = useQuery({
+    queryKey: ["calendar-feed"],
+    queryFn: () => adminApi.getCalendarFeed(),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const regenMut = useMutation({
+    mutationFn: () => adminApi.regenerateCalendarFeed(),
+    onSuccess: (data) => {
+      qc.setQueryData(["calendar-feed"], data);
+      toast.success("Generamos una URL nueva. La anterior dejó de funcionar.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+    onSettled: () => setConfirmReset(false),
+  });
+
+  const url = feedQ.data?.url ?? "";
+  // webcal:// abre directo el diálogo de suscripción del calendario (un clic),
+  // sin copiar-pegar. Mismo enlace, solo cambia el esquema.
+  const webcalUrl = url.replace(/^https?:\/\//, "webcal://");
+
+  const copiar = async () => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("URL copiada");
+    } catch {
+      toast.error("No se pudo copiar — copiala a mano");
+    }
+  };
+
+  return (
+    <section className="rounded-lg border hairline bg-background p-4 space-y-3">
+      <div>
+        <h2 className="font-display text-lg text-ink">Calendario de reservas</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Suscribí esta URL en tu calendario para ver las reservas <strong>confirmadas</strong> como
+          eventos (los alquileres ocupan el día completo; las reservas del Estudio van con su
+          horario). Se actualiza solo cada algunas horas y es <strong>solo lectura</strong>: editás
+          las reservas en Rambla, el calendario las refleja.
+        </p>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          En Google Calendar: <em>Otros calendarios → Suscribirse con URL</em> → pegá el enlace.
+          También funciona en Apple Calendar y Outlook.
+        </p>
+      </div>
+
+      <div className="border-t hairline pt-3 space-y-2">
+        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          URL del feed
+        </div>
+        {feedQ.isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+          </div>
+        ) : feedQ.isError ? (
+          <p className="text-sm text-destructive">
+            No se pudo cargar la URL del feed. Reintentá recargando la página.
+          </p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              readOnly
+              value={url}
+              onFocus={(e) => e.currentTarget.select()}
+              className="w-full sm:w-[28rem] font-mono text-xs"
+            />
+            <Button size="sm" onClick={copiar} disabled={!url}>
+              Copiar
+            </Button>
+            <Button size="sm" variant="outline" asChild>
+              <a href={webcalUrl}>Suscribir</a>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirmReset(true)}
+              disabled={regenMut.isPending}
+            >
+              Regenerar
+            </Button>
+          </div>
+        )}
+        <p className="text-[11px] text-muted-foreground">
+          <strong>Suscribir</strong> abre tu app de calendario directo; o copiá la URL y pegala a
+          mano (Google Calendar: <em>Otros calendarios → Suscribirse con URL</em>).
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          La URL es secreta: cualquiera que la tenga puede ver tus reservas. Si se filtró,
+          regenerala (se corta el acceso anterior y hay que volver a suscribir el calendario).
+        </p>
+      </div>
+
+      <AlertDialog open={confirmReset} onOpenChange={setConfirmReset}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Regenerar la URL del feed?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La URL actual dejará de funcionar al instante. Los calendarios ya suscritos con la URL
+              vieja van a dejar de actualizarse hasta que los vuelvas a suscribir con la nueva.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={regenMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                regenMut.mutate();
+              }}
+              disabled={regenMut.isPending}
+            >
+              {regenMut.isPending ? "Regenerando…" : "Regenerar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

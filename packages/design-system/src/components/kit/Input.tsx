@@ -6,8 +6,7 @@ import { cn } from "@/lib/utils";
 /**
  * Input — campo de texto branded del kit Rambla.
  *
- * Source: `docs/design-kit/kit/components/input.tsx`. Variante del Input
- * shadcn con ring amber-soft y borde hairline default. Convive con
+ * Variante del Input shadcn con ring amber-soft y borde hairline default. Convive con
  * `src/components/ui/input.tsx`; los nuevos forms pueden elegir.
  */
 export const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(

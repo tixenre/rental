@@ -41,6 +41,15 @@
   --color-destructive-foreground: oklch(0.98 0.005 80);
   --color-ring:                 color-mix(in oklch, #FAB428 60%, transparent);
 
+  /* Card & popover (surfaces shadcn — blanco sobre bone). */
+  --color-card:                 oklch(1 0 0);
+  --color-card-foreground:      oklch(0.18 0.01 60);
+  --color-popover:              oklch(1 0 0);
+  --color-popover-foreground:   oklch(0.18 0.01 60);
+
+  /* Ring offset (focus rings shadcn — el bg de la página). */
+  --color-ring-offset-background: oklch(0.985 0.005 90);
+
   /* ── Status palette (secundaria — SOLO order states & charts) ── */
   --color-rosa:    #ED7BAD;   /* Pantone 211 C  — Devuelto */
   --color-azul:    #1097DB;   /* Pantone 299 C  — Presupuesto / info */
@@ -53,17 +62,37 @@
   --color-chart-3: var(--color-naranja);
   --color-chart-4: var(--color-verde);
   --color-chart-5: var(--color-rosa);
+
+  /* ── Sidebar (back-office admin) ───────────────────────────
+     Item activo/hover = amber-soft + ink (como el mock). */
+  --color-sidebar:                    oklch(0.985 0.005 90);
+  --color-sidebar-foreground:         oklch(0.18 0.01 60);
+  --color-sidebar-primary:            #FAB428;
+  --color-sidebar-primary-foreground: oklch(0.18 0.01 60);
+  --color-sidebar-accent:             var(--color-amber-soft);
+  --color-sidebar-accent-foreground:  oklch(0.18 0.01 60);
+  --color-sidebar-border:             oklch(0.18 0.01 60 / 12%);
+  --color-sidebar-ring:               color-mix(in oklch, #FAB428 50%, transparent);
 }
 
 /* ── Dark mode ─────────────────────────────────────────────
    Tokens semánticos auto-switchean con .dark en <html>.
-   Amber permanece como acento en ambos modos. */
+   Amber permanece como acento en ambos modos.
+   (Hoy la app es light-only —sin toggle—; el set queda completo y correcto
+   por si se habilita más adelante.) */
 .dark {
-  --color-background:       oklch(0.16 0.01 60);
-  --color-foreground:       oklch(0.97 0.008 85);
-  --color-surface:          oklch(0.2 0.01 60);
-  --color-surface-elevated: oklch(0.24 0.01 60);
-  --color-hairline:         oklch(1 0 0 / 12%);
-  --color-border:           oklch(1 0 0 / 12%);
-  --color-muted-foreground: oklch(0.72 0.01 70);
+  --color-background:         oklch(0.16 0.01 60);
+  --color-foreground:         oklch(0.97 0.008 85);
+  --color-surface:            oklch(0.2 0.01 60);
+  --color-surface-elevated:   oklch(0.24 0.01 60);
+  --color-hairline:           oklch(1 0 0 / 12%);
+  --color-border:             oklch(1 0 0 / 12%);
+  --color-muted:              oklch(0.24 0.01 60);
+  --color-muted-foreground:   oklch(0.72 0.01 70);
+  --color-card:               oklch(0.2 0.01 60);
+  --color-card-foreground:    oklch(0.97 0.008 85);
+  --color-popover:            oklch(0.2 0.01 60);
+  --color-popover-foreground: oklch(0.97 0.008 85);
+  --color-primary:            oklch(0.82 0.16 78);
+  --color-primary-foreground: oklch(0.16 0.01 60);
 }

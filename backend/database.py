@@ -1067,6 +1067,14 @@ def init_db():
         VALUES ('hero_taglines', '[["rental, estudio,","rambla."],["en rambla,","en mardel."],["en rambla,","tu proyecto."],["en rambla,","tu rodaje."]]', 'system-seed')
         ON CONFLICT (key) DO NOTHING
     """)
+    # Token del feed iCal de reservas (routes/calendar.py). Vacío = feed
+    # deshabilitado; el admin lo genera desde /admin/settings (no se expone
+    # por el GET /settings/{key} público).
+    conn.execute("""
+        INSERT INTO app_settings (key, value, updated_by)
+        VALUES ('ical_feed_token', '', 'system-seed')
+        ON CONFLICT (key) DO NOTHING
+    """)
 
     # Sugerencias automáticas ignoradas (#352). Cuando el admin descarta una
     # sugerencia, la persistimos por (tipo, ref) para no volver a mostrarla.
@@ -1076,6 +1084,22 @@ def init_db():
             ref        TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (tipo, ref)
+        )
+    """)
+
+    # Cierres de liquidación (#721). Cerrar un mes congela una FOTO inmutable del
+    # reporte de ese mes (los números Y el modelo de comisiones con que se calculó)
+    # → cambiar el modelo o editar un pedido viejo ya no reescribe un mes liquidado.
+    # `mes` es 'YYYY-MM'. Reabrir = borrar la fila (vuelve a calcularse en vivo).
+    # Motor: backend/reportes/cierres.py. Va TAMBIÉN en una migración (esquema en
+    # dos capas, decisión 2026-06-03).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS liquidacion_cierres (
+            mes           VARCHAR(7) PRIMARY KEY,
+            snapshot_json TEXT NOT NULL,
+            modelo_json   TEXT NOT NULL,
+            cerrado_por   VARCHAR(255),
+            cerrado_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -1107,6 +1131,22 @@ def init_db():
             updated_by TEXT
         )
     """)
+    # Seed idempotente de las 4 plantillas (esquema en dos capas, MEMORIA
+    # 2026-06-03): el contenido vivía SOLO en migraciones, así que con las
+    # migraciones trabadas la tabla quedaba vacía y la sección /admin/email-templates
+    # no tenía nada que abrir ni previsualizar. La fuente única forward del copy
+    # es services/email/default_templates.py. ON CONFLICT DO NOTHING respeta lo
+    # que ya exista (filas migradas o editadas por un admin).
+    from services.email.default_templates import DEFAULT_TEMPLATES
+    for _key, _tpl in DEFAULT_TEMPLATES.items():
+        conn.execute(
+            """
+            INSERT INTO email_templates (key, subject, body_html, body_text, updated_by)
+            VALUES (?, ?, ?, ?, 'system:migration')
+            ON CONFLICT (key) DO NOTHING
+            """,
+            (_key, _tpl["subject"], _tpl["body_html"], _tpl["body_text"]),
+        )
     conn.execute("""
         CREATE TABLE IF NOT EXISTS emails_log (
             id           BIGSERIAL PRIMARY KEY,

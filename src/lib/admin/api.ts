@@ -892,6 +892,18 @@ export const adminApi = {
         body: JSON.stringify({ value: String(value) }),
       },
     ),
+
+  // ── Feed iCal de reservas (calendario suscribible) ────────────────────
+  /** URL del feed iCal para suscribir en Google/Apple Calendar. Genera el
+   *  token la primera vez que se consulta. */
+  getCalendarFeed: () =>
+    authedJson<{ url: string; token: string; enabled: boolean }>("/api/admin/calendar/feed"),
+  /** Rota el token → invalida la URL anterior. */
+  regenerateCalendarFeed: () =>
+    authedPostJson<{ url: string; token: string; enabled: boolean }>(
+      "/api/admin/calendar/feed/regenerate",
+      {},
+    ),
   /** Modos: "missing" (sin precio), "auto" (respeta manuales — default),
    *  "all" (todos), "ids" (solo los listados). */
   recalcularPrecios: (args: {
@@ -1261,6 +1273,15 @@ export const adminApi = {
     return authedJson<PedidosListResp>(`/api/alquileres?${sp.toString()}`);
   },
   getPedido: (id: number) => authedJson<Pedido>(`/api/alquileres/${id}`),
+  enviarDocumentos: (id: number, payload: { docs: string[]; to?: string; mensaje?: string }) =>
+    authedJson<{ ok: true; to: string; docs: string[]; provider?: string }>(
+      `/api/alquileres/${id}/enviar-documentos`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    ),
   setPedidoEstado: (id: number, estado: PedidoEstado) =>
     authedJson<Pedido>(`/api/alquileres/${id}`, {
       method: "PATCH",
@@ -1353,6 +1374,42 @@ export const adminApi = {
   // analítica de búsquedas del catálogo público
   getBusquedas: (dias?: number) =>
     authedJson<BusquedasData>(`/api/admin/busquedas${dias && dias > 0 ? `?dias=${dias}` : ""}`),
+
+  // Reportes (#88) — liquidación por dueño (pedidos 100% pagados, repartidos)
+  getLiquidacion: (desde: string, hasta: string) =>
+    authedJson<LiquidacionData>(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}`),
+  liquidacionCsv: (desde: string, hasta: string) =>
+    authedFetch(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}&formato=csv`).then(
+      (r) => r.blob(),
+    ),
+  // Reporte en PDF branded + envío por mail (misma maquinaria que los documentos
+  // de pedido). El preview se trae como HTML y se muestra con iframe srcDoc para
+  // no depender de cookies cross-origin en un iframe.
+  liquidacionPreviewHtml: (desde: string, hasta: string) =>
+    authedFetch(
+      `/api/admin/reportes/liquidacion/pdf?desde=${desde}&hasta=${hasta}&format=html`,
+    ).then((r) => r.text()),
+  getReporteDestinatarios: () =>
+    authedJson<{ destinatarios: string[] }>("/api/admin/reportes/liquidacion/destinatarios"),
+  enviarReporteMail: (payload: {
+    desde: string;
+    hasta: string;
+    destinatarios: string[];
+    mensaje?: string;
+  }) =>
+    authedPostJson<{ enviados: string[]; fallidos: string[] }>(
+      "/api/admin/reportes/liquidacion/enviar-mail",
+      payload,
+    ),
+  getReconciliacion: () => authedJson<ReconciliacionData>("/api/admin/reportes/reconciliacion"),
+  // Cierre de mes (#721): congelar/reabrir la foto inmutable de un mes liquidado.
+  cerrarMes: (mes: string) =>
+    authedJson<LiquidacionData>(`/api/admin/reportes/cierres/${mes}`, { method: "POST" }),
+  reabrirMes: (mes: string) =>
+    authedJson<{ mes: string; cerrado: boolean; reabierto: boolean }>(
+      `/api/admin/reportes/cierres/${mes}`,
+      { method: "DELETE" },
+    ),
 
   uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
@@ -1467,6 +1524,52 @@ export type BusquedaRow = {
 export type BusquedasData = {
   top: BusquedaRow[];
   zero: BusquedaRow[];
+};
+
+// Liquidación por dueño (#88): ingreso 100% pagado, atribuido al mes/día de
+// saldado y repartido entre beneficiarios según el modelo de comisiones.
+export type PorBeneficiario = Record<string, number>;
+export type LiquidacionPunto = {
+  total: number;
+  por_beneficiario: PorBeneficiario;
+};
+export type LiquidacionMes = LiquidacionPunto & { mes: string };
+export type LiquidacionDia = LiquidacionPunto & { dia: string };
+export type LiquidacionDueno = {
+  dueno: string;
+  monto_generado: number;
+  pedidos: number;
+  reparto: PorBeneficiario;
+  equipos: { equipo: string; monto: number; veces: number }[];
+};
+export type LiquidacionData = {
+  desde: string;
+  hasta: string;
+  beneficiarios: string[];
+  modelo: Record<string, Record<string, number>>;
+  resumen: LiquidacionPunto & { pedidos: number };
+  por_mes: LiquidacionMes[];
+  por_dia: LiquidacionDia[];
+  por_dueno: LiquidacionDueno[];
+  // Cierre del mes (#721): presentes solo cuando el rango es exactamente un mes
+  // calendario (la vista mensual). `cerrado` true → los números vienen de la foto
+  // inmutable. `mes` es 'YYYY-MM'.
+  mes?: string;
+  cerrado?: boolean;
+  cerrado_por?: string | null;
+  cerrado_at?: string | null;
+};
+
+// Reconciliación de datos de liquidación (#88, hardening): semáforo de confianza.
+export type ReconciliacionData = {
+  ok: boolean;
+  pagados_sin_ledger: { cantidad: number; ids: number[] };
+  monto_pagado_divergente: { cantidad: number; ids: number[] };
+  sobrepagados: { cantidad: number; ids: number[] };
+  // Mes cerrado desactualizado (#721): pedidos saldados en un mes ya cerrado que
+  // recibieron actividad después del cierre → la foto quedó vieja, hay que reabrir.
+  mes_cerrado_desactualizado: { cantidad: number; ids: number[]; meses: string[] };
+  duenos_no_canonicos: string[];
 };
 
 export type EstadisticasData = {
