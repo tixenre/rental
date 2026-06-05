@@ -22,6 +22,7 @@ import {
   Download,
   ShoppingCart,
   Info,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,16 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
@@ -152,6 +163,18 @@ function PedidoV2EditorPage() {
   const [openPagoModal, setOpenPagoModal] = useState(false);
   const [openMailDialog, setOpenMailDialog] = useState(false);
   const [openSearchSheet, setOpenSearchSheet] = useState(false);
+  const [askDelete, setAskDelete] = useState(false);
+
+  const qc = useQueryClient();
+  const deleteMut = useMutation({
+    mutationFn: () => adminApi.deletePedido(pedidoId),
+    onSuccess: () => {
+      toast.success("Pedido eliminado");
+      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
+      navigate({ to: "/admin/pedidos-v2" });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   if (pedidoQ.isError) {
     return (
@@ -240,12 +263,8 @@ function PedidoV2EditorPage() {
               <Info className="h-4 w-4 text-amber shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <span className="font-medium text-ink">Hay una solicitud de cambio pendiente.</span>{" "}
-                <Link
-                  to="/admin/pedidos/$id"
-                  params={{ id: String(p.id) }}
-                  className="underline text-muted-foreground"
-                >
-                  Revisarla en la vista clásica
+                <Link to="/admin/solicitudes" className="underline text-muted-foreground">
+                  Revisarla en Solicitudes
                 </Link>
                 .
               </div>
@@ -641,6 +660,18 @@ function PedidoV2EditorPage() {
               <Mail className="h-4 w-4 mr-1" /> Enviar por mail
             </Button>
           </RailSection>
+
+          {/* Eliminar pedido */}
+          <RailSection label="Zona peligrosa">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setAskDelete(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-1" /> Eliminar pedido
+            </Button>
+          </RailSection>
         </aside>
       </div>
 
@@ -682,6 +713,25 @@ function PedidoV2EditorPage() {
         open={openMailDialog}
         onOpenChange={setOpenMailDialog}
       />
+      <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar pedido #{p.numero_pedido ?? p.id}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borran también sus ítems y pagos. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMut.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
