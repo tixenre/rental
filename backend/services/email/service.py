@@ -251,6 +251,8 @@ def send_email(
     context: dict[str, Any],
     alquiler_id: Optional[int] = None,
     attachments: Optional[Sequence["Attachment"]] = None,
+    *,
+    respect_enabled: bool = True,
 ) -> dict[str, Any]:
     """Envía un mail renderizando una plantilla. Loggea SIEMPRE en
     `emails_log`. NUNCA propaga excepciones del provider.
@@ -258,6 +260,12 @@ def send_email(
     `attachments` (opcional): lista de `Attachment` que el backend adjunta
     al mail (ej. el `.ics` de la reserva en la confirmación). Es la única boca
     de envío — no se crea un segundo camino para adjuntar.
+
+    `respect_enabled` (default True): si la plantilla está apagada
+    (`email_templates.enabled = false`), no se envía y se devuelve
+    `{ok, skipped, reason:'disabled'}` sin loggear. Los envíos automáticos lo
+    dejan en True; el envío de prueba del admin lo pasa en False para poder
+    testear un template apagado.
 
     Devuelve un dict {ok, provider, provider_id?, error?, log_id} útil para
     el endpoint de test del admin.
@@ -271,6 +279,18 @@ def send_email(
 
     conn = get_db()
     try:
+        # On/off por plantilla (Fase B): si está apagada, no se manda. El envío
+        # de prueba del admin pasa respect_enabled=False para saltarse el gate.
+        if respect_enabled:
+            erow = conn.execute(
+                "SELECT enabled FROM email_templates WHERE key = ?", (template_key,)
+            ).fetchone()
+            if erow is not None and not erow["enabled"]:
+                logger.info(
+                    "send_email: template '%s' apagado (enabled=false) → skip", template_key
+                )
+                return {"ok": True, "skipped": True, "reason": "disabled"}
+
         # Idempotency: si este template ya se envió OK para este pedido,
         # no lo mandamos de nuevo (doble-click en confirmar, retries, etc).
         if template_key in _IDEMPOTENT_PER_PEDIDO and alquiler_id:

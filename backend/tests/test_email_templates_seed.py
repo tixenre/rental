@@ -13,10 +13,13 @@ EXPECTED_KEYS = {
     "pedido_confirmado_cliente",
     "pedido_creado_admin",
     "recordatorio_retiro",
+    "modificacion_solicitada_admin",
+    "modificacion_resuelta_cliente",
+    "modificacion_cancelada_admin",
 }
 
 
-def test_estan_las_4_plantillas():
+def test_estan_todas_las_plantillas():
     assert set(DEFAULT_TEMPLATES) == EXPECTED_KEYS
 
 

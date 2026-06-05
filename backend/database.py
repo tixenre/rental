@@ -1127,11 +1127,19 @@ def init_db():
             subject    TEXT NOT NULL,
             body_html  TEXT NOT NULL,
             body_text  TEXT NOT NULL,
+            enabled    BOOLEAN NOT NULL DEFAULT TRUE,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_by TEXT
         )
     """)
-    # Seed idempotente de las 4 plantillas (esquema en dos capas, MEMORIA
+    # On/off por plantilla (Fase B mails): apagar un mail automático sin tocar
+    # código. `send_email` lo respeta. ADD COLUMN idempotente para BDs que ya
+    # tenían la tabla (CREATE IF NOT EXISTS no agrega columnas nuevas). Espeja la
+    # migración r2s3t4u5v6w7.
+    conn.execute(
+        "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE"
+    )
+    # Seed idempotente de las plantillas del sistema (esquema en dos capas, MEMORIA
     # 2026-06-03): el contenido vivía SOLO en migraciones, así que con las
     # migraciones trabadas la tabla quedaba vacía y la sección /admin/email-templates
     # no tenía nada que abrir ni previsualizar. La fuente única forward del copy

@@ -1,11 +1,13 @@
-"""Contenido por defecto de las plantillas de email (los 4 mails del sistema).
+"""Contenido por defecto de las plantillas de email (los 7 mails del sistema).
 
 **Fuente única forward del copy de los templates.** Espeja el end-state de la
 cadena de migraciones (`a4e8c2b9d710` siembra → `e7c3a9f5d1b8` → `c1e9f3a7b5d2`
-branded → `f2a4c6e8b0d1` botón calendario → restyle Design System). `init_db()`
-siembra estas filas de forma idempotente (`ON CONFLICT DO NOTHING`) para que las
-plantillas **existan siempre**, aunque las migraciones se traben — la red del
-esquema en dos capas (ver `docs/MEMORIA.md` 2026-06-03).
+branded → `f2a4c6e8b0d1` botón calendario → `a7d4f1c9e2b5` restyle Design System;
+los 3 mails `modificacion_*` los sembró `b6f8d3e5a2c1` y los repintó al DS
+`c5e9a3f7d1b4`). `init_db()` siembra estas filas de forma idempotente
+(`ON CONFLICT DO NOTHING`) para que las plantillas **existan siempre**, aunque las
+migraciones se traben — la red del esquema en dos capas (ver `docs/MEMORIA.md`
+2026-06-03).
 
 El layout branded (header con logo, colores, footer) lo pone el shell común en
 `services/email/service.py` (`_wrap_email_html`); estos bodies guardan **solo el
@@ -108,16 +110,19 @@ Total: {{ total }}
 Ver en el back-office: {{ admin_url }}""",
     },
     "recordatorio_retiro": {
-        "subject": "Mañana retirás tu pedido #{{ numero_pedido }} — Rambla Rental",
-        "body_html": f"""<p {b.H}>¡Mañana es el día!</p>
-<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, te recordamos que <strong>mañana ({{{{ fecha_desde }}}})</strong> retirás tu pedido <strong>#{{{{ numero_pedido }}}}</strong>.</p>
+        # El copy se adapta a `dias_antes` (configurable desde /admin/settings):
+        # con 1 día dice "mañana"; con N>1 dice "en N días". `dias_antes` lo
+        # inyecta el job (jobs/recordatorios.py) y el preview del admin (=1).
+        "subject": "{% if dias_antes == 1 %}Mañana retirás{% else %}Faltan {{ dias_antes }} días para retirar{% endif %} tu pedido #{{ numero_pedido }} — Rambla Rental",
+        "body_html": f"""<p {b.H}>{{% if dias_antes == 1 %}}¡Mañana es el día!{{% else %}}¡Falta poco!{{% endif %}}</p>
+<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, te recordamos que <strong>{{% if dias_antes == 1 %}}mañana{{% else %}}en {{{{ dias_antes }}}} días{{% endif %}} ({{{{ fecha_desde }}}})</strong> retirás tu pedido <strong>#{{{{ numero_pedido }}}}</strong>.</p>
 {{{{ items_html|safe }}}}
 {b.btn("portal_url", "Ver mi pedido")}
 <p {b.MUTED_P}>Te esperamos en el galpón. Si necesitás reagendar, escribinos cuanto antes.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
         "body_text": """Hola {{ cliente_nombre }},
 
-Mañana ({{ fecha_desde }}) retirás tu pedido #{{ numero_pedido }}.
+{% if dias_antes == 1 %}Mañana{% else %}En {{ dias_antes }} días{% endif %} ({{ fecha_desde }}) retirás tu pedido #{{ numero_pedido }}.
 
 {{ items_text }}
 
@@ -125,5 +130,61 @@ Te esperamos en el galpón. Si necesitás reagendar, escribinos cuanto antes.
 Tu portal: {{ portal_url }}
 
 — El equipo de Rambla""",
+    },
+    "modificacion_solicitada_admin": {
+        "subject": "Modificación pedida — pedido #{{ numero_pedido }} ({{ cliente_nombre }})",
+        "body_html": f"""<p {b.H}>El cliente pidió modificar un pedido</p>
+<p style="margin:0 0 4px;"><strong>#{{{{ numero_pedido }}}}</strong> de <strong>{{{{ cliente_nombre }}}}</strong></p>
+<p style="margin:0 0 4px;color:{b.MUTED};font-size:14px;">{{{{ cliente_email }}}}</p>
+<p {b.LBL}>Pedido actual</p>
+<p style="margin:0 0 4px;"><strong>Fechas:</strong> {{{{ fecha_desde_actual }}}} → {{{{ fecha_hasta_actual }}}}</p>
+<p {b.TOTAL}><strong>Total: {{{{ total_actual }}}}</strong></p>
+<p {b.LBL}>Cambios propuestos</p>
+<p style="margin:0 0 4px;"><strong>Fechas:</strong> {{{{ fecha_desde_propuesta }}}} → {{{{ fecha_hasta_propuesta }}}}</p>
+{{{{ diff_html|safe }}}}
+{{% if mensaje %}}<p {b.MUTED_P}><strong>Comentario del cliente:</strong> {{{{ mensaje }}}}</p>{{% endif %}}
+{b.btn("admin_url", "Revisar en el back-office")}""",
+        "body_text": """El cliente {{ cliente_nombre }} ({{ cliente_email }}) pidió modificar el pedido #{{ numero_pedido }}.
+
+Pedido actual:
+  Fechas: {{ fecha_desde_actual }} → {{ fecha_hasta_actual }}
+  Total: {{ total_actual }}
+
+Cambios propuestos:
+  Fechas: {{ fecha_desde_propuesta }} → {{ fecha_hasta_propuesta }}
+{{ diff_text }}
+{% if mensaje %}
+Comentario del cliente: {{ mensaje }}{% endif %}
+
+Revisar en el back-office: {{ admin_url }}""",
+    },
+    "modificacion_resuelta_cliente": {
+        "subject": "Tu solicitud de modificación del pedido #{{ numero_pedido }} fue {{ estado_label }}",
+        "body_html": f"""<p {b.H}>Tu solicitud fue {{{{ estado_label }}}}</p>
+<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, tu solicitud de modificación del pedido <strong>#{{{{ numero_pedido }}}}</strong> fue <strong>{{{{ estado_label }}}}</strong>.</p>
+{{% if respuesta %}}<p {b.LBL}>Nota</p>
+<p style="margin:0 0 4px;">{{{{ respuesta }}}}</p>{{% endif %}}
+{b.btn("portal_url", "Ver mi pedido")}
+<p {b.MUTED_P}>Podés ver el detalle del pedido actualizado en tu portal.</p>
+<p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
+        "body_text": """Hola {{ cliente_nombre }},
+
+Tu solicitud de modificación del pedido #{{ numero_pedido }} fue {{ estado_label }}.
+{% if respuesta %}
+Nota: {{ respuesta }}{% endif %}
+
+Podés ver el detalle del pedido actualizado en tu portal: {{ portal_url }}
+
+— El equipo de Rambla""",
+    },
+    "modificacion_cancelada_admin": {
+        "subject": "El cliente canceló su solicitud — pedido #{{ numero_pedido }}",
+        "body_html": f"""<p {b.H}>El cliente canceló su solicitud</p>
+<p style="margin:0 0 4px;"><strong>{{{{ cliente_nombre }}}}</strong> canceló su solicitud de modificación del pedido <strong>#{{{{ numero_pedido }}}}</strong>.</p>
+<p style="margin:0 0 4px;color:{b.MUTED};font-size:14px;">{{{{ cliente_email }}}}</p>
+{b.btn("admin_url", "Ver pedido")}""",
+        "body_text": """El cliente {{ cliente_nombre }} ({{ cliente_email }}) canceló su solicitud de modificación del pedido #{{ numero_pedido }}.
+
+Ver pedido: {{ admin_url }}""",
     },
 }

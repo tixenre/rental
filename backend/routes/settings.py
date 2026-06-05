@@ -165,6 +165,13 @@ ALLOWED_SETTINGS_KEYS = {
     "ga4_measurement_id",      # Measurement ID de Google Analytics 4 ("G-XXXXXXXXXX"). Vacío = GA apagado.
     # ── Reportes ─────────────────────────────────────────────────────
     "comisiones_modelo",       # Reparto de ingresos por dueño (#88). JSON {dueño: {beneficiario: %}}.
+    # ── Recordatorio de retiro (Fase B mails) ────────────────────────
+    # Control del job "mañana retirás" desde la UI. Override por env
+    # (REMINDERS_ENABLED/REMINDERS_HOUR/REMINDERS_DIAS_ANTES) — ver
+    # jobs/recordatorios_config.py. Lo resuelve el scheduler en runtime.
+    "recordatorios_enabled",      # Encendido del recordatorio automático. "1"/"0".
+    "recordatorios_hora",         # Hora AR del barrido diario. Int 0-23.
+    "recordatorios_dias_antes",   # Días de anticipación. Int 1-14.
 }
 
 # Keys cuyo valor puede borrarse (volver al default) desde la UI. El resto
@@ -298,6 +305,25 @@ def update_setting(key: str, payload: dict, request: Request):
             value = str(v)
         except (ValueError, TypeError) as e:
             raise HTTPException(400, f"Valor inválido para '{key}': debe ser un entero >= 0 ({e})")
+    if key == "recordatorios_enabled":
+        # Checkbox → normalizamos a "1"/"0".
+        value = "1" if value.lower() in ("1", "true", "yes", "on") else "0"
+    if key == "recordatorios_hora":
+        try:
+            v = int(value)
+            if not (0 <= v <= 23):
+                raise ValueError("fuera de rango 0-23")
+            value = str(v)
+        except (ValueError, TypeError) as e:
+            raise HTTPException(400, f"Valor inválido para '{key}': hora entre 0 y 23 ({e})")
+    if key == "recordatorios_dias_antes":
+        try:
+            v = int(value)
+            if not (1 <= v <= 14):
+                raise ValueError("fuera de rango 1-14")
+            value = str(v)
+        except (ValueError, TypeError) as e:
+            raise HTTPException(400, f"Valor inválido para '{key}': días entre 1 y 14 ({e})")
     if key == "ga4_measurement_id":
         # GA4 IDs son case-insensitive pero conviven mejor en mayúscula.
         value = value.upper()

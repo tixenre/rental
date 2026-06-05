@@ -945,6 +945,7 @@ def _enviar_email_cancelacion_admin(
     pedido_id: int, numero_pedido, cliente_nombre: str, cliente_email: str,
 ) -> None:
     """Background task: notifica al admin que el cliente canceló su solicitud."""
+    from config import SITE_URL
     from services.email import send_email
     from services.email.service import get_admin_to
     admin_to = get_admin_to()
@@ -954,7 +955,7 @@ def _enviar_email_cancelacion_admin(
         "cliente_nombre": cliente_nombre or "",
         "cliente_email":  cliente_email or "",
         "numero_pedido":  numero_pedido or pedido_id,
-        "admin_url":      f"/admin/pedidos/{pedido_id}",
+        "admin_url":      f"{SITE_URL}/admin/pedidos/{pedido_id}",
     }
     send_email("modificacion_cancelada_admin", admin_to, ctx, pedido_id)
 
@@ -1030,6 +1031,7 @@ def _build_diff_payload(pedido_actual: dict, cambios: dict) -> dict:
 
 def _enviar_email_solicitud_admin(pedido_id: int, cambios: dict) -> None:
     """Background task: notifica al admin de una nueva solicitud."""
+    from config import SITE_URL
     from services.email import send_email
     from services.email.service import get_admin_to
     from routes.alquileres import _get_alquiler_detail
@@ -1051,7 +1053,7 @@ def _enviar_email_solicitud_admin(pedido_id: int, cambios: dict) -> None:
         "cliente_nombre":  pedido.get("cliente_nombre") or "",
         "cliente_email":   pedido.get("cliente_email") or "",
         "numero_pedido":   pedido.get("numero_pedido") or pedido_id,
-        "admin_url":       f"/admin/pedidos/{pedido_id}",
+        "admin_url":       f"{SITE_URL}/admin/pedidos/{pedido_id}",
         **_build_diff_payload(pedido, cambios),
     }
     send_email("modificacion_solicitada_admin", admin_to, ctx, pedido_id)
@@ -1062,6 +1064,7 @@ def _enviar_email_resolucion_cliente(
     numero_pedido, estado: str, respuesta: str,
 ) -> None:
     """Background task: notifica al cliente cuando se resuelve su solicitud."""
+    from config import SITE_URL
     from services.email import send_email
     estado_label = "aprobada" if estado == "aprobada" else "rechazada"
     ctx = {
@@ -1070,6 +1073,7 @@ def _enviar_email_resolucion_cliente(
         "estado":         estado,
         "estado_label":   estado_label,
         "respuesta":      respuesta or "",
+        "portal_url":     f"{SITE_URL}/cliente/portal",
     }
     send_email("modificacion_resuelta_cliente", cliente_email, ctx, pedido_id)
 

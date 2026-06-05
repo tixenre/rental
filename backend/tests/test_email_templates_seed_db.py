@@ -2,8 +2,8 @@
 
 Reproduce el bug: si la tabla `email_templates` está vacía, /admin/email-templates
 no puede abrir ni previsualizar nada (render_template tira 404). Verifica que
-init_db() siembra las 4 plantillas y que el preview (render_template) anda para
-cada una.
+init_db() siembra todas las plantillas del sistema y que el preview
+(render_template) anda para cada una.
 
 OPT-IN y SEGURO POR DEFECTO (mismo gating que los demás `*_db.py`):
 
@@ -33,6 +33,9 @@ EXPECTED_KEYS = {
     "pedido_confirmado_cliente",
     "pedido_creado_admin",
     "recordatorio_retiro",
+    "modificacion_solicitada_admin",
+    "modificacion_resuelta_cliente",
+    "modificacion_cancelada_admin",
 }
 
 _CTX = {
@@ -48,6 +51,17 @@ _CTX = {
     "items_text": "- Sony FX3 × 1",
     "admin_url": "https://x/admin",
     "portal_url": "https://x/portal",
+    # modificacion_* (mails de modificación de pedido).
+    "fecha_desde_actual": "20 may · 10:00",
+    "fecha_hasta_actual": "24 may · 18:00",
+    "fecha_desde_propuesta": "21 may · 10:00",
+    "fecha_hasta_propuesta": "25 may · 18:00",
+    "total_actual": "$ 12.500",
+    "diff_html": "<ul><li>Sony FX3: 1 → 2</li></ul>",
+    "diff_text": "  - Sony FX3: 1 → 2",
+    "mensaje": "¿Suman un trípode?",
+    "estado_label": "aprobada",
+    "respuesta": "Listo, ajustado.",
 }
 
 
@@ -63,7 +77,7 @@ def test_init_db_siembra_y_el_preview_anda():
     finally:
         conn.close()
 
-    # init_db() debe re-sembrar las 4 (idempotente).
+    # init_db() debe re-sembrarlas todas (idempotente).
     init_db()
 
     conn = get_db()

@@ -13,6 +13,7 @@ from datetime import datetime
 import pytest
 
 import jobs.recordatorios as rec
+import jobs.recordatorios_config as cfg
 import jobs.scheduler as sched
 
 pytestmark = pytest.mark.unit
@@ -107,9 +108,18 @@ class TestEnviar:
     def test_fecha_retiro_es_manana(self, capture_send):
         conn = FakeJobConn([])
         res = rec.enviar_recordatorios_retiro(conn, hoy=HOY)
-        assert res["fecha_retiro"] == "2026-06-05"
+        assert res["fecha_retiro"] == "2026-06-05"  # HOY + 1 (default)
+        assert res["dias_antes"] == 1
         assert res["candidatos"] == 0
         assert capture_send == []
+
+    def test_dias_antes_define_la_ventana_y_el_contexto(self, capture_send):
+        conn = FakeJobConn([_pedido()])
+        res = rec.enviar_recordatorios_retiro(conn, hoy=HOY, dias_antes=3)
+        assert res["dias_antes"] == 3
+        assert res["fecha_retiro"] == "2026-06-07"  # HOY (jun 4) + 3
+        # el copy adaptable necesita dias_antes en el contexto del mail
+        assert capture_send[0][3]["dias_antes"] == 3
 
     def test_send_fallido_se_contabiliza_sin_propagar(self, monkeypatch):
         monkeypatch.setattr(
@@ -147,19 +157,20 @@ class TestDryRun:
         assert all(p["status"] == "dry_run" for p in res["pedidos"])
 
 
-# ── Scheduler: gating por entorno ────────────────────────────────────────────
+# ── Scheduler: arranque del thread (gating real es en runtime) ───────────────
 
-class TestSchedulerGating:
-    def test_apagado_por_default(self, monkeypatch):
-        monkeypatch.delenv("REMINDERS_ENABLED", raising=False)
-        started = {"n": 0}
+class TestSchedulerArranque:
+    """El thread arranca SIEMPRE salvo el kill-switch; el on/off real se decide
+    en runtime dentro del loop vía resolve() (env > settings > default)."""
+
+    def test_kill_switch_no_arranca(self, monkeypatch):
+        monkeypatch.setenv("REMINDERS_SCHEDULER_DISABLED", "1")
         monkeypatch.setattr(sched.threading, "Thread",
                             lambda *a, **k: pytest.fail("no debía arrancar"))
         assert sched.start_scheduler() is False
 
-    @pytest.mark.parametrize("val", ["1", "true", "YES"])
-    def test_prende_con_flag(self, monkeypatch, val):
-        monkeypatch.setenv("REMINDERS_ENABLED", val)
+    def test_arranca_sin_kill_switch(self, monkeypatch):
+        monkeypatch.delenv("REMINDERS_SCHEDULER_DISABLED", raising=False)
 
         class FakeThread:
             def __init__(self, *a, **k):
@@ -171,6 +182,69 @@ class TestSchedulerGating:
         monkeypatch.setattr(sched.threading, "Thread", FakeThread)
         assert sched.start_scheduler() is True
 
-    def test_flag_invalido_no_prende(self, monkeypatch):
-        monkeypatch.setenv("REMINDERS_ENABLED", "nope")
-        assert sched._enabled() is False
+
+# ── Config del recordatorio: precedencia env > settings > default ─────────────
+
+class FakeSettingsConn:
+    """Conn que sirve valores de app_settings desde un dict key→value."""
+
+    def __init__(self, settings=None):
+        self._s = settings or {}
+        self.closed = False
+
+    def execute(self, sql, params=()):
+        key = params[0] if params else None
+        val = self._s.get(key)
+        return FakeCursor([FakeRow(value=val)] if val is not None else [])
+
+    def close(self):
+        self.closed = True
+
+
+class TestResolveConfig:
+    def test_defaults_sin_env_ni_settings(self, monkeypatch):
+        for v in ("REMINDERS_ENABLED", "REMINDERS_HOUR", "REMINDERS_DIAS_ANTES"):
+            monkeypatch.delenv(v, raising=False)
+        r = cfg.resolve(FakeSettingsConn())
+        assert r == {"enabled": False, "hora": 9, "dias_antes": 1}
+
+    def test_settings_mandan_si_no_hay_env(self, monkeypatch):
+        for v in ("REMINDERS_ENABLED", "REMINDERS_HOUR", "REMINDERS_DIAS_ANTES"):
+            monkeypatch.delenv(v, raising=False)
+        conn = FakeSettingsConn({
+            "recordatorios_enabled": "1",
+            "recordatorios_hora": "7",
+            "recordatorios_dias_antes": "2",
+        })
+        assert cfg.resolve(conn) == {"enabled": True, "hora": 7, "dias_antes": 2}
+
+    def test_env_overridea_settings(self, monkeypatch):
+        monkeypatch.setenv("REMINDERS_ENABLED", "0")  # env explícito apaga
+        monkeypatch.setenv("REMINDERS_HOUR", "11")
+        monkeypatch.delenv("REMINDERS_DIAS_ANTES", raising=False)
+        conn = FakeSettingsConn({
+            "recordatorios_enabled": "1",   # lo pisa el env "0"
+            "recordatorios_hora": "7",      # lo pisa el env "11"
+            "recordatorios_dias_antes": "5",
+        })
+        assert cfg.resolve(conn) == {"enabled": False, "hora": 11, "dias_antes": 5}
+
+    def test_clamp_valores_fuera_de_rango(self, monkeypatch):
+        for v in ("REMINDERS_ENABLED", "REMINDERS_HOUR", "REMINDERS_DIAS_ANTES"):
+            monkeypatch.delenv(v, raising=False)
+        conn = FakeSettingsConn({
+            "recordatorios_hora": "99",        # → 23
+            "recordatorios_dias_antes": "999", # → 14 (MAX)
+        })
+        r = cfg.resolve(conn)
+        assert r["hora"] == 23 and r["dias_antes"] == 14
+
+    def test_valores_basura_caen_al_default(self, monkeypatch):
+        for v in ("REMINDERS_ENABLED", "REMINDERS_HOUR", "REMINDERS_DIAS_ANTES"):
+            monkeypatch.delenv(v, raising=False)
+        conn = FakeSettingsConn({
+            "recordatorios_hora": "xx",
+            "recordatorios_dias_antes": "",
+        })
+        r = cfg.resolve(conn)
+        assert r["hora"] == 9 and r["dias_antes"] == 1

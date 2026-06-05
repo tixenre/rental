@@ -20,6 +20,10 @@ if str(BACKEND_ROOT) not in sys.path:
 # Setear ANTES de cualquier import de módulos del proyecto.
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production-use-only-in-tests")
 os.environ.setdefault("ADMIN_EMAILS", "admin@test.com")
+# Kill-switch del scheduler de recordatorios: el thread arranca al importar main
+# (start_scheduler) y sondea la DB en runtime; en tests no queremos un thread
+# tocando Postgres. Los tests del scheduler borran esta env para probar el arranque.
+os.environ.setdefault("REMINDERS_SCHEDULER_DISABLED", "1")
 
 
 @pytest.fixture(autouse=True)
