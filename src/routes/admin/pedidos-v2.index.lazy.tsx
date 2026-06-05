@@ -31,7 +31,7 @@ import {
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaCorta } from "@/lib/format";
 
-export const Route = createLazyFileRoute("/admin/pedidos-v2")({
+export const Route = createLazyFileRoute("/admin/pedidos-v2/")({
   component: PedidosV2Page,
 });
 
