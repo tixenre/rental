@@ -24,6 +24,8 @@ import jinja2
 
 from database import get_db
 
+from . import branding as b
+
 logger = logging.getLogger(__name__)
 
 _jinja_html = jinja2.Environment(autoescape=True, undefined=jinja2.Undefined)
@@ -117,7 +119,7 @@ def _wrap_email_html(body_html: str, conn) -> str:
         digits = "".join(ch for ch in whatsapp if ch.isdigit())
         wa_html = (
             f' · <a href="https://wa.me/{digits}" '
-            f'style="color:#6b6457;text-decoration:underline;">WhatsApp</a>'
+            f'style="color:{b.MUTED};text-decoration:underline;">WhatsApp</a>'
         )
 
     return f"""<!DOCTYPE html>
@@ -127,20 +129,20 @@ def _wrap_email_html(body_html: str, conn) -> str:
 <meta name="color-scheme" content="light only">
 <title>Rambla Rental</title>
 </head>
-<body style="margin:0;padding:0;background:#f1efe9;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1efe9;padding:24px 12px;">
+<body style="margin:0;padding:0;background:{b.BONE};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{b.BONE};padding:24px 12px;">
 <tr><td align="center">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e1d8;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:{b.CARD};border-radius:12px;overflow:hidden;border:1px solid {b.HAIRLINE};">
 <tr><td style="padding:22px 28px 18px;text-align:center;">
 <img src="{logo}" alt="Rambla Rental" height="40" style="height:40px;width:auto;display:inline-block;border:0;">
 </td></tr>
-<tr><td style="height:4px;background:#FAB428;font-size:0;line-height:0;">&nbsp;</td></tr>
-<tr><td style="padding:28px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#2a251e;">
+<tr><td style="height:4px;background:{b.AMBER};font-size:0;line-height:0;">&nbsp;</td></tr>
+<tr><td style="padding:28px;font-family:{b.FONT_SANS};font-size:15px;line-height:1.55;color:{b.INK};">
 {body_html}
 </td></tr>
-<tr><td style="padding:20px 28px;background:#faf8f3;border-top:1px solid #e5e1d8;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#8a8378;text-align:center;">
-<strong style="color:#2a251e;">Rambla Rental</strong> · alquiler de equipos audiovisuales<br>
-<a href="{SITE_URL}" style="color:#6b6457;text-decoration:underline;">{SITE_URL.replace("https://", "").replace("http://", "")}</a>{wa_html}
+<tr><td style="padding:20px 28px;background:{b.SURFACE};border-top:1px solid {b.HAIRLINE};font-family:{b.FONT_SANS};font-size:12px;line-height:1.5;color:{b.FAINT};text-align:center;">
+<strong style="color:{b.INK};">Rambla Rental</strong> · alquiler de equipos audiovisuales<br>
+<a href="{SITE_URL}" style="color:{b.MUTED};text-decoration:underline;">{SITE_URL.replace("https://", "").replace("http://", "")}</a>{wa_html}
 </td></tr>
 </table>
 </td></tr>
@@ -249,6 +251,8 @@ def send_email(
     context: dict[str, Any],
     alquiler_id: Optional[int] = None,
     attachments: Optional[Sequence["Attachment"]] = None,
+    *,
+    respect_enabled: bool = True,
 ) -> dict[str, Any]:
     """Envía un mail renderizando una plantilla. Loggea SIEMPRE en
     `emails_log`. NUNCA propaga excepciones del provider.
@@ -256,6 +260,12 @@ def send_email(
     `attachments` (opcional): lista de `Attachment` que el backend adjunta
     al mail (ej. el `.ics` de la reserva en la confirmación). Es la única boca
     de envío — no se crea un segundo camino para adjuntar.
+
+    `respect_enabled` (default True): si la plantilla está apagada
+    (`email_templates.enabled = false`), no se envía y se devuelve
+    `{ok, skipped, reason:'disabled'}` sin loggear. Los envíos automáticos lo
+    dejan en True; el envío de prueba del admin lo pasa en False para poder
+    testear un template apagado.
 
     Devuelve un dict {ok, provider, provider_id?, error?, log_id} útil para
     el endpoint de test del admin.
@@ -269,6 +279,18 @@ def send_email(
 
     conn = get_db()
     try:
+        # On/off por plantilla (Fase B): si está apagada, no se manda. El envío
+        # de prueba del admin pasa respect_enabled=False para saltarse el gate.
+        if respect_enabled:
+            erow = conn.execute(
+                "SELECT enabled FROM email_templates WHERE key = ?", (template_key,)
+            ).fetchone()
+            if erow is not None and not erow["enabled"]:
+                logger.info(
+                    "send_email: template '%s' apagado (enabled=false) → skip", template_key
+                )
+                return {"ok": True, "skipped": True, "reason": "disabled"}
+
         # Idempotency: si este template ya se envió OK para este pedido,
         # no lo mandamos de nuevo (doble-click en confirmar, retries, etc).
         if template_key in _IDEMPOTENT_PER_PEDIDO and alquiler_id:

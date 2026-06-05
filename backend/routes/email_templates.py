@@ -17,26 +17,19 @@ from pydantic import BaseModel
 
 from admin_guard import require_admin
 from database import get_db, row_to_dict
-from services.email import render_template, send_email
+from services.email import branding as _eb, render_template, send_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 # Sample context para previews — refleja los placeholders comunes que
-# pueden aparecer en cualquier template. Pisable por el caller.
-_PREVIEW_ITEMS_HTML = (
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-    'style="border-collapse:collapse;font-size:14px;margin:4px 0 8px;">'
-    '<tr style="border-bottom:1px solid #ececec;">'
-    '<td style="padding:8px 8px 8px 0;color:#2a251e;">Sony FX3</td>'
-    '<td style="padding:8px 12px;text-align:center;color:#8a8378;white-space:nowrap;">× 1</td>'
-    '<td style="padding:8px 0;text-align:right;white-space:nowrap;color:#2a251e;">$ 9.000</td></tr>'
-    '<tr style="border-bottom:1px solid #ececec;">'
-    '<td style="padding:8px 8px 8px 0;color:#2a251e;">RØDE NTG</td>'
-    '<td style="padding:8px 12px;text-align:center;color:#8a8378;white-space:nowrap;">× 2</td>'
-    '<td style="padding:8px 0;text-align:right;white-space:nowrap;color:#2a251e;">$ 3.500</td></tr>'
-    "</table>"
+# pueden aparecer en cualquier template. Pisable por el caller. La tabla de
+# ítems se arma con el helper canónico de branding (misma fuente que el mail
+# real → el preview no miente sobre el estilo).
+_PREVIEW_ITEMS_HTML = _eb.items_table(
+    _eb.item_row("Sony FX3", "1", "$ 9.000")
+    + _eb.item_row("RØDE NTG", "2", "$ 3.500")
 )
 
 _PREVIEW_CONTEXT: dict[str, Any] = {
@@ -52,6 +45,24 @@ _PREVIEW_CONTEXT: dict[str, Any] = {
     "items_text": "- Sony FX3 × 1\n- RØDE NTG × 2",
     "admin_url": "https://www.ramblarental.com.ar/admin/pedidos/1234",
     "portal_url": "https://www.ramblarental.com.ar/cliente/portal",
+    # Sample para que el botón "Agregar al calendario" (confirmado) se vea en
+    # el Preview; en el envío real lo arma `_pedido_email_context`.
+    "gcal_url": "https://calendar.google.com/calendar/render?action=TEMPLATE",
+    # Días de anticipación del recordatorio (configurable). =1 → el preview
+    # muestra la variante "mañana"; el envío real lo inyecta el job.
+    "dias_antes": 1,
+    # Placeholders de los mails de modificación de pedido (modificacion_*); en el
+    # envío real los arma `routes/cliente_portal._build_diff_payload` / el dispatch.
+    "fecha_desde_actual": "20 may · 10:00",
+    "fecha_hasta_actual": "24 may · 18:00",
+    "fecha_desde_propuesta": "21 may · 10:00",
+    "fecha_hasta_propuesta": "25 may · 18:00",
+    "total_actual": "$ 12.500",
+    "diff_html": "<ul><li>Sony FX3: 1 → 2</li><li>RØDE NTG: 2 → 1</li></ul>",
+    "diff_text": "  - Sony FX3: 1 → 2\n  - RØDE NTG: 2 → 1",
+    "mensaje": "¿Pueden sumar un trípode?",
+    "estado_label": "aprobada",
+    "respuesta": "Listo, ajustamos las fechas y el equipo.",
 }
 
 
@@ -68,6 +79,10 @@ class TemplatePreview(BaseModel):
 class TemplateTest(BaseModel):
     to: str
     context: Optional[dict[str, Any]] = None
+
+
+class TemplateEnabled(BaseModel):
+    enabled: bool
 
 
 @router.get("/admin/email/status")
@@ -87,7 +102,8 @@ def list_templates(request: Request):
     conn = get_db()
     try:
         rows = conn.execute(
-            "SELECT key, subject, updated_at, updated_by FROM email_templates ORDER BY key"
+            "SELECT key, subject, enabled, updated_at, updated_by "
+            "FROM email_templates ORDER BY key"
         ).fetchall()
         return {"items": [row_to_dict(r) for r in rows]}
     finally:
@@ -101,7 +117,7 @@ def get_template(key: str, request: Request):
     try:
         row = conn.execute(
             """
-            SELECT key, subject, body_html, body_text, updated_at, updated_by
+            SELECT key, subject, body_html, body_text, enabled, updated_at, updated_by
             FROM email_templates WHERE key = ?
             """,
             (key,),
@@ -142,6 +158,76 @@ def update_template(key: str, data: TemplateUpdate, request: Request):
         conn.close()
 
 
+@router.patch("/admin/email-templates/{key}/enabled")
+def set_template_enabled(key: str, data: TemplateEnabled, request: Request):
+    """Prende/apaga el envío automático de una plantilla. No toca el contenido
+    ni `updated_by` (no es una edición de copy del admin) → el repintado por
+    migración sigue aplicando si la plantilla nunca se editó a mano."""
+    require_admin(request)
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "UPDATE email_templates SET enabled = ? WHERE key = ? RETURNING key, enabled",
+            (data.enabled, key),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, f"Template '{key}' no encontrado")
+        conn.commit()
+        return row_to_dict(row)
+    finally:
+        conn.close()
+
+
+@router.get("/admin/emails-log")
+def list_emails_log(
+    request: Request,
+    status: Optional[str] = None,
+    template_key: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """Visor read-only del log de envíos (`emails_log`): qué salió, a quién,
+    cuáles fallaron y el error. Lo más valioso para diagnosticar entregabilidad.
+    Paginado (limit/offset) y con filtros opcionales por estado y plantilla."""
+    require_admin(request)
+    limit = max(1, min(int(limit), 200))
+    offset = max(0, int(offset))
+    where = []
+    params: list[Any] = []
+    if status:
+        where.append("status = ?")
+        params.append(status)
+    if template_key:
+        where.append("template_key = ?")
+        params.append(template_key)
+    clause = (" WHERE " + " AND ".join(where)) if where else ""
+    conn = get_db()
+    try:
+        total = conn.execute(
+            f"SELECT COUNT(*) AS n FROM emails_log{clause}", tuple(params)
+        ).fetchone()["n"]
+        rows = conn.execute(
+            f"""
+            SELECT id, to_addr, subject, template_key, alquiler_id,
+                   status, provider, provider_id, error, sent_at
+            FROM emails_log{clause}
+            ORDER BY sent_at DESC, id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (*params, limit, offset),
+        ).fetchall()
+        items = []
+        for r in rows:
+            d = row_to_dict(r)
+            if d.get("sent_at") is not None and hasattr(d["sent_at"], "isoformat"):
+                d["sent_at"] = d["sent_at"].isoformat()
+            items.append(d)
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+    finally:
+        conn.close()
+
+
 @router.post("/admin/email-templates/{key}/preview")
 def preview_template(key: str, data: TemplatePreview = Body(default=TemplatePreview()),
                      request: Request = None):
@@ -163,5 +249,10 @@ def test_template(key: str, data: TemplateTest, request: Request):
     if not data.to or "@" not in data.to:
         raise HTTPException(400, "Dirección 'to' inválida")
     ctx = {**_PREVIEW_CONTEXT, **(data.context or {})}
-    result = send_email(template_key=key, to=data.to, context=ctx, alquiler_id=None)
+    # El test del admin ignora el on/off: tiene que poder probar un template
+    # aunque esté apagado para envíos automáticos.
+    result = send_email(
+        template_key=key, to=data.to, context=ctx, alquiler_id=None,
+        respect_enabled=False,
+    )
     return result
