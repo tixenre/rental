@@ -249,12 +249,16 @@ function TemplateEditorModal({ tplKey, onClose }: { tplKey: string; onClose: () 
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={onClose}
+      // Cerrar SOLO si el gesto empezó en el backdrop (no si arrancó adentro y
+      // soltó afuera). Con `onClick` el modal se cerraba "a veces": al apretar
+      // un botón que se re-renderiza (ej. "Enviar test" → "Enviando…"), el
+      // mouseup caía en el overlay y el click se atribuía al fondo. Anclar la
+      // decisión al pointerdown lo hace determinístico.
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div
-        className="w-full max-w-4xl max-h-[92vh] rounded-lg bg-background border hairline shadow-lg flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-full max-w-4xl max-h-[92vh] rounded-lg bg-background border hairline shadow-lg flex flex-col">
         <header className="border-b hairline px-4 py-3 shrink-0">
           <div className="font-display text-base text-ink">{meta?.label ?? tplKey}</div>
           <div className="font-mono text-[10px] text-muted-foreground mt-0.5">key: {tplKey}</div>
