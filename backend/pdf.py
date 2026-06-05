@@ -154,9 +154,21 @@ def _fmt_ars(n, zero_dash: bool = True) -> str:
         return str(n) if n else "—"
 
 def _parse_valor(v) -> int:
-    """Parsea un valor numérico desde string con posibles $, puntos y comas."""
+    """Parsea un valor de reposición a entero (pesos).
+
+    El valor llega de la BD como número (la columna `valor_reposicion` es
+    FLOAT, en pesos) → se redondea directo. Borrarle el '.' a un float
+    (ej. 500.0 → '5000') lo multiplicaba por 10 — ese era el bug.
+    Solo cuando llega un string con formato argentino ('$1.500') se limpian
+    los separadores: ahí el '.' es separador de miles, no decimal.
+    """
     if v is None or v == "":
         return 0
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        try:
+            return int(round(v))
+        except Exception:
+            return 0
     try:
         s = str(v).replace("$", "").replace(".", "").replace(",", "").strip()
         return int(float(s)) if s else 0

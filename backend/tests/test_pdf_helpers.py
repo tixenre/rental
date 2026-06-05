@@ -119,6 +119,17 @@ class TestParseValor:
         assert _parse_valor("") == 0
         assert _parse_valor(None) == 0
 
+    def test_float_de_la_bd_no_se_multiplica_por_diez(self):
+        # Regresión: el valor llega de la BD como FLOAT (ej. 500.0). Antes se
+        # convertía a str "500.0" y al borrar el '.' quedaba "5000" → x10.
+        assert _parse_valor(500.0) == 500
+        assert _parse_valor(1800.0) == 1800
+        assert _parse_valor(12000.0) == 12000
+
+    def test_float_con_decimales_redondea(self):
+        assert _parse_valor(1500.4) == 1500
+        assert _parse_valor(1500.6) == 1501
+
 
 class TestAbsImageUrl:
     """Resolver foto_url a URL absoluta para que Playwright pueda cargarla."""

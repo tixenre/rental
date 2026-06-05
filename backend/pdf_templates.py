@@ -595,12 +595,11 @@ def _albaran_html(pedido):
 
 
 def _parse_int(v):
-    if v in (None, ""):
-        return 0
-    try:
-        return int(float(str(v).replace("$", "").replace(".", "").replace(",", "").strip() or 0))
-    except Exception:
-        return 0
+    # Fuente única: delega en el parser canónico de pdf.py (import lazy para
+    # evitar el ciclo pdf ↔ pdf_templates, igual que _abs_image_url). Maneja
+    # el float de la BD sin multiplicarlo por 10 (ver _parse_valor).
+    from pdf import _parse_valor
+    return _parse_valor(v)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
