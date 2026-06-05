@@ -67,6 +67,30 @@ def get_admin_to() -> Optional[str]:
         conn.close()
 
 
+def channel_status() -> dict:
+    """Estado del canal de mail para el back-office (indicador "¿está integrado?").
+
+    Devuelve el backend activo, si manda de verdad (`activo`: test=False porque
+    solo loggea en memoria), el `from` resuelto y el destinatario admin.
+    **No expone secretos** — nunca la API key. Reusa la fuente única
+    `resolve_provider()` y los mismos helpers de resolución que el envío real.
+    """
+    from . import resolve_provider
+
+    provider = resolve_provider()
+    conn = get_db()
+    try:
+        from_addr = _resolve_from(conn)
+    finally:
+        conn.close()
+    return {
+        "provider": provider,
+        "activo": provider != "test",
+        "from_addr": from_addr,
+        "admin_to": get_admin_to() or "",
+    }
+
+
 def _setting(conn, key: str) -> str:
     """Lee un app_setting como string (vacío si no existe)."""
     row = conn.execute(

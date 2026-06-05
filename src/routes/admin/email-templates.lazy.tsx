@@ -15,14 +15,19 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Mail, Send, Eye, Pencil, Loader2 } from "lucide-react";
+import { Mail, Send, Eye, Pencil, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
-import { adminApi, type EmailTemplate, type EmailTemplateInput } from "@/lib/admin/api";
+import {
+  adminApi,
+  type EmailTemplate,
+  type EmailTemplateInput,
+  type EmailChannelStatus,
+} from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/email-templates")({
@@ -78,6 +83,12 @@ function EmailTemplatesPage() {
     staleTime: 30_000,
   });
 
+  const statusQ = useQuery({
+    queryKey: ["admin", "email-status"],
+    queryFn: () => adminApi.getEmailStatus(),
+    staleTime: 30_000,
+  });
+
   const items = listQ.data?.items ?? [];
 
   return (
@@ -93,6 +104,8 @@ function EmailTemplatesPage() {
           <code className="font-mono text-xs">{`{{ variable }}`}</code>.
         </p>
       </header>
+
+      {statusQ.data && <EmailChannelBanner status={statusQ.data} />}
 
       {listQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
 
@@ -149,6 +162,53 @@ function EmailTemplatesPage() {
           onClose={() => setEditingKey(null)}
         />
       )}
+    </div>
+  );
+}
+
+// Indicador del estado del canal de mail. `activo=false` (backend "test")
+// significa que NO sale ningún mail: solo se loggea. Apenas se setea
+// RESEND_API_KEY en el ambiente, esto pasa a verde sin tocar código.
+function EmailChannelBanner({ status }: { status: EmailChannelStatus }) {
+  const provLabel: Record<string, string> = {
+    resend: "Resend",
+    smtp: "SMTP",
+    test: "Test (no envía)",
+  };
+  if (!status.activo) {
+    return (
+      <div className="mb-6 rounded-md border border-amber/40 bg-amber/10 p-4 flex items-start gap-3">
+        <AlertTriangle className="h-5 w-5 text-amber shrink-0 mt-0.5" />
+        <div className="text-sm">
+          <div className="font-display text-ink">El canal de mail está apagado</div>
+          <p className="text-muted-foreground mt-0.5">
+            Backend actual: <strong>{provLabel[status.provider] ?? status.provider}</strong>. No se
+            envía ningún mail (solo se registra). Para activarlo, seteá{" "}
+            <code className="font-mono text-xs">RESEND_API_KEY</code> en las variables del ambiente
+            y volvé a desplegar.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="mb-6 rounded-md border border-verde/30 bg-verde/10 p-4 flex items-start gap-3">
+      <CheckCircle2 className="h-5 w-5 text-verde shrink-0 mt-0.5" />
+      <div className="text-sm">
+        <div className="font-display text-ink">
+          Canal de mail activo · {provLabel[status.provider] ?? status.provider}
+        </div>
+        <p className="text-muted-foreground mt-0.5">
+          Enviando como <strong>{status.from_addr}</strong>
+          {status.admin_to && (
+            <>
+              {" "}
+              · avisos al admin a <strong>{status.admin_to}</strong>
+            </>
+          )}
+          . Probá un envío real desde el tab <em>Test</em> de cualquier plantilla.
+        </p>
+      </div>
     </div>
   );
 }

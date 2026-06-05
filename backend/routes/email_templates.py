@@ -70,6 +70,17 @@ class TemplateTest(BaseModel):
     context: Optional[dict[str, Any]] = None
 
 
+@router.get("/admin/email/status")
+def email_channel_status(request: Request):
+    """Estado del canal de mail: qué backend está activo y si manda de verdad.
+    Para que el dueño verifique de un vistazo que el mail quedó integrado tras
+    setear `RESEND_API_KEY` en prod. No expone secretos."""
+    require_admin(request)
+    from services.email.service import channel_status
+
+    return channel_status()
+
+
 @router.get("/admin/email-templates")
 def list_templates(request: Request):
     require_admin(request)

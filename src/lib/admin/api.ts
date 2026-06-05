@@ -1436,6 +1436,7 @@ export const adminApi = {
   },
 
   // ── Email templates ─────────────────────────────────────────────────
+  getEmailStatus: () => authedJson<EmailChannelStatus>("/api/admin/email/status"),
   listEmailTemplates: () =>
     authedJson<{ items: EmailTemplateSummary[] }>("/api/admin/email-templates"),
   getEmailTemplate: (key: string) =>
@@ -1467,6 +1468,15 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to, context: context ?? null }),
     }),
+};
+
+export type EmailChannelStatus = {
+  /** Backend activo: "resend" | "smtp" | "test". */
+  provider: string;
+  /** false cuando provider === "test" (no manda, solo loggea). */
+  activo: boolean;
+  from_addr: string;
+  admin_to: string;
 };
 
 export type EmailTemplateSummary = {
