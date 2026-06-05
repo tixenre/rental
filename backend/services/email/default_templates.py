@@ -2,48 +2,37 @@
 
 **Fuente única forward del copy de los templates.** Espeja el end-state de la
 cadena de migraciones (`a4e8c2b9d710` siembra → `e7c3a9f5d1b8` → `c1e9f3a7b5d2`
-branded). `init_db()` siembra estas filas de forma idempotente (`ON CONFLICT DO
-NOTHING`) para que las plantillas **existan siempre**, aunque las migraciones se
-traben — la red del esquema en dos capas (ver `docs/MEMORIA.md` 2026-06-03).
+branded → `f2a4c6e8b0d1` botón calendario → restyle Design System). `init_db()`
+siembra estas filas de forma idempotente (`ON CONFLICT DO NOTHING`) para que las
+plantillas **existan siempre**, aunque las migraciones se traben — la red del
+esquema en dos capas (ver `docs/MEMORIA.md` 2026-06-03).
 
 El layout branded (header con logo, colores, footer) lo pone el shell común en
 `services/email/service.py` (`_wrap_email_html`); estos bodies guardan **solo el
 contenido editable** (el admin los puede editar desde `/admin/email-templates`).
+
+Los tokens visuales (colores, fuentes) y los helpers (`btn`, `H`, `LBL`, …) viven
+en `services/email/branding.py` — **fuente única**, no se repiten hex acá.
 
 Si se cambia el copy, se edita ACÁ (+ una migración si hay que repisar prod). No
 duplicar el contenido en otro lado.
 """
 from __future__ import annotations
 
-
-def _btn(url_var: str, label: str) -> str:
-    """Botón CTA bulletproof (table-based, inline) para clientes de mail."""
-    return (
-        '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0;">'
-        '<tr><td style="border-radius:8px;background:#FAB428;">'
-        f'<a href="{{{{ {url_var} }}}}" style="display:inline-block;padding:12px 24px;'
-        'font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;'
-        f'color:#2a251e;text-decoration:none;">{label}</a></td></tr></table>'
-    )
-
-
-_H = 'style="margin:0 0 12px;font-size:19px;font-weight:bold;color:#2a251e;"'
-_LBL = 'style="margin:18px 0 4px;color:#8a8378;font-size:12px;text-transform:uppercase;letter-spacing:.05em;"'
-_TOTAL = 'style="margin:6px 0 4px;font-size:16px;color:#2a251e;"'
-_MUTED = 'style="margin:18px 0 0;color:#6b6457;font-size:14px;"'
+from . import branding as b
 
 # key → {subject, body_html, body_text}
 DEFAULT_TEMPLATES: dict[str, dict[str, str]] = {
     "pedido_creado_cliente": {
         "subject": "Recibimos tu pedido #{{ numero_pedido }} — Rambla Rental",
-        "body_html": f"""<p {_H}>¡Recibimos tu pedido!</p>
+        "body_html": f"""<p {b.H}>¡Recibimos tu pedido!</p>
 <p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, gracias por tu pedido <strong>#{{{{ numero_pedido }}}}</strong>. Lo estamos revisando y te confirmamos la disponibilidad a la brevedad.</p>
-<p {_LBL}>Tu pedido</p>
+<p {b.LBL}>Tu pedido</p>
 <p style="margin:0 0 4px;"><strong>Retiro:</strong> {{{{ fecha_desde }}}}<br><strong>Devolución:</strong> {{{{ fecha_hasta }}}}</p>
 {{{{ items_html|safe }}}}
-<p {_TOTAL}><strong>Total estimado: {{{{ total }}}}</strong></p>
-{_btn("portal_url", "Ver mi pedido")}
-<p {_MUTED}>Cuando confirmemos el pedido vas a poder descargar el <strong>remito</strong> y el <strong>contrato</strong> desde tu portal. ¿Tenés alguna duda? Respondé este mail.</p>
+<p {b.TOTAL}><strong>Total estimado: {{{{ total }}}}</strong></p>
+{b.btn("portal_url", "Ver mi pedido")}
+<p {b.MUTED_P}>Cuando confirmemos el pedido vas a poder descargar el <strong>remito</strong> y el <strong>contrato</strong> desde tu portal. ¿Tenés alguna duda? Respondé este mail.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
         "body_text": """Hola {{ cliente_nombre }},
 
@@ -64,14 +53,15 @@ Cuando lo confirmemos vas a poder descargar el remito y el contrato desde ahí.
     },
     "pedido_confirmado_cliente": {
         "subject": "Tu pedido #{{ numero_pedido }} está confirmado",
-        "body_html": f"""<p {_H}>¡Tu pedido está confirmado!</p>
+        "body_html": f"""<p {b.H}>¡Tu pedido está confirmado!</p>
 <p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, confirmamos tu pedido <strong>#{{{{ numero_pedido }}}}</strong>. Ya está todo listo.</p>
-<p {_LBL}>Tu pedido</p>
+<p {b.LBL}>Tu pedido</p>
 <p style="margin:0 0 4px;"><strong>Retiro:</strong> {{{{ fecha_desde }}}}<br><strong>Devolución:</strong> {{{{ fecha_hasta }}}}</p>
 {{{{ items_html|safe }}}}
-<p {_TOTAL}><strong>Total: {{{{ total }}}}</strong></p>
-{_btn("portal_url", "Ver mi pedido")}
-<p {_MUTED}>Ya podés descargar el <strong>remito</strong> y el <strong>contrato</strong> desde tu portal. Te esperamos en el galpón el día del retiro.</p>
+<p {b.TOTAL}><strong>Total: {{{{ total }}}}</strong></p>
+{b.btn("portal_url", "Ver mi pedido")}
+{{% if gcal_url %}}{b.btn_secondary("gcal_url", "📅 Agregar al calendario")}{{% endif %}}
+<p {b.MUTED_P}>Ya podés descargar el <strong>remito</strong> y el <strong>contrato</strong> desde tu portal. Te esperamos en el galpón el día del retiro.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
         "body_text": """Hola {{ cliente_nombre }},
 
@@ -83,7 +73,9 @@ Devolución: {{ fecha_hasta }}
 {{ items_text }}
 
 Total: {{ total }}
-
+{% if gcal_url %}
+Agregá la reserva a tu calendario: {{ gcal_url }}
+{% endif %}
 Ya podés descargar el remito y el contrato desde tu portal: {{ portal_url }}
 Te esperamos en el galpón el día del retiro.
 
@@ -91,15 +83,15 @@ Te esperamos en el galpón el día del retiro.
     },
     "pedido_creado_admin": {
         "subject": "Nuevo pedido #{{ numero_pedido }} — {{ cliente_nombre }}",
-        "body_html": f"""<p {_H}>Entró un pedido nuevo</p>
+        "body_html": f"""<p {b.H}>Entró un pedido nuevo</p>
 <p style="margin:0 0 4px;"><strong>#{{{{ numero_pedido }}}}</strong> de <strong>{{{{ cliente_nombre }}}}</strong></p>
-<p style="margin:0 0 4px;color:#6b6457;font-size:14px;">{{{{ cliente_email }}}}{{% if cliente_telefono %}} · {{{{ cliente_telefono }}}}{{% endif %}}</p>
-<p {_LBL}>Pedido</p>
+<p style="margin:0 0 4px;color:{b.MUTED};font-size:14px;">{{{{ cliente_email }}}}{{% if cliente_telefono %}} · {{{{ cliente_telefono }}}}{{% endif %}}</p>
+<p {b.LBL}>Pedido</p>
 <p style="margin:0 0 4px;"><strong>Retiro:</strong> {{{{ fecha_desde }}}}<br><strong>Devolución:</strong> {{{{ fecha_hasta }}}}</p>
 {{{{ items_html|safe }}}}
-<p {_TOTAL}><strong>Total: {{{{ total }}}}</strong></p>
+<p {b.TOTAL}><strong>Total: {{{{ total }}}}</strong></p>
 {{% if notas %}}<p style="margin:8px 0 0;"><strong>Notas:</strong> {{{{ notas }}}}</p>{{% endif %}}
-{_btn("admin_url", "Ver en el back-office")}""",
+{b.btn("admin_url", "Ver en el back-office")}""",
         "body_text": """Entró un pedido nuevo.
 
 #{{ numero_pedido }} de {{ cliente_nombre }}
@@ -117,11 +109,11 @@ Ver en el back-office: {{ admin_url }}""",
     },
     "recordatorio_retiro": {
         "subject": "Mañana retirás tu pedido #{{ numero_pedido }} — Rambla Rental",
-        "body_html": f"""<p {_H}>¡Mañana es el día!</p>
+        "body_html": f"""<p {b.H}>¡Mañana es el día!</p>
 <p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, te recordamos que <strong>mañana ({{{{ fecha_desde }}}})</strong> retirás tu pedido <strong>#{{{{ numero_pedido }}}}</strong>.</p>
 {{{{ items_html|safe }}}}
-{_btn("portal_url", "Ver mi pedido")}
-<p {_MUTED}>Te esperamos en el galpón. Si necesitás reagendar, escribinos cuanto antes.</p>
+{b.btn("portal_url", "Ver mi pedido")}
+<p {b.MUTED_P}>Te esperamos en el galpón. Si necesitás reagendar, escribinos cuanto antes.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
         "body_text": """Hola {{ cliente_nombre }},
 

@@ -17,26 +17,19 @@ from pydantic import BaseModel
 
 from admin_guard import require_admin
 from database import get_db, row_to_dict
-from services.email import render_template, send_email
+from services.email import branding as _eb, render_template, send_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 # Sample context para previews — refleja los placeholders comunes que
-# pueden aparecer en cualquier template. Pisable por el caller.
-_PREVIEW_ITEMS_HTML = (
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-    'style="border-collapse:collapse;font-size:14px;margin:4px 0 8px;">'
-    '<tr style="border-bottom:1px solid #ececec;">'
-    '<td style="padding:8px 8px 8px 0;color:#2a251e;">Sony FX3</td>'
-    '<td style="padding:8px 12px;text-align:center;color:#8a8378;white-space:nowrap;">× 1</td>'
-    '<td style="padding:8px 0;text-align:right;white-space:nowrap;color:#2a251e;">$ 9.000</td></tr>'
-    '<tr style="border-bottom:1px solid #ececec;">'
-    '<td style="padding:8px 8px 8px 0;color:#2a251e;">RØDE NTG</td>'
-    '<td style="padding:8px 12px;text-align:center;color:#8a8378;white-space:nowrap;">× 2</td>'
-    '<td style="padding:8px 0;text-align:right;white-space:nowrap;color:#2a251e;">$ 3.500</td></tr>'
-    "</table>"
+# pueden aparecer en cualquier template. Pisable por el caller. La tabla de
+# ítems se arma con el helper canónico de branding (misma fuente que el mail
+# real → el preview no miente sobre el estilo).
+_PREVIEW_ITEMS_HTML = _eb.items_table(
+    _eb.item_row("Sony FX3", "1", "$ 9.000")
+    + _eb.item_row("RØDE NTG", "2", "$ 3.500")
 )
 
 _PREVIEW_CONTEXT: dict[str, Any] = {
@@ -52,6 +45,9 @@ _PREVIEW_CONTEXT: dict[str, Any] = {
     "items_text": "- Sony FX3 × 1\n- RØDE NTG × 2",
     "admin_url": "https://www.ramblarental.com.ar/admin/pedidos/1234",
     "portal_url": "https://www.ramblarental.com.ar/cliente/portal",
+    # Sample para que el botón "Agregar al calendario" (confirmado) se vea en
+    # el Preview; en el envío real lo arma `_pedido_email_context`.
+    "gcal_url": "https://calendar.google.com/calendar/render?action=TEMPLATE",
 }
 
 
