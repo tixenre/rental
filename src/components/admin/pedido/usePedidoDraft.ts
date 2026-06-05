@@ -31,7 +31,10 @@ export type DraftDatos = {
   cliente_nombre: string;
   cliente_email: string;
   cliente_telefono: string;
-  fecha_desde: string; // YYYY-MM-DD
+  /** Fecha de retiro. Por defecto `YYYY-MM-DD` (compat `<input type=date>`);
+   * con la opción `keepDateTime` conserva la hora (`YYYY-MM-DDTHH:MM:SS`) para
+   * el editor que usa el selector de fechas+horas. */
+  fecha_desde: string;
   fecha_hasta: string;
   notas: string;
   descuento_pct: number;
@@ -42,14 +45,17 @@ export type SubmitMode = "autosave" | "propose";
 
 const DEBOUNCE_MS = 700;
 
-function pedidoToDatos(p: Pedido): DraftDatos {
+function pedidoToDatos(p: Pedido, keepDateTime = false): DraftDatos {
   return {
     cliente_id: p.cliente_id,
     cliente_nombre: p.cliente_nombre ?? "",
     cliente_email: p.cliente_email ?? "",
     cliente_telefono: p.cliente_telefono ?? "",
-    fecha_desde: (p.fecha_desde ?? "").slice(0, 10),
-    fecha_hasta: (p.fecha_hasta ?? "").slice(0, 10),
+    // keepDateTime: conservar la hora para que el editor con selector de
+    // fechas+horas no la pierda en el round-trip del autosave. Default: slice a
+    // YYYY-MM-DD (los editores con `<input type=date>` esperan date-only).
+    fecha_desde: keepDateTime ? (p.fecha_desde ?? "") : (p.fecha_desde ?? "").slice(0, 10),
+    fecha_hasta: keepDateTime ? (p.fecha_hasta ?? "") : (p.fecha_hasta ?? "").slice(0, 10),
     notas: p.notas ?? "",
     descuento_pct: p.descuento_pct ?? 0,
   };
@@ -120,10 +126,20 @@ export type UsePedidoDraftOptions = {
   mensaje?: string;
   /** Callback cuando una propuesta se envía con éxito. Sólo modo cliente+propose. */
   onProposalSent?: (tipo: "directo" | "aprobacion") => void;
+  /** Conservar la hora en `fecha_desde`/`fecha_hasta` (datetime, no date-only).
+   * Para el editor que usa el selector de fechas+horas; el resto deja date-only
+   * por compat con `<input type=date>`. Default false. */
+  keepDateTime?: boolean;
 };
 
 export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftOptions = {}) {
-  const { mode = "admin", submitMode = "autosave", mensaje, onProposalSent } = opts;
+  const {
+    mode = "admin",
+    submitMode = "autosave",
+    mensaje,
+    onProposalSent,
+    keepDateTime = false,
+  } = opts;
   const qc = useQueryClient();
 
   // Snapshot del server (lo que está persistido)
@@ -149,7 +165,7 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
     onSuccess: (p) => {
       qc.setQueryData(["admin", "pedido", p.id], p);
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
-      if (serverRef.current) serverRef.current.datos = pedidoToDatos(p);
+      if (serverRef.current) serverRef.current.datos = pedidoToDatos(p, keepDateTime);
     },
     onError: (e: Error) => toast.error(`Datos: ${e.message}`),
   });
@@ -169,7 +185,7 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
       if (serverRef.current) {
         serverRef.current.items = pedidoToItems(p);
-        serverRef.current.datos = pedidoToDatos(p);
+        serverRef.current.datos = pedidoToDatos(p, keepDateTime);
       }
     },
     onError: (e: Error) => toast.error(`Equipos: ${e.message}`),
@@ -191,7 +207,7 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
       qc.invalidateQueries({ queryKey: ["cliente", "pedido", pedido!.id] });
       qc.invalidateQueries({ queryKey: ["cliente", "pedidos"] });
       if (resp.tipo === "directo" && "pedido" in resp && serverRef.current) {
-        serverRef.current.datos = pedidoToDatos(resp.pedido);
+        serverRef.current.datos = pedidoToDatos(resp.pedido, keepDateTime);
         serverRef.current.items = pedidoToItems(resp.pedido);
       }
       onProposalSent?.(resp.tipo);
@@ -235,7 +251,7 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
   // pero no se ve guardado hasta reentrar").
   useEffect(() => {
     if (!pedido) return;
-    const d = pedidoToDatos(pedido);
+    const d = pedidoToDatos(pedido, keepDateTime);
     const it = pedidoToItems(pedido);
     serverRef.current = { datos: d, items: it };
     // Solo sincronizamos el estado local si la mutación correspondiente no
@@ -248,7 +264,7 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
     if (!itemsMut.isPending) {
       setItems((cur) => (cur && shallowItemsEq(cur, it) ? cur : it));
     }
-  }, [pedido, datosMut.isPending, itemsMut.isPending]);
+  }, [pedido, datosMut.isPending, itemsMut.isPending, keepDateTime]);
 
   // ── Autosave debounced ─────────────────────────────────────────────────
   // Admin: dos efectos separados (datos / items) que dispatchean a sus mutations.

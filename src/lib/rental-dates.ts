@@ -66,6 +66,30 @@ export function parseRentalDate(s: string): Date {
   return s.includes("T") ? new Date(s) : new Date(s + "T12:00:00");
 }
 
+/**
+ * Parsea `fecha_desde`/`fecha_hasta` (datetime ISO `YYYY-MM-DDTHH:MM...` o
+ * date-only `YYYY-MM-DD`) en `{ date, time }`: el día como Date local a
+ * medianoche y la hora como "HH:MM". Si el string no trae hora, usa
+ * `fallbackTime`. Inverso de `toLocalISO`. Devuelve `date: undefined` si el
+ * string está vacío o es inválido (rango sin fechas).
+ *
+ * Fuente única para el editor admin de pedidos, que guarda con hora y debe
+ * recombinar día+hora a datetime con `toLocalISO`.
+ */
+export function parseDateTimeParts(
+  s: string | null | undefined,
+  fallbackTime = "09:00",
+): { date: Date | undefined; time: string } {
+  if (!s) return { date: undefined, time: fallbackTime };
+  const [datePart, timePartRaw] = s.split("T");
+  const [y, mo, d] = datePart.split("-").map(Number);
+  if (!y || !mo || !d) return { date: undefined, time: fallbackTime };
+  const date = new Date(y, mo - 1, d); // local, medianoche
+  if (Number.isNaN(date.getTime())) return { date: undefined, time: fallbackTime };
+  const time = timePartRaw ? timePartRaw.slice(0, 5) : fallbackTime;
+  return { date, time };
+}
+
 /** Jornadas entre dos strings ISO (date-only o datetime completo). */
 export function jornadasFromISO(desde?: string, hasta?: string): number {
   if (!desde || !hasta) return 1;
