@@ -34,6 +34,7 @@ import { interpolarDescuento } from "@/lib/api";
 import { FAQ_GROUPS, parseFaq, type FaqGroup } from "@/data/faq";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { AdminSection } from "@/components/admin/AdminSection";
+import { EmailsAdmin } from "@/components/admin/email/EmailsAdmin";
 
 export const Route = createLazyFileRoute("/admin/settings")({
   component: SettingsPage,
@@ -92,6 +93,10 @@ function SettingsPage() {
         defaultOpen={false}
       >
         <ComisionesSection />
+      </AdminSection>
+
+      <AdminSection title="Emails" storageKey="settings:emails" defaultOpen={false}>
+        <EmailsAdmin />
       </AdminSection>
     </div>
   );

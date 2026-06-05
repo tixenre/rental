@@ -20,7 +20,6 @@ import {
   Ruler,
   ShieldCheck,
   Database,
-  Mail,
   Inbox,
   HardDriveDownload,
   Clapperboard,
@@ -80,7 +79,6 @@ const items: NavItem[] = [
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
   { title: "Diseño y marca", url: "/admin/diseno", icon: Palette },
   { title: "Novedades", url: "/admin/novedades", icon: Sparkles },
-  { title: "Emails", url: "/admin/email-templates", icon: Mail },
   { title: "Datos y backups", url: "/admin/dataio", icon: HardDriveDownload },
   { title: "Settings", url: "/admin/settings", icon: Settings },
 ];
