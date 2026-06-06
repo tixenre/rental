@@ -1,20 +1,33 @@
 ---
 name: limpieza
-description: Barrido de mantenimiento del repo — encontrar y eliminar código muerto, imports/variables sin usar, archivos huérfanos, dependencias sin uso y duplicación (DRY) con la lógica, el cuidado y la red de tests pertinentes. Úsalo cuando el dueño pida "limpiar", "seguir limpiando", "sacar lo que no se usa", "código muerto / dead code", "housekeeping", "hay cosas legacy dando vueltas", "imports sin usar", "unificar lo duplicado", o cuando vos detectes cruft mientras trabajás. El corazón del skill NO es una lista de ítems a borrar, sino el MÉTODO seguro: herramientas dan candidatos → triage con criterio (cazar falsos positivos) → verificar cada uno → clasificar el tipo de cambio → red de tests (incluido Postgres real para SQL) → commits atómicos → supervisor. NO es para refactors de arquitectura, ni para tocar el core sagrado de reservas/plata en un barrido (eso va como iniciativa propia), ni para "borrar todo lo que la herramienta diga".
+description: Flujo completo de mantenimiento del repo y el proyecto, en 4 frentes con la misma disciplina — (A) código muerto / imports / archivos / deps / duplicación (DRY) / modularización / optimización; (B) auditoría de seguridad + bugs; (C) ramas (borrar las mergeadas); (D) issues (triagear, cerrar lo hecho con evidencia, consolidar trackers/umbrellas solapados). Úsalo cuando el dueño pida "limpiar", "seguir limpiando", "housekeeping", "sacar lo que no se usa", "código muerto", "hay legacy dando vueltas", "revisá seguridad/bugs", "está todo seguro?", "limpiá ramas", "ordená/cerrá los issues", o cuando detectes cruft/drift mientras trabajás. El corazón NO es una lista de ítems, sino el MÉTODO seguro: verificar antes de ACTUAR (borrar/cerrar/afirmar — las herramientas Y la intuición mienten) → red de tests → no perder tracking → commits atómicos → supervisor. NO es para refactors de arquitectura ni tocar el core sagrado de reservas/plata en un barrido (eso va como iniciativa propia).
 ---
 
-# limpieza — housekeeping del repo, sin romper nada
+# limpieza — mantenimiento del repo, sin romper nada
 
-Codifica **cómo** se limpia Rambla: no la lista de lo ya limpiado, sino la **lógica, el cuidado y
-los tests** para que cada barrido futuro sea seguro. Materializa la _Barra de calidad_ (MEMORIA
-*2026-05-25*): modularidad a prueba de balas, nada de hotfixes, y **el core de reservas es sagrado**.
+Codifica **cómo** se mantiene Rambla sano: no la lista de lo ya hecho, sino la **lógica, el cuidado
+y los tests** para que cada pasada futura sea segura. Es el flujo completo de housekeeping en **4
+frentes** con la misma disciplina. Materializa la _Barra de calidad_ (MEMORIA *2026-05-25*):
+modularidad a prueba de balas, nada de hotfixes, y **el core de reservas es sagrado**.
 
-> ## Regla de oro
+| Frente | Qué barre | Acción que arriesga | Verificación antes de actuar |
+|---|---|---|---|
+| **A · Código** | muerto / imports / archivos / deps / DRY / modularizar / optimizar | borrar | grep repo-wide + suite verde |
+| **B · Seguridad + bugs** | authz/IDOR, injection, SSRF/XSS, overlap de reservas, plata | afirmar "está OK" / parchar | reproducir el exploit + test de regresión |
+| **C · Ramas** | ramas que no son `dev`/`main` ya mergeadas | borrar la rama | confirmar que su PR está mergeado |
+| **D · Issues** | triagear, cerrar lo hecho, consolidar trackers/umbrellas | cerrar el issue | evidencia (PR/commit) de que está hecho |
+
+> ## Regla de oro (vale para los 4 frentes)
 >
-> **Las herramientas dan CANDIDATOS, nunca una lista de borrado.** Nada se elimina sin (1) verificar
-> a mano que está realmente muerto y (2) que la **red de tests queda verde**. El gate del dueño es
-> *probar en staging*, no leer diffs → **"no romper nada" pesa más que "cuánto limpiamos"**. Ante la
-> duda, se **deja y se reporta**, no se borra.
+> **Verificá antes de ACTUAR — y "actuar" es borrar, cerrar o afirmar.** Las tres acciones son
+> irreversibles en la práctica (un issue cerrado se entierra, una rama borrada se olvida, un "está
+> todo seguro" tranquiliza de más). Nada se ejecuta sin evidencia: las **herramientas dan candidatos,
+> nunca sentencias** (knip/ruff/vulture mienten); **la intuición del dueño también se equivoca**
+> ("casi todos los issues se pueden cerrar" → varios eran backlog real; "¿está todo seguro?" → había
+> un agujero de authz crítico). El gate del dueño es *probar en staging*, no leer diffs → **"no
+> romper nada / no enterrar nada" pesa más que "cuánto limpiamos"**. Ante la duda, se **deja, se deja
+> abierto y se reporta** — nunca se borra/cierra a ciegas. **Honestidad > actividad:** si está limpio,
+> la respuesta correcta es decirlo, no fabricar churn.
 
 Casos testigo (de por qué la regla existe):
 
@@ -22,12 +35,17 @@ Casos testigo (de por qué la regla existe):
   `trackEvent` (uso dinámico desde cart-store/orders).
 - **ruff mintió:** marcó `reservas.ESTADOS_RESERVADO` en `routes/alquileres.py` como import sin usar
   → es un **re-export canónico que un test exige** (`test_reservas_sql_safety`). Lo cazó el suite.
+- **La intuición mintió:** "casi todos los issues se pueden cerrar" — al triagear con evidencia,
+  varios eran trabajo pendiente real (ej. #476, lint promovible a bloqueante) → se dejaron abiertos.
+- **El "todo OK" mintió:** ante "¿está todo seguro?", la auditoría destapó **escrituras de `/api/equipos`
+  sin `require_admin`** (cualquier anónimo creaba/borraba equipos) → fix #795. No era cosmético.
 
-La moraleja: la herramienta arranca el trabajo, **el suite y el grep lo terminan**.
+La moraleja: la herramienta (o la corazonada) arranca el trabajo, **el suite, el grep y la evidencia
+lo terminan**.
 
 ---
 
-## El método (6 fases)
+## Frente A — Código (el método, 6 fases)
 
 ### 1 · Inventario con herramientas (no grep ciego)
 
@@ -263,6 +281,82 @@ y clasificá por riesgo (tabla de la fase 4). Reglas:
 - **Honestidad > actividad.** Si tras el análisis el código ya está bien modularizado (motores únicos
   presentes, clones ≤0.5%), la respuesta correcta es **decirlo**, no fabricar churn de bajo valor.
 
+---
+
+## Frente B — Seguridad + bugs
+
+Se dispara con "¿está todo seguro?", "¿no hay ningún bug posta?", "revisá seguridad", o como pasada
+propia. **La misma regla de oro: no se AFIRMA "está OK" ni se parcha sin verificar.** Un "todo bien"
+sin auditar es la mentira más cara — tranquiliza al dueño sobre un agujero real.
+
+**Cómo se barre:**
+
+1. **Auditar con un agente read-only** (`Explore`/`general-purpose`) en paralelo a la revisión a mano
+   — fan-out por superficie, sin tocar nada. El barrido cubre estas superficies:
+   - **Authz / IDOR:** ¿toda escritura sensible tiene su guard (`require_admin`/`require_cliente`)?
+     ¿un endpoint lee/edita un recurso de **otro** cliente por id sin chequear dueño? Caso testigo
+     **#795**: 12 handlers de escritura de `/api/equipos` (create/update/delete/ficha/mantenimiento/
+     kit/etiquetas/categorías) **sin `require_admin`** → anónimo total. El gate de público vivía en
+     `middleware.PUBLIC_API`; se partió en `PUBLIC_API_READONLY` (GET/HEAD) vs `PUBLIC_API_ANY`.
+   - **Injection:** SQL siempre parametrizado (`?`→`%s` vía el wrapper PGCursor), nunca f-strings con
+     input. Command/template injection en lo que toque shell o render.
+   - **SSRF:** todo `fetch`/descarga de URL externa (media, webhooks) con allowlist + `follow_redirects=False`
+     (caso testigo: `services/media/security.py`). Un redirect a `169.254.169.254` roba credenciales de cloud.
+   - **XSS / open-redirect:** todo lo que vuelva al DOM o a `Location`. Caso testigo: `_safe_next_path`
+     en `auth.py` endurecido para rechazar `<>"'`\``, whitespace y control chars en el `?next=`.
+   - **Core sagrado:** overlap de reservas (cero doble-booking) y cálculos de plata — un bug acá es
+     de severidad máxima aunque no sea "seguridad" clásica.
+2. **Triage por severidad** (crítico / alto / medio / bajo). El crítico se arregla ya; lo medio/bajo
+   puede ir a issue con label si no es urgente.
+3. **Verificar explotabilidad antes de tocar.** No parchar lo que no se reprodujo: confirmá el
+   exploit (ej. `TestClient` haciendo la escritura anónima → debe dar 401 después del fix; GET sigue
+   200; admin pasa). Un "fix" de algo no explotable puede romper conducta legítima.
+4. **Test de regresión sí o sí.** Cada hallazgo arreglado deja un test que falla sin el fix (caso
+   testigo: `test_auth_guards.py` parametrizado por los 12 endpoints + el test XSS de `_safe_next_path`).
+   Sin el test, el agujero vuelve en el próximo refactor.
+
+> **El core de reservas/plata sigue sagrado.** Un bug **se reporta** y se arregla con plan + Opus +
+> test; no se parcha de apuro dentro de un barrido. Lo demás (la fase 4 de Frente A) aplica igual.
+
+## Frente C — Ramas
+
+"Limpiá las ramas que no sean `dev` ni `main`." El riesgo es **borrar trabajo no mergeado**.
+
+1. **Mapear rama → PR.** Por cada rama remota, buscá su PR (`mcp__github__list_pull_requests` por
+   `head`). Una rama es segura de borrar **solo si su PR está MERGED** (o el trabajo llegó a `dev` por
+   otra vía verificable). Una rama **sin PR o con PR abierto/cerrado-sin-merge = se deja** y se reporta.
+2. **`git branch --merged` NO alcanza:** el flujo mergea con **squash** a `dev` (MEMORIA *2026-06-01*),
+   así que la rama squasheada **no aparece** como merged por ancestría aunque su contenido ya esté en
+   `dev`. La verdad es el **estado del PR** (MERGED), no el grafo de commits.
+3. **Limitación del entorno:** en el sandbox `git push origin --delete <rama>` da **HTTP 403** y no hay
+   tool MCP de delete-ref → **no se pueden borrar ramas remotas desde acá**. Acción correcta: **reportar
+   la lista** de ramas borrables (con su PR mergeado como evidencia) y recomendar al dueño activar
+   **"Automatically delete head branches"** en Settings del repo (las borra solas al mergear, de ahí
+   en más). Nunca afirmar "borré las ramas" si el entorno no lo permitió.
+
+## Frente D — Issues
+
+"Hacé housekeeping de los issues, casi todos se pueden cerrar." El riesgo es **enterrar backlog real**
+porque la corazonada dice "ya está". Acá la regla de oro pesa doble: **cerrar es afirmar "esto está hecho".**
+
+1. **Listar + agrupar por tópico.** `mcp__github__list_issues` (devuelve `{issues, totalCount, pageInfo}`
+   — es un dict, no una lista) → mapear cada uno a su tema para ver solapamientos.
+2. **Cerrar SOLO con evidencia.** Un issue se cierra cuando hay un PR/commit que lo resuelve, o el dueño
+   lo confirma explícitamente. Cerrar = `mcp__github__issue_write` con `state:closed` + `state_reason`
+   (`completed`/`not_planned`) **+ un comentario** que linkee la evidencia (PR/commit/decisión). Sin
+   comentario, el "por qué se cerró" se pierde.
+3. **No cerrar backlog real.** Si el issue describe trabajo pendiente que **no** se hizo, queda abierto
+   aunque "suene viejo" (caso testigo: **#476**, promover reglas de lint a bloqueante — pendiente real,
+   se dejó abierto y se flageó). Parciales = abiertos.
+4. **Consolidar trackers/umbrellas solapados.** Cuando N issues cubren la misma iniciativa (caso testigo:
+   DS #612/#605/#479 → #612; specs #526/#528/#535 → #526), **rescatá primero los ítems únicos** de cada
+   uno hacia el tracker que sobrevive, **después** cerrá los redundantes apuntando al consolidador. Un
+   **umbrella** se cierra cuando su pasada está completa; si quedan sub-tareas, sobrevive con el checklist
+   actualizado.
+5. **El dueño dirige, la sesión recomienda.** Proponé la lista de cierres con su razón; el dueño da la
+   orden ("borrá 234 476 764…" — ojo a los typos: "476" era probablemente "477"). Ante un número dudoso,
+   **confirmá** antes de cerrar.
+
 ## Anti-objetivos (cuándo NO es este skill)
 
 - **Refactor de arquitectura** o consolidación del core sagrado → iniciativa propia con plan + Opus,
@@ -271,11 +365,23 @@ y clasificá por riesgo (tabla de la fase 4). Reglas:
 - **Cambios de conducta** disfrazados de limpieza → requieren plan de prueba y aviso.
 - **Borrar a ciegas** lo que diga la herramienta → la herramienta da candidatos, no sentencias.
 
-## Cheatsheet (orden de un barrido)
+## Cheatsheet (el flow — 4 frentes)
 
 ```
-1. setup venv + deps + npm ci          5. clasificar (puro / DRY / conducta / sagrado)
-2. ruff + vulture + knip → candidatos  6. red de tests (pytest [+Postgres real] / prettier+tsc+eslint+build)
-3. triage: cazar falsos positivos      7. commits atómicos + body con "lo que se dejó"
-4. grep repo-wide por cada candidato    8. supervisor + plan de prueba
+A · CÓDIGO (6 fases)                      B · SEGURIDAD + BUGS
+1. setup venv + deps + npm ci            1. agente read-only por superficie (authz/inject/SSRF/XSS/core)
+2. ruff + vulture + knip → candidatos    2. triage por severidad
+3. triage: cazar falsos positivos        3. reproducir el exploit (no parchar lo no explotable)
+4. grep repo-wide por cada candidato     4. fix + test de regresión que falla sin él
+5. clasificar (puro/DRY/conducta/sagrado)
+6. red de tests (pytest[+PG real] / prettier+tsc+eslint+build)
+
+C · RAMAS                                 D · ISSUES
+1. mapear rama → PR                       1. listar + agrupar por tópico
+2. borrable solo si PR=MERGED             2. cerrar SOLO con evidencia (state_reason + comentario)
+   (squash ≠ git branch --merged)        3. no enterrar backlog real (parciales = abiertos)
+3. sandbox no borra (403) →              4. consolidar trackers/umbrellas (rescatar únicos primero)
+   reportar lista + auto-delete           5. el dueño dirige, la sesión recomienda
+
+CIERRE (todos los frentes): commits atómicos + body con "lo que se dejó" → supervisor → plan de prueba
 ```
