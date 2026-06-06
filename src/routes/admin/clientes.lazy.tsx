@@ -31,6 +31,7 @@ import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { nombreCliente } from "@/lib/cliente-nombre";
 
 export const Route = createLazyFileRoute("/admin/clientes")({
   component: ClientesPage,
@@ -136,9 +137,7 @@ function ClientesPage() {
                 onClick={() => setViewing(c)}
               >
                 <TableCell>
-                  <div className="text-ink">
-                    {[c.nombre, c.apellido].filter(Boolean).join(" ") || c.nombre}
-                  </div>
+                  <div className="text-ink">{nombreCliente(c)}</div>
                   {c.perfil_impuestos && (
                     <div className="text-xs text-muted-foreground">{c.perfil_impuestos}</div>
                   )}
@@ -187,12 +186,7 @@ function ClientesPage() {
         onOpenChange={(v) => {
           if (!v) setMenuCliente(null);
         }}
-        title={
-          menuCliente
-            ? [menuCliente.apellido, menuCliente.nombre].filter(Boolean).join(", ") ||
-              menuCliente.nombre
-            : undefined
-        }
+        title={menuCliente ? nombreCliente(menuCliente) : undefined}
         actions={[
           {
             label: "Ver historial",
@@ -242,7 +236,7 @@ function ClientesPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Eliminar a {deleting?.apellido}, {deleting?.nombre}
+              Eliminar a {deleting ? nombreCliente(deleting) : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
               No se borrarán los pedidos históricos, pero quedarán sin cliente asignado.
@@ -287,11 +281,7 @@ function ClienteHistorialSheet({
       <BottomSheet
         open={!!cliente}
         onOpenChange={onOpenChange}
-        title={
-          cliente
-            ? [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || cliente.nombre
-            : ""
-        }
+        title={cliente ? nombreCliente(cliente) : ""}
         showClose
         maxH="max-h-[90vh]"
       >

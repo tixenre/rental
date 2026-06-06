@@ -1014,7 +1014,7 @@ class TestReservaLoginObligatorio:
         # cliente_id (7, de la sesión) es el primer parámetro del INSERT.
         assert conn.alquiler_params[0] == 7
         # nombre/email salen de la tabla clientes, no del body.
-        assert "Estudio, Tester" in conn.alquiler_params
+        assert "Tester Estudio" in conn.alquiler_params  # "Nombre Apellido"
         assert "tester@example.com" in conn.alquiler_params
 
     def test_body_no_acepta_datos_de_cliente(self):

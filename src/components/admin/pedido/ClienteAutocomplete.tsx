@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Input } from "@/components/ui/input";
 import { adminApi, type Cliente } from "@/lib/admin/api";
+import { nombreCliente } from "@/lib/cliente-nombre";
 
 export function ClienteAutocomplete({
   onPick,
@@ -77,9 +78,7 @@ export function ClienteAutocomplete({
                 }}
                 className="w-full text-left px-3 py-2 hover:bg-accent/50 transition"
               >
-                <div className="text-sm text-ink">
-                  {c.apellido ? `${c.apellido}, ${c.nombre}` : c.nombre}
-                </div>
+                <div className="text-sm text-ink">{nombreCliente(c)}</div>
                 <div className="text-xs text-muted-foreground">
                   {[c.email, c.telefono].filter(Boolean).join(" · ") || "—"}
                 </div>

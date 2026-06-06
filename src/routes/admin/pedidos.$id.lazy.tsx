@@ -59,6 +59,7 @@ import { es } from "date-fns/locale";
 import { useCotizacion } from "@/lib/cotizacion";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaCorta } from "@/lib/format";
+import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoSearchSheet } from "@/components/admin/pedido/EquipoSearchSheet";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "@/components/admin/pedido/EnviarDocsDialog";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
@@ -320,7 +321,7 @@ function PedidoEditorPage() {
                       ? {
                           ...d,
                           cliente_id: c.id,
-                          cliente_nombre: c.apellido ? `${c.apellido}, ${c.nombre}` : c.nombre,
+                          cliente_nombre: nombreCliente(c),
                           cliente_email: c.email ?? "",
                           cliente_telefono: c.telefono ?? "",
                           // El descuento sigue al cliente: si el nuevo no tiene

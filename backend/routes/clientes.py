@@ -13,6 +13,17 @@ from busqueda import construir
 
 router = APIRouter()
 
+
+def nombre_completo_cliente(nombre, apellido) -> str:
+    """Compone el nombre visible de un cliente: **"Nombre Apellido"** (nombre
+    primero). Fuente ÚNICA — antes se armaba "Apellido, Nombre" copiado en ~6
+    lugares (back-office, pedidos, estudio). Decisión del dueño 2026-06-06: el
+    nombre se muestra siempre con el nombre primero. Si falta el apellido,
+    devuelve solo el nombre."""
+    n = (nombre or "").strip()
+    a = (apellido or "").strip()
+    return f"{n} {a}".strip() if a else n
+
 # Campos buscables del cliente. El combinado nombre+apellido permite que
 # "santiago perez" matchee/rankee aunque nombre y apellido sean campos distintos.
 CAMPOS_CLIENTE = [
