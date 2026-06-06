@@ -419,6 +419,34 @@
   marca como hallazgo cualquier cambio que vuelva a sumar el IVA al total del presupuesto sin
   aprobación del dueño.
 
+### 2026-06-06 — Datos del pedido: contacto en vivo, plata congelada
+
+- **Contexto:** un pedido (`alquileres`) guarda una **foto** de los datos del cliente al crearse
+  (`cliente_nombre/email/telefono` + `descuento_pct`). El dueño editó el descuento y el contacto de
+  un cliente y esperaba verlos reflejados en sus pedidos; no pasaba. Además había **inconsistencia**:
+  el back-office mostraba la foto vieja del contacto mientras el portal del cliente ya lo leía en
+  vivo (el mismo documento mostraba datos distintos según quién lo abría).
+- **Decisión — dos tipos de dato, dos comportamientos:**
+  - **Contacto / identidad (nombre, email, teléfono) → SIEMPRE en vivo** desde la ficha del cliente,
+    en **todos los estados** (presupuesto/confirmado/finalizado) y **todas las superficies**
+    (back-office: detalle + listado + los 4 PDFs; portal). Corregir un apellido o teléfono se ve en
+    todos los pedidos de esa persona. No hay nada que "congelar" en un dato de contacto.
+  - **Plata (precio, descuento, ítems, totales) → snapshot con lock por estado.** El descuento del
+    cliente se propaga a sus **presupuestos** (no confirmados), que se **recotizan**; los
+    **confirmados/cerrados conservan su snapshot** (un pedido ya confirmado/facturado no debe cambiar
+    de importe porque después se editó el perfil). El **perfil fiscal** (razón social/CUIT) sí se lee
+    en vivo, porque la Factura A debe salir correcta.
+- **Why:** el contacto es *cómo/quién es* la persona → se quiere lo último. La plata es lo *cobrado/
+  a cobrar* → trazabilidad: lo confirmado no muta. Son ejes ortogonales y por eso se tratan distinto.
+- **How to apply / quién hace cumplir:** el contacto pasa por un **helper único**
+  `_enriquecer_pedido_con_cliente` (+ su versión batch para listados, sin N+1) en
+  `routes/alquileres.py`, que sobrescribe **solo** nombre/email/teléfono (nunca montos); fallback a la
+  foto si el pedido no tiene cliente vinculado o el cliente no existe. La plata vive en
+  `_recalcular_total_pedido` + `propagar_descuento_a_presupuestos` (misma transacción que el update
+  del cliente). El supervisor marca como hallazgo: (1) cualquier superficie de pedido que muestre
+  contacto sin pasar por el helper; (2) congelar el contacto o, al revés, descongelar la plata de un
+  confirmado/finalizado; (3) propagar el descuento a estados que no sean `presupuesto`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
