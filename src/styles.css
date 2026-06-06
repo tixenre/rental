@@ -2,26 +2,18 @@
    Rambla Rental — App CSS entry
    ------------------------------------------------------------
    El design system canónico (tokens, tipografía, utilities, fuentes)
-   vive en el paquete del workspace @rambla/design-system y se consume
-   desde acá. Este archivo NO define tokens ni utilities: solo cablea.
+   vive en `src/` — entry `./ds-styles.css` + `./styles/`. Este archivo
+   solo cablea: importa el DS, tw-animate, define el scan de Tailwind y
+   las vars de runtime + alias planos.
 
-     1. importa el CSS del DS (Tailwind + tokens + utilities + @font-face)
-     2. tw-animate-css (animate-in/out de shadcn)
-     3. @source → qué escanea Tailwind v4 (no mira node_modules)
-     4. vars de runtime que setea el JS + alias planos transicionales
-
-   Para editar un token/utility: hacelo en packages/design-system/src/,
-   NO acá. Ver packages/design-system/ADOPT.md.
+   Para editar un token/utility: hacelo en `src/styles/`, NO acá.
    ============================================================ */
 
-@import "@rambla/design-system/styles.css";
+@import "./ds-styles.css";
 @import "tw-animate-css";
 
-/* Tailwind v4 no escanea node_modules. El paquete se resuelve por el symlink
-   del workspace, así que apuntamos a su src real (y al de la app) para que no
-   purgue las clases de sus componentes. */
+/* Tailwind v4 no escanea node_modules. Apuntamos al src de la app. */
 @source "../src";
-@source "../packages/design-system/src";
 
 :root {
   /* Vars de runtime: las setea el JS (scroll del topbar / alto del cart strip).

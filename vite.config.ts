@@ -17,7 +17,7 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
-    tsconfigPaths({ projects: ["tsconfig.json", "packages/design-system/tsconfig.json"] }),
+    tsconfigPaths({ projects: ["tsconfig.json"] }),
     ...(analyze
       ? [
           visualizer({
