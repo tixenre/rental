@@ -71,7 +71,7 @@ Estructura:
 ## Sugerencia de orden de ataque
 1. Críticos restantes (típicamente fixes chicos).
 2. Altos de UX (afectan el día a día).
-3. Limpieza (pycache, código muerto).
+3. Limpieza (pycache, código muerto) → ver skill [`limpieza`](../.claude/skills/limpieza/SKILL.md) para el método seguro.
 4. Resto cuando se pueda.
 ```
 

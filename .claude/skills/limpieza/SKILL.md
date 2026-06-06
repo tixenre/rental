@@ -45,6 +45,8 @@ para el barrido. Dan una **lista de candidatos**.
 python -m venv /tmp/venv && . /tmp/venv/bin/activate
 pip install -q -r backend/requirements-dev.txt vulture ruff
 # (knip se baja con npx; el front necesita `npm ci` para tsc/eslint/build)
+# ruff/vulture NO están pineados: una versión nueva puede traer reglas distintas →
+# si querés reproducir un barrido viejo, fijá la versión (ruff==X, vulture==Y).
 ```
 
 > **`migrations/` se excluye SIEMPRE.** Es historia congelada (decisión _esquema en dos capas_,
@@ -58,6 +60,15 @@ positivos típicos (**NO borrar**):
 - **Re-exports** intencionales: barrels (`index.ts`), `__all__`, constantes canónicas re-expuestas.
   Si un **test** los exige, se conservan con `# noqa: F401` + comentario que apunte al test.
 - **Uso dinámico / por string:** eventos de analytics, registries, factories, rutas lazy.
+- **Endpoints / handlers HTTP:** un handler sin llamadas en Python NO está muerto — el front lo
+  consume por **string de URL** (`fetch('/api/...')`, cliente API). vulture lo marca igual →
+  grepear la **ruta** (`/api/...`) en el front antes de tocar.
+- **Assets referenciados por string:** imágenes/íconos/templates cargados por path armado en runtime
+  (no `import` estático) → knip no los ve. Grepear el nombre del archivo en TODO el repo.
+- **Código de un job/cron:** una función llamada solo desde un scheduled job de Railway (ej. los
+  slots fijos del estudio que generan pedidos mensuales, MEMORIA *2026-05-27*) parece muerta y no lo está.
+- **Feature flags / settings administrables:** código detrás de un flag de `app_settings` apagado
+  hoy NO es muerto (se enciende desde el back-office).
 - **Parámetros de interfaz:** firmas que un framework exige (ej. `attrs` en `HTMLParser.handle_starttag`,
   params con default usados por keyword). Quitar un parámetro **cambia la firma** → no es limpieza.
 - **Imports/llamadas con efecto secundario:** `client.fetch_token(...)` guarda estado; `import x`
@@ -80,6 +91,8 @@ La herramienta mira su dominio; vos mirás el repo entero. Antes de tocar:
 ```bash
 # ¿Se usa en CUALQUIER lado? (no solo src/ o routes/ — incluir .mjs, tests, public, index.html)
 grep -rn "NOMBRE" src packages backend .claude --include=*.ts --include=*.tsx --include=*.py --include=*.mjs
+# Para un endpoint backend: grepeá la RUTA, no la función (el front la llama por string):
+grep -rn "/api/la-ruta" src
 ```
 
 Distinguir tres situaciones (cambian qué se borra):
@@ -118,18 +131,25 @@ bindings reales), o dejarlos.
 . /tmp/venv/bin/activate
 export SECRET_KEY=ci-test-secret-not-for-production ADMIN_EMAILS=admin@test.com
 unset DATABASE_URL
-python -m pytest backend/tests/ -q          # paridad con CI (integration tests se saltan)
+cd backend && python -m pytest tests/ -q     # corré DESDE backend/ (toma pytest.ini: asyncio_mode, markers)
 ```
+> Los tests de DB se saltan **solos**: cada archivo exige su opt-in (`RESERVAS_DB_TEST=1` /
+> `ALEMBIC_DB_TEST=1` + `DATABASE_URL` a una base con `test` en el nombre) vía `skipif`. Sin eso no
+> corren — **no** es un marker por default. Por eso este comando es paridad real con el job de CI.
 
-**SQL / refactors de DB → Postgres REAL** (CI **no** ejercita las queries de las rutas; hay que
-hacerlo a mano). Receta:
+**SQL / refactors de DB → Postgres REAL.** CI corre contra Postgres real **solo** las migraciones
+(`test_alembic_upgrade_db.py`) y el SQL de liquidación (`test_reportes_liquidacion_db.py`); el resto
+de las queries de rutas **no** tiene cobertura DB en CI → si tu refactor toca SQL de otra ruta,
+**ejercelo a mano**. Receta:
 ```bash
 pg_ctlcluster 16 main start
 su - postgres -c "psql -c \"ALTER USER postgres WITH PASSWORD 'postgres';\""
 su - postgres -c "psql -c 'CREATE DATABASE rambla_rental_test;'"
 export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
-# bootstrap: init_db() + alembic upgrade head (esquema en dos capas), sembrar datos mínimos,
-# y EJECUTAR los caminos reales: TestClient sobre endpoints públicos + llamadas directas a helpers.
+# bootstrap (init_db() + alembic upgrade head + base limpia) YA está escrito como harness copiable
+# en backend/tests/test_alembic_upgrade_db.py (fixture clean_db) → usalo de base.
+# Después: sembrar datos mínimos y EJECUTAR los caminos reales (TestClient sobre endpoints públicos
+# + llamadas directas a helpers).
 ```
 El objetivo: que **cada forma distinta de query** y cada **alias** se ejecute contra Postgres y
 devuelva lo esperado (no solo que compile).
