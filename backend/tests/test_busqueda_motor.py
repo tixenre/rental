@@ -23,8 +23,9 @@ _CORPUS = json.loads(
 
 @pytest.mark.parametrize("caso", _CORPUS["casos"], ids=lambda c: c["in"] or "<empty>")
 def test_normalizar_corpus_compartido(caso):
-    """La normalización de Python debe coincidir con el corpus que también
-    corre el front (src/lib/search/normalize.test.ts)."""
+    """La normalización de Python debe coincidir con el corpus compartido. El
+    espejo del front (src/lib/search/normalize.ts) replica estas reglas a mano
+    (todavía no hay runner de tests JS que lo enforce — ver el corpus)."""
     assert normalizar(caso["in"]) == caso["out"]
 
 

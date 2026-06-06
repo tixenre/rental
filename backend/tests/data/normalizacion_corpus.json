@@ -1,5 +1,5 @@
 {
-  "_comment": "Corpus compartido de normalización de búsqueda. Lo corren el test de Python (backend/tests/test_busqueda_motor.py) Y el de TypeScript (src/lib/search/normalize.test.ts) para garantizar que el motor backend y su espejo en el front NO diverjan. Reglas: minúsculas, sin acentos, no-alfanumérico→espacio, espacios colapsados. Editá los dos lados a la vez.",
+  "_comment": "Corpus compartido de normalización de búsqueda. Hoy lo enforce SOLO el test de Python (backend/tests/test_busqueda_motor.py); el espejo del front (src/lib/search/normalize.ts) NO tiene test todavía (el repo aún no tiene runner de tests JS), así que este corpus es el contrato manual: si cambiás una regla, actualizá Python Y el front a la vez. Reglas: minúsculas, sin acentos, no-alfanumérico→espacio, espacios colapsados.",
   "casos": [
     { "in": "Batería", "out": "bateria" },
     { "in": "Cámara", "out": "camara" },

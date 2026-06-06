@@ -4,8 +4,10 @@ Fuente ÚNICA del lado backend de "cómo se normaliza un término para buscar".
 Antes esta lógica estaba copiada (con variantes sutilmente distintas) en
 `routes/busquedas.py`, en el slug, en el render de specs y en ~3 lugares del
 front. Acá vive la versión canónica; el front la espeja en
-`src/lib/search/normalize.ts` y un corpus de casos compartido
-(`backend/tests/data/normalizacion_corpus.json`) garantiza que NO diverjan.
+`src/lib/search/normalize.ts`. El corpus compartido
+(`backend/tests/data/normalizacion_corpus.json`) es el contrato entre ambos: lo
+enforce el test de Python; el espejo del front lo replica a mano (todavía no hay
+runner de tests JS), así que al cambiar una regla se tocan los dos lados.
 
 Reglas (idénticas en Python y TypeScript):
   1. minúsculas
