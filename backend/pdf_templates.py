@@ -164,14 +164,17 @@ _DOC_CSS = r"""
   --r-sm:8px; --r-md:10px; --r-lg:12px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-@page{size:A4;margin:14mm}
-/* La 1ª hoja arranca a tope arriba para que la barra amber del membrete
-   sangre hasta el borde superior (Chromium clipea lo que cae en el margen
-   @page → no se puede bleed-top con margen negativo; sí con margin-top:0). */
+/* Márgenes verticales en el @page; los LATERALES van como padding de .paper.
+   Así la barra amber del membrete puede sangrar a los bordes izq/der de verdad
+   (con margin negativo cancela el padding de .paper) — Chromium clipea lo que
+   cae en el margen lateral del @page, por eso el lateral NO va en @page. */
+@page{size:A4;margin:14mm 0}
+/* La 1ª hoja arranca a tope arriba para que la barra amber sangre al borde
+   superior (margin-top:0; el margen negativo arriba lo clipearía el @page). */
 @page:first{margin-top:0}
 body{font-family:var(--font-sans);color:var(--ink);background:#fff;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-.paper{display:flex;flex-direction:column;min-height:269mm}
+.paper{display:flex;flex-direction:column;min-height:269mm;padding:0 14mm}
 
 /* Membrete (barra amber full-bleed: wordmark blanco + info del documento).
    El margen negativo sangra la barra hasta el borde físico de la hoja
@@ -180,11 +183,9 @@ body{font-family:var(--font-sans);color:var(--ink);background:#fff;
 .membrete{margin:0 -14mm 26px;padding:34px 14mm 20px;background:var(--amber);
   -webkit-print-color-adjust:exact;print-color-adjust:exact}
 .mb-top{display:flex;justify-content:space-between;align-items:center;gap:28px}
-.mb-brand{display:flex;flex-direction:column;gap:7px}
+.mb-brand{display:flex;align-items:center}
 .mb-wordmark{color:#fff}
 .mb-wordmark svg{height:38px!important}
-.mb-tagline{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.14em;
-  text-transform:uppercase;color:color-mix(in oklch,var(--ink) 64%,var(--amber));white-space:nowrap}
 .mb-doc{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:2px;flex-shrink:0}
 .mb-eyebrow{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.22em;
   text-transform:uppercase;color:color-mix(in oklch,var(--ink) 64%,var(--amber));white-space:nowrap}
@@ -440,8 +441,7 @@ def _membrete(pedido, doc_type, num, fecha, estado=True):
     badge_row = f'<div class="mb-badge-row">{badge}</div>' if badge else ""
     return (
         '<header class="membrete"><div class="mb-top">'
-        f'<div class="mb-brand"><span class="mb-wordmark">{_active_wordmark()}</span>'
-        '<div class="mb-tagline">Alquiler de equipos audiovisuales</div></div>'
+        f'<div class="mb-brand"><span class="mb-wordmark">{_active_wordmark()}</span></div>'
         '<div class="mb-doc"><div class="mb-eyebrow">Documento</div>'
         f'<div class="mb-type">{html.escape(doc_type)}</div>'
         f'<div class="mb-num">N° {html.escape(num)}</div>'
