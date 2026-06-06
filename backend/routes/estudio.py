@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from admin_guard import require_admin
 from database import MARCA_SUBQUERY, get_db, now_ar, to_datetime
+from routes.clientes import nombre_completo_cliente
 from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock
 from routes.alquileres import (
     _dispatch_pedido_creado_emails,
@@ -864,7 +865,7 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
         ).fetchone()
         if not cli:
             raise HTTPException(401, "Sesión de cliente inválida")
-        cliente_nombre = f"{cli['apellido']}, {cli['nombre']}"
+        cliente_nombre = nombre_completo_cliente(cli["nombre"], cli["apellido"])
         cliente_email = cli["email"]
         cliente_telefono = cli["telefono"]
 

@@ -247,11 +247,21 @@ export function apiGetAnalyticsConfig() {
 }
 
 /** Registra una búsqueda del catálogo público (analítica interna). Best-effort:
- *  el wrapper con debounce vive en `src/lib/search-log.ts`. */
+ *  el wrapper con debounce vive en `src/lib/search-log.ts`. Devuelve el `id` del
+ *  registro para poder ligar el click-through posterior. */
 export function apiLogSearch(query: string, resultCount: number) {
-  return post<{ ok: boolean; logged: boolean }>("/api/search-log", {
+  return post<{ ok: boolean; logged: boolean; id: number | null }>("/api/search-log", {
     query,
     result_count: resultCount,
+  });
+}
+
+/** Registra que, tras la búsqueda `queryId`, el usuario abrió `equipoId`
+ *  (click-through). Best-effort: la analítica nunca rompe la navegación. */
+export function apiLogSearchClick(queryId: number, equipoId: number | null) {
+  return post<{ ok: boolean; logged: boolean }>("/api/search-click", {
+    query_id: queryId,
+    equipo_id: equipoId,
   });
 }
 

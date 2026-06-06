@@ -1,5 +1,5 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { LogoSection } from "@/components/admin/diseno/LogoSection";
+import { BrandSvgSection } from "@/components/admin/diseno/BrandSvgSection";
 import { BrandingSection } from "@/components/admin/diseno/BrandingSection";
 import { ContactoSection } from "@/components/admin/diseno/ContactoSection";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -21,7 +21,7 @@ function DisenoPage() {
           Identidad visual y datos del negocio que aparecen en el sitio público y los mails.
         </p>
       </header>
-      <LogoSection />
+      <BrandSvgSection />
       <BrandingSection />
       <ContactoSection />
     </div>

@@ -25,7 +25,14 @@ class _FakeConn:
             def fetchall(self_inner):
                 return []
 
+            def fetchone(self_inner):
+                # /search-log inserta con RETURNING id.
+                return (123,)
+
         return _Result()
+
+    def rollback(self):
+        pass
 
     def commit(self):
         self.committed = True
@@ -76,7 +83,7 @@ def test_log_search_ignora_termino_corto(monkeypatch):
     monkeypatch.setattr(mod, "get_db", lambda: fake)
 
     res = mod.log_search.__wrapped__(SearchLogBody(query="a", result_count=5), request=None)
-    assert res == {"ok": True, "logged": False}
+    assert res == {"ok": True, "logged": False, "id": None}
     # No debe tocar la BD para un término inútil.
     assert fake.inserts == []
 
@@ -91,9 +98,29 @@ def test_log_search_guarda_raw_y_norm(monkeypatch):
     res = mod.log_search.__wrapped__(
         SearchLogBody(query="  Cámara Sony ", result_count=3), request=None
     )
-    assert res == {"ok": True, "logged": True}
+    assert res == {"ok": True, "logged": True, "id": 123}
     assert fake.committed is True
     assert len(fake.inserts) == 1
     _, params = fake.inserts[0]
     # Guarda el crudo (trim) y la versión normalizada, con el conteo.
     assert params == ("Cámara Sony", "camara sony", 3)
+
+
+# ── log_click ────────────────────────────────────────────────────────────────
+
+
+def test_log_click_inserta(monkeypatch):
+    import routes.busquedas as mod
+    from routes.busquedas import SearchClickBody
+
+    fake = _FakeConn()
+    monkeypatch.setattr(mod, "get_db", lambda: fake)
+
+    res = mod.log_click.__wrapped__(
+        SearchClickBody(query_id=123, equipo_id=7), request=None
+    )
+    assert res == {"ok": True, "logged": True}
+    assert fake.committed is True
+    assert len(fake.inserts) == 1
+    _, params = fake.inserts[0]
+    assert params == (123, 7)

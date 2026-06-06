@@ -19,8 +19,9 @@ from pydantic import BaseModel, Field
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
     attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
-    regenerate_auto_tags, MARCA_SUBQUERY,
+    regenerate_auto_tags, MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
 )
+from busqueda import construir
 from reservas import ESTADOS_RESERVADO, calcular_disponibilidad
 from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de
@@ -33,6 +34,17 @@ from services.spec_render import (
 )
 
 router = APIRouter()
+
+
+# Campos buscables del equipo (motor único backend/busqueda). Incluye la marca
+# (subquery por brand_id) y los textos de la ficha (descripción + keywords) para
+# que la barra siga siendo un "find anything" — buscás "log3" o "iso 25600" y
+# aparece aunque la palabra viva en un spec, no en el nombre.
+_FICHA_EXPR = (
+    "(SELECT string_agg(coalesce(ef.descripcion, '') || ' ' || coalesce(ef.keywords_json, ''), ' ') "
+    "FROM equipo_fichas ef WHERE ef.equipo_id = e.id)"
+)
+CAMPOS_EQUIPO = ["e.nombre", MARCA_NOMBRE_EXPR, "e.modelo", "e.serie", _FICHA_EXPR]
 
 
 # ── Normalización de specs del autocompletar (#209) ───────────────────────────
@@ -721,26 +733,14 @@ def list_equipos(
                 " AND LOWER(es.value) = LOWER(?))"
             )
             params += [key, value]
-    if q:
-        # Búsqueda fuzzy global: ILIKE case-insensitive sobre nombre/marca/modelo
-        # del equipo + serie + campos de la ficha (descripción, specs, keywords).
-        # Convierte la barra en un find-anything: buscás "log3" o "iso 25600" y
-        # aparece el equipo aunque la palabra esté en un spec, no en el nombre.
-        like = f"%{q}%"
-        base_sql += """ AND (
-            e.nombre ILIKE ?
-            OR COALESCE((SELECT nombre FROM marcas WHERE id = e.brand_id), '') ILIKE ?
-            OR COALESCE(e.modelo, '') ILIKE ?
-            OR COALESCE(e.serie, '') ILIKE ?
-            OR EXISTS (
-                SELECT 1 FROM equipo_fichas ef
-                WHERE ef.equipo_id = e.id AND (
-                    COALESCE(ef.descripcion, '') ILIKE ?
-                    OR COALESCE(ef.keywords_json, '') ILIKE ?
-                )
-            )
-        )"""
-        params += [like] * 6
+    # Búsqueda fuzzy global (motor único backend/busqueda): sin tildes
+    # ("bateria"→"Batería"), sin guiones ("a7 iii"→"A7-III"), multi-palabra
+    # cruzando campos ("sony fx3") y con tolerancia a typos. El ranking por
+    # relevancia (más abajo) ordena el mejor match primero.
+    pred = construir(CAMPOS_EQUIPO, q) if q else None
+    if pred and pred.activo:
+        base_sql += f" AND ({pred.where})"
+        params += pred.where_params
     if categoria:
         # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
         # Acepta id numérico o nombre.
@@ -791,22 +791,37 @@ def list_equipos(
     # ── Sort ──
     # Default: ranking compuesto (relevancia_manual + popularidad_score).
     # Esto pone los flagship arriba y desempata por uso real.
-    order_clause = {
-        None: "ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC",
-        "ranking": "ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC",
-        "nombre": "ORDER BY COALESCE(e.nombre_publico, e.nombre) ASC",
-        "precio_asc": "ORDER BY e.precio_jornada ASC NULLS LAST, e.nombre ASC",
-        "precio_desc": "ORDER BY e.precio_jornada DESC NULLS LAST, e.nombre ASC",
-        "id": "ORDER BY e.id ASC",
-    }.get(sort, "ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC")
+    # Cuando hay búsqueda (`q`) y el sort es el default, ordena por relevancia
+    # del match (`_score`) primero — el mejor resultado arriba, consistente.
+    _RANKING = "e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC"
+    use_score = bool(pred and pred.activo) and sort in (None, "ranking")
+    if use_score:
+        order_clause = f"ORDER BY _score DESC, {_RANKING}"
+    else:
+        order_clause = {
+            None: f"ORDER BY {_RANKING}",
+            "ranking": f"ORDER BY {_RANKING}",
+            "nombre": "ORDER BY COALESCE(e.nombre_publico, e.nombre) ASC",
+            "precio_asc": "ORDER BY e.precio_jornada ASC NULLS LAST, e.nombre ASC",
+            "precio_desc": "ORDER BY e.precio_jornada DESC NULLS LAST, e.nombre ASC",
+            "id": "ORDER BY e.id ASC",
+        }.get(sort, f"ORDER BY {_RANKING}")
 
     try:
         total = conn.execute(f"SELECT COUNT(*) {base_sql}", params).fetchone()[0]
+        if use_score:
+            select_cols = f"e.*, {MARCA_SUBQUERY}, ({pred.score}) AS _score"
+            select_params = pred.score_params + params + [per_page, offset]
+        else:
+            select_cols = f"e.*, {MARCA_SUBQUERY}"
+            select_params = params + [per_page, offset]
         rows  = conn.execute(
-            f"SELECT e.*, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca {base_sql} {order_clause} LIMIT ? OFFSET ?",
-            params + [per_page, offset]
+            f"SELECT {select_cols} {base_sql} {order_clause} LIMIT ? OFFSET ?",
+            select_params,
         ).fetchall()
         equipos = [row_to_dict(r) for r in rows]
+        for e in equipos:
+            e.pop("_score", None)  # interno del ranking, no parte del contrato
 
         # Attach brand object (id, nombre, logo_url) — batched (#350 perf).
         # Antes era 1 query por equipo (N+1). Con 168 equipos sobre Railway

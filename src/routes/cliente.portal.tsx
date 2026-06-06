@@ -73,6 +73,7 @@ import { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";
 import { whatsappLink } from "@/lib/whatsapp";
 import { MODIFICAR_PEDIDOS_HABILITADO } from "@/lib/features";
 import { cn } from "@/lib/utils";
+import { nombreCliente } from "@/lib/cliente-nombre";
 import { GoogleIcon } from "@/components/ui/GoogleIcon";
 import { formatARS } from "@/lib/format";
 
@@ -363,7 +364,7 @@ export default function ClientePortal() {
     });
   }, [tabFiltered, q]);
 
-  const userName = perfil ? `${perfil.nombre} ${perfil.apellido}` : undefined;
+  const userName = perfil ? nombreCliente(perfil) : undefined;
   const activosPedidos = pedidos.filter((p) => ACTIVE_STATES.has(p.estado));
   const totalActivos = activosPedidos.reduce((sum, p) => sum + (p.monto_total ?? 0), 0);
   const pendientePago = activosPedidos.reduce(
@@ -441,7 +442,7 @@ export default function ClientePortal() {
                 Portal · cliente
               </div>
               <div className="font-sans text-sm font-semibold text-ink mt-0.5 truncate">
-                {perfil.nombre} {perfil.apellido}
+                {nombreCliente(perfil)}
               </div>
             </div>
           )}
@@ -817,7 +818,7 @@ function PerfilSection({
   onLogout: () => void;
 }) {
   const initial = perfil.nombre?.[0]?.toUpperCase() ?? "?";
-  const fullName = `${perfil.nombre} ${perfil.apellido}`;
+  const fullName = nombreCliente(perfil);
 
   const memberSince = (() => {
     if (!perfil.created_at) return null;

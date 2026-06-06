@@ -37,6 +37,7 @@ import { ShareButton } from "@/components/rental/equipment/shared/ShareButton";
 import { createOrder } from "@/lib/orders";
 import { authedFetch } from "@/lib/authedFetch";
 import { logSearch } from "@/lib/search-log";
+import { filtrarOrdenar } from "@/lib/search/normalize";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useHeroPhotos } from "@/lib/studio/hero-photos";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
@@ -1240,20 +1241,20 @@ export function CatalogoMovil() {
   );
 
   const filteredEquipos = useMemo(() => {
-    const norm = (s: string) =>
-      (s ?? "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-    return allEquipos.filter((e) => {
+    const list = allEquipos.filter((e) => {
       const matchCat = matchesActiveTab(e);
-      const matchQ =
-        query === "" ||
-        norm([e.name, e.brand, e.category, e.description ?? ""].join(" ")).includes(norm(query));
       const matchStock = !stockOnly || e.cantidad == null || e.cantidad > 0;
       const matchBrand = !selectedBrand || e.brand === selectedBrand;
-      return matchCat && matchQ && matchStock && matchBrand;
+      return matchCat && matchStock && matchBrand;
     });
+    // Motor de búsqueda compartido (espejo del backend): sin tildes, sin
+    // guiones, multi-palabra y ordenado por relevancia. Mismo comportamiento
+    // que el catálogo desktop.
+    if (!query.trim()) return list;
+    return filtrarOrdenar(list, query, (e) => ({
+      nombre: e.name,
+      extra: [e.brand, e.category, e.description ?? ""].join(" "),
+    }));
   }, [allEquipos, matchesActiveTab, query, stockOnly, selectedBrand]);
 
   // Analítica interna: registra qué busca la gente (con cuántos resultados vio).

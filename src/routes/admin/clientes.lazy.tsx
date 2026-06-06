@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { Plus, Search, Pencil, Trash2, Eye, MoreHorizontal } from "lucide-react";
@@ -31,6 +31,7 @@ import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { nombreCliente } from "@/lib/cliente-nombre";
 
 export const Route = createLazyFileRoute("/admin/clientes")({
   component: ClientesPage,
@@ -46,6 +47,13 @@ function ClientesPage() {
   useDocumentTitle("Clientes · Back Office");
   const qc = useQueryClient();
   const [q, setQ] = useState("");
+  // Debounce real (mismo patrón que el selector de clientes del pedido): cada
+  // tecla cancela el timer anterior → una sola búsqueda al frenar, no por tecla.
+  const [debouncedQ, setDebouncedQ] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
+    return () => clearTimeout(t);
+  }, [q]);
   const [editing, setEditing] = useState<Cliente | null>(null);
   const [creating, setCreating] = useState(false);
   const [viewing, setViewing] = useState<Cliente | null>(null);
@@ -53,8 +61,8 @@ function ClientesPage() {
   const [menuCliente, setMenuCliente] = useState<Cliente | null>(null);
 
   const listQ = useQuery({
-    queryKey: ["admin", "clientes", { q }],
-    queryFn: () => adminApi.listClientes({ q: q || undefined, per_page: 500 }),
+    queryKey: ["admin", "clientes", { q: debouncedQ }],
+    queryFn: () => adminApi.listClientes({ q: debouncedQ || undefined, per_page: 500 }),
   });
 
   const deleteMut = useMutation({
@@ -129,9 +137,7 @@ function ClientesPage() {
                 onClick={() => setViewing(c)}
               >
                 <TableCell>
-                  <div className="text-ink">
-                    {[c.apellido, c.nombre].filter(Boolean).join(", ") || c.nombre}
-                  </div>
+                  <div className="text-ink">{nombreCliente(c)}</div>
                   {c.perfil_impuestos && (
                     <div className="text-xs text-muted-foreground">{c.perfil_impuestos}</div>
                   )}
@@ -180,12 +186,7 @@ function ClientesPage() {
         onOpenChange={(v) => {
           if (!v) setMenuCliente(null);
         }}
-        title={
-          menuCliente
-            ? [menuCliente.apellido, menuCliente.nombre].filter(Boolean).join(", ") ||
-              menuCliente.nombre
-            : undefined
-        }
+        title={menuCliente ? nombreCliente(menuCliente) : undefined}
         actions={[
           {
             label: "Ver historial",
@@ -235,7 +236,7 @@ function ClientesPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Eliminar a {deleting?.apellido}, {deleting?.nombre}
+              Eliminar a {deleting ? nombreCliente(deleting) : ""}
             </AlertDialogTitle>
             <AlertDialogDescription>
               No se borrarán los pedidos históricos, pero quedarán sin cliente asignado.
@@ -280,11 +281,7 @@ function ClienteHistorialSheet({
       <BottomSheet
         open={!!cliente}
         onOpenChange={onOpenChange}
-        title={
-          cliente
-            ? [cliente.apellido, cliente.nombre].filter(Boolean).join(", ") || cliente.nombre
-            : ""
-        }
+        title={cliente ? nombreCliente(cliente) : ""}
         showClose
         maxH="max-h-[90vh]"
       >

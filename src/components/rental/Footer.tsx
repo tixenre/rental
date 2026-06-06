@@ -3,7 +3,7 @@ import { Instagram, MessageCircle, MapPin, Phone, Mail, Clock } from "lucide-rea
 
 import { CONTACT, whatsappUrl } from "@/data/contact";
 import { useBusinessContact } from "@/hooks/useBusinessContact";
-import logoWordmark from "@/assets/rambla-wordmark.webp";
+import { Logo } from "@/components/rental/Logo";
 
 /**
  * Footer público — usado en home, catálogo, estudio, FAQ, portal cliente.
@@ -34,7 +34,7 @@ function FooterMobile() {
       <div className="px-4 py-6 space-y-4">
         {/* Logo + WhatsApp CTA en una fila */}
         <div className="flex items-center justify-between gap-3">
-          <img src={logoWordmark} alt="Rambla Rental" className="h-7 w-auto" loading="lazy" />
+          <Logo size="sm" linkTo={null} />
           <a
             href={whatsappUrl("Hola! Tengo una consulta.")}
             target="_blank"
@@ -121,7 +121,7 @@ function FooterDesktop() {
         <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr]">
           {/* Branding + tagline */}
           <div>
-            <img src={logoWordmark} alt="Rambla Rental" className="h-12 w-auto" loading="lazy" />
+            <Logo size="lg" linkTo={null} />
             <p className="mt-3 text-sm text-muted-foreground max-w-xs">
               Equipos audiovisuales y estudio de foto/video en Mar del Plata. Producciones de
               cualquier escala.

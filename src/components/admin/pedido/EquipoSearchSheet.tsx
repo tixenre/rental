@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { BottomSheet } from "@/components/mobile";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
+import { filtrarOrdenar } from "@/lib/search/normalize";
+import { EquipoThumb } from "./EquipoThumb";
 import type { DraftItem } from "./usePedidoDraft";
 
 const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
@@ -41,18 +43,13 @@ export function EquipoSearchSheet({
   });
 
   const lista = useMemo(() => {
-    const all = equiposQ.data?.items ?? [];
-    const ql = q.trim().toLowerCase();
-    return all
-      .filter((e) => e.estado !== "fuera_servicio")
-      .filter(
-        (e) =>
-          !ql ||
-          e.nombre.toLowerCase().includes(ql) ||
-          (e.nombre_publico ?? "").toLowerCase().includes(ql) ||
-          (e.marca ?? "").toLowerCase().includes(ql) ||
-          (e.modelo ?? "").toLowerCase().includes(ql),
-      );
+    const all = (equiposQ.data?.items ?? []).filter((e) => e.estado !== "fuera_servicio");
+    // Motor de búsqueda compartido (espejo del backend): sin tildes, sin
+    // guiones, multi-palabra y ordenado por relevancia.
+    return filtrarOrdenar(all, q, (e) => ({
+      nombre: e.nombre,
+      extra: [e.nombre_publico ?? "", e.marca ?? "", e.modelo ?? ""].join(" "),
+    }));
   }, [equiposQ.data, q]);
 
   const grupos = useMemo(() => {
@@ -115,6 +112,11 @@ export function EquipoSearchSheet({
                 const disponible = max - (inCart?.cantidad ?? 0);
                 return (
                   <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
+                    <EquipoThumb
+                      src={eq.foto_url}
+                      alt={eq.nombre_publico || eq.nombre}
+                      className="h-10 w-10"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm text-ink truncate">
                         {eq.nombre_publico || eq.nombre}

@@ -65,7 +65,6 @@ import {
   ESTADO_LABEL,
   pedidoPdfUrl,
   type PedidoEstado,
-  type Cliente,
   type PedidoHistorialItem,
 } from "@/lib/admin/api";
 import { clienteApi } from "@/lib/cliente/api";
@@ -80,7 +79,9 @@ import {
   type PedidoMode,
 } from "./usePedidoDraft";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoSearchSheet } from "./EquipoSearchSheet";
+import { ClienteAutocomplete } from "./ClienteAutocomplete";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "./EnviarDocsDialog";
 
 // ── Formatters ────────────────────────────────────────────────────────────
@@ -570,12 +571,11 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                 {!isCliente && (
                   <>
                     <ClienteAutocomplete
-                      datos={draft.datos}
                       onPick={(c) =>
                         draft.setDatos({
                           ...draft.datos!,
                           cliente_id: c.id,
-                          cliente_nombre: `${c.apellido}, ${c.nombre}`,
+                          cliente_nombre: nombreCliente(c),
                           cliente_email: c.email ?? "",
                           cliente_telefono: c.telefono ?? "",
                           // El descuento sigue al cliente: si el nuevo no tiene
@@ -1393,83 +1393,6 @@ function DocumentosSidebar({ pedidoId, clienteEmail }: { pedidoId: number; clien
         open={mailOpen}
         onOpenChange={setMailOpen}
       />
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Cliente autocomplete
-// ─────────────────────────────────────────────────────────────────────────
-
-function ClienteAutocomplete({
-  datos,
-  onPick,
-}: {
-  datos: DraftDatos;
-  onPick: (c: Cliente) => void;
-}) {
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
-  const [debouncedQ, setDebouncedQ] = useState("");
-
-  // Debounce real: useEffect respeta el cleanup (clearTimeout), así cada
-  // tecla cancela el timer anterior y se dispara una sola búsqueda al frenar.
-  // (useMemo descartaba el return → no cancelaba nada → una query por tecla.)
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  const clientesQ = useQuery({
-    queryKey: ["admin", "clientes", { q: debouncedQ }],
-    queryFn: () => adminApi.listClientes({ q: debouncedQ || undefined, per_page: 20 }),
-    enabled: open && debouncedQ.length > 0,
-  });
-
-  return (
-    <div className="relative">
-      <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
-      <Input
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Buscar ficha existente…"
-        className="pl-9 h-8 text-sm text-base sm:text-sm"
-      />
-      {open && q.trim().length > 0 && (
-        <div className="absolute z-30 left-0 right-0 mt-1 rounded-md border hairline bg-background shadow-md max-h-52 overflow-auto">
-          {clientesQ.isLoading && (
-            <div className="p-3 text-xs text-muted-foreground">Buscando…</div>
-          )}
-          {clientesQ.data?.items.length === 0 && (
-            <div className="p-3 text-xs text-muted-foreground">Sin resultados</div>
-          )}
-          {(clientesQ.data?.items ?? []).map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                onPick(c);
-                setQ("");
-                setOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 hover:bg-accent/50 transition"
-            >
-              <div className="text-sm text-ink">
-                {c.apellido ? `${c.apellido}, ${c.nombre}` : c.nombre}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {[c.email, c.telefono].filter(Boolean).join(" · ") || "—"}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

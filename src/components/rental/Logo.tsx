@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import logoWordmark from "@/assets/rambla-wordmark.webp";
+import wordmarkSvgRaw from "@/assets/rambla-wordmark.svg?raw";
 
 type Size = "sm" | "md" | "lg";
 
@@ -11,11 +11,15 @@ const SIZE_CLASS: Record<Size, string> = {
 };
 
 /**
- * Logo único de marca. Fetcha `/api/settings/logo_url` (admin puede sobrescribir
- * desde back-office). Si no hay setting, usa el wordmark del repo.
+ * Logo único de marca — wordmark SVG **inline** (themable vía `currentColor`).
  *
- * Usar en: TopBar, login pages, footer. Si se necesita un logo sin link
- * (ej. dentro de un header que ya es link), pasar `linkTo={null}`.
+ * Fuente única: el SVG canónico bundleado, o el que el admin sube en
+ * /admin/diseño → "Marca (SVG)" (setting `wordmark_svg`, texto saneado por el
+ * backend). Se inyecta inline (no `<img>`) para que tome el color del contexto:
+ * `text-amber` por default, y la inversión a blanco del top bar (filtro al
+ * snapear) funciona sobre el mismo elemento.
+ *
+ * Usar en: TopBar, login pages, footer. `linkTo={null}` lo deja sin link.
  */
 export function Logo({
   size = "md",
@@ -26,29 +30,30 @@ export function Logo({
   linkTo?: string | null;
   className?: string;
 }) {
-  const { data: logoSetting } = useQuery({
-    queryKey: ["settings", "logo_url"],
+  const { data: customSvg } = useQuery({
+    queryKey: ["settings", "wordmark_svg"],
     queryFn: () =>
-      fetch("/api/settings/logo_url")
+      fetch("/api/settings/wordmark_svg")
         .then((r) => (r.ok ? r.json() : null))
+        .then((d) => (d?.value as string | null) ?? null)
         .catch(() => null),
-    // Cache buster (?v=<ts>) del setting invalida el cache del navegador.
-    staleTime: 30_000,
+    staleTime: 60_000,
   });
-  const src = (logoSetting?.value as string | null) ?? logoWordmark;
+  const svg = customSvg ?? wordmarkSvgRaw;
 
-  const img = (
-    <img
-      src={src}
-      alt="Rambla Rental"
-      className={`${SIZE_CLASS[size]} w-auto object-contain ${className}`}
+  const mark = (
+    <span
+      className={`logo-wordmark inline-block w-auto text-amber ${SIZE_CLASS[size]} ${className}`}
+      role="img"
+      aria-label="Rambla Rental"
+      dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
 
-  if (linkTo === null) return img;
+  if (linkTo === null) return mark;
   return (
     <Link to={linkTo} className="inline-flex items-center">
-      {img}
+      {mark}
     </Link>
   );
 }

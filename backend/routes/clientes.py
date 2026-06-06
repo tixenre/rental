@@ -9,8 +9,31 @@ from pydantic import BaseModel
 
 from database import get_db, row_to_dict
 from admin_guard import require_admin
+from busqueda import construir
 
 router = APIRouter()
+
+
+def nombre_completo_cliente(nombre, apellido) -> str:
+    """Compone el nombre visible de un cliente: **"Nombre Apellido"** (nombre
+    primero). Fuente ÚNICA — antes se armaba "Apellido, Nombre" copiado en ~6
+    lugares (back-office, pedidos, estudio). Decisión del dueño 2026-06-06: el
+    nombre se muestra siempre con el nombre primero. Si falta el apellido,
+    devuelve solo el nombre."""
+    n = (nombre or "").strip()
+    a = (apellido or "").strip()
+    return f"{n} {a}".strip() if a else n
+
+# Campos buscables del cliente. El combinado nombre+apellido permite que
+# "santiago perez" matchee/rankee aunque nombre y apellido sean campos distintos.
+CAMPOS_CLIENTE = [
+    "(c.nombre || ' ' || c.apellido)",
+    "c.nombre",
+    "c.apellido",
+    "c.email",
+    "c.cuit",
+    "c.telefono",
+]
 
 
 # ── Modelos ──────────────────────────────────────────────────────────────────
@@ -76,17 +99,35 @@ def list_clientes(
     offset = (page - 1) * per_page
     where  = "WHERE 1=1"
     params: list = []
-    if q:
-        like = f"%{q}%"
-        where += " AND (nombre LIKE ? OR apellido LIKE ? OR email LIKE ? OR cuit LIKE ?)"
-        params += [like, like, like, like]
+
+    # Búsqueda fuzzy unificada (backend/busqueda): sin tildes, sin guiones,
+    # multi-palabra cruzando campos y ranking por relevancia (el mejor match
+    # primero, consistente — antes ordenaba alfabético y "a veces traía otro").
+    pred = construir(CAMPOS_CLIENTE, q) if q else None
+    if pred and pred.activo:
+        where += f" AND ({pred.where})"
+        params += pred.where_params
+
     try:
-        total = conn.execute(f"SELECT COUNT(*) FROM clientes {where}", params).fetchone()[0]
-        rows  = conn.execute(
-            f"SELECT * FROM clientes {where} ORDER BY apellido, nombre LIMIT ? OFFSET ?",
-            params + [per_page, offset]
-        ).fetchall()
-        return {"total": total, "page": page, "per_page": per_page, "items": [row_to_dict(r) for r in rows]}
+        total = conn.execute(f"SELECT COUNT(*) FROM clientes c {where}", params).fetchone()[0]
+        if pred and pred.activo:
+            select_params = pred.score_params + params + [per_page, offset]
+            rows = conn.execute(
+                f"SELECT c.*, ({pred.score}) AS _score FROM clientes c {where} "
+                f"ORDER BY _score DESC, c.apellido, c.nombre LIMIT ? OFFSET ?",
+                select_params,
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"SELECT c.* FROM clientes c {where} ORDER BY c.apellido, c.nombre LIMIT ? OFFSET ?",
+                params + [per_page, offset],
+            ).fetchall()
+        items = []
+        for r in rows:
+            d = row_to_dict(r)
+            d.pop("_score", None)  # interno del ranking, no parte del contrato
+            items.append(d)
+        return {"total": total, "page": page, "per_page": per_page, "items": items}
     finally:
         conn.close()
 

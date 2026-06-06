@@ -73,7 +73,7 @@ def compute_estadisticas(conn) -> dict:
         # ── Top clientes ──────────────────────────────────────────────────────────
         top_clientes = conn.execute("""
             SELECT
-                MAX(COALESCE(c.apellido || ', ' || c.nombre, p.cliente_nombre)) AS cliente,
+                MAX(COALESCE(c.nombre || ' ' || c.apellido, p.cliente_nombre)) AS cliente,
                 SUM(p.monto_total)             AS total_ars,
                 COUNT(DISTINCT p.id)           AS pedidos
             FROM alquileres p
@@ -123,7 +123,7 @@ def compute_estadisticas(conn) -> dict:
         # ── Clientes más recurrentes ───────────────────────────────────────────────
         clientes_recurrentes = conn.execute("""
             SELECT
-                MAX(COALESCE(c.apellido || ', ' || c.nombre, p.cliente_nombre)) AS cliente,
+                MAX(COALESCE(c.nombre || ' ' || c.apellido, p.cliente_nombre)) AS cliente,
                 COUNT(DISTINCT p.id)           AS veces_alquiladas,
                 SUM(p.monto_total)             AS total_ars
             FROM alquileres p

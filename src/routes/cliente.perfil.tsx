@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { invalidateClienteSession } from "@/lib/iva";
+import { nombreCliente } from "@/lib/cliente-nombre";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -106,7 +107,7 @@ function PerfilPage() {
   }
   if (!perfil) return null;
 
-  const userName = `${perfil.nombre} ${perfil.apellido}`.trim();
+  const userName = nombreCliente(perfil);
 
   return (
     <PublicLayout topBar={{ variant: "cliente", userName, onLogout: handleLogout }}>

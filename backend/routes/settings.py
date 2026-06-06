@@ -144,8 +144,15 @@ ALLOWED_SETTINGS_KEYS = {
     "usd_rate",          # ARS por 1 USD. Float.
     "roi_pct_default",   # % default para nuevos equipos. Float.
     "shipping_usd",      # Envío default en USD para cálculo de reposición. Float.
-    "logo_url",          # URL pública del logo (imagen). String.
     "og_image_url",      # URL pública del OG image para preview en redes (1200x630).
+    # ── Marca: SVG masters + assets derivados (motor services/branding) ──
+    "wordmark_svg_url",       # SVG master del wordmark (subido desde el back-office). URL R2.
+    "wordmark_svg",           # SVG del wordmark saneado (texto) → logo inline de la web + PDFs.
+    "isologo_svg_url",        # SVG master del isologo.
+    "email_logo_url",         # Wordmark blanco/transparente derivado → header del mail.
+    "favicon_url",            # Favicon derivado del isologo (tile amber + ink).
+    "apple_touch_icon_url",   # Ícono iOS derivado del isologo.
+    "icon_512_url",           # Ícono cuadrado 512 derivado del isologo (no es el og:image).
     "whatsapp_phone",    # Teléfono del negocio para click-to-chat (formato +5492235852510).
     "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
@@ -521,37 +528,10 @@ def listar_precios_manuales(request: Request):
 
 
 
-# ── Upload logo a R2 ──────────────────────────────────────────────────────────
-
-def _optimize_logo(raw_content: bytes) -> tuple[bytes, str, str]:
-    """Optimiza una imagen para usar como logo del top bar.
-
-    Distinto de `_optimize_image` (que es para fotos de equipos):
-    - NO recorta al ras (trim_and_square).
-    - NO hace cuadrado.
-    - Mantiene aspect ratio original (wordmark horizontal queda horizontal).
-    - Resize si el ancho excede 600px (preserva proporciones).
-    - Guarda como PNG para preservar transparencia.
-
-    Retorna (bytes, content_type, ext).
-    """
-    from io import BytesIO
-    from PIL import Image
-
-    img = Image.open(BytesIO(raw_content))
-    # Convertir a RGBA para preservar transparencia.
-    if img.mode != "RGBA":
-        img = img.convert("RGBA")
-
-    MAX_WIDTH = 600
-    if img.width > MAX_WIDTH:
-        new_height = int(img.height * (MAX_WIDTH / img.width))
-        img = img.resize((MAX_WIDTH, new_height), Image.Resampling.LANCZOS)
-
-    out = BytesIO()
-    img.save(out, format="PNG", optimize=True)
-    return out.getvalue(), "image/png", "png"
-
+# ── Upload de imágenes a R2 (OG image) ────────────────────────────────────────
+# El logo del sitio ya NO se sube como imagen: se unificó en el SVG master del
+# wordmark (sección "Marca (SVG)" → setting `wordmark_svg`), que la web inyecta
+# inline. Ver `services/branding` + `upload-wordmark`.
 
 def _optimize_og_image(raw_content: bytes) -> tuple[bytes, str, str]:
     """Optimiza imagen para preview Open Graph (WhatsApp / IG / Facebook).
@@ -601,88 +581,13 @@ def _optimize_og_image(raw_content: bytes) -> tuple[bytes, str, str]:
     return out.getvalue(), "image/jpeg", "jpg"
 
 
-@router.post("/admin/settings/upload-logo")
-async def upload_logo(request: Request):
-    """Sube una imagen como logo a R2 y guarda la URL en app_settings.
-
-    Path fijo: 'branding/logo.png'. R2 sobreescribe — cada upload reemplaza
-    la versión anterior (no acumula basura). La URL guardada incluye un
-    query string `?v=<timestamp>` como cache buster para invalidar el cache
-    del navegador / CDN sin esperar TTL.
-
-    Issue #127.
-    """
-    session = require_admin(request)
-    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
-
-    form = await request.form()
-    file = form.get("file")
-    if file is None or not hasattr(file, "read"):
-        raise HTTPException(400, "Falta el campo 'file'")
-
-    raw_content = await file.read()
-    if not raw_content:
-        raise HTTPException(400, "Archivo vacío")
-    if len(raw_content) > 5 * 1024 * 1024:
-        raise HTTPException(413, "Archivo muy grande (máx 5MB)")
-
-    # SVG: es vectorial, no pasa por PIL (que no lo entiende → "cannot
-    # identify image file"). Se sube tal cual; <img> lo renderiza bien y
-    # escala sin pérdida. Se sirve con content-type image/svg+xml.
-    filename = (getattr(file, "filename", "") or "").lower()
-    ctype_in = (getattr(file, "content_type", "") or "").lower()
-    is_svg = (
-        filename.endswith(".svg")
-        or "svg" in ctype_in
-        or b"<svg" in raw_content[:1024].lower()
-    )
-
-    if is_svg:
-        content, ctype, ext = raw_content, "image/svg+xml", "svg"
-    else:
-        # Optimizar manteniendo aspect ratio (wordmarks horizontales no se
-        # vuelven cuadrados — eso engrosaba el top bar mobile, issue #127).
-        try:
-            content, ctype, ext = _optimize_logo(raw_content)
-        except Exception as e:
-            raise HTTPException(400, f"No se pudo procesar la imagen: {e}")
-
-    # Path FIJO — R2 sobreescribe.
-    path = f"branding/logo.{ext}"
-
-    from services.media.storage import put as _r2_put
-    from services.media_fastapi import media_http
-    with media_http():
-        public_url = _r2_put(path, content, ctype)
-
-    # Cache buster: cada upload genera un ?v=<timestamp> distinto. El
-    # navegador descarga la versión nueva sin esperar TTL del CDN.
-    import time as _time
-    versioned_url = f"{public_url}?v={int(_time.time())}"
-
-    conn = get_db()
-    try:
-        conn.execute("""
-            INSERT INTO app_settings (key, value, updated_at, updated_by)
-            VALUES ('logo_url', %s, CURRENT_TIMESTAMP, %s)
-            ON CONFLICT (key) DO UPDATE
-            SET value = EXCLUDED.value,
-                updated_at = CURRENT_TIMESTAMP,
-                updated_by = EXCLUDED.updated_by
-        """, (versioned_url, actor))
-        conn.commit()
-        return {"ok": True, "url": versioned_url}
-    finally:
-        conn.close()
-
-
 @router.post("/admin/settings/upload-og-image")
 async def upload_og_image(request: Request):
     """Sube imagen como preview de Open Graph (1200x630) y guarda la URL
     en `app_settings.og_image_url`.
 
     Es la imagen que ven WhatsApp / IG / Facebook al compartir el link de
-    la home. Misma estrategia que upload-logo: path fijo + cache-buster.
+    la home. Path fijo en R2 + cache-buster (?v=<ts>).
     """
     session = require_admin(request)
     actor = (session.get("email") or session.get("user_id") or "admin")[:255]
@@ -727,6 +632,102 @@ async def upload_og_image(request: Request):
         return {"ok": True, "url": versioned_url}
     finally:
         conn.close()
+
+
+# ── Marca: subir SVG (wordmark + isologo) → derivar assets ────────────────────
+
+def _save_settings(conn, mapping: dict, actor: str) -> None:
+    """Upsert de varias settings en una transacción."""
+    for key, value in mapping.items():
+        conn.execute(
+            """
+            INSERT INTO app_settings (key, value, updated_at, updated_by)
+            VALUES (%s, %s, CURRENT_TIMESTAMP, %s)
+            ON CONFLICT (key) DO UPDATE
+            SET value = EXCLUDED.value,
+                updated_at = CURRENT_TIMESTAMP,
+                updated_by = EXCLUDED.updated_by
+            """,
+            (key, value, actor),
+        )
+    conn.commit()
+
+
+async def _upload_brand_svg(request: Request, kind: str):
+    """Sube un SVG master de marca (`wordmark` | `isologo`) a R2 y deriva los
+    assets raster que consume el sistema (mail / favicon / íconos).
+
+    Solo acepta SVG: es la fuente vectorial themable de la que se rasteriza todo
+    (motor `services.branding`). El master + cada derivado se guardan en
+    `app_settings` con su URL versionada (cache-buster).
+    """
+    from services.branding import derive_from_isologo, derive_from_wordmark, sanitize_svg
+    from services.media.storage import put as _r2_put
+    from services.media_fastapi import media_http
+
+    session = require_admin(request)
+    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file'")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Archivo muy grande (máx 5MB)")
+
+    filename = (getattr(file, "filename", "") or "").lower()
+    ctype_in = (getattr(file, "content_type", "") or "").lower()
+    is_svg = filename.endswith(".svg") or "svg" in ctype_in or b"<svg" in raw[:1024].lower()
+    if not is_svg:
+        raise HTTPException(400, "Solo se admite SVG (es la fuente vectorial de la marca)")
+
+    try:
+        svg_text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(400, "El SVG no es UTF-8 válido")
+
+    # Master a R2 (path fijo → sobreescribe).
+    with media_http():
+        master_url = _r2_put(f"branding/{kind}.svg", raw, "image/svg+xml")
+    import time as _time
+
+    master_key = f"{kind}_svg_url"
+    settings_out = {master_key: f"{master_url}?v={int(_time.time())}"}
+
+    # Derivar los assets raster del master.
+    try:
+        if kind == "wordmark":
+            settings_out.update(await derive_from_wordmark(svg_text))
+            # SVG saneado como texto → lo inyectan inline el logo de la web
+            # (themable vía currentColor) y, en el follow-up, los PDFs.
+            settings_out["wordmark_svg"] = sanitize_svg(svg_text)
+        else:
+            settings_out.update(await derive_from_isologo(svg_text))
+    except Exception as e:
+        raise HTTPException(500, f"No se pudieron derivar los assets: {e}")
+
+    conn = get_db()
+    try:
+        _save_settings(conn, settings_out, actor)
+    finally:
+        conn.close()
+    return {"ok": True, "settings": settings_out}
+
+
+@router.post("/admin/settings/upload-wordmark")
+async def upload_wordmark(request: Request):
+    """SVG del wordmark → deriva el logo del mail (blanco sobre transparente)."""
+    return await _upload_brand_svg(request, "wordmark")
+
+
+@router.post("/admin/settings/upload-isologo")
+async def upload_isologo(request: Request):
+    """SVG del isologo → deriva favicon + apple-touch + icon-512 (tile amber + ink)."""
+    return await _upload_brand_svg(request, "isologo")
 
 
 # ── Backup manual ─────────────────────────────────────────────────────────────

@@ -115,6 +115,33 @@ WORDMARK = (
     '</svg>'
 )
 
+
+def _active_wordmark() -> str:
+    """Wordmark SVG activo para los documentos: el que el admin sube en
+    /admin/diseño → "Marca (SVG)" (setting `wordmark_svg`, saneado), o el SVG
+    canónico `WORDMARK` bundleado como fallback.
+
+    Misma fuente única que el logo de la web (`wordmark_svg`) → subir el wordmark
+    una vez lo refleja en la web Y en los 5 PDFs. Resiliente: ante cualquier error
+    (sin DB, p. ej. en el render del skill) cae al constante. Una lectura por PDF
+    es despreciable (los PDFs no son de alta frecuencia)."""
+    try:
+        from database import get_db
+
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = ?", ("wordmark_svg",)
+            ).fetchone()
+        finally:
+            conn.close()
+        if row and row["value"] and row["value"].strip():
+            return row["value"]
+    except Exception:
+        pass
+    return WORDMARK
+
+
 # Paleta de ESTADO (EstadoBadge oficial) → (color, fondo soft)
 _ESTADOS = {
     "borrador":    ("oklch(0.42 0.01 70)", "color-mix(in oklch, oklch(0.42 0.01 70) 14%, transparent)"),
@@ -137,25 +164,36 @@ _DOC_CSS = r"""
   --r-sm:8px; --r-md:10px; --r-lg:12px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-@page{size:A4;margin:14mm}
+/* Márgenes verticales en el @page; los LATERALES van como padding de .paper.
+   Así la barra amber del membrete puede sangrar a los bordes izq/der de verdad
+   (con margin negativo cancela el padding de .paper) — Chromium clipea lo que
+   cae en el margen lateral del @page, por eso el lateral NO va en @page. */
+@page{size:A4;margin:14mm 0}
+/* La 1ª hoja arranca a tope arriba para que la barra amber sangre al borde
+   superior (margin-top:0; el margen negativo arriba lo clipearía el @page). */
+@page:first{margin-top:0}
 body{font-family:var(--font-sans);color:var(--ink);background:#fff;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-.paper{display:flex;flex-direction:column;min-height:269mm}
+.paper{display:flex;flex-direction:column;min-height:269mm;padding:0 14mm}
 
-/* Membrete (filete) */
-.membrete{margin-bottom:30px}
-.mb-top{display:flex;justify-content:space-between;align-items:flex-start;gap:28px}
-.mb-brand{display:flex;flex-direction:column;gap:8px}
-.mb-wordmark{color:var(--ink)}
-.mb-tagline{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--muted);white-space:nowrap}
-.mb-doc{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:3px;flex-shrink:0}
+/* Membrete (barra amber full-bleed: wordmark blanco + info del documento).
+   El margen negativo sangra la barra hasta el borde físico de la hoja
+   (contrarresta el margin:14mm del @page). print-color-adjust fuerza que el
+   amber se imprima/rasterice (igual que los filetes). */
+.membrete{margin:0 -14mm 26px;padding:34px 14mm 20px;background:var(--amber);
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.mb-top{display:flex;justify-content:space-between;align-items:center;gap:28px}
+.mb-brand{display:flex;align-items:center}
+.mb-wordmark{color:#fff}
+.mb-wordmark svg{height:38px!important}
+.mb-doc{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:2px;flex-shrink:0}
 .mb-eyebrow{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.22em;
-  text-transform:uppercase;color:var(--muted);white-space:nowrap}
-.mb-type{font-weight:700;font-size:26px;letter-spacing:-.01em;line-height:1;white-space:nowrap}
-.mb-num{font-family:var(--font-mono);font-weight:600;font-size:15px;margin-top:4px;white-space:nowrap}
-.mb-date{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap}
-.mb-rule{height:3px;background:var(--amber);border-radius:2px;margin-top:22px}
+  text-transform:uppercase;color:color-mix(in oklch,var(--ink) 64%,var(--amber));white-space:nowrap}
+.mb-type{font-weight:700;font-size:26px;letter-spacing:-.01em;line-height:1;color:var(--ink);white-space:nowrap}
+.mb-num{font-family:var(--font-mono);font-weight:600;font-size:15px;margin-top:4px;color:var(--ink);white-space:nowrap}
+.mb-date{font-family:var(--font-mono);font-size:10.5px;color:color-mix(in oklch,var(--ink) 64%,var(--amber));margin-top:2px;white-space:nowrap}
+/* Badge de estado: tras la barra, sobre el blanco del cuerpo (alineado a la derecha). */
+.mb-badge-row{display:flex;justify-content:flex-end;margin:-14px 0 22px}
 
 .estado-badge{display:inline-flex;align-items:center;gap:6px;margin-top:10px;
   font-family:var(--font-mono);font-size:9.5px;font-weight:700;letter-spacing:.12em;
@@ -400,15 +438,15 @@ def _membrete(pedido, doc_type, num, fecha, estado=True):
         badge = (f'<span class="estado-badge" style="color:{color};background:{soft};'
                  f'border:1px solid color-mix(in oklch,{color} 28%,transparent)">'
                  f'<span class="dot" style="background:{color}"></span>{label}</span>')
+    badge_row = f'<div class="mb-badge-row">{badge}</div>' if badge else ""
     return (
         '<header class="membrete"><div class="mb-top">'
-        f'<div class="mb-brand"><span class="mb-wordmark">{WORDMARK}</span>'
-        '<div class="mb-tagline">Alquiler de equipos audiovisuales</div></div>'
+        f'<div class="mb-brand"><span class="mb-wordmark">{_active_wordmark()}</span></div>'
         '<div class="mb-doc"><div class="mb-eyebrow">Documento</div>'
         f'<div class="mb-type">{html.escape(doc_type)}</div>'
         f'<div class="mb-num">N° {html.escape(num)}</div>'
-        f'<div class="mb-date">Emitido {html.escape(fecha)}</div>{badge}</div>'
-        '</div><div class="mb-rule"></div></header>'
+        f'<div class="mb-date">Emitido {html.escape(fecha)}</div></div>'
+        f'</div></header>{badge_row}'
     )
 
 
