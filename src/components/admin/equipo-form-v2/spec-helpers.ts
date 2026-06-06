@@ -49,17 +49,6 @@ export const fuzzySameLabel = (a: string, b: string): boolean => {
   return long.includes(short);
 };
 
-/** Une dos listas de specs por label (case-insensitive). Si ya existe, no pisa. */
-export const mergeSpecs = (existing: Spec[], extras: Spec[]): Spec[] => {
-  const result = [...existing];
-  for (const e of extras) {
-    if (!e.value.trim()) continue;
-    if (result.some((s) => sameLabel(s.label, e.label))) continue;
-    result.push(e);
-  }
-  return result;
-};
-
 /** Devuelve el valor de un spec por label, o "". */
 export const findSpecValue = (specs: Spec[], label: string): string =>
   specs.find((s) => sameLabel(s.label, label))?.value ?? "";
