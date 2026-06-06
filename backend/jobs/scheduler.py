@@ -4,11 +4,13 @@ Decisión 2026-06-04 (issue #735): el recordatorio se dispara desde un thread
 **dentro del backend que ya corre 24/7**, no como servicio de cron aparte.
 Costo extra: $0 (reusa el compute que ya se paga).
 
-**Opt-in por configuración, no por código** (alineado con decisión 2026-05-27 —
-los envíos se activan seteando variables, no tocando código): el scheduler solo
-arranca si `REMINDERS_ENABLED` está en `1/true/yes`. Apagado por default → en
-staging/test no manda nada aunque el código esté deployado. Ops lo prende junto
-con la `RESEND_API_KEY` cuando el canal de mail está listo.
+**Gating en runtime, no en el arranque (Fase B mails):** el thread arranca
+siempre (salvo el kill-switch `REMINDERS_SCHEDULER_DISABLED`, para CI/tests) y en
+cada ciclo resuelve si está prendido, a qué hora y con cuántos días de
+anticipación vía `jobs/recordatorios_config.resolve()` — env override >
+`app_settings` > default. Así el admin lo prende/apaga y ajusta hora/días desde
+`/admin/settings` **sin redeploy ni tocar env vars**. Se reusa el mismo mecanismo
+de thread+sondeo (no se "recrea" el scheduler).
 
 **Single-instance:** hoy el backend corre 1 instancia. Si se escala a >1, dos
 schedulers dispararían el barrido en paralelo el mismo día → agregar un lock
@@ -16,7 +18,7 @@ schedulers dispararían el barrido en paralelo el mismo día → agregar un lock
 la red final es el índice único de `emails_log` (ver `jobs/recordatorios.py`).
 
 Mecanismo: un thread daemon que sondea cada `_CHECK_EVERY_S`; una vez por día,
-a partir de `REMINDERS_HOUR` (hora AR), corre el barrido y marca la fecha para no
+a partir de la hora resuelta (hora AR), corre el barrido y marca la fecha para no
 repetir. Simple y sin dependencia nueva (no se agrega APScheduler). Un reinicio
 después de la hora puede volver a correrlo, pero el envío es idempotente.
 """
@@ -29,16 +31,17 @@ import threading
 import time
 
 from database import now_ar
+from jobs.recordatorios_config import resolve
 
 logger = logging.getLogger(__name__)
 
-# Hora AR a la que corre el barrido (09:00 → "mañana retirás", a horario humano).
-_HORA_CORRIDA = int(os.getenv("REMINDERS_HOUR", "9"))
 _CHECK_EVERY_S = 600  # 10 min: granularidad del sondeo
 
 
-def _enabled() -> bool:
-    return os.getenv("REMINDERS_ENABLED", "").strip().lower() in ("1", "true", "yes")
+def _hard_disabled() -> bool:
+    """Kill-switch de ops/CI: apaga el thread por completo (no sondea). Útil en
+    tests para no levantar un thread que intente tocar la DB."""
+    return os.getenv("REMINDERS_SCHEDULER_DISABLED", "").strip().lower() in ("1", "true", "yes")
 
 
 def _loop() -> None:
@@ -49,29 +52,36 @@ def _loop() -> None:
     ultima_fecha = None
     while True:
         try:
+            cfg = resolve()  # env > settings > default, en cada ciclo
             ahora = now_ar()
-            if ahora.hour >= _HORA_CORRIDA and ahora.date() != ultima_fecha:
+            if (
+                cfg["enabled"]
+                and ahora.hour >= cfg["hora"]
+                and ahora.date() != ultima_fecha
+            ):
                 ultima_fecha = ahora.date()
-                enviar_recordatorios_retiro()
+                enviar_recordatorios_retiro(dias_antes=cfg["dias_antes"])
         except Exception:  # nunca dejar morir el thread por un error puntual
             logger.exception("Falló el barrido de recordatorios de retiro")
         time.sleep(_CHECK_EVERY_S)
 
 
 def start_scheduler() -> bool:
-    """Arranca el thread del scheduler si está habilitado. Devuelve si arrancó.
+    """Arranca el thread daemon del scheduler. Devuelve si arrancó.
 
-    Idempotente a nivel proceso: pensado para llamarse una vez al inicio.
+    Arranca siempre salvo el kill-switch `REMINDERS_SCHEDULER_DISABLED` — el
+    on/off real se decide en runtime dentro del loop (ver módulo). Idempotente a
+    nivel proceso: pensado para llamarse una vez al inicio.
     """
-    if not _enabled():
+    if _hard_disabled():
         logger.info(
-            "Scheduler de recordatorios DESACTIVADO (seteá REMINDERS_ENABLED=1 para activarlo)"
+            "Scheduler de recordatorios DESHABILITADO por REMINDERS_SCHEDULER_DISABLED"
         )
         return False
     threading.Thread(
         target=_loop, name="recordatorios-scheduler", daemon=True
     ).start()
     logger.info(
-        "Scheduler de recordatorios ACTIVO (barrido diario ~%02d:00 AR)", _HORA_CORRIDA
+        "Scheduler de recordatorios ACTIVO (gating en runtime: env > settings > default)"
     )
     return True

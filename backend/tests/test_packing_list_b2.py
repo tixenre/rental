@@ -3,8 +3,8 @@
 Verifica:
 - _packing_list_html genera HTML con los campos básicos del pedido.
 - Los ítems del pedido aparecen en el HTML.
-- Los componentes de kit aparecen indentados (prefijo "Kit:").
-- El contenido_incluido_json se expande como ítems de caja (emoji 📦 / &#128230;).
+- Los componentes de kit aparecen marcados (rediseño DS: marca └ / clase comp-mark).
+- El contenido_incluido_json se expande como chips "Incluye" (clase row-cont).
 - Un pedido sin ítems genera HTML sin errores.
 """
 
@@ -91,7 +91,7 @@ def test_packing_list_html_componentes_kit():
     result = _packing_list_html(pedido)
 
     assert "FX3" in result
-    assert "Kit:" in result
+    assert "comp-mark" in result  # rediseño DS: componentes con marca └ (antes "Kit:")
     assert "Cargador BC-QZ1" in result
 
 
@@ -108,8 +108,8 @@ def test_packing_list_html_contenido_incluido():
 
     assert "Cable USB-C" in result
     assert "Tapa de cuerpo" in result
-    # row-contenido class → distingue visualmente los ítems de caja
-    assert "row-contenido" in result
+    # El contenido se expande como filas chequeables; la 1ª lleva el tag "Incluye".
+    assert "pk-incluye" in result
 
 
 def test_packing_list_html_contenido_incluido_json_invalido():
@@ -145,8 +145,8 @@ def test_packing_list_html_checkbox_salida_retorno():
     # Los encabezados de checklist están presentes
     assert "Salida" in result
     assert "Retorno" in result
-    # Los checkboxes renderizados
-    assert "checkbox" in result
+    # Los checkboxes renderizados (rediseño DS: clase pk-check)
+    assert "pk-check" in result
 
 
 def test_packing_list_html_contenido_multiplicado_por_cantidad():
@@ -160,4 +160,4 @@ def test_packing_list_html_contenido_multiplicado_por_cantidad():
 
     assert ">3<" in result  # cant del item principal
     # El componente también debe aparecer con cant×3
-    assert "Kit:" in result
+    assert "comp-mark" in result  # rediseño DS: componentes con marca └ (antes "Kit:")

@@ -40,14 +40,20 @@ class FakeConn:
     """Conn que devuelve plantillas hardcoded y registra los INSERT a
     emails_log para inspección."""
 
-    def __init__(self, templates):
+    def __init__(self, templates, disabled=None):
         # templates: dict[key] = (subject, body_html, body_text)
         self.templates = templates
+        self.disabled = set(disabled or ())  # keys con enabled=False
         self.inserted_logs = []
         self.committed = False
 
     def execute(self, sql, params=()):
         s = sql.strip().upper()
+        if s.startswith("SELECT ENABLED FROM EMAIL_TEMPLATES"):
+            key = params[0]
+            if key not in self.templates:
+                return FakeCursor([])
+            return FakeCursor([FakeRow(enabled=key not in self.disabled)])
         if s.startswith("SELECT SUBJECT, BODY_HTML, BODY_TEXT FROM EMAIL_TEMPLATES"):
             key = params[0]
             t = self.templates.get(key)
@@ -313,3 +319,45 @@ class TestSendEmailIdempotency:
         send_email("pedido_creado_admin", "admin@x.com", ctx, alquiler_id=5)
         send_email("pedido_creado_admin", "admin@x.com", ctx, alquiler_id=5)
         assert len(SENT_MAILS) == 2
+
+
+# ── On/off por plantilla (enabled) ───────────────────────────────────────────
+
+class TestEnabledGate:
+    def test_template_apagado_no_envia_ni_loggea(self, monkeypatch):
+        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        conn = FakeConn(
+            templates={"pedido_creado_cliente": ("S", "<p>{{ numero_pedido }}</p>", "x")},
+            disabled={"pedido_creado_cliente"},
+        )
+        monkeypatch.setattr("services.email.service.get_db", lambda: conn)
+        res = send_email("pedido_creado_cliente", "a@b.com", {"numero_pedido": 1})
+        assert res["ok"] is True and res.get("skipped") is True
+        assert res.get("reason") == "disabled"
+        assert SENT_MAILS == []
+        assert conn.inserted_logs == []  # no ensucia el log
+
+    def test_respect_enabled_false_ignora_el_apagado(self, monkeypatch):
+        # El envío de prueba del admin (respect_enabled=False) manda igual.
+        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        conn = FakeConn(
+            templates={"pedido_creado_cliente": ("S", "<p>{{ numero_pedido }}</p>", "x")},
+            disabled={"pedido_creado_cliente"},
+        )
+        monkeypatch.setattr("services.email.service.get_db", lambda: conn)
+        res = send_email(
+            "pedido_creado_cliente", "a@b.com", {"numero_pedido": 1},
+            respect_enabled=False,
+        )
+        assert res["ok"] is True and not res.get("skipped")
+        assert len(SENT_MAILS) == 1
+
+    def test_template_prendido_envia_normal(self, monkeypatch):
+        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        conn = FakeConn(
+            templates={"pedido_creado_cliente": ("S", "<p>{{ numero_pedido }}</p>", "x")},
+        )  # sin disabled → enabled
+        monkeypatch.setattr("services.email.service.get_db", lambda: conn)
+        res = send_email("pedido_creado_cliente", "a@b.com", {"numero_pedido": 1})
+        assert res["ok"] is True and not res.get("skipped")
+        assert len(SENT_MAILS) == 1

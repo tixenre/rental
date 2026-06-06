@@ -24,34 +24,39 @@ __all__ = [
     "send_raw_email",
     "render_template",
     "get_backend",
+    "resolve_provider",
 ]
 
 
-def get_backend() -> EmailBackend:
-    """Factory. Lee EMAIL_PROVIDER y devuelve la instancia adecuada.
+def resolve_provider() -> str:
+    """Nombre del backend que se usaría hoy ('resend' | 'smtp' | 'test'),
+    según el entorno, **sin instanciarlo** (instanciar Resend/SMTP valida
+    credenciales y puede tirar). Fuente única de la resolución: la usan tanto
+    `get_backend()` como el indicador de estado del canal.
 
-    Orden de resolución:
-    1. EMAIL_PROVIDER explícito ('resend' | 'smtp' | 'test').
-    2. Si RESEND_API_KEY está seteado → resend.
-    3. Si SMTP_HOST está seteado → smtp.
-    4. Fallback → test (no envía, solo loggea en memoria; útil en dev/CI).
+    Orden: EMAIL_PROVIDER explícito → RESEND_API_KEY → SMTP_HOST → test.
     """
     provider = (os.environ.get("EMAIL_PROVIDER") or "").lower().strip()
+    if provider in ("resend", "smtp", "test"):
+        return provider
+    if os.environ.get("RESEND_API_KEY"):
+        return "resend"
+    if os.environ.get("SMTP_HOST"):
+        return "smtp"
+    return "test"
+
+
+def get_backend() -> EmailBackend:
+    """Factory. Devuelve la instancia del backend activo (ver `resolve_provider`).
+
+    Backend `test` no envía: solo loggea en memoria (dev/CI/sin configurar).
+    """
+    provider = resolve_provider()
 
     if provider == "resend":
         from .resend_backend import ResendBackend
         return ResendBackend()
     if provider == "smtp":
-        from .smtp_backend import SmtpBackend
-        return SmtpBackend()
-    if provider == "test":
-        from .test_backend import InMemoryBackend
-        return InMemoryBackend()
-
-    if os.environ.get("RESEND_API_KEY"):
-        from .resend_backend import ResendBackend
-        return ResendBackend()
-    if os.environ.get("SMTP_HOST"):
         from .smtp_backend import SmtpBackend
         return SmtpBackend()
 

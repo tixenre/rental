@@ -601,30 +601,19 @@ def _pedido_email_context(pedido: dict) -> dict:
     )
 
     # Tabla estilizada (inline) para el mail. Los nombres (datos dinámicos) se
-    # escapan; la estructura HTML es segura → la plantilla la inyecta con |safe.
+    # escapan; la estructura/estilo la pone el helper canónico de branding
+    # (`services/email/branding.py`, fuente única del look de mail) → la plantilla
+    # la inyecta con |safe.
+    from services.email import branding as _eb
+
     filas = ""
     for it in items:
         nombre = escape(_nombre(it))
         cant = escape(str(it.get("cantidad", 1)))
         sub = it.get("subtotal")
-        sub_cell = (
-            f'<td style="padding:8px 0;text-align:right;white-space:nowrap;color:#2a251e;">{escape(_fmt_ars(sub))}</td>'
-            if sub is not None
-            else '<td style="padding:8px 0;"></td>'
-        )
-        filas += (
-            '<tr style="border-bottom:1px solid #ececec;">'
-            f'<td style="padding:8px 8px 8px 0;color:#2a251e;">{nombre}</td>'
-            f'<td style="padding:8px 12px;text-align:center;color:#8a8378;white-space:nowrap;">× {cant}</td>'
-            f"{sub_cell}</tr>"
-        )
-    items_html = (
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-        'style="border-collapse:collapse;font-size:14px;margin:4px 0 8px;">'
-        f"{filas}</table>"
-        if items
-        else ""
-    )
+        sub_html = escape(_fmt_ars(sub)) if sub is not None else None
+        filas += _eb.item_row(nombre, cant, sub_html)
+    items_html = _eb.items_table(filas)
 
     return {
         "cliente_nombre": pedido.get("cliente_nombre") or "",

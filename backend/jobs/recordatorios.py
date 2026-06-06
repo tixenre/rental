@@ -23,6 +23,7 @@ import logging
 from datetime import timedelta
 
 from database import get_db, now_ar, row_to_dict
+from jobs.recordatorios_config import resolve as _resolve_config
 from routes.alquileres import _get_alquiler_items, _pedido_email_context
 from services.email import send_email
 
@@ -36,18 +37,19 @@ TEMPLATE_KEY = "recordatorio_retiro"
 ESTADOS_RECORDABLES = ("confirmado",)
 
 
-def _pedidos_para_manana(conn, hoy) -> list[dict]:
-    """Pedidos con retiro **mañana** (respecto de `hoy`, wall-clock AR), en
-    estado recordable, con email, que todavía no recibieron el recordatorio.
+def _pedidos_para_retiro(conn, hoy, dias_antes: int) -> list[dict]:
+    """Pedidos con retiro dentro de `dias_antes` días (respecto de `hoy`,
+    wall-clock AR), en estado recordable, con email, que todavía no recibieron el
+    recordatorio.
 
     El `NOT EXISTS` contra `emails_log` es la primera línea anti-duplicado (la
-    definitiva es el índice único). La ventana es `[mañana 00:00, pasado 00:00)`
+    definitiva es el índice único). La ventana es `[día-objetivo 00:00, +1 00:00)`
     para cubrir el día entero sin importar la hora de retiro.
     """
-    manana_ini = (hoy + timedelta(days=1)).replace(
+    dia_ini = (hoy + timedelta(days=dias_antes)).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
-    manana_fin = manana_ini + timedelta(days=1)
+    dia_fin = dia_ini + timedelta(days=1)
     ph = ",".join(["?"] * len(ESTADOS_RECORDABLES))
     rows = conn.execute(
         f"""
@@ -68,19 +70,22 @@ def _pedidos_para_manana(conn, hoy) -> list[dict]:
           )
         ORDER BY a.id
     """,
-        (*ESTADOS_RECORDABLES, manana_ini, manana_fin, TEMPLATE_KEY),
+        (*ESTADOS_RECORDABLES, dia_ini, dia_fin, TEMPLATE_KEY),
     ).fetchall()
     return [row_to_dict(r) for r in rows]
 
 
-def enviar_recordatorios_retiro(conn=None, *, hoy=None, dry_run: bool = False) -> dict:
+def enviar_recordatorios_retiro(
+    conn=None, *, hoy=None, dias_antes: int | None = None, dry_run: bool = False
+) -> dict:
     """Manda (o simula, si `dry_run`) el recordatorio a cada pedido cuyo retiro
-    cae mañana. Devuelve un resumen en lenguaje de datos:
-    `{fecha_retiro, candidatos, enviados, fallidos, dry_run, pedidos:[...]}`.
+    cae dentro de `dias_antes` días. Devuelve un resumen en lenguaje de datos:
+    `{fecha_retiro, dias_antes, candidatos, enviados, fallidos, dry_run, pedidos:[...]}`.
 
     `conn=None` → abre y cierra su propia conexión (uso del scheduler). Si se le
     pasa una, no la cierra (uso desde un endpoint que ya tiene la suya). `hoy`
-    se inyecta en los tests; por defecto es el ahora AR.
+    se inyecta en los tests; por defecto es el ahora AR. `dias_antes=None` →
+    se resuelve de la config (env > app_settings > default 1).
 
     Nunca propaga: `send_email` ya traga sus errores y loguea; acá se contabiliza
     el resultado para que el barrido diario no se caiga por un pedido roto.
@@ -89,10 +94,13 @@ def enviar_recordatorios_retiro(conn=None, *, hoy=None, dry_run: bool = False) -
     if propia:
         conn = get_db()
     hoy = hoy or now_ar()
+    if dias_antes is None:
+        dias_antes = _resolve_config(conn)["dias_antes"]
     try:
-        pedidos = _pedidos_para_manana(conn, hoy)
+        pedidos = _pedidos_para_retiro(conn, hoy, dias_antes)
         resumen: dict = {
-            "fecha_retiro": (hoy + timedelta(days=1)).date().isoformat(),
+            "fecha_retiro": (hoy + timedelta(days=dias_antes)).date().isoformat(),
+            "dias_antes": dias_antes,
             "candidatos": len(pedidos),
             "enviados": 0,
             "fallidos": 0,
@@ -112,6 +120,7 @@ def enviar_recordatorios_retiro(conn=None, *, hoy=None, dry_run: bool = False) -
                 continue
             p["items"] = _get_alquiler_items(conn, p["id"])
             ctx = _pedido_email_context(p)
+            ctx["dias_antes"] = dias_antes  # el copy del recordatorio lo usa
             res = send_email(TEMPLATE_KEY, p["cliente_email"], ctx, p["id"])
             if res.get("ok"):
                 resumen["enviados"] += 1

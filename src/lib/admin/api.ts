@@ -1436,6 +1436,7 @@ export const adminApi = {
   },
 
   // ── Email templates ─────────────────────────────────────────────────
+  getEmailStatus: () => authedJson<EmailChannelStatus>("/api/admin/email/status"),
   listEmailTemplates: () =>
     authedJson<{ items: EmailTemplateSummary[] }>("/api/admin/email-templates"),
   getEmailTemplate: (key: string) =>
@@ -1467,13 +1468,66 @@ export const adminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to, context: context ?? null }),
     }),
+  /** On/off del envío automático de una plantilla. */
+  setEmailTemplateEnabled: (key: string, enabled: boolean) =>
+    authedJson<{ key: string; enabled: boolean }>(
+      `/api/admin/email-templates/${encodeURIComponent(key)}/enabled`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      },
+    ),
+  /** Log de envíos (read-only, paginado). Filtros opcionales por estado/plantilla. */
+  listEmailsLog: (params?: {
+    status?: string;
+    template_key?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status", params.status);
+    if (params?.template_key) q.set("template_key", params.template_key);
+    if (params?.limit != null) q.set("limit", String(params.limit));
+    if (params?.offset != null) q.set("offset", String(params.offset));
+    const qs = q.toString();
+    return authedJson<{
+      items: EmailLogEntry[];
+      total: number;
+      limit: number;
+      offset: number;
+    }>(`/api/admin/emails-log${qs ? `?${qs}` : ""}`);
+  },
+};
+
+export type EmailChannelStatus = {
+  /** Backend activo: "resend" | "smtp" | "test". */
+  provider: string;
+  /** false cuando provider === "test" (no manda, solo loggea). */
+  activo: boolean;
+  from_addr: string;
+  admin_to: string;
 };
 
 export type EmailTemplateSummary = {
   key: string;
   subject: string;
+  enabled: boolean;
   updated_at: string;
   updated_by: string | null;
+};
+
+export type EmailLogEntry = {
+  id: number;
+  to_addr: string;
+  subject: string;
+  template_key: string;
+  alquiler_id: number | null;
+  status: string;
+  provider: string;
+  provider_id: string | null;
+  error: string | null;
+  sent_at: string | null;
 };
 
 export type EmailTemplate = EmailTemplateSummary & {

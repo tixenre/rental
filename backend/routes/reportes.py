@@ -145,14 +145,16 @@ async def reporte_liquidacion_pdf(
     require_admin(request)
     _validar_rango(desde, hasta)
     from pdf import _liquidacion_html, _render_pdf
+    from routes.estadisticas import compute_estadisticas
 
     conn = get_db()
     try:
         data = _data_liquidacion(conn, desde, hasta)
+        stats = compute_estadisticas(conn)
     finally:
         conn.close()
 
-    html = _liquidacion_html(data, _periodo_label(desde, hasta))
+    html = _liquidacion_html(data, _periodo_label(desde, hasta), stats=stats)
     if format == "html":
         return HTMLResponse(html)
     pdf_bytes = await _render_pdf(html)
@@ -206,6 +208,7 @@ async def enviar_reporte_mail(request: Request, body: EnviarReporteBody):
     import html as html_mod
 
     from pdf import _liquidacion_html, _render_pdf
+    from routes.estadisticas import compute_estadisticas
     from services.email import send_raw_email
     from services.email.base import Attachment
 
@@ -213,6 +216,7 @@ async def enviar_reporte_mail(request: Request, body: EnviarReporteBody):
     conn = get_db()
     try:
         data = _data_liquidacion(conn, body.desde, body.hasta)
+        stats = compute_estadisticas(conn)
         # Persistir la lista de destinatarios para la próxima vez.
         conn.execute(
             """
@@ -227,7 +231,7 @@ async def enviar_reporte_mail(request: Request, body: EnviarReporteBody):
     finally:
         conn.close()
 
-    reporte_html = _liquidacion_html(data, periodo)
+    reporte_html = _liquidacion_html(data, periodo, stats=stats)
     pdf_bytes = await _render_pdf(reporte_html)
     adjunto = Attachment(
         filename=f"liquidacion_{body.desde}_a_{body.hasta}.pdf",

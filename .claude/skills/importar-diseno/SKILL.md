@@ -1,6 +1,6 @@
 ---
 name: importar-diseno
-description: Importa un handoff de Claude Design (carpeta design_handoff_<feature>/ con un HTML de referencia visual + uno o más .tsx que espejan rutas/componentes reales del repo + README de specs) y lo convierte en front-end real de este repo. Úsalo cuando el usuario pase una carpeta de handoff de Claude Design (o diga "importá este diseño / handoff / pantalla de Claude Design", "implementá este TSX", "conectá este diseño con datos reales"). El skill orienta TODO el recorrido: ver el render, leer el README, reusar la librería de componentes del repo, implementar, conectar el backend y verificar contra la referencia. Incluye un motor visual (render.mjs) que rasteriza el HTML/ruta a PNG para que Claude pueda VER el resultado (sirve los .html por HTTP; anda local y en la nube).
+description: Implementa un diseño de Claude Design en el repo real — su front-end (rutas/componentes React) Y sus documentos PDF (presupuesto, albarán/remito, contrato, packing list, reportes). Úsalo siempre que el usuario pase un handoff de Claude Design (carpeta design_handoff_<feature>/ con HTML de referencia + .tsx + README), O simplemente pegue imágenes/mockups y pida que algo "quede así", "se vea como el diseño", "alineá X al mockup". Dispará también cuando el pedido sea sobre un DOCUMENTO/PDF — "rediseñá el presupuesto / remito / contrato / packing / reporte", "que el PDF quede como el diseño", "alineá los documentos al mockup" — aunque no mencione "Claude Design" ni una carpeta de handoff. El skill orienta TODO el recorrido: VER el render (rutas web con render.mjs; documentos PDF con render-doc.py), reusar la librería/infra del repo (componentes React o helpers de pdf_templates.py), implementar, conectar los datos reales y verificar contra el mockup. Su corazón es el loop render-compare: renderizar el output real → comparar con el mockup → implementar → re-renderizar hasta que coincidan. NO es para diseñar pantallas/documentos desde cero (eso lo hace Claude Design, en otro proyecto) ni para mantener la librería del design system / agregar tokens (ese es el skill design-system) — este skill IMPLEMENTA un diseño ya hecho en el código real.
 ---
 
 # importar-diseno — del handoff de Claude Design al front real del repo
@@ -16,8 +16,8 @@ una carpeta `design_handoff_<feature>/` que **espeja los paths reales del repo**
 > lo decide Claude Design). Lo abre en Claude Design, que con eso produce el handoff. Flujo de punta
 > a punta: **brief → Claude Design (handoff) → implementar (este skill) → borrar el handoff** (ciclo
 > de vida en _Patrones útiles_). El **brief se queda mientras el rediseño esté pendiente**; se retira
-> cuando se implementa. (Vigente hoy: [`docs/design-brief-documentos.md`](../../../docs/design-brief-documentos.md)
-> — rediseño de los 5 PDF de documentos.)
+> cuando se implementa (caso testigo: el brief `design-brief-documentos.md` de los 5 PDF se retiró
+> al implementarlos — ver la sección **Handoff de documentos (PDF)** más abajo).
 
 | Pieza                 | Qué es                                                                   | Cómo la tratás                                                |
 | --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------- |
@@ -125,6 +125,60 @@ son referencia, pero el repo manda.
    render del prototipo). Funciona igual de bien. El agujero conocido —no poder auto-render-comparar el
    **componente real** de una ruta autenticada— se cierra con un harness de preview con mocks: tracking
    en **#743**.
+
+## Handoff de documentos (PDF) — el mismo loop, otro medio
+
+El recorrido de arriba asume un target **front-end** (rutas/componentes React). Pero los **PDF que
+genera el sistema** —presupuesto, albarán/remito, contrato, packing list y el reporte— también se
+rediseñan por este flujo. Cambia el medio, no el corazón: **render-compare** (render del documento
+real → comparar con el mockup → implementar → re-renderizar). Caso testigo: los 5 PDF alineados al
+mockup de Claude Design en una sola iniciativa.
+
+Diferencias clave respecto del track web:
+
+- **No hay ruta web ni `npm run dev`.** Un PDF se genera server-side: una función-template de Python
+  devuelve HTML, y Playwright (Python) lo rasteriza a PDF A4. Para VERLO, usá el helper
+  **`render-doc.py`** (análogo a `render.mjs`):
+  ```bash
+  source backend/.venv/bin/activate
+  python .claude/skills/importar-diseno/render-doc.py presupuesto   # o albaran/contrato/packing/reportes/todos
+  ```
+  Imprime `PNG: /tmp/doc-<tipo>.png` → leelo con la tool de imágenes y compará con el mockup. El
+  helper trae un **dict de muestra rico** (ítems con specs, componentes, contenido, serie, valor de
+  reposición, fecha de compra, cliente RI) para que cada documento rinda todas sus partes. Si el
+  modelo de datos gana un campo que un documento muestra, sumalo al sample del helper.
+
+- **El input suele ser solo imágenes**, no una carpeta `design_handoff_<feature>/` con `.tsx`. No hay
+  TSX porque los documentos no son React — son templates de Python. El loop es: **renderizá el output
+  REAL actual** (con `render-doc.py`) → **compará contra las imágenes que pegó el dueño** → implementá
+  → re-renderizá. La verdad visual la manda el mockup; la estructura, el template existente.
+
+- **Reuse-first = la infra de PDFs, no el catálogo de componentes React.** Antes de tocar nada, mirá
+  qué ya existe en **`backend/pdf_templates.py`**: los **tokens** del DS (`--amber #FAB428`, `--ink`,
+  `--surface`, `--hairline`, `--muted`, `--font-sans` TT Commons, `--font-mono`), el **shell** común
+  (`_document`/`_membrete`/`_footer`/`_fonts_css`), helpers ya escritos (`_nombre_con_incluye` para la
+  línea "INCLUYE…", `total-box--light` para la caja de totales clara, `_thumb`, la paleta de estado
+  `_ESTADOS`). El 5º documento (Reportes) vive en **`backend/pdf.py`** (`_liquidacion_html`). Muchas
+  veces el token/variante que necesitás **ya está** (caso testigo: `total-box--light` existía en el CSS
+  antes de que el presupuesto lo usara). Si extraés algo reusable nuevo, va a un helper único
+  (`_nombre_con_incluye` unificó la línea INCLUYE de 3 documentos) — no lo copies por documento.
+
+- **Conectar el dato = el dict que ya recibe el template.** No hay `api.ts`/`useQuery`: el documento se
+  renderiza desde un `pedido` (o `stats`) que arma el backend. Para datos nuevos, buscá si ya se
+  computan (caso testigo: el "Resumen general" del reporte salía entero de `get_estadisticas`; se
+  extrajo a `compute_estadisticas(conn)` —función pura reutilizable— para que el endpoint **y** el PDF
+  lo compartan, sin duplicar SQL). Leé la función-template para descubrir qué campos espera.
+
+- **Los documentos esconden decisiones de negocio.** Un presupuesto/contrato/remito codifica reglas de
+  **plata o legales** (IVA, descuentos, condición fiscal, cláusulas). El mockup puede implicar un
+  cambio de esas reglas sin decirlo (caso testigo: el presupuesto pasó a mostrar el **IVA aparte**, no
+  sumado al total — cambia la cifra que ve el cliente). **No lo infieras: preguntale al dueño** y, si
+  hay una decisión durable, proponé registrarla en `docs/MEMORIA.md` para que una sesión futura no la
+  "corrija" pensando que es un bug.
+
+El resto del flujo es igual: una iniciativa = rama + PR, supervisor antes de mergear, y el dueño
+prueba en staging (genera el PDF real desde `/admin/pedidos` o `/admin/reportes`). El core de reservas
+y los cálculos de plata son sagrados — el rediseño es **presentación**, no toca el motor.
 
 ## Patrones útiles
 

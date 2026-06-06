@@ -15,6 +15,19 @@ def get_estadisticas(request: Request):
     require_admin(request)
     conn = get_db()
     try:
+        return compute_estadisticas(conn)
+    finally:
+        conn.close()
+
+
+def compute_estadisticas(conn) -> dict:
+    """Calcula el dict completo de estadísticas a partir de una conexión.
+
+    Fuente única (barra de calidad: modularidad) — la usan tanto el endpoint
+    `get_estadisticas` (transporte HTTP) como el PDF de Reportes (sección
+    'Resumen general'). No abre ni cierra la conexión: el caller la administra.
+    """
+    if True:
         # ── Totales generales (solo pedidos confirmados/finalizados) ──────────────
         totales = conn.execute("""
             SELECT
@@ -200,5 +213,3 @@ def get_estadisticas(request: Request):
             "por_dueno":            [row_to_dict(r) for r in por_dueno],
             "favoritos_equipo":     [row_to_dict(r) for r in favoritos_equipo],
         }
-    finally:
-        conn.close()
