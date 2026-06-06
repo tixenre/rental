@@ -52,6 +52,16 @@ pip install -q -r backend/requirements-dev.txt vulture ruff
 > **`migrations/` se excluye SIEMPRE.** Es historia congelada (decisión _esquema en dos capas_,
 > MEMORIA *2026-06-03*); sus "imports sin usar" (`op`, `sa`) son convención de Alembic, no cruft.
 
+> **vulture: quedate en `--min-confidence 80`.** A 60 **inunda** de falsos positivos: marca todos
+> los handlers de ruta FastAPI y los validators Pydantic (no ve los decoradores). Más ruido que señal.
+
+> **Señales extra de ruff** (corré `--select F` para verlas además de las tres de arriba): **F541**
+> (f-string sin placeholder) = micro-limpieza segura (`--fix`). **F601** (clave de dict repetida) =
+> **bug smell, NO limpieza**: si los dos valores **coinciden** es una dup inocua (cleanup); si
+> **difieren** es un bug de conducta (una clave pisa a la otra) → **reportar**, no "arreglar" a
+> ciegas. Caso testigo: `"lens mount"` mapeaba a `"Montura"` y una dup lo pisaba con `"Lens mount"`
+> (inglés sin traducir) — la "limpieza" de la dup es en realidad una decisión de qué label se muestra.
+
 ### 2 · Triage — separar muerto real de falso positivo
 
 Por cada candidato, preguntarse **por qué la herramienta lo marcó** y si es legítimo. Falsos
@@ -60,9 +70,18 @@ positivos típicos (**NO borrar**):
 - **Re-exports** intencionales: barrels (`index.ts`), `__all__`, constantes canónicas re-expuestas.
   Si un **test** los exige, se conservan con `# noqa: F401` + comentario que apunte al test.
 - **Uso dinámico / por string:** eventos de analytics, registries, factories, rutas lazy.
-- **Endpoints / handlers HTTP:** un handler sin llamadas en Python NO está muerto — el front lo
-  consume por **string de URL** (`fetch('/api/...')`, cliente API). vulture lo marca igual →
-  grepear la **ruta** (`/api/...`) en el front antes de tocar.
+- **Funciones registradas por decorador:** las herramientas Python NO ven los decoradores → marcan
+  como muertos los **handlers de ruta** (`@router.get`/`@app.get`) y los **validators Pydantic**
+  (`@field_validator`/`@classmethod`). Es la fuente #1 de falsos positivos de vulture. Un handler,
+  además, puede ser consumido por el front por **string de URL** (`fetch('/api/...')`) → grepear la
+  **ruta** (`/api/...`) en el front, no el nombre de la función.
+- **`__init__.py` vacíos:** son markers de paquete obligatorios, no archivos a borrar.
+- **Helper que se autodescribe "fuente única"/canónico pero con 0 consumidores** (caso testigo:
+  `pdf._a4_page`): es la baranda del barrel a menor escala → **reportar**, no borrar (suele ser
+  intención sin cablear; borrarlo pierde el diseño, cablearlo es un refactor aparte).
+- **Miembro suelto de una API simétrica** (caso testigo: `refresh`/`refresh_equipos` dentro de una
+  familia `refresh_*` cuya mayoría sí se usa): borrar 1-2 rompe la simetría y empeora la legibilidad
+  → dejar.
 - **Assets referenciados por string:** imágenes/íconos/templates cargados por path armado en runtime
   (no `import` estático) → knip no los ve. Grepear el nombre del archivo en TODO el repo.
 - **Código de un job/cron:** una función llamada solo desde un scheduled job de Railway (ej. los
