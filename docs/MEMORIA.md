@@ -75,18 +75,20 @@
   muestra que funciona. La BD de staging es una copia de prod del 2026-06-01; las migraciones
   de `dev` corren en staging y no tocan prod hasta el merge.
 
-### 2026-05-25 — Gate de estilo en CI: formato bloquea, lógica de React avisa
+### 2026-05-25 — Gate de estilo en CI: formato + lógica de React bloquean
 
 - **Contexto:** el repo tenía `eslint.config.js` pero el tooling nunca se instaló ni corría; al
   medir, ~98% de la deuda era formato auto-arreglable (prettier), no bugs.
-- **Decisión:** el CI bloquea por **formato (prettier)** — es automático y sin criterio, mantiene el
-  código parejo. Las **reglas de lógica de React** (`exhaustive-deps`, `react-refresh`) quedan como
-  **aviso, no bloqueante**, para no frenar el trabajo por deuda preexistente.
-- **Consecuencias:** los cambios nuevos deben pasar `npm run lint` sin errores de formato; los
-  avisos de React se revisan pero no impiden mergear.
-- **Pendiente (para que el aviso no se vuelva ruido permanente):** triagear los ~22 avisos, arreglar
-  los bugs reales (sobre todo `exhaustive-deps`) y promover a bloqueante las reglas que valgan →
-  issue de tracking **#476**.
+- **Decisión:** el CI bloquea por **formato (prettier)** — automático y sin criterio, mantiene el
+  código parejo. Las **reglas de lógica de React** (`exhaustive-deps`, `react-refresh`) arrancaron
+  como **aviso** (para no frenar por deuda preexistente) y se **promovieron a bloqueante** una vez
+  saldada esa deuda: hoy van en `"error"` + `reportUnusedDisableDirectives: "error"`.
+- **Consecuencias:** los cambios nuevos deben pasar `npm run lint` sin errores (formato **y** lógica
+  de React). Cada `eslint-disable` que sobreviva tiene que estar **justificado** — un disable que ya
+  no silencia nada es error, así no se acumula deuda muerta.
+- **Resuelto (#476, 2026-06-06):** triage completo de los avisos suprimidos — los 10 `exhaustive-deps`
+  restantes son patrones intencionales (autosave con debounce, efectos mount-once, memos capturados
+  una vez, exclusión de método/store estable), documentados en el código; **cero bugs reales**.
 
 ### 2026-05-26 — Convención de alias `e` para `equipos` en queries SQL
 
