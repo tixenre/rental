@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { BottomSheet } from "@/components/mobile";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
+import { EquipoThumb } from "./EquipoThumb";
 import type { DraftItem } from "./usePedidoDraft";
 
 const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
@@ -115,6 +116,11 @@ export function EquipoSearchSheet({
                 const disponible = max - (inCart?.cantidad ?? 0);
                 return (
                   <li key={eq.id} className="flex items-center justify-between gap-2 py-3">
+                    <EquipoThumb
+                      src={eq.foto_url}
+                      alt={eq.nombre_publico || eq.nombre}
+                      className="h-10 w-10"
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm text-ink truncate">
                         {eq.nombre_publico || eq.nombre}

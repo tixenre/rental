@@ -24,6 +24,7 @@ export type DraftItem = {
   nombre: string;
   marca: string | null;
   nombre_publico?: string | null;
+  foto_url?: string | null;
 };
 
 export type DraftDatos = {
@@ -69,6 +70,7 @@ function pedidoToItems(p: Pedido): DraftItem[] {
     nombre: it.nombre,
     marca: it.marca,
     nombre_publico: it.nombre_publico ?? null,
+    foto_url: it.foto_url ?? null,
   }));
 }
 
