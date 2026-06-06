@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
     attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
-    regenerate_auto_tags, MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
+    regenerate_auto_tags, MARCA_SUBQUERY, MARCA_NOMBRE_EXPR, marca_subquery,
 )
 from busqueda import construir
 from reservas import ESTADOS_RESERVADO, calcular_disponibilidad
@@ -785,7 +785,7 @@ def list_equipos(
 
     if marca:
         # Filtro por marca exacta (case-insensitive) contra marcas.nombre (brand_id FK).
-        base_sql += " AND LOWER(COALESCE((SELECT nombre FROM marcas WHERE id = e.brand_id), '')) = LOWER(?)"
+        base_sql += f" AND LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(?)"
         params.append(marca)
 
     # ── Sort ──
@@ -895,7 +895,7 @@ def get_equipo(id_or_slug: str):
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id = ?", (actual_id,)
+            f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id = ?", (actual_id,)
         ).fetchone()
         if not row:
             raise HTTPException(404, "Equipo no encontrado")
@@ -906,9 +906,9 @@ def get_equipo(id_or_slug: str):
         # `equipo.specs` (dict keyed por spec_key) en vez de las columnas
         # legacy de equipo_fichas. Mantenemos `ficha` para back-compat.
         equipo = attach_specs_estructuradas(conn, [equipo])[0]
-        kit = conn.execute("""
+        kit = conn.execute(f"""
             SELECT kc.componente_id, kc.cantidad, kc.descuento_pct, kc.esencial,
-                   e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
+                   e.nombre, {MARCA_SUBQUERY}, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
             WHERE kc.equipo_id = ?  ORDER BY kc.orden ASC, e.nombre ASC
         """, (actual_id,)).fetchall()
@@ -1017,7 +1017,7 @@ def create_equipo(data: EquipoCreate):
         except Exception:
             pass
         conn.commit()
-        row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (new_id,)).fetchone()
+        row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (new_id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         return equipo
     except Exception:
@@ -1046,7 +1046,7 @@ def _normalize_fecha_compra(value):
 def update_equipo(id: int, data: EquipoUpdate):
     conn     = get_db()
     try:
-        existing = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+        existing = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
         if not existing:
             raise HTTPException(404, "Equipo no encontrado")
         updates = data.model_dump(exclude_unset=True)
@@ -1100,7 +1100,7 @@ def update_equipo(id: int, data: EquipoUpdate):
             except Exception:
                 pass
         conn.commit()
-        row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+        row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         return equipo
     except Exception:
@@ -1120,7 +1120,7 @@ def duplicate_equipo(id: int):
     """
     conn = get_db()
     try:
-        src = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+        src = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
         if not src:
             raise HTTPException(404, "Equipo no encontrado")
         src_d = row_to_dict(src)
@@ -1200,7 +1200,7 @@ def duplicate_equipo(id: int):
             logger.warning("regenerate_auto_tags falló para duplicado %s: %s", new_id, e)
 
         conn.commit()
-        row = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (new_id,)).fetchone()
+        row = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (new_id,)).fetchone()
         return attach_tags(conn, [row_to_dict(row)])[0]
     except Exception:
         conn.rollback()
@@ -1650,10 +1650,10 @@ def get_kit(id: int):
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        rows = conn.execute("""
+        rows = conn.execute(f"""
             SELECT kc.id, kc.componente_id, kc.cantidad, kc.orden,
                    kc.descuento_pct, kc.esencial,
-                   e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url, e.visible_catalogo
+                   e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url, e.visible_catalogo
             FROM kit_componentes kc
             JOIN equipos e ON e.id = kc.componente_id
             WHERE kc.equipo_id = ?
@@ -1822,7 +1822,7 @@ def set_etiquetas(id: int, data: EtiquetasUpdate):
                 DO UPDATE SET orden = EXCLUDED.orden, origen = 'manual'
             """, (id, row["id"], orden))
         conn.commit()
-        row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+        row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         return equipo
     except Exception:
@@ -1925,7 +1925,7 @@ def set_categorias(id: int, data: CategoriasUpdate):
         except Exception:
             pass
         conn.commit()
-        row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+        row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
         equipo = attach_tags(conn, [row_to_dict(row)])[0]
         equipo = attach_categorias(conn, [equipo])[0]
         return equipo
@@ -2081,9 +2081,9 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
     conn = get_db()
     try:
         # ── Top 10 más alquilados (cantidad de pedidos + revenue total) ──
-        top_alquilados = conn.execute("""
+        top_alquilados = conn.execute(f"""
             SELECT
-                e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url,
+                e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
                 COUNT(DISTINCT p.id) AS cant_pedidos,
                 SUM(
                     COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
@@ -2099,9 +2099,9 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
         """).fetchall()
 
         # ── Equipos sin movimiento (último alquiler hace > N días, o nunca) ──
-        sin_uso = conn.execute("""
+        sin_uso = conn.execute(f"""
             SELECT
-                e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url, e.valor_reposicion,
+                e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url, e.valor_reposicion,
                 MAX(p.fecha_desde) AS ultimo_alquiler,
                 COUNT(DISTINCT p.id) AS total_alquileres
             FROM equipos e
@@ -2758,8 +2758,8 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
 
     conn = get_db()
     try:
-        equipos = conn.execute("""
-            SELECT e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo
+        equipos = conn.execute(f"""
+            SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo
             FROM equipos e
             WHERE e.es_recurso_interno = FALSE
             ORDER BY e.nombre
