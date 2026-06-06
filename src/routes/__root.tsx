@@ -3,6 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { FaviconSync } from "@/components/rental/FaviconSync";
 import { Component, type ReactNode } from "react";
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -57,6 +58,7 @@ function NotFoundComponent() {
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: () => (
     <RootErrorBoundary>
+      <FaviconSync />
       <Outlet />
       <Toaster richColors position="top-right" />
     </RootErrorBoundary>

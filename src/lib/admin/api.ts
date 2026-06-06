@@ -1273,8 +1273,11 @@ export const adminApi = {
     return authedJson<PedidosListResp>(`/api/alquileres?${sp.toString()}`);
   },
   getPedido: (id: number) => authedJson<Pedido>(`/api/alquileres/${id}`),
-  enviarDocumentos: (id: number, payload: { docs: string[]; to?: string; mensaje?: string }) =>
-    authedJson<{ ok: true; to: string; docs: string[]; provider?: string }>(
+  enviarDocumentos: (
+    id: number,
+    payload: { docs: string[]; to?: string; mensaje?: string; template?: string },
+  ) =>
+    authedJson<{ ok: true; to: string; docs: string[]; template?: string; provider?: string }>(
       `/api/alquileres/${id}/enviar-documentos`,
       {
         method: "POST",
@@ -1411,18 +1414,6 @@ export const adminApi = {
       { method: "DELETE" },
     ),
 
-  uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await authedFetch("/api/admin/settings/upload-logo", {
-      method: "POST",
-      body: fd,
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.detail ?? `Upload logo → ${res.status}`);
-    return json as { ok: true; url: string };
-  },
-
   uploadOgImage: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
     fd.append("file", file);
@@ -1433,6 +1424,22 @@ export const adminApi = {
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(json?.detail ?? `Upload OG image → ${res.status}`);
     return json as { ok: true; url: string };
+  },
+
+  // ── Marca: subir SVG master → derivar assets (motor backend services/branding) ──
+  uploadBrandSvg: async (
+    kind: "wordmark" | "isologo",
+    file: File,
+  ): Promise<{ ok: true; settings: Record<string, string> }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await authedFetch(`/api/admin/settings/upload-${kind}`, {
+      method: "POST",
+      body: fd,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.detail ?? `Upload ${kind} → ${res.status}`);
+    return json as { ok: true; settings: Record<string, string> };
   },
 
   // ── Email templates ─────────────────────────────────────────────────
@@ -1705,6 +1712,7 @@ export type PedidoItem = {
   marca: string | null;
   nombre_publico?: string | null;
   nombre_publico_largo?: string | null;
+  foto_url?: string | null;
 };
 
 export type PedidoPago = {

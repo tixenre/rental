@@ -14,7 +14,7 @@ Todo está espejado en `database.init_db()` (esquema en dos capas, decisión
 (click-through): la señal para, a futuro, aprender qué encontró la gente.
 
 Revision ID: s3t4u5v6w7x8
-Revises: c5e9a3f7d1b4
+Revises: d8b2f4a6c0e1
 Create Date: 2026-06-06
 """
 
@@ -23,7 +23,7 @@ from typing import Union
 from alembic import op
 
 revision: str = "s3t4u5v6w7x8"
-down_revision: Union[str, None] = "c5e9a3f7d1b4"
+down_revision: Union[str, None] = "d8b2f4a6c0e1"
 branch_labels = None
 depends_on = None
 

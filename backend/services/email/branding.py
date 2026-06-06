@@ -73,6 +73,19 @@ def btn_secondary(url_var: str, label: str) -> str:
     )
 
 
+def callout(var_name: str) -> str:
+    """Caja destacada (ej. la nota del admin al cliente): fondo tintado + barra
+    de acento amber a la izquierda. `var_name` es el nombre de la variable Jinja
+    con el texto → se deja como `{{ var_name }}` para que la plantilla la
+    renderice (escapada, por el autoescape del html)."""
+    return (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0;">'
+        f'<tr><td style="padding:12px 14px;background:{SURFACE};border-left:3px solid {AMBER};'
+        f'border-radius:6px;font-family:{FONT_SANS};font-size:14px;line-height:1.5;color:{INK};">'
+        f'{{{{ {var_name} }}}}</td></tr></table>'
+    )
+
+
 def item_row(nombre_html: str, cantidad_html: str, subtotal_html: str | None) -> str:
     """Una fila de la tabla de ítems del mail. Los tres args ya vienen
     escapados/seguros desde el caller (datos dinámicos) — acá solo se les da

@@ -29,24 +29,31 @@ DEFAULT_TEMPLATES: dict[str, dict[str, str]] = {
         "subject": "Recibimos tu pedido #{{ numero_pedido }} — Rambla Rental",
         "body_html": f"""<p {b.H}>¡Recibimos tu pedido!</p>
 <p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, gracias por tu pedido <strong>#{{{{ numero_pedido }}}}</strong>. Lo estamos revisando y te confirmamos la disponibilidad a la brevedad.</p>
+{{% if mensaje_admin %}}{b.callout("mensaje_admin")}{{% endif %}}
 <p {b.LBL}>Tu pedido</p>
-<p style="margin:0 0 4px;"><strong>Retiro:</strong> {{{{ fecha_desde }}}}<br><strong>Devolución:</strong> {{{{ fecha_hasta }}}}</p>
+<p style="margin:0 0 4px;"><strong>Retiro:</strong> {{{{ fecha_desde }}}}<br><strong>Devolución:</strong> {{{{ fecha_hasta }}}}{{% if cantidad_jornadas %}}<br><strong>Jornadas:</strong> {{{{ cantidad_jornadas }}}}{{% endif %}}</p>
 {{{{ items_html|safe }}}}
 <p {b.TOTAL}><strong>Total estimado: {{{{ total }}}}</strong></p>
+{{% if docs_adjuntos %}}<p style="margin:6px 0 4px;">Te adjuntamos en este mail: <strong>{{{{ docs_adjuntos|join(', ') }}}}</strong>.</p>{{% endif %}}
 {b.btn("portal_url", "Ver mi pedido")}
 <p {b.MUTED_P}>Cuando confirmemos el pedido vas a poder descargar el <strong>remito</strong> y el <strong>contrato</strong> desde tu portal. ¿Tenés alguna duda? Respondé este mail.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
         "body_text": """Hola {{ cliente_nombre }},
 
 Recibimos tu pedido #{{ numero_pedido }}. Lo estamos revisando y te confirmamos la disponibilidad a la brevedad.
-
+{% if mensaje_admin %}
+{{ mensaje_admin }}
+{% endif %}
 Retiro: {{ fecha_desde }}
-Devolución: {{ fecha_hasta }}
+Devolución: {{ fecha_hasta }}{% if cantidad_jornadas %}
+Jornadas: {{ cantidad_jornadas }}{% endif %}
 
 {{ items_text }}
 
 Total estimado: {{ total }}
-
+{% if docs_adjuntos %}
+Te adjuntamos en este mail: {{ docs_adjuntos|join(', ') }}.
+{% endif %}
 Seguí tu pedido en el portal: {{ portal_url }}
 Cuando lo confirmemos vas a poder descargar el remito y el contrato desde ahí.
 
@@ -54,32 +61,48 @@ Cuando lo confirmemos vas a poder descargar el remito y el contrato desde ahí.
 — El equipo de Rambla""",
     },
     "pedido_confirmado_cliente": {
-        "subject": "Tu pedido #{{ numero_pedido }} está confirmado",
+        "subject": "Tu pedido #{{ numero_pedido }} está confirmado — Rambla Rental",
         "body_html": f"""<p {b.H}>¡Tu pedido está confirmado!</p>
-<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, confirmamos tu pedido <strong>#{{{{ numero_pedido }}}}</strong>. Ya está todo listo.</p>
-<p {b.LBL}>Tu pedido</p>
-<p style="margin:0 0 4px;"><strong>Retiro:</strong> {{{{ fecha_desde }}}}<br><strong>Devolución:</strong> {{{{ fecha_hasta }}}}</p>
+<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, confirmamos tu pedido <strong>#{{{{ numero_pedido }}}}</strong>. Acá tenés todos los datos de tu reserva.</p>
+{{% if mensaje_admin %}}{b.callout("mensaje_admin")}{{% endif %}}
+<p {b.LBL}>Reserva</p>
+<p style="margin:0 0 4px;"><strong>Retiro:</strong> {{{{ fecha_desde }}}}<br><strong>Devolución:</strong> {{{{ fecha_hasta }}}}{{% if cantidad_jornadas %}}<br><strong>Jornadas:</strong> {{{{ cantidad_jornadas }}}}{{% endif %}}</p>
+<p {b.LBL}>Equipos</p>
 {{{{ items_html|safe }}}}
+<p {b.LBL}>Pago</p>
 <p {b.TOTAL}><strong>Total: {{{{ total }}}}</strong></p>
+{{% if pago_estado %}}<p style="margin:0 0 4px;color:{b.MUTED};font-size:14px;">{{{{ pago_estado }}}}</p>{{% endif %}}
+{{% if docs_adjuntos %}}<p {b.LBL}>Documentos</p>
+<p style="margin:0 0 4px;">Te adjuntamos en este mail: <strong>{{{{ docs_adjuntos|join(', ') }}}}</strong>.</p>{{% else %}}<p {b.MUTED_P}>Ya podés descargar el <strong>remito</strong> y el <strong>contrato</strong> desde tu portal.</p>{{% endif %}}
 {b.btn("portal_url", "Ver mi pedido")}
 {{% if gcal_url %}}{b.btn_secondary("gcal_url", "📅 Agregar al calendario")}{{% endif %}}
-<p {b.MUTED_P}>Ya podés descargar el <strong>remito</strong> y el <strong>contrato</strong> desde tu portal. Te esperamos en el galpón el día del retiro.</p>
+<p {b.MUTED_P}>Te esperamos en el galpón el día del retiro. ¿Dudas? Respondé este mail.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
         "body_text": """Hola {{ cliente_nombre }},
 
-Tu pedido #{{ numero_pedido }} está confirmado.
-
+Tu pedido #{{ numero_pedido }} está confirmado. Acá tenés todos los datos de tu reserva.
+{% if mensaje_admin %}
+{{ mensaje_admin }}
+{% endif %}
+RESERVA
 Retiro: {{ fecha_desde }}
-Devolución: {{ fecha_hasta }}
+Devolución: {{ fecha_hasta }}{% if cantidad_jornadas %}
+Jornadas: {{ cantidad_jornadas }}{% endif %}
 
+EQUIPOS
 {{ items_text }}
 
-Total: {{ total }}
-{% if gcal_url %}
+PAGO
+Total: {{ total }}{% if pago_estado %}
+{{ pago_estado }}{% endif %}
+{% if docs_adjuntos %}
+Te adjuntamos en este mail: {{ docs_adjuntos|join(', ') }}.
+{% else %}
+Ya podés descargar el remito y el contrato desde tu portal: {{ portal_url }}
+{% endif %}{% if gcal_url %}
 Agregá la reserva a tu calendario: {{ gcal_url }}
 {% endif %}
-Ya podés descargar el remito y el contrato desde tu portal: {{ portal_url }}
-Te esperamos en el galpón el día del retiro.
+Te esperamos en el galpón el día del retiro. ¿Dudas? Respondé este mail.
 
 — El equipo de Rambla""",
     },

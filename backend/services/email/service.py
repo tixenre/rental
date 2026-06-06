@@ -111,7 +111,13 @@ def _wrap_email_html(body_html: str, conn) -> str:
     """
     from config import SITE_URL
 
-    logo = _setting(conn, "logo_url") or f"{SITE_URL}/email-logo.png"
+    # Header = barra amber sólida + wordmark BLANCO (mismo lenguaje que los
+    # documentos PDF). La celda amber sólida resuelve el bug de dark mode: el
+    # wordmark es blanco sobre transparente, así que el hueco muestra el amber
+    # de la celda (no negro) en cualquier cliente. `email_logo_url` permite
+    # override desde el back-office; NO se usa `logo_url` (el logo del top bar
+    # puede ser de color → se perdería sobre el amber).
+    logo = _setting(conn, "email_logo_url") or f"{SITE_URL}/email-wordmark-white.png"
     whatsapp = _setting(conn, "whatsapp_phone")
 
     wa_html = ""
@@ -133,10 +139,9 @@ def _wrap_email_html(body_html: str, conn) -> str:
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{b.BONE};padding:24px 12px;">
 <tr><td align="center">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:{b.CARD};border-radius:12px;overflow:hidden;border:1px solid {b.HAIRLINE};">
-<tr><td style="padding:22px 28px 18px;text-align:center;">
-<img src="{logo}" alt="Rambla Rental" height="40" style="height:40px;width:auto;display:inline-block;border:0;">
+<tr><td bgcolor="{b.AMBER}" style="padding:20px 28px;background:{b.AMBER};text-align:left;">
+<img src="{logo}" alt="Rambla Rental" height="32" style="height:32px;width:auto;display:inline-block;border:0;">
 </td></tr>
-<tr><td style="height:4px;background:{b.AMBER};font-size:0;line-height:0;">&nbsp;</td></tr>
 <tr><td style="padding:28px;font-family:{b.FONT_SANS};font-size:15px;line-height:1.55;color:{b.INK};">
 {body_html}
 </td></tr>
@@ -253,6 +258,7 @@ def send_email(
     attachments: Optional[Sequence["Attachment"]] = None,
     *,
     respect_enabled: bool = True,
+    force: bool = False,
 ) -> dict[str, Any]:
     """Envía un mail renderizando una plantilla. Loggea SIEMPRE en
     `emails_log`. NUNCA propaga excepciones del provider.
@@ -266,6 +272,12 @@ def send_email(
     `{ok, skipped, reason:'disabled'}` sin loggear. Los envíos automáticos lo
     dejan en True; el envío de prueba del admin lo pasa en False para poder
     testear un template apagado.
+
+    `force` (default False): saltea la idempotencia por-pedido
+    (`_IDEMPOTENT_PER_PEDIDO`). Los disparos automáticos (crear/confirmar) la
+    dejan en False para no mandar dos veces por doble-click/retry; un **envío
+    manual desde el back-office** (el admin aprieta "Enviar" en el modal) la
+    pasa en True para poder reenviar la confirmación a pedido.
 
     Devuelve un dict {ok, provider, provider_id?, error?, log_id} útil para
     el endpoint de test del admin.
@@ -293,7 +305,8 @@ def send_email(
 
         # Idempotency: si este template ya se envió OK para este pedido,
         # no lo mandamos de nuevo (doble-click en confirmar, retries, etc).
-        if template_key in _IDEMPOTENT_PER_PEDIDO and alquiler_id:
+        # `force=True` (envío manual desde el back-office) la saltea.
+        if not force and template_key in _IDEMPOTENT_PER_PEDIDO and alquiler_id:
             existing = conn.execute(
                 """
                 SELECT id FROM emails_log
