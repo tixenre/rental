@@ -201,14 +201,7 @@ body{font-family:var(--font-sans);color:var(--ink);background:#fff;
   align-items:center;justify-content:center;color:var(--muted);flex-shrink:0}
 .eq-thumb.sm{width:36px;height:36px}
 
-/* Specs como lista compacta */
-.spec-list{list-style:none;display:flex;flex-direction:column;gap:1px;margin-top:5px;padding:0}
-.spec-list li{font-family:var(--font-mono);font-size:9.5px;line-height:1.5;color:var(--muted);
-  padding-left:11px;position:relative}
-.spec-list li::before{content:"·";position:absolute;left:2px;font-weight:700;
-  color:color-mix(in oklch,var(--amber) 65%,var(--ink))}
-
-/* Línea "INCLUYE …" del presupuesto: accesorios inline bajo el nombre. */
+/* Línea "INCLUYE …": accesorios inline bajo el nombre (presupuesto/albarán/contrato). */
 .incluye{font-family:var(--font-mono);font-size:9px;line-height:1.55;
   color:var(--muted);margin-top:3px}
 .incluye-lbl{font-weight:600;letter-spacing:.1em;text-transform:uppercase;
@@ -292,17 +285,17 @@ body{font-family:var(--font-sans);color:var(--ink);background:#fff;
 .pk-box{width:13px;height:13px;border:1.5px solid var(--ink);border-radius:3px;display:inline-block}
 .items.packing td.chk{text-align:center;width:70px}
 .pk-check{width:16px;height:16px;border:1.5px solid var(--ink);border-radius:4px;display:inline-block}
-.items.packing .row-cont td{padding:5px 12px 12px;border-bottom:1px dashed var(--hairline)}
-.cont-list{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px;padding-left:58px}
-.cont-label{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;
-  color:color-mix(in oklch,var(--amber) 55%,var(--ink));margin-right:2px}
-.cont-item{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:9.5px;color:var(--muted)}
-.cont-item .cb{width:11px;height:11px;border:1px solid var(--hairline);border-radius:3px;flex-shrink:0}
 .pk-summary{display:flex;justify-content:space-between;align-items:center;margin-top:24px;
   padding:16px 20px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--hairline)}
 .pk-stat{display:flex;flex-direction:column;gap:2px}
 .pk-stat .n{font-family:var(--font-mono);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
 .pk-stat .l{font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+/* COMPRA {fecha} bajo el nombre del equipo + tag INCLUYE en la 1ª fila de contenido. */
+.pk-compra{font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:2px}
+.pk-compra-lbl{letter-spacing:.1em;text-transform:uppercase;margin-right:5px;
+  color:color-mix(in oklch,var(--amber) 60%,var(--ink))}
+.pk-incluye{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;
+  margin-left:8px;color:color-mix(in oklch,var(--amber) 60%,var(--ink))}
 """
 
 # ── Helpers de formato (espejan los de pdf.py; reusá los del repo al mergear) ─
@@ -362,17 +355,6 @@ def _nombre_para_pdf(item, formal=False):
     if marca and marca.lower() not in nombre.lower():
         return f"{marca} {nombre}".strip() or "—"
     return nombre or "—"
-
-
-def _nombre_rich(item, formal=False, mark=False):
-    """Cabecera en negrita + specs ('·') como lista de tags compacta."""
-    parts = _nombre_para_pdf(item, formal=formal).split(" · ")
-    mk = '<span class="comp-mark">└</span>' if mark else ""
-    out = f'<div class="eq-name">{mk}{html.escape(parts[0])}</div>'
-    if len(parts) > 1:
-        tags = "".join(f"<li>{html.escape(p)}</li>" for p in parts[1:])
-        out += f'<ul class="spec-list">{tags}</ul>'
-    return out
 
 
 def _nombre_con_incluye(item, formal=False, mark=False):
@@ -720,13 +702,12 @@ def _contrato_html(pedido):
 # ═══════════════════════════════════════════════════════════════════════════
 #  PACKING LIST   (reemplaza _packing_list_html)
 # ═══════════════════════════════════════════════════════════════════════════
-def _contenido_list(item):
-    """Lista de strings de 'contenido incluido' para los chips del packing.
+def _contenido_pairs(item):
+    """Contenido incluido como lista de `(nombre, cantidad)`.
 
     El repo guarda `contenido_incluido_json` (string JSON con una lista de
     **objetos** `{nombre, cantidad, ...}`); el reference usaba `contenido_incluido`
-    como lista de strings. Acepta ambas formas y devuelve strings listos para
-    mostrar ("Cable USB-C" o "Cable USB-C ×2"). JSON inválido → [] (no rompe).
+    como lista de strings. Acepta ambas formas. JSON inválido → [] (no rompe).
     """
     raw = item.get("contenido_incluido")
     if not isinstance(raw, list):
@@ -745,10 +726,9 @@ def _contenido_list(item):
             nombre = (x.get("nombre") or x.get("nombre_publico") or "").strip()
             if not nombre:
                 continue
-            cant = x.get("cantidad") or 1
-            out.append(f"{nombre} ×{cant}" if cant and cant != 1 else nombre)
+            out.append((nombre, x.get("cantidad") or 1))
         elif x not in (None, ""):
-            out.append(str(x))
+            out.append((str(x), 1))
     return out
 
 
@@ -756,14 +736,29 @@ def _packing_list_html(pedido):
     items = pedido.get("items", [])
     rows, n, unidades = [], 1, 0
 
-    def _row(it, sub=False):
+    def _eq_row(it, num):
+        """Fila del equipo principal: foto + nombre + 'COMPRA {fecha}' + checkboxes."""
         cant = it.get("cantidad", 1)
-        cls = ' class="comp"' if sub else ""
-        num = "" if sub else n
+        compra = ""
+        if it.get("fecha_compra"):
+            compra = ('<div class="pk-compra"><span class="pk-compra-lbl">Compra</span>'
+                      f'{_fmt_date_short(it.get("fecha_compra"))}</div>')
+        nombre = html.escape(_nombre_para_pdf(it).split(" · ")[0])
         return (
-            f'<tr{cls}><td class="c num" style="width:34px">{num}</td>'
+            f'<tr><td class="c num" style="width:34px">{num}</td>'
             f'<td style="width:50px">{_thumb(it, True)}</td>'
-            f'<td>{_nombre_rich(it, formal=True, mark=sub)}</td>'
+            f'<td><div class="eq-name">{nombre}</div>{compra}</td>'
+            f'<td class="c num">{cant}</td>'
+            '<td class="chk"><span class="pk-check"></span></td>'
+            '<td class="chk"><span class="pk-check"></span></td></tr>'
+        )
+
+    def _sub_row(nombre, cant, primero=False):
+        """Fila chequeable de contenido/componente (└), con tag 'Incluye' en la 1ª."""
+        tag = '<span class="pk-incluye">Incluye</span>' if primero else ""
+        return (
+            '<tr class="comp"><td></td><td></td>'
+            f'<td><span class="comp-mark">└</span>{html.escape(nombre)}{tag}</td>'
             f'<td class="c num">{cant}</td>'
             '<td class="chk"><span class="pk-check"></span></td>'
             '<td class="chk"><span class="pk-check"></span></td></tr>'
@@ -771,16 +766,16 @@ def _packing_list_html(pedido):
 
     for it in items:
         cant = it.get("cantidad", 1); unidades += cant
-        rows.append(_row(it)); n += 1
+        rows.append(_eq_row(it, n)); n += 1
+        primero = True
+        # Contenido incluido (accesorios) → cada uno su fila chequeable.
+        for nombre, ucant in _contenido_pairs(it):
+            tot = ucant * cant; unidades += tot
+            rows.append(_sub_row(nombre, tot, primero)); primero = False
+        # Componentes (sub-equipos del kit) → también filas chequeables.
         for c in it.get("componentes", []):
             ccant = c.get("cantidad", 1) * cant; unidades += ccant
-            cc = dict(c); cc["cantidad"] = ccant
-            rows.append(_row(cc, sub=True))
-        cont = _contenido_list(it)
-        if cont:
-            chips = "".join(f'<span class="cont-item"><span class="cb"></span>{html.escape(x)}</span>' for x in cont)
-            rows.append('<tr class="row-cont"><td></td><td colspan="5">'
-                        f'<div class="cont-list"><span class="cont-label">Incluye</span>{chips}</div></td></tr>')
+            rows.append(_sub_row(_nombre_para_pdf(c).split(" · ")[0], ccant, primero)); primero = False
 
     salida = (
         '<div class="meta-block"><div class="meta-label">Salida / retorno</div>'

@@ -108,8 +108,8 @@ def test_packing_list_html_contenido_incluido():
 
     assert "Cable USB-C" in result
     assert "Tapa de cuerpo" in result
-    # row-cont class → distingue visualmente los ítems de caja ("Incluye")
-    assert "row-cont" in result
+    # El contenido se expande como filas chequeables; la 1ª lleva el tag "Incluye".
+    assert "pk-incluye" in result
 
 
 def test_packing_list_html_contenido_incluido_json_invalido():
