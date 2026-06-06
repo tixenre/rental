@@ -14,6 +14,11 @@
 > dueño). **El dueño es quien lo completa/corrige** con lo que ve día a día en la herramienta —
 > sobre todo micro-flujos del operador (atajos, escaneo, etc.) que no se ven desde afuera. Marcá
 > acá lo que falte y lo bajamos a issues.
+>
+> **Triage del dueño (2026-06-06):** línea personalizada → SÍ (#805). Drag-reorder → SÍ (#806).
+> Calendario de disponibilidad → SÍ pero reformulado a **catálogo-facing** (#808, con pregunta de
+> diseño abierta). Depósito/garantía → **futuro**, atado a un repensado del sistema de pagos (#807).
+> Check-out/check-in asistido → el dueño no conoce el flujo; **pendiente de evaluar** tras explicación.
 
 ---
 
@@ -47,7 +52,7 @@
 Estos tres son los que el propio #74 dejó abiertos tras Pedidos v2. Son lo más cercano a "terminar
 de robarle a Booqable el detalle de pedido".
 
-### 1.1 — Línea personalizada (ítem de texto libre)
+### 1.1 — Línea personalizada (ítem de texto libre) → ✅ confirmado · #805
 - **Booqable:** podés agregar a un pedido una línea que **no** es del catálogo (ej. "Flete",
   "Operador 4h", "Limpieza") con nombre, cantidad y precio libres.
 - **Rambla hoy:** toda línea es un `alquiler_item` ligado a un `equipo`. No hay ítem libre.
@@ -66,7 +71,7 @@ de robarle a Booqable el detalle de pedido".
   Coordinar con cómo `priceBreakdown()` y `services/precios.py` calculan hoy.
 - **Issue candidato:** sub-issue de #74.
 
-### 1.3 — Etiquetas en el pedido + drag-reorder de líneas
+### 1.3 — Etiquetas en el pedido + drag-reorder de líneas → drag-reorder ✅ #806 · etiquetas sin confirmar
 - **Booqable:** chips/labels arbitrarios en el pedido ("urgente", "productora X", "retira en local")
   y reordenar líneas arrastrando.
 - **Rambla hoy:** hay etiquetas en **equipos** (`equipo_etiquetas`), no en pedidos. El orden de
@@ -78,25 +83,24 @@ de robarle a Booqable el detalle de pedido".
 
 ## Prioridad 2 — flujos del operador que Booqable hace bien
 
-### 2.1 — Calendario de disponibilidad por-equipo (matriz/planning)
-- **Booqable:** vista de planning tipo Gantt — filas = productos, columnas = días, se ve **qué está
-  reservado cuándo** y se puede mover/editar desde ahí.
-- **Rambla hoy:** `CalendarioWidget` (conteos agregados por día) + feed iCal + cards "salen/devuelven
-  hoy". No hay matriz por-equipo ni edición desde el calendario.
-- **Por qué importa:** es la forma natural de ver huecos y evitar choques de un vistazo. Hoy hay que
-  entrar pedido por pedido.
+### 2.1 — Calendario de disponibilidad por equipo → ✅ #808 (reformulado catálogo-facing)
+- **El dueño lo quiere catálogo-facing, no como planning interno:** que en **cada equipo** se vea su
+  calendario de disponibilidad (cuándo está libre/reservado).
+- **Decisión del dueño:** en la **ficha técnica** (`/equipo/<slug>`) entra bien, no hay problema. En
+  las vistas **grid y lista** del catálogo **hay que pensar bien la UI** → ⏳ pregunta de diseño
+  abierta (handoff de Claude Design antes de implementar grid/lista).
 - **Cuidado:** es **lectura** sobre el motor de reservas — debe leer de `backend/reservas/`
-  (disponibilidad), no recalcular overlap por su cuenta. Empezar read-only (sin drag-edit).
-- **Issue candidato:** nuevo, `feature` + `complexity:large`.
+  (disponibilidad), no recalcular overlap. Reusar la fuente que ya bloquea días en `RentalDateModal`.
+- **Estado:** issue #808. Empezar por la ficha (decidido); grid/lista en stand-by hasta diseño.
 
-### 2.2 — Check-out / check-in del equipo (retiro y devolución asistidos)
+### 2.2 — Check-out / check-in del equipo (retiro y devolución asistidos) → ⏳ pendiente de evaluar
 - **Booqable:** al retirar/devolver marcás ítem por ítem (con escaneo de código de barras/QR
   opcional) qué salió y qué volvió, y detecta faltantes.
 - **Rambla hoy:** el packing list (PDF con checkboxes) cubre la versión en papel; el estado
   `retirado`/`devuelto` es a nivel pedido, no ítem por ítem en pantalla.
 - **Por qué importa:** menos errores de qué volvió y qué no; base para "equipo dañado/faltante".
-- **Issue candidato:** nuevo, `feature` + `complexity:medium`. **Confirmar con el dueño** si lo usa
-  en Booqable y cuánto.
+- **Estado (2026-06-06):** el dueño **no conoce este flujo** → primero hay que explicárselo y que
+  decida si lo quiere. Sin issue hasta entonces.
 
 ### 2.3 — Activar los mails (no es feature, es ops)
 - **Rambla hoy:** infra de mails 100% construida pero en modo `test` (no envía). Falta setear
@@ -109,10 +113,11 @@ de robarle a Booqable el detalle de pedido".
 
 ## Prioridad 3 — adoptar si el negocio lo pide (no urgente)
 
-### 3.1 — Depósito / seña de garantía explícita
+### 3.1 — Depósito / seña de garantía explícita → ✅ #807 (futuro, atado a pagos)
 - **Booqable:** monto de garantía que se retiene y se devuelve, separado del pago del alquiler.
 - **Rambla hoy:** hay "seña" como pago parcial, pero no un **depósito reembolsable** modelado aparte.
-- **Confirmar:** ¿el dueño cobra depósito de garantía hoy? Si no, no se adopta.
+- **Decisión del dueño (2026-06-06):** sumarlo al **sistema de pagos**, que todavía no tiene claro
+  cómo lo quiere → es **feature para el futuro**, no se ataca hasta definir el modelo de pagos. #807.
 
 ### 3.2 — Pago online desde el portal (MP / Stripe)
 - **Booqable:** el cliente paga o deja la seña online al confirmar.
