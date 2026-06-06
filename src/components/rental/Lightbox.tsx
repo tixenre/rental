@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { XIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { ModalBackdrop } from "@/components/ui/modal-backdrop";
 
 interface LightboxPhoto {
   url: string;
@@ -40,9 +41,9 @@ export function Lightbox({ open, onClose, photos, index, onIndexChange }: Lightb
   const current = photos[Math.min(index, photos.length - 1)];
 
   return (
-    <div
-      className="fixed inset-0 z-[100] bg-black/95 flex flex-col"
-      onClick={onClose}
+    <ModalBackdrop
+      onClose={onClose}
+      className="z-[100] bg-black/95 flex flex-col"
       role="dialog"
       aria-modal="true"
     >
@@ -141,6 +142,6 @@ export function Lightbox({ open, onClose, photos, index, onIndexChange }: Lightb
           </div>
         </>
       )}
-    </div>
+    </ModalBackdrop>
   );
 }

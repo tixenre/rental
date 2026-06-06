@@ -30,6 +30,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Star, FileText, Filter, Info, X } from "lucide-react";
+import { ModalBackdrop } from "@/components/ui/modal-backdrop";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -392,14 +393,8 @@ function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () => void }
   });
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end"
-      onClick={onClose}
-    >
-      <div
-        className="bg-background w-full max-w-md h-full overflow-y-auto p-6 shadow-2xl border-l"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <ModalBackdrop onClose={onClose} className="z-50 bg-black/60 backdrop-blur-sm flex justify-end">
+      <div className="bg-background w-full max-w-md h-full overflow-y-auto p-6 shadow-2xl border-l">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -532,7 +527,7 @@ function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () => void }
           )}
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 
