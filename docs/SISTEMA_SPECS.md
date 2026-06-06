@@ -108,7 +108,7 @@ El JSON del dataset NO se edita post-seed (es dev artifact). Para cambios puntua
 
 Los equipos se relacionan entre sí por **specs compartidos** — el motor de compatibilidad (`backend/routes/specs.py::_compute_compat`) decide si dos equipos son compatibles, parciales o incompatibles según sus valores en specs marcadas con `es_compatibilidad=TRUE`.
 
-**Specs compartidos** (declarados en [`backend/seeds/compat_config.py`](../backend/seeds/compat_config.py)):
+**Specs compartidos** (declarados en el **registry de specs** — [`backend/specs/shared/`](../backend/specs/shared/); el `rol_compatibilidad` de Cámaras/Lentes vive en [`backend/specs/categorias/`](../backend/specs/categorias/)):
 
 | Spec | Modo | Aplica a | Resuelve |
 |---|---|---|---|
@@ -119,8 +119,8 @@ Los equipos se relacionan entre sí por **specs compartidos** — el motor de co
 
 **Cómo se conecta** (operativa):
 
-1. Los seeds importan `seeds/compat_config.py` y llaman `apply_compat_config(conn, spec_def_ids)` después de crear `spec_definitions` → marca cada spec con `es_compatibilidad=TRUE` + `compatibilidad_modo` + (si jerárquico) `enum_options` ordenadas.
-2. Lentes y Cámaras además llaman `apply_rol_compat(...)` después de crear `categoria_spec_templates` → setea `rol_compatibilidad` (`contenedor` o `contenido`) para que el motor sepa quién proyecta y quién recibe.
+1. Las specs compartidas declaran `es_compatibilidad=True` + `compatibilidad_modo` (y `enum_options` ordenadas si son jerárquicas) en el **registry** (`backend/specs/shared/`). `seeds/registry_seeder.py` las **upserta** en `spec_definitions` con esas columnas al sembrar el registry.
+2. Lentes y Cámaras declaran además `rol_compatibilidad` (`contenedor` o `contenido`) en `backend/specs/categorias/{lentes,camaras}.py` → el mismo seeder lo persiste, para que el motor sepa quién proyecta y quién recibe.
 3. El endpoint `GET /admin/equipos/{id}/compatibles` cruza specs de ambos equipos y devuelve overall ∈ `{compatible, compatible_con_crop, parcial, incompatible, requiere_adaptador, sin_relacion}` + razones por spec.
 
 **Casos típicos resueltos automáticamente** (sin tocar el motor):
