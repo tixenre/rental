@@ -154,13 +154,20 @@ def update_cliente(id: int, data: ClienteUpdate, request: Request):
     require_admin(request)
     conn = get_db()
     try:
-        if not conn.execute("SELECT id FROM clientes WHERE id=?", (id,)).fetchone():
+        actual = conn.execute("SELECT descuento FROM clientes WHERE id=?", (id,)).fetchone()
+        if not actual:
             raise HTTPException(404, "Cliente no encontrado")
         updates = data.model_dump(exclude_unset=True)
         if not updates:
             raise HTTPException(400, "Nada para actualizar")
         set_clause = ", ".join(f"{k}=?" for k in updates) + ", updated_at=CURRENT_TIMESTAMP"
         conn.execute(f"UPDATE clientes SET {set_clause} WHERE id=?", list(updates.values()) + [id])
+        # Si cambió el descuento del cliente, propagarlo a sus presupuestos
+        # (pedidos NO confirmados). Los confirmados/cerrados quedan congelados
+        # con su snapshot — lock de precio. Misma transacción → atómico.
+        if "descuento" in updates and (updates["descuento"] or 0) != (actual["descuento"] or 0):
+            from routes.alquileres import propagar_descuento_a_presupuestos
+            propagar_descuento_a_presupuestos(conn, id, updates["descuento"] or 0)
         conn.commit()
         row = conn.execute("SELECT * FROM clientes WHERE id=?", (id,)).fetchone()
         return row_to_dict(row)
