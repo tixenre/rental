@@ -1414,18 +1414,6 @@ export const adminApi = {
       { method: "DELETE" },
     ),
 
-  uploadLogo: async (file: File): Promise<{ ok: true; url: string }> => {
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await authedFetch("/api/admin/settings/upload-logo", {
-      method: "POST",
-      body: fd,
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json?.detail ?? `Upload logo → ${res.status}`);
-    return json as { ok: true; url: string };
-  },
-
   uploadOgImage: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
     fd.append("file", file);
