@@ -95,7 +95,6 @@ def list_clientes(
     per_page: int = Query(100, ge=1, le=500),
 ):
     require_admin(request)
-    conn   = get_db()
     offset = (page - 1) * per_page
     where  = "WHERE 1=1"
     params: list = []
@@ -108,7 +107,7 @@ def list_clientes(
         where += f" AND ({pred.where})"
         params += pred.where_params
 
-    try:
+    with get_db() as conn:
         total = conn.execute(f"SELECT COUNT(*) FROM clientes c {where}", params).fetchone()[0]
         if pred and pred.activo:
             select_params = pred.score_params + params + [per_page, offset]
@@ -128,28 +127,22 @@ def list_clientes(
             d.pop("_score", None)  # interno del ranking, no parte del contrato
             items.append(d)
         return {"total": total, "page": page, "per_page": per_page, "items": items}
-    finally:
-        conn.close()
 
 
 @router.get("/clientes/{id}")
 def get_cliente(id: int, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row  = conn.execute("SELECT * FROM clientes WHERE id=?", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
         return row_to_dict(row)
-    finally:
-        conn.close()
 
 
 @router.get("/clientes/{id}/pedidos")
 def get_cliente_pedidos(id: int, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         if not conn.execute("SELECT id FROM clientes WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Cliente no encontrado")
         rows = conn.execute("""
@@ -165,71 +158,63 @@ def get_cliente_pedidos(id: int, request: Request):
             ORDER BY p.created_at DESC NULLS LAST, p.numero_pedido DESC
         """, (id,)).fetchall()
         return [row_to_dict(r) for r in rows]
-    finally:
-        conn.close()
 
 
 @router.post("/clientes", status_code=201)
 def create_cliente(data: ClienteCreate, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
-        cur  = conn.execute("""
-            INSERT INTO clientes (nombre, apellido, telefono, email, direccion, cuit,
-                                  descuento, perfil_impuestos, notas, direccion_maps_url)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-        """, (data.nombre, data.apellido, data.telefono, data.email, data.direccion,
-              data.cuit, data.descuento, data.perfil_impuestos, data.notas, data.direccion_maps_url))
-        conn.commit()
-        row = conn.execute("SELECT * FROM clientes WHERE id=?", (cur.lastrowid,)).fetchone()
-        return row_to_dict(row)
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            cur  = conn.execute("""
+                INSERT INTO clientes (nombre, apellido, telefono, email, direccion, cuit,
+                                      descuento, perfil_impuestos, notas, direccion_maps_url)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+            """, (data.nombre, data.apellido, data.telefono, data.email, data.direccion,
+                  data.cuit, data.descuento, data.perfil_impuestos, data.notas, data.direccion_maps_url))
+            conn.commit()
+            row = conn.execute("SELECT * FROM clientes WHERE id=?", (cur.lastrowid,)).fetchone()
+            return row_to_dict(row)
+        except Exception:
+            conn.rollback()
+            raise
 
 
 @router.patch("/clientes/{id}")
 def update_cliente(id: int, data: ClienteUpdate, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
-        actual = conn.execute("SELECT descuento FROM clientes WHERE id=?", (id,)).fetchone()
-        if not actual:
-            raise HTTPException(404, "Cliente no encontrado")
-        updates = data.model_dump(exclude_unset=True)
-        if not updates:
-            raise HTTPException(400, "Nada para actualizar")
-        set_clause = ", ".join(f"{k}=?" for k in updates) + ", updated_at=CURRENT_TIMESTAMP"
-        conn.execute(f"UPDATE clientes SET {set_clause} WHERE id=?", list(updates.values()) + [id])
-        # Si cambió el descuento del cliente, propagarlo a sus presupuestos
-        # (pedidos NO confirmados). Los confirmados/cerrados quedan congelados
-        # con su snapshot — lock de precio. Misma transacción → atómico.
-        if "descuento" in updates and (updates["descuento"] or 0) != (actual["descuento"] or 0):
-            from routes.alquileres import propagar_descuento_a_presupuestos
-            propagar_descuento_a_presupuestos(conn, id, updates["descuento"] or 0)
-        conn.commit()
-        row = conn.execute("SELECT * FROM clientes WHERE id=?", (id,)).fetchone()
-        return row_to_dict(row)
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            actual = conn.execute("SELECT descuento FROM clientes WHERE id=?", (id,)).fetchone()
+            if not actual:
+                raise HTTPException(404, "Cliente no encontrado")
+            updates = data.model_dump(exclude_unset=True)
+            if not updates:
+                raise HTTPException(400, "Nada para actualizar")
+            set_clause = ", ".join(f"{k}=?" for k in updates) + ", updated_at=CURRENT_TIMESTAMP"
+            conn.execute(f"UPDATE clientes SET {set_clause} WHERE id=?", list(updates.values()) + [id])
+            # Si cambió el descuento del cliente, propagarlo a sus presupuestos
+            # (pedidos NO confirmados). Los confirmados/cerrados quedan congelados
+            # con su snapshot — lock de precio. Misma transacción → atómico.
+            if "descuento" in updates and (updates["descuento"] or 0) != (actual["descuento"] or 0):
+                from routes.alquileres import propagar_descuento_a_presupuestos
+                propagar_descuento_a_presupuestos(conn, id, updates["descuento"] or 0)
+            conn.commit()
+            row = conn.execute("SELECT * FROM clientes WHERE id=?", (id,)).fetchone()
+            return row_to_dict(row)
+        except Exception:
+            conn.rollback()
+            raise
 
 
 @router.delete("/clientes/{id}", status_code=204)
 def delete_cliente(id: int, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
-        if not conn.execute("SELECT id FROM clientes WHERE id=?", (id,)).fetchone():
-            raise HTTPException(404, "Cliente no encontrado")
-        conn.execute("DELETE FROM clientes WHERE id=?", (id,))
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            if not conn.execute("SELECT id FROM clientes WHERE id=?", (id,)).fetchone():
+                raise HTTPException(404, "Cliente no encontrado")
+            conn.execute("DELETE FROM clientes WHERE id=?", (id,))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise

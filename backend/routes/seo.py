@@ -77,8 +77,7 @@ def sitemap():
     # Detalle por equipo + páginas de categoría. Si la BD no está disponible,
     # devolvemos sitemap parcial con solo estáticas — Google reintenta.
     try:
-        conn = get_db()
-        try:
+        with get_db() as conn:
             equipos = conn.execute(f"""
                 SELECT e.id, {MARCA_SUBQUERY}, e.nombre,
                        COALESCE(e.updated_at, e.created_at) AS lastmod
@@ -100,8 +99,6 @@ def sitemap():
                   )
                 ORDER BY c.nombre
             """).fetchall()
-        finally:
-            conn.close()
 
         for r in equipos:
             lastmod_raw = r["lastmod"]

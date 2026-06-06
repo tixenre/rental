@@ -106,11 +106,8 @@ def reporte_liquidacion(
 ):
     require_admin(request)
     _validar_rango(desde, hasta)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         data = _data_liquidacion(conn, desde, hasta)
-    finally:
-        conn.close()
 
     if formato == "csv":
         filename = f"liquidacion_{desde}_a_{hasta}.csv"
@@ -147,12 +144,9 @@ async def reporte_liquidacion_pdf(
     from pdf import _liquidacion_html, _render_pdf
     from routes.estadisticas import compute_estadisticas
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         data = _data_liquidacion(conn, desde, hasta)
         stats = compute_estadisticas(conn)
-    finally:
-        conn.close()
 
     html = _liquidacion_html(data, _periodo_label(desde, hasta), stats=stats)
     if format == "html":
@@ -171,8 +165,7 @@ def reporte_destinatarios(request: Request):
     """Lista de mails guardada para enviar el reporte (se prefilla en el diálogo).
     Default: el mail de admin configurado, si hay."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute(
             "SELECT value FROM app_settings WHERE key = ?", (_DESTINATARIOS_KEY,)
         ).fetchone()
@@ -182,8 +175,6 @@ def reporte_destinatarios(request: Request):
 
         admin_to = email_service.get_admin_to()
         return {"destinatarios": [admin_to] if admin_to else []}
-    finally:
-        conn.close()
 
 
 class EnviarReporteBody(BaseModel):
@@ -213,8 +204,7 @@ async def enviar_reporte_mail(request: Request, body: EnviarReporteBody):
     from services.email.base import Attachment
 
     periodo = _periodo_label(body.desde, body.hasta)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         data = _data_liquidacion(conn, body.desde, body.hasta)
         stats = compute_estadisticas(conn)
         # Persistir la lista de destinatarios para la próxima vez.
@@ -228,8 +218,6 @@ async def enviar_reporte_mail(request: Request, body: EnviarReporteBody):
             (_DESTINATARIOS_KEY, ", ".join(validos), (admin or {}).get("email")),
         )
         conn.commit()
-    finally:
-        conn.close()
 
     reporte_html = _liquidacion_html(data, periodo, stats=stats)
     pdf_bytes = await _render_pdf(reporte_html)
@@ -270,11 +258,8 @@ async def enviar_reporte_mail(request: Request, body: EnviarReporteBody):
 def reporte_reconciliacion(request: Request):
     """Chequeos de integridad de los datos de liquidación (semáforo de confianza)."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         return reconciliar(conn)
-    finally:
-        conn.close()
 
 
 def _validar_mes_http(mes: str) -> None:
@@ -290,11 +275,8 @@ def cerrar_mes_liquidacion(request: Request, mes: str):
     Idempotente: re-cerrar recalcula la foto con los datos actuales (#721)."""
     admin = require_admin(request)
     _validar_mes_http(mes)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         return cerrar_mes(conn, mes, admin.get("email"))
-    finally:
-        conn.close()
 
 
 @router.delete("/admin/reportes/cierres/{mes}")
@@ -303,9 +285,6 @@ def reabrir_mes_liquidacion(request: Request, mes: str):
     vivo (para corregir; después se vuelve a cerrar) (#721)."""
     require_admin(request)
     _validar_mes_http(mes)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         reabierto = reabrir_mes(conn, mes)
-    finally:
-        conn.close()
     return {"mes": mes, "cerrado": False, "reabierto": reabierto}

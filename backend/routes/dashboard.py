@@ -14,11 +14,10 @@ router = APIRouter()
 
 @router.get("/dashboard")
 def get_dashboard(_admin: dict = Depends(require_admin)):
-    conn    = get_db()
     hoy     = datetime.date.today().isoformat()
     manana  = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
     mes_ini = hoy[:7] + "-01"
-    try:
+    with get_db() as conn:
         pendientes = conn.execute(
             "SELECT COUNT(*) FROM alquileres WHERE estado='presupuesto'"
         ).fetchone()[0]
@@ -81,8 +80,6 @@ def get_dashboard(_admin: dict = Depends(require_admin)):
             "devuelven_manana": [row_to_dict(r) for r in devuelven_manana],
             "equipos_afuera":   [row_to_dict(r) for r in equipos_afuera],
         }
-    finally:
-        conn.close()
 
 
 @router.get("/calendario")
@@ -91,8 +88,7 @@ def get_calendario(
     hasta: str = Query(..., description="YYYY-MM-DD"),
     _admin: dict = Depends(require_admin),
 ):
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute("""
             SELECT p.id, p.numero_pedido, p.cliente_nombre, p.estado,
                    p.fecha_desde, p.fecha_hasta, p.monto_total,
@@ -107,5 +103,3 @@ def get_calendario(
             ORDER BY p.fecha_desde
         """, (desde, hasta)).fetchall()
         return [row_to_dict(r) for r in rows]
-    finally:
-        conn.close()
