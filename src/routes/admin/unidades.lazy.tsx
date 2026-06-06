@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Ruler, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ModalBackdrop } from "@/components/ui/modal-backdrop";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -272,14 +273,11 @@ function UnidadFormModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={onClose}
+    <ModalBackdrop
+      onClose={onClose}
+      className="z-50 bg-black/60 flex items-center justify-center p-4"
     >
-      <div
-        className="w-full max-w-md rounded-lg bg-background border hairline shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-full max-w-md rounded-lg bg-background border hairline shadow-lg">
         <header className="border-b hairline px-4 py-3">
           <div className="font-display text-base text-ink">
             {isNew ? "Nueva unidad" : "Editar unidad"}
@@ -328,6 +326,6 @@ function UnidadFormModal({
           </Button>
         </footer>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
