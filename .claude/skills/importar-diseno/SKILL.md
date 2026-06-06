@@ -148,6 +148,19 @@ Diferencias clave respecto del track web:
   reposición, fecha de compra, cliente RI) para que cada documento rinda todas sus partes. Si el
   modelo de datos gana un campo que un documento muestra, sumalo al sample del helper.
 
+  - **Screenshot de HTML vs PDF REAL — `--real` (clave para layout de impresión).** Por default
+    `render-doc.py` saca un **screenshot del HTML** (rápido, muestra todo el flujo en una imagen).
+    PERO el screenshot **ignora `@page`** y clipea distinto los márgenes negativos → **no refleja la
+    paginación ni el sangrado reales**. Para layout sensible a la impresión (headers full-bleed,
+    márgenes, saltos de página) usá **`--real`**: genera el PDF A4 real (`pdf._render_pdf`) y lo
+    rasteriza con PyMuPDF (`pip install pymupdf`), una imagen por página con `--all-pages`. Caso
+    testigo: un header con barra full-bleed que sangra al borde (`@page:first{margin-top:0}`) se ve
+    **cortado** en el screenshot de HTML pero **correcto** en el PDF real — sin `--real` lo
+    "arreglás" a ciegas contra un render mentiroso.
+    ```bash
+    python .claude/skills/importar-diseno/render-doc.py reportes --real --all-pages
+    ```
+
 - **El input suele ser solo imágenes**, no una carpeta `design_handoff_<feature>/` con `.tsx`. No hay
   TSX porque los documentos no son React — son templates de Python. El loop es: **renderizá el output
   REAL actual** (con `render-doc.py`) → **compará contra las imágenes que pegó el dueño** → implementá

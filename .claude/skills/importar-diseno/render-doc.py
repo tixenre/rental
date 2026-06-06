@@ -14,6 +14,10 @@ Uso (desde la raíz del repo, con el venv del backend activo):
 
 Documentos: presupuesto · albaran · contrato · packing · reportes · todos
 Flags: --out <path> (default /tmp/doc-<tipo>.png) · --width <px> (default 820)
+       --real   → rasteriza el PDF A4 REAL (paginación + sangrado @page reales),
+                  no un screenshot de HTML. Necesita pymupdf (`pip install pymupdf`).
+                  Usalo para verificar headers full-bleed / márgenes / saltos de página.
+       --all-pages → con --real, rasteriza todas las páginas (sufijo -pN).
 
 El script imprime `PNG: /tmp/...` por cada render → Claude lee ese PNG con la tool
 de imágenes y lo compara con el mockup.
@@ -151,6 +155,41 @@ async def _shot(htmlstr: str, out: str, width: int) -> None:
         await b.close()
 
 
+async def _shot_real(htmlstr: str, out: str, all_pages: bool) -> list[str]:
+    """Rasteriza el PDF A4 **real** (no un screenshot de HTML).
+
+    Genera el PDF con el motor del repo (`pdf._render_pdf` → `page.pdf` A4) y lo
+    rasteriza con PyMuPDF. A diferencia de `_shot`, esto refleja la **paginación
+    y el sangrado `@page` reales** — imprescindible para verificar headers
+    full-bleed, márgenes y saltos de página, que el screenshot de HTML NO muestra
+    (ignora `@page` y clipea distinto los márgenes negativos → un header que
+    sangra al borde se ve mal en el screenshot pero bien en el PDF, y viceversa).
+
+    Devuelve la lista de PNG escritos (uno por página si `all_pages`).
+    """
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        raise SystemExit(
+            "El modo --real necesita PyMuPDF. Instalalo en el venv del backend:\n"
+            "    pip install pymupdf"
+        )
+    from pdf import _render_pdf
+
+    pdf_bytes = await _render_pdf(htmlstr)
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    base = out[:-4] if out.lower().endswith(".png") else out
+    written: list[str] = []
+    pages = range(doc.page_count) if all_pages else [0]
+    for i in pages:
+        pix = doc[i].get_pixmap(matrix=fitz.Matrix(2, 2))
+        path = out if (i == 0 and not all_pages) else f"{base}-p{i + 1}.png"
+        pix.save(path)
+        written.append(path)
+    doc.close()
+    return written
+
+
 _TIPOS = ["presupuesto", "albaran", "contrato", "packing", "reportes"]
 
 
@@ -159,12 +198,28 @@ def main() -> None:
     ap.add_argument("tipo", choices=_TIPOS + ["todos"])
     ap.add_argument("--out", default=None)
     ap.add_argument("--width", type=int, default=820)
+    ap.add_argument(
+        "--real",
+        action="store_true",
+        help="Rasteriza el PDF A4 REAL (paginación + sangrado @page reales), en "
+        "vez del screenshot de HTML. Necesita pymupdf. Usalo para verificar "
+        "headers full-bleed / márgenes / saltos de página.",
+    )
+    ap.add_argument(
+        "--all-pages",
+        action="store_true",
+        help="Con --real: rasteriza TODAS las páginas (sufijo -pN). Default: solo la 1ª.",
+    )
     args = ap.parse_args()
     tipos = _TIPOS if args.tipo == "todos" else [args.tipo]
     for tipo in tipos:
         out = args.out if (args.out and args.tipo != "todos") else f"/tmp/doc-{tipo}.png"
-        asyncio.run(_shot(_html_for(tipo), out, args.width))
-        print(f"PNG: {out}")
+        if args.real:
+            for path in asyncio.run(_shot_real(_html_for(tipo), out, args.all_pages)):
+                print(f"PNG: {path}")
+        else:
+            asyncio.run(_shot(_html_for(tipo), out, args.width))
+            print(f"PNG: {out}")
 
 
 if __name__ == "__main__":
