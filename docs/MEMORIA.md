@@ -400,6 +400,25 @@
   el Resumen general con el clean start; (4) reintroducir expansión/atribución de plata ad-hoc fuera de
   `backend/reportes/`. Extiende la decisión _2026-06-03 — `backend/reportes/` = motor único_.
 
+### 2026-06-06 — El Presupuesto (PDF) muestra el IVA aparte, no sumado al total
+
+- **Contexto:** al alinear los 5 documentos PDF al mockup de Claude Design, el Presupuesto
+  pasó a mostrar el **total como el neto** (con descuento) y un sufijo **"+ IVA"** al lado,
+  en vez de sumar el IVA dentro del número grande (como hacía antes, con filas "Neto" e
+  "IVA 21%").
+- **Decisión:** en el **Presupuesto**, para un cliente **responsable inscripto**, el total
+  grande es el **neto** y el IVA se anota como **"+ IVA"** (no se suma ni se discrimina el monto
+  acá). Para no-RI, total = neto sin sufijo. Es **decisión del dueño**, puramente de presentación.
+- **Why:** el presupuesto es un documento **previo**, no la factura. El cliente RI ve el precio
+  sin IVA con la aclaración de que se agrega; la **Factura A** real sigue discriminando el IVA por
+  el motor de precios (`services/precios.py`, intacto). Mostrar el neto grande es más limpio y es
+  lo que pidió el dueño.
+- **How to apply / quién hace cumplir:** **no "arreglar" esto** pensando que es un bug — el
+  Presupuesto NO suma el IVA al total a propósito. Vive en `pdf_templates._pedido_html`
+  (sufijo `.iva-suffix`). El **remito/contrato/reportes y la Factura A** no cambian. El supervisor
+  marca como hallazgo cualquier cambio que vuelva a sumar el IVA al total del presupuesto sin
+  aprobación del dueño.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
