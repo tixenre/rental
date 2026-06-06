@@ -16,6 +16,7 @@ from rate_limit import limiter
 from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
+from routes.clientes import nombre_completo_cliente
 from services.email import send_email, send_raw_email, render_template, wrap_preview, Attachment
 from services.email.service import get_admin_to
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
@@ -318,11 +319,11 @@ def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
 def _aplicar_contacto_cliente(pedido: dict, c: dict) -> None:
     """Sobrescribe nombre/email/teléfono del pedido con los datos `c` del cliente.
 
-    El nombre se arma con el formato del back-office ("Apellido, Nombre"). El
-    email/teléfono se sobrescriben solo si el cliente tiene un valor — si está
+    El nombre se arma "Nombre Apellido" (helper único `nombre_completo_cliente`).
+    El email/teléfono se sobrescriben solo si el cliente tiene un valor — si está
     vacío en la ficha, se conserva la foto del pedido para no perder el contacto.
     """
-    pedido["cliente_nombre"] = f"{c['apellido']}, {c['nombre']}"
+    pedido["cliente_nombre"] = nombre_completo_cliente(c["nombre"], c["apellido"])
     if c.get("email"):
         pedido["cliente_email"] = c["email"]
     if c.get("telefono"):
@@ -941,7 +942,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
         if data.cliente_id:
             c = conn.execute("SELECT * FROM clientes WHERE id=?", (data.cliente_id,)).fetchone()
             if c:
-                cliente_nombre   = f"{c['apellido']}, {c['nombre']}"
+                cliente_nombre   = nombre_completo_cliente(c["nombre"], c["apellido"])
                 cliente_email    = cliente_email    or c["email"]
                 cliente_telefono = cliente_telefono or c["telefono"]
                 descuento_pct    = c["descuento"] or 0.0
@@ -1477,7 +1478,7 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
     if cliente_cambio:
         c = conn.execute("SELECT * FROM clientes WHERE id=?", (payload["cliente_id"],)).fetchone()
         if c:
-            payload.setdefault("cliente_nombre",   f"{c['apellido']}, {c['nombre']}")
+            payload.setdefault("cliente_nombre",   nombre_completo_cliente(c["nombre"], c["apellido"]))
             payload.setdefault("cliente_email",    c["email"])
             payload.setdefault("cliente_telefono", c["telefono"])
             if "descuento_pct" not in payload:

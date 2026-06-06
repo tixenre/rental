@@ -79,6 +79,7 @@ import {
   type PedidoMode,
 } from "./usePedidoDraft";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoSearchSheet } from "./EquipoSearchSheet";
 import { ClienteAutocomplete } from "./ClienteAutocomplete";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "./EnviarDocsDialog";
@@ -574,7 +575,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                         draft.setDatos({
                           ...draft.datos!,
                           cliente_id: c.id,
-                          cliente_nombre: `${c.apellido}, ${c.nombre}`,
+                          cliente_nombre: nombreCliente(c),
                           cliente_email: c.email ?? "",
                           cliente_telefono: c.telefono ?? "",
                           // El descuento sigue al cliente: si el nuevo no tiene

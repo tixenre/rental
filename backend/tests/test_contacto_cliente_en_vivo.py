@@ -61,7 +61,7 @@ def test_sobrescribe_con_el_dato_actual():
                          "email": "nuevo@mail.com", "telefono": "222-nuevo"}})
     p = _foto()
     _enriquecer_pedido_con_cliente(conn, p)
-    assert p["cliente_nombre"] == "Pereyra, Juan"   # apellido corregido
+    assert p["cliente_nombre"] == "Juan Pereyra"   # apellido corregido, "Nombre Apellido"
     assert p["cliente_email"] == "nuevo@mail.com"
     assert p["cliente_telefono"] == "222-nuevo"
     assert p["descuento_pct"] == 30                  # plata intacta
@@ -90,7 +90,7 @@ def test_email_vacio_en_ficha_no_borra_el_contacto():
                          "email": "", "telefono": None}})
     p = _foto()
     _enriquecer_pedido_con_cliente(conn, p)
-    assert p["cliente_nombre"] == "Pereyra, Juan"
+    assert p["cliente_nombre"] == "Juan Pereyra"
     assert p["cliente_email"] == "viejo@mail.com"
     assert p["cliente_telefono"] == "111-viejo"
 
@@ -111,6 +111,6 @@ def test_batch_listado():
          "cliente_email": "manual@mail.com", "cliente_telefono": "000"},
     ]
     _enriquecer_pedidos_con_cliente(conn, pedidos)
-    assert pedidos[0]["cliente_nombre"] == "Pereyra, Juan"
-    assert pedidos[1]["cliente_nombre"] == "Gómez, Ana"
+    assert pedidos[0]["cliente_nombre"] == "Juan Pereyra"
+    assert pedidos[1]["cliente_nombre"] == "Ana Gómez"
     assert pedidos[2]["cliente_nombre"] == "Manual"  # sin cliente vinculado, intacto
