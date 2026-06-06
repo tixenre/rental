@@ -2039,9 +2039,10 @@ def _regenerate_auto_tags_chunk(conn, ids) -> int:
     """Procesa una tanda de equipos (sin la limpieza de huérfanas, que hace el
     caller una vez al final). Devuelve cuántos equipos se procesaron."""
     # 1) Cargar marca/modelo/nombre de todos los equipos de la tanda en UNA query.
+    #    Alias `e` + helper MARCA_SUBQUERY (convención 2026-05-26).
     eq_rows = conn.execute(
-        "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo "
-        "FROM equipos WHERE id = ANY(%s)",
+        f"SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo "
+        "FROM equipos e WHERE e.id = ANY(%s)",
         (ids,),
     ).fetchall()
     if not eq_rows:
