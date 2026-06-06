@@ -8,8 +8,7 @@ Cubre:
    como parte del flujo de seeding completo).
 """
 
-import sys
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

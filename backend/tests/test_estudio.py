@@ -51,7 +51,6 @@ class TestFotoPathEstudio:
         assert path.endswith(".webp")
 
     def test_paths_unicos(self):
-        import time
         from routes.estudio import _foto_path_estudio
         paths = {_foto_path_estudio() for _ in range(5)}
         # Si el reloj corre muy rápido puede colapsar; aceptamos ≥ 1 único

@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
-from database import get_db, row_to_dict, to_datetime, to_iso, now_ar
+from database import get_db, row_to_dict, to_datetime, to_iso, now_ar, MARCA_SUBQUERY, marca_subquery
 from rate_limit import limiter
 from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin, is_admin_email
@@ -30,8 +30,8 @@ from config import SITE_URL
 # es la constante canónica del dominio. El resto de las primitivas se importan
 # directo de `reservas` donde se usan (routes.estudio, routes.cliente_portal).
 # Ver issue #501, Fase 1.
-from reservas import ESTADOS_RESERVADO
 from reservas import (
+    ESTADOS_RESERVADO,  # noqa: F401 — re-export canónico (guard: test_reservas_sql_safety)
     calcular_disponibilidad as _calcular_disponibilidad,
     dias_no_disponibles as _dias_no_disponibles,
     validar_stock as _check_stock,
@@ -71,9 +71,9 @@ def _maybe_finalizar(conn, pedido_id: int):
 
 
 def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
-    rows = conn.execute("""
+    rows = conn.execute(f"""
         SELECT pi.*, e.nombre,
-               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+               {MARCA_SUBQUERY},
                e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo,
                ef.contenido_incluido_json
@@ -92,7 +92,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     equipo_ids = list({item["equipo_id"] for item in items})
     placeholders = ",".join("?" for _ in equipo_ids)
     comp_rows = conn.execute(f"""
-        SELECT kc.*, ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.foto_url, ec.cantidad AS stock_total,
+        SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.cantidad AS stock_total,
                ec.nombre_publico, ec.nombre_publico_largo
         FROM kit_componentes kc
         JOIN equipos ec ON ec.id = kc.componente_id
@@ -156,7 +156,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     ph = ",".join(["?"] * len(pedido_ids))
     rows = conn.execute(f"""
         SELECT pi.*, e.nombre,
-               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+               {MARCA_SUBQUERY},
                e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
@@ -171,7 +171,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     if equipo_ids:
         cph = ",".join(["?"] * len(equipo_ids))
         comp_rows = conn.execute(f"""
-            SELECT kc.*, ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.foto_url, ec.cantidad AS stock_total,
+            SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.cantidad AS stock_total,
                    ec.nombre_publico, ec.nombre_publico_largo
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
@@ -1619,8 +1619,8 @@ DOCUMENTOS = {
 def _add_componentes(conn, items: list[dict]) -> None:
     """Agrega `componentes` a cada item (kits). Compartido por albarán y contrato."""
     for item in items:
-        comp_rows = conn.execute("""
-            SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca,
+        comp_rows = conn.execute(f"""
+            SELECT ec.nombre, {marca_subquery('ec')},
                    ec.modelo, ec.serie, ec.valor_reposicion,
                    ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
             FROM kit_componentes kc
@@ -1649,8 +1649,8 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
-        items = conn.execute("""
-            SELECT pi.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
+        items = conn.execute(f"""
+            SELECT pi.cantidad, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
                    e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
             FROM alquiler_items pi
             JOIN equipos e ON e.id = pi.equipo_id

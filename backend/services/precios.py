@@ -93,7 +93,9 @@ def descuento_aplicable(
     """
     cli = max(0.0, float(descuento_cliente_pct or 0))
     jor = max(0.0, float(descuento_jornadas_pct or 0))
-    return max(cli, jor)
+    # Topar en 100: un descuento > 100% daría neto/total NEGATIVO. Solo lo
+    # podría setear un admin, pero acotamos para no perder plata por un typo.
+    return min(100.0, max(cli, jor))
 
 
 def es_responsable_inscripto(perfil_impuestos: Optional[str]) -> bool:

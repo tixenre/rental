@@ -7,7 +7,6 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { whatsappLink } from "./whatsapp";
 
 /** Fallback hardcoded. El admin puede sobreescribirlo desde /admin/diseno. */
 const FALLBACK_PHONE = "+5492235852510";
@@ -33,16 +32,4 @@ export function useBusinessPhone(): string {
     staleTime: 5 * 60 * 1000, // 5 min
   });
   return q.data ?? FALLBACK_PHONE;
-}
-
-/**
- * Arma el link a wa.me del negocio con un mensaje opcional pre-llenado.
- * Devuelve `null` si el teléfono no es parseable (no debería pasar).
- *
- * IMPORTANTE: para que tome el teléfono configurado en /admin/diseno, el
- * caller debe usar `useBusinessPhone()` y armar el link con `whatsappLink`
- * directamente. Esta función usa el fallback — útil en contextos no-React.
- */
-export function businessWhatsappLink(message?: string): string | null {
-  return whatsappLink({ phone: BUSINESS_PHONE, message });
 }

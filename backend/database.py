@@ -3,12 +3,10 @@ database.py — Conexión PostgreSQL con pool de conexiones, migraciones y helpe
 """
 
 import logging
-import os
 import pathlib
 import psycopg2
 import psycopg2.extras
 import psycopg2.pool
-from datetime import datetime
 
 from config import settings
 from busqueda.motor import CAMPO_PLANTILLA
@@ -41,13 +39,29 @@ FRONT_NEW = BASE.parent / "dist"
 # quedaron sin migrar → 500s (#499). El helper único acá garantiza que cualquier
 # query nueva use la forma correcta y que "que no se repita el olvido".
 #
-# Uso (todas las queries asumen `equipos` aliasado como `e`):
+# Uso (la convención es aliasar `equipos` como `e`):
 #     conn.execute(f"SELECT e.id, e.nombre, {MARCA_SUBQUERY} FROM equipos e ...")
-# Para predicados en WHERE/COALESCE sin alias:
+# Para predicados en WHERE/COALESCE:
 #     conn.execute(f"... WHERE LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(?) ...")
+# Cuando el equipo va con OTRO alias (ej. `ec` para componentes de combo/kit, o
+# la tabla `equipos` sin aliasar), pasar el alias al helper:
+#     f"SELECT ec.nombre, {marca_subquery('ec')} FROM ... equipos ec ..."
+#     f"SELECT id, {marca_subquery('equipos')} FROM equipos WHERE id = %s"
 
-MARCA_NOMBRE_EXPR = "(SELECT nombre FROM marcas WHERE id = e.brand_id)"
-MARCA_SUBQUERY = f"{MARCA_NOMBRE_EXPR} AS marca"
+
+def marca_nombre_expr(alias: str = "e") -> str:
+    """Subquery que resuelve `marcas.nombre` por `<alias>.brand_id` (sin `AS`)."""
+    return f"(SELECT nombre FROM marcas WHERE id = {alias}.brand_id)"
+
+
+def marca_subquery(alias: str = "e") -> str:
+    """`marca_nombre_expr(alias)` con `AS marca` — para la lista de SELECT."""
+    return f"{marca_nombre_expr(alias)} AS marca"
+
+
+# Constantes para el caso por defecto (alias `e`), las más usadas.
+MARCA_NOMBRE_EXPR = marca_nombre_expr()
+MARCA_SUBQUERY = marca_subquery()
 
 
 # ── Config BD desde variables de entorno ─────────────────────────────────────
@@ -1662,7 +1676,7 @@ def attach_kit(conn, equipos: list[dict]) -> list[dict]:
     cur.execute(f"""
         SELECT kc.equipo_id, kc.componente_id, kc.cantidad,
                kc.descuento_pct, kc.esencial,
-               e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
+               e.nombre, {MARCA_SUBQUERY}, e.foto_url
         FROM kit_componentes kc
         JOIN equipos e ON e.id = kc.componente_id AND e.eliminado_at IS NULL
         WHERE kc.equipo_id IN ({placeholders})
@@ -1958,7 +1972,7 @@ def regenerate_auto_tags(conn, equipo_id: int) -> int:
     No toca las `origen='manual'`. Devuelve cuántas auto-tags quedaron asignadas.
     """
     eq = conn.execute(
-        "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo FROM equipos WHERE id = %s", (equipo_id,)
+        f"SELECT id, nombre, {marca_subquery('equipos')}, modelo FROM equipos WHERE id = %s", (equipo_id,)
     ).fetchone()
     if not eq:
         return 0

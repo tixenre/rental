@@ -59,11 +59,12 @@ def test_delete_equipo_borra_blob_r2(monkeypatch):
 
     cfg = {"bucket": "equipos-fotos", "public_base": "https://cdn.example.com"}
     monkeypatch.setattr(eq, "_r2_config", lambda: cfg)
+    monkeypatch.setattr(eq, "require_admin", lambda request: {"email": "admin@test.com"})
 
     deleted_keys = []
     monkeypatch.setattr(eq, "_delete_from_r2", lambda key: deleted_keys.append(key) or True)
 
-    eq.delete_equipo(7)
+    eq.delete_equipo(7, request=None)
 
     assert deleted_keys == ["equipos/7_cam/scrape.html"]
 
@@ -73,6 +74,7 @@ def test_delete_equipo_sin_html_no_toca_r2(monkeypatch):
     row = {"id": 8, "html_source_url": None}
     conn = _FakeConn(row)
     monkeypatch.setattr(eq, "get_db", lambda: conn)
+    monkeypatch.setattr(eq, "require_admin", lambda request: {"email": "admin@test.com"})
 
     called = {"r2": False}
     def _boom(key):
@@ -80,7 +82,7 @@ def test_delete_equipo_sin_html_no_toca_r2(monkeypatch):
         raise AssertionError("no debería tocar R2 sin html_source_url")
     monkeypatch.setattr(eq, "_delete_from_r2", _boom)
 
-    eq.delete_equipo(8)
+    eq.delete_equipo(8, request=None)
     assert called["r2"] is False
 
 

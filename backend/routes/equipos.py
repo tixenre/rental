@@ -29,10 +29,6 @@ from reservas.semantics import componentes_de
 from routes.auth import get_session
 from admin_guard import require_admin
 from services.nombre_service import actualizar_nombres_de
-from services.spec_render import (
-    format_tabla_value,
-    norm_spec_label,
-)
 
 router = APIRouter()
 
@@ -177,8 +173,6 @@ _SPEC_KEY_TRANSLATIONS = {
     "mobile app compatible": "Compatible con app móvil",
     "power sources": "Fuentes de alimentación",
     "usb/lightning connectivity": "Conectividad USB/Lightning",
-    "battery": "Batería",
-    "lens mount": "Lens mount",
 }
 
 
@@ -779,7 +773,7 @@ def list_equipos(
 
     if marca:
         # Filtro por marca exacta (case-insensitive) contra marcas.nombre (brand_id FK).
-        base_sql += " AND LOWER(COALESCE((SELECT nombre FROM marcas WHERE id = e.brand_id), '')) = LOWER(?)"
+        base_sql += f" AND LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(?)"
         params.append(marca)
 
     # ── Sort ──
@@ -886,7 +880,7 @@ def get_equipo(id_or_slug: str):
 
     with get_db() as conn:
         row = conn.execute(
-            "SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id = ?", (actual_id,)
+            f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id = ?", (actual_id,)
         ).fetchone()
         if not row:
             raise HTTPException(404, "Equipo no encontrado")
@@ -897,9 +891,9 @@ def get_equipo(id_or_slug: str):
         # `equipo.specs` (dict keyed por spec_key) en vez de las columnas
         # legacy de equipo_fichas. Mantenemos `ficha` para back-compat.
         equipo = attach_specs_estructuradas(conn, [equipo])[0]
-        kit = conn.execute("""
+        kit = conn.execute(f"""
             SELECT kc.componente_id, kc.cantidad, kc.descuento_pct, kc.esencial,
-                   e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
+                   e.nombre, {MARCA_SUBQUERY}, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
             WHERE kc.equipo_id = ?  ORDER BY kc.orden ASC, e.nombre ASC
         """, (actual_id,)).fetchall()
@@ -980,7 +974,8 @@ def _resolve_brand_id(conn, nombre: str | None) -> int | None:
 
 
 @router.post("/equipos", status_code=201)
-def create_equipo(data: EquipoCreate):
+def create_equipo(data: EquipoCreate, request: Request):
+    require_admin(request)
     with get_db() as conn:
         try:
             # Validar serie única (rechaza 409 si choca con otro activo)
@@ -1006,7 +1001,7 @@ def create_equipo(data: EquipoCreate):
             except Exception:
                 pass
             conn.commit()
-            row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (new_id,)).fetchone()
+            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (new_id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]
             return equipo
         except Exception:
@@ -1030,10 +1025,11 @@ def _normalize_fecha_compra(value):
 
 
 @router.patch("/equipos/{id}")
-def update_equipo(id: int, data: EquipoUpdate):
+def update_equipo(id: int, data: EquipoUpdate, request: Request):
+    require_admin(request)
     with get_db() as conn:
         try:
-            existing = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+            existing = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
             if not existing:
                 raise HTTPException(404, "Equipo no encontrado")
             updates = data.model_dump(exclude_unset=True)
@@ -1087,7 +1083,7 @@ def update_equipo(id: int, data: EquipoUpdate):
                 except Exception:
                     pass
             conn.commit()
-            row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]
             return equipo
         except Exception:
@@ -1096,16 +1092,17 @@ def update_equipo(id: int, data: EquipoUpdate):
 
 
 @router.post("/equipos/{id}/duplicate")
-def duplicate_equipo(id: int):
+def duplicate_equipo(id: int, request: Request):
     """
     Duplica un equipo: copia equipo + ficha + categorías + kit. La nueva fila
     arranca con `serie` vacía (debe ser única por equipo), `ficha_completa = false`
     (para forzar al admin a revisar) y `cantidad = 1` (default seguro).
     Útil cuando comprás varias unidades del mismo modelo con series distintas.
     """
+    require_admin(request)
     with get_db() as conn:
         try:
-            src = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+            src = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
             if not src:
                 raise HTTPException(404, "Equipo no encontrado")
             src_d = row_to_dict(src)
@@ -1145,11 +1142,10 @@ def duplicate_equipo(id: int):
             cats = conn.execute(
                 "SELECT categoria_id, orden FROM equipo_categorias WHERE equipo_id=?", (id,)
             ).fetchall()
-            for cat in cats:
-                conn.execute(
-                    "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
-                    (new_id, cat["categoria_id"], cat["orden"]),
-                )
+            conn.executemany(
+                "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
+                [(new_id, cat["categoria_id"], cat["orden"]) for cat in cats],
+            )
 
             # Copiar etiquetas MANUALES (las auto se regeneran al setear marca/
             # modelo/categorías). Sin esto, el duplicado pierde los tags que
@@ -1159,22 +1155,20 @@ def duplicate_equipo(id: int):
                 "WHERE equipo_id=? AND origen='manual'",
                 (id,),
             ).fetchall()
-            for e in etqs:
-                conn.execute(
-                    "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen) "
-                    "VALUES (?, ?, ?, 'manual')",
-                    (new_id, e["etiqueta_id"], e["orden"]),
-                )
+            conn.executemany(
+                "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen) "
+                "VALUES (?, ?, ?, 'manual')",
+                [(new_id, e["etiqueta_id"], e["orden"]) for e in etqs],
+            )
 
             # Copiar kit
             kit = conn.execute(
                 "SELECT componente_id, cantidad, orden FROM kit_componentes WHERE equipo_id=?", (id,)
             ).fetchall()
-            for (componente_id, cantidad, orden) in kit:
-                conn.execute(
-                    "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, orden) VALUES (?, ?, ?, ?)",
-                    (new_id, componente_id, cantidad, orden),
-                )
+            conn.executemany(
+                "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, orden) VALUES (?, ?, ?, ?)",
+                [(new_id, componente_id, cantidad, orden) for (componente_id, cantidad, orden) in kit],
+            )
 
             # Regenerar etiquetas auto (categoría/marca/modelo/nombre) sobre el
             # duplicado. Las manuales ya las copiamos arriba; esto agrega las auto
@@ -1185,7 +1179,7 @@ def duplicate_equipo(id: int):
                 logger.warning("regenerate_auto_tags falló para duplicado %s: %s", new_id, e)
 
             conn.commit()
-            row = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (new_id,)).fetchone()
+            row = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (new_id,)).fetchone()
             return attach_tags(conn, [row_to_dict(row)])[0]
         except Exception:
             conn.rollback()
@@ -1275,12 +1269,10 @@ def bulk_action(payload: BulkActionInput, request: Request):
                     f"DELETE FROM equipo_categorias WHERE equipo_id IN ({placeholders})",
                     ids,
                 )
-                for eid in ids:
-                    for orden, cid_int in enumerate(ancestor_ids):
-                        conn.execute(
-                            "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
-                            (eid, cid_int, orden),
-                        )
+                conn.executemany(
+                    "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
+                    [(eid, cid_int, orden) for eid in ids for orden, cid_int in enumerate(ancestor_ids)],
+                )
                 # Regeneración batch (1 pasada para los N equipos, no N+1).
                 try:
                     regenerate_auto_tags_batch(conn, ids)
@@ -1301,16 +1293,14 @@ def bulk_action(payload: BulkActionInput, request: Request):
                     raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
                 # Expandimos a ancestros una sola vez para todos los equipos.
                 ancestor_ids = _expand_to_ancestors(conn, [payload.categoria_id])
-                for eid in ids:
-                    for orden, cid_int in enumerate(ancestor_ids):
-                        conn.execute(
-                            """
-                            INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-                            VALUES (?, ?, ?)
-                            ON CONFLICT (equipo_id, categoria_id) DO NOTHING
-                            """,
-                            (eid, cid_int, orden),
-                        )
+                conn.executemany(
+                    """
+                    INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT (equipo_id, categoria_id) DO NOTHING
+                    """,
+                    [(eid, cid_int, orden) for eid in ids for orden, cid_int in enumerate(ancestor_ids)],
+                )
                 # Regeneración batch (1 pasada para los N equipos, no N+1).
                 try:
                     regenerate_auto_tags_batch(conn, ids)
@@ -1366,9 +1356,10 @@ def bulk_action(payload: BulkActionInput, request: Request):
 
 
 @router.delete("/equipos/{id}", status_code=204)
-def delete_equipo(id: int):
+def delete_equipo(id: int, request: Request):
     """Soft delete: marca eliminado_at = NOW(). Preserva historial de
     alquileres del equipo dado de baja. Restaurable vía POST /restore (#206)."""
+    require_admin(request)
     html_source_url = None
     with get_db() as conn:
         try:
@@ -1420,12 +1411,13 @@ def get_ficha(id: int):
 
 
 @router.put("/equipos/{id}/ficha")
-def upsert_ficha(id: int, data: FichaUpdate):
+def upsert_ficha(id: int, data: FichaUpdate, request: Request):
     """
     PATCH-style upsert: solo actualiza columnas que vinieron en el body
     (no las nullea si el cliente no las mandó). Esto evita que enriquecer con
     IA borre montura/formato/resolución existentes.
     """
+    require_admin(request)
     with get_db() as conn:
         try:
             if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
@@ -1528,8 +1520,9 @@ def list_mantenimiento(id: int):
 
 
 @router.post("/equipos/{id}/mantenimiento", status_code=201)
-def add_mantenimiento(id: int, data: MantenimientoCreate):
+def add_mantenimiento(id: int, data: MantenimientoCreate, request: Request):
     """Agrega un evento de mantenimiento al equipo."""
+    require_admin(request)
     with get_db() as conn:
         try:
             if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
@@ -1554,8 +1547,9 @@ def add_mantenimiento(id: int, data: MantenimientoCreate):
 
 
 @router.patch("/equipos/{id}/mantenimiento/{log_id}")
-def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate):
+def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate, request: Request):
     """Actualiza un evento de mantenimiento existente."""
+    require_admin(request)
     with get_db() as conn:
         try:
             existing = conn.execute(
@@ -1587,8 +1581,9 @@ def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate):
 
 
 @router.delete("/equipos/{id}/mantenimiento/{log_id}", status_code=204)
-def delete_mantenimiento(id: int, log_id: int):
+def delete_mantenimiento(id: int, log_id: int, request: Request):
     """Elimina un evento de mantenimiento."""
+    require_admin(request)
     with get_db() as conn:
         try:
             existing = conn.execute(
@@ -1611,10 +1606,10 @@ def get_kit(id: int):
     with get_db() as conn:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        rows = conn.execute("""
+        rows = conn.execute(f"""
             SELECT kc.id, kc.componente_id, kc.cantidad, kc.orden,
                    kc.descuento_pct, kc.esencial,
-                   e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url, e.visible_catalogo
+                   e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url, e.visible_catalogo
             FROM kit_componentes kc
             JOIN equipos e ON e.id = kc.componente_id
             WHERE kc.equipo_id = ?
@@ -1655,7 +1650,8 @@ def _crea_ciclo_kit(conn, equipo_id: int, componente_id: int) -> bool:
 
 
 @router.post("/equipos/{id}/kit", status_code=201)
-def add_kit_item(id: int, data: KitItem):
+def add_kit_item(id: int, data: KitItem, request: Request):
+    require_admin(request)
     if id == data.componente_id:
         raise HTTPException(400, "Un equipo no puede ser componente de sí mismo")
     with get_db() as conn:
@@ -1691,7 +1687,8 @@ def add_kit_item(id: int, data: KitItem):
 
 
 @router.delete("/equipos/{id}/kit/{componente_id}", status_code=204)
-def remove_kit_item(id: int, componente_id: int):
+def remove_kit_item(id: int, componente_id: int, request: Request):
+    require_admin(request)
     with get_db() as conn:
         try:
             conn.execute(
@@ -1741,8 +1738,9 @@ def get_precio_historial(id: int):
 # ── Etiquetas por equipo (reemplaza todas) ────────────────────────────────────
 
 @router.put("/equipos/{id}/etiquetas", status_code=200)
-def set_etiquetas(id: int, data: EtiquetasUpdate):
+def set_etiquetas(id: int, data: EtiquetasUpdate, request: Request):
     """Reemplaza SOLO las etiquetas manuales del equipo. Las auto se preservan."""
+    require_admin(request)
     with get_db() as conn:
         try:
             if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
@@ -1772,7 +1770,7 @@ def set_etiquetas(id: int, data: EtiquetasUpdate):
                     DO UPDATE SET orden = EXCLUDED.orden, origen = 'manual'
                 """, (id, row["id"], orden))
             conn.commit()
-            row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]
             return equipo
         except Exception:
@@ -1828,11 +1826,12 @@ def _expand_to_ancestors(conn, ids) -> list[int]:
 
 
 @router.put("/equipos/{id}/categorias", status_code=200)
-def set_categorias(id: int, data: CategoriasUpdate):
+def set_categorias(id: int, data: CategoriasUpdate, request: Request):
     """
     Reemplaza la lista de categorías asignadas al equipo y regenera auto-tags
     (porque los nombres de categoría alimentan la bolsa de etiquetas auto).
     """
+    require_admin(request)
     with get_db() as conn:
         try:
             if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
@@ -1873,7 +1872,7 @@ def set_categorias(id: int, data: CategoriasUpdate):
             except Exception:
                 pass
             conn.commit()
-            row    = conn.execute("SELECT *, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca FROM equipos WHERE id=?", (id,)).fetchone()
+            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]
             equipo = attach_categorias(conn, [equipo])[0]
             return equipo
@@ -2020,9 +2019,9 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
     require_admin(request)
     with get_db() as conn:
         # ── Top 10 más alquilados (cantidad de pedidos + revenue total) ──
-        top_alquilados = conn.execute("""
+        top_alquilados = conn.execute(f"""
             SELECT
-                e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url,
+                e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
                 COUNT(DISTINCT p.id) AS cant_pedidos,
                 SUM(
                     COALESCE(pi.precio_jornada, 0) * COALESCE(pi.cantidad, 1)
@@ -2038,9 +2037,9 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
         """).fetchall()
 
         # ── Equipos sin movimiento (último alquiler hace > N días, o nunca) ──
-        sin_uso = conn.execute("""
+        sin_uso = conn.execute(f"""
             SELECT
-                e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url, e.valor_reposicion,
+                e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url, e.valor_reposicion,
                 MAX(p.fecha_desde) AS ultimo_alquiler,
                 COUNT(DISTINCT p.id) AS total_alquileres
             FROM equipos e
@@ -2654,8 +2653,8 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
 
     with get_db() as conn:
         try:
-            equipos = conn.execute("""
-                SELECT e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo
+            equipos = conn.execute(f"""
+                SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo
                 FROM equipos e
                 WHERE e.es_recurso_interno = FALSE
                 ORDER BY e.nombre
@@ -2709,8 +2708,7 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
                 })
 
             if apply:
-                # Regeneración batch de auto-tags para todos los equipos reclasificados
-                # (1 pasada, no N+1).
+                # Regeneración batch de auto-tags para todos los reclasificados.
                 regenerate_auto_tags_batch(conn, aplicados_ids)
                 conn.commit()
 
@@ -3288,7 +3286,7 @@ def admin_upload_foto_from_url(
             with media_http():
                 asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE, OG_SQUARE_JPEG], conn=conn)
             display = asset.variant("display")
-            foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+            _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
         except Exception:
             conn.rollback()
             raise
@@ -3333,7 +3331,7 @@ async def admin_upload_foto_file(
             with media_http():
                 asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE, OG_SQUARE_JPEG], conn=conn)
             display = asset.variant("display")
-            foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+            _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
         except Exception:
             conn.rollback()
             raise

@@ -12,7 +12,7 @@ import json
 import re
 
 from fastapi import APIRouter, Request, HTTPException
-from database import get_db, row_to_dict, MARCA_SUBQUERY
+from database import get_db, MARCA_SUBQUERY
 from routes.auth import get_session
 
 router = APIRouter()

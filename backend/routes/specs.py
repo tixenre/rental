@@ -25,7 +25,7 @@ from services.nombre_service import (
     regenerar_nombres_todos,
 )
 from services.ranking_service import recalcular_ranking_todos
-from services.spec_persist import persistir_specs, _validate_tabla_value
+from services.spec_persist import persistir_specs
 
 
 router = APIRouter()
@@ -1320,7 +1320,7 @@ def clasificar_bulk(request: Request, payload: dict = None):
 
         clause = "WHERE " + " AND ".join(where)
         rows = conn.execute(
-            f"SELECT e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url "
+            f"SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url "
             f"FROM equipos e {clause} ORDER BY e.nombre",
             tuple(params),
         ).fetchall()
@@ -1912,7 +1912,7 @@ def listar_compatibles(
             WHERE ec.equipo_a_id = ? OR ec.equipo_b_id = ?
         """
         candidates_sql = f"""
-            SELECT e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url
+            SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.foto_url
             FROM equipos e
             WHERE e.eliminado_at IS NULL AND e.id IN (
               {spec_candidatos_sql}
@@ -2198,9 +2198,9 @@ def listar_pendientes_compat(request: Request, limit: int = 50):
     _require_admin(request)
     with get_db() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT
-                e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo,
+                e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo,
                 e.compat_analizado_at,
                 e.updated_at,
                 CASE

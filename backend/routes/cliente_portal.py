@@ -2,7 +2,6 @@
 routes/cliente_portal.py — Portal de clientes (solo Google OAuth).
 """
 
-import datetime
 import json
 import logging
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
@@ -10,7 +9,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
-from database import get_db, row_to_dict, to_datetime, now_ar
+from database import get_db, row_to_dict, to_datetime, now_ar, MARCA_SUBQUERY, marca_subquery
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
 from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
@@ -384,9 +383,9 @@ def cliente_pedidos(request: Request):
         result = []
         for p in pedidos:
             d = row_to_dict(p)
-            items = conn.execute("""
+            items = conn.execute(f"""
                 SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                       e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url,
+                       e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
                        e.nombre_publico, e.nombre_publico_largo
                 FROM alquiler_items ai
                 JOIN equipos e ON e.id = ai.equipo_id
@@ -437,9 +436,9 @@ def cliente_pedido_detalle(id: int, request: Request):
 
         d = row_to_dict(pedido)
 
-        items = conn.execute("""
+        items = conn.execute(f"""
             SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                   e.id AS equipo_id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url,
+                   e.id AS equipo_id, e.nombre, {MARCA_SUBQUERY}, e.foto_url,
                    e.nombre_publico, e.nombre_publico_largo
             FROM alquiler_items ai
             JOIN equipos e ON e.id = ai.equipo_id
@@ -586,86 +585,21 @@ def _check_stock_hipotetico(
     conn, pedido_id: int, fecha_desde: str, fecha_hasta: str,
     items: "list",
 ) -> list[str]:
-    """Verifica stock para un set HIPOTÉTICO de items + fechas (no toca DB).
+    """Pre-chequeo en SECO (dry-run) de stock para un set HIPOTÉTICO de items +
+    fechas (la propuesta del cliente que todavía no se guardó).
 
     Usado en el path `confirmado`/propose: el cliente envía una propuesta y
     queremos rechazarla si no hay stock, sin pasar antes por aplicar nada.
-    Excluye el pedido actual del cálculo de reservas existentes (sus items
-    actuales no compiten con los propuestos para el mismo rango).
+
+    Delega en el motor único `reservas.validar_stock_hipotetico` — la MISMA pieza
+    que usa el gate AUTORITATIVO `validar_stock`, así el dry-run del portal y el
+    gate real NO pueden divergir (MEMORIA 2026-05-30 / 2026-05-31). Antes esta
+    función re-implementaba la expansión "en seco" importando internos del motor
+    (`expandir_demanda`, `parientes_de`, `reservado_total`, ...) y se
+    desincronizaba en silencio si el gate cambiaba.
     """
-    from reservas import (
-        expandir_demanda as _expandir_demanda,
-        get_buffer_horas as _get_buffer_horas,
-        parientes_de as _parientes_de,
-        rango_con_buffer as _rango_con_buffer,
-        reservado_total as _reservado_total,
-        unidades_en_mantenimiento as _unidades_en_mantenimiento,
-    )
-    if not items or not fecha_desde or not fecha_hasta:
-        return []
-
-    # Consolidar la propuesta sumando duplicados del mismo equipo (issue #102).
-    roots: dict[int, int] = {}
-    for it in items:
-        roots[it.equipo_id] = roots.get(it.equipo_id, 0) + it.cantidad
-
-    # FORWARD: expandir la propuesta RECURSIVAMENTE hasta las hojas (C4 #635) —
-    # MISMA expansión que el gate real (`validar_stock`), así el pre-chequeo no
-    # acepta una propuesta con un combo anidado que el gate después rechaza. Estricto
-    # (`solo_esenciales=False`), igual que el gate.
-    demanda = _expandir_demanda(conn, roots, solo_esenciales=False)
-    if not demanda:
-        return []
-
-    # Buffer entre alquileres (mantenimiento usa rango original).
-    buffer_horas = _get_buffer_horas(conn)
-    fd_buf, fh_buf = _rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
-
-    # Nombres para los mensajes (el stock AUTORITATIVO sale del lock de abajo).
-    # Orden ascendente de id → locking determinístico, sin deadlock (igual que el gate).
-    ids = sorted(demanda)
-    ph = ",".join("?" for _ in ids)
-    nombres = {
-        r["id"]: r["nombre"]
-        for r in conn.execute(
-            f"SELECT id, nombre FROM equipos WHERE id IN ({ph})", tuple(ids)
-        ).fetchall()
-    }
-
-    # Grafo inverso (una sola lectura) + memo de reserva directa, igual que el gate.
-    rev_graph = _parientes_de(conn)
-    rd_cache: dict[int, int] = {}
-
-    problemas: list[str] = []
-    for eid in ids:  # ascendente por id (ORDER BY id)
-        nombre = nombres.get(eid, f"equipo #{eid}")
-        lock = conn.execute(
-            "SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE",
-            (eid,)
-        ).fetchone()
-        if not lock:
-            problemas.append(f"{nombre} (no encontrado)")
-            continue
-        stock_total = lock["cantidad"]
-        # CONSUMO (backward) recursivo: directo + vía cualquier compuesto que lo
-        # contenga, a cualquier profundidad — MISMO helper que el gate real
-        # (`reservado_total`). Con el forward de arriba, este pre-chequeo "amistoso"
-        # ahora espeja completo a `validar_stock` (forward + backward recursivos),
-        # así rechaza temprano lo que el control autoritativo (al aprobar) rechazaría.
-        # El lock FOR UPDATE se mantiene (corre dentro de la transacción del caller).
-        reservado = _reservado_total(
-            conn, eid, pedido_id, fh_buf, fd_buf,
-            rev_graph=rev_graph, cache=rd_cache,
-        )
-        en_mantenimiento = _unidades_en_mantenimiento(
-            conn, eid, fecha_desde, fecha_hasta
-        )
-        disponible = stock_total - reservado - en_mantenimiento
-        if disponible < demanda[eid]:
-            problemas.append(
-                f"{nombre} (necesitás {demanda[eid]}, disponible: {max(0, disponible)})"
-            )
-    return problemas
+    from reservas import validar_stock_hipotetico
+    return validar_stock_hipotetico(conn, pedido_id, fecha_desde, fecha_hasta, items)
 
 
 def _cancelar_solicitudes_pendientes(
@@ -1233,8 +1167,8 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
         raise HTTPException(404, "Pedido no encontrado")
     pedido = row_to_dict(row)
 
-    items = conn.execute("""
-        SELECT pi.cantidad, e.id AS equipo_id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo,
+    items = conn.execute(f"""
+        SELECT pi.cantidad, e.id AS equipo_id, e.nombre, {MARCA_SUBQUERY}, e.modelo,
                e.serie, e.valor_reposicion, e.foto_url, pi.precio_jornada, pi.subtotal,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
@@ -1245,8 +1179,8 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
     pedido["items"] = [row_to_dict(i) for i in items]
 
     for item in pedido["items"]:
-        comp_rows = conn.execute("""
-            SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.modelo, ec.serie, ec.valor_reposicion,
+        comp_rows = conn.execute(f"""
+            SELECT ec.nombre, {marca_subquery('ec')}, ec.modelo, ec.serie, ec.valor_reposicion,
                    ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
