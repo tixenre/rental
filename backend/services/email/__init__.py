@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 
 from .base import Attachment, EmailBackend, EmailBackendError, SendResult
-from .service import send_email, send_raw_email, render_template
+from .service import send_email, send_raw_email, render_template, wrap_preview
 
 __all__ = [
     "Attachment",
@@ -23,6 +23,7 @@ __all__ = [
     "send_email",
     "send_raw_email",
     "render_template",
+    "wrap_preview",
     "get_backend",
     "resolve_provider",
 ]
