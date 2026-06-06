@@ -26,6 +26,7 @@ from pdf_templates import (  # noqa: F401
     _albaran_html,
     _contrato_html,
     _packing_list_html,
+    _a4_page,
 )
 
 # ── Datos del locador (configurar en variables de entorno) ────────────────────
@@ -243,17 +244,6 @@ async def _render_pdf(html: str) -> bytes:
     finally:
         await page.close()
     return pdf_bytes
-
-
-def _a4_page(margin: str = "18mm 14mm") -> str:
-    """CSS `@page` que fija la hoja en **A4** para TODOS los documentos.
-
-    El tamaño A4 es la regla compartida (requisito: todo PDF que se manda es A4);
-    el margen es lo único por-documento. Fuente única — no declarar `@page` /
-    tamaños de hoja ad-hoc en cada template (modularidad: una sola verdad de la
-    hoja). `_render_pdf` ya rasteriza en A4; esto alinea el HTML con esa hoja para
-    que el preview y la paginación coincidan."""
-    return f"@page {{ size: A4; margin: {margin}; }}"
 
 
 # ── Reporte de liquidación (#88) ──────────────────────────────────────────────
