@@ -338,16 +338,16 @@ def _liquidacion_html(data: dict, titulo: str, stats: dict | None = None) -> str
     mes_liq = data.get("mes")
     periodo_eyebrow = _rep_mes_eyebrow(mes_liq) if mes_liq else esc(titulo).upper()
 
-    # ── HEADER (banner amber, estilo membrete) ───────────────────────────────
+    # ── HEADER (barra amber full-bleed: wordmark blanco izq · info der) ───────
     header = (
         '<header class="rep-header"><div class="rep-header-top">'
-        f'<div class="rep-brand"><span class="rep-wordmark">{_DS_WORDMARK}</span>'
-        '<div class="rep-eyebrow">Reporte interno</div></div>'
+        f'<div class="rep-brand"><span class="rep-wordmark">{_DS_WORDMARK}</span></div>'
         '<div class="rep-head-meta">'
-        '<div class="rep-eyebrow">Mensual</div>'
-        f'<div class="rep-head-date">Generado {esc(fecha_doc)}</div></div></div>'
+        '<div class="rep-eyebrow">Reporte interno</div>'
         '<h1 class="rep-title">Reportes</h1>'
-        '<div class="rep-rule"></div></header>'
+        '<div class="rep-eyebrow">Mensual</div>'
+        f'<div class="rep-head-date">Generado {esc(fecha_doc)}</div>'
+        '</div></div></header>'
     )
 
     # ═══ SECCIÓN LIQUIDACIÓN ═════════════════════════════════════════════════
@@ -593,19 +593,21 @@ def _resumen_general_html(stats: dict) -> str:
 _REP_CSS = r"""
 :root{ --hairline-bar:oklch(0.85 0.01 80); }
 
-/* Header (banner amber estilo membrete) */
-.rep-header{margin-bottom:26px}
-.rep-header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:28px}
-.rep-brand{display:flex;flex-direction:column;gap:8px}
-.rep-wordmark{color:var(--ink)}
-.rep-head-meta{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:3px}
-.rep-eyebrow{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.22em;
-  text-transform:uppercase;color:var(--muted);white-space:nowrap}
-.rep-head-date{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
-.rep-title{font-family:var(--font-sans);font-weight:700;font-size:34px;letter-spacing:-.015em;
-  line-height:1;margin-top:16px}
-.rep-rule{height:3px;background:var(--amber);border-radius:2px;margin-top:14px;
+/* Header (barra amber full-bleed: wordmark blanco izq · info doc der).
+   Margen negativo = sangra al borde de la hoja (contrarresta @page margin:14mm). */
+.rep-header{margin:0 -14mm 26px;padding:34px 14mm 20px;background:var(--amber);
   -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rep-header-top{display:flex;justify-content:space-between;align-items:center;gap:28px}
+.rep-brand{display:flex;flex-direction:column;gap:8px}
+.rep-wordmark{color:#fff}
+.rep-wordmark svg{height:38px!important}
+.rep-head-meta{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:2px}
+.rep-eyebrow{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.22em;
+  text-transform:uppercase;color:color-mix(in oklch,var(--ink) 64%,var(--amber));white-space:nowrap}
+.rep-head-date{font-family:var(--font-mono);font-size:10.5px;
+  color:color-mix(in oklch,var(--ink) 64%,var(--amber));white-space:nowrap}
+.rep-title{font-family:var(--font-sans);font-weight:700;font-size:30px;letter-spacing:-.015em;
+  line-height:1;margin:3px 0;color:var(--ink)}
 
 /* Section */
 .rep-section{margin-top:6px}
