@@ -194,6 +194,16 @@ class TestSafeNextPath:
     def test_longitud_excesiva_rechaza(self):
         assert self._safe("/" + ("a" * 3000)) is None
 
+    def test_xss_payload_rechaza(self):
+        # El valor se embebe en <script>…replace("{next}")…</script>; un next con
+        # `<`/`>`/comillas/backslash podría romper ese contexto y ejecutar JS.
+        assert self._safe("/x</script><img src=x onerror=alert(1)>") is None
+        assert self._safe('/x"><script>alert(1)</script>') is None
+        assert self._safe("/x';alert(1);//") is None
+        assert self._safe("/ok\nlinea") is None  # whitespace/control
+        # No rompemos lo legítimo: path interno normal con query sigue pasando.
+        assert self._safe("/estudio?d=2026-06-01&h=10:00") == "/estudio?d=2026-06-01&h=10:00"
+
 
 # ── dev_bypass_enabled + /auth/dev-login (#503) ───────────────────────────────
 
