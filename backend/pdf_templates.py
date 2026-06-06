@@ -7,7 +7,7 @@ DROP-IN para `backend/pdf.py`. Reemplazá las cuatro funciones de template
 por las de este módulo. El resto de `pdf.py` queda IGUAL:
 `_render_pdf`, `_get_browser`, `_abs_image_url`, `_pedido_filename`,
 y los helpers de `services.precios` (`jornadas_periodo`,
-`es_responsable_inscripto`, `IVA_PCT`).
+`es_responsable_inscripto`).
 
 Qué cambia respecto del template anterior
 ------------------------------------------
@@ -47,9 +47,8 @@ from datetime import datetime, date
 
 # Helpers de precios del repo — mismos imports que el pdf.py original.
 try:
-    from services.precios import jornadas_periodo, es_responsable_inscripto, IVA_PCT
+    from services.precios import jornadas_periodo, es_responsable_inscripto
 except Exception:  # pragma: no cover — fallback para correr el módulo aislado
-    IVA_PCT = 21
     def jornadas_periodo(d1, d2):
         try:
             return max(1, (d2 - d1).days)
@@ -202,12 +201,11 @@ body{font-family:var(--font-sans);color:var(--ink);background:#fff;
   align-items:center;justify-content:center;color:var(--muted);flex-shrink:0}
 .eq-thumb.sm{width:36px;height:36px}
 
-/* Specs como lista compacta */
-.spec-list{list-style:none;display:flex;flex-direction:column;gap:1px;margin-top:5px;padding:0}
-.spec-list li{font-family:var(--font-mono);font-size:9.5px;line-height:1.5;color:var(--muted);
-  padding-left:11px;position:relative}
-.spec-list li::before{content:"·";position:absolute;left:2px;font-weight:700;
-  color:color-mix(in oklch,var(--amber) 65%,var(--ink))}
+/* Línea "INCLUYE …": accesorios inline bajo el nombre (presupuesto/albarán/contrato). */
+.incluye{font-family:var(--font-mono);font-size:9px;line-height:1.55;
+  color:var(--muted);margin-top:3px}
+.incluye-lbl{font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  margin-right:5px;color:color-mix(in oklch,var(--amber) 65%,var(--ink))}
 
 /* Totales (ink) */
 .total-section{display:flex;justify-content:flex-end;margin-top:22px}
@@ -230,7 +228,11 @@ body{font-family:var(--font-sans);color:var(--ink);background:#fff;
 .total-box--light .total-row .tv{color:var(--ink)}
 .total-box--light .total-row.grand{border-top-color:var(--ink)}
 .total-box--light .total-row.grand .tl{color:var(--ink)}
+.total-box--light .total-row.grand .tv{color:var(--ink)}
 .total-box--light .total-foot{color:var(--muted)}
+/* Sufijo "+ IVA" del total cuando el IVA va aparte (no sumado al número). */
+.iva-suffix{font-family:var(--font-mono);font-size:12px;font-weight:600;
+  color:var(--muted);margin-left:7px;letter-spacing:0}
 
 /* Notas */
 .notas{margin-top:26px;padding:14px 18px;background:var(--amber-soft);
@@ -283,17 +285,17 @@ body{font-family:var(--font-sans);color:var(--ink);background:#fff;
 .pk-box{width:13px;height:13px;border:1.5px solid var(--ink);border-radius:3px;display:inline-block}
 .items.packing td.chk{text-align:center;width:70px}
 .pk-check{width:16px;height:16px;border:1.5px solid var(--ink);border-radius:4px;display:inline-block}
-.items.packing .row-cont td{padding:5px 12px 12px;border-bottom:1px dashed var(--hairline)}
-.cont-list{display:flex;flex-wrap:wrap;align-items:center;gap:5px 8px;padding-left:58px}
-.cont-label{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;
-  color:color-mix(in oklch,var(--amber) 55%,var(--ink));margin-right:2px}
-.cont-item{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:9.5px;color:var(--muted)}
-.cont-item .cb{width:11px;height:11px;border:1px solid var(--hairline);border-radius:3px;flex-shrink:0}
 .pk-summary{display:flex;justify-content:space-between;align-items:center;margin-top:24px;
   padding:16px 20px;border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--hairline)}
 .pk-stat{display:flex;flex-direction:column;gap:2px}
 .pk-stat .n{font-family:var(--font-mono);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
 .pk-stat .l{font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+/* COMPRA {fecha} bajo el nombre del equipo + tag INCLUYE en la 1ª fila de contenido. */
+.pk-compra{font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:2px}
+.pk-compra-lbl{letter-spacing:.1em;text-transform:uppercase;margin-right:5px;
+  color:color-mix(in oklch,var(--amber) 60%,var(--ink))}
+.pk-incluye{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;
+  margin-left:8px;color:color-mix(in oklch,var(--amber) 60%,var(--ink))}
 """
 
 # ── Helpers de formato (espejan los de pdf.py; reusá los del repo al mergear) ─
@@ -355,14 +357,16 @@ def _nombre_para_pdf(item, formal=False):
     return nombre or "—"
 
 
-def _nombre_rich(item, formal=False, mark=False):
-    """Cabecera en negrita + specs ('·') como lista de tags compacta."""
+def _nombre_con_incluye(item, formal=False, mark=False):
+    """Nombre en negrita (con └ opcional para componentes) + una sub-línea
+    'INCLUYE accesorio · accesorio …' (los specs vienen como ' · ' en el nombre).
+    Estilo compartido por presupuesto, albarán y contrato."""
     parts = _nombre_para_pdf(item, formal=formal).split(" · ")
     mk = '<span class="comp-mark">└</span>' if mark else ""
     out = f'<div class="eq-name">{mk}{html.escape(parts[0])}</div>'
     if len(parts) > 1:
-        tags = "".join(f"<li>{html.escape(p)}</li>" for p in parts[1:])
-        out += f'<ul class="spec-list">{tags}</ul>'
+        specs = " · ".join(html.escape(p) for p in parts[1:])
+        out += f'<div class="incluye"><span class="incluye-lbl">Incluye</span>{specs}</div>'
     return out
 
 
@@ -460,7 +464,7 @@ def _pedido_html(pedido):
         sub = (it.get("precio_jornada") or 0) * it.get("cantidad", 1) * j
         rows.append(
             f'<tr><td style="width:58px">{_thumb(it)}</td>'
-            f'<td><div class="eq-name">{html.escape(_nombre_para_pdf(it))}</div></td>'
+            f'<td>{_nombre_con_incluye(it)}</td>'
             f'<td class="c num">{it.get("cantidad", 1)}</td>'
             f'<td class="r num">{_fmt_ars(it.get("precio_jornada"))}</td>'
             f'<td class="r num">{_fmt_ars(sub)}</td></tr>'
@@ -476,9 +480,10 @@ def _pedido_html(pedido):
                 f'<td class="r num">{_fmt_ars(csub) if csub else "—"}</td></tr>'
             )
 
-    # Desglose — usa el precomputado por services.precios (igual que el original)
+    # Desglose — usa el precomputado por services.precios (igual que el original).
+    # El IVA no se suma al total del presupuesto (va aparte, ver abajo), así que
+    # acá solo necesitamos bruto / descuento / neto y si el cliente es RI.
     es_ri = es_responsable_inscripto(pedido.get("cliente_perfil_impuestos"))
-    iva_pct = int(pedido.get("iva_pct") or IVA_PCT)
     neto = int(pedido["monto_neto"] if pedido.get("monto_neto") is not None
                else (pedido.get("monto_total") or _sum_bruto(items, j)))
     bruto = int(pedido.get("bruto") or _sum_bruto(items, j) or neto)
@@ -487,19 +492,18 @@ def _pedido_html(pedido):
                else max(0, bruto - neto))
     if pedido.get("monto_neto") is None and desc:
         neto = bruto - desc
-    iva = int(pedido["iva_monto"] if pedido.get("iva_monto") is not None
-              else (round(neto * iva_pct / 100) if es_ri else 0))
-    total = neto + iva
 
+    # El IVA va APARTE en el presupuesto (decisión del dueño): el total grande es
+    # el neto (con descuento) y, si el cliente es responsable inscripto, se anota
+    # "+ IVA" al lado en vez de sumarlo. Para Factura A el IVA se discrimina en la
+    # factura, no en el presupuesto.
     tr = [f'<div class="total-row"><span class="tl">Subtotal</span><span class="tv">{_fmt_ars(bruto)}</span></div>']
     if desc > 0:
         pct = f" ({desc_pct:g}%)" if desc_pct else ""
         tr.append(f'<div class="total-row"><span class="tl">Descuento{pct}</span><span class="tv">− {_fmt_ars(desc)}</span></div>')
-    if es_ri:
-        if desc > 0:
-            tr.append(f'<div class="total-row"><span class="tl">Neto</span><span class="tv">{_fmt_ars(neto)}</span></div>')
-        tr.append(f'<div class="total-row"><span class="tl">IVA {iva_pct}%</span><span class="tv">{_fmt_ars(iva)}</span></div>')
-    tr.append(f'<div class="total-row grand"><span class="tl">Total</span><span class="tv">{_fmt_ars(total)}</span></div>')
+    iva_suffix = f'<span class="iva-suffix">+ IVA</span>' if es_ri else ""
+    tr.append(f'<div class="total-row grand"><span class="tl">Total</span>'
+              f'<span class="tv">{_fmt_ars(neto)}{iva_suffix}</span></div>')
 
     notas = ""
     if pedido.get("notas"):
@@ -517,7 +521,7 @@ def _pedido_html(pedido):
         + '<table class="items"><thead><tr><th></th><th>Equipo</th>'
           '<th class="c">Cant.</th><th class="r">Precio / jornada</th><th class="r">Subtotal</th></tr></thead>'
           f'<tbody>{"".join(rows)}</tbody></table>'
-        + '<div class="total-section"><div><div class="total-box">' + "".join(tr) + "</div>"
+        + '<div class="total-section"><div><div class="total-box total-box--light">' + "".join(tr) + "</div>"
         + f'<div class="total-foot">{j} jornada{"s" if j != 1 else ""} · '
           f'{len(items)} equipo{"s" if len(items) != 1 else ""}{" · Factura A" if es_ri else ""}</div></div></div>'
         + notas + _footer()
@@ -554,7 +558,7 @@ def _albaran_html(pedido):
         rows.append(
             f'<tr><td class="c num" style="width:34px">{n}</td>'
             f'<td style="width:54px">{_thumb(it, True)}</td>'
-            f'<td>{_nombre_rich(it, formal=True)}</td>'
+            f'<td>{_nombre_con_incluye(it, formal=True)}</td>'
             f'<td class="c num">{cant}</td>'
             f'<td class="mono">{html.escape(it.get("serie") or "—")}</td>'
             f'<td class="r">{_valor(valor, cant)}</td></tr>'
@@ -565,7 +569,7 @@ def _albaran_html(pedido):
             rows.append(
                 f'<tr class="comp"><td class="c num">{n}</td>'
                 f'<td>{_thumb(c, True)}</td>'
-                f'<td>{_nombre_rich(c, formal=True, mark=True)}</td>'
+                f'<td>{_nombre_con_incluye(c, formal=True, mark=True)}</td>'
                 f'<td class="c num">{ccant}</td>'
                 f'<td class="mono">{html.escape(c.get("serie") or "—")}</td>'
                 f'<td class="r">{_valor(cvalor, ccant)}</td></tr>'
@@ -582,7 +586,7 @@ def _albaran_html(pedido):
         + '<table class="items"><thead><tr><th class="c">#</th><th></th><th>Equipo</th>'
           '<th class="c">Cant.</th><th>N° Serie</th><th class="r">Valor reposición</th></tr></thead>'
           f'<tbody>{"".join(rows)}</tbody></table>'
-        + '<div class="total-section"><div class="total-box" style="min-width:320px">'
+        + '<div class="total-section"><div class="total-box total-box--light" style="min-width:320px">'
           f'<div class="total-row"><span class="tl">Equipos entregados</span><span class="tv">{unidades} unidades</span></div>'
           f'<div class="total-row grand"><span class="tl">Valor total de reposición</span><span class="tv">{_fmt_ars(valor_total)}</span></div>'
           '<div class="total-foot">Suma de cantidad × valor unitario, incluyendo componentes de kits.</div></div></div>'
@@ -636,7 +640,7 @@ def _contrato_html(pedido):
         cant = it.get("cantidad", 1)
         rows.append(
             f'<tr><td class="c num">{i}</td>'
-            f'<td>{_nombre_rich(it, formal=True)}</td>'
+            f'<td>{_nombre_con_incluye(it, formal=True)}</td>'
             f'<td class="c num">{cant}</td>'
             f'<td class="mono">{html.escape(it.get("serie") or "—")}</td>'
             f'<td class="r num">{_fmt_ars(_parse_int(it.get("valor_reposicion")))}</td></tr>'
@@ -645,7 +649,7 @@ def _contrato_html(pedido):
             ccant = c.get("cantidad", 1) * cant
             rows.append(
                 f'<tr class="comp"><td class="c">—</td>'
-                f'<td>{_nombre_rich(c, formal=True, mark=True)}</td>'
+                f'<td>{_nombre_con_incluye(c, formal=True, mark=True)}</td>'
                 f'<td class="c num">{ccant}</td>'
                 f'<td class="mono">{html.escape(c.get("serie") or "—")}</td>'
                 f'<td class="r num">{_fmt_ars(_parse_int(c.get("valor_reposicion"))) if c.get("valor_reposicion") else "—"}</td></tr>'
@@ -698,13 +702,12 @@ def _contrato_html(pedido):
 # ═══════════════════════════════════════════════════════════════════════════
 #  PACKING LIST   (reemplaza _packing_list_html)
 # ═══════════════════════════════════════════════════════════════════════════
-def _contenido_list(item):
-    """Lista de strings de 'contenido incluido' para los chips del packing.
+def _contenido_pairs(item):
+    """Contenido incluido como lista de `(nombre, cantidad)`.
 
     El repo guarda `contenido_incluido_json` (string JSON con una lista de
     **objetos** `{nombre, cantidad, ...}`); el reference usaba `contenido_incluido`
-    como lista de strings. Acepta ambas formas y devuelve strings listos para
-    mostrar ("Cable USB-C" o "Cable USB-C ×2"). JSON inválido → [] (no rompe).
+    como lista de strings. Acepta ambas formas. JSON inválido → [] (no rompe).
     """
     raw = item.get("contenido_incluido")
     if not isinstance(raw, list):
@@ -723,10 +726,9 @@ def _contenido_list(item):
             nombre = (x.get("nombre") or x.get("nombre_publico") or "").strip()
             if not nombre:
                 continue
-            cant = x.get("cantidad") or 1
-            out.append(f"{nombre} ×{cant}" if cant and cant != 1 else nombre)
+            out.append((nombre, x.get("cantidad") or 1))
         elif x not in (None, ""):
-            out.append(str(x))
+            out.append((str(x), 1))
     return out
 
 
@@ -734,14 +736,29 @@ def _packing_list_html(pedido):
     items = pedido.get("items", [])
     rows, n, unidades = [], 1, 0
 
-    def _row(it, sub=False):
+    def _eq_row(it, num):
+        """Fila del equipo principal: foto + nombre + 'COMPRA {fecha}' + checkboxes."""
         cant = it.get("cantidad", 1)
-        cls = ' class="comp"' if sub else ""
-        num = "" if sub else n
+        compra = ""
+        if it.get("fecha_compra"):
+            compra = ('<div class="pk-compra"><span class="pk-compra-lbl">Compra</span>'
+                      f'{_fmt_date_short(it.get("fecha_compra"))}</div>')
+        nombre = html.escape(_nombre_para_pdf(it).split(" · ")[0])
         return (
-            f'<tr{cls}><td class="c num" style="width:34px">{num}</td>'
+            f'<tr><td class="c num" style="width:34px">{num}</td>'
             f'<td style="width:50px">{_thumb(it, True)}</td>'
-            f'<td>{_nombre_rich(it, formal=True, mark=sub)}</td>'
+            f'<td><div class="eq-name">{nombre}</div>{compra}</td>'
+            f'<td class="c num">{cant}</td>'
+            '<td class="chk"><span class="pk-check"></span></td>'
+            '<td class="chk"><span class="pk-check"></span></td></tr>'
+        )
+
+    def _sub_row(nombre, cant, primero=False):
+        """Fila chequeable de contenido/componente (└), con tag 'Incluye' en la 1ª."""
+        tag = '<span class="pk-incluye">Incluye</span>' if primero else ""
+        return (
+            '<tr class="comp"><td></td><td></td>'
+            f'<td><span class="comp-mark">└</span>{html.escape(nombre)}{tag}</td>'
             f'<td class="c num">{cant}</td>'
             '<td class="chk"><span class="pk-check"></span></td>'
             '<td class="chk"><span class="pk-check"></span></td></tr>'
@@ -749,16 +766,16 @@ def _packing_list_html(pedido):
 
     for it in items:
         cant = it.get("cantidad", 1); unidades += cant
-        rows.append(_row(it)); n += 1
+        rows.append(_eq_row(it, n)); n += 1
+        primero = True
+        # Contenido incluido (accesorios) → cada uno su fila chequeable.
+        for nombre, ucant in _contenido_pairs(it):
+            tot = ucant * cant; unidades += tot
+            rows.append(_sub_row(nombre, tot, primero)); primero = False
+        # Componentes (sub-equipos del kit) → también filas chequeables.
         for c in it.get("componentes", []):
             ccant = c.get("cantidad", 1) * cant; unidades += ccant
-            cc = dict(c); cc["cantidad"] = ccant
-            rows.append(_row(cc, sub=True))
-        cont = _contenido_list(it)
-        if cont:
-            chips = "".join(f'<span class="cont-item"><span class="cb"></span>{html.escape(x)}</span>' for x in cont)
-            rows.append('<tr class="row-cont"><td></td><td colspan="5">'
-                        f'<div class="cont-list"><span class="cont-label">Incluye</span>{chips}</div></td></tr>')
+            rows.append(_sub_row(_nombre_para_pdf(c).split(" · ")[0], ccant, primero)); primero = False
 
     salida = (
         '<div class="meta-block"><div class="meta-label">Salida / retorno</div>'

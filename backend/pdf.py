@@ -248,162 +248,458 @@ def _a4_page(margin: str = "18mm 14mm") -> str:
 
 # ── Reporte de liquidación (#88) ──────────────────────────────────────────────
 # Espeja el patrón de los documentos de pedido: un builder de HTML branded que
-# `_render_pdf` convierte a PDF A4. La data viene del motor `backend/reportes/`
-# (vía `liquidar`); acá solo se presenta — no se calcula nada.
+# `_render_pdf` convierte a PDF A4. La data de liquidación viene del motor
+# `backend/reportes/` (vía `liquidar`); las stats del 'Resumen general' vienen de
+# `routes.estadisticas.compute_estadisticas`. Acá solo se presenta — no se calcula
+# nada de negocio (solo derivaciones de presentación: %, promedios, abreviaturas).
+#
+# Diseño en el Design System v1 (mismo shell branded que presupuesto/albarán/…):
+# reusa `_fonts_css()`, `WORDMARK` y los tokens del DS de `pdf_templates`. Todos
+# los colores salen de tokens; los acentos de estado (verde/azul/rosa) salen de la
+# paleta oficial `_ESTADOS`.
 
-def _liquidacion_html(data: dict, titulo: str) -> str:
-    """HTML branded del reporte de liquidación para un período (PDF / preview).
+from pdf_templates import (  # noqa: E402
+    _fonts_css as _ds_fonts_css,
+    WORDMARK as _DS_WORDMARK,
+    _DOC_CSS as _DS_DOC_CSS,
+    _footer as _ds_footer,
+    _ESTADOS as _DS_ESTADOS,
+)
 
-    `data` es el dict que devuelve `reportes.liquidacion.liquidar`
-    (beneficiarios, por_mes, resumen, por_dueno). `titulo` es el rótulo del
-    período (ej. 'junio de 2026')."""
+# Acentos de estado del DS (color sólido), por nombre — fuente única `_ESTADOS`.
+_REP_VERDE = _DS_ESTADOS["confirmado"][0]   # #009971
+_REP_AZUL = _DS_ESTADOS["presupuesto"][0]   # #1097DB
+_REP_ROSA = _DS_ESTADOS["devuelto"][0]      # #ED7BAD
+_REP_DESTRUCTIVE = _DS_ESTADOS["cancelado"][0]
+
+_MESES_ABBR = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
+               "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"]
+_MESES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+                "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+
+def _rep_mes_abbr(ym: str) -> str:
+    """'2026-06' → 'JUN'. Robusto ante formatos inesperados."""
+    try:
+        return _MESES_ABBR[int(str(ym).split("-")[1]) - 1]
+    except (IndexError, ValueError):
+        return html.escape(str(ym or ""))[:3].upper()
+
+
+def _rep_mes_eyebrow(ym: str) -> str:
+    """'2026-06' → 'JUNIO 2026' (eyebrow del período)."""
+    try:
+        y, m = str(ym).split("-")[:2]
+        return f"{_MESES_LARGO[int(m) - 1].upper()} {y}"
+    except (IndexError, ValueError):
+        return html.escape(str(ym or "")).upper()
+
+
+def _rep_mes_largo(ym: str) -> str:
+    """'2026-06' → 'junio de 2026'."""
+    try:
+        y, m = str(ym).split("-")[:2]
+        return f"{_MESES_LARGO[int(m) - 1]} de {y}"
+    except (IndexError, ValueError):
+        return html.escape(str(ym or ""))
+
+
+def _rep_fmt_compact(n) -> str:
+    """Monto compacto para etiquetas de barras: '$ 1.250k' / '$ 980'."""
+    try:
+        v = int(float(n or 0))
+    except (TypeError, ValueError):
+        return "$ 0"
+    if abs(v) >= 1000:
+        return "$ " + f"{round(v / 1000):,}".replace(",", ".") + "k"
+    return "$ " + f"{v:,}".replace(",", ".")
+
+
+def _liquidacion_html(data: dict, titulo: str, stats: dict | None = None) -> str:
+    """HTML branded (Design System) del reporte 'Reportes' para un período.
+
+    `data` es el dict de `reportes.liquidacion.liquidar` (beneficiarios, resumen,
+    por_dueno). `titulo` es el rótulo del período (ej. 'junio de 2026'). `stats`
+    es el dict de `routes.estadisticas.compute_estadisticas`; si es None, solo se
+    rinde la sección Liquidación (compat hacia atrás)."""
     fmt = lambda n: _fmt_ars(n, zero_dash=False)
-    beneficiarios = data.get("beneficiarios", [])
+    esc = lambda s: html.escape(str(s if s is not None else ""))
+
+    beneficiarios = data.get("beneficiarios", []) or []
     res = data.get("resumen", {}) or {}
-    por_mes = data.get("por_mes", []) or []
     por_dueno = data.get("por_dueno", []) or []
     res_pb = res.get("por_beneficiario", {}) or {}
+    total_periodo = res.get("total", 0)
+
     fecha_doc = _es_month(datetime.now().strftime("%-d de %B de %Y"))
 
-    # Tarjetas de resumen por beneficiario (lo que le toca a cada uno).
-    cards = ""
+    # Eyebrow del período de liquidación: derivado del `mes` del dict si está, si
+    # no del propio título.
+    mes_liq = data.get("mes")
+    periodo_eyebrow = _rep_mes_eyebrow(mes_liq) if mes_liq else esc(titulo).upper()
+
+    # ── HEADER (banner amber, estilo membrete) ───────────────────────────────
+    header = (
+        '<header class="rep-header"><div class="rep-header-top">'
+        f'<div class="rep-brand"><span class="rep-wordmark">{_DS_WORDMARK}</span>'
+        '<div class="rep-eyebrow">Reporte interno</div></div>'
+        '<div class="rep-head-meta">'
+        '<div class="rep-eyebrow">Mensual</div>'
+        f'<div class="rep-head-date">Generado {esc(fecha_doc)}</div></div></div>'
+        '<h1 class="rep-title">Reportes</h1>'
+        '<div class="rep-rule"></div></header>'
+    )
+
+    # ═══ SECCIÓN LIQUIDACIÓN ═════════════════════════════════════════════════
+    # Cards "A cobrar por beneficiario".
+    benef_cards = ""
     for b in beneficiarios:
-        cards += f"""
-        <div class="card">
-          <div class="card-label">{html.escape(str(b))}</div>
-          <div class="card-value">{fmt(res_pb.get(b, 0))}</div>
-        </div>"""
-    cards += f"""
-        <div class="card card-total">
-          <div class="card-label">Total del período</div>
-          <div class="card-value">{fmt(res.get("total", 0))}</div>
-        </div>"""
+        benef_cards += (
+            '<div class="rep-card rep-card--benef">'
+            f'<div class="rep-card-label">{esc(b)}</div>'
+            f'<div class="rep-card-value">{fmt(res_pb.get(b, 0))}</div></div>'
+        )
+    benef_cards += (
+        '<div class="rep-card rep-card--total">'
+        '<div class="rep-card-label">Total del período</div>'
+        f'<div class="rep-card-value">{fmt(total_periodo)}</div></div>'
+    )
 
-    # Grilla mes × beneficiario (solo si hay más de un mes en el rango).
-    grilla = ""
-    if len(por_mes) > 1:
-        head = "".join(f"<th class='right'>{html.escape(str(b))}</th>" for b in beneficiarios)
-        body = ""
-        for fila in por_mes:
-            pb = fila.get("por_beneficiario", {}) or {}
-            celdas = "".join(f"<td class='right'>{fmt(pb.get(b, 0))}</td>" for b in beneficiarios)
-            body += (
-                f"<tr><td>{html.escape(_es_month(str(fila.get('mes', ''))))}</td>"
-                f"{celdas}<td class='right strong'>{fmt(fila.get('total', 0))}</td></tr>"
-            )
-        tot = "".join(f"<td class='right'>{fmt(res_pb.get(b, 0))}</td>" for b in beneficiarios)
-        grilla = f"""
-        <h2>Por mes</h2>
-        <table class="grid">
-          <thead><tr><th>Mes</th>{head}<th class="right">Total</th></tr></thead>
-          <tbody>{body}</tbody>
-          <tfoot><tr><td class="strong">TOTAL</td>{tot}<td class="right strong">{fmt(res.get('total', 0))}</td></tr></tfoot>
-        </table>"""
-
-    # Detalle por dueño: equipos + cuánto generó cada uno.
+    # Detalle por dueño.
     detalle = ""
     for d in por_dueno:
+        gen = d.get("monto_generado", 0) or 0
         filas = ""
         for eq in d.get("equipos", []):
             veces = eq.get("veces")
             veces_txt = f"{veces}" if veces not in (None, "") else "—"
             filas += (
-                f"<tr><td>{html.escape(str(eq.get('equipo', '')))}</td>"
-                f"<td class='center'>{veces_txt}</td>"
-                f"<td class='right'>{fmt(eq.get('monto', 0))}</td></tr>"
+                f'<tr><td>{esc(eq.get("equipo", ""))}</td>'
+                f'<td class="c mono">{veces_txt}</td>'
+                f'<td class="r mono">{fmt(eq.get("monto", 0))}</td></tr>'
             )
-        detalle += f"""
-        <div class="dueno">
-          <div class="dueno-head">
-            <span class="dueno-name">{html.escape(str(d.get("dueno", "")))}</span>
-            <span class="dueno-tot">{fmt(d.get("monto_generado", 0))}
-              <span class="dueno-sub">· {d.get("pedidos", 0)} alquileres</span></span>
-          </div>
-          <table class="detail">
-            <thead><tr><th>Equipo</th><th class="center">Veces</th><th class="right">Generado</th></tr></thead>
-            <tbody>{filas or '<tr><td colspan="3" class="empty">Sin equipos con ingreso en el período.</td></tr>'}</tbody>
-          </table>
-        </div>"""
+        if not filas:
+            filas = ('<tr><td colspan="3" class="rep-empty-cell">'
+                     'Sin equipos con ingreso en el período.</td></tr>')
 
+        reparto = d.get("reparto", {}) or {}
+        chips = []
+        for b, m in reparto.items():
+            pct = round((m / gen) * 100) if gen else 0
+            chips.append(f"{esc(b)} {pct}%")
+        reparto_html = ""
+        if chips:
+            reparto_html = (
+                '<div class="rep-dueno-foot"><span class="rep-reparte-lbl">Reparte</span>'
+                f'{" · ".join(chips)}</div>'
+            )
+
+        detalle += (
+            '<div class="rep-dueno">'
+            '<div class="rep-dueno-head"><span class="rep-dot"></span>'
+            f'<span class="rep-dueno-name">{esc(d.get("dueno", ""))}</span>'
+            '<span class="rep-dueno-tot">'
+            f'{fmt(gen)} <span class="rep-dueno-sub">· {d.get("pedidos", 0)} alquileres</span>'
+            '</span></div>'
+            '<table class="rep-tbl"><thead><tr>'
+            '<th>Equipo</th><th class="c">Veces</th><th class="r">Generado</th>'
+            f'</tr></thead><tbody>{filas}</tbody></table>'
+            f'{reparto_html}</div>'
+        )
     if not por_dueno:
-        detalle = '<p class="empty">No hay pedidos saldados en este período.</p>'
+        detalle = '<p class="rep-empty">No hay pedidos saldados en este período.</p>'
 
-    return f"""<!DOCTYPE html>
-<html lang="es"><head>
-<meta charset="utf-8">
-<title>Liquidación — {html.escape(titulo)}</title>
-<style>
-  {_a4_page(margin="0")}
-  * {{ box-sizing: border-box; }}
-  body {{ font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-          color: #2a251e; margin: 0; padding: 0; font-size: 13px; }}
-  /* La hoja: en el PDF es A4 (llena la hoja, el padding hace de margen). En
-     pantalla (preview del modal) se adapta al ancho del iframe para verse
-     completa — Chromium rasteriza el PDF con media `print`, así que el override
-     `screen` no afecta al PDF. */
-  .sheet {{ width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm 15mm;
-            background: #fff; box-sizing: border-box; }}
-  @media screen {{
-    html {{ background: #f1efe9; }}
-    .sheet {{ width: 100%; min-height: 0; margin: 0; padding: 28px 30px; }}
-  }}
-  .head {{ display: flex; justify-content: space-between; align-items: flex-end;
-           border-bottom: 3px solid #FAB428; padding-bottom: 14px; margin-bottom: 22px; }}
-  .head h1 {{ font-size: 22px; margin: 0; }}
-  .head .sub {{ color: #8a8378; font-size: 12px; margin-top: 4px; }}
-  .head .brand {{ text-align: right; font-size: 12px; color: #6b6457; }}
-  .head .brand strong {{ display: block; color: #2a251e; font-size: 15px; }}
-  h2 {{ font-size: 14px; margin: 24px 0 10px; color: #2a251e; }}
-  .cards {{ display: flex; flex-wrap: wrap; gap: 10px; }}
-  .card {{ flex: 1 1 140px; border: 1px solid #e5e1d8; border-radius: 10px; padding: 12px 14px; }}
-  .card-label {{ font-size: 11px; color: #8a8378; text-transform: uppercase; letter-spacing: .04em; }}
-  .card-value {{ font-size: 19px; font-weight: 700; margin-top: 4px; }}
-  .card-total {{ background: #2a251e; border-color: #2a251e; }}
-  .card-total .card-label {{ color: #d8d2c6; }}
-  .card-total .card-value {{ color: #fff; }}
-  table {{ width: 100%; border-collapse: collapse; }}
-  .grid th, .grid td {{ padding: 7px 9px; border-bottom: 1px solid #eee; }}
-  .grid thead th {{ background: #faf8f3; font-size: 11px; text-transform: uppercase;
-                    letter-spacing: .03em; color: #6b6457; }}
-  .grid tfoot td {{ border-top: 2px solid #d8d2c6; font-weight: 700; }}
-  .dueno {{ border: 1px solid #e5e1d8; border-radius: 10px; margin-bottom: 12px;
-            overflow: hidden; page-break-inside: avoid; }}
-  .dueno-head {{ display: flex; justify-content: space-between; align-items: baseline;
-                 background: #faf8f3; padding: 10px 14px; border-bottom: 1px solid #e5e1d8; }}
-  .dueno-name {{ font-weight: 700; font-size: 14px; }}
-  .dueno-tot {{ font-weight: 700; font-size: 14px; }}
-  .dueno-sub {{ font-weight: 400; font-size: 11px; color: #8a8378; }}
-  .detail th, .detail td {{ padding: 6px 14px; border-bottom: 1px solid #f0ede6; font-size: 12px; }}
-  .detail thead th {{ font-size: 10px; text-transform: uppercase; color: #8a8378; text-align: left; }}
-  .right {{ text-align: right; }}
-  .center {{ text-align: center; }}
-  .strong {{ font-weight: 700; }}
-  .empty {{ color: #8a8378; font-style: italic; padding: 10px 14px; }}
-  .foot {{ margin-top: 26px; padding-top: 12px; border-top: 1px solid #e5e1d8;
-           font-size: 11px; color: #8a8378; text-align: center; }}
-</style>
-</head>
-<body>
-  <div class="sheet">
-    <div class="head">
-      <div>
-        <h1>Liquidación</h1>
-        <div class="sub">{html.escape(titulo)} · ingreso 100% pagado, repartido</div>
-      </div>
-      <div class="brand">
-        <strong>Rambla Rental</strong>
-        Reporte generado el {fecha_doc}
-      </div>
-    </div>
+    seccion_liq = (
+        '<section class="rep-section">'
+        '<div class="rep-sec-head"><h2 class="rep-h2">Liquidación</h2>'
+        f'<span class="rep-sec-eyebrow">{periodo_eyebrow}</span></div>'
+        '<p class="rep-sub">Pedidos 100% pagados, atribuidos al día de pago y '
+        'repartidos por dueño.</p>'
+        '<div class="rep-h3-row"><h3 class="rep-h3">A cobrar por beneficiario</h3>'
+        f'<span class="rep-h3-meta">total · {fmt(total_periodo)}</span></div>'
+        f'<div class="rep-cards">{benef_cards}</div>'
+        '<div class="rep-h3-row"><h3 class="rep-h3">Detalle por dueño</h3>'
+        f'<span class="rep-h3-meta">generado · {fmt(total_periodo)}</span></div>'
+        f'{detalle}</section>'
+    )
 
-    <div class="cards">{cards}</div>
-    {grilla}
-    <h2>Detalle por dueño</h2>
-    {detalle}
+    # ═══ SECCIÓN RESUMEN GENERAL (opcional) ══════════════════════════════════
+    # Se rinde si `stats` no es None (un dict vacío → estados vacíos, no se omite).
+    seccion_stats = _resumen_general_html(stats) if stats is not None else ""
 
-    <div class="foot">
-      Rambla Rental · alquiler de equipos audiovisuales · reporte interno de liquidación
-    </div>
-  </div>
-</body>
-</html>"""
+    body = header + seccion_liq + seccion_stats + _ds_footer()
+
+    head = (
+        '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+        f'<title>Reportes — {esc(titulo)}</title>'
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
+        + _ds_fonts_css()
+        + "<style>" + _DS_DOC_CSS + _REP_CSS + "</style></head><body>"
+    )
+    return head + '<article class="paper">' + body + "</article></body></html>"
+
+
+def _resumen_general_html(stats: dict) -> str:
+    """Sección 'Resumen general' del reporte (contexto histórico). Recibe el dict
+    de `compute_estadisticas`. Robusto ante claves vacías."""
+    esc = lambda s: html.escape(str(s if s is not None else ""))
+    fmt = lambda n: _fmt_ars(n, zero_dash=False)
+
+    totales = stats.get("totales", {}) or {}
+    por_mes = stats.get("por_mes", []) or []
+    crecimiento = stats.get("crecimiento", []) or []
+    por_dueno = stats.get("por_dueno", []) or []
+    top_clientes = stats.get("top_clientes", []) or []
+
+    total_ars = totales.get("total_ars") or 0
+    total_pedidos = totales.get("total_pedidos") or 0
+    total_clientes = totales.get("total_clientes") or 0
+
+    # Eyebrow del período: último mes con datos (por_mes viene DESC) o 'histórico'.
+    if por_mes:
+        ultimo_mes = por_mes[0].get("mes")
+        periodo_eyebrow = _rep_mes_eyebrow(ultimo_mes)
+    else:
+        periodo_eyebrow = "HISTÓRICO"
+
+    # ── 4 cards ──────────────────────────────────────────────────────────────
+    promedio = (total_ars / total_pedidos) if total_pedidos else 0
+    ratio = round(total_pedidos / total_clientes, 1) if total_clientes else 0
+
+    # Crecimiento del último mes (crecimiento viene DESC por mes).
+    crec_pct, crec_prev = 0, None
+    if crecimiento:
+        crec_pct = crecimiento[0].get("crecimiento_pct") or 0
+        if len(crecimiento) > 1:
+            crec_prev = crecimiento[1].get("mes")
+    if crec_pct > 0:
+        crec_color, crec_txt = _REP_VERDE, f"+{crec_pct:g}%"
+    elif crec_pct < 0:
+        crec_color, crec_txt = _REP_DESTRUCTIVE, f"{crec_pct:g}%"
+    else:
+        crec_color, crec_txt = "var(--muted)", f"{crec_pct:g}%"
+    crec_sub = f"vs {_rep_mes_largo(crec_prev)}" if crec_prev else "sin mes previo"
+
+    cards = (
+        '<div class="rep-stat-card"><div class="rep-stat-label">Facturado neto</div>'
+        f'<div class="rep-stat-num">{fmt(total_ars)}</div>'
+        '<div class="rep-stat-sub">ingreso confirmado</div></div>'
+        '<div class="rep-stat-card"><div class="rep-stat-label">Pedidos</div>'
+        f'<div class="rep-stat-num">{total_pedidos}</div>'
+        f'<div class="rep-stat-sub">{fmt(promedio)} promedio</div></div>'
+        '<div class="rep-stat-card"><div class="rep-stat-label">Clientes</div>'
+        f'<div class="rep-stat-num">{total_clientes}</div>'
+        f'<div class="rep-stat-sub">{ratio:g} pedidos c/u</div></div>'
+        '<div class="rep-stat-card"><div class="rep-stat-label">Crecimiento</div>'
+        f'<div class="rep-stat-num" style="color:{crec_color}">{crec_txt}</div>'
+        f'<div class="rep-stat-sub">{crec_sub}</div></div>'
+    )
+
+    # ── Ingresos por dueño (barras) ──────────────────────────────────────────
+    suma_dueno = sum((d.get("total_ars") or 0) for d in por_dueno)
+    # Paleta de barras: Rambla = amber; los demás siguen el orden del DS.
+    paleta = [_REP_AZUL, _REP_ROSA, _REP_VERDE, _REP_DESTRUCTIVE]
+    pal_i = 0
+    barras = ""
+    for d in por_dueno:
+        dueno = d.get("dueno", "")
+        monto = d.get("total_ars") or 0
+        pct = (monto / suma_dueno * 100) if suma_dueno else 0
+        if str(dueno).strip().lower() == "rambla":
+            color = "var(--amber)"
+        else:
+            color = paleta[pal_i % len(paleta)]
+            pal_i += 1
+        items = d.get("items") or 0
+        barras += (
+            '<div class="rep-bar-row">'
+            '<div class="rep-bar-top"><span class="rep-bar-name">'
+            f'<span class="rep-dot" style="background:{color}"></span>{esc(dueno)}</span>'
+            f'<span class="rep-bar-val mono">{fmt(monto)} '
+            f'<span class="rep-bar-pct">{round(pct)}%</span></span></div>'
+            '<div class="rep-bar-track">'
+            f'<div class="rep-bar-fill" style="width:{max(pct, 1.5):.1f}%;background:{color}"></div></div>'
+            f'<div class="rep-bar-foot">{items} items</div></div>'
+        )
+    if not por_dueno:
+        barras = '<p class="rep-empty">Sin ingresos por dueño en el histórico.</p>'
+
+    # ── Clientes del mes (top 5) ─────────────────────────────────────────────
+    top = top_clientes[:5]
+    filas_cli = ""
+    for i, c in enumerate(top, 1):
+        filas_cli += (
+            f'<tr><td class="c mono rep-rank">{i}</td>'
+            f'<td>{esc(c.get("cliente", "—"))}</td>'
+            f'<td class="c mono">{c.get("pedidos", 0)}</td>'
+            f'<td class="r mono">{fmt(c.get("total_ars", 0))}</td></tr>'
+        )
+    if not filas_cli:
+        filas_cli = '<tr><td colspan="4" class="rep-empty-cell">Sin clientes en el histórico.</td></tr>'
+    clientes_tbl = (
+        '<table class="rep-tbl rep-cli-tbl"><thead><tr>'
+        '<th class="c">#</th><th>Cliente</th><th class="c">Pedidos</th>'
+        '<th class="r">Facturado</th></tr></thead>'
+        f'<tbody>{filas_cli}</tbody></table>'
+    )
+
+    # ── Tendencia · barras de los últimos 6 meses ────────────────────────────
+    # por_mes viene DESC → tomamos los 6 más recientes y los damos vuelta a ASC.
+    meses6 = list(reversed(por_mes[:6]))
+    max_total = max((m.get("total_ars") or 0) for m in meses6) if meses6 else 0
+    chart_bars = ""
+    for i, m in enumerate(meses6):
+        t = m.get("total_ars") or 0
+        h = (t / max_total * 100) if max_total else 0
+        ultima = (i == len(meses6) - 1)
+        color = "var(--amber)" if ultima else "var(--hairline-bar)"
+        chart_bars += (
+            '<div class="rep-chart-col">'
+            f'<div class="rep-chart-amt mono">{_rep_fmt_compact(t)}</div>'
+            '<div class="rep-chart-barwrap">'
+            f'<div class="rep-chart-bar" style="height:{max(h, 2):.1f}%;background:{color}"></div></div>'
+            f'<div class="rep-chart-lbl">{_rep_mes_abbr(m.get("mes"))}</div></div>'
+        )
+    if not meses6:
+        chart_bars = '<p class="rep-empty">Sin histórico mensual.</p>'
+
+    n_meses = len(meses6)
+    n_top = len(top)
+
+    return (
+        '<section class="rep-section rep-section--stats">'
+        '<div class="rep-sec-head"><h2 class="rep-h2">Resumen general</h2>'
+        f'<span class="rep-sec-eyebrow">{periodo_eyebrow}</span></div>'
+        '<p class="rep-sub">Contexto · histórico de pedidos confirmados, '
+        'retirados y finalizados.</p>'
+        f'<div class="rep-stat-grid">{cards}</div>'
+        '<div class="rep-h3-row"><h3 class="rep-h3">Ingresos por dueño</h3>'
+        f'<span class="rep-h3-meta">neto · {fmt(suma_dueno)}</span></div>'
+        f'<div class="rep-bars">{barras}</div>'
+        '<div class="rep-h3-row"><h3 class="rep-h3">Clientes del mes</h3>'
+        f'<span class="rep-h3-meta">top {n_top}</span></div>'
+        f'{clientes_tbl}'
+        '<div class="rep-h3-row"><h3 class="rep-h3">'
+        f'Tendencia · {n_meses} meses</h3>'
+        '<span class="rep-h3-meta">neto mensual</span></div>'
+        f'<div class="rep-chart">{chart_bars}</div>'
+        '</section>'
+    )
+
+
+# CSS específico de Reportes — se concatena después de `_DS_DOC_CSS`, así que
+# hereda todos los tokens del DS (--amber/--ink/--surface/--hairline/--muted/…).
+_REP_CSS = r"""
+:root{ --hairline-bar:oklch(0.85 0.01 80); }
+
+/* Header (banner amber estilo membrete) */
+.rep-header{margin-bottom:26px}
+.rep-header-top{display:flex;justify-content:space-between;align-items:flex-start;gap:28px}
+.rep-brand{display:flex;flex-direction:column;gap:8px}
+.rep-wordmark{color:var(--ink)}
+.rep-head-meta{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:3px}
+.rep-eyebrow{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.rep-head-date{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
+.rep-title{font-family:var(--font-sans);font-weight:700;font-size:34px;letter-spacing:-.015em;
+  line-height:1;margin-top:16px}
+.rep-rule{height:3px;background:var(--amber);border-radius:2px;margin-top:14px;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+/* Section */
+.rep-section{margin-top:6px}
+.rep-section--stats{margin-top:30px;padding-top:26px;border-top:1px solid var(--hairline)}
+.rep-sec-head{display:flex;justify-content:space-between;align-items:baseline;gap:14px;margin-bottom:4px}
+.rep-h2{font-family:var(--font-sans);font-weight:700;font-size:21px;letter-spacing:-.01em}
+.rep-sec-eyebrow{font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:color-mix(in oklch,var(--amber) 78%,var(--ink));white-space:nowrap}
+.rep-sub{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+
+/* H3 row (título + meta mono a la derecha) */
+.rep-h3-row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;
+  margin:24px 0 12px}
+.rep-h3{font-family:var(--font-sans);font-weight:600;font-size:14px}
+.rep-h3-meta{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);
+  letter-spacing:.04em;white-space:nowrap}
+
+/* Cards de beneficiario */
+.rep-cards{display:flex;flex-wrap:wrap;gap:10px}
+.rep-card{flex:1 1 150px;border:1px solid var(--hairline);border-radius:var(--r-md);
+  padding:13px 15px;background:var(--surface)}
+.rep-card-label{font-family:var(--font-mono);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.rep-card-value{font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-weight:600;font-size:20px;margin-top:6px}
+.rep-card--total{background:var(--amber);border-color:var(--amber);
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rep-card--total .rep-card-label{color:color-mix(in oklch,var(--ink) 70%,transparent)}
+.rep-card--total .rep-card-value{color:var(--ink)}
+
+/* Card de dueño */
+.rep-dueno{border:1px solid var(--hairline);border-radius:var(--r-lg);
+  background:var(--surface);margin-bottom:12px;overflow:hidden;break-inside:avoid}
+.rep-dueno-head{display:flex;align-items:baseline;gap:9px;padding:12px 16px;
+  border-bottom:1px solid var(--hairline)}
+.rep-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);flex-shrink:0;
+  align-self:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rep-dueno-name{font-weight:600;font-size:14px}
+.rep-dueno-tot{margin-left:auto;font-family:var(--font-mono);font-variant-numeric:tabular-nums;
+  font-weight:600;font-size:14px;white-space:nowrap}
+.rep-dueno-sub{font-weight:400;font-size:10.5px;color:var(--muted)}
+.rep-dueno-foot{padding:10px 16px;border-top:1px solid var(--hairline);
+  font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;color:var(--muted)}
+.rep-reparte-lbl{font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:color-mix(in oklch,var(--amber) 72%,var(--ink));margin-right:8px}
+
+/* Tabla genérica del reporte */
+.rep-tbl{width:100%;border-collapse:collapse}
+.rep-tbl thead th{font-family:var(--font-mono);font-size:8.5px;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);text-align:left;
+  padding:0 16px 8px}
+.rep-tbl th.r,.rep-tbl td.r{text-align:right}
+.rep-tbl th.c,.rep-tbl td.c{text-align:center}
+.rep-tbl tbody td{padding:8px 16px;border-top:1px solid var(--hairline);font-size:12px;
+  vertical-align:middle}
+.rep-tbl .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.rep-tbl td.r,.rep-tbl td.c{white-space:nowrap}
+.rep-dueno .rep-tbl thead th{padding-top:10px}
+.rep-cli-tbl{border:1px solid var(--hairline);border-radius:var(--r-lg);overflow:hidden}
+.rep-cli-tbl thead th{padding:10px 16px 8px;background:var(--surface)}
+.rep-rank{color:var(--muted)}
+.rep-empty-cell{color:var(--muted);font-style:italic;text-align:center;padding:14px}
+.rep-empty{color:var(--muted);font-style:italic;font-size:12px;padding:8px 0}
+
+/* Stats: 4 cards grandes */
+.rep-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.rep-stat-card{border:1px solid var(--hairline);border-radius:var(--r-md);
+  background:var(--surface);padding:14px 16px}
+.rep-stat-label{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.rep-stat-num{font-family:"Champ Black",var(--font-sans);font-weight:900;font-size:23px;
+  letter-spacing:-.01em;line-height:1.1;margin-top:8px;font-variant-numeric:tabular-nums}
+.rep-stat-sub{font-family:var(--font-mono);font-size:9.5px;color:var(--muted);margin-top:6px}
+
+/* Stats: barras de ingresos por dueño */
+.rep-bars{display:flex;flex-direction:column;gap:14px}
+.rep-bar-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.rep-bar-name{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
+.rep-bar-val{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:12px;
+  font-weight:600;white-space:nowrap}
+.rep-bar-pct{color:var(--muted);font-weight:400;margin-left:4px}
+.rep-bar-track{height:9px;border-radius:5px;background:var(--surface);margin-top:7px;overflow:hidden}
+.rep-bar-fill{height:100%;border-radius:5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rep-bar-foot{font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:5px}
+
+/* Stats: gráfico de tendencia (barras verticales) */
+.rep-chart{display:flex;align-items:flex-end;gap:14px;height:170px;
+  padding:8px 4px 0;border-bottom:1px solid var(--hairline)}
+.rep-chart-col{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-end;height:100%;gap:6px}
+.rep-chart-amt{font-size:9px;color:var(--muted);white-space:nowrap}
+.rep-chart-barwrap{width:100%;flex:1;display:flex;align-items:flex-end;justify-content:center}
+.rep-chart-bar{width:62%;max-width:46px;border-radius:5px 5px 0 0;min-height:2px;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rep-chart-lbl{font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted)}
+"""
