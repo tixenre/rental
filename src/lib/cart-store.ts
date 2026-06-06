@@ -4,6 +4,7 @@ import { startOfDay } from "date-fns";
 import { snapTo30 } from "@/components/rental/time-utils";
 import { computeJornadas } from "@/lib/rental-dates";
 import { trackAddToCart } from "@/lib/analytics";
+import { registrarClickBusqueda } from "@/lib/search-log";
 
 type DrawerPlacement = "right" | "bottom";
 
@@ -39,6 +40,10 @@ export const useCart = create<CartState>()(
       drawerPlacement: "right" as DrawerPlacement,
       add: (id) => {
         trackAddToCart(id);
+        // Click-through de búsqueda: si el usuario venía de buscar, este agregado
+        // es la señal de que encontró lo que buscaba. Best-effort (no-op si no
+        // hubo búsqueda reciente). Único punto canónico, junto al add_to_cart.
+        registrarClickBusqueda(id);
         set((s) => ({ items: { ...s.items, [id]: (s.items[id] ?? 0) + 1 } }));
       },
       remove: (id) =>

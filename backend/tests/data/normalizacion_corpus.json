@@ -1,0 +1,15 @@
+{
+  "_comment": "Corpus compartido de normalización de búsqueda. Hoy lo enforce SOLO el test de Python (backend/tests/test_busqueda_motor.py); el espejo del front (src/lib/search/normalize.ts) NO tiene test todavía (el repo aún no tiene runner de tests JS), así que este corpus es el contrato manual: si cambiás una regla, actualizá Python Y el front a la vez. Reglas: minúsculas, sin acentos, no-alfanumérico→espacio, espacios colapsados.",
+  "casos": [
+    { "in": "Batería", "out": "bateria" },
+    { "in": "Cámara", "out": "camara" },
+    { "in": "SONY", "out": "sony" },
+    { "in": "Sony A7-III", "out": "sony a7 iii" },
+    { "in": "f/2.8", "out": "f 2 8" },
+    { "in": "  Trípode   grande ", "out": "tripode grande" },
+    { "in": "Ñandú", "out": "nandu" },
+    { "in": "100-400mm", "out": "100 400mm" },
+    { "in": "Manfrotto_055", "out": "manfrotto 055" },
+    { "in": "", "out": "" }
+  ]
+}

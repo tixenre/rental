@@ -17,6 +17,7 @@ import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { logSearch } from "@/lib/search-log";
+import { filtrarOrdenar } from "@/lib/search/normalize";
 import { SITE_URL } from "@/lib/site";
 import { HeroSection } from "@/components/rental/HeroSection";
 import { ComoFunciona } from "@/components/rental/ComoFunciona";
@@ -369,13 +370,6 @@ function Index() {
   }, [allEquipos]);
 
   const filtered = useMemo(() => {
-    // Normaliza: minúsculas + sin acentos. Así "baterias" matchea "Batería".
-    const norm = (s: string) =>
-      (s ?? "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-
     let list = allEquipos.slice();
     if (selectedCats.size > 0) {
       // Match contra root (`e.category`) + sub-cats (vía `equipo_categorias` M2M).
@@ -407,15 +401,19 @@ function Index() {
       });
     }
     if (query.trim()) {
-      // Cada palabra de la query debe aparecer en el "haystack" del equipo.
-      const tokens = norm(query).split(/\s+/).filter(Boolean);
-      list = list.filter((e) => {
-        const specsText = (e.specs ?? []).map((s) => `${s.label} ${s.value}`).join(" ");
-        const haystack = norm(
-          [e.name, e.brand, e.category, e.description ?? "", specsText].join(" "),
-        );
-        return tokens.every((t) => haystack.includes(t));
-      });
+      // Motor de búsqueda compartido (espejo del backend): sin tildes, sin
+      // guiones, multi-palabra y ORDENADO por relevancia (mejor match primero).
+      // `nombre` pondera el ranking; el resto (marca/categoría/specs/descripción)
+      // entra al match como contexto.
+      list = filtrarOrdenar(list, query, (e) => ({
+        nombre: e.name,
+        extra: [
+          e.brand,
+          e.category,
+          e.description ?? "",
+          (e.specs ?? []).map((s) => `${s.label} ${s.value}`).join(" "),
+        ].join(" "),
+      }));
     }
     return list;
   }, [selectedCats, brand, query, disponiblesOnly, favoritosOnly, fav, allEquipos, specFilters]);
