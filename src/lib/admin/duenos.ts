@@ -18,17 +18,3 @@ export function isCanonicalDueno(value: string | null | undefined): value is Due
   if (!value) return false;
   return (DUENOS as readonly string[]).includes(value);
 }
-
-/**
- * Normaliza un valor legacy al dueño canónico más cercano.
- * Si no se puede mapear con confianza, devuelve null (el form muestra
- * el valor crudo pero el admin elige uno del dropdown al guardar).
- */
-export function normalizeDueno(value: string | null | undefined): Dueno | null {
-  if (!value) return null;
-  const lower = value.trim().toLowerCase();
-  for (const d of DUENOS) {
-    if (d.toLowerCase() === lower) return d;
-  }
-  return null;
-}
