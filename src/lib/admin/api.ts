@@ -1273,8 +1273,11 @@ export const adminApi = {
     return authedJson<PedidosListResp>(`/api/alquileres?${sp.toString()}`);
   },
   getPedido: (id: number) => authedJson<Pedido>(`/api/alquileres/${id}`),
-  enviarDocumentos: (id: number, payload: { docs: string[]; to?: string; mensaje?: string }) =>
-    authedJson<{ ok: true; to: string; docs: string[]; provider?: string }>(
+  enviarDocumentos: (
+    id: number,
+    payload: { docs: string[]; to?: string; mensaje?: string; template?: string },
+  ) =>
+    authedJson<{ ok: true; to: string; docs: string[]; template?: string; provider?: string }>(
       `/api/alquileres/${id}/enviar-documentos`,
       {
         method: "POST",
