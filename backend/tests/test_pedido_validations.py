@@ -45,6 +45,13 @@ class MinimalFakeConn:
     def rollback(self):
         pass
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
     def close(self):
         pass
 

@@ -51,6 +51,13 @@ class FakeConn:
         self._params = ()
         self.closed = 0  # cuántas veces se devolvió la conexión al pool
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
     def close(self):
         self.closed += 1
 
