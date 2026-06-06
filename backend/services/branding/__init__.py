@@ -12,11 +12,12 @@ a prueba de balas — `docs/MEMORIA.md`).
 """
 
 from .derive import derive_from_isologo, derive_from_wordmark
-from .rasterize import render_svg_png, svg_aspect
+from .rasterize import render_svg_png, sanitize_svg, svg_aspect
 
 __all__ = [
     "render_svg_png",
     "svg_aspect",
+    "sanitize_svg",
     "derive_from_wordmark",
     "derive_from_isologo",
 ]

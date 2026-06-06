@@ -21,6 +21,8 @@ _VIEWBOX_RE = re.compile(
 _SVG_W_RE = re.compile(r'<svg\b[^>]*\bwidth\s*=\s*["\']([\d.]+)', re.I)
 _SVG_H_RE = re.compile(r'<svg\b[^>]*\bheight\s*=\s*["\']([\d.]+)', re.I)
 _SCRIPT_RE = re.compile(r"<script\b.*?</script\s*>", re.I | re.S)
+_ON_ATTR_RE = re.compile(r"\son\w+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)", re.I)
+_JS_HREF_RE = re.compile(r"(href|xlink:href)\s*=\s*(\"|')\s*javascript:[^\"']*\2", re.I)
 
 
 def svg_aspect(svg_text: str) -> float | None:
@@ -41,6 +43,19 @@ def svg_aspect(svg_text: str) -> float | None:
 def _sanitize(svg_text: str) -> str:
     """Saca <script> del SVG (defensa básica; el upload ya es admin-only)."""
     return _SCRIPT_RE.sub("", svg_text)
+
+
+def sanitize_svg(svg_text: str) -> str:
+    """Sanea un SVG para inyectarlo inline en el DOM / en el HTML de un PDF.
+
+    Saca `<script>`, atributos de evento (`onload`, `onclick`, …) y hrefs
+    `javascript:`. El upload es admin-only (riesgo = self-XSS), pero igual se
+    higieniza porque el SVG se inyecta como markup (inline), no vía `<img>`.
+    """
+    out = _SCRIPT_RE.sub("", svg_text)
+    out = _ON_ATTR_RE.sub("", out)
+    out = _JS_HREF_RE.sub("", out)
+    return out.strip()
 
 
 async def render_svg_png(
