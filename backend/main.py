@@ -111,7 +111,11 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
 async def security_headers(request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
+    # DENY global por default (anti-clickjacking, #503). `setdefault` para que una
+    # ruta pueda relajar a SAMEORIGIN cuando su HTML está hecho para embeberse en
+    # un iframe del propio portal (preview de documentos) sin que el middleware lo
+    # pise de vuelta a DENY.
+    response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
