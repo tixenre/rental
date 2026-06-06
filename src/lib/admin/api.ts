@@ -1705,6 +1705,7 @@ export type PedidoItem = {
   marca: string | null;
   nombre_publico?: string | null;
   nombre_publico_largo?: string | null;
+  foto_url?: string | null;
 };
 
 export type PedidoPago = {

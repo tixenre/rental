@@ -20,7 +20,6 @@ import {
   Mail,
   Eye,
   Download,
-  ShoppingCart,
   Info,
   Trash2,
 } from "lucide-react";
@@ -51,6 +50,8 @@ import {
   type Equipo,
 } from "@/lib/admin/api";
 import { usePedidoDraft, type DraftItem } from "@/components/admin/pedido/usePedidoDraft";
+import { ClienteAutocomplete } from "@/components/admin/pedido/ClienteAutocomplete";
+import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
 import { computeJornadas, parseDateTimeParts, toLocalISO } from "@/lib/rental-dates";
 import { format } from "date-fns";
@@ -307,6 +308,43 @@ function PedidoEditorPage() {
 
           {/* Cliente */}
           <Section icon={User} title="Cliente">
+            {/* Buscar ficha existente: al elegirla, el contacto y el descuento
+                se completan solos. También se puede tipear a mano abajo (pedido
+                sin ficha vinculada). */}
+            <div className="mb-3">
+              <ClienteAutocomplete
+                placeholder="Buscar cliente por nombre, email o teléfono…"
+                onPick={(c) =>
+                  setDatos((d) =>
+                    d
+                      ? {
+                          ...d,
+                          cliente_id: c.id,
+                          cliente_nombre: c.apellido ? `${c.apellido}, ${c.nombre}` : c.nombre,
+                          cliente_email: c.email ?? "",
+                          cliente_telefono: c.telefono ?? "",
+                          // El descuento sigue al cliente: si el nuevo no tiene
+                          // uno propio, se resetea a 0.
+                          descuento_pct: c.descuento ?? 0,
+                        }
+                      : d,
+                  )
+                }
+              />
+              {datos.cliente_id && (
+                <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                  <Check className="h-3 w-3 text-verde" />
+                  <span>Ficha vinculada · el contacto se sincroniza con el cliente</span>
+                  <button
+                    type="button"
+                    onClick={() => setDatos((d) => d && { ...d, cliente_id: null })}
+                    className="ml-1 underline hover:text-ink"
+                  >
+                    Desvincular
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FieldLabel label="Nombre">
                 <Input
@@ -411,9 +449,11 @@ function PedidoEditorPage() {
                 return (
                   <li key={it.equipo_id} className="py-2.5 space-y-1.5">
                     <div className="flex items-center gap-3">
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-md border hairline text-muted-foreground shrink-0">
-                        <ShoppingCart className="h-4 w-4" />
-                      </span>
+                      <EquipoThumb
+                        src={it.foto_url}
+                        alt={it.nombre_publico || it.nombre}
+                        className="h-10 w-10"
+                      />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm text-ink truncate">
                           {it.nombre_publico || it.nombre}
@@ -535,6 +575,7 @@ function PedidoEditorPage() {
                       nombre: eq.nombre,
                       marca: eq.marca,
                       nombre_publico: eq.nombre_publico ?? null,
+                      foto_url: eq.foto_url ?? null,
                     },
                   ]);
                   toast.success(`Agregado: ${display}`);
