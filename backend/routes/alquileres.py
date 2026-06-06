@@ -226,6 +226,7 @@ def _get_alquiler_detail(conn, id: int) -> dict:
     pedido["items"] = _get_alquiler_items(conn, id)
     pedido["pagos"] = _get_alquiler_pagos(conn, id)
     pedido["historial_modificaciones"] = _get_historial_modificaciones(conn, id)
+    _enriquecer_pedido_con_cliente(conn, pedido)
     _enriquecer_pedido_con_total(conn, pedido)
     return pedido
 
@@ -313,6 +314,59 @@ def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
     pedido["cliente_email_facturacion"] = c.get("email_facturacion")
     return pedido
 
+
+def _aplicar_contacto_cliente(pedido: dict, c: dict) -> None:
+    """Sobrescribe nombre/email/teléfono del pedido con los datos `c` del cliente.
+
+    El nombre se arma con el formato del back-office ("Apellido, Nombre"). El
+    email/teléfono se sobrescriben solo si el cliente tiene un valor — si está
+    vacío en la ficha, se conserva la foto del pedido para no perder el contacto.
+    """
+    pedido["cliente_nombre"] = f"{c['apellido']}, {c['nombre']}"
+    if c.get("email"):
+        pedido["cliente_email"] = c["email"]
+    if c.get("telefono"):
+        pedido["cliente_telefono"] = c["telefono"]
+
+
+def _enriquecer_pedido_con_cliente(conn, pedido: dict) -> dict:
+    """Muestra los datos de contacto/identidad SIEMPRE en vivo desde la ficha.
+
+    Los pedidos guardan una foto de nombre/email/teléfono al crearse, pero el
+    contacto se muestra con el dato ACTUAL del cliente (decisión 2026-06-06):
+    corregir un apellido o un teléfono en la ficha se refleja en todos los
+    pedidos del cliente, en cualquier estado, en el back-office y en el portal.
+    Si el pedido no tiene cliente vinculado (carga manual) o el cliente ya no
+    existe, se conserva la foto. La plata (precio/descuento) NO se toca acá: esa
+    sí queda congelada en confirmados/finalizados.
+    """
+    cid = pedido.get("cliente_id")
+    if not cid:
+        return pedido
+    row = conn.execute(
+        "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = ?",
+        (cid,),
+    ).fetchone()
+    if row:
+        _aplicar_contacto_cliente(pedido, row_to_dict(row))
+    return pedido
+
+
+def _enriquecer_pedidos_con_cliente(conn, pedidos: list[dict]) -> None:
+    """Versión batch de `_enriquecer_pedido_con_cliente` para listados (sin N+1)."""
+    ids = sorted({p["cliente_id"] for p in pedidos if p.get("cliente_id")})
+    if not ids:
+        return
+    ph = ",".join(["?"] * len(ids))
+    rows = conn.execute(
+        f"SELECT id, nombre, apellido, email, telefono FROM clientes WHERE id IN ({ph})",
+        ids,
+    ).fetchall()
+    by_id = {r["id"]: row_to_dict(r) for r in rows}
+    for p in pedidos:
+        c = by_id.get(p.get("cliente_id"))
+        if c:
+            _aplicar_contacto_cliente(p, c)
 
 
 def _get_historial_modificaciones(conn, pedido_id: int) -> list[dict]:
@@ -978,8 +1032,15 @@ def list_pedidos(
             params.append(fuente)
         if q:
             like = f"%{q}%"
-            where += " AND (p.cliente_nombre LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?)"
-            params += [like, like]
+            # Busca por la foto del pedido Y por el nombre ACTUAL del cliente
+            # (el contacto se muestra en vivo → buscar por el dato corregido
+            # también tiene que encontrar el pedido).
+            where += (
+                " AND (p.cliente_nombre LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?"
+                " OR EXISTS (SELECT 1 FROM clientes c WHERE c.id = p.cliente_id"
+                " AND (c.nombre LIKE ? OR c.apellido LIKE ?)))"
+            )
+            params += [like, like, like, like]
         if con_saldo:
             # Pedidos con saldo > 0 y no cancelados. Borrador y presupuesto no
             # aplican porque todavía no se cobra; cancelado tampoco.
@@ -1002,6 +1063,7 @@ def list_pedidos(
         ).fetchall()
 
         pedidos    = [row_to_dict(r) for r in rows]
+        _enriquecer_pedidos_con_cliente(conn, pedidos)
         items_map  = _batch_get_alquiler_items(conn, [p["id"] for p in pedidos])
 
         # Pedidos con solicitud de modificación pendiente — para badge en UI.
@@ -1290,6 +1352,72 @@ def eliminar_pago(id: int, pago_id: int, request: Request):
         conn.close()
 
 
+def _recalcular_total_pedido(conn, id: int) -> None:
+    """Recalcula y persiste el total de un pedido desde su estado YA guardado.
+
+    Fuente ÚNICA del recálculo "desde lo que hay en la base": subtotales por
+    línea, `descuento_jornadas_pct` (derivado de las jornadas) y `monto_total`
+    (neto). Lee los ítems, las fechas y el `descuento_pct` del propio pedido —
+    no recibe nada de afuera. No toca stock ni estado.
+
+    Lo usan `_apply_pedido_datos` (editar fechas/cliente/descuento), la edición
+    de ítems y la propagación del descuento del cliente a sus presupuestos.
+    """
+    p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+    if not p:
+        return
+    d0 = to_datetime(p["fecha_desde"]) if p["fecha_desde"] else None
+    d1 = to_datetime(p["fecha_hasta"]) if p["fecha_hasta"] else None
+    jornadas = jornadas_periodo(d0, d1)
+    items = conn.execute(
+        "SELECT id, equipo_id, cantidad, precio_jornada FROM alquiler_items WHERE pedido_id=?",
+        (id,),
+    ).fetchall()
+    # Subtotales persistidos por línea (los usan los visores).
+    for it in items:
+        sub = it["precio_jornada"] * it["cantidad"] * jornadas
+        conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
+    descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+    total_desglose = calcular_total(
+        items=[
+            {"equipo_id": it["equipo_id"], "cantidad": it["cantidad"],
+             "precio_jornada": it["precio_jornada"]}
+            for it in items
+        ],
+        jornadas=jornadas,
+        descuento_cliente_pct=p["descuento_pct"] or 0,
+        descuento_jornadas_pct=descuento_jornadas_pct,
+        perfil_impuestos=None,  # persiste NETO; IVA es derivado al mostrar.
+    )
+    conn.execute(
+        "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
+        (total_desglose["neto"], descuento_jornadas_pct, id),
+    )
+
+
+def propagar_descuento_a_presupuestos(conn, cliente_id: int, nuevo_pct: float) -> int:
+    """Aplica el nuevo descuento del cliente a sus pedidos NO confirmados y los
+    recotiza. Devuelve cuántos presupuestos tocó.
+
+    Solo afecta el estado `presupuesto` (no confirmado): los pedidos confirmados
+    o cerrados conservan el snapshot del descuento con que se crearon — es un
+    lock de precio deliberado (un pedido confirmado/facturado no debe cambiar de
+    importe porque después se editó el perfil del cliente). Recibe una conexión
+    abierta; el caller hace commit.
+    """
+    ids = [
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM alquileres WHERE cliente_id=? AND estado='presupuesto'",
+            (cliente_id,),
+        ).fetchall()
+    ]
+    for pid in ids:
+        conn.execute("UPDATE alquileres SET descuento_pct=? WHERE id=?", (nuevo_pct or 0, pid))
+        _recalcular_total_pedido(conn, pid)
+    return len(ids)
+
+
 def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = False) -> dict:
     """Aplica un cambio parcial de datos (cliente/fechas/notas/descuento) al pedido.
 
@@ -1345,36 +1473,13 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
     cols = ", ".join(f"{k}=?" for k in payload)
     conn.execute(f"UPDATE alquileres SET {cols} WHERE id=?", (*payload.values(), id))
 
-    if "fecha_desde" in payload or "fecha_hasta" in payload or cliente_cambio:
-        p2 = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-        d0 = to_datetime(p2["fecha_desde"]) if p2["fecha_desde"] else None
-        d1 = to_datetime(p2["fecha_hasta"]) if p2["fecha_hasta"] else None
-        jornadas = jornadas_periodo(d0, d1)
-        items = conn.execute(
-            "SELECT id, equipo_id, cantidad, precio_jornada FROM alquiler_items WHERE pedido_id=?",
-            (id,),
-        ).fetchall()
-        # Actualizar subtotales persistidos por línea (los usan los visores).
-        for it in items:
-            sub = it["precio_jornada"] * it["cantidad"] * jornadas
-            conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
-        descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
-        total_desglose = calcular_total(
-            items=[
-                {"equipo_id": it["equipo_id"], "cantidad": it["cantidad"],
-                 "precio_jornada": it["precio_jornada"]}
-                for it in items
-            ],
-            jornadas=jornadas,
-            descuento_cliente_pct=p2["descuento_pct"] or 0,
-            descuento_jornadas_pct=descuento_jornadas_pct,
-            perfil_impuestos=None,  # persiste NETO; IVA es derivado al mostrar.
-        )
-        monto_total = total_desglose["neto"]
-        conn.execute(
-            "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
-            (monto_total, descuento_jornadas_pct, id)
-        )
+    if (
+        "fecha_desde" in payload
+        or "fecha_hasta" in payload
+        or "descuento_pct" in payload
+        or cliente_cambio
+    ):
+        _recalcular_total_pedido(conn, id)
 
     return _get_alquiler_detail(conn, id)
 
@@ -1424,7 +1529,8 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
 
     # Re-aplicar AMBOS descuentos (cliente + jornadas), como hacen las
     # otras 2 sedes. Antes solo se aplicaba el del cliente → editar ítems
-    # perdía el descuento por jornadas (#500).
+    # perdía el descuento por jornadas (#500). Acá se calcula desde los ítems
+    # en memoria (los que estamos por insertar), no desde la base.
     descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
     total_desglose = calcular_total(
         items=list(consolidado.values()),
@@ -1535,6 +1641,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
         pedido["items"] = _get_alquiler_items(conn, id)
+        _enriquecer_pedido_con_cliente(conn, pedido)
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
         _enriquecer_pedido_con_total(conn, pedido)
         return _pedido_html(pedido), _pedido_filename(pedido)
@@ -1554,6 +1661,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         """, (id,)).fetchall()
         pedido["items"] = [row_to_dict(i) for i in items]
         _add_componentes(conn, pedido["items"])
+        _enriquecer_pedido_con_cliente(conn, pedido)
         return _albaran_html(pedido), _pedido_filename(pedido, suffix="albaran")
 
     if kind == "packing-list":
@@ -1561,6 +1669,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
+        _enriquecer_pedido_con_cliente(conn, pedido)
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
         pedido["items"] = _get_alquiler_items(conn, id)
         pedido["items"].sort(key=lambda it: (it.get("nombre") or "").lower())

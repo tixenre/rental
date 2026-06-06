@@ -1329,6 +1329,12 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
 # tras editar el pedido (mismo criterio que `_DOC_NO_CACHE` en alquileres.py).
 _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
+# El preview HTML se muestra dentro de un <iframe> del portal (mismo origen). El
+# middleware global pone X-Frame-Options: DENY, que bloquea TODO embedding —
+# incluido el propio — y deja el preview en blanco. SAMEORIGIN permite que el
+# portal embeba su propio documento sin abrir framing a terceros.
+_DOC_PREVIEW_HEADERS = {**_DOC_NO_CACHE, "X-Frame-Options": "SAMEORIGIN"}
+
 
 def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
     return Response(
@@ -1350,7 +1356,7 @@ def _doc_response(
     """
     if format == "html":
         from fastapi.responses import HTMLResponse
-        return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
+        return HTMLResponse(content=html_str, headers=_DOC_PREVIEW_HEADERS)
     return None  # caller sigue con PDF
 
 
