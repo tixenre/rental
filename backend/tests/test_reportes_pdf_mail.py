@@ -38,11 +38,12 @@ def test_html_incluye_beneficiarios_y_total():
 
 
 def test_html_es_hoja_a4():
-    # Requisito: todo documento que se manda por mail es A4 (hoja + HTML).
+    # Requisito: todo documento que se manda por mail es A4. Tras el rediseño DS
+    # el tamaño de hoja lo declara el shell compartido (_DOC_CSS): @page A4 + el
+    # contenedor .paper (igual que presupuesto/albarán/contrato/packing).
     html = _liquidacion_html(_DATA, "junio de 2026")
-    assert "@page { size: A4;" in html
-    assert 'class="sheet"' in html
-    assert "210mm" in html  # ancho A4 de la hoja en pantalla/PDF
+    assert "@page{size:A4" in html
+    assert 'class="paper"' in html
 
 
 def test_html_periodo_vacio_no_rompe():
@@ -58,6 +59,49 @@ def test_html_escapa_nombres():
     html = _liquidacion_html(data, "junio de 2026")
     assert "<script>x</script>" not in html
     assert "&lt;script&gt;" in html
+
+
+_STATS = {
+    "totales": {"total_ars": 8_450_000, "total_pedidos": 64, "total_clientes": 23},
+    "por_mes": [
+        {"mes": "2026-06", "pedidos": 12, "total_ars": 1_980_000},
+        {"mes": "2026-05", "pedidos": 10, "total_ars": 1_620_000},
+        {"mes": "2026-04", "pedidos": 9, "total_ars": 1_410_000},
+    ],
+    "crecimiento": [
+        {"mes": "2026-06", "total_ars": 1_980_000, "crecimiento_pct": 22.2},
+        {"mes": "2026-05", "total_ars": 1_620_000, "crecimiento_pct": 14.9},
+    ],
+    "por_dueno": [
+        {"dueno": "Rambla", "total_ars": 5_100_000, "items": 140},
+        {"dueno": "Pablo", "total_ars": 2_300_000, "items": 60},
+        {"dueno": "Tincho", "total_ars": 1_050_000, "items": 28},
+    ],
+    "top_clientes": [
+        {"cliente": "Faro Audiovisual", "pedidos": 8, "total_ars": 1_200_000},
+        {"cliente": "Productora Sur", "pedidos": 5, "total_ars": 740_000},
+    ],
+}
+
+
+def test_html_sin_stats_es_solo_liquidacion():
+    # Compat hacia atrás: stats=None → no aparece la sección Resumen general.
+    html = _liquidacion_html(_DATA, "junio de 2026")
+    assert "Resumen general" not in html
+    assert "Liquidación" in html
+
+
+def test_html_con_stats_incluye_resumen_general():
+    html = _liquidacion_html(_DATA, "junio de 2026", stats=_STATS)
+    assert "Resumen general" in html
+    assert "Facturado neto" in html
+    # Total facturado formateado en pesos.
+    assert "$8.450.000" in html
+    # Dueños del histórico + un cliente del top.
+    assert "Tincho" in html
+    assert "Faro Audiovisual" in html
+    # Crecimiento positivo con signo +.
+    assert "+22.2%" in html
 
 
 def test_split_emails_separadores():
