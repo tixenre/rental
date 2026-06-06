@@ -177,8 +177,9 @@ def cmd_init_slugs(args: argparse.Namespace) -> int:
         # call al orchestrator. Útil para auditar slugs antes de aplicar.
         if args.dry_run and args.verbose:
             from .slug import equipo_slug
+            from database import marca_subquery  # type: ignore
             rows = conn.execute(
-                "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo FROM equipos "
+                f"SELECT id, nombre, {marca_subquery('equipos')}, modelo FROM equipos "
                 "WHERE slug IS NULL ORDER BY id"
             ).fetchall()
             if rows:

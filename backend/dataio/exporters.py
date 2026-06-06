@@ -204,8 +204,9 @@ def _ensure_equipos_slug(conn) -> None:
 
     # Poblar slugs faltantes (también cubre el caso "columna existía pero
     # init-slugs nunca corrió").
-    pending = conn.execute("""
-        SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo FROM equipos
+    from database import marca_subquery  # type: ignore
+    pending = conn.execute(f"""
+        SELECT id, nombre, {marca_subquery('equipos')}, modelo FROM equipos
         WHERE slug IS NULL AND eliminado_at IS NULL
     """).fetchall()
     if pending:
@@ -258,8 +259,9 @@ def export_equipos(conn) -> list[dict]:
     """
     _ensure_equipos_slug(conn)
 
-    rows = conn.execute("""
-        SELECT e.slug, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.cantidad,
+    from database import MARCA_SUBQUERY  # type: ignore
+    rows = conn.execute(f"""
+        SELECT e.slug, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.cantidad,
                e.precio_jornada, e.precio_jornada_manual, e.precio_usd,
                e.roi_pct, e.valor_reposicion, e.foto_url, e.fecha_compra,
                e.serie, e.bh_url, e.dueno, e.visible_catalogo, e.estado,

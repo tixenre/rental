@@ -42,7 +42,7 @@ if _sentry_dsn:
         send_default_pii=False,
     )
 
-from database import init_db, get_db, row_to_dict, FRONT, FRONT_NEW
+from database import init_db, get_db, row_to_dict, FRONT, FRONT_NEW, MARCA_SUBQUERY
 from config import SITE_URL
 from routes.equipos          import router as equipos_router
 from routes.alquileres       import router as alquileres_router
@@ -292,9 +292,9 @@ def equipo_page(id_or_slug: str):
         conn = get_db()
         try:
             row = conn.execute(
-                """
+                f"""
                 SELECT e.nombre, e.foto_url, e.nombre_publico,
-                       (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+                       {MARCA_SUBQUERY},
                        ef.descripcion
                 FROM equipos e
                 LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
