@@ -19,7 +19,8 @@ from pydantic import BaseModel, Field
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
     attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
-    regenerate_auto_tags, MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
+    regenerate_auto_tags, regenerate_auto_tags_batch,
+    MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
 )
 from busqueda import construir
 from reservas import ESTADOS_RESERVADO, calcular_disponibilidad
@@ -1300,10 +1301,11 @@ def bulk_action(payload: BulkActionInput, request: Request):
                         "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
                         (eid, cid_int, orden),
                     )
-                try:
-                    regenerate_auto_tags(conn, eid)
-                except Exception as e:
-                    logger.warning("regenerate_auto_tags falló para %s en bulk: %s", eid, e)
+            # Regeneración batch (1 pasada para los N equipos, no N+1).
+            try:
+                regenerate_auto_tags_batch(conn, ids)
+            except Exception as e:
+                logger.warning("regenerate_auto_tags_batch falló en bulk set_categoria: %s", e)
 
         elif payload.action == "add_categoria":
             # Igual que set_categoria pero NO borra las existentes — sólo
@@ -1329,10 +1331,11 @@ def bulk_action(payload: BulkActionInput, request: Request):
                         """,
                         (eid, cid_int, orden),
                     )
-                try:
-                    regenerate_auto_tags(conn, eid)
-                except Exception as e:
-                    logger.warning("regenerate_auto_tags falló para %s en bulk: %s", eid, e)
+            # Regeneración batch (1 pasada para los N equipos, no N+1).
+            try:
+                regenerate_auto_tags_batch(conn, ids)
+            except Exception as e:
+                logger.warning("regenerate_auto_tags_batch falló en bulk add_categoria: %s", e)
 
         elif payload.action == "remove_categoria":
             # Saca UNA categoría de cada equipo sin tocar las otras. Si la
@@ -1345,11 +1348,11 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 f"DELETE FROM equipo_categorias WHERE categoria_id = ? AND equipo_id IN ({placeholders_ids})",
                 [payload.categoria_id, *ids],
             )
-            for eid in ids:
-                try:
-                    regenerate_auto_tags(conn, eid)
-                except Exception as e:
-                    logger.warning("regenerate_auto_tags falló para %s en bulk remove: %s", eid, e)
+            # Regeneración batch (1 pasada para los N equipos, no N+1).
+            try:
+                regenerate_auto_tags_batch(conn, ids)
+            except Exception as e:
+                logger.warning("regenerate_auto_tags_batch falló en bulk remove_categoria: %s", e)
 
         elif payload.action == "delete":
             # Soft delete: consistente con el endpoint single DELETE (#206).
@@ -2662,13 +2665,12 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
             eq_rows = conn.execute(
                 "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = ?", (cid,)
             ).fetchall()
-            for r in eq_rows:
-                try:
-                    regenerate_auto_tags(conn, r["equipo_id"])
-                except Exception:
-                    # No abortar el rename si un equipo falla regenerar tags.
-                    logger.warning("regenerate_auto_tags falló para equipo %s tras rename de cat %s",
-                                   r["equipo_id"], cid, exc_info=True)
+            try:
+                regenerate_auto_tags_batch(conn, [r["equipo_id"] for r in eq_rows])
+            except Exception:
+                # No abortar el rename si la regeneración de tags falla.
+                logger.warning("regenerate_auto_tags_batch falló tras rename de cat %s",
+                               cid, exc_info=True)
         # Si cambió el template del nombre público, regenerar el nombre de
         # cada equipo asignado a esta categoría (directa o como sub-cat).
         # Sin esto, el admin guarda el template pero los equipos siguen con
@@ -2721,8 +2723,7 @@ def admin_delete_categoria(cid: int, request: Request):
         ).fetchall()
         affected = [r["equipo_id"] for r in eq_rows]
         conn.execute("DELETE FROM categorias WHERE id = ?", (cid,))
-        for eid in affected:
-            regenerate_auto_tags(conn, eid)
+        regenerate_auto_tags_batch(conn, affected)
         conn.commit()
     finally:
         conn.close()
@@ -2785,6 +2786,7 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
         items = []
         matched = 0
         applied = 0
+        aplicados_ids = []
         for eq in equipos:
             propuestas = _propose_tags(eq["nombre"], eq["marca"] or "", eq["modelo"] or "")
             propuestas = [p for p in propuestas if p in leaf_id]
@@ -2801,7 +2803,7 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
                             ON CONFLICT (equipo_id, categoria_id)
                             DO UPDATE SET orden = EXCLUDED.orden
                         """, (eq["id"], leaf_id[name], orden))
-                    regenerate_auto_tags(conn, eq["id"])
+                    aplicados_ids.append(eq["id"])
                     applied += 1
             items.append({
                 "id":        eq["id"],
@@ -2812,6 +2814,9 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
             })
 
         if apply:
+            # Regeneración batch de auto-tags para todos los equipos reclasificados
+            # (1 pasada, no N+1).
+            regenerate_auto_tags_batch(conn, aplicados_ids)
             conn.commit()
 
         return {
