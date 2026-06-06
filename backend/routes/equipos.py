@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from database import (
     get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
     attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
-    regenerate_auto_tags, MARCA_SUBQUERY, MARCA_NOMBRE_EXPR, marca_subquery,
+    regenerate_auto_tags, MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
 )
 from busqueda import construir
 from reservas import ESTADOS_RESERVADO, calcular_disponibilidad
