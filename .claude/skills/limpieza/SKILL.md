@@ -55,12 +55,24 @@ pip install -q -r backend/requirements-dev.txt vulture ruff
 > **vulture: quedate en `--min-confidence 80`.** A 60 **inunda** de falsos positivos: marca todos
 > los handlers de ruta FastAPI y los validators Pydantic (no ve los decoradores). Más ruido que señal.
 
+> **No confíes en RUF100** ("unused noqa directive") corriendo ruff **ad-hoc**: como el repo no tiene
+> config de ruff, RUF100 marca como "sin usar" `# noqa` que SÍ hacen falta cuando se corre el ruleset
+> real (`E402` de scripts con path-setup antes del import, `E501`, y los `# noqa: F401` que protegen
+> re-exports como `ESTADOS_RESERVADO`). **No saques noqas** basándote en un run ad-hoc.
+
 > **Señales extra de ruff** (corré `--select F` para verlas además de las tres de arriba): **F541**
 > (f-string sin placeholder) = micro-limpieza segura (`--fix`). **F601** (clave de dict repetida) =
 > **bug smell, NO limpieza**: si los dos valores **coinciden** es una dup inocua (cleanup); si
 > **difieren** es un bug de conducta (una clave pisa a la otra) → **reportar**, no "arreglar" a
 > ciegas. Caso testigo: `"lens mount"` mapeaba a `"Montura"` y una dup lo pisaba con `"Lens mount"`
 > (inglés sin traducir) — la "limpieza" de la dup es en realidad una decisión de qué label se muestra.
+
+> **Ángulos extra cuando las herramientas principales ya no encuentran nada:** (1) **comentarios
+> huérfanos** — tras una tanda de borrados, grepeá los símbolos eliminados en comentarios (`grep -rn
+> WhatsappPill`) y actualizalos (caso testigo: un docstring seguía nombrando `WhatsappPill` ya borrado);
+> (2) **código duplicado** con `npx jscpd src backend --min-tokens 80 --min-lines 15` → un % bajo
+> (≤0.5) es sano; solo vale extraer un clon **grande e idéntico** (refactor DRY, no borrado). Cuando
+> estos ángulos tampoco dan nada, el repo está limpio: **parar es la respuesta correcta**, no forzar.
 
 ### 2 · Triage — separar muerto real de falso positivo
 
@@ -89,7 +101,10 @@ positivos típicos (**NO borrar**):
   con comentario ("a propósito", "coexiste con el componente") marca un export **deliberado** → dejar
   (casos testigo: `PLANTILLAS_MAIL`, `Illustrations`). El marcador ES la decisión registrada en el código.
 - **Assets referenciados por string:** imágenes/íconos/templates cargados por path armado en runtime
-  (no `import` estático) → knip no los ve. Grepear el nombre del archivo en TODO el repo.
+  (no `import` estático) → knip no los ve. Grepear el nombre del archivo en TODO el repo. Y ojo: un
+  asset de `public/` puede estar apuntado por un **setting administrable en la BD de prod** (ej.
+  `app_settings.email_logo_url` → `/email-logo.png`) que NO podés inspeccionar → con 0 refs en código
+  pero "seteable desde el back-office", **reportá, no borres** (caso testigo: `public/email-logo.png`).
 - **Código de un job/cron:** una función llamada solo desde un scheduled job de Railway (ej. los
   slots fijos del estudio que generan pedidos mensuales, MEMORIA *2026-05-27*) parece muerta y no lo está.
 - **Feature flags / settings administrables:** código detrás de un flag de `app_settings` apagado
