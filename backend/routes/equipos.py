@@ -172,7 +172,6 @@ _SPEC_KEY_TRANSLATIONS = {
     "mobile app compatible": "Compatible con app móvil",
     "power sources": "Fuentes de alimentación",
     "usb/lightning connectivity": "Conectividad USB/Lightning",
-    "battery": "Batería",
     "lens mount": "Lens mount",
 }
 

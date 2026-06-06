@@ -109,7 +109,7 @@ def cmd_import(args: argparse.Namespace) -> int:
         total_ins += ins
         total_upd += upd
         print(f"  {entity:<30} +{ins} ins, ~{upd} upd")
-    print(f"  ─────────────────────────────")
+    print("  ─────────────────────────────")
     print(f"  TOTAL                         +{total_ins} ins, ~{total_upd} upd")
     return 0
 

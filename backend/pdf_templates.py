@@ -539,7 +539,7 @@ def _pedido_html(pedido):
     if desc > 0:
         pct = f" ({desc_pct:g}%)" if desc_pct else ""
         tr.append(f'<div class="total-row"><span class="tl">Descuento{pct}</span><span class="tv">− {_fmt_ars(desc)}</span></div>')
-    iva_suffix = f'<span class="iva-suffix">+ IVA</span>' if es_ri else ""
+    iva_suffix = '<span class="iva-suffix">+ IVA</span>' if es_ri else ""
     tr.append(f'<div class="total-row grand"><span class="tl">Total</span>'
               f'<span class="tv">{_fmt_ars(neto)}{iva_suffix}</span></div>')
 
