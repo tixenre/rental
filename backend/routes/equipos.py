@@ -985,7 +985,8 @@ def _resolve_brand_id(conn, nombre: str | None) -> int | None:
 
 
 @router.post("/equipos", status_code=201)
-def create_equipo(data: EquipoCreate):
+def create_equipo(data: EquipoCreate, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         # Validar serie única (rechaza 409 si choca con otro activo)
@@ -1037,7 +1038,8 @@ def _normalize_fecha_compra(value):
 
 
 @router.patch("/equipos/{id}")
-def update_equipo(id: int, data: EquipoUpdate):
+def update_equipo(id: int, data: EquipoUpdate, request: Request):
+    require_admin(request)
     conn     = get_db()
     try:
         existing = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
@@ -1105,13 +1107,14 @@ def update_equipo(id: int, data: EquipoUpdate):
 
 
 @router.post("/equipos/{id}/duplicate")
-def duplicate_equipo(id: int):
+def duplicate_equipo(id: int, request: Request):
     """
     Duplica un equipo: copia equipo + ficha + categorías + kit. La nueva fila
     arranca con `serie` vacía (debe ser única por equipo), `ficha_completa = false`
     (para forzar al admin a revisar) y `cantidad = 1` (default seguro).
     Útil cuando comprás varias unidades del mismo modelo con series distintas.
     """
+    require_admin(request)
     conn = get_db()
     try:
         src = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
@@ -1374,9 +1377,10 @@ def bulk_action(payload: BulkActionInput, request: Request):
 
 
 @router.delete("/equipos/{id}", status_code=204)
-def delete_equipo(id: int):
+def delete_equipo(id: int, request: Request):
     """Soft delete: marca eliminado_at = NOW(). Preserva historial de
     alquileres del equipo dado de baja. Restaurable vía POST /restore (#206)."""
+    require_admin(request)
     html_source_url = None
     conn = get_db()
     try:
@@ -1433,12 +1437,13 @@ def get_ficha(id: int):
 
 
 @router.put("/equipos/{id}/ficha")
-def upsert_ficha(id: int, data: FichaUpdate):
+def upsert_ficha(id: int, data: FichaUpdate, request: Request):
     """
     PATCH-style upsert: solo actualiza columnas que vinieron en el body
     (no las nullea si el cliente no las mandó). Esto evita que enriquecer con
     IA borre montura/formato/resolución existentes.
     """
+    require_admin(request)
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
@@ -1549,8 +1554,9 @@ def list_mantenimiento(id: int):
 
 
 @router.post("/equipos/{id}/mantenimiento", status_code=201)
-def add_mantenimiento(id: int, data: MantenimientoCreate):
+def add_mantenimiento(id: int, data: MantenimientoCreate, request: Request):
     """Agrega un evento de mantenimiento al equipo."""
+    require_admin(request)
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
@@ -1577,8 +1583,9 @@ def add_mantenimiento(id: int, data: MantenimientoCreate):
 
 
 @router.patch("/equipos/{id}/mantenimiento/{log_id}")
-def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate):
+def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate, request: Request):
     """Actualiza un evento de mantenimiento existente."""
+    require_admin(request)
     conn = get_db()
     try:
         existing = conn.execute(
@@ -1612,8 +1619,9 @@ def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate):
 
 
 @router.delete("/equipos/{id}/mantenimiento/{log_id}", status_code=204)
-def delete_mantenimiento(id: int, log_id: int):
+def delete_mantenimiento(id: int, log_id: int, request: Request):
     """Elimina un evento de mantenimiento."""
+    require_admin(request)
     conn = get_db()
     try:
         existing = conn.execute(
@@ -1685,7 +1693,8 @@ def _crea_ciclo_kit(conn, equipo_id: int, componente_id: int) -> bool:
 
 
 @router.post("/equipos/{id}/kit", status_code=201)
-def add_kit_item(id: int, data: KitItem):
+def add_kit_item(id: int, data: KitItem, request: Request):
+    require_admin(request)
     if id == data.componente_id:
         raise HTTPException(400, "Un equipo no puede ser componente de sí mismo")
     conn = get_db()
@@ -1723,7 +1732,8 @@ def add_kit_item(id: int, data: KitItem):
 
 
 @router.delete("/equipos/{id}/kit/{componente_id}", status_code=204)
-def remove_kit_item(id: int, componente_id: int):
+def remove_kit_item(id: int, componente_id: int, request: Request):
+    require_admin(request)
     conn = get_db()
     try:
         conn.execute(
@@ -1780,8 +1790,9 @@ def get_precio_historial(id: int):
 # ── Etiquetas por equipo (reemplaza todas) ────────────────────────────────────
 
 @router.put("/equipos/{id}/etiquetas", status_code=200)
-def set_etiquetas(id: int, data: EtiquetasUpdate):
+def set_etiquetas(id: int, data: EtiquetasUpdate, request: Request):
     """Reemplaza SOLO las etiquetas manuales del equipo. Las auto se preservan."""
+    require_admin(request)
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
@@ -1869,11 +1880,12 @@ def _expand_to_ancestors(conn, ids) -> list[int]:
 
 
 @router.put("/equipos/{id}/categorias", status_code=200)
-def set_categorias(id: int, data: CategoriasUpdate):
+def set_categorias(id: int, data: CategoriasUpdate, request: Request):
     """
     Reemplaza la lista de categorías asignadas al equipo y regenera auto-tags
     (porque los nombres de categoría alimentan la bolsa de etiquetas auto).
     """
+    require_admin(request)
     conn = get_db()
     try:
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
