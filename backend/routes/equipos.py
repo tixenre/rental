@@ -1154,11 +1154,10 @@ def duplicate_equipo(id: int):
         cats = conn.execute(
             "SELECT categoria_id, orden FROM equipo_categorias WHERE equipo_id=?", (id,)
         ).fetchall()
-        for cat in cats:
-            conn.execute(
-                "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
-                (new_id, cat["categoria_id"], cat["orden"]),
-            )
+        conn.executemany(
+            "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
+            [(new_id, cat["categoria_id"], cat["orden"]) for cat in cats],
+        )
 
         # Copiar etiquetas MANUALES (las auto se regeneran al setear marca/
         # modelo/categorías). Sin esto, el duplicado pierde los tags que
@@ -1168,22 +1167,20 @@ def duplicate_equipo(id: int):
             "WHERE equipo_id=? AND origen='manual'",
             (id,),
         ).fetchall()
-        for e in etqs:
-            conn.execute(
-                "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen) "
-                "VALUES (?, ?, ?, 'manual')",
-                (new_id, e["etiqueta_id"], e["orden"]),
-            )
+        conn.executemany(
+            "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen) "
+            "VALUES (?, ?, ?, 'manual')",
+            [(new_id, e["etiqueta_id"], e["orden"]) for e in etqs],
+        )
 
         # Copiar kit
         kit = conn.execute(
             "SELECT componente_id, cantidad, orden FROM kit_componentes WHERE equipo_id=?", (id,)
         ).fetchall()
-        for (componente_id, cantidad, orden) in kit:
-            conn.execute(
-                "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, orden) VALUES (?, ?, ?, ?)",
-                (new_id, componente_id, cantidad, orden),
-            )
+        conn.executemany(
+            "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, orden) VALUES (?, ?, ?, ?)",
+            [(new_id, componente_id, cantidad, orden) for (componente_id, cantidad, orden) in kit],
+        )
 
         # Regenerar etiquetas auto (categoría/marca/modelo/nombre) sobre el
         # duplicado. Las manuales ya las copiamos arriba; esto agrega las auto
@@ -1288,12 +1285,11 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 f"DELETE FROM equipo_categorias WHERE equipo_id IN ({placeholders})",
                 ids,
             )
+            conn.executemany(
+                "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
+                [(eid, cid_int, orden) for eid in ids for orden, cid_int in enumerate(ancestor_ids)],
+            )
             for eid in ids:
-                for orden, cid_int in enumerate(ancestor_ids):
-                    conn.execute(
-                        "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
-                        (eid, cid_int, orden),
-                    )
                 try:
                     regenerate_auto_tags(conn, eid)
                 except Exception as e:
@@ -1313,16 +1309,15 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
             # Expandimos a ancestros una sola vez para todos los equipos.
             ancestor_ids = _expand_to_ancestors(conn, [payload.categoria_id])
+            conn.executemany(
+                """
+                INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
+                VALUES (?, ?, ?)
+                ON CONFLICT (equipo_id, categoria_id) DO NOTHING
+                """,
+                [(eid, cid_int, orden) for eid in ids for orden, cid_int in enumerate(ancestor_ids)],
+            )
             for eid in ids:
-                for orden, cid_int in enumerate(ancestor_ids):
-                    conn.execute(
-                        """
-                        INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-                        VALUES (?, ?, ?)
-                        ON CONFLICT (equipo_id, categoria_id) DO NOTHING
-                        """,
-                        (eid, cid_int, orden),
-                    )
                 try:
                     regenerate_auto_tags(conn, eid)
                 except Exception as e:
