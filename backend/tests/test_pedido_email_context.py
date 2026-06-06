@@ -65,6 +65,119 @@ class TestContextoFormato:
         assert ctx["items_text"] == ""
 
 
+# ── info "estilo pasaje": jornadas + estado de pago ─────────────────────────
+
+class TestContextoReserva:
+    def test_jornadas_derivadas_de_fechas(self):
+        ctx = _pedido_email_context(
+            {
+                "id": 1,
+                "fecha_desde": datetime.datetime(2026, 6, 15, 10, 0),
+                "fecha_hasta": datetime.datetime(2026, 6, 17, 10, 0),
+                "items": [],
+            }
+        )
+        assert ctx["cantidad_jornadas"] == 2
+
+    def test_jornadas_ya_enriquecidas_tienen_prioridad(self):
+        # Si el pedido ya trae cantidad_jornadas (de _enriquecer_pedido_con_total),
+        # se reusa en vez de recalcular.
+        ctx = _pedido_email_context({"id": 1, "cantidad_jornadas": 5, "items": []})
+        assert ctx["cantidad_jornadas"] == 5
+
+    def test_pago_completo(self):
+        ctx = _pedido_email_context(
+            {"id": 1, "monto_total": 10000, "monto_pagado": 10000, "items": []}
+        )
+        assert ctx["pago_estado"] == "Pago completo ✓"
+        assert ctx["saldo_pendiente"] == "$ 0"
+
+    def test_pago_parcial_muestra_sena_y_saldo(self):
+        ctx = _pedido_email_context(
+            {"id": 1, "monto_total": 10000, "monto_pagado": 4000, "items": []}
+        )
+        assert ctx["pago_estado"] == "Pagado $ 4.000 · saldo pendiente $ 6.000"
+        assert ctx["total_pagado"] == "$ 4.000"
+        assert ctx["saldo_pendiente"] == "$ 6.000"
+
+    def test_pago_pendiente(self):
+        ctx = _pedido_email_context(
+            {"id": 1, "monto_total": 10000, "monto_pagado": 0, "items": []}
+        )
+        assert ctx["pago_estado"] == "Pendiente de pago"
+
+    def test_sin_total_no_muestra_estado_de_pago(self):
+        ctx = _pedido_email_context({"id": 1, "monto_total": 0, "items": []})
+        assert ctx["pago_estado"] == ""
+
+
+# ── render de los templates enriquecidos al cliente ─────────────────────────
+
+class TestTemplatesEnriquecidos:
+    """Los mails al cliente (creado/confirmado) suman secciones nuevas. El
+    mismo template tiene que servir para el disparo automático (sin nota ni
+    adjuntos) y para el envío manual desde el modal (con `mensaje_admin` +
+    `docs_adjuntos`) — vía bloques `{% if %}`."""
+
+    import jinja2 as _jinja2
+
+    _env_html = _jinja2.Environment(autoescape=True)
+    _env_text = _jinja2.Environment(autoescape=False)
+
+    _CTX = {
+        "cliente_nombre": "Juan Pérez",
+        "numero_pedido": 1234,
+        "fecha_desde": "20 may · 10:00",
+        "fecha_hasta": "24 may · 18:00",
+        "cantidad_jornadas": 4,
+        "total": "$ 12.500",
+        "pago_estado": "Pagado $ 6.250 · saldo pendiente $ 6.250",
+        "items_html": "<table></table>",
+        "items_text": "- Sony FX3 × 1",
+        "portal_url": "https://x/cliente/portal",
+        "gcal_url": "https://cal",
+    }
+
+    def _tpl(self, key: str):
+        from services.email.default_templates import DEFAULT_TEMPLATES
+
+        return DEFAULT_TEMPLATES[key]
+
+    def _render(self, key: str, ctx: dict) -> tuple[str, str]:
+        tpl = self._tpl(key)
+        return (
+            self._env_html.from_string(tpl["body_html"]).render(**ctx),
+            self._env_text.from_string(tpl["body_text"]).render(**ctx),
+        )
+
+    @pytest.mark.parametrize(
+        "key", ["pedido_creado_cliente", "pedido_confirmado_cliente"]
+    )
+    def test_modo_modal_muestra_nota_jornadas_y_adjuntos(self, key):
+        ctx = {
+            **self._CTX,
+            "mensaje_admin": "¡Te esperamos el jueves!",
+            "docs_adjuntos": ["Contrato", "Cotización"],
+        }
+        html, text = self._render(key, ctx)
+        assert "Jornadas:</strong> 4" in html
+        assert "¡Te esperamos el jueves!" in html
+        assert "Contrato, Cotización" in html
+        assert "Jornadas: 4" in text
+        assert "Contrato, Cotización" in text
+
+    def test_confirmado_sin_adjuntos_cae_al_portal(self):
+        # Disparo automático: sin nota ni adjuntos no debe filtrar esos bloques.
+        html, _ = self._render("pedido_confirmado_cliente", self._CTX)
+        assert "descargar el <strong>remito</strong>" in html
+        assert "Te adjuntamos en este mail" not in html
+
+    def test_confirmado_muestra_estado_de_pago(self):
+        html, text = self._render("pedido_confirmado_cliente", self._CTX)
+        assert "saldo pendiente $ 6.250" in html
+        assert "saldo pendiente $ 6.250" in text
+
+
 # ── _pedido_email_context ───────────────────────────────────────────────────
 
 class TestPedidoEmailContext:

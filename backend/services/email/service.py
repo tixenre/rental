@@ -253,6 +253,7 @@ def send_email(
     attachments: Optional[Sequence["Attachment"]] = None,
     *,
     respect_enabled: bool = True,
+    force: bool = False,
 ) -> dict[str, Any]:
     """Envía un mail renderizando una plantilla. Loggea SIEMPRE en
     `emails_log`. NUNCA propaga excepciones del provider.
@@ -266,6 +267,12 @@ def send_email(
     `{ok, skipped, reason:'disabled'}` sin loggear. Los envíos automáticos lo
     dejan en True; el envío de prueba del admin lo pasa en False para poder
     testear un template apagado.
+
+    `force` (default False): saltea la idempotencia por-pedido
+    (`_IDEMPOTENT_PER_PEDIDO`). Los disparos automáticos (crear/confirmar) la
+    dejan en False para no mandar dos veces por doble-click/retry; un **envío
+    manual desde el back-office** (el admin aprieta "Enviar" en el modal) la
+    pasa en True para poder reenviar la confirmación a pedido.
 
     Devuelve un dict {ok, provider, provider_id?, error?, log_id} útil para
     el endpoint de test del admin.
@@ -293,7 +300,8 @@ def send_email(
 
         # Idempotency: si este template ya se envió OK para este pedido,
         # no lo mandamos de nuevo (doble-click en confirmar, retries, etc).
-        if template_key in _IDEMPOTENT_PER_PEDIDO and alquiler_id:
+        # `force=True` (envío manual desde el back-office) la saltea.
+        if not force and template_key in _IDEMPOTENT_PER_PEDIDO and alquiler_id:
             existing = conn.execute(
                 """
                 SELECT id FROM emails_log
