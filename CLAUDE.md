@@ -58,6 +58,7 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 | [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)                             | Design system canónico: tokens, componentes, mobile rules, voz/tono, patterns                                                                                                                               |
 | [`.claude/skills/importar-diseno/`](.claude/skills/importar-diseno/SKILL.md) | Implementar un handoff de Claude Design en el front real (ver el render, reusar la librería, conectar backend, verificar). Su contrato (`INSTRUCCIONES_CLAUDE_DESIGN.md`) es la fuente del flujo de handoff |
 | [`.claude/skills/design-system/`](.claude/skills/design-system/SKILL.md)     | Mantener + consumir la librería `@rambla/design-system` (tokens + componentes canónicos)                                                                                                                    |
+| [`.claude/skills/limpieza/`](.claude/skills/limpieza/SKILL.md)               | Barrido de housekeeping seguro: código muerto / imports / archivos / deps / DRY, con el método y la red de tests (incl. Postgres real) para no romper nada                                                   |
 | [`.claude/agents/supervisor.md`](.claude/agents/supervisor.md)               | El agente revisor                                                                                                                                                                                           |
 
 @docs/MEMORIA.md

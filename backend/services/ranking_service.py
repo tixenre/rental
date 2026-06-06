@@ -23,8 +23,6 @@ y `categorias.popularidad_score` con los mismos criterios (cant_pedidos
 + ingreso, normalizado contra el max de su universo).
 """
 
-from datetime import datetime
-from typing import Optional
 
 
 # Ventana de tiempo para el cálculo de popularidad (últimos N días).

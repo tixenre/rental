@@ -209,9 +209,9 @@ def _detect_categoria_sospechosa(conn) -> list[dict]:
     if not any(keyword_to_cats.values()):
         return []  # no hay categorías matcheables en la BD
 
-    rows = conn.execute("""
+    rows = conn.execute(f"""
         SELECT
-          e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+          e.id, e.nombre, {MARCA_SUBQUERY},
           COALESCE(
             (SELECT array_agg(ec.categoria_id) FROM equipo_categorias ec WHERE ec.equipo_id = e.id),
             ARRAY[]::int[]

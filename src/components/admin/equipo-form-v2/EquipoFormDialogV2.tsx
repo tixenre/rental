@@ -91,6 +91,7 @@ import { SpecsDiffEditor } from "./SpecsDiffEditor";
 import { type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq } from "./spec-helpers";
 import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
+import { normalizar } from "@/lib/search/normalize";
 
 // ════════════════════════════════════════════════════════════════════
 // Schema
@@ -2237,9 +2238,8 @@ function CategoriasPicker({
   const roots = categorias.filter((c) => c.parent_id == null);
   const childrenOf = (pid: number) => categorias.filter((c) => c.parent_id === pid);
 
-  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const nq = norm(q.trim());
-  const matchesName = (nombre: string) => !nq || norm(nombre).includes(nq);
+  const nq = normalizar(q.trim());
+  const matchesName = (nombre: string) => !nq || normalizar(nombre).includes(nq);
 
   const visibleRoots = roots.filter((r) => {
     if (matchesName(r.nombre)) return true;

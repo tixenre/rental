@@ -127,7 +127,7 @@ def actualizar_unidad(unidad_id: int, payload: UnidadUpdate, request: Request):
         except Exception as e:
             conn.rollback()
             if "duplicate key" in str(e).lower() or "unique" in str(e).lower():
-                raise HTTPException(409, f"Ya existe otra unidad con ese símbolo.")
+                raise HTTPException(409, "Ya existe otra unidad con ese símbolo.")
             raise
         return {"ok": True, "id": unidad_id, **updates}
     finally:

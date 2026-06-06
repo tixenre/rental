@@ -23,7 +23,6 @@ from .paths import (
     CATALOG_ENTITIES,
     DATA_DIR,
     ENTITY_ORDER,
-    OPERATIONAL_ENTITIES,
     entity_path,
 )
 
@@ -258,8 +257,9 @@ def init_slugs(conn, dry_run: bool = False) -> dict[str, int]:
         stats["skipped_no_column"] = True
         return stats
 
+    from database import marca_subquery  # type: ignore
     rows = conn.execute(
-        "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo FROM equipos WHERE slug IS NULL"
+        f"SELECT id, nombre, {marca_subquery('equipos')}, modelo FROM equipos WHERE slug IS NULL"
     ).fetchall()
     if not rows:
         r = conn.execute(

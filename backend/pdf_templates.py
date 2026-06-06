@@ -43,7 +43,7 @@ import base64
 import html
 import json
 import os
-from datetime import datetime, date
+from datetime import datetime
 
 # Helpers de precios del repo — mismos imports que el pdf.py original.
 try:
@@ -553,7 +553,7 @@ def _pedido_html(pedido):
     if desc > 0:
         pct = f" ({desc_pct:g}%)" if desc_pct else ""
         tr.append(f'<div class="total-row"><span class="tl">Descuento{pct}</span><span class="tv">− {_fmt_ars(desc)}</span></div>')
-    iva_suffix = f'<span class="iva-suffix">+ IVA</span>' if es_ri else ""
+    iva_suffix = '<span class="iva-suffix">+ IVA</span>' if es_ri else ""
     tr.append(f'<div class="total-row grand"><span class="tl">Total</span>'
               f'<span class="tv">{_fmt_ars(neto)}{iva_suffix}</span></div>')
 

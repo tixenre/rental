@@ -6,12 +6,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Equipment } from "@/data/equipment";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
+import { normalizar, tokenizar } from "@/lib/search/normalize";
 import { EmptyImage } from "./EmptyImage";
 import { FilterControls } from "./FilterControls";
 
 const MAX_RESULTS = 12;
-
-const norm = (s: string) => (s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /**
  * Sheet de "discovery" mobile — unifica búsqueda y filtros en una sola
@@ -82,10 +81,10 @@ export function DiscoverySheet({
 
   const results = useMemo(() => {
     if (!trimmed) return [];
-    const tokens = norm(trimmed).split(/\s+/).filter(Boolean);
+    const tokens = tokenizar(trimmed);
     return allEquipos.filter((e) => {
       const specsText = (e.specs ?? []).map((s) => `${s.label} ${s.value}`).join(" ");
-      const haystack = norm(
+      const haystack = normalizar(
         [e.name, e.brand, e.category, e.description ?? "", specsText].join(" "),
       );
       return tokens.every((t) => haystack.includes(t));

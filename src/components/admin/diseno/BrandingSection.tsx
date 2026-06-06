@@ -5,9 +5,9 @@
  *
  * - OG image: imagen que ven WhatsApp / IG / Facebook al compartir el link
  *   de la home (1200x630). El upload sobreescribe la versión anterior en R2.
- * - WhatsApp del negocio: teléfono para el botón "Consulta por WhatsApp"
- *   en cada PedidoCard + en el catálogo (WhatsappPill). Antes hardcoded en
- *   `src/lib/business.ts`, ahora editable desde acá.
+ * - WhatsApp del negocio: teléfono para los botones "Consulta por WhatsApp"
+ *   del catálogo y el back-office. Antes hardcoded en `src/lib/business.ts`,
+ *   ahora editable desde acá.
  */
 
 import { useEffect, useRef, useState } from "react";

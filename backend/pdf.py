@@ -5,16 +5,10 @@ Contiene los templates HTML y el renderer compartido.
 
 import asyncio
 import html
-import json
 import os
 import re
 from datetime import datetime
 
-from services.precios import (
-    jornadas_periodo,
-    es_responsable_inscripto,
-    IVA_PCT,
-)
 
 # Documentos de pedido (rediseño DS v1): los 4 builders
 # (presupuesto/albarán/contrato/packing) viven en `pdf_templates.py` (port
@@ -134,13 +128,6 @@ def _fmt_date_long(s) -> str:
         return "—"
     d = _as_dt(s)
     return _es_month(d.strftime("%-d de %B de %Y")) if d else str(s)
-
-def _fmt_date_long_time(s) -> str:
-    """Formatea fecha+hora como '5 de marzo de 2025, 14:30'."""
-    if not s:
-        return "—"
-    d = _as_dt(s)
-    return _es_month(d.strftime("%-d de %B de %Y, %H:%M")) if d else str(s)
 
 def _fmt_ars(n, zero_dash: bool = True) -> str:
     """Formatea número como peso argentino ('$1.234.567').

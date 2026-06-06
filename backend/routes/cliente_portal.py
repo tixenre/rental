@@ -2,7 +2,6 @@
 routes/cliente_portal.py — Portal de clientes (solo Google OAuth).
 """
 
-import datetime
 import json
 import logging
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
@@ -10,7 +9,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
-from database import get_db, row_to_dict, to_datetime, now_ar
+from database import get_db, row_to_dict, to_datetime, now_ar, MARCA_SUBQUERY, marca_subquery
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
 from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
@@ -402,9 +401,9 @@ def cliente_pedidos(request: Request):
         result = []
         for p in pedidos:
             d = row_to_dict(p)
-            items = conn.execute("""
+            items = conn.execute(f"""
                 SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                       e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.foto_url,
+                       e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
                        e.nombre_publico, e.nombre_publico_largo
                 FROM alquiler_items ai
                 JOIN equipos e ON e.id = ai.equipo_id
@@ -458,9 +457,9 @@ def cliente_pedido_detalle(id: int, request: Request):
 
         d = row_to_dict(pedido)
 
-        items = conn.execute("""
+        items = conn.execute(f"""
             SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                   e.id AS equipo_id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.foto_url,
+                   e.id AS equipo_id, e.nombre, {MARCA_SUBQUERY}, e.foto_url,
                    e.nombre_publico, e.nombre_publico_largo
             FROM alquiler_items ai
             JOIN equipos e ON e.id = ai.equipo_id
@@ -1210,8 +1209,8 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
         raise HTTPException(404, "Pedido no encontrado")
     pedido = row_to_dict(row)
 
-    items = conn.execute("""
-        SELECT pi.cantidad, e.id AS equipo_id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo,
+    items = conn.execute(f"""
+        SELECT pi.cantidad, e.id AS equipo_id, e.nombre, {MARCA_SUBQUERY}, e.modelo,
                e.serie, e.valor_reposicion, e.foto_url, pi.precio_jornada, pi.subtotal,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
@@ -1222,8 +1221,8 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
     pedido["items"] = [row_to_dict(i) for i in items]
 
     for item in pedido["items"]:
-        comp_rows = conn.execute("""
-            SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.modelo, ec.serie, ec.valor_reposicion,
+        comp_rows = conn.execute(f"""
+            SELECT ec.nombre, {marca_subquery('ec')}, ec.modelo, ec.serie, ec.valor_reposicion,
                    ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
