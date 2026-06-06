@@ -395,7 +395,6 @@ def _run_alembic_migrations() -> None:
     Idempotente: en BD pre-Alembic, el baseline es no-op + agrega la tabla
     `alembic_version`. Próximos arranques solo aplican migraciones nuevas.
     """
-    from pathlib import Path
     from alembic import command
     from alembic.config import Config
     import migration_state

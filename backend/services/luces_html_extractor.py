@@ -34,9 +34,7 @@ from iluminacion_parser import (  # noqa: E402  type: ignore
     BHSpecsParser,
     _clean_title,
     _extract_brand,
-    _extract_id,
     _extract_modelo,
-    _extract_subtipo,
     map_luz_specs,
     map_luz_extras,
 )

@@ -8,7 +8,7 @@ Fuente de verdad de los totales del pedido. Estos tests aseguran:
 - `neto` se persiste en `alquileres.monto_total`; el IVA es derivado.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 

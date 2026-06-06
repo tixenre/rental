@@ -276,7 +276,6 @@ def export_equipos(conn) -> list[dict]:
     if not rows:
         return []
 
-    equipo_ids = [r["slug"] for r in rows]
     # Cargar M2M en batch para no hacer N+1 queries
     slug_by_id = {}
     id_rows = conn.execute("""

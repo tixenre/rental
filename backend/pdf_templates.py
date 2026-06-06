@@ -43,7 +43,7 @@ import base64
 import html
 import json
 import os
-from datetime import datetime, date
+from datetime import datetime
 
 # Helpers de precios del repo — mismos imports que el pdf.py original.
 try:

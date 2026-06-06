@@ -30,8 +30,8 @@ from config import SITE_URL
 # es la constante canónica del dominio. El resto de las primitivas se importan
 # directo de `reservas` donde se usan (routes.estudio, routes.cliente_portal).
 # Ver issue #501, Fase 1.
-from reservas import ESTADOS_RESERVADO
 from reservas import (
+    ESTADOS_RESERVADO,  # noqa: F401 — re-export canónico (guard: test_reservas_sql_safety)
     calcular_disponibilidad as _calcular_disponibilidad,
     dias_no_disponibles as _dias_no_disponibles,
     validar_stock as _check_stock,

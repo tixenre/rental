@@ -25,7 +25,7 @@ from services.nombre_service import (
     regenerar_nombres_todos,
 )
 from services.ranking_service import recalcular_ranking_todos
-from services.spec_persist import persistir_specs, _validate_tabla_value
+from services.spec_persist import persistir_specs
 
 
 router = APIRouter()

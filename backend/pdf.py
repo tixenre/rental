@@ -5,16 +5,10 @@ Contiene los templates HTML y el renderer compartido.
 
 import asyncio
 import html
-import json
 import os
 import re
 from datetime import datetime
 
-from services.precios import (
-    jornadas_periodo,
-    es_responsable_inscripto,
-    IVA_PCT,
-)
 
 # Documentos de pedido (rediseño DS v1): los 4 builders
 # (presupuesto/albarán/contrato/packing) viven en `pdf_templates.py` (port

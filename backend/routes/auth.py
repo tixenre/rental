@@ -228,7 +228,7 @@ def auth_callback(request: Request):
     # Intercambiar código por token
     client = _oauth_client()
     try:
-        token = client.fetch_token(GOOGLE_TOKEN_URL, code=code)
+        client.fetch_token(GOOGLE_TOKEN_URL, code=code)
     except Exception as e:
         logger.warning("Admin OAuth token_error: %s", e, exc_info=True)
         _record_fail(ip)

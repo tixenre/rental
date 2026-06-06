@@ -10,7 +10,6 @@ Cubre:
 import pytest
 
 from services.email import get_backend, send_email, render_template
-from services.email.base import EmailBackendError
 from services.email.test_backend import SENT_MAILS, InMemoryBackend
 from services.email.resend_backend import ResendBackend
 from services.email.smtp_backend import SmtpBackend

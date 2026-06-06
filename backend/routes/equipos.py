@@ -28,10 +28,6 @@ from reservas.semantics import componentes_de
 from routes.auth import get_session
 from admin_guard import require_admin
 from services.nombre_service import actualizar_nombres_de
-from services.spec_render import (
-    format_tabla_value,
-    norm_spec_label,
-)
 
 router = APIRouter()
 
@@ -3399,7 +3395,7 @@ def admin_upload_foto_from_url(
         with media_http():
             asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE, OG_SQUARE_JPEG], conn=conn)
         display = asset.variant("display")
-        foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+        _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
     except Exception:
         conn.rollback()
         raise
@@ -3446,7 +3442,7 @@ async def admin_upload_foto_file(
         with media_http():
             asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE, OG_SQUARE_JPEG], conn=conn)
         display = asset.variant("display")
-        foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+        _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
     except Exception:
         conn.rollback()
         raise

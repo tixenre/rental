@@ -34,7 +34,7 @@ except ImportError:
     from specs import REGISTRY, CategoriaRegistry, SpecDef  # type: ignore
 
 if TYPE_CHECKING:
-    from psycopg.cursor import Cursor
+    pass
 
 
 def _ensure_categoria_raiz(

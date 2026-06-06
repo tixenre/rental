@@ -6,7 +6,6 @@ sd.en_filtros, sd.en_nombre y sd.prioridad.
 """
 
 import sys
-import types
 from unittest.mock import MagicMock
 
 import pytest

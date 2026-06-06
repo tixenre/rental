@@ -235,7 +235,6 @@ def _create_placeholder_equipos(conn, zip_bytes: bytes) -> int:
     donde hay items historicos sin equivalente en el catalogo activo.
     """
     import io
-    import json
     import zipfile
 
     try:

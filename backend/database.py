@@ -3,12 +3,10 @@ database.py — Conexión PostgreSQL con pool de conexiones, migraciones y helpe
 """
 
 import logging
-import os
 import pathlib
 import psycopg2
 import psycopg2.extras
 import psycopg2.pool
-from datetime import datetime
 
 from config import settings
 from busqueda.motor import CAMPO_PLANTILLA

@@ -23,7 +23,6 @@ from .paths import (
     CATALOG_ENTITIES,
     DATA_DIR,
     ENTITY_ORDER,
-    OPERATIONAL_ENTITIES,
     entity_path,
 )
 

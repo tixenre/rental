@@ -2,7 +2,6 @@
 routes/cliente_portal.py — Portal de clientes (solo Google OAuth).
 """
 
-import datetime
 import json
 import logging
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
