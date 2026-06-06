@@ -27,7 +27,7 @@ export function PageHeader({ title, subtitle, onBack, action, className }: Props
           type="button"
           onClick={onBack}
           aria-label="Volver"
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-full transition hover:bg-muted active:bg-muted"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full transition hover:bg-muted active:bg-muted"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>

@@ -298,7 +298,7 @@ export function CartDrawer({
                 ref={closeBtnRef}
                 onClick={() => setDrawerOpen(false)}
                 aria-label="Cerrar carrito"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
               >
                 <X className="h-5 w-5" />
               </button>

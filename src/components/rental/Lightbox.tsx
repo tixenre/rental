@@ -56,7 +56,7 @@ export function Lightbox({ open, onClose, photos, index, onIndexChange }: Lightb
             e.stopPropagation();
             onClose();
           }}
-          className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10 transition"
+          className="grid h-11 w-11 place-items-center rounded-full hover:bg-white/10 transition"
           aria-label="Cerrar"
         >
           <XIcon className="h-5 w-5" />
