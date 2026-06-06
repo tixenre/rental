@@ -67,8 +67,7 @@ def export_dataio(
     _admin: dict = Depends(require_admin),
 ):
     """Exporta una entidad como JSON, o un grupo como ZIP."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         # ── Grupos de backup de la UI: backup-<grupo> → un solo ZIP ──
         if entity.startswith("backup-"):
             grupo = entity[len("backup-"):]
@@ -140,8 +139,6 @@ def export_dataio(
                 "Content-Disposition": f'attachment; filename="{entity}-{ts}.json"'
             },
         )
-    finally:
-        conn.close()
 
 
 # Scopes de import expuestos por la UI. Cada uno mapea a una lista de
@@ -180,50 +177,48 @@ async def import_dataio(
     if not content:
         raise HTTPException(400, "Archivo vacío")
 
-    conn = get_db()
-    try:
-        # Hook para imports de migracion (ej. Booqable). Si el ZIP trae
-        # un `placeholders_equipos.json`, creamos esos equipos antes
-        # de importar alquileres para que las FKs resuelvan. Idempotente.
-        placeholders_created = _create_placeholder_equipos(conn, content)
-
-        stats = orchestrator.import_from_zip_bytes(
-            conn,
-            content,
-            only=list(entities),
-            dry_run=dry_run,
-        )
-
-        # Bumpear secuencias operacionales post-import para que nuevos pedidos
-        # manuales no colisionen con los importados. Idempotente. Solo si se
-        # tocaron clientes o pedidos.
-        sequences_bumped = []
-        toco_operacional = (
-            stats.get("alquileres", {}).get("inserted", 0) > 0
-            or stats.get("clientes", {}).get("inserted", 0) > 0
-        )
-        if not dry_run and toco_operacional:
-            sequences_bumped = _bump_operacional_sequences(conn)
-
-        if not dry_run:
-            conn.commit()
-        return {
-            "ok": True,
-            "dry_run": dry_run,
-            "stats": stats,
-            "total_inserted": sum(s.get("inserted", 0) for s in stats.values()),
-            "total_updated": sum(s.get("updated", 0) for s in stats.values()),
-            "placeholders_creados": placeholders_created,
-            "sequences_bumped": sequences_bumped,
-        }
-    except Exception as e:
+    with get_db() as conn:
         try:
-            conn.rollback()
-        except Exception:
-            pass
-        raise HTTPException(400, f"Import falló: {e}")
-    finally:
-        conn.close()
+            # Hook para imports de migracion (ej. Booqable). Si el ZIP trae
+            # un `placeholders_equipos.json`, creamos esos equipos antes
+            # de importar alquileres para que las FKs resuelvan. Idempotente.
+            placeholders_created = _create_placeholder_equipos(conn, content)
+
+            stats = orchestrator.import_from_zip_bytes(
+                conn,
+                content,
+                only=list(entities),
+                dry_run=dry_run,
+            )
+
+            # Bumpear secuencias operacionales post-import para que nuevos pedidos
+            # manuales no colisionen con los importados. Idempotente. Solo si se
+            # tocaron clientes o pedidos.
+            sequences_bumped = []
+            toco_operacional = (
+                stats.get("alquileres", {}).get("inserted", 0) > 0
+                or stats.get("clientes", {}).get("inserted", 0) > 0
+            )
+            if not dry_run and toco_operacional:
+                sequences_bumped = _bump_operacional_sequences(conn)
+
+            if not dry_run:
+                conn.commit()
+            return {
+                "ok": True,
+                "dry_run": dry_run,
+                "stats": stats,
+                "total_inserted": sum(s.get("inserted", 0) for s in stats.values()),
+                "total_updated": sum(s.get("updated", 0) for s in stats.values()),
+                "placeholders_creados": placeholders_created,
+                "sequences_bumped": sequences_bumped,
+            }
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise HTTPException(400, f"Import falló: {e}")
 
 
 def _create_placeholder_equipos(conn, zip_bytes: bytes) -> int:
@@ -343,33 +338,31 @@ def reset_operacional(
             f"Confirmacion requerida. Enviar {{'confirm': '{RESET_CONFIRMATION}'}}",
         )
 
-    conn = get_db()
-    try:
-        clientes_before = conn.execute("SELECT COUNT(*) AS n FROM clientes").fetchone()["n"]
-        alquileres_before = conn.execute("SELECT COUNT(*) AS n FROM alquileres").fetchone()["n"]
-
-        # alquileres primero: CASCADE limpia items, pagos y solicitudes_modificacion.
-        conn.execute("DELETE FROM alquileres")
-        conn.execute("DELETE FROM clientes")
-
-        for seq in _OPERACIONAL_SEQUENCES:
-            conn.execute(f"ALTER SEQUENCE IF EXISTS {seq} RESTART WITH 1")
-
-        conn.commit()
-
-        return {
-            "ok": True,
-            "deleted": {
-                "clientes": clientes_before,
-                "alquileres": alquileres_before,
-            },
-            "sequences_reset": list(_OPERACIONAL_SEQUENCES),
-        }
-    except Exception as e:
+    with get_db() as conn:
         try:
-            conn.rollback()
-        except Exception:
-            pass
-        raise HTTPException(500, f"Reset falló: {e}")
-    finally:
-        conn.close()
+            clientes_before = conn.execute("SELECT COUNT(*) AS n FROM clientes").fetchone()["n"]
+            alquileres_before = conn.execute("SELECT COUNT(*) AS n FROM alquileres").fetchone()["n"]
+
+            # alquileres primero: CASCADE limpia items, pagos y solicitudes_modificacion.
+            conn.execute("DELETE FROM alquileres")
+            conn.execute("DELETE FROM clientes")
+
+            for seq in _OPERACIONAL_SEQUENCES:
+                conn.execute(f"ALTER SEQUENCE IF EXISTS {seq} RESTART WITH 1")
+
+            conn.commit()
+
+            return {
+                "ok": True,
+                "deleted": {
+                    "clientes": clientes_before,
+                    "alquileres": alquileres_before,
+                },
+                "sequences_reset": list(_OPERACIONAL_SEQUENCES),
+            }
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise HTTPException(500, f"Reset falló: {e}")

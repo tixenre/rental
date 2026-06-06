@@ -13,11 +13,8 @@ router = APIRouter()
 @router.get("/estadisticas")
 def get_estadisticas(request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         return compute_estadisticas(conn)
-    finally:
-        conn.close()
 
 
 def compute_estadisticas(conn) -> dict:

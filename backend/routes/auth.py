@@ -406,13 +406,10 @@ def cliente_auth_callback(request: Request):
         return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=no_email", status_code=303)
 
     # ¿El cliente ya existe en la BD?
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute(
             "SELECT id FROM clientes WHERE LOWER(email) = LOWER(?)", (email,)
         ).fetchone()
-    finally:
-        conn.close()
 
     if row:
         # Cliente conocido → crear sesión directamente. Si llegó `next` válido

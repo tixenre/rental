@@ -121,8 +121,7 @@ def cliente_registro(request: Request, data: RegistroCreate):
     if not data.nombre.strip() or not data.apellido.strip() or not data.telefono.strip():
         raise HTTPException(400, "Nombre, apellido y teléfono son obligatorios.")
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         # Verificar que no se haya registrado ya (doble submit)
         existente = conn.execute(
             "SELECT id FROM clientes WHERE LOWER(email) = LOWER(?)", (email,)
@@ -164,8 +163,6 @@ def cliente_registro(request: Request, data: RegistroCreate):
         res.set_cookie("session", token, httponly=True, samesite="lax",
                        secure=COOKIE_SECURE, max_age=SESSION_MAX_AGE)
         return res
-    finally:
-        conn.close()
 
 
 # ── Perfil ────────────────────────────────────────────────────────────────────
@@ -174,8 +171,7 @@ def cliente_registro(request: Request, data: RegistroCreate):
 def cliente_me(request: Request):
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
-    conn = get_db()
-    try:
+    with get_db() as conn:
         # `created_at` lo usa el drawer del portal para mostrar "Cliente desde
         # [año]" — no es opcional, el cliente espera verlo en su perfil.
         row = conn.execute(
@@ -189,8 +185,6 @@ def cliente_me(request: Request):
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
         return row_to_dict(row)
-    finally:
-        conn.close()
 
 
 class PerfilUpdate(BaseModel):
@@ -243,27 +237,25 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
     if not sets:
         raise HTTPException(400, "Sin cambios")
 
-    conn = get_db()
-    try:
-        vals.append(cliente_id)
-        conn.execute(f"UPDATE clientes SET {', '.join(sets)} WHERE id = ?", tuple(vals))
-        conn.commit()
-        row = conn.execute(
-            """SELECT id, nombre, apellido, email, telefono, direccion, cuit,
-                      perfil_impuestos, descuento, direccion_maps_url,
-                      razon_social, domicilio_fiscal, email_facturacion
-               FROM clientes WHERE id = ?""",
-            (cliente_id,),
-        ).fetchone()
-        return row_to_dict(row) if row else {}
-    except HTTPException:
-        conn.rollback()
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(500, f"Error al actualizar perfil: {e}")
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            vals.append(cliente_id)
+            conn.execute(f"UPDATE clientes SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+            conn.commit()
+            row = conn.execute(
+                """SELECT id, nombre, apellido, email, telefono, direccion, cuit,
+                          perfil_impuestos, descuento, direccion_maps_url,
+                          razon_social, domicilio_fiscal, email_facturacion
+                   FROM clientes WHERE id = ?""",
+                (cliente_id,),
+            ).fetchone()
+            return row_to_dict(row) if row else {}
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(500, f"Error al actualizar perfil: {e}")
 
 
 # ── Crear / cancelar pedido ───────────────────────────────────────────────────
@@ -306,11 +298,8 @@ def cliente_crear_pedido(
 
     # Horas habilitadas de retiro/devolución (setting `horarios_retiro`).
     from routes.alquileres import _validar_horarios_habilitados
-    _conn = get_db()
-    try:
+    with get_db() as _conn:
         _validar_horarios_habilitados(_conn, data.fecha_desde, data.fecha_hasta)
-    finally:
-        _conn.close()
 
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
     from routes.alquileres import create_pedido, PedidoCreate, PedidoItem
@@ -321,8 +310,7 @@ def cliente_crear_pedido(
     # devolvemos 404 (no creamos pedidos con equipos fantasma).
     # (Mismo patrón que `cliente_modificar_pedido` —
     # `_items_payload_to_pedido_items`.)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         precios: dict[int, int] = {}
         for it in data.items:
             if it.equipo_id in precios:
@@ -334,8 +322,6 @@ def cliente_crear_pedido(
             if not row:
                 raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
             precios[it.equipo_id] = int(row["precio_jornada"] or 0)
-    finally:
-        conn.close()
 
     payload = PedidoCreate(
         cliente_id=cliente_id,
@@ -359,8 +345,7 @@ def cliente_crear_pedido(
 def cliente_cancelar_pedido(id: int, request: Request):
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
-    conn = get_db()
-    try:
+    with get_db() as conn:
         p = conn.execute(
             "SELECT estado FROM alquileres WHERE id = ? AND cliente_id = ?",
             (id, cliente_id),
@@ -378,8 +363,6 @@ def cliente_cancelar_pedido(id: int, request: Request):
         )
         conn.commit()
         return {"ok": True}
-    finally:
-        conn.close()
 
 
 # ── Pedidos ───────────────────────────────────────────────────────────────────
@@ -388,8 +371,7 @@ def cliente_cancelar_pedido(id: int, request: Request):
 def cliente_pedidos(request: Request):
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
-    conn = get_db()
-    try:
+    with get_db() as conn:
         pedidos = conn.execute("""
             SELECT id, numero_pedido, estado, fecha_desde, fecha_hasta,
                    monto_total, monto_pagado, descuento_pct, notas, created_at
@@ -435,16 +417,13 @@ def cliente_pedidos(request: Request):
 
             result.append(d)
         return result
-    finally:
-        conn.close()
 
 
 @router.get("/api/cliente/pedidos/{id}")
 def cliente_pedido_detalle(id: int, request: Request):
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
-    conn = get_db()
-    try:
+    with get_db() as conn:
         pedido = conn.execute("""
             SELECT id, numero_pedido, estado, fecha_desde, fecha_hasta,
                    monto_total, monto_pagado, descuento_pct,
@@ -491,8 +470,6 @@ def cliente_pedido_detalle(id: int, request: Request):
         _enriquecer_pedido_con_total(conn, d)
 
         return d
-    finally:
-        conn.close()
 
 
 # ── Solicitud de modificación ─────────────────────────────────────────────────
@@ -700,134 +677,132 @@ def cliente_modificar_pedido(
     if not data.items:
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
 
-    conn = get_db()
-    try:
-        pedido = conn.execute(
-            "SELECT * FROM alquileres WHERE id = ? AND cliente_id = ?",
-            (id, cliente_id)
-        ).fetchone()
-        if not pedido:
-            raise HTTPException(404, "Pedido no encontrado")
-
-        _validar_modificacion_estado(pedido["estado"])
-        _validar_ventana_corte(conn, pedido["fecha_desde"], data.fecha_desde)
-        _check_solicitud_pendiente(conn, id)
-        _validar_fechas_propuestas(
-            data.fecha_desde, data.fecha_hasta,
-            pedido["fecha_desde"], pedido["fecha_hasta"],
-        )
-        # Horarios habilitados: solo si el cliente propone fechas nuevas (no
-        # bloqueamos ediciones de solo-items aunque el admin haya cambiado los
-        # horarios después de creado el pedido).
-        if data.fecha_desde is not None or data.fecha_hasta is not None:
-            from routes.alquileres import _validar_horarios_habilitados
-            _validar_horarios_habilitados(
-                conn,
-                data.fecha_desde if data.fecha_desde is not None else pedido["fecha_desde"],
-                data.fecha_hasta if data.fecha_hasta is not None else pedido["fecha_hasta"],
-            )
-
-        # Rellenar precios desde el pedido actual o catálogo (el cliente no
-        # puede definir precios).
-        precios = _precios_actuales(conn, id)
-        for it in data.items:
-            if it.equipo_id not in precios:
-                precios[it.equipo_id] = _equipo_precio_catalogo(conn, it.equipo_id)
-
-        # ── Caso `presupuesto`: aplicar directo ──────────────────────────
-        if pedido["estado"] == "presupuesto":
-            # Sólo enviamos fechas si vinieron en el payload (evita pisar a null).
-            datos_kwargs = {}
-            if data.fecha_desde is not None:
-                datos_kwargs["fecha_desde"] = data.fecha_desde
-            if data.fecha_hasta is not None:
-                datos_kwargs["fecha_hasta"] = data.fecha_hasta
-            if datos_kwargs:
-                _apply_pedido_datos(conn, id, PedidoDatos(**datos_kwargs))
-
-            pedido_items = _items_payload_to_pedido_items(data.items, precios)
-            _apply_pedido_items(conn, id, pedido_items)
-
-            # Re-validar stock con el rango nuevo
-            p2 = conn.execute("SELECT fecha_desde, fecha_hasta FROM alquileres WHERE id=?", (id,)).fetchone()
-            if p2["fecha_desde"] and p2["fecha_hasta"]:
-                problemas = _check_stock(conn, id, p2["fecha_desde"], p2["fecha_hasta"])
-                if problemas:
-                    raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
-
-            # Auditoría: dedup. Si hay un row `directo` reciente para este
-            # pedido (≤ 5 min), lo actualizamos en lugar de insertar uno
-            # nuevo — sino el autosave llena la tabla con N rows por sesión.
-            actor = session.get("email") or "cliente"
-            reciente = conn.execute(
-                """SELECT id FROM solicitudes_modificacion
-                   WHERE pedido_id = ? AND cliente_id = ? AND tipo = 'directo'
-                     AND resolved_at >= CURRENT_TIMESTAMP - INTERVAL '5 minutes'
-                   ORDER BY resolved_at DESC LIMIT 1""",
+    with get_db() as conn:
+        try:
+            pedido = conn.execute(
+                "SELECT * FROM alquileres WHERE id = ? AND cliente_id = ?",
                 (id, cliente_id)
             ).fetchone()
-            cambios_str = json.dumps(data.model_dump())
-            if reciente:
-                conn.execute(
-                    """UPDATE solicitudes_modificacion
-                       SET mensaje = ?, cambios_json = ?,
-                           resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
-                       WHERE id = ?""",
-                    (data.mensaje, cambios_str, actor, reciente["id"])
+            if not pedido:
+                raise HTTPException(404, "Pedido no encontrado")
+
+            _validar_modificacion_estado(pedido["estado"])
+            _validar_ventana_corte(conn, pedido["fecha_desde"], data.fecha_desde)
+            _check_solicitud_pendiente(conn, id)
+            _validar_fechas_propuestas(
+                data.fecha_desde, data.fecha_hasta,
+                pedido["fecha_desde"], pedido["fecha_hasta"],
+            )
+            # Horarios habilitados: solo si el cliente propone fechas nuevas (no
+            # bloqueamos ediciones de solo-items aunque el admin haya cambiado los
+            # horarios después de creado el pedido).
+            if data.fecha_desde is not None or data.fecha_hasta is not None:
+                from routes.alquileres import _validar_horarios_habilitados
+                _validar_horarios_habilitados(
+                    conn,
+                    data.fecha_desde if data.fecha_desde is not None else pedido["fecha_desde"],
+                    data.fecha_hasta if data.fecha_hasta is not None else pedido["fecha_hasta"],
                 )
-            else:
+
+            # Rellenar precios desde el pedido actual o catálogo (el cliente no
+            # puede definir precios).
+            precios = _precios_actuales(conn, id)
+            for it in data.items:
+                if it.equipo_id not in precios:
+                    precios[it.equipo_id] = _equipo_precio_catalogo(conn, it.equipo_id)
+
+            # ── Caso `presupuesto`: aplicar directo ──────────────────────────
+            if pedido["estado"] == "presupuesto":
+                # Sólo enviamos fechas si vinieron en el payload (evita pisar a null).
+                datos_kwargs = {}
+                if data.fecha_desde is not None:
+                    datos_kwargs["fecha_desde"] = data.fecha_desde
+                if data.fecha_hasta is not None:
+                    datos_kwargs["fecha_hasta"] = data.fecha_hasta
+                if datos_kwargs:
+                    _apply_pedido_datos(conn, id, PedidoDatos(**datos_kwargs))
+
+                pedido_items = _items_payload_to_pedido_items(data.items, precios)
+                _apply_pedido_items(conn, id, pedido_items)
+
+                # Re-validar stock con el rango nuevo
+                p2 = conn.execute("SELECT fecha_desde, fecha_hasta FROM alquileres WHERE id=?", (id,)).fetchone()
+                if p2["fecha_desde"] and p2["fecha_hasta"]:
+                    problemas = _check_stock(conn, id, p2["fecha_desde"], p2["fecha_hasta"])
+                    if problemas:
+                        raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
+
+                # Auditoría: dedup. Si hay un row `directo` reciente para este
+                # pedido (≤ 5 min), lo actualizamos en lugar de insertar uno
+                # nuevo — sino el autosave llena la tabla con N rows por sesión.
+                actor = session.get("email") or "cliente"
+                reciente = conn.execute(
+                    """SELECT id FROM solicitudes_modificacion
+                       WHERE pedido_id = ? AND cliente_id = ? AND tipo = 'directo'
+                         AND resolved_at >= CURRENT_TIMESTAMP - INTERVAL '5 minutes'
+                       ORDER BY resolved_at DESC LIMIT 1""",
+                    (id, cliente_id)
+                ).fetchone()
+                cambios_str = json.dumps(data.model_dump())
+                if reciente:
+                    conn.execute(
+                        """UPDATE solicitudes_modificacion
+                           SET mensaje = ?, cambios_json = ?,
+                               resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
+                           WHERE id = ?""",
+                        (data.mensaje, cambios_str, actor, reciente["id"])
+                    )
+                else:
+                    conn.execute(
+                        """INSERT INTO solicitudes_modificacion
+                           (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado, resolved_at, resolved_by)
+                           VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP,?)""",
+                        (id, cliente_id, data.mensaje, cambios_str,
+                         "directo", "aprobada", actor)
+                    )
+                conn.commit()
+
+                pedido_actualizado = _get_alquiler_detail(conn, id)
+                return {"ok": True, "tipo": "directo", "pedido": pedido_actualizado}
+
+            # ── Caso `confirmado`: guardar propuesta ─────────────────────────
+            # Validar stock hipotéticamente: rechazar antes de que el admin la vea
+            # si la propuesta es imposible. Las fechas a chequear son las que el
+            # cliente propone, con fallback a las actuales del pedido.
+            fd = data.fecha_desde or pedido["fecha_desde"]
+            fh = data.fecha_hasta or pedido["fecha_hasta"]
+            problemas = _check_stock_hipotetico(conn, id, fd, fh, data.items)
+            if problemas:
+                raise HTTPException(409, "Sin stock para tu propuesta: " + "; ".join(problemas))
+
+            try:
                 conn.execute(
                     """INSERT INTO solicitudes_modificacion
-                       (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado, resolved_at, resolved_by)
-                       VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP,?)""",
-                    (id, cliente_id, data.mensaje, cambios_str,
-                     "directo", "aprobada", actor)
+                       (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado)
+                       VALUES (?,?,?,?,?,'pendiente')""",
+                    (id, cliente_id, data.mensaje, json.dumps(data.model_dump()),
+                     "aprobacion")
                 )
-            conn.commit()
+                conn.commit()
+            except Exception as e:
+                # Si el partial unique index agarra una race con otra pestaña del
+                # mismo cliente, devolvemos 409 igual que el pre-check optimista.
+                # Re-mapeamos para que la respuesta sea consistente.
+                msg = str(e).lower()
+                if "uniq_solicitud_pendiente_por_pedido" in msg or "unique" in msg:
+                    raise HTTPException(409, "Ya hay una solicitud pendiente para este pedido")
+                raise
 
-            pedido_actualizado = _get_alquiler_detail(conn, id)
-            return {"ok": True, "tipo": "directo", "pedido": pedido_actualizado}
+            background.add_task(_enviar_email_solicitud_admin, id, data.model_dump())
 
-        # ── Caso `confirmado`: guardar propuesta ─────────────────────────
-        # Validar stock hipotéticamente: rechazar antes de que el admin la vea
-        # si la propuesta es imposible. Las fechas a chequear son las que el
-        # cliente propone, con fallback a las actuales del pedido.
-        fd = data.fecha_desde or pedido["fecha_desde"]
-        fh = data.fecha_hasta or pedido["fecha_hasta"]
-        problemas = _check_stock_hipotetico(conn, id, fd, fh, data.items)
-        if problemas:
-            raise HTTPException(409, "Sin stock para tu propuesta: " + "; ".join(problemas))
-
-        try:
-            conn.execute(
-                """INSERT INTO solicitudes_modificacion
-                   (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado)
-                   VALUES (?,?,?,?,?,'pendiente')""",
-                (id, cliente_id, data.mensaje, json.dumps(data.model_dump()),
-                 "aprobacion")
-            )
-            conn.commit()
-        except Exception as e:
-            # Si el partial unique index agarra una race con otra pestaña del
-            # mismo cliente, devolvemos 409 igual que el pre-check optimista.
-            # Re-mapeamos para que la respuesta sea consistente.
-            msg = str(e).lower()
-            if "uniq_solicitud_pendiente_por_pedido" in msg or "unique" in msg:
-                raise HTTPException(409, "Ya hay una solicitud pendiente para este pedido")
+            return {"ok": True, "tipo": "aprobacion"}
+        except HTTPException:
+            conn.rollback()
             raise
-
-        background.add_task(_enviar_email_solicitud_admin, id, data.model_dump())
-
-        return {"ok": True, "tipo": "aprobacion"}
-    except HTTPException:
-        conn.rollback()
-        raise
-    except Exception:
-        logger.error("Error en modificación cliente pedido %s", id, exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+        except Exception:
+            logger.error("Error en modificación cliente pedido %s", id, exc_info=True)
+            conn.rollback()
+            raise
 
 
 @router.delete("/api/cliente/pedidos/{id}/modificacion/{sm_id}")
@@ -837,8 +812,7 @@ def cliente_cancelar_solicitud(
     """El cliente cancela su propia solicitud pendiente."""
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
-    conn = get_db()
-    try:
+    with get_db() as conn:
         # Lock + filtro atómico: si dos pestañas cancelan a la vez, sólo
         # una ve `estado='pendiente'`.
         sm = conn.execute(
@@ -871,8 +845,6 @@ def cliente_cancelar_solicitud(
             sm["cliente_nombre"], sm["cliente_email"],
         )
         return {"ok": True}
-    finally:
-        conn.close()
 
 
 def _enviar_email_cancelacion_admin(
@@ -902,16 +874,13 @@ def cliente_disponibilidad(
     `exclude_pedido_id` automático."""
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
-    conn = get_db()
-    try:
+    with get_db() as conn:
         owned = conn.execute(
             "SELECT id FROM alquileres WHERE id = ? AND cliente_id = ?",
             (id, cliente_id)
         ).fetchone()
         if not owned:
             raise HTTPException(404, "Pedido no encontrado")
-    finally:
-        conn.close()
     from routes.alquileres import get_disponibilidad
     return get_disponibilidad(
         fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, exclude_pedido_id=id,
@@ -923,11 +892,8 @@ def cliente_modificacion_config(request: Request):
     """Devuelve la ventana de corte para que el frontend pueda mostrar/ocultar
     el botón de modificar sin tener que tocar settings."""
     require_cliente(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         return {"ventana_horas": _modificacion_ventana_horas(conn)}
-    finally:
-        conn.close()
 
 
 # ── Emails de solicitud/resolución ────────────────────────────────────────────
@@ -974,14 +940,11 @@ def _enviar_email_solicitud_admin(pedido_id: int, cambios: dict) -> None:
     if not admin_to:
         return
 
-    conn = get_db()
-    try:
-        pedido = _get_alquiler_detail(conn, pedido_id)
-    except Exception:
-        conn.close()
-        return
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            pedido = _get_alquiler_detail(conn, pedido_id)
+        except Exception:
+            return
 
     ctx = {
         "cliente_nombre":  pedido.get("cliente_nombre") or "",
@@ -1018,8 +981,7 @@ def _enviar_email_resolucion_cliente(
 def admin_solicitudes(request: Request):
     """Lista de solicitudes de modificación (solo admins)."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute("""
             SELECT sm.id, sm.pedido_id, sm.mensaje, sm.estado, sm.respuesta,
                    sm.cambios_json, sm.cambios_aplicados, sm.tipo,
@@ -1036,8 +998,6 @@ def admin_solicitudes(request: Request):
               sm.created_at DESC
         """).fetchall()
         return [row_to_dict(r) for r in rows]
-    finally:
-        conn.close()
 
 
 class SolicitudOverrideItem(BaseModel):
@@ -1087,114 +1047,112 @@ def admin_responder_solicitud(
     if data.estado not in ("aprobada", "rechazada"):
         raise HTTPException(400, "Estado debe ser 'aprobada' o 'rechazada'")
 
-    conn = get_db()
-    try:
-        # Lock pesimista de la fila para evitar que dos admins (o admin +
-        # cancelación del cliente) corran en paralelo sobre la misma
-        # solicitud y ambos pasen el check de "pendiente".
-        sm = conn.execute(
-            """SELECT sm.*, a.cliente_id, a.fecha_desde, a.fecha_hasta,
-                      a.estado AS pedido_estado, a.numero_pedido,
-                      c.email AS cliente_email, c.nombre AS cliente_nombre
-               FROM solicitudes_modificacion sm
-               JOIN alquileres a ON a.id = sm.pedido_id
-               JOIN clientes c ON c.id = sm.cliente_id
-               WHERE sm.id = ?
-               FOR UPDATE OF sm""",
-            (id,)
-        ).fetchone()
-        if not sm:
-            raise HTTPException(404, "Solicitud no encontrada")
-        if sm["estado"] != "pendiente":
-            raise HTTPException(400, "Esta solicitud ya fue resuelta")
-
-        cambios_aplicados_str: Optional[str] = None
-
-        if data.estado == "aprobada" and sm["tipo"] == "aprobacion":
-            if sm["pedido_estado"] not in ESTADOS_MODIFICABLES:
-                raise HTTPException(
-                    400, f"El pedido está en estado '{sm['pedido_estado']}' y ya no admite cambios"
-                )
-
-            cambios_pre = sm["cambios_json"] or {}
-            if isinstance(cambios_pre, str):
-                cambios_pre = json.loads(cambios_pre)
-
-            # Contrapropuesta del admin: si se envió, sobreescribe la del cliente.
-            if data.cambios_override is not None:
-                cambios = data.cambios_override.model_dump()
-                if not cambios.get("items"):
-                    raise HTTPException(400, "La contrapropuesta debe incluir items")
-                _validar_fechas_propuestas(
-                    cambios.get("fecha_desde"), cambios.get("fecha_hasta"),
-                    sm["fecha_desde"], sm["fecha_hasta"],
-                )
-            else:
-                cambios = cambios_pre
-
-            _validar_ventana_corte(
-                conn, sm["fecha_desde"], cambios.get("fecha_desde"),
-            )
-
-            precios = _precios_actuales(conn, sm["pedido_id"])
-            for it in cambios.get("items") or []:
-                eq_id = it["equipo_id"]
-                if eq_id not in precios:
-                    precios[eq_id] = _equipo_precio_catalogo(conn, eq_id)
-
-            datos_kwargs = {}
-            if cambios.get("fecha_desde") is not None:
-                datos_kwargs["fecha_desde"] = cambios["fecha_desde"]
-            if cambios.get("fecha_hasta") is not None:
-                datos_kwargs["fecha_hasta"] = cambios["fecha_hasta"]
-            if datos_kwargs:
-                _apply_pedido_datos(conn, sm["pedido_id"], PedidoDatos(**datos_kwargs))
-
-            pedido_items = _items_payload_to_pedido_items(
-                [ModificacionItemIn(**it) for it in cambios.get("items") or []],
-                precios,
-            )
-            _apply_pedido_items(conn, sm["pedido_id"], pedido_items)
-
-            # Re-validar stock con el rango nuevo
-            p2 = conn.execute(
-                "SELECT fecha_desde, fecha_hasta FROM alquileres WHERE id=?",
-                (sm["pedido_id"],)
+    with get_db() as conn:
+        try:
+            # Lock pesimista de la fila para evitar que dos admins (o admin +
+            # cancelación del cliente) corran en paralelo sobre la misma
+            # solicitud y ambos pasen el check de "pendiente".
+            sm = conn.execute(
+                """SELECT sm.*, a.cliente_id, a.fecha_desde, a.fecha_hasta,
+                          a.estado AS pedido_estado, a.numero_pedido,
+                          c.email AS cliente_email, c.nombre AS cliente_nombre
+                   FROM solicitudes_modificacion sm
+                   JOIN alquileres a ON a.id = sm.pedido_id
+                   JOIN clientes c ON c.id = sm.cliente_id
+                   WHERE sm.id = ?
+                   FOR UPDATE OF sm""",
+                (id,)
             ).fetchone()
-            if p2["fecha_desde"] and p2["fecha_hasta"]:
-                problemas = _check_stock(conn, sm["pedido_id"], p2["fecha_desde"], p2["fecha_hasta"])
-                if problemas:
-                    raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
+            if not sm:
+                raise HTTPException(404, "Solicitud no encontrada")
+            if sm["estado"] != "pendiente":
+                raise HTTPException(400, "Esta solicitud ya fue resuelta")
 
-            # Snapshot de lo que efectivamente se aplicó (≠ a la propuesta del
-            # cliente si admin usó override). Para auditoría.
-            cambios_aplicados_str = json.dumps(cambios)
+            cambios_aplicados_str: Optional[str] = None
 
-        conn.execute(
-            """UPDATE solicitudes_modificacion
-               SET estado = ?, respuesta = ?, cambios_aplicados = ?,
-                   resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
-               WHERE id = ?""",
-            (data.estado, data.respuesta, cambios_aplicados_str, admin_email, id)
-        )
-        conn.commit()
+            if data.estado == "aprobada" and sm["tipo"] == "aprobacion":
+                if sm["pedido_estado"] not in ESTADOS_MODIFICABLES:
+                    raise HTTPException(
+                        400, f"El pedido está en estado '{sm['pedido_estado']}' y ya no admite cambios"
+                    )
 
-        if sm["cliente_email"]:
-            background.add_task(
-                _enviar_email_resolucion_cliente,
-                sm["pedido_id"], sm["cliente_email"], sm["cliente_nombre"],
-                sm["numero_pedido"], data.estado, data.respuesta or "",
+                cambios_pre = sm["cambios_json"] or {}
+                if isinstance(cambios_pre, str):
+                    cambios_pre = json.loads(cambios_pre)
+
+                # Contrapropuesta del admin: si se envió, sobreescribe la del cliente.
+                if data.cambios_override is not None:
+                    cambios = data.cambios_override.model_dump()
+                    if not cambios.get("items"):
+                        raise HTTPException(400, "La contrapropuesta debe incluir items")
+                    _validar_fechas_propuestas(
+                        cambios.get("fecha_desde"), cambios.get("fecha_hasta"),
+                        sm["fecha_desde"], sm["fecha_hasta"],
+                    )
+                else:
+                    cambios = cambios_pre
+
+                _validar_ventana_corte(
+                    conn, sm["fecha_desde"], cambios.get("fecha_desde"),
+                )
+
+                precios = _precios_actuales(conn, sm["pedido_id"])
+                for it in cambios.get("items") or []:
+                    eq_id = it["equipo_id"]
+                    if eq_id not in precios:
+                        precios[eq_id] = _equipo_precio_catalogo(conn, eq_id)
+
+                datos_kwargs = {}
+                if cambios.get("fecha_desde") is not None:
+                    datos_kwargs["fecha_desde"] = cambios["fecha_desde"]
+                if cambios.get("fecha_hasta") is not None:
+                    datos_kwargs["fecha_hasta"] = cambios["fecha_hasta"]
+                if datos_kwargs:
+                    _apply_pedido_datos(conn, sm["pedido_id"], PedidoDatos(**datos_kwargs))
+
+                pedido_items = _items_payload_to_pedido_items(
+                    [ModificacionItemIn(**it) for it in cambios.get("items") or []],
+                    precios,
+                )
+                _apply_pedido_items(conn, sm["pedido_id"], pedido_items)
+
+                # Re-validar stock con el rango nuevo
+                p2 = conn.execute(
+                    "SELECT fecha_desde, fecha_hasta FROM alquileres WHERE id=?",
+                    (sm["pedido_id"],)
+                ).fetchone()
+                if p2["fecha_desde"] and p2["fecha_hasta"]:
+                    problemas = _check_stock(conn, sm["pedido_id"], p2["fecha_desde"], p2["fecha_hasta"])
+                    if problemas:
+                        raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
+
+                # Snapshot de lo que efectivamente se aplicó (≠ a la propuesta del
+                # cliente si admin usó override). Para auditoría.
+                cambios_aplicados_str = json.dumps(cambios)
+
+            conn.execute(
+                """UPDATE solicitudes_modificacion
+                   SET estado = ?, respuesta = ?, cambios_aplicados = ?,
+                       resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
+                   WHERE id = ?""",
+                (data.estado, data.respuesta, cambios_aplicados_str, admin_email, id)
             )
-        return {"ok": True}
-    except HTTPException:
-        conn.rollback()
-        raise
-    except Exception:
-        logger.error("Error resolviendo solicitud %s", id, exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            conn.commit()
+
+            if sm["cliente_email"]:
+                background.add_task(
+                    _enviar_email_resolucion_cliente,
+                    sm["pedido_id"], sm["cliente_email"], sm["cliente_nombre"],
+                    sm["numero_pedido"], data.estado, data.respuesta or "",
+                )
+            return {"ok": True}
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception:
+            logger.error("Error resolviendo solicitud %s", id, exc_info=True)
+            conn.rollback()
+            raise
 
 
 # ── Documentos PDF (cliente) ──────────────────────────────────────────────────
@@ -1312,11 +1270,8 @@ async def _doc_response_or_pdf(html_str: str, pdf_filename: str, format: str):
 async def cliente_pedido_remito(id: int, request: Request, format: str = "pdf"):
     """Remito del pedido. format=pdf (default, download) o html (preview)."""
     session = require_cliente(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
-    finally:
-        conn.close()
     if not _documentos_disponibles(pedido.get("estado", ""))["remito"]:
         raise HTTPException(403, "El remito estará disponible cuando confirmemos el pedido.")
     return await _doc_response_or_pdf(
@@ -1329,11 +1284,8 @@ async def cliente_pedido_remito(id: int, request: Request, format: str = "pdf"):
 async def cliente_pedido_contrato(id: int, request: Request, format: str = "pdf"):
     """Contrato del pedido. format=pdf (default) o html (preview)."""
     session = require_cliente(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
-    finally:
-        conn.close()
     if not _documentos_disponibles(pedido.get("estado", ""))["contrato"]:
         raise HTTPException(403, "El contrato estará disponible cuando confirmemos el pedido.")
     return await _doc_response_or_pdf(
@@ -1346,11 +1298,8 @@ async def cliente_pedido_contrato(id: int, request: Request, format: str = "pdf"
 async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf"):
     """Albarán del pedido. format=pdf (default) o html (preview)."""
     session = require_cliente(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
-    finally:
-        conn.close()
     if not _documentos_disponibles(pedido.get("estado", ""))["albaran"]:
         raise HTTPException(403, "El albarán estará disponible al momento de la entrega.")
     return await _doc_response_or_pdf(
@@ -1365,15 +1314,12 @@ async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf")
 def get_favoritos(request: Request):
     """Lista de equipo_ids marcados como favoritos por el cliente."""
     session = require_cliente(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute(
             "SELECT equipo_id FROM cliente_favoritos WHERE cliente_id = %s",
             (session["cliente_id"],),
         ).fetchall()
         return [str(r["equipo_id"]) for r in rows]
-    finally:
-        conn.close()
 
 
 class FavSync(BaseModel):
@@ -1386,8 +1332,7 @@ def sync_favoritos(data: FavSync, request: Request):
     session = require_cliente(request)
     if not data.ids:
         return {"synced": 0}
-    conn = get_db()
-    try:
+    with get_db() as conn:
         count = 0
         for eid in data.ids[:200]:  # cap de seguridad
             eq = conn.execute(
@@ -1403,16 +1348,13 @@ def sync_favoritos(data: FavSync, request: Request):
             count += 1
         conn.commit()
         return {"synced": count}
-    finally:
-        conn.close()
 
 
 @router.post("/api/cliente/favoritos/{equipo_id}", status_code=201)
 def add_favorito(equipo_id: int, request: Request):
     """Agrega un equipo a los favoritos del cliente."""
     session = require_cliente(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         eq = conn.execute(
             "SELECT id FROM equipos WHERE id = %s", (equipo_id,)
         ).fetchone()
@@ -1425,21 +1367,16 @@ def add_favorito(equipo_id: int, request: Request):
         )
         conn.commit()
         return {"ok": True}
-    finally:
-        conn.close()
 
 
 @router.delete("/api/cliente/favoritos/{equipo_id}")
 def remove_favorito(equipo_id: int, request: Request):
     """Quita un equipo de los favoritos del cliente."""
     session = require_cliente(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         conn.execute(
             "DELETE FROM cliente_favoritos WHERE cliente_id = %s AND equipo_id = %s",
             (session["cliente_id"], equipo_id),
         )
         conn.commit()
         return {"ok": True}
-    finally:
-        conn.close()

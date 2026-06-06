@@ -74,8 +74,7 @@ def list_marcas():
     El campo `destacada` (issue #288) lo lee el frontend para curar el
     BrandCarousel del home: si hay marcas con destacada=true las muestra,
     sino fallback al algoritmo automático de top N por count."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute("""
             SELECT id, nombre, logo_url, destacada, orden,
                    popularidad_score, created_at, updated_at
@@ -85,8 +84,6 @@ def list_marcas():
         """).fetchall()
         marcas = [row_to_dict(r) for r in rows]
         return {"items": marcas}
-    finally:
-        conn.close()
 
 
 # ── Admin API ────────────────────────────────────────────────────────────────
@@ -95,8 +92,7 @@ def list_marcas():
 def admin_list_marcas(request: Request):
     """Lista todas las marcas (visible/invisible) con count de equipos y flag `destacada`."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute("""
             SELECT
                 m.id, m.nombre, m.logo_url, m.visible, m.destacada, m.orden,
@@ -108,16 +104,13 @@ def admin_list_marcas(request: Request):
         """).fetchall()
         marcas = [dict(row) for row in rows]
         return {"items": marcas}
-    finally:
-        conn.close()
 
 
 @router.patch("/admin/marcas/{marca_id}")
 def admin_update_marca(marca_id: int, patch: MarcaPatch, request: Request):
     """Actualiza una marca (nombre, logo_url, visible, orden)."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         # Verificar que existe
         existing = conn.execute("SELECT id FROM marcas WHERE id = %s", (marca_id,)).fetchone()
         if not existing:
@@ -165,8 +158,6 @@ def admin_update_marca(marca_id: int, patch: MarcaPatch, request: Request):
 
         conn.commit()
         return dict(row) if row else {}
-    finally:
-        conn.close()
 
 
 @router.post("/admin/marcas/merge")
@@ -178,64 +169,60 @@ def admin_merge_marcas(req: MarcaMergeRequest, request: Request):
     require_admin(request)
     if req.source_id == req.target_id:
         raise HTTPException(400, "source_id y target_id no pueden ser iguales")
-    conn = get_db()
-    try:
-        # Validar que ambas existen
-        rows = conn.execute(
-            "SELECT id, nombre FROM marcas WHERE id IN (%s, %s)",
-            (req.source_id, req.target_id),
-        ).fetchall()
-        existing = {r["id"]: r["nombre"] for r in rows}
-        if req.source_id not in existing:
-            raise HTTPException(404, f"Marca source {req.source_id} no encontrada")
-        if req.target_id not in existing:
-            raise HTTPException(404, f"Marca target {req.target_id} no encontrada")
+    with get_db() as conn:
+        try:
+            # Validar que ambas existen
+            rows = conn.execute(
+                "SELECT id, nombre FROM marcas WHERE id IN (%s, %s)",
+                (req.source_id, req.target_id),
+            ).fetchall()
+            existing = {r["id"]: r["nombre"] for r in rows}
+            if req.source_id not in existing:
+                raise HTTPException(404, f"Marca source {req.source_id} no encontrada")
+            if req.target_id not in existing:
+                raise HTTPException(404, f"Marca target {req.target_id} no encontrada")
 
-        target_nombre = existing[req.target_id]
+            target_nombre = existing[req.target_id]
 
-        # Reasignar brand_id (FK) — único campo necesario. La columna
-        # legacy `equipos.marca` (TEXT) fue dropeada por la migración
-        # d5a8f2c4b6e9; el nombre se resuelve por subquery contra
-        # `marcas.nombre` (ver MARCA_SUBQUERY en database.py).
-        conn.execute(
-            "UPDATE equipos SET brand_id = %s WHERE brand_id = %s",
-            (req.target_id, req.source_id),
-        )
-        # Borrar la source
-        conn.execute("DELETE FROM marcas WHERE id = %s", (req.source_id,))
-        conn.commit()
-        return {"ok": True, "merged_into": target_nombre}
-    except HTTPException:
-        conn.rollback()
-        raise
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(500, f"Error al fusionar marcas: {e}")
-    finally:
-        conn.close()
+            # Reasignar brand_id (FK) — único campo necesario. La columna
+            # legacy `equipos.marca` (TEXT) fue dropeada por la migración
+            # d5a8f2c4b6e9; el nombre se resuelve por subquery contra
+            # `marcas.nombre` (ver MARCA_SUBQUERY en database.py).
+            conn.execute(
+                "UPDATE equipos SET brand_id = %s WHERE brand_id = %s",
+                (req.target_id, req.source_id),
+            )
+            # Borrar la source
+            conn.execute("DELETE FROM marcas WHERE id = %s", (req.source_id,))
+            conn.commit()
+            return {"ok": True, "merged_into": target_nombre}
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(500, f"Error al fusionar marcas: {e}")
 
 
 @router.post("/admin/marcas/reorder")
 def admin_reorder_marcas(req: MarcasReorderRequest, request: Request):
     """Actualiza el orden de múltiples marcas."""
     require_admin(request)
-    conn = get_db()
-    try:
-        for item in req.marcas:
-            marca_id = item.get("id")
-            orden = item.get("orden")
-            if marca_id is None or orden is None:
-                raise HTTPException(status_code=400, detail="Items deben tener 'id' y 'orden'")
-            conn.execute("""
-                UPDATE marcas SET orden = %s, updated_at = NOW() WHERE id = %s
-            """, (orden, marca_id))
-        conn.commit()
-        return {"ok": True}
-    except Exception as e:
-        conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            for item in req.marcas:
+                marca_id = item.get("id")
+                orden = item.get("orden")
+                if marca_id is None or orden is None:
+                    raise HTTPException(status_code=400, detail="Items deben tener 'id' y 'orden'")
+                conn.execute("""
+                    UPDATE marcas SET orden = %s, updated_at = NOW() WHERE id = %s
+                """, (orden, marca_id))
+            conn.commit()
+            return {"ok": True}
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/admin/marcas/{marca_id}", status_code=204)
@@ -243,31 +230,29 @@ def admin_delete_marca(marca_id: int, request: Request):
     """Borra una marca. Rechaza si tiene equipos asociados — primero hay que
     fusionar (POST /admin/marcas/merge) o reasignar los equipos."""
     require_admin(request)
-    conn = get_db()
-    try:
-        existing = conn.execute(
-            "SELECT id, nombre FROM marcas WHERE id = %s", (marca_id,)
-        ).fetchone()
-        if not existing:
-            raise HTTPException(404, "Marca no encontrada")
+    with get_db() as conn:
+        try:
+            existing = conn.execute(
+                "SELECT id, nombre FROM marcas WHERE id = %s", (marca_id,)
+            ).fetchone()
+            if not existing:
+                raise HTTPException(404, "Marca no encontrada")
 
-        count_row = conn.execute(
-            "SELECT COUNT(*) AS n FROM equipos WHERE brand_id = %s", (marca_id,)
-        ).fetchone()
-        n = int(count_row["n"] if isinstance(count_row, dict) else count_row[0])
-        if n > 0:
-            raise HTTPException(
-                409,
-                f"La marca tiene {n} equipos asociados. Fusionala con otra o reasigná los equipos antes de borrar.",
-            )
+            count_row = conn.execute(
+                "SELECT COUNT(*) AS n FROM equipos WHERE brand_id = %s", (marca_id,)
+            ).fetchone()
+            n = int(count_row["n"] if isinstance(count_row, dict) else count_row[0])
+            if n > 0:
+                raise HTTPException(
+                    409,
+                    f"La marca tiene {n} equipos asociados. Fusionala con otra o reasigná los equipos antes de borrar.",
+                )
 
-        conn.execute("DELETE FROM marcas WHERE id = %s", (marca_id,))
-        conn.commit()
-    except HTTPException:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            conn.execute("DELETE FROM marcas WHERE id = %s", (marca_id,))
+            conn.commit()
+        except HTTPException:
+            conn.rollback()
+            raise
 
 
 def _is_svg(raw: bytes, filename: str | None) -> bool:
@@ -328,63 +313,61 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
     filename = getattr(file, "filename", None)
     is_svg = _is_svg(raw_content, filename)
 
-    conn = get_db()
-    try:
-        marca = conn.execute(
-            "SELECT id, nombre FROM marcas WHERE id = ?", (marca_id,)
-        ).fetchone()
-        if not marca:
-            raise HTTPException(404, "Marca no encontrada")
-        nombre = marca["nombre"]
+    with get_db() as conn:
+        try:
+            marca = conn.execute(
+                "SELECT id, nombre FROM marcas WHERE id = ?", (marca_id,)
+            ).fetchone()
+            if not marca:
+                raise HTTPException(404, "Marca no encontrada")
+            nombre = marca["nombre"]
 
-        if is_svg:
-            from services.media.storage import put as _r2_put
-            from services.media_fastapi import media_http
-            content = _sanitize_svg(raw_content)
-            path = _logo_path(marca_id, nombre, "svg")
-            with media_http():
-                public_url = _r2_put(path, content, "image/svg+xml")
-            conn.execute(
-                "UPDATE marcas SET logo_url = ?, updated_at = NOW() WHERE id = ?",
-                (public_url, marca_id),
-            )
-            conn.commit()
-            return {
-                "public_url": public_url,
-                "path": path,
-                "size": len(content),
-                "size_original": len(raw_content),
-                "content_type": "image/svg+xml",
-                "width": None,
-                "height": None,
-            }
-        else:
-            from services.media import DISPLAY_KEEP_ASPECT, store_upload
-            from services.media_fastapi import media_http
-            with media_http():
-                asset = store_upload(
-                    raw_content, kind="marca", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn
+            if is_svg:
+                from services.media.storage import put as _r2_put
+                from services.media_fastapi import media_http
+                content = _sanitize_svg(raw_content)
+                path = _logo_path(marca_id, nombre, "svg")
+                with media_http():
+                    public_url = _r2_put(path, content, "image/svg+xml")
+                conn.execute(
+                    "UPDATE marcas SET logo_url = ?, updated_at = NOW() WHERE id = ?",
+                    (public_url, marca_id),
                 )
-            display = asset.variant("display")
-            conn.execute(
-                "UPDATE marcas SET logo_url = ?, media_id = ?, updated_at = NOW() WHERE id = ?",
-                (display.url, asset.id, marca_id),
-            )
-            conn.commit()
-            return {
-                "public_url": display.url,
-                "path": display.key,
-                "size": display.bytes,
-                "size_original": len(raw_content),
-                "content_type": display.content_type,
-                "width": display.width,
-                "height": display.height,
-            }
-    except HTTPException:
-        conn.rollback()
-        raise
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+                conn.commit()
+                return {
+                    "public_url": public_url,
+                    "path": path,
+                    "size": len(content),
+                    "size_original": len(raw_content),
+                    "content_type": "image/svg+xml",
+                    "width": None,
+                    "height": None,
+                }
+            else:
+                from services.media import DISPLAY_KEEP_ASPECT, store_upload
+                from services.media_fastapi import media_http
+                with media_http():
+                    asset = store_upload(
+                        raw_content, kind="marca", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn
+                    )
+                display = asset.variant("display")
+                conn.execute(
+                    "UPDATE marcas SET logo_url = ?, media_id = ?, updated_at = NOW() WHERE id = ?",
+                    (display.url, asset.id, marca_id),
+                )
+                conn.commit()
+                return {
+                    "public_url": display.url,
+                    "path": display.key,
+                    "size": display.bytes,
+                    "size_original": len(raw_content),
+                    "content_type": display.content_type,
+                    "width": display.width,
+                    "height": display.height,
+                }
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception:
+            conn.rollback()
+            raise

@@ -107,22 +107,18 @@ def email_channel_status(request: Request):
 @router.get("/admin/email-templates")
 def list_templates(request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute(
             "SELECT key, subject, enabled, updated_at, updated_by "
             "FROM email_templates ORDER BY key"
         ).fetchall()
         return {"items": [row_to_dict(r) for r in rows]}
-    finally:
-        conn.close()
 
 
 @router.get("/admin/email-templates/{key}")
 def get_template(key: str, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute(
             """
             SELECT key, subject, body_html, body_text, enabled, updated_at, updated_by
@@ -133,8 +129,6 @@ def get_template(key: str, request: Request):
         if not row:
             raise HTTPException(404, f"Template '{key}' no encontrado")
         return row_to_dict(row)
-    finally:
-        conn.close()
 
 
 @router.patch("/admin/email-templates/{key}")
@@ -144,8 +138,7 @@ def update_template(key: str, data: TemplateUpdate, request: Request):
         raise HTTPException(400, "subject no puede estar vacío")
     if not data.body_html.strip() and not data.body_text.strip():
         raise HTTPException(400, "body_html y body_text no pueden estar ambos vacíos")
-    conn = get_db()
-    try:
+    with get_db() as conn:
         cur = conn.execute(
             """
             UPDATE email_templates
@@ -162,8 +155,6 @@ def update_template(key: str, data: TemplateUpdate, request: Request):
             raise HTTPException(404, f"Template '{key}' no encontrado")
         conn.commit()
         return row_to_dict(row)
-    finally:
-        conn.close()
 
 
 @router.patch("/admin/email-templates/{key}/enabled")
@@ -172,8 +163,7 @@ def set_template_enabled(key: str, data: TemplateEnabled, request: Request):
     ni `updated_by` (no es una edición de copy del admin) → el repintado por
     migración sigue aplicando si la plantilla nunca se editó a mano."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         cur = conn.execute(
             "UPDATE email_templates SET enabled = ? WHERE key = ? RETURNING key, enabled",
             (data.enabled, key),
@@ -183,8 +173,6 @@ def set_template_enabled(key: str, data: TemplateEnabled, request: Request):
             raise HTTPException(404, f"Template '{key}' no encontrado")
         conn.commit()
         return row_to_dict(row)
-    finally:
-        conn.close()
 
 
 @router.get("/admin/emails-log")
@@ -210,8 +198,7 @@ def list_emails_log(
         where.append("template_key = ?")
         params.append(template_key)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         total = conn.execute(
             f"SELECT COUNT(*) AS n FROM emails_log{clause}", tuple(params)
         ).fetchone()["n"]
@@ -232,8 +219,6 @@ def list_emails_log(
                 d["sent_at"] = d["sent_at"].isoformat()
             items.append(d)
         return {"items": items, "total": total, "limit": limit, "offset": offset}
-    finally:
-        conn.close()
 
 
 @router.post("/admin/email-templates/{key}/preview")

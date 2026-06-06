@@ -153,15 +153,12 @@ def get_estudio():
     `pack_equipos` es la lista curada del pack con cantidades (stock total) para
     mostrar "qué incluye" en la ficha — independiente de la franja. La
     disponibilidad real por franja sigue saliendo de /estudio/disponibilidad."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = _get_estudio_row(conn)
         fotos = _get_fotos(conn)
         resp = _build_response(row, fotos)
         resp["pack_equipos"] = _pack_curado(conn)
         return resp
-    finally:
-        conn.close()
 
 
 # ── Endpoints admin ──────────────────────────────────────────────────────────
@@ -220,8 +217,7 @@ def patch_estudio(body: EstudioUpdate, request: Request):
             updates["mapa_url"] = parsed.raw_url
             updates["mapa_embed_url"] = parsed.embed_url
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         if updates:
             set_parts = [f"{k} = ?" for k in updates]
             set_parts.append("updated_at = ?")
@@ -236,8 +232,6 @@ def patch_estudio(body: EstudioUpdate, request: Request):
         row = _get_estudio_row(conn)
         fotos = _get_fotos(conn)
         return _build_response(row, fotos)
-    finally:
-        conn.close()
 
 
 @router.post("/admin/estudio/upload-foto")
@@ -256,19 +250,17 @@ async def upload_foto(request: Request):
     if len(raw) > 20 * 1024 * 1024:
         raise HTTPException(413, "Archivo muy grande (máx 20 MB)")
 
-    conn = get_db()
-    try:
-        with media_http():
-            asset = store_upload(
-                raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
-            )
-        display = asset.variant("display")
-        foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            with media_http():
+                asset = store_upload(
+                    raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
+                )
+            display = asset.variant("display")
+            foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
+        except Exception:
+            conn.rollback()
+            raise
 
     return {
         "id": foto["id"],
@@ -299,19 +291,17 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
         _validate_ssrf_only(url)
         raw, _raw_ctype = _download_image_bytes(url)
 
-    conn = get_db()
-    try:
-        with media_http():
-            asset = store_upload(
-                raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
-            )
-        display = asset.variant("display")
-        foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            with media_http():
+                asset = store_upload(
+                    raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
+                )
+            display = asset.variant("display")
+            foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
+        except Exception:
+            conn.rollback()
+            raise
 
     return {
         "id": foto["id"],
@@ -329,8 +319,7 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
 def delete_foto(foto_id: int, request: Request):
     require_admin(request)
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         cur = conn.execute(
             "SELECT path, media_id FROM estudio_fotos WHERE id = ? AND estudio_id = 1",
             (foto_id,),
@@ -350,8 +339,6 @@ def delete_foto(foto_id: int, request: Request):
         if media_id:
             conn.execute("DELETE FROM media_assets WHERE id = ?", (media_id,))
         conn.commit()
-    finally:
-        conn.close()
 
     # Best-effort R2 cleanup (después del commit — la DB es la fuente de verdad)
     if r2_keys:
@@ -376,8 +363,7 @@ class ReorderBody(BaseModel):
 def reorder_fotos(body: ReorderBody, request: Request):
     require_admin(request)
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         for f in body.fotos:
             conn.execute(
                 "UPDATE estudio_fotos SET orden = ?, es_principal = ? "
@@ -386,8 +372,6 @@ def reorder_fotos(body: ReorderBody, request: Request):
             )
         conn.commit()
         fotos = _get_fotos(conn)
-    finally:
-        conn.close()
 
     return {"fotos": fotos}
 
@@ -572,11 +556,8 @@ def _pack_curado(conn) -> list[dict]:
 @router.get("/admin/estudio/pack")
 def listar_pack(request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         return {"pack": _pack_curado(conn)}
-    finally:
-        conn.close()
 
 
 class PackEquipoCreate(BaseModel):
@@ -586,49 +567,45 @@ class PackEquipoCreate(BaseModel):
 @router.post("/admin/estudio/pack", status_code=201)
 def agregar_pack_equipo(body: PackEquipoCreate, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
-        eq = conn.execute(
-            "SELECT id, es_recurso_interno, eliminado_at FROM equipos WHERE id = ?",
-            (body.equipo_id,),
-        ).fetchone()
-        if not eq or eq["eliminado_at"] is not None:
-            raise HTTPException(404, "Equipo no encontrado")
-        if eq["es_recurso_interno"]:
-            raise HTTPException(400, "No se puede agregar un recurso interno al pack")
-        orden = conn.execute(
-            "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_pack_equipos WHERE estudio_id = 1"
-        ).fetchone()["next"]
-        conn.execute(
-            "INSERT INTO estudio_pack_equipos (estudio_id, equipo_id, orden) "
-            "VALUES (1, ?, ?) ON CONFLICT (estudio_id, equipo_id) DO NOTHING",
-            (body.equipo_id, orden),
-        )
-        conn.commit()
-        return {"pack": _pack_curado(conn)}
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            eq = conn.execute(
+                "SELECT id, es_recurso_interno, eliminado_at FROM equipos WHERE id = ?",
+                (body.equipo_id,),
+            ).fetchone()
+            if not eq or eq["eliminado_at"] is not None:
+                raise HTTPException(404, "Equipo no encontrado")
+            if eq["es_recurso_interno"]:
+                raise HTTPException(400, "No se puede agregar un recurso interno al pack")
+            orden = conn.execute(
+                "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_pack_equipos WHERE estudio_id = 1"
+            ).fetchone()["next"]
+            conn.execute(
+                "INSERT INTO estudio_pack_equipos (estudio_id, equipo_id, orden) "
+                "VALUES (1, ?, ?) ON CONFLICT (estudio_id, equipo_id) DO NOTHING",
+                (body.equipo_id, orden),
+            )
+            conn.commit()
+            return {"pack": _pack_curado(conn)}
+        except Exception:
+            conn.rollback()
+            raise
 
 
 @router.delete("/admin/estudio/pack/{equipo_id}")
 def quitar_pack_equipo(equipo_id: int, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
-        conn.execute(
-            "DELETE FROM estudio_pack_equipos WHERE estudio_id = 1 AND equipo_id = ?",
-            (equipo_id,),
-        )
-        conn.commit()
-        return {"pack": _pack_curado(conn)}
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            conn.execute(
+                "DELETE FROM estudio_pack_equipos WHERE estudio_id = 1 AND equipo_id = ?",
+                (equipo_id,),
+            )
+            conn.commit()
+            return {"pack": _pack_curado(conn)}
+        except Exception:
+            conn.rollback()
+            raise
 
 
 # ── Slots fijos recurrentes mensuales (E4) ─────────────────────────────────────
@@ -776,8 +753,7 @@ def estudio_disponibilidad(
 ):
     """¿El estudio está libre en [fecha start, +horas]? Aplica el buffer propio
     del estudio (no el global) y la anticipación mínima. Devuelve {libre, motivo}."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         estudio = _get_estudio_row(conn)
 
         if not estudio["equipo_id"]:
@@ -807,8 +783,6 @@ def estudio_disponibilidad(
             else []
         )
         return {"libre": True, "motivo": None, "pack": pack}
-    finally:
-        conn.close()
 
 
 class EstudioReservaCreate(BaseModel):
@@ -852,104 +826,102 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
     session = _require_cliente(request)
     cliente_id = session["cliente_id"]
 
-    conn = get_db()
-    try:
-        estudio = _get_estudio_row(conn)
-        if not estudio["equipo_id"]:
-            raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+    with get_db() as conn:
+        try:
+            estudio = _get_estudio_row(conn)
+            if not estudio["equipo_id"]:
+                raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
 
-        # Datos del cliente desde la cuenta (no del body), mismo formato que create_pedido.
-        cli = conn.execute(
-            "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = ?",
-            (cliente_id,),
-        ).fetchone()
-        if not cli:
-            raise HTTPException(401, "Sesión de cliente inválida")
-        cliente_nombre = nombre_completo_cliente(cli["nombre"], cli["apellido"])
-        cliente_email = cli["email"]
-        cliente_telefono = cli["telefono"]
+            # Datos del cliente desde la cuenta (no del body), mismo formato que create_pedido.
+            cli = conn.execute(
+                "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = ?",
+                (cliente_id,),
+            ).fetchone()
+            if not cli:
+                raise HTTPException(401, "Sesión de cliente inválida")
+            cliente_nombre = nombre_completo_cliente(cli["nombre"], cli["apellido"])
+            cliente_email = cli["email"]
+            cliente_telefono = cli["telefono"]
 
-        fecha_desde, fecha_hasta = _franja_estudio(
-            estudio, body.fecha, body.start, body.horas
-        )
-        hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
-        if fecha_desde < hoy:
-            raise HTTPException(400, "La fecha no puede ser en el pasado")
-        if _viola_anticipacion(estudio, fecha_desde):
-            raise HTTPException(
-                400,
-                f"Necesitás reservar con al menos {estudio['anticipacion_min_horas']} h de anticipación",
+            fecha_desde, fecha_hasta = _franja_estudio(
+                estudio, body.fecha, body.start, body.horas
             )
+            hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
+            if fecha_desde < hoy:
+                raise HTTPException(400, "La fecha no puede ser en el pasado")
+            if _viola_anticipacion(estudio, fecha_desde):
+                raise HTTPException(
+                    400,
+                    f"Necesitás reservar con al menos {estudio['anticipacion_min_horas']} h de anticipación",
+                )
 
-        slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
-        if slot_cliente:
-            raise HTTPException(409, f"Esa franja está reservada de forma fija ({slot_cliente})")
+            slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
+            if slot_cliente:
+                raise HTTPException(409, f"Esa franja está reservada de forma fija ({slot_cliente})")
 
-        con_pack = bool(body.con_pack) and bool(estudio["pack_activo"])
-        monto_total = (estudio["precio_hora"] or 0) * body.horas
-        if con_pack:
-            monto_total += estudio["pack_precio"] or 0
+            con_pack = bool(body.con_pack) and bool(estudio["pack_activo"])
+            monto_total = (estudio["precio_hora"] or 0) * body.horas
+            if con_pack:
+                monto_total += estudio["pack_precio"] or 0
 
-        next_num = _next_numero_pedido(conn)
-        cur = conn.execute(
-            """
-            INSERT INTO alquileres (cliente_id, cliente_nombre, cliente_email, cliente_telefono,
-                                    fecha_desde, fecha_hasta, monto_total, estado,
-                                    fuente, tipo, estudio_con_pack, numero_pedido)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-            """,
-            (
-                cliente_id, cliente_nombre, cliente_email, cliente_telefono,
-                fecha_desde, fecha_hasta, monto_total, "presupuesto",
-                "estudio", "estudio", con_pack, next_num,
-            ),
-        )
-        pedido_id = cur.lastrowid
+            next_num = _next_numero_pedido(conn)
+            cur = conn.execute(
+                """
+                INSERT INTO alquileres (cliente_id, cliente_nombre, cliente_email, cliente_telefono,
+                                        fecha_desde, fecha_hasta, monto_total, estado,
+                                        fuente, tipo, estudio_con_pack, numero_pedido)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    cliente_id, cliente_nombre, cliente_email, cliente_telefono,
+                    fecha_desde, fecha_hasta, monto_total, "presupuesto",
+                    "estudio", "estudio", con_pack, next_num,
+                ),
+            )
+            pedido_id = cur.lastrowid
 
-        # ── Pack PRIMERO (antes del ítem centinela) ─────────────────────────────
-        # Así _check_stock solo ve los equipos reales del pack y nunca el
-        # centinela → no se mezcla el buffer global con el propio del espacio.
-        if con_pack:
-            pack_ids = _pack_equipo_ids(conn)
-            if pack_ids:
-                # Lock de las filas del pack: serializa contra otras reservas que
-                # toquen estos equipos (su _check_stock también las lockea).
-                conn.execute("SELECT id FROM equipos WHERE id = ANY(?) FOR UPDATE", (pack_ids,))
-                _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
-                # Gate del motor (FOR UPDATE). Best-effort: si algo se lo llevó
-                # otro entre el snapshot y el lock, re-snapshoteamos bajo el lock
-                # (ya refleja a los competidores commiteados) en vez de fallar
-                # toda la reserva. El espacio sí es requisito duro (abajo).
-                fd_iso, fh_iso = fecha_desde.isoformat(), fecha_hasta.isoformat()
-                if _check_stock(conn, pedido_id, fd_iso, fh_iso):
-                    conn.execute(
-                        "DELETE FROM alquiler_items WHERE pedido_id = ? AND equipo_id = ANY(?)",
-                        (pedido_id, pack_ids),
-                    )
+            # ── Pack PRIMERO (antes del ítem centinela) ─────────────────────────────
+            # Así _check_stock solo ve los equipos reales del pack y nunca el
+            # centinela → no se mezcla el buffer global con el propio del espacio.
+            if con_pack:
+                pack_ids = _pack_equipo_ids(conn)
+                if pack_ids:
+                    # Lock de las filas del pack: serializa contra otras reservas que
+                    # toquen estos equipos (su _check_stock también las lockea).
+                    conn.execute("SELECT id FROM equipos WHERE id = ANY(?) FOR UPDATE", (pack_ids,))
                     _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
+                    # Gate del motor (FOR UPDATE). Best-effort: si algo se lo llevó
+                    # otro entre el snapshot y el lock, re-snapshoteamos bajo el lock
+                    # (ya refleja a los competidores commiteados) en vez de fallar
+                    # toda la reserva. El espacio sí es requisito duro (abajo).
+                    fd_iso, fh_iso = fecha_desde.isoformat(), fecha_hasta.isoformat()
+                    if _check_stock(conn, pedido_id, fd_iso, fh_iso):
+                        conn.execute(
+                            "DELETE FROM alquiler_items WHERE pedido_id = ? AND equipo_id = ANY(?)",
+                            (pedido_id, pack_ids),
+                        )
+                        _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
 
-        # ── Espacio (centinela): requisito DURO ─────────────────────────────────
-        conn.execute(
-            """
-            INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-            VALUES (?,?,?,?,?)
-            """,
-            (pedido_id, estudio["equipo_id"], 1, 0, 0),
-        )
-        # Lock del centinela (recurso único) + chequeo con SU buffer propio. Una
-        # 2da reserva concurrente espera el lock y ve la 1ra commiteada.
-        conn.execute("SELECT id FROM equipos WHERE id = ? FOR UPDATE", (estudio["equipo_id"],))
-        if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
-                                estudio["buffer_horas"], exclude_pedido_id=pedido_id):
-            raise HTTPException(409, "El estudio no está disponible en esa franja")
+            # ── Espacio (centinela): requisito DURO ─────────────────────────────────
+            conn.execute(
+                """
+                INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
+                VALUES (?,?,?,?,?)
+                """,
+                (pedido_id, estudio["equipo_id"], 1, 0, 0),
+            )
+            # Lock del centinela (recurso único) + chequeo con SU buffer propio. Una
+            # 2da reserva concurrente espera el lock y ve la 1ra commiteada.
+            conn.execute("SELECT id FROM equipos WHERE id = ? FOR UPDATE", (estudio["equipo_id"],))
+            if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
+                                    estudio["buffer_horas"], exclude_pedido_id=pedido_id):
+                raise HTTPException(409, "El estudio no está disponible en esa franja")
 
-        conn.commit()
-        pedido = _get_alquiler_detail(conn, pedido_id)
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            conn.commit()
+            pedido = _get_alquiler_detail(conn, pedido_id)
+        except Exception:
+            conn.rollback()
+            raise
 
     _dispatch_pedido_creado_emails(background, pedido)
     return pedido
@@ -1008,14 +980,11 @@ def _get_slot(conn, slot_id: int) -> dict:
 @router.get("/admin/estudio/slots")
 def listar_slots(request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM estudio_slots_fijos ORDER BY activo DESC, dia_semana, hora_desde"
         ).fetchall()
         return {"slots": [_slot_to_dict(r) for r in rows]}
-    finally:
-        conn.close()
 
 
 @router.post("/admin/estudio/slots", status_code=201)
@@ -1023,70 +992,64 @@ def crear_slot(body: SlotFijoCreate, request: Request):
     require_admin(request)
     data = body.dict()
     _validar_slot(data)
-    conn = get_db()
-    try:
-        cur = conn.execute(
-            """
-            INSERT INTO estudio_slots_fijos
-                (cliente, dia_semana, hora_desde, hora_hasta, valor_mensual,
-                 mes_desde, mes_hasta, activo)
-            VALUES (?,?,?,?,?,?,?,?)
-            """,
-            (data["cliente"], data["dia_semana"], data["hora_desde"], data["hora_hasta"],
-             data["valor_mensual"], data["mes_desde"], data["mes_hasta"], data["activo"]),
-        )
-        slot = _get_slot(conn, cur.lastrowid)
-        _regenerar_pedidos_slot(conn, slot)
-        conn.commit()
-        return slot
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            cur = conn.execute(
+                """
+                INSERT INTO estudio_slots_fijos
+                    (cliente, dia_semana, hora_desde, hora_hasta, valor_mensual,
+                     mes_desde, mes_hasta, activo)
+                VALUES (?,?,?,?,?,?,?,?)
+                """,
+                (data["cliente"], data["dia_semana"], data["hora_desde"], data["hora_hasta"],
+                 data["valor_mensual"], data["mes_desde"], data["mes_hasta"], data["activo"]),
+            )
+            slot = _get_slot(conn, cur.lastrowid)
+            _regenerar_pedidos_slot(conn, slot)
+            conn.commit()
+            return slot
+        except Exception:
+            conn.rollback()
+            raise
 
 
 @router.patch("/admin/estudio/slots/{slot_id}")
 def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
     require_admin(request)
     updates = {k: v for k, v in body.dict().items() if v is not None}
-    conn = get_db()
-    try:
-        actual = _get_slot(conn, slot_id)
-        merged = {**actual, **updates}
-        _validar_slot(merged)
-        if updates:
-            updates["updated_at"] = now_ar()
-            set_parts = ", ".join(f"{k} = ?" for k in updates)
-            conn.execute(
-                f"UPDATE estudio_slots_fijos SET {set_parts} WHERE id = ?",
-                (*updates.values(), slot_id),
-            )
-        slot = _get_slot(conn, slot_id)
-        _regenerar_pedidos_slot(conn, slot)
-        conn.commit()
-        return slot
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            actual = _get_slot(conn, slot_id)
+            merged = {**actual, **updates}
+            _validar_slot(merged)
+            if updates:
+                updates["updated_at"] = now_ar()
+                set_parts = ", ".join(f"{k} = ?" for k in updates)
+                conn.execute(
+                    f"UPDATE estudio_slots_fijos SET {set_parts} WHERE id = ?",
+                    (*updates.values(), slot_id),
+                )
+            slot = _get_slot(conn, slot_id)
+            _regenerar_pedidos_slot(conn, slot)
+            conn.commit()
+            return slot
+        except Exception:
+            conn.rollback()
+            raise
 
 
 @router.delete("/admin/estudio/slots/{slot_id}")
 def borrar_slot(slot_id: int, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
-        _get_slot(conn, slot_id)  # 404 si no existe
-        # Borra los pedidos futuros impagos; los pasados/pagados quedan (su
-        # estudio_slot_id pasa a NULL por la FK ON DELETE SET NULL).
-        _borrar_pedidos_futuros_impagos(conn, slot_id)
-        conn.execute("DELETE FROM estudio_slots_fijos WHERE id = ?", (slot_id,))
-        conn.commit()
-        return {"ok": True}
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            _get_slot(conn, slot_id)  # 404 si no existe
+            # Borra los pedidos futuros impagos; los pasados/pagados quedan (su
+            # estudio_slot_id pasa a NULL por la FK ON DELETE SET NULL).
+            _borrar_pedidos_futuros_impagos(conn, slot_id)
+            conn.execute("DELETE FROM estudio_slots_fijos WHERE id = ?", (slot_id,))
+            conn.commit()
+            return {"ok": True}
+        except Exception:
+            conn.rollback()
+            raise

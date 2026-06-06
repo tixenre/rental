@@ -209,15 +209,12 @@ def analytics_config():
 
     if not app_settings.is_production:
         return {"ga4_id": None}
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute(
             "SELECT value FROM app_settings WHERE key = ?", ("ga4_measurement_id",)
         ).fetchone()
         value = row["value"].strip() if row and row["value"] else None
         return {"ga4_id": value or None}
-    finally:
-        conn.close()
 
 
 @router.get("/settings/{key}")
@@ -226,8 +223,7 @@ def get_setting(key: str):
     afecta cálculos en el frontend público también)."""
     if key not in ALLOWED_SETTINGS_KEYS:
         raise HTTPException(404, f"Setting '{key}' no existe")
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute(
             "SELECT value, updated_at, updated_by FROM app_settings WHERE key = ?",
             (key,),
@@ -240,15 +236,12 @@ def get_setting(key: str):
             "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
             "updated_by": row["updated_by"],
         }
-    finally:
-        conn.close()
 
 
 @router.get("/settings")
 def list_settings():
     """Lista todas las settings públicas. Útil para el panel admin."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute(
             "SELECT key, value, updated_at, updated_by FROM app_settings ORDER BY key"
         ).fetchall()
@@ -264,8 +257,6 @@ def list_settings():
                 if r["key"] in ALLOWED_SETTINGS_KEYS
             ]
         }
-    finally:
-        conn.close()
 
 
 @router.put("/admin/settings/{key}")
@@ -280,13 +271,10 @@ def update_setting(key: str, payload: dict, request: Request):
         if key not in CLEARABLE_SETTINGS_KEYS:
             raise HTTPException(400, "El valor no puede estar vacío")
         # Para claves "limpiables" borrar la fila → cae al default del cliente.
-        conn = get_db()
-        try:
+        with get_db() as conn:
             conn.execute("DELETE FROM app_settings WHERE key = ?", (key,))
             conn.commit()
             return {"key": key, "value": "", "updated_by": None}
-        finally:
-            conn.close()
     value = str(value).strip()
     # Validaciones livianas para datos de contacto (display-only).
     if key == "business_email" and "@" not in value:
@@ -349,28 +337,26 @@ def update_setting(key: str, payload: dict, request: Request):
     if key == "comisiones_modelo":
         value = _validar_comisiones(value)
     actor = (session.get("email") or session.get("user_id") or "admin")[:255]
-    conn = get_db()
-    try:
-        conn.execute("""
-            INSERT INTO app_settings (key, value, updated_at, updated_by)
-            VALUES (?, ?, CURRENT_TIMESTAMP, ?)
-            ON CONFLICT (key) DO UPDATE
-            SET value      = EXCLUDED.value,
-                updated_at = CURRENT_TIMESTAMP,
-                updated_by = EXCLUDED.updated_by
-        """, (key, value, actor))
-        conn.commit()
-        # El motor de reservas cachea el buffer global → invalidar al cambiarlo
-        # para que la próxima cotización/confirmación use el valor nuevo.
-        if key == "buffer_horas_alquiler":
-            from reservas import invalidate_buffer_cache
-            invalidate_buffer_cache()
-        return {"key": key, "value": value, "updated_by": actor}
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            conn.execute("""
+                INSERT INTO app_settings (key, value, updated_at, updated_by)
+                VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+                ON CONFLICT (key) DO UPDATE
+                SET value      = EXCLUDED.value,
+                    updated_at = CURRENT_TIMESTAMP,
+                    updated_by = EXCLUDED.updated_by
+            """, (key, value, actor))
+            conn.commit()
+            # El motor de reservas cachea el buffer global → invalidar al cambiarlo
+            # para que la próxima cotización/confirmación use el valor nuevo.
+            if key == "buffer_horas_alquiler":
+                from reservas import invalidate_buffer_cache
+                invalidate_buffer_cache()
+            return {"key": key, "value": value, "updated_by": actor}
+        except Exception:
+            conn.rollback()
+            raise
 
 
 # ── Recálculo masivo de precio_jornada según USD rate actual ─────────────────
@@ -412,73 +398,71 @@ def recalcular_precios(payload: dict, request: Request):
     if mode == "ids" and not ids:
         raise HTTPException(400, "mode=ids requiere lista `ids` no vacía")
 
-    conn = get_db()
-    try:
-        row = conn.execute(
-            "SELECT value FROM app_settings WHERE key = ?", ("usd_rate",)
-        ).fetchone()
-        if not row:
-            raise HTTPException(400, "usd_rate no configurado")
+    with get_db() as conn:
         try:
-            usd_rate = float(row["value"])
-        except (ValueError, TypeError):
-            raise HTTPException(400, f"usd_rate inválido: {row['value']}")
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = ?", ("usd_rate",)
+            ).fetchone()
+            if not row:
+                raise HTTPException(400, "usd_rate no configurado")
+            try:
+                usd_rate = float(row["value"])
+            except (ValueError, TypeError):
+                raise HTTPException(400, f"usd_rate inválido: {row['value']}")
 
-        where = "precio_usd IS NOT NULL AND roi_pct IS NOT NULL"
-        params: list = []
-        if mode == "missing":
-            where += " AND precio_jornada IS NULL"
-        elif mode == "auto":
-            where += " AND precio_jornada_manual = FALSE"
-        elif mode == "ids":
-            placeholders = ",".join(["?"] * len(ids))
-            where += f" AND id IN ({placeholders})"
-            params.extend(int(i) for i in ids)
-        # mode == "all": sin filtro adicional
-        rows = conn.execute(
-            f"SELECT id, nombre, precio_usd, roi_pct, precio_jornada, precio_jornada_manual "
-            f"FROM equipos WHERE {where}",
-            tuple(params),
-        ).fetchall()
+            where = "precio_usd IS NOT NULL AND roi_pct IS NOT NULL"
+            params: list = []
+            if mode == "missing":
+                where += " AND precio_jornada IS NULL"
+            elif mode == "auto":
+                where += " AND precio_jornada_manual = FALSE"
+            elif mode == "ids":
+                placeholders = ",".join(["?"] * len(ids))
+                where += f" AND id IN ({placeholders})"
+                params.extend(int(i) for i in ids)
+            # mode == "all": sin filtro adicional
+            rows = conn.execute(
+                f"SELECT id, nombre, precio_usd, roi_pct, precio_jornada, precio_jornada_manual "
+                f"FROM equipos WHERE {where}",
+                tuple(params),
+            ).fetchall()
 
-        cambios: list[dict] = []
-        for r in rows:
-            # Redondeo al múltiplo de 100 más cercano.
-            raw = r["precio_usd"] * usd_rate * (r["roi_pct"] / 100)
-            nuevo = round(raw / 100) * 100
-            anterior = r["precio_jornada"]
-            if anterior != nuevo:
-                cambios.append({
-                    "id": r["id"], "nombre": r["nombre"],
-                    "antes": anterior, "despues": nuevo,
-                    "delta": nuevo - (anterior or 0),
-                    "manual": bool(r["precio_jornada_manual"]),
-                })
-                if not dry_run:
-                    # Al recalcular bulk, marcamos como auto (precio
-                    # vuelve a la fórmula). Si el admin quiere preservarlo
-                    # como manual debe usar mode="auto" que ya skipea.
-                    conn.execute(
-                        "UPDATE equipos SET precio_jornada = ?, "
-                        "precio_jornada_manual = FALSE, "
-                        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                        (nuevo, r["id"]),
-                    )
-        if not dry_run:
-            conn.commit()
-        return {
-            "usd_rate": usd_rate,
-            "mode": mode,
-            "total_evaluados": len(rows),
-            "total_cambios": len(cambios),
-            "cambios": cambios[:50],  # cap por si son muchos
-            "dry_run": dry_run,
-        }
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            cambios: list[dict] = []
+            for r in rows:
+                # Redondeo al múltiplo de 100 más cercano.
+                raw = r["precio_usd"] * usd_rate * (r["roi_pct"] / 100)
+                nuevo = round(raw / 100) * 100
+                anterior = r["precio_jornada"]
+                if anterior != nuevo:
+                    cambios.append({
+                        "id": r["id"], "nombre": r["nombre"],
+                        "antes": anterior, "despues": nuevo,
+                        "delta": nuevo - (anterior or 0),
+                        "manual": bool(r["precio_jornada_manual"]),
+                    })
+                    if not dry_run:
+                        # Al recalcular bulk, marcamos como auto (precio
+                        # vuelve a la fórmula). Si el admin quiere preservarlo
+                        # como manual debe usar mode="auto" que ya skipea.
+                        conn.execute(
+                            "UPDATE equipos SET precio_jornada = ?, "
+                            "precio_jornada_manual = FALSE, "
+                            "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (nuevo, r["id"]),
+                        )
+            if not dry_run:
+                conn.commit()
+            return {
+                "usd_rate": usd_rate,
+                "mode": mode,
+                "total_evaluados": len(rows),
+                "total_cambios": len(cambios),
+                "cambios": cambios[:50],  # cap por si son muchos
+                "dry_run": dry_run,
+            }
+        except Exception:
+            conn.rollback()
+            raise
 
 
 @router.get("/admin/equipos/precios-manuales")
@@ -487,8 +471,7 @@ def listar_precios_manuales(request: Request):
     junto con el precio que daría la fórmula con el USD rate actual.
     Útil para revisar uno por uno qué hacer cuando se actualiza el USD."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute(
             "SELECT value FROM app_settings WHERE key = ?", ("usd_rate",)
         ).fetchone()
@@ -523,8 +506,6 @@ def listar_precios_manuales(request: Request):
                 "delta": (calculado - r["precio_jornada"]) if calculado is not None and r["precio_jornada"] is not None else None,
             })
         return {"usd_rate": usd_rate, "items": items}
-    finally:
-        conn.close()
 
 
 
@@ -618,8 +599,7 @@ async def upload_og_image(request: Request):
     import time as _time
     versioned_url = f"{public_url}?v={int(_time.time())}"
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         conn.execute("""
             INSERT INTO app_settings (key, value, updated_at, updated_by)
             VALUES ('og_image_url', %s, CURRENT_TIMESTAMP, %s)
@@ -630,8 +610,6 @@ async def upload_og_image(request: Request):
         """, (versioned_url, actor))
         conn.commit()
         return {"ok": True, "url": versioned_url}
-    finally:
-        conn.close()
 
 
 # ── Marca: subir SVG (wordmark + isologo) → derivar assets ────────────────────
@@ -710,11 +688,8 @@ async def _upload_brand_svg(request: Request, kind: str):
     except Exception as e:
         raise HTTPException(500, f"No se pudieron derivar los assets: {e}")
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         _save_settings(conn, settings_out, actor)
-    finally:
-        conn.close()
     return {"ok": True, "settings": settings_out}
 
 

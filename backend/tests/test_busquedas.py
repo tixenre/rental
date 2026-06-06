@@ -37,6 +37,13 @@ class _FakeConn:
     def commit(self):
         self.committed = True
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
     def close(self):
         self.closed = True
 

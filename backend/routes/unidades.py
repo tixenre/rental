@@ -49,8 +49,7 @@ def _require_admin(request: Request) -> dict:
 def listar_unidades(request: Request):
     """Lista todas las unidades del catálogo, agrupables por dimensión."""
     _require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute(
             """
             SELECT id, simbolo, nombre, dimension
@@ -59,8 +58,6 @@ def listar_unidades(request: Request):
             """
         ).fetchall()
         return {"items": [row_to_dict(r) for r in rows]}
-    finally:
-        conn.close()
 
 
 @router.post("/admin/unidades", status_code=201)
@@ -71,8 +68,7 @@ def crear_unidad(payload: UnidadInput, request: Request):
     dimension = (payload.dimension or "").strip() or None
     if not simbolo or not nombre:
         raise HTTPException(400, "simbolo y nombre son obligatorios")
-    conn = get_db()
-    try:
+    with get_db() as conn:
         try:
             cur = conn.execute(
                 """
@@ -90,8 +86,6 @@ def crear_unidad(payload: UnidadInput, request: Request):
             if "duplicate key" in str(e).lower() or "unique" in str(e).lower():
                 raise HTTPException(409, f"Ya existe una unidad con símbolo '{simbolo}'.")
             raise
-    finally:
-        conn.close()
 
 
 @router.patch("/admin/unidades/{unidad_id}")
@@ -110,8 +104,7 @@ def actualizar_unidad(unidad_id: int, payload: UnidadUpdate, request: Request):
     if "dimension" in updates:
         v = (updates["dimension"] or "").strip()
         updates["dimension"] = v or None
-    conn = get_db()
-    try:
+    with get_db() as conn:
         existing = conn.execute(
             "SELECT id FROM unidades WHERE id = ?", (unidad_id,)
         ).fetchone()
@@ -130,8 +123,6 @@ def actualizar_unidad(unidad_id: int, payload: UnidadUpdate, request: Request):
                 raise HTTPException(409, "Ya existe otra unidad con ese símbolo.")
             raise
         return {"ok": True, "id": unidad_id, **updates}
-    finally:
-        conn.close()
 
 
 @router.delete("/admin/unidades/{unidad_id}", status_code=204)
@@ -140,8 +131,7 @@ def borrar_unidad(unidad_id: int, request: Request):
     símbolo como string libre, no hay FK). Si una unidad borrada estaba
     en uso, queda como string huérfano en las columnas que la usaban."""
     _require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         existing = conn.execute(
             "SELECT id FROM unidades WHERE id = ?", (unidad_id,)
         ).fetchone()
@@ -149,5 +139,3 @@ def borrar_unidad(unidad_id: int, request: Request):
             raise HTTPException(404, "Unidad no existe")
         conn.execute("DELETE FROM unidades WHERE id = ?", (unidad_id,))
         conn.commit()
-    finally:
-        conn.close()
