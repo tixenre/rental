@@ -79,9 +79,15 @@ positivos típicos (**NO borrar**):
 - **Helper que se autodescribe "fuente única"/canónico pero con 0 consumidores** (caso testigo:
   `pdf._a4_page`): es la baranda del barrel a menor escala → **reportar**, no borrar (suele ser
   intención sin cablear; borrarlo pierde el diseño, cablearlo es un refactor aparte).
-- **Miembro suelto de una API simétrica** (caso testigo: `refresh`/`refresh_equipos` dentro de una
-  familia `refresh_*` cuya mayoría sí se usa): borrar 1-2 rompe la simetría y empeora la legibilidad
-  → dejar.
+- **Miembro suelto de una API simétrica / compound-component / toolkit curado:** un export sin usar
+  que es parte de una familia coherente cuya mayoría sí se usa → dejar (borrar el miembro suelto
+  rompe la simetría y empeora la legibilidad). Casos testigo: `refresh`/`refresh_equipos` en la
+  familia `refresh_*`; `AdminCardActions` en el compound `AdminCard.*` (Header/Meta/Footer/Price/
+  Actions); `PageHeader` en el barrel de primitivos mobile (`components/mobile/`: FAB, BottomSheet,
+  ActionMenu…). Si dudás si es toolkit deliberado o muerto → **reportar**, no borrar.
+- **Export con marcador de intención:** un `// eslint-disable-next-line react-refresh/only-export-components`
+  con comentario ("a propósito", "coexiste con el componente") marca un export **deliberado** → dejar
+  (casos testigo: `PLANTILLAS_MAIL`, `Illustrations`). El marcador ES la decisión registrada en el código.
 - **Assets referenciados por string:** imágenes/íconos/templates cargados por path armado en runtime
   (no `import` estático) → knip no los ve. Grepear el nombre del archivo en TODO el repo.
 - **Código de un job/cron:** una función llamada solo desde un scheduled job de Railway (ej. los
@@ -139,6 +145,13 @@ bindings reales), o dejarlos.
 > **Refactor DRY = byte-idéntico.** Si extraés un helper, probá que genera **exactamente** la misma
 > salida que el código viejo (ej. imprimir el SQL resultante y comparar carácter por carácter). Un
 > refactor de limpieza no debe cambiar ninguna conducta.
+
+> **Conditional siempre-verdadero** (`if True:` envolviendo un bloque grande; vulture lo marca como
+> _redundant if-condition_): se elimina dedentando el bloque, pero **nunca a mano** si son muchas
+> líneas → **script de dedent uniforme** (-4 espacios) **después** de verificar que TODA línea no-vacía
+> del bloque tiene ≥ ese indent (si una no, el dedent rompe la estructura). Red: `py_compile` + suite
+> + **ejecutar la función real** (caso testigo: `compute_estadisticas`, 175 líneas de SQL, dedentadas
+> por script y verificadas contra Postgres real).
 
 ### 5 · La red de tests (esto es el "cuidado")
 
