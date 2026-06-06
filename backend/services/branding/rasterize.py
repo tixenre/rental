@@ -7,9 +7,8 @@ bajo nivel del motor de assets de marca — `derive.py` arma la matriz de assets
 encima de ésta.
 
 El recoloreo se hace por CSS (`color:<fg>` + forzar `fill:currentColor` sobre
-los paths con relleno): los SVG de marca del repo son **monocromáticos themables**
-(ver `packages/design-system/src/assets/brand`), así que tiñen a un solo color
-sin tocar los paths. Los huecos (`fill="none"`) se preservan.
+los paths con relleno): los SVG de marca del repo son **monocromáticos themables**,
+así que tiñen a un solo color sin tocar los paths. Los huecos (`fill="none"`) se preservan.
 """
 from __future__ import annotations
 
