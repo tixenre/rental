@@ -1290,6 +1290,72 @@ def eliminar_pago(id: int, pago_id: int, request: Request):
         conn.close()
 
 
+def _recalcular_total_pedido(conn, id: int) -> None:
+    """Recalcula y persiste el total de un pedido desde su estado YA guardado.
+
+    Fuente ÚNICA del recálculo "desde lo que hay en la base": subtotales por
+    línea, `descuento_jornadas_pct` (derivado de las jornadas) y `monto_total`
+    (neto). Lee los ítems, las fechas y el `descuento_pct` del propio pedido —
+    no recibe nada de afuera. No toca stock ni estado.
+
+    Lo usan `_apply_pedido_datos` (editar fechas/cliente/descuento), la edición
+    de ítems y la propagación del descuento del cliente a sus presupuestos.
+    """
+    p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+    if not p:
+        return
+    d0 = to_datetime(p["fecha_desde"]) if p["fecha_desde"] else None
+    d1 = to_datetime(p["fecha_hasta"]) if p["fecha_hasta"] else None
+    jornadas = jornadas_periodo(d0, d1)
+    items = conn.execute(
+        "SELECT id, equipo_id, cantidad, precio_jornada FROM alquiler_items WHERE pedido_id=?",
+        (id,),
+    ).fetchall()
+    # Subtotales persistidos por línea (los usan los visores).
+    for it in items:
+        sub = it["precio_jornada"] * it["cantidad"] * jornadas
+        conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
+    descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+    total_desglose = calcular_total(
+        items=[
+            {"equipo_id": it["equipo_id"], "cantidad": it["cantidad"],
+             "precio_jornada": it["precio_jornada"]}
+            for it in items
+        ],
+        jornadas=jornadas,
+        descuento_cliente_pct=p["descuento_pct"] or 0,
+        descuento_jornadas_pct=descuento_jornadas_pct,
+        perfil_impuestos=None,  # persiste NETO; IVA es derivado al mostrar.
+    )
+    conn.execute(
+        "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
+        (total_desglose["neto"], descuento_jornadas_pct, id),
+    )
+
+
+def propagar_descuento_a_presupuestos(conn, cliente_id: int, nuevo_pct: float) -> int:
+    """Aplica el nuevo descuento del cliente a sus pedidos NO confirmados y los
+    recotiza. Devuelve cuántos presupuestos tocó.
+
+    Solo afecta el estado `presupuesto` (no confirmado): los pedidos confirmados
+    o cerrados conservan el snapshot del descuento con que se crearon — es un
+    lock de precio deliberado (un pedido confirmado/facturado no debe cambiar de
+    importe porque después se editó el perfil del cliente). Recibe una conexión
+    abierta; el caller hace commit.
+    """
+    ids = [
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM alquileres WHERE cliente_id=? AND estado='presupuesto'",
+            (cliente_id,),
+        ).fetchall()
+    ]
+    for pid in ids:
+        conn.execute("UPDATE alquileres SET descuento_pct=? WHERE id=?", (nuevo_pct or 0, pid))
+        _recalcular_total_pedido(conn, pid)
+    return len(ids)
+
+
 def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = False) -> dict:
     """Aplica un cambio parcial de datos (cliente/fechas/notas/descuento) al pedido.
 
@@ -1345,36 +1411,13 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
     cols = ", ".join(f"{k}=?" for k in payload)
     conn.execute(f"UPDATE alquileres SET {cols} WHERE id=?", (*payload.values(), id))
 
-    if "fecha_desde" in payload or "fecha_hasta" in payload or cliente_cambio:
-        p2 = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-        d0 = to_datetime(p2["fecha_desde"]) if p2["fecha_desde"] else None
-        d1 = to_datetime(p2["fecha_hasta"]) if p2["fecha_hasta"] else None
-        jornadas = jornadas_periodo(d0, d1)
-        items = conn.execute(
-            "SELECT id, equipo_id, cantidad, precio_jornada FROM alquiler_items WHERE pedido_id=?",
-            (id,),
-        ).fetchall()
-        # Actualizar subtotales persistidos por línea (los usan los visores).
-        for it in items:
-            sub = it["precio_jornada"] * it["cantidad"] * jornadas
-            conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
-        descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
-        total_desglose = calcular_total(
-            items=[
-                {"equipo_id": it["equipo_id"], "cantidad": it["cantidad"],
-                 "precio_jornada": it["precio_jornada"]}
-                for it in items
-            ],
-            jornadas=jornadas,
-            descuento_cliente_pct=p2["descuento_pct"] or 0,
-            descuento_jornadas_pct=descuento_jornadas_pct,
-            perfil_impuestos=None,  # persiste NETO; IVA es derivado al mostrar.
-        )
-        monto_total = total_desglose["neto"]
-        conn.execute(
-            "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
-            (monto_total, descuento_jornadas_pct, id)
-        )
+    if (
+        "fecha_desde" in payload
+        or "fecha_hasta" in payload
+        or "descuento_pct" in payload
+        or cliente_cambio
+    ):
+        _recalcular_total_pedido(conn, id)
 
     return _get_alquiler_detail(conn, id)
 
@@ -1424,7 +1467,8 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
 
     # Re-aplicar AMBOS descuentos (cliente + jornadas), como hacen las
     # otras 2 sedes. Antes solo se aplicaba el del cliente → editar ítems
-    # perdía el descuento por jornadas (#500).
+    # perdía el descuento por jornadas (#500). Acá se calcula desde los ítems
+    # en memoria (los que estamos por insertar), no desde la base.
     descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
     total_desglose = calcular_total(
         items=list(consolidado.values()),
