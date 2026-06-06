@@ -28,7 +28,7 @@ DEFAULT_TEMPLATES: dict[str, dict[str, str]] = {
     "pedido_creado_cliente": {
         "subject": "Recibimos tu pedido #{{ numero_pedido }} — Rambla Rental",
         "body_html": f"""<p {b.H}>¡Recibimos tu pedido!</p>
-<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, gracias por tu pedido <strong>#{{{{ numero_pedido }}}}</strong>. Lo estamos revisando y te confirmamos la disponibilidad a la brevedad.</p>
+<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre_pila }}}}, gracias por tu pedido <strong>#{{{{ numero_pedido }}}}</strong>. Lo estamos revisando y te confirmamos la disponibilidad a la brevedad.</p>
 {{% if mensaje_admin %}}{b.callout("mensaje_admin")}{{% endif %}}
 <p {b.LBL}>Tu pedido</p>
 <p style="margin:0 0 4px;"><strong>Retiro:</strong> {{{{ fecha_desde }}}}<br><strong>Devolución:</strong> {{{{ fecha_hasta }}}}{{% if cantidad_jornadas %}}<br><strong>Jornadas:</strong> {{{{ cantidad_jornadas }}}}{{% endif %}}</p>
@@ -38,7 +38,7 @@ DEFAULT_TEMPLATES: dict[str, dict[str, str]] = {
 {b.btn("portal_url", "Ver mi pedido")}
 <p {b.MUTED_P}>Cuando confirmemos el pedido vas a poder descargar el <strong>remito</strong> y el <strong>contrato</strong> desde tu portal. ¿Tenés alguna duda? Respondé este mail.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
-        "body_text": """Hola {{ cliente_nombre }},
+        "body_text": """Hola {{ cliente_nombre_pila }},
 
 Recibimos tu pedido #{{ numero_pedido }}. Lo estamos revisando y te confirmamos la disponibilidad a la brevedad.
 {% if mensaje_admin %}
@@ -63,7 +63,7 @@ Cuando lo confirmemos vas a poder descargar el remito y el contrato desde ahí.
     "pedido_confirmado_cliente": {
         "subject": "Tu pedido #{{ numero_pedido }} está confirmado — Rambla Rental",
         "body_html": f"""<p {b.H}>¡Tu pedido está confirmado!</p>
-<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, confirmamos tu pedido <strong>#{{{{ numero_pedido }}}}</strong>. Acá tenés todos los datos de tu reserva.</p>
+<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre_pila }}}}, confirmamos tu pedido <strong>#{{{{ numero_pedido }}}}</strong>. Acá tenés todos los datos de tu reserva.</p>
 {{% if mensaje_admin %}}{b.callout("mensaje_admin")}{{% endif %}}
 <p {b.LBL}>Reserva</p>
 <p style="margin:0 0 4px;"><strong>Retiro:</strong> {{{{ fecha_desde }}}}<br><strong>Devolución:</strong> {{{{ fecha_hasta }}}}{{% if cantidad_jornadas %}}<br><strong>Jornadas:</strong> {{{{ cantidad_jornadas }}}}{{% endif %}}</p>
@@ -78,7 +78,7 @@ Cuando lo confirmemos vas a poder descargar el remito y el contrato desde ahí.
 {{% if gcal_url %}}{b.btn_secondary("gcal_url", "📅 Agregar al calendario")}{{% endif %}}
 <p {b.MUTED_P}>Te esperamos en el galpón el día del retiro. ¿Dudas? Respondé este mail.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
-        "body_text": """Hola {{ cliente_nombre }},
+        "body_text": """Hola {{ cliente_nombre_pila }},
 
 Tu pedido #{{ numero_pedido }} está confirmado. Acá tenés todos los datos de tu reserva.
 {% if mensaje_admin %}
@@ -138,12 +138,12 @@ Ver en el back-office: {{ admin_url }}""",
         # inyecta el job (jobs/recordatorios.py) y el preview del admin (=1).
         "subject": "{% if dias_antes == 1 %}Mañana retirás{% else %}Faltan {{ dias_antes }} días para retirar{% endif %} tu pedido #{{ numero_pedido }} — Rambla Rental",
         "body_html": f"""<p {b.H}>{{% if dias_antes == 1 %}}¡Mañana es el día!{{% else %}}¡Falta poco!{{% endif %}}</p>
-<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, te recordamos que <strong>{{% if dias_antes == 1 %}}mañana{{% else %}}en {{{{ dias_antes }}}} días{{% endif %}} ({{{{ fecha_desde }}}})</strong> retirás tu pedido <strong>#{{{{ numero_pedido }}}}</strong>.</p>
+<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre_pila }}}}, te recordamos que <strong>{{% if dias_antes == 1 %}}mañana{{% else %}}en {{{{ dias_antes }}}} días{{% endif %}} ({{{{ fecha_desde }}}})</strong> retirás tu pedido <strong>#{{{{ numero_pedido }}}}</strong>.</p>
 {{{{ items_html|safe }}}}
 {b.btn("portal_url", "Ver mi pedido")}
 <p {b.MUTED_P}>Te esperamos en el galpón. Si necesitás reagendar, escribinos cuanto antes.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
-        "body_text": """Hola {{ cliente_nombre }},
+        "body_text": """Hola {{ cliente_nombre_pila }},
 
 {% if dias_antes == 1 %}Mañana{% else %}En {{ dias_antes }} días{% endif %} ({{ fecha_desde }}) retirás tu pedido #{{ numero_pedido }}.
 
@@ -184,13 +184,13 @@ Revisar en el back-office: {{ admin_url }}""",
     "modificacion_resuelta_cliente": {
         "subject": "Tu solicitud de modificación del pedido #{{ numero_pedido }} fue {{ estado_label }}",
         "body_html": f"""<p {b.H}>Tu solicitud fue {{{{ estado_label }}}}</p>
-<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre }}}}, tu solicitud de modificación del pedido <strong>#{{{{ numero_pedido }}}}</strong> fue <strong>{{{{ estado_label }}}}</strong>.</p>
+<p style="margin:0 0 8px;">Hola {{{{ cliente_nombre_pila }}}}, tu solicitud de modificación del pedido <strong>#{{{{ numero_pedido }}}}</strong> fue <strong>{{{{ estado_label }}}}</strong>.</p>
 {{% if respuesta %}}<p {b.LBL}>Nota</p>
 <p style="margin:0 0 4px;">{{{{ respuesta }}}}</p>{{% endif %}}
 {b.btn("portal_url", "Ver mi pedido")}
 <p {b.MUTED_P}>Podés ver el detalle del pedido actualizado en tu portal.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
-        "body_text": """Hola {{ cliente_nombre }},
+        "body_text": """Hola {{ cliente_nombre_pila }},
 
 Tu solicitud de modificación del pedido #{{ numero_pedido }} fue {{ estado_label }}.
 {% if respuesta %}

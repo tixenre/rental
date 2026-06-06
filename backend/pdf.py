@@ -185,17 +185,27 @@ def _slug(s: str) -> str:
     return s[:60] or "sin-cliente"
 
 
-def _pedido_filename(pedido: dict, suffix: str = "") -> str:
-    """Devuelve algo como 'R-0001_Martinez-Santiago.pdf' o '..._albaran.pdf'."""
+# Etiqueta legible de cada tipo de documento para el NOMBRE del archivo. Va
+# entre el número de pedido y el nombre del cliente para que, en la vista de
+# adjuntos, se distingan de un vistazo (R-0405_Albaran_..., R-0405_Contrato_...).
+_DOC_LABELS = {
+    "presupuesto": "Presupuesto",
+    "albaran": "Albaran",
+    "contrato": "Contrato",
+    "packing-list": "Packing-list",
+}
+
+
+def _pedido_filename(pedido: dict, doc: str = "presupuesto") -> str:
+    """Devuelve algo como 'R-0001_Albaran_Martinez-Santiago.pdf': número de
+    pedido, tipo de documento y cliente, en ese orden."""
     if pedido.get("numero_pedido"):
         num = f"R-{int(pedido['numero_pedido']):04d}"
     else:
         num = str(pedido["id"])
     cliente = _slug(pedido.get("cliente_nombre") or "")
-    base = f"{num}_{cliente}"
-    if suffix:
-        base += f"_{suffix}"
-    return f"{base}.pdf"
+    doc_label = _DOC_LABELS.get(doc, _DOC_LABELS["presupuesto"])
+    return f"{num}_{doc_label}_{cliente}.pdf"
 
 
 # Shared Chromium instance — created once, reused for every PDF request.
