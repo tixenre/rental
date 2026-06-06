@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from routes.alquileres import _pedido_email_context
+from routes.alquileres import _pedido_email_context, _cuerpo_mail_simple
 from config import SITE_URL
 
 pytestmark = pytest.mark.unit
@@ -176,6 +176,29 @@ class TestTemplatesEnriquecidos:
         html, text = self._render("pedido_confirmado_cliente", self._CTX)
         assert "saldo pendiente $ 6.250" in html
         assert "saldo pendiente $ 6.250" in text
+
+
+# ── cuerpo del mail "mensaje simple" (compartido envío + preview) ───────────
+
+class TestCuerpoMailSimple:
+    def test_subject_y_lista_de_docs(self):
+        subject, body_html, text = _cuerpo_mail_simple(
+            1023, "Juan Pérez", ["contrato", "pdf"], None
+        )
+        assert subject == "Documentos de tu pedido #1023"
+        assert "Hola Juan Pérez," in body_html
+        assert "Contrato" in body_html and "Cotización" in body_html
+        assert "Contrato, Cotización" in text
+
+    def test_sin_nombre_usa_saludo_generico(self):
+        _, body_html, _ = _cuerpo_mail_simple(1, "", ["pdf"], None)
+        assert "<p>Hola,</p>" in body_html
+
+    def test_nota_del_admin_se_escapa(self):
+        # El mensaje lo escribe el admin; igual se escapa por las dudas (XSS).
+        _, body_html, _ = _cuerpo_mail_simple(1, "Ana", ["pdf"], "<b>ojo</b>")
+        assert "&lt;b&gt;ojo&lt;/b&gt;" in body_html
+        assert "<b>ojo</b>" not in body_html
 
 
 # ── _pedido_email_context ───────────────────────────────────────────────────

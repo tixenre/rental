@@ -184,6 +184,18 @@ def render_template(
         conn.close()
 
 
+def wrap_preview(body_html: str) -> str:
+    """Envuelve un body ya armado en el layout branded común, para
+    **previsualizar** (no envía ni loggea). Es la misma envoltura que usa
+    `send_raw_email`, expuesta para que el preview del back-office muestre el
+    mail tal cual sale (chrome incluido) sin duplicar el wrapper."""
+    conn = get_db()
+    try:
+        return _wrap_email_html(body_html, conn)
+    finally:
+        conn.close()
+
+
 def send_raw_email(
     to: str,
     subject: str,
