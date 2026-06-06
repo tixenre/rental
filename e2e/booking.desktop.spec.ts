@@ -10,11 +10,20 @@ import { test, expect } from "@playwright/test";
  * horarios configurados queden deshabilitados en el calendario.
  */
 
+// "Hoy" congelado al 2026-06-01 (lunes). El calendario deshabilita las fechas
+// pasadas con `new Date()` (DateRangePickerModal: `date < startOfDay(new Date())`),
+// así que un test que afirma sobre fechas fijas (vie 5/6, sáb 6/6) se rompe solo
+// cuando el reloj real pasa esas fechas (time-bomb). Fijar el reloj las deja
+// siempre a futuro → el resultado depende solo del día de semana (vie abierto,
+// sáb cerrado), no de cuándo corre el CI. setFixedTime no pausa los timers.
+const HOY_FIJO = new Date("2026-06-01T12:00:00");
+
 // El ViewIntroDialog se auto-abre 400ms después del primer render cuando no
 // hay localStorage.rambla.view_intro_seen. En CI esa key nunca existe → el
 // Dialog abre → su overlay bloquea los clicks. addInitScript inyecta la key
 // antes de que la página cargue, igual que si el usuario ya lo hubiera visto.
 test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(HOY_FIJO);
   await page.addInitScript(() => {
     localStorage.setItem("rambla.view_intro_seen", "1");
   });
