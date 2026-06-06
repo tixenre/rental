@@ -21,11 +21,20 @@ PUBLIC_PREFIXES = (
     "/cliente/",
 )
 
-PUBLIC_API = (
+# Prefijos públicos de SOLO LECTURA — el catálogo anónimo los consume por GET.
+# Sus endpoints de ESCRITURA viven bajo /api/admin/... con require_admin; acá se
+# eximen únicamente para GET/HEAD para que una escritura anónima bajo el mismo
+# prefijo (regresión tipo el CRUD de /api/equipos) caiga igual en el chequeo de
+# sesión. NO sustituye al require_admin por handler — es defensa en profundidad.
+PUBLIC_API_READONLY = (
     "/api/equipos",
     "/api/categorias",
     "/api/etiquetas",
     "/api/disponibilidad",
+)
+
+# Prefijos públicos que aceptan POST a propósito (cada uno valida adentro lo suyo).
+PUBLIC_API_ANY = (
     "/api/cotizar",  # cotización del carrito: pública (catálogo anónimo cotiza
     # como consumidor_final). No escribe; los descuentos/IVA de cliente requieren
     # sesión adentro del handler (get_session), así que abrirla es seguro.
@@ -61,7 +70,12 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
     if any(path.startswith(p) for p in PUBLIC_PREFIXES):
         return await call_next(request)
-    if any(path.startswith(p) for p in PUBLIC_API):
+    # Lecturas públicas del catálogo: solo GET/HEAD se eximen sin sesión. Una
+    # escritura bajo el mismo prefijo NO se exime (cae al guard de sesión abajo,
+    # y el handler además exige require_admin).
+    if request.method in ("GET", "HEAD") and any(path.startswith(p) for p in PUBLIC_API_READONLY):
+        return await call_next(request)
+    if any(path.startswith(p) for p in PUBLIC_API_ANY):
         return await call_next(request)
     # Assets estáticos de dist root (no-/api/ con extensión de archivo).
     if not path.startswith("/api/") and path.endswith(STATIC_EXTENSIONS):

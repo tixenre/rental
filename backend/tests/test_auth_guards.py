@@ -245,9 +245,10 @@ class _FakeURL:
 
 class _MiddlewareRequest:
     """Request mínimo para auth_middleware: solo necesita .url.path."""
-    def __init__(self, path):
+    def __init__(self, path, method="GET"):
         self.url = _FakeURL(path)
         self.cookies = {}
+        self.method = method
 
 
 class TestAuthMiddlewareStaticAssets:
@@ -264,7 +265,7 @@ class TestAuthMiddlewareStaticAssets:
         # Sin sesión: el peor caso para un asset público.
         monkeypatch.setattr("middleware.get_session", lambda req: None)
 
-    async def _classify(self, path):
+    async def _classify(self, path, method="GET"):
         """Corre el middleware con un call_next sentinela. Devuelve
         'PASS' si llamó a call_next, o la respuesta de redirect/401."""
         from middleware import auth_middleware
@@ -274,8 +275,20 @@ class TestAuthMiddlewareStaticAssets:
         async def call_next(_req):
             return sentinel
 
-        result = await auth_middleware(_MiddlewareRequest(path), call_next)
+        result = await auth_middleware(_MiddlewareRequest(path, method), call_next)
         return "PASS" if result is sentinel else result
+
+    @pytest.mark.parametrize("method", ["POST", "PATCH", "DELETE", "PUT"])
+    async def test_escritura_equipos_no_es_publica(self, method):
+        """Regresión del fix de authz: `/api/equipos` es público SOLO para
+        lectura. Una escritura sin sesión NO debe pasar el middleware (defensa
+        en profundidad; el handler además exige require_admin)."""
+        res = await self._classify("/api/equipos/5", method=method)
+        assert res != "PASS", f"{method} /api/equipos no debería eximirse sin sesión"
+
+    async def test_lectura_equipos_sigue_publica(self):
+        """El catálogo anónimo (GET) tiene que seguir pasando."""
+        assert await self._classify("/api/equipos", method="GET") == "PASS"
 
     @pytest.mark.parametrize("path", [
         "/estudio/Rambla_Estudio_S7V9470.jpg",
@@ -308,3 +321,34 @@ class TestAuthMiddlewareStaticAssets:
         res = await self._classify(path)
         assert isinstance(res, JSONResponse)
         assert res.status_code == 401
+
+
+# ── Regresión por-endpoint del fix de authz de /api/equipos (#795) ──
+# Pega a CADA handler de escritura SIN sesión y exige rechazo. Si alguien saca el
+# require_admin de un handler a futuro (la misma clase de bug que #55, recurrente),
+# este test lo caza de punta a punta (app real + middleware + handler).
+_EQUIPOS_WRITE_ENDPOINTS = [
+    ("POST", "/api/equipos"),
+    ("PATCH", "/api/equipos/1"),
+    ("DELETE", "/api/equipos/1"),
+    ("POST", "/api/equipos/1/duplicate"),
+    ("PUT", "/api/equipos/1/ficha"),
+    ("POST", "/api/equipos/1/mantenimiento"),
+    ("PATCH", "/api/equipos/1/mantenimiento/1"),
+    ("DELETE", "/api/equipos/1/mantenimiento/1"),
+    ("POST", "/api/equipos/1/kit"),
+    ("DELETE", "/api/equipos/1/kit/1"),
+    ("PUT", "/api/equipos/1/etiquetas"),
+    ("PUT", "/api/equipos/1/categorias"),
+]
+
+
+@pytest.mark.parametrize("method,path", _EQUIPOS_WRITE_ENDPOINTS)
+def test_escritura_equipos_sin_sesion_rechazada(method, path):
+    """Anónimo (sin cookie) → 401/403 en toda escritura de /api/equipos."""
+    from fastapi.testclient import TestClient
+    import main
+
+    client = TestClient(main.app)
+    res = client.request(method, path, json={})
+    assert res.status_code in (401, 403), f"{method} {path} dejó pasar a un anónimo ({res.status_code})"
