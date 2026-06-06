@@ -1403,7 +1403,7 @@ async def cliente_pedido_contrato(id: int, request: Request, format: str = "pdf"
     if not _documentos_disponibles(pedido.get("estado", ""))["contrato"]:
         raise HTTPException(403, "El contrato estará disponible cuando confirmemos el pedido.")
     return await _doc_response_or_pdf(
-        _contrato_html(pedido), _pedido_filename(pedido, suffix="contrato"), format
+        _contrato_html(pedido), _pedido_filename(pedido, doc="contrato"), format
     )
 
 
@@ -1420,7 +1420,7 @@ async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf")
     if not _documentos_disponibles(pedido.get("estado", ""))["albaran"]:
         raise HTTPException(403, "El albarán estará disponible al momento de la entrega.")
     return await _doc_response_or_pdf(
-        _albaran_html(pedido), _pedido_filename(pedido, suffix="albaran"), format
+        _albaran_html(pedido), _pedido_filename(pedido, doc="albaran"), format
     )
 
 

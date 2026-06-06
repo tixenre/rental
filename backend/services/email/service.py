@@ -155,6 +155,26 @@ def _wrap_email_html(body_html: str, conn) -> str:
 </body></html>"""
 
 
+def primer_nombre(nombre: str) -> str:
+    """Devuelve solo el nombre de pila (primera palabra) de un nombre completo.
+    Fuente ÚNICA del saludo por nombre de pila en los mails ("Hola Santiago" a
+    partir de "Santiago Granone López"). Cadena vacía si no hay nombre."""
+    partes = (nombre or "").strip().split()
+    return partes[0] if partes else ""
+
+
+def _con_nombre_pila(context: dict[str, Any]) -> dict[str, Any]:
+    """Agrega `cliente_nombre_pila` (solo el nombre de pila) derivado de
+    `cliente_nombre`, sin mutar el dict original. Los saludos de los mails al
+    cliente ("Hola Santiago") usan el nombre de pila; el resto del mail y los
+    documentos PDF siguen usando el nombre completo (`cliente_nombre`)."""
+    if "cliente_nombre_pila" in context:
+        return context
+    ctx = dict(context)
+    ctx["cliente_nombre_pila"] = primer_nombre(ctx.get("cliente_nombre") or "")
+    return ctx
+
+
 def render_template(
     template_key: str,
     context: dict[str, Any],
@@ -172,6 +192,7 @@ def render_template(
         ).fetchone()
         if not row:
             raise ValueError(f"Template '{template_key}' no existe")
+        context = _con_nombre_pila(context)
         # subject + text: sin autoescape (texto plano).
         subject = _jinja_text.from_string(row["subject"]).render(**context)
         text = _jinja_text.from_string(row["body_text"]).render(**context)

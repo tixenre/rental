@@ -145,10 +145,27 @@ class TestTemplatesEnriquecidos:
 
     def _render(self, key: str, ctx: dict) -> tuple[str, str]:
         tpl = self._tpl(key)
+        # Espeja el render real: el saludo usa el nombre de pila derivado.
+        ctx = {
+            "cliente_nombre_pila": (ctx.get("cliente_nombre") or "").split()[0]
+            if ctx.get("cliente_nombre")
+            else "",
+            **ctx,
+        }
         return (
             self._env_html.from_string(tpl["body_html"]).render(**ctx),
             self._env_text.from_string(tpl["body_text"]).render(**ctx),
         )
+
+    @pytest.mark.parametrize(
+        "key", ["pedido_creado_cliente", "pedido_confirmado_cliente"]
+    )
+    def test_saludo_por_nombre_de_pila(self, key):
+        # "Juan Pérez" → "Hola Juan," (solo nombre de pila, no el apellido).
+        html, text = self._render(key, self._CTX)
+        assert "Hola Juan," in html
+        assert "Hola Juan," in text
+        assert "Hola Juan Pérez" not in html
 
     @pytest.mark.parametrize(
         "key", ["pedido_creado_cliente", "pedido_confirmado_cliente"]
@@ -186,7 +203,9 @@ class TestCuerpoMailSimple:
             1023, "Juan Pérez", ["contrato", "pdf"], None
         )
         assert subject == "Documentos de tu pedido #1023"
-        assert "Hola Juan Pérez," in body_html
+        # El saludo es por nombre de pila, no el nombre completo.
+        assert "Hola Juan," in body_html
+        assert "Juan Pérez" not in body_html
         assert "Contrato" in body_html and "Cotización" in body_html
         assert "Contrato, Cotización" in text
 
