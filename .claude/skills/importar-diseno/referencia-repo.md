@@ -35,6 +35,14 @@ chequeá si ya existe. Un primitivo nuevo reutilizable va a `src/components/{ui,
 pantallas cableadas (carrito, topbar…) consumen esos primitivos. (Hubo un paquete workspace
 `@rambla/design-system` que se consolidó acá — ya no existe.)
 
+> **Assets de marca (logo/wordmark/favicon/og) → NO se recrean.** Salen de un motor backend único,
+> `backend/services/branding/` (`rasterize.py` + `derive.py`): el dueño sube dos SVG master en
+> `/admin/diseño` y el sistema deriva favicon / apple-touch / og:image / logo de mail / wordmark de los
+> PDFs. Consumidores: **web** `Logo.tsx` (wordmark SVG **inline**, themable — nunca un `<img>` nuevo),
+> **mail**, **PDFs** (`pdf_templates._active_wordmark`), **favicon** (`FaviconSync`). Decisión: MEMORIA
+> *2026-06-06 — `backend/services/branding/` = motor único de assets de marca*. Si un diseño trae un
+> logo, se cablea a este motor, no se hardcodea.
+
 ## 2. Data layer (cómo conecta datos una pantalla)
 
 - **Fetch:** TanStack Query (`useQuery`) + hook custom. Patrón canónico: `src/hooks/useEquipos.ts`
