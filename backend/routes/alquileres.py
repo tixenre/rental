@@ -17,7 +17,7 @@ from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html,
 from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
 from routes.clientes import nombre_completo_cliente
-from services.email import send_email, send_raw_email, Attachment
+from services.email import send_email, send_raw_email, render_template, wrap_preview, Attachment
 from services.email.service import get_admin_to
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
 from services.precios import calcular_total, jornadas_periodo, precio_combo
@@ -1811,11 +1811,68 @@ PLANTILLAS_ENVIO_CLIENTE = {
 }
 
 
+def _ctx_mail_pedido(conn, id: int, docs: list[str], mensaje: Optional[str],
+                     ped: Optional[dict] = None) -> tuple[dict, dict]:
+    """Arma el contexto del mail rico (modo plantilla) de un pedido: contacto en
+    vivo + desglose de total/jornadas (decisión 2026-06-06) + la lista de
+    documentos adjuntos y la nota del admin. Fuente ÚNICA usada por el envío y
+    por el preview → el preview no puede divergir de lo que se manda."""
+    if ped is None:
+        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Pedido no encontrado")
+        ped = row_to_dict(row)
+    ped["items"] = _get_alquiler_items(conn, id)
+    _enriquecer_pedido_con_cliente(conn, ped)
+    _enriquecer_pedido_con_total(conn, ped)
+    ctx = _pedido_email_context(ped)
+    ctx["docs_adjuntos"] = [DOCUMENTOS[k] for k in docs]
+    if mensaje and mensaje.strip():
+        ctx["mensaje_admin"] = mensaje.strip()
+    return ped, ctx
+
+
+def _cuerpo_mail_simple(numero, nombre: str, docs: list[str],
+                        mensaje: Optional[str]) -> tuple[str, str, str]:
+    """Arma (subject, body_html, text) del mail genérico "mensaje simple". El
+    body_html es el CONTENIDO (sin chrome) — se envuelve afuera. Fuente ÚNICA
+    usada por el envío (`send_raw_email`) y por el preview (`wrap_preview`)."""
+    nombres_docs = [DOCUMENTOS[k] for k in docs]
+    subject = f"Documentos de tu pedido #{numero}"
+    saludo = f"Hola {nombre}," if nombre else "Hola,"
+    mensaje_html = ""
+    if mensaje and mensaje.strip():
+        # Escapado básico: el mensaje lo escribe el admin, pero por las dudas.
+        import html as _html_mod
+        mensaje_html = f"<p>{_html_mod.escape(mensaje.strip())}</p>"
+    lista_docs = "".join(f"<li>{d}</li>" for d in nombres_docs)
+    body_html = (
+        f"<p>{saludo}</p>"
+        f"<p>Te adjuntamos los siguientes documentos de tu pedido <strong>#{numero}</strong>:</p>"
+        f"<ul>{lista_docs}</ul>"
+        f"{mensaje_html}"
+        f"<p>Cualquier duda, respondé este mail. ¡Gracias!</p>"
+    )
+    text = (
+        f"{saludo}\n\nTe adjuntamos los documentos de tu pedido #{numero}: "
+        f"{', '.join(nombres_docs)}.\n\n"
+        f"{(mensaje.strip() + chr(10) + chr(10)) if (mensaje and mensaje.strip()) else ''}"
+        f"Cualquier duda, respondé este mail. ¡Gracias!"
+    )
+    return subject, body_html, text
+
+
 class EnviarDocsRequest(BaseModel):
     docs: list[str]                       # subconjunto de DOCUMENTOS
     to: Optional[str] = None              # override del destinatario (default: cliente)
     mensaje: Optional[str] = None         # mensaje/nota opcional del admin
     template: Optional[str] = None        # plantilla a usar (whitelist); None = mensaje simple
+
+
+class MailPreviewRequest(BaseModel):
+    docs: list[str] = []                  # documentos a listar como adjuntos en el cuerpo
+    mensaje: Optional[str] = None         # nota del admin (se ve en el preview)
+    template: Optional[str] = None        # plantilla; None = mensaje simple
 
 
 @router.post("/alquileres/{id}/enviar-documentos")
@@ -1861,17 +1918,11 @@ async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
         # Renderizar el HTML de cada documento (con la conexión abierta).
         docs_html = [(kind, *_doc_html(conn, id, kind)) for kind in docs]
 
-        # Si hay plantilla, armamos el contexto del mail con la conexión abierta:
-        # contacto en vivo + desglose de total/jornadas (decisión 2026-06-06).
+        # Si hay plantilla, armamos el contexto del mail con la conexión abierta
+        # (helper único, compartido con el preview).
         ctx = None
         if template:
-            ped["items"] = _get_alquiler_items(conn, id)
-            _enriquecer_pedido_con_cliente(conn, ped)
-            _enriquecer_pedido_con_total(conn, ped)
-            ctx = _pedido_email_context(ped)
-            ctx["docs_adjuntos"] = [DOCUMENTOS[k] for k in docs]
-            if data.mensaje and data.mensaje.strip():
-                ctx["mensaje_admin"] = data.mensaje.strip()
+            _, ctx = _ctx_mail_pedido(conn, id, docs, data.mensaje, ped=ped)
     finally:
         conn.close()
 
@@ -1900,29 +1951,7 @@ async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
 
     # ── Modo mensaje simple: cuerpo genérico + PDFs adjuntos ──────────────────
     nombre = (ped.get("cliente_nombre") or "").strip()
-    nombres_docs = [DOCUMENTOS[k] for k in docs]
-    subject = f"Documentos de tu pedido #{numero}"
-
-    saludo = f"Hola {nombre}," if nombre else "Hola,"
-    mensaje_html = ""
-    if data.mensaje and data.mensaje.strip():
-        # Escapado básico: el mensaje lo escribe el admin, pero por las dudas.
-        import html as _html_mod
-        mensaje_html = f"<p>{_html_mod.escape(data.mensaje.strip())}</p>"
-    lista_docs = "".join(f"<li>{d}</li>" for d in nombres_docs)
-    body_html = (
-        f"<p>{saludo}</p>"
-        f"<p>Te adjuntamos los siguientes documentos de tu pedido <strong>#{numero}</strong>:</p>"
-        f"<ul>{lista_docs}</ul>"
-        f"{mensaje_html}"
-        f"<p>Cualquier duda, respondé este mail. ¡Gracias!</p>"
-    )
-    text = (
-        f"{saludo}\n\nTe adjuntamos los documentos de tu pedido #{numero}: "
-        f"{', '.join(nombres_docs)}.\n\n"
-        f"{(data.mensaje.strip() + chr(10) + chr(10)) if (data.mensaje and data.mensaje.strip()) else ''}"
-        f"Cualquier duda, respondé este mail. ¡Gracias!"
-    )
+    subject, body_html, text = _cuerpo_mail_simple(numero, nombre, docs, data.mensaje)
 
     res = send_raw_email(
         to=destinatario,
@@ -1936,6 +1965,44 @@ async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
     if not res.get("ok"):
         raise HTTPException(502, f"No se pudo enviar el mail: {res.get('error', 'error desconocido')}")
     return {"ok": True, "to": destinatario, "docs": docs, "provider": res.get("provider")}
+
+
+@router.post("/alquileres/{id}/mail-preview")
+def mail_preview(id: int, data: MailPreviewRequest, request: Request):
+    """Renderiza el mail que mandaría el modal (plantilla + nota + adjuntos
+    elegidos) con los datos REALES de este pedido, **sin enviar**. Devuelve
+    {subject, html, text}. Reusa los mismos helpers que el envío
+    (`_ctx_mail_pedido` / `_cuerpo_mail_simple`) → el preview no puede divergir
+    de lo que se manda."""
+    require_admin(request)
+
+    docs = [d for d in (data.docs or []) if d in DOCUMENTOS]
+    template = (data.template or "").strip() or None
+    if template and template not in PLANTILLAS_ENVIO_CLIENTE:
+        raise HTTPException(400, f"Plantilla inválida: {template}")
+
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT numero_pedido, cliente_nombre FROM alquileres WHERE id=?", (id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Pedido no encontrado")
+        ped = row_to_dict(row)
+        if template:
+            _, ctx = _ctx_mail_pedido(conn, id, docs, data.mensaje)
+        else:
+            numero = ped.get("numero_pedido") or id
+            nombre = (ped.get("cliente_nombre") or "").strip()
+            subject, body_html, text = _cuerpo_mail_simple(numero, nombre, docs, data.mensaje)
+    finally:
+        conn.close()
+
+    # Renderizado fuera de la conexión (cada uno abre la suya: render_template /
+    # wrap_preview) — mismo patrón que el envío.
+    if template:
+        return render_template(template, ctx)
+    return {"subject": subject, "html": wrap_preview(body_html), "text": text}
 
 
 # ── Descuentos por jornadas ───────────────────────────────────────────────────

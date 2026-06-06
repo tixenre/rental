@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { FileText, FileSignature, Truck, ClipboardList } from "lucide-react";
+import { FileText, FileSignature, Truck, ClipboardList, Eye } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -69,29 +69,47 @@ export function EnviarDocsDialog({
   const [to, setTo] = useState(clienteEmail);
   const [mensaje, setMensaje] = useState("");
   const [plantilla, setPlantilla] = useState(PLANTILLA_SIMPLE);
+  const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
 
-  // Re-sincroniza el destinatario al abrir (por si cambió el cliente).
+  // Re-sincroniza el destinatario al abrir (por si cambió el cliente) y limpia
+  // el preview viejo.
   useEffect(() => {
-    if (open) setTo(clienteEmail);
+    if (open) {
+      setTo(clienteEmail);
+      setPreview(null);
+    }
   }, [open, clienteEmail]);
 
   const esPlantillaRica = plantilla !== PLANTILLA_SIMPLE;
 
+  const docsElegidos = () => DOCS_PEDIDO.filter((d) => seleccion[d.kind]).map((d) => d.kind);
+
   const enviarMut = useMutation({
-    mutationFn: () => {
-      const docs = DOCS_PEDIDO.filter((d) => seleccion[d.kind]).map((d) => d.kind);
-      return adminApi.enviarDocumentos(pedidoId, {
-        docs,
+    mutationFn: () =>
+      adminApi.enviarDocumentos(pedidoId, {
+        docs: docsElegidos(),
         to: to.trim() || undefined,
         mensaje: mensaje.trim() || undefined,
         template: esPlantillaRica ? plantilla : undefined,
-      });
-    },
+      }),
     onSuccess: (r) => {
       toast.success(`Mail enviado a ${r.to}`);
       onOpenChange(false);
       setMensaje("");
     },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Preview con los datos reales del pedido (no envía). Se genera a pedido para
+  // reflejar la plantilla + nota + adjuntos elegidos en ese momento.
+  const previewMut = useMutation({
+    mutationFn: () =>
+      adminApi.previewMailPedido(pedidoId, {
+        docs: docsElegidos(),
+        mensaje: mensaje.trim() || undefined,
+        template: esPlantillaRica ? plantilla : undefined,
+      }),
+    onSuccess: (d) => setPreview({ subject: d.subject, html: d.html }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -112,7 +130,13 @@ export function EnviarDocsDialog({
         <div className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="enviar-docs-plantilla">Plantilla del mail</Label>
-            <Select value={plantilla} onValueChange={setPlantilla}>
+            <Select
+              value={plantilla}
+              onValueChange={(v) => {
+                setPlantilla(v);
+                setPreview(null);
+              }}
+            >
               <SelectTrigger id="enviar-docs-plantilla">
                 <SelectValue />
               </SelectTrigger>
@@ -168,6 +192,38 @@ export function EnviarDocsDialog({
               rows={3}
               onChange={(e) => setMensaje(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 w-full"
+              onClick={() => previewMut.mutate()}
+              disabled={!algunoElegido || previewMut.isPending}
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              {previewMut.isPending
+                ? "Generando…"
+                : preview
+                  ? "Actualizar vista previa"
+                  : "Ver vista previa"}
+            </Button>
+
+            {preview && (
+              <div className="space-y-1 rounded-md border hairline bg-muted/20 p-2">
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Asunto
+                </div>
+                <div className="break-words text-sm font-medium text-ink">{preview.subject}</div>
+                <iframe
+                  srcDoc={preview.html}
+                  sandbox=""
+                  title="Vista previa del mail"
+                  className="mt-1 h-64 w-full rounded border hairline bg-white"
+                />
+              </div>
+            )}
           </div>
         </div>
 
