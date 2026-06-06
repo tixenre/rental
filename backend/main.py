@@ -208,7 +208,30 @@ def _serve_frontend(path: str = "index.html"):
 
 @app.get("/", include_in_schema=False)
 def root():
-    return _serve_frontend("index.html")
+    """Home. Inyecta el `og:image` configurado (`app_settings.og_image_url`) en el
+    index.html servido, para los crawlers de WhatsApp/redes que NO ejecutan JS (el
+    SPA lo lee en runtime, pero el bot solo ve el `<head>` estático → sin esto
+    mostraba el `/icon-512.png` hardcodeado). Ante cualquier error sirve el index
+    plano — nunca rompe la home."""
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = ?", ("og_image_url",)
+            ).fetchone()
+        finally:
+            conn.close()
+        image = (row["value"].strip() if row and row["value"] else "")
+        if not image.startswith("http"):
+            return _serve_frontend("index.html")
+        html_text = _set_og_image(index_file.read_text(encoding="utf-8"), image)
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("OG injection de la home falló — sirvo index plano", exc_info=True)
+        return _serve_frontend("index.html")
 
 @app.get("/login", include_in_schema=False)
 def login_page():
@@ -236,6 +259,16 @@ def _inject_og_meta(html_text: str, *, title: str, description: str, image: str,
     ):
         html_text = _set(html_text, attr, key, value)
     html_text = re.sub(r"<title>[^<]*</title>", "<title>" + _html.escape(title) + "</title>", html_text, count=1)
+    return html_text
+
+
+def _set_og_image(html_text: str, image: str) -> str:
+    """Reemplaza SOLO `og:image` + `twitter:image` del index.html (el resto del
+    `<head>` de la home ya es correcto). Mismo patrón que `_inject_og_meta`."""
+    esc = _html.escape(image, quote=True)
+    for attr, key in (("property", "og:image"), ("name", "twitter:image")):
+        pat = re.compile(r'(<meta\s+' + attr + r'="' + re.escape(key) + r'"\s+content=")[^"]*(")')
+        html_text = pat.sub(lambda m: m.group(1) + esc + m.group(2), html_text, count=1)
     return html_text
 
 

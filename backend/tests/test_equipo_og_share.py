@@ -64,3 +64,15 @@ def test_ruta_equipo_acepta_slug_sin_422():
     # Lo crítico: NO es 422. Según haya build de front o no, será 200 (HTML) o
     # 503 (frontend not built en CI) — ambos prueban que el slug fue aceptado.
     assert resp.status_code != 422
+
+
+def test_set_og_image_home_reemplaza_solo_la_imagen():
+    """La home inyecta el og:image configurado (og_image_url) para crawlers,
+    sin tocar el resto del <head>."""
+    out = main._set_og_image(_SAMPLE_HTML, "https://cdn.example.com/branding/og.jpg?v=9")
+    assert '<meta property="og:image" content="https://cdn.example.com/branding/og.jpg?v=9" />' in out
+    assert '<meta name="twitter:image" content="https://cdn.example.com/branding/og.jpg?v=9" />' in out
+    assert "icon-512.png" not in out  # reemplazó el default
+    # No tocó título ni descripción (la home ya los trae bien en el index estático).
+    assert '<meta property="og:title" content="Rambla Rental — default" />' in out
+    assert '<meta property="og:description" content="desc default" />' in out
