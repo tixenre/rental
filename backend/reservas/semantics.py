@@ -276,9 +276,10 @@ def reservado_directo(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf)
     """Unidades de `equipo_id` reservadas DIRECTAMENTE (items que lo apuntan) por
     otros pedidos activos que se pisan con el rango ya bufferizado [fd_buf, fh_buf].
 
-    Fuente única de la subquery de reserva directa: la comparten el gate
-    (`_check_stock`) y el chequeo hipotético del portal (`_check_stock_hipotetico`)
-    con SQL idéntico. Todos los valores van como bound params; el único token
+    Fuente única de la subquery de reserva directa: el gate autoritativo
+    (`validar_stock`) y el dry-run del portal (`validar_stock_hipotetico`) la
+    consumen vía el MISMO núcleo `gate._validar_demanda` → `reservado_total` → acá,
+    sin re-copiar SQL. Todos los valores van como bound params; el único token
     interpolado es la constante interna ESTADOS_RESERVADO.
     """
     return conn.execute(f"""

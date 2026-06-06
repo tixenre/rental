@@ -1,24 +1,39 @@
 """Gate de ESCRITURA del motor de reservas — la última línea contra el overbooking.
 
-`validar_stock` es el chequeo que corre al crear/confirmar un pedido. Originado
-como move VERBATIM desde `routes/alquileres._check_stock` (issue #501, Fase 1,
-Paso 4). C4 (#635) reescribió SOLO la EXPANSIÓN para que sea recursiva hasta las
-hojas (forward + backward), cerrando el overbooking en combos anidados; la
-semántica del lock/transacción NO cambió (ver invariantes abajo). La red que fija
-"mismo comportamiento donde no hay anidamiento" es el test diferencial
+Dos entradas públicas, UN solo núcleo:
+  - `validar_stock(conn, pedido_id, ...)` — el chequeo AUTORITATIVO que corre al
+    crear/confirmar un pedido: lee los items del pedido desde `alquiler_items`.
+  - `validar_stock_hipotetico(conn, excl_pedido_id, ..., items)` — el pre-chequeo
+    en SECO (dry-run) de una propuesta que TODAVÍA no se guardó (portal del
+    cliente): recibe los items hipotéticos y excluye el propio pedido.
+
+Ambas consolidan sus items en `roots` ({equipo_id: cantidad}) y delegan en el
+núcleo único `_validar_demanda` — la MISMA expansión, el MISMO lock, el MISMO
+conteo. Esto MATERIALIZA "el core de reservas es sagrado / motor único"
+(MEMORIA 2026-05-30 y 2026-05-31): el dry-run y el gate real NO PUEDEN divergir
+porque son la misma pieza; antes el portal re-implementaba la expansión "en seco"
+importando internos y se desincronizaba en silencio si el gate cambiaba.
+
+Originado como move VERBATIM desde `routes/alquileres._check_stock` (issue #501,
+Fase 1, Paso 4). C4 (#635) reescribió SOLO la EXPANSIÓN para que sea recursiva
+hasta las hojas (forward + backward), cerrando el overbooking en combos anidados;
+la semántica del lock/transacción NO cambió (ver invariantes abajo). La red que
+fija "mismo comportamiento donde no hay anidamiento" es el test diferencial
 `test_gate_caracterizacion_c4.py`.
 
-⚠️ NÚCLEO SAGRADO. Invariantes que C4 (ni ningún refactor de expansión) toca:
-  - El `SELECT ... FOR UPDATE` (lock pesimista de la fila del equipo) queda en
-    esta función con el MISMO texto SQL — no se factoriza a un helper, para que
-    ningún refactor pueda "perder" el lock por accidente. Los nodos se lockean en
-    orden ascendente de id (`ORDER BY id`) — la recursión lockea más filas, así el
-    orden total evita deadlocks entre transacciones concurrentes.
-  - El lock y la transacción son del CALLER: `validar_stock` recibe `conn` y solo
-    emite SELECTs; NUNCA llama commit/rollback/get_db/close. El lock vive hasta
-    que el caller (update_pedido / crear_reserva_estudio) commitea, en su misma
-    sesión → mover el código de archivo no cambia el alcance ni la duración del
-    lock (es propiedad de la conexión+transacción, no del módulo).
+⚠️ NÚCLEO SAGRADO. Invariantes que C4 (ni ningún refactor) toca:
+  - El `SELECT ... FOR UPDATE` (lock pesimista de la fila del equipo) vive en
+    `_validar_demanda` con el MISMO texto SQL, en UN solo lugar — no se factoriza a
+    un sub-helper más chico ni se duplica por entrada, para que ningún refactor
+    pueda "perder" el lock por accidente. Los nodos se lockean en orden ascendente
+    de id (`ORDER BY id`) — la recursión lockea más filas, así el orden total evita
+    deadlocks entre transacciones concurrentes.
+  - El lock y la transacción son del CALLER: el núcleo recibe `conn` y solo emite
+    SELECTs; NUNCA llama commit/rollback/get_db/close. El lock vive hasta que el
+    caller (update_pedido / crear_reserva_estudio / la propuesta del portal)
+    commitea, en su misma sesión → mover o compartir el código entre entradas no
+    cambia el alcance ni la duración del lock (es propiedad de la
+    conexión+transacción, no del módulo ni de la función).
 """
 from reservas.semantics import (
     expandir_demanda,
@@ -31,15 +46,70 @@ from reservas.semantics import (
 
 
 def validar_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> list[str]:
-    """Devuelve lista de nombres de equipos sin stock suficiente para el rango dado.
-
-    Usa SELECT ... FOR UPDATE en equipos para evitar race conditions de concurrencia.
+    """Gate AUTORITATIVO: equipos sin stock suficiente para el rango, leyendo los
+    items YA guardados del pedido (`alquiler_items`). Corre al crear/confirmar.
 
     Si el pedido tiene varios items del MISMO equipo (raro pero posible si el
     frontend tiene un bug o si se usa la API directamente), suma las cantidades
     antes de validar — sino la validación pasaría con falsa negativa. Issue #102.
-    La consolidación la hace `expandir_demanda` (un equipo repetido o alcanzado por
-    varios caminos suma su demanda).
+
+    Lee los items, los consolida en `roots` ({equipo_id: cantidad}) y delega TODO
+    el chequeo (expansión recursiva forward+backward, lock `FOR UPDATE`, conteo de
+    consumo y mantenimiento) en el núcleo único `_validar_demanda`. El propio
+    pedido se excluye del consumo de OTROS pedidos (`excl_pedido_id=pedido_id`).
+    """
+    items = conn.execute(
+        "SELECT equipo_id, cantidad FROM alquiler_items WHERE pedido_id = ?",
+        (pedido_id,),
+    ).fetchall()
+
+    # Consolidar items repetidos del MISMO equipo SUMANDO cantidades (issue #102):
+    # un pedido con dos líneas del mismo equipo exige la suma, no la última.
+    roots: dict[int, int] = {}
+    for r in items:
+        roots[r["equipo_id"]] = roots.get(r["equipo_id"], 0) + r["cantidad"]
+
+    return _validar_demanda(conn, roots, pedido_id, fecha_desde, fecha_hasta)
+
+
+def validar_stock_hipotetico(
+    conn, excl_pedido_id: int, fecha_desde: str, fecha_hasta: str, items,
+) -> list[str]:
+    """Pre-chequeo en SECO (dry-run) de un set HIPOTÉTICO de items + fechas que aún
+    NO se guardaron — el portal del cliente lo usa para rechazar una propuesta sin
+    stock antes de registrarla.
+
+    Es la MISMA pieza que el gate real (`validar_stock`): consolida los items
+    propuestos en `roots` y delega en `_validar_demanda`. Antes el portal
+    re-implementaba la expansión "en seco" importando internos del motor y se
+    desincronizaba en silencio si el gate cambiaba; ahora no pueden divergir.
+
+    `items` es un iterable de objetos con `.equipo_id` y `.cantidad` (p. ej.
+    `ModificacionItemIn`). `excl_pedido_id` es el pedido que se está modificando:
+    sus reservas actuales NO compiten con la propuesta para el mismo rango, así que
+    se excluyen del consumo. Es de SOLO LECTURA salvo el `FOR UPDATE` del núcleo
+    (que vive y muere en la transacción del caller, igual que el gate real).
+    """
+    if not items or not fecha_desde or not fecha_hasta:
+        return []
+
+    # Consolidar la propuesta sumando duplicados del mismo equipo (issue #102).
+    roots: dict[int, int] = {}
+    for it in items:
+        roots[it.equipo_id] = roots.get(it.equipo_id, 0) + it.cantidad
+
+    return _validar_demanda(conn, roots, excl_pedido_id, fecha_desde, fecha_hasta)
+
+
+def _validar_demanda(
+    conn, roots: dict, excl_pedido_id: int, fecha_desde: str, fecha_hasta: str,
+) -> list[str]:
+    """NÚCLEO ÚNICO del gate (lo comparten `validar_stock` y
+    `validar_stock_hipotetico` — el dry-run y el autoritativo no pueden divergir).
+
+    Dado un set ya consolidado de `roots` ({equipo_id: cantidad}), devuelve la lista
+    de nombres de equipos sin stock suficiente para el rango, excluyendo del consumo
+    al pedido `excl_pedido_id`.
 
     Para cada equipo de la demanda, suma el stock reservado por TODOS los pedidos
     activos en el rango (`reservado_total`), contando la reserva DIRECTA y la que
@@ -58,17 +128,6 @@ def validar_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> l
     NÚCLEO SAGRADO: el `SELECT ... FOR UPDATE`, la transacción y el commit son del
     caller; acá solo se emite ese lock (texto SQL intacto) + SELECTs de conteo.
     """
-    items = conn.execute(
-        "SELECT equipo_id, cantidad FROM alquiler_items WHERE pedido_id = ?",
-        (pedido_id,),
-    ).fetchall()
-
-    # Consolidar items repetidos del MISMO equipo SUMANDO cantidades (issue #102):
-    # un pedido con dos líneas del mismo equipo exige la suma, no la última.
-    roots: dict[int, int] = {}
-    for r in items:
-        roots[r["equipo_id"]] = roots.get(r["equipo_id"], 0) + r["cantidad"]
-
     # Forward: demanda recursiva hasta las hojas (todos los componentes — el gate
     # sigue estricto; la lógica blanda de best-effort se resuelve afuera).
     demanda = expandir_demanda(conn, roots, solo_esenciales=False)
@@ -117,7 +176,7 @@ def validar_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> l
         # Consumo recursivo de este equipo por OTROS pedidos: directo + vía
         # cualquier compuesto que lo contenga, a cualquier profundidad (C4).
         reservado = reservado_total(
-            conn, eid, pedido_id, fh_buf, fd_buf,
+            conn, eid, excl_pedido_id, fh_buf, fd_buf,
             rev_graph=rev_graph, cache=rd_cache,
         )
 

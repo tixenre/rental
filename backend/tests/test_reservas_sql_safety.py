@@ -82,12 +82,16 @@ def _funciones_motor():
         reservado_total,
         unidades_en_mantenimiento,
         validar_stock,
+        validar_stock_hipotetico,
     )
+    from reservas.gate import _validar_demanda
     from routes.cliente_portal import _check_stock_hipotetico
     from routes.estudio import _centinela_libre
 
     return [
         validar_stock,
+        validar_stock_hipotetico,
+        _validar_demanda,
         _check_stock_hipotetico,
         calcular_disponibilidad,
         dias_no_disponibles,
