@@ -214,7 +214,7 @@ function SolicitudCard({
       items: m,
     };
   })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot capturado una vez por solicitud; no debe recalcular mientras el admin tipea
   const snapshotMemo = useMemo(() => snapshot, [solicitud.id]);
 
   // Contrapropuesta editable del admin (precargada con el snapshot).

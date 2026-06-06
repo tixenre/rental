@@ -120,7 +120,7 @@ export function AdminSidebar({ email }: { email: string }) {
         setOpenGroups((s) => ({ ...s, [item.url]: true }));
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-expandir solo al cambiar de ruta; items es config estable y setOpenGroups usa functional update
   }, [currentPath]);
 
   const handleSignOut = async () => {
