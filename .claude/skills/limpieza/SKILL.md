@@ -235,6 +235,34 @@ npm run build                       # job `build` de CI
 6. Analytics (`src/lib/analytics.ts`) — eventos dinámicos (MEMORIA *2026-06-02*).
 7. Parámetros de funciones, imports/llamadas con efecto, scripts de tooling/skills.
 
+## Más allá del código muerto: modularizar y optimizar
+
+Cuando el código muerto ya está barrido, el dueño suele pedir "¿y modularizar? ¿optimizar?".
+Son lentes distintos: **no es borrado puro, cambia estructura/comportamiento** → red de tests sí o sí,
+y clasificá por riesgo (tabla de la fase 4). Reglas:
+
+- **Distinguí duplicación real-y-peligrosa de trivial/intencional.** Vale extraer cuando el patrón es
+  largo, copiado en muchos lados y propenso a fallar (caso testigo: `MARCA_SUBQUERY`, una subquery de
+  60 chars copiada 37× que ya había causado 500s en prod, #499). **NO** vale "DRY-ear" un one-liner
+  (ej. el chequeo de rango `0 ≤ descuento ≤ 100`, repetido 3× pero con manejo de `None`/mensaje
+  **distintos a propósito** por sitio) → forzarlo es over-engineering y arriesga pisar la diferencia
+  intencional. La herramienta de detección de clones (`jscpd`) ayuda; un % bajo es sano.
+- **N+1 de escritura** (`for x: conn.execute(INSERT …)`) → `conn.executemany(sql, [tuplas])`
+  (behavior-idéntico; lista vacía = no-op; mismo orden de filas). Caso testigo: `duplicate_equipo`
+  (categorías/etiquetas/kit) y `bulk_action` (insert anidado equipo×categoría). Verificá con suite +
+  **ejercicio real contra Postgres** (forjá sesión admin con `signer.dumps({"email": <ADMIN_EMAILS>})`
+  y pegale a la ruta con TestClient). **Pero ojo:** a veces el N+1 caro no es el INSERT sino una
+  **llamada adentro del loop** (ej. `regenerate_auto_tags(conn, eid)` por equipo) → batchear eso toca
+  el helper interno = refactor propio, no sweep.
+- **Optimización sin problema medido = no tocar.** Memoización de React sin lag reportado, índices sin
+  un `EXPLAIN` que muestre el cuello → es optimización prematura (deuda, no calidad). Reportá el
+  candidato, no lo fuerces.
+- **Boilerplate cross-cutting** (ej. `conn = get_db(); try/finally: close()` en ~37 rutas) → unificarlo
+  (context-manager / FastAPI `Depends`) toca el manejo transaccional de **cada** endpoint = alto radio
+  de explosión → **iniciativa propia con plan + supervisor**, jamás en un barrido.
+- **Honestidad > actividad.** Si tras el análisis el código ya está bien modularizado (motores únicos
+  presentes, clones ≤0.5%), la respuesta correcta es **decirlo**, no fabricar churn de bajo valor.
+
 ## Anti-objetivos (cuándo NO es este skill)
 
 - **Refactor de arquitectura** o consolidación del core sagrado → iniciativa propia con plan + Opus,
