@@ -92,6 +92,12 @@ class TestDescuentoAplicable:
         # Defensivo: nunca permitir descuento "que aumenta el precio".
         assert descuento_aplicable(-10.0, 5.0) == 5.0
 
+    def test_mayores_a_100_se_topan(self):
+        # Un descuento > 100% daría neto/total NEGATIVO → se topa en 100.
+        assert descuento_aplicable(150.0, 5.0) == 100.0
+        assert descuento_aplicable(5.0, 200.0) == 100.0
+        assert descuento_aplicable(100.0, 0) == 100.0
+
 
 # ── es_responsable_inscripto ─────────────────────────────────────────────
 

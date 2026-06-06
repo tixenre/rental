@@ -304,6 +304,12 @@ def _safe_next_path(raw: str | None) -> str | None:
         return None
     if s.startswith("//") or s.startswith("/\\"):  # protocol-relative → otro host
         return None
+    # XSS hardening: el valor se embebe en el HTML+JS del callback
+    # (<script>…replace("{next}")…</script>). Rechazar caracteres que permitan
+    # romper ese contexto (`<`/`>` → `</script>`, comillas, backtick, backslash)
+    # o whitespace/control — un path interno legítimo no los necesita.
+    if any(c in s for c in "<>\"'`\\") or any(c.isspace() or ord(c) < 0x20 for c in s):
+        return None
     if ":" in s.split("/", 2)[1] if "/" in s[1:] else False:  # noqa: E501
         # Defensivo: si algún componente trae ':' antes de un '/' adicional,
         # podría intentarse `/\\example.com:443/x` u otros tricks. Rechazamos.

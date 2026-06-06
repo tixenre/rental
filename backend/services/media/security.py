@@ -259,7 +259,7 @@ def _download_image_bytes(url: str) -> tuple[bytes, str]:
             r = _httpx.get(
                 url,
                 headers=_headers(primary_referer),
-                follow_redirects=True,
+                follow_redirects=False,  # no seguir redirects no re-validados (anti-SSRF)
                 timeout=20.0,
             )
             if r.status_code == 200:
