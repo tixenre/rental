@@ -198,8 +198,7 @@ export function EnviarDocsDialog({
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              className="w-full"
+              className="h-11 w-full"
               onClick={() => previewMut.mutate()}
               disabled={!algunoElegido || previewMut.isPending}
             >
