@@ -447,6 +447,35 @@
   contacto sin pasar por el helper; (2) congelar el contacto o, al revés, descongelar la plata de un
   confirmado/finalizado; (3) propagar el descuento a estados que no sean `presupuesto`.
 
+### 2026-06-06 — `backend/services/branding/` = motor único de assets de marca (SVG master → derivados)
+
+- **Contexto:** el logo de marca convivía en ~4 fuentes distintas (webp en `Logo.tsx`, webp suelto en
+  el footer, SVG huérfano del DS, PNGs estáticos de favicon/og) y el logo del mail era un PNG
+  transparente sobredimensionado que se ensuciaba en dark mode. Se unificó todo: el dueño sube
+  **dos SVG master** (wordmark + isologo) en `/admin/diseño → "Marca (SVG)"` y el sistema **deriva**
+  el resto.
+- **Decisión:** todo asset de marca sale de un **motor único** `backend/services/branding/`
+  (`rasterize.render_svg_png` reusa el **Chromium headless de los PDFs** — `pdf._get_browser`, cero
+  deps nuevas; `derive_from_wordmark`/`derive_from_isologo` arman la matriz). El recoloreo usa los
+  **tokens del DS** y el par sancionado **ink ↔ amber** (blanco-sobre-amber NO está sancionado).
+  Los SVG master + sus derivados se guardan en `app_settings` (incluido `wordmark_svg`, el SVG
+  saneado como texto). **Consumidores (una sola fuente):**
+  - **web:** `Logo.tsx` inyecta el wordmark **inline** (themable vía `currentColor`) desde
+    `wordmark_svg` → fallback al SVG canónico bundleado. Topbar + footer + logins.
+  - **mail:** header = celda amber + wordmark blanco (`email_logo_url`, derivado).
+  - **PDFs (5 docs):** `pdf_templates._active_wordmark()` lee `wordmark_svg` con fallback al constante.
+  - **favicon / apple-touch / icon:** derivados del isologo (tile amber + ink), swap en runtime
+    (`FaviconSync`). El **og:image** para crawlers se inyecta server-side en la home (`main.root()`).
+- **Materializa** el mismo principio que _2026-05-30_ (`backend/reservas/`) y _2026-06-03_
+  (`backend/reportes/`): el dominio tiene una **dirección física única**. Se **retiró** la subida
+  vieja "Logo del sitio" (`logo_url` / `upload-logo`) — unificada en el wordmark SVG master.
+- **Quién hace cumplir:** el supervisor marca como hallazgo (1) cualquier rasterización/recoloreo de
+  marca ad-hoc fuera de `services/branding/`; (2) un `<img>` de wordmark nuevo en la web en vez del
+  `Logo` inline; (3) resucitar la subida `logo_url`/`upload-logo`; (4) un derivado de logo/favicon
+  hecho a mano en vez de generado por el motor. El diseño del header de documentos/mail (barra amber
+  full-bleed + wordmark blanco) es decisión visual del dueño — no "arreglar" el full-bleed ni sumar
+  un tagline bajo el wordmark sin pedido.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
