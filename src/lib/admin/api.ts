@@ -1435,6 +1435,22 @@ export const adminApi = {
     return json as { ok: true; url: string };
   },
 
+  // ── Marca: subir SVG master → derivar assets (motor backend services/branding) ──
+  uploadBrandSvg: async (
+    kind: "wordmark" | "isologo",
+    file: File,
+  ): Promise<{ ok: true; settings: Record<string, string> }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await authedFetch(`/api/admin/settings/upload-${kind}`, {
+      method: "POST",
+      body: fd,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.detail ?? `Upload ${kind} → ${res.status}`);
+    return json as { ok: true; settings: Record<string, string> };
+  },
+
   // ── Email templates ─────────────────────────────────────────────────
   getEmailStatus: () => authedJson<EmailChannelStatus>("/api/admin/email/status"),
   listEmailTemplates: () =>
