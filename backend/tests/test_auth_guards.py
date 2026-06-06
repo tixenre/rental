@@ -321,3 +321,34 @@ class TestAuthMiddlewareStaticAssets:
         res = await self._classify(path)
         assert isinstance(res, JSONResponse)
         assert res.status_code == 401
+
+
+# ── Regresión por-endpoint del fix de authz de /api/equipos (#795) ──
+# Pega a CADA handler de escritura SIN sesión y exige rechazo. Si alguien saca el
+# require_admin de un handler a futuro (la misma clase de bug que #55, recurrente),
+# este test lo caza de punta a punta (app real + middleware + handler).
+_EQUIPOS_WRITE_ENDPOINTS = [
+    ("POST", "/api/equipos"),
+    ("PATCH", "/api/equipos/1"),
+    ("DELETE", "/api/equipos/1"),
+    ("POST", "/api/equipos/1/duplicate"),
+    ("PUT", "/api/equipos/1/ficha"),
+    ("POST", "/api/equipos/1/mantenimiento"),
+    ("PATCH", "/api/equipos/1/mantenimiento/1"),
+    ("DELETE", "/api/equipos/1/mantenimiento/1"),
+    ("POST", "/api/equipos/1/kit"),
+    ("DELETE", "/api/equipos/1/kit/1"),
+    ("PUT", "/api/equipos/1/etiquetas"),
+    ("PUT", "/api/equipos/1/categorias"),
+]
+
+
+@pytest.mark.parametrize("method,path", _EQUIPOS_WRITE_ENDPOINTS)
+def test_escritura_equipos_sin_sesion_rechazada(method, path):
+    """Anónimo (sin cookie) → 401/403 en toda escritura de /api/equipos."""
+    from fastapi.testclient import TestClient
+    import main
+
+    client = TestClient(main.app)
+    res = client.request(method, path, json={})
+    assert res.status_code in (401, 403), f"{method} {path} dejó pasar a un anónimo ({res.status_code})"
