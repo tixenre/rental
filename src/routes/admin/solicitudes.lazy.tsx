@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 import { authedFetch, authedJson } from "@/lib/authedFetch";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { nombreCliente } from "@/lib/cliente-nombre";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -316,7 +317,10 @@ function SolicitudCard({
               #{solicitud.numero_pedido ?? solicitud.pedido_id}
             </Link>
             <Badge variant="outline">
-              {solicitud.cliente_nombre} {solicitud.cliente_apellido ?? ""}
+              {nombreCliente({
+                nombre: solicitud.cliente_nombre,
+                apellido: solicitud.cliente_apellido,
+              })}
             </Badge>
             {solicitud.cliente_email && (
               <span className="text-xs text-muted-foreground">{solicitud.cliente_email}</span>
