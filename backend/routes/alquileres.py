@@ -226,6 +226,7 @@ def _get_alquiler_detail(conn, id: int) -> dict:
     pedido["items"] = _get_alquiler_items(conn, id)
     pedido["pagos"] = _get_alquiler_pagos(conn, id)
     pedido["historial_modificaciones"] = _get_historial_modificaciones(conn, id)
+    _enriquecer_pedido_con_cliente(conn, pedido)
     _enriquecer_pedido_con_total(conn, pedido)
     return pedido
 
@@ -313,6 +314,59 @@ def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
     pedido["cliente_email_facturacion"] = c.get("email_facturacion")
     return pedido
 
+
+def _aplicar_contacto_cliente(pedido: dict, c: dict) -> None:
+    """Sobrescribe nombre/email/teléfono del pedido con los datos `c` del cliente.
+
+    El nombre se arma con el formato del back-office ("Apellido, Nombre"). El
+    email/teléfono se sobrescriben solo si el cliente tiene un valor — si está
+    vacío en la ficha, se conserva la foto del pedido para no perder el contacto.
+    """
+    pedido["cliente_nombre"] = f"{c['apellido']}, {c['nombre']}"
+    if c.get("email"):
+        pedido["cliente_email"] = c["email"]
+    if c.get("telefono"):
+        pedido["cliente_telefono"] = c["telefono"]
+
+
+def _enriquecer_pedido_con_cliente(conn, pedido: dict) -> dict:
+    """Muestra los datos de contacto/identidad SIEMPRE en vivo desde la ficha.
+
+    Los pedidos guardan una foto de nombre/email/teléfono al crearse, pero el
+    contacto se muestra con el dato ACTUAL del cliente (decisión 2026-06-06):
+    corregir un apellido o un teléfono en la ficha se refleja en todos los
+    pedidos del cliente, en cualquier estado, en el back-office y en el portal.
+    Si el pedido no tiene cliente vinculado (carga manual) o el cliente ya no
+    existe, se conserva la foto. La plata (precio/descuento) NO se toca acá: esa
+    sí queda congelada en confirmados/finalizados.
+    """
+    cid = pedido.get("cliente_id")
+    if not cid:
+        return pedido
+    row = conn.execute(
+        "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = ?",
+        (cid,),
+    ).fetchone()
+    if row:
+        _aplicar_contacto_cliente(pedido, row_to_dict(row))
+    return pedido
+
+
+def _enriquecer_pedidos_con_cliente(conn, pedidos: list[dict]) -> None:
+    """Versión batch de `_enriquecer_pedido_con_cliente` para listados (sin N+1)."""
+    ids = sorted({p["cliente_id"] for p in pedidos if p.get("cliente_id")})
+    if not ids:
+        return
+    ph = ",".join(["?"] * len(ids))
+    rows = conn.execute(
+        f"SELECT id, nombre, apellido, email, telefono FROM clientes WHERE id IN ({ph})",
+        ids,
+    ).fetchall()
+    by_id = {r["id"]: row_to_dict(r) for r in rows}
+    for p in pedidos:
+        c = by_id.get(p.get("cliente_id"))
+        if c:
+            _aplicar_contacto_cliente(p, c)
 
 
 def _get_historial_modificaciones(conn, pedido_id: int) -> list[dict]:
@@ -978,8 +1032,15 @@ def list_pedidos(
             params.append(fuente)
         if q:
             like = f"%{q}%"
-            where += " AND (p.cliente_nombre LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?)"
-            params += [like, like]
+            # Busca por la foto del pedido Y por el nombre ACTUAL del cliente
+            # (el contacto se muestra en vivo → buscar por el dato corregido
+            # también tiene que encontrar el pedido).
+            where += (
+                " AND (p.cliente_nombre LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?"
+                " OR EXISTS (SELECT 1 FROM clientes c WHERE c.id = p.cliente_id"
+                " AND (c.nombre LIKE ? OR c.apellido LIKE ?)))"
+            )
+            params += [like, like, like, like]
         if con_saldo:
             # Pedidos con saldo > 0 y no cancelados. Borrador y presupuesto no
             # aplican porque todavía no se cobra; cancelado tampoco.
@@ -1002,6 +1063,7 @@ def list_pedidos(
         ).fetchall()
 
         pedidos    = [row_to_dict(r) for r in rows]
+        _enriquecer_pedidos_con_cliente(conn, pedidos)
         items_map  = _batch_get_alquiler_items(conn, [p["id"] for p in pedidos])
 
         # Pedidos con solicitud de modificación pendiente — para badge en UI.
@@ -1579,6 +1641,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
         pedido["items"] = _get_alquiler_items(conn, id)
+        _enriquecer_pedido_con_cliente(conn, pedido)
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
         _enriquecer_pedido_con_total(conn, pedido)
         return _pedido_html(pedido), _pedido_filename(pedido)
@@ -1598,6 +1661,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         """, (id,)).fetchall()
         pedido["items"] = [row_to_dict(i) for i in items]
         _add_componentes(conn, pedido["items"])
+        _enriquecer_pedido_con_cliente(conn, pedido)
         return _albaran_html(pedido), _pedido_filename(pedido, suffix="albaran")
 
     if kind == "packing-list":
@@ -1605,6 +1669,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
+        _enriquecer_pedido_con_cliente(conn, pedido)
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
         pedido["items"] = _get_alquiler_items(conn, id)
         pedido["items"].sort(key=lambda it: (it.get("nombre") or "").lower())
