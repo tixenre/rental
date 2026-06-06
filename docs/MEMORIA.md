@@ -476,6 +476,37 @@
   full-bleed + wordmark blanco) es decisión visual del dueño — no "arreglar" el full-bleed ni sumar
   un tagline bajo el wordmark sin pedido.
 
+### 2026-06-06 — `backend/busqueda/` = motor único de búsqueda textual (fuzzy + ranking)
+
+- **Contexto:** la búsqueda de clientes (`LIKE` alfabético, sensible a tildes, sin entender "nombre
+  apellido" en campos separados) y de equipos (`ILIKE` plano, sensible a tildes/guiones) estaba
+  copiada ad-hoc en los routes, y el front tenía ~3 normalizadores de texto distintos. El dueño no
+  encontraba clientes ("escribo Santiago y a veces trae uno, a veces otro") ni equipos con tilde o
+  guion en el nombre.
+- **Decisión:** toda búsqueda de texto (clientes, equipos, catálogo) pasa por el paquete único
+  **`backend/busqueda/`** (`normalizar.py` + `motor.py`), espejando el patrón de `reservas/` y
+  `reportes/`. Normalización canónica (minúsculas, sin acentos, no-alfanumérico→espacio, espacios
+  colapsados) **espejada en el front** (`src/lib/search/normalize.ts`) contra un corpus compartido
+  (`backend/tests/data/normalizacion_corpus.json`). Matching + ranking con **`pg_trgm` + `unaccent`**:
+  substring sin tildes/guiones, multi-palabra cruzando campos, tolerancia a typos y **ranking por
+  relevancia** (el mejor match primero, consistente). Los índices GIN trigram usan la **misma
+  expresión canónica** que arma el motor (`CAMPO_PLANTILLA` / `busqueda.campo_sql`). El catálogo
+  público sigue filtrando **client-side** (instantáneo, mobile-first) pero con esas mismas reglas.
+- **Nombre del cliente:** se compone "Nombre Apellido" (nombre primero) en TODAS las superficies, vía
+  un helper único por lado (`routes/clientes.nombre_completo_cliente` / `src/lib/cliente-nombre.ts`).
+  Ortogonal al motor de búsqueda, pero salió en la misma iniciativa.
+- **Aprendizaje (todavía no):** el click-through (`search_clicks`) registra qué resultado abre la
+  gente del catálogo público — es señal **cruda para el futuro**, NO toca el ranking todavía. Cuando
+  se active la capa de aprendizaje (sinónimos curados desde búsquedas con cero resultados + boost por
+  popularidad/click-through), **actualizar esta entrada**.
+- **Quién hace cumplir:** el supervisor marca como hallazgo cualquier `ILIKE`/`LIKE` o normalizador de
+  búsqueda ad-hoc en un route o en el front que no pase por el motor; cualquier índice de búsqueda
+  cuya expresión no sea la canónica; o componer el nombre del cliente sin el helper único. **Caveat
+  honesto:** el contrato corpus↔front NO está enforzado por un test mientras el repo no tenga runner
+  de tests JS (hoy solo lo verifica el test de Python). Extiende _2026-05-30 (`reservas/`)_,
+  _2026-06-03 (`reportes/`)_ y el esquema en dos capas _2026-06-03_ (extensiones + `f_unaccent` +
+  índices + `search_clicks` viven en `init_db()` Y migración).
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
