@@ -1285,6 +1285,20 @@ export const adminApi = {
         body: JSON.stringify(payload),
       },
     ),
+  // Preview del mail (plantilla + nota + adjuntos) con los datos reales del
+  // pedido, sin enviar. Mismo render que el envío (el backend reusa helpers).
+  previewMailPedido: (
+    id: number,
+    payload: { docs: string[]; mensaje?: string; template?: string },
+  ) =>
+    authedJson<{ subject: string; html: string; text: string }>(
+      `/api/alquileres/${id}/mail-preview`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    ),
   setPedidoEstado: (id: number, estado: PedidoEstado) =>
     authedJson<Pedido>(`/api/alquileres/${id}`, {
       method: "PATCH",
