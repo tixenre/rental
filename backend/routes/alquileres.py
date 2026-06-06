@@ -669,6 +669,36 @@ def _pedido_email_context(pedido: dict) -> dict:
         filas += _eb.item_row(nombre, cant, sub_html)
     items_html = _eb.items_table(filas)
 
+    # Jornadas: si el pedido ya viene enriquecido (`_enriquecer_pedido_con_total`)
+    # lo reusamos; si no, lo derivamos con la fórmula única (mismo helper).
+    jornadas = pedido.get("cantidad_jornadas")
+    if jornadas is None:
+        d0 = to_datetime(pedido["fecha_desde"]) if pedido.get("fecha_desde") else None
+        d1 = to_datetime(pedido["fecha_hasta"]) if pedido.get("fecha_hasta") else None
+        jornadas = jornadas_periodo(d0, d1)
+
+    # Estado de pago (info "estilo pasaje": total, lo abonado y el saldo). La
+    # plata sigue siendo NETO persistido — no se recalcula acá, solo se formatea.
+    def _num(v) -> float:
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    total_num = _num(pedido.get("monto_total"))
+    pagado_num = _num(pedido.get("monto_pagado"))
+    saldo_num = max(total_num - pagado_num, 0.0)
+    total_pagado = _fmt_ars(pagado_num)
+    saldo_pendiente = _fmt_ars(saldo_num)
+    if total_num <= 0:
+        pago_estado = ""
+    elif saldo_num <= 0:
+        pago_estado = "Pago completo ✓"
+    elif pagado_num > 0:
+        pago_estado = f"Pagado {total_pagado} · saldo pendiente {saldo_pendiente}"
+    else:
+        pago_estado = "Pendiente de pago"
+
     return {
         "cliente_nombre": pedido.get("cliente_nombre") or "",
         "cliente_email": pedido.get("cliente_email") or "",
@@ -676,7 +706,11 @@ def _pedido_email_context(pedido: dict) -> dict:
         "numero_pedido": pedido.get("numero_pedido") or pedido.get("id"),
         "fecha_desde": _fmt_fecha_amable(pedido.get("fecha_desde")),
         "fecha_hasta": _fmt_fecha_amable(pedido.get("fecha_hasta")),
+        "cantidad_jornadas": jornadas,
         "total": _fmt_ars(pedido.get("monto_total")),
+        "total_pagado": total_pagado,
+        "saldo_pendiente": saldo_pendiente,
+        "pago_estado": pago_estado,
         "notas": pedido.get("notas") or "",
         "items_html": items_html,
         "items_text": items_text,
@@ -1766,31 +1800,50 @@ async def pedido_contrato(id: int, request: Request, format: str = "pdf"):
 
 # ── Enviar documentos por mail (#725) ─────────────────────────────────────────
 
+# Plantillas de mail que se pueden elegir desde el modal de envío al cliente.
+# Es un subconjunto curado de los templates al CLIENTE (nunca los de admin) →
+# evita que el modal mande un "entró un pedido nuevo" al cliente por error.
+# Las etiquetas (lo que ve el admin) viven en el frontend; acá solo la whitelist.
+PLANTILLAS_ENVIO_CLIENTE = {
+    "pedido_confirmado_cliente",
+    "pedido_creado_cliente",
+}
+
+
 class EnviarDocsRequest(BaseModel):
     docs: list[str]                       # subconjunto de DOCUMENTOS
     to: Optional[str] = None              # override del destinatario (default: cliente)
-    mensaje: Optional[str] = None         # mensaje opcional del admin
+    mensaje: Optional[str] = None         # mensaje/nota opcional del admin
+    template: Optional[str] = None        # plantilla a usar (whitelist); None = mensaje simple
 
 
 @router.post("/alquileres/{id}/enviar-documentos")
 async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
     """Manda al cliente los documentos elegidos (cotización/remito/contrato/
-    packing-list) adjuntos en PDF. Reusa el renderer único (`_doc_html`) y el
-    mailer (`send_raw_email`)."""
+    packing-list) adjuntos en PDF.
+
+    Dos modos, mismo adjunto:
+    - **Con `template`** (ej. `pedido_confirmado_cliente`): renderiza el mail
+      rico editable con TODO el contexto de la reserva (fechas, jornadas, ítems,
+      total, estado de pago, botón calendario) vía el mailer único `send_email`.
+      `force=True` permite reenviarlo a mano aunque ya se haya mandado el auto.
+    - **Sin `template`** (mensaje simple): cuerpo genérico vía `send_raw_email`.
+
+    Reusa el renderer único de documentos (`_doc_html`) en ambos."""
     require_admin(request)
 
     docs = [d for d in (data.docs or []) if d in DOCUMENTOS]
     if not docs:
         raise HTTPException(400, "Elegí al menos un documento válido.")
 
+    template = (data.template or "").strip() or None
+    if template and template not in PLANTILLAS_ENVIO_CLIENTE:
+        raise HTTPException(400, f"Plantilla inválida: {template}")
+
     # Resolver destinatario + metadatos del pedido (dentro de la conexión).
     conn = get_db()
     try:
-        row = conn.execute(
-            "SELECT numero_pedido, cliente_nombre, cliente_email, cliente_id "
-            "FROM alquileres WHERE id=?",
-            (id,),
-        ).fetchone()
+        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         ped = row_to_dict(row)
@@ -1806,6 +1859,18 @@ async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
 
         # Renderizar el HTML de cada documento (con la conexión abierta).
         docs_html = [(kind, *_doc_html(conn, id, kind)) for kind in docs]
+
+        # Si hay plantilla, armamos el contexto del mail con la conexión abierta:
+        # contacto en vivo + desglose de total/jornadas (decisión 2026-06-06).
+        ctx = None
+        if template:
+            ped["items"] = _get_alquiler_items(conn, id)
+            _enriquecer_pedido_con_cliente(conn, ped)
+            _enriquecer_pedido_con_total(conn, ped)
+            ctx = _pedido_email_context(ped)
+            ctx["docs_adjuntos"] = [DOCUMENTOS[k] for k in docs]
+            if data.mensaje and data.mensaje.strip():
+                ctx["mensaje_admin"] = data.mensaje.strip()
     finally:
         conn.close()
 
@@ -1816,6 +1881,23 @@ async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
         adjuntos.append(Attachment(filename=filename, content=pdf_bytes))
 
     numero = ped.get("numero_pedido") or id
+
+    # ── Modo plantilla: mail rico editable + PDFs adjuntos ────────────────────
+    if template and ctx is not None:
+        res = send_email(
+            template, destinatario, ctx, alquiler_id=id,
+            attachments=adjuntos, respect_enabled=False, force=True,
+        )
+        if not res.get("ok"):
+            raise HTTPException(
+                502, f"No se pudo enviar el mail: {res.get('error', 'error desconocido')}"
+            )
+        return {
+            "ok": True, "to": destinatario, "docs": docs,
+            "template": template, "provider": res.get("provider"),
+        }
+
+    # ── Modo mensaje simple: cuerpo genérico + PDFs adjuntos ──────────────────
     nombre = (ped.get("cliente_nombre") or "").strip()
     nombres_docs = [DOCUMENTOS[k] for k in docs]
     subject = f"Documentos de tu pedido #{numero}"

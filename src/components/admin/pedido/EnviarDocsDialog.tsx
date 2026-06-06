@@ -22,7 +22,25 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { adminApi } from "@/lib/admin/api";
+
+// Plantillas de mail elegibles desde el modal. `simple` (sentinela; Radix no
+// admite value="") = el cuerpo genérico de siempre; el resto son los mails ricos
+// al cliente (deben estar en la whitelist `PLANTILLAS_ENVIO_CLIENTE` del backend).
+const PLANTILLA_SIMPLE = "simple";
+// eslint-disable-next-line react-refresh/only-export-components -- constante de datos, coexiste con el componente a propósito
+export const PLANTILLAS_MAIL: { value: string; label: string }[] = [
+  { value: PLANTILLA_SIMPLE, label: "Mensaje simple (solo documentos)" },
+  { value: "pedido_confirmado_cliente", label: "Confirmación de pedido" },
+  { value: "pedido_creado_cliente", label: "Recibimos tu pedido" },
+];
 
 // eslint-disable-next-line react-refresh/only-export-components -- constante de datos (no componente); coexiste con EnviarDocsDialog intencionalmente
 export const DOCS_PEDIDO: {
@@ -50,11 +68,14 @@ export function EnviarDocsDialog({
   const [seleccion, setSeleccion] = useState<Record<string, boolean>>({ pdf: true });
   const [to, setTo] = useState(clienteEmail);
   const [mensaje, setMensaje] = useState("");
+  const [plantilla, setPlantilla] = useState(PLANTILLA_SIMPLE);
 
   // Re-sincroniza el destinatario al abrir (por si cambió el cliente).
   useEffect(() => {
     if (open) setTo(clienteEmail);
   }, [open, clienteEmail]);
+
+  const esPlantillaRica = plantilla !== PLANTILLA_SIMPLE;
 
   const enviarMut = useMutation({
     mutationFn: () => {
@@ -63,6 +84,7 @@ export function EnviarDocsDialog({
         docs,
         to: to.trim() || undefined,
         mensaje: mensaje.trim() || undefined,
+        template: esPlantillaRica ? plantilla : undefined,
       });
     },
     onSuccess: (r) => {
@@ -81,12 +103,31 @@ export function EnviarDocsDialog({
         <DialogHeader>
           <DialogTitle>Enviar documentos por mail</DialogTitle>
           <DialogDescription>
-            Se mandan adjuntos en PDF al email del cliente. Elegí qué documentos incluir.
+            {esPlantillaRica
+              ? "Se manda el mail con todos los datos de la reserva + los documentos adjuntos en PDF."
+              : "Se mandan adjuntos en PDF al email del cliente. Elegí qué documentos incluir."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="enviar-docs-plantilla">Plantilla del mail</Label>
+            <Select value={plantilla} onValueChange={setPlantilla}>
+              <SelectTrigger id="enviar-docs-plantilla">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PLANTILLAS_MAIL.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
+            <Label>Documentos adjuntos</Label>
             {DOCS_PEDIDO.map((d) => (
               <label key={d.kind} className="flex items-center gap-2 text-sm text-ink">
                 <Checkbox
@@ -113,11 +154,17 @@ export function EnviarDocsDialog({
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="enviar-docs-msg">Mensaje (opcional)</Label>
+            <Label htmlFor="enviar-docs-msg">
+              {esPlantillaRica ? "Nota para el cliente (opcional)" : "Mensaje (opcional)"}
+            </Label>
             <Textarea
               id="enviar-docs-msg"
               value={mensaje}
-              placeholder="Una nota para el cliente…"
+              placeholder={
+                esPlantillaRica
+                  ? "Una nota que aparece destacada arriba del mail…"
+                  : "Una nota para el cliente…"
+              }
               rows={3}
               onChange={(e) => setMensaje(e.target.value)}
             />
