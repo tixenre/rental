@@ -27,7 +27,7 @@ export function useFavoritos() {
     };
     sync();
     // Correr solo cuando cambia el id de sesión (login/logout)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync solo en login/logout; store (zustand) es referencia estable
   }, [session?.id]);
 
   // Set derivado para lookups O(1) — recalcular solo cuando items cambia

@@ -229,7 +229,7 @@ export default function ClientePortal() {
   const { data: allEquipos = [] } = useEquipos();
   const favEquipos = useMemo(
     () => allEquipos.filter((e) => fav.has(String(e.id))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- depende de fav.items (los datos), no de fav.has (método recreado por render)
     [allEquipos, fav.items],
   );
 
@@ -316,7 +316,7 @@ export default function ClientePortal() {
     verPedido(nuevo);
     setHighlightId(nuevo);
     navigate({ to: "/cliente/portal", search: {}, replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- maneja ?nuevo= una sola vez (guard por ref); verPedido/setHighlightId quedan fuera a propósito
   }, [loading, nuevo, pedidos, navigate]);
 
   useEffect(() => {
