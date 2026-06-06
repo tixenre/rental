@@ -161,3 +161,27 @@ def test_packing_list_html_contenido_multiplicado_por_cantidad():
     assert ">3<" in result  # cant del item principal
     # El componente también debe aparecer con cant×3
     assert "comp-mark" in result  # rediseño DS: componentes con marca └ (antes "Kit:")
+
+
+# ── Nombre de archivo de los PDFs ──────────────────────────────────────────────
+
+def test_pedido_filename_lleva_tipo_de_documento():
+    """El nombre del archivo es R-XXXX_<TipoDoc>_<Cliente>.pdf para que en la
+    vista de adjuntos se distingan de un vistazo (antes eran todos iguales)."""
+    from pdf import _pedido_filename
+
+    pedido = _make_pedido()  # numero_pedido=7, cliente_nombre="Ana Gómez"
+    assert _pedido_filename(pedido) == "R-0007_Presupuesto_Ana-Gómez.pdf"
+    assert _pedido_filename(pedido, doc="albaran") == "R-0007_Albaran_Ana-Gómez.pdf"
+    assert _pedido_filename(pedido, doc="contrato") == "R-0007_Contrato_Ana-Gómez.pdf"
+    assert (
+        _pedido_filename(pedido, doc="packing-list")
+        == "R-0007_Packing-list_Ana-Gómez.pdf"
+    )
+
+
+def test_pedido_filename_sin_numero_usa_id():
+    from pdf import _pedido_filename
+
+    pedido = _make_pedido(numero_pedido=None, id=42)
+    assert _pedido_filename(pedido, doc="contrato") == "42_Contrato_Ana-Gómez.pdf"

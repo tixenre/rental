@@ -18,7 +18,7 @@ from admin_guard import require_admin, is_admin_email
 from routes.auth import get_session
 from routes.clientes import nombre_completo_cliente
 from services.email import send_email, send_raw_email, render_template, wrap_preview, Attachment
-from services.email.service import get_admin_to
+from services.email.service import get_admin_to, primer_nombre
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
 from services.precios import calcular_total, jornadas_periodo, precio_combo
 from config import SITE_URL
@@ -1697,7 +1697,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         pedido["items"] = [row_to_dict(i) for i in items]
         _add_componentes(conn, pedido["items"])
         _enriquecer_pedido_con_cliente(conn, pedido)
-        return _albaran_html(pedido), _pedido_filename(pedido, suffix="albaran")
+        return _albaran_html(pedido), _pedido_filename(pedido, doc="albaran")
 
     if kind == "packing-list":
         row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
@@ -1708,13 +1708,13 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
         pedido["items"] = _get_alquiler_items(conn, id)
         pedido["items"].sort(key=lambda it: (it.get("nombre") or "").lower())
-        return _packing_list_html(pedido), _pedido_filename(pedido, suffix="packing-list")
+        return _packing_list_html(pedido), _pedido_filename(pedido, doc="packing-list")
 
     if kind == "contrato":
         pedido = _get_alquiler_detail(conn, id)
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
         _add_componentes(conn, pedido["items"])
-        return _contrato_html(pedido), _pedido_filename(pedido, suffix="contrato")
+        return _contrato_html(pedido), _pedido_filename(pedido, doc="contrato")
 
     raise HTTPException(400, f"Documento inválido: {kind}")
 
@@ -1839,7 +1839,8 @@ def _cuerpo_mail_simple(numero, nombre: str, docs: list[str],
     usada por el envío (`send_raw_email`) y por el preview (`wrap_preview`)."""
     nombres_docs = [DOCUMENTOS[k] for k in docs]
     subject = f"Documentos de tu pedido #{numero}"
-    saludo = f"Hola {nombre}," if nombre else "Hola,"
+    pila = primer_nombre(nombre)
+    saludo = f"Hola {pila}," if pila else "Hola,"
     mensaje_html = ""
     if mensaje and mensaje.strip():
         # Escapado básico: el mensaje lo escribe el admin, pero por las dudas.
