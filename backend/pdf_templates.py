@@ -115,6 +115,33 @@ WORDMARK = (
     '</svg>'
 )
 
+
+def _active_wordmark() -> str:
+    """Wordmark SVG activo para los documentos: el que el admin sube en
+    /admin/diseño → "Marca (SVG)" (setting `wordmark_svg`, saneado), o el SVG
+    canónico `WORDMARK` bundleado como fallback.
+
+    Misma fuente única que el logo de la web (`wordmark_svg`) → subir el wordmark
+    una vez lo refleja en la web Y en los 5 PDFs. Resiliente: ante cualquier error
+    (sin DB, p. ej. en el render del skill) cae al constante. Una lectura por PDF
+    es despreciable (los PDFs no son de alta frecuencia)."""
+    try:
+        from database import get_db
+
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = ?", ("wordmark_svg",)
+            ).fetchone()
+        finally:
+            conn.close()
+        if row and row["value"] and row["value"].strip():
+            return row["value"]
+    except Exception:
+        pass
+    return WORDMARK
+
+
 # Paleta de ESTADO (EstadoBadge oficial) → (color, fondo soft)
 _ESTADOS = {
     "borrador":    ("oklch(0.42 0.01 70)", "color-mix(in oklch, oklch(0.42 0.01 70) 14%, transparent)"),
@@ -413,7 +440,7 @@ def _membrete(pedido, doc_type, num, fecha, estado=True):
     badge_row = f'<div class="mb-badge-row">{badge}</div>' if badge else ""
     return (
         '<header class="membrete"><div class="mb-top">'
-        f'<div class="mb-brand"><span class="mb-wordmark">{WORDMARK}</span>'
+        f'<div class="mb-brand"><span class="mb-wordmark">{_active_wordmark()}</span>'
         '<div class="mb-tagline">Alquiler de equipos audiovisuales</div></div>'
         '<div class="mb-doc"><div class="mb-eyebrow">Documento</div>'
         f'<div class="mb-type">{html.escape(doc_type)}</div>'

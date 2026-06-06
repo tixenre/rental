@@ -18,6 +18,16 @@ from pdf import (
 pytestmark = pytest.mark.unit
 
 
+def test_active_wordmark_cae_al_constante_sin_db():
+    """Sin DB (o sin setting `wordmark_svg`), `_active_wordmark` devuelve el SVG
+    canónico bundleado — nunca rompe el render del documento."""
+    from pdf_templates import WORDMARK, _active_wordmark
+
+    wm = _active_wordmark()
+    assert "<svg" in wm
+    assert wm == WORDMARK  # en test no hay setting → el constante
+
+
 class TestEsMonth:
     def test_traduce_meses_individuales(self):
         assert "enero" in _es_month("5 de January de 2026")

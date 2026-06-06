@@ -260,7 +260,7 @@ def _a4_page(margin: str = "18mm 14mm") -> str:
 
 from pdf_templates import (  # noqa: E402
     _fonts_css as _ds_fonts_css,
-    WORDMARK as _DS_WORDMARK,
+    _active_wordmark as _ds_active_wordmark,
     _DOC_CSS as _DS_DOC_CSS,
     _footer as _ds_footer,
     _ESTADOS as _DS_ESTADOS,
@@ -341,7 +341,7 @@ def _liquidacion_html(data: dict, titulo: str, stats: dict | None = None) -> str
     # ── HEADER (barra amber full-bleed: wordmark blanco izq · info der) ───────
     header = (
         '<header class="rep-header"><div class="rep-header-top">'
-        f'<div class="rep-brand"><span class="rep-wordmark">{_DS_WORDMARK}</span></div>'
+        f'<div class="rep-brand"><span class="rep-wordmark">{_ds_active_wordmark()}</span></div>'
         '<div class="rep-head-meta">'
         '<div class="rep-eyebrow">Reporte interno</div>'
         '<h1 class="rep-title">Reportes</h1>'
