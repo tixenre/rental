@@ -6,10 +6,9 @@
 
 ## 1. Catálogo de componentes canónicos (reusar antes que crear)
 
-> **Fuente canónica = la librería `@rambla/design-system`** (`packages/design-system/src/components/*`)
-> + su styleguide (`packages/design-system/styleguide/`). La app **hoy** importa estas piezas desde
-> `@/components/*` (un espejo, hasta que las pantallas migren a consumir el paquete — "capa 3"). La
-> columna "Dónde" apunta al path que **resuelve hoy** en la app.
+> **Fuente canónica = la librería del DS, que vive en la app:** `src/components/*` (primitivos +
+> piezas) y `src/styles/` (tokens/tipografía/utilities/fuentes). No hay paquete aparte. La columna
+> "Dónde" apunta al path real en `src/`.
 
 | Necesitás… | Usá | Dónde (hoy, en la app) |
 |---|---|---|
@@ -27,10 +26,22 @@
 | shadcn primitives (dialog, card, accordion, calendar, dropdown…) | varios | `src/components/ui/*` |
 | `cn()` classnames | `cn` | `src/lib/utils.ts` |
 
-**Librería canónica:** el paquete `@rambla/design-system` (tokens + primitivos + kit). Si un diseño trae
-un primitivo nuevo reutilizable, **va a la librería** (`packages/design-system/src/components/{ui,kit}`),
-no inline en la página. Ver/mantener/consumir la librería: skill [`design-system`](../design-system/SKILL.md).
-Las pantallas cableadas (carrito, topbar…) **se quedan en la app** y consumen la librería.
+**Librería canónica del DS — vive EN LA APP, en `src/`:** primitivos shadcn en `src/components/ui/*`,
+piezas de marca en `src/components/{kit,rental}` (PriceBlock, StepperPill, EstadoBadge, StatCard…), y
+tokens/tipografía/utilities/fuentes en `src/styles/` (entry `src/ds-styles.css`, cableado desde
+`src/styles.css`). Es la **fuente única**: un token/utility se edita en `src/styles/`, una pieza en
+`src/components/`, **no se duplica**. **Reuse-first:** antes de crear un botón/badge/precio/stepper/estado,
+chequeá si ya existe. Un primitivo nuevo reutilizable va a `src/components/{ui,kit}`, no inline. Las
+pantallas cableadas (carrito, topbar…) consumen esos primitivos. (Hubo un paquete workspace
+`@rambla/design-system` que se consolidó acá — ya no existe.)
+
+> **Assets de marca (logo/wordmark/favicon/og) → NO se recrean.** Salen de un motor backend único,
+> `backend/services/branding/` (`rasterize.py` + `derive.py`): el dueño sube dos SVG master en
+> `/admin/diseño` y el sistema deriva favicon / apple-touch / og:image / logo de mail / wordmark de los
+> PDFs. Consumidores: **web** `Logo.tsx` (wordmark SVG **inline**, themable — nunca un `<img>` nuevo),
+> **mail**, **PDFs** (`pdf_templates._active_wordmark`), **favicon** (`FaviconSync`). Decisión: MEMORIA
+> *2026-06-06 — `backend/services/branding/` = motor único de assets de marca*. Si un diseño trae un
+> logo, se cablea a este motor, no se hardcodea.
 
 ## 2. Data layer (cómo conecta datos una pantalla)
 

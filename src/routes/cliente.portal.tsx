@@ -1749,7 +1749,7 @@ function DocPreviewModal({
             <button
               type="button"
               onClick={onClose}
-              className="grid h-10 w-10 place-items-center rounded-md hover:bg-muted transition"
+              className="grid h-11 w-11 place-items-center rounded-md hover:bg-muted transition"
               aria-label="Cerrar"
             >
               ✕

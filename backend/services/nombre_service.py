@@ -15,6 +15,7 @@ Lo importa quien quiera recalcular nombres:
 from typing import Optional
 
 from .nombre_builder import construir_nombre_publico
+from database import marca_subquery
 
 
 def _categorias_de(conn, equipo_id: int) -> tuple[Optional[str], Optional[str]]:
@@ -136,7 +137,7 @@ def calcular_nombres_para(conn, equipo_id: int) -> tuple[str, str]:
 
     Devuelve (corto, largo). Útil para preview/dry-run."""
     eq = conn.execute(
-        "SELECT id, nombre, (SELECT nombre FROM marcas WHERE id = equipos.brand_id) AS marca, modelo, "
+        f"SELECT id, nombre, {marca_subquery('equipos')}, modelo, "
         "       nombre_publico_override, nombre_publico_revisado "
         "FROM equipos WHERE id = ?",
         (equipo_id,),

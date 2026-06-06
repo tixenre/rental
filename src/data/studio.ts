@@ -94,9 +94,3 @@ export type StudioBooking = {
   durationHours: number;
   withAddon: boolean;
 };
-
-export function studioTotal(b: { durationHours: number; withAddon: boolean }): number {
-  const base = STUDIO.pricePerHour * b.durationHours;
-  const addon = b.withAddon ? STUDIO.addon.pricePerDay : 0;
-  return base + addon;
-}

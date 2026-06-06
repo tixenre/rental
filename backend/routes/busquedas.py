@@ -63,8 +63,7 @@ def log_search(body: SearchLogBody, request: Request):
     norm = normalizar_busqueda(texto)
     if not norm:
         return {"ok": True, "logged": False, "id": None}
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute(
             "INSERT INTO search_queries (query_text, query_norm, result_count) "
             "VALUES (?, ?, ?) RETURNING id",
@@ -72,8 +71,6 @@ def log_search(body: SearchLogBody, request: Request):
         ).fetchone()
         conn.commit()
         return {"ok": True, "logged": True, "id": row[0]}
-    finally:
-        conn.close()
 
 
 @router.post("/search-click")
@@ -81,19 +78,17 @@ def log_search(body: SearchLogBody, request: Request):
 def log_click(body: SearchClickBody, request: Request):
     """Registra que, tras la búsqueda `query_id`, el usuario abrió `equipo_id`.
     Best-effort: si la búsqueda no existe (FK), no rompe la UX."""
-    conn = get_db()
-    try:
-        conn.execute(
-            "INSERT INTO search_clicks (query_id, equipo_id) VALUES (?, ?)",
-            (body.query_id, body.equipo_id),
-        )
-        conn.commit()
-        return {"ok": True, "logged": True}
-    except Exception:
-        conn.rollback()
-        return {"ok": True, "logged": False}
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO search_clicks (query_id, equipo_id) VALUES (?, ?)",
+                (body.query_id, body.equipo_id),
+            )
+            conn.commit()
+            return {"ok": True, "logged": True}
+        except Exception:
+            conn.rollback()
+            return {"ok": True, "logged": False}
 
 
 @router.get("/admin/busquedas")
@@ -116,8 +111,7 @@ def admin_busquedas(request: Request, dias: Optional[int] = None):
         where = "WHERE created_at >= ?"
         params.append(datetime.utcnow() - timedelta(days=dias))
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         top = conn.execute(
             f"""
             SELECT query_norm,
@@ -162,5 +156,3 @@ def admin_busquedas(request: Request, dias: Optional[int] = None):
             "top": [row_to_dict(r) for r in top],
             "zero": [row_to_dict(r) for r in zero],
         }
-    finally:
-        conn.close()

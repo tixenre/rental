@@ -507,6 +507,28 @@
   _2026-06-03 (`reportes/`)_ y el esquema en dos capas _2026-06-03_ (extensiones + `f_unaccent` +
   índices + `search_clicks` viven en `init_db()` Y migración).
 
+### 2026-06-06 — Design system consolidado en la app; un solo skill de UI
+
+- **Contexto:** convivían DOS implementaciones del DS: el paquete workspace
+  `@rambla/design-system` (tokens/CSS/fuentes — consumidos vía `@import` — **+** copias paralelas de
+  componentes que **driftearon** de la app, ej. EquipmentCard 317 líneas distintas) y los componentes
+  reales de la app en `src/components` (los que usó el rediseño de Pedidos v2 = lo último/canónico). El
+  paquete no se consumía para componentes (0 imports JS), solo para CSS. Además había dos skills de
+  diseño (`design-system` para el paquete, `importar-diseno` para implementar handoffs).
+- **Decisión (del dueño):** **todo lo de UI / front-end / design system / Claude Design / import +
+  implementación vive en UN solo lugar, con lo último y lo mejor.** (1) El DS canónico es la app:
+  componentes en `src/components/{ui,kit,rental}`, tokens/tipografía/utilities/fuentes en `src/styles/`
+  (entry `src/ds-styles.css`, cableado desde `src/styles.css`). (2) El paquete `@rambla/design-system`
+  y su workspace se **retiraron** (los tokens/CSS/fuentes se migraron a `src/` **verbatim** — CSS
+  compilado verificado como subconjunto del previo, cero regresión visual; las copias de componentes
+  drifteadas se descartaron, gana la app). (3) **Un solo skill: `importar-diseno`** — implementa
+  diseños Y mantiene/consume la librería (reuse-first). El skill `design-system` se retiró.
+- **Cómo aplica / quién hace cumplir:** un token/utility se edita en `src/styles/`, una pieza en
+  `src/components/`; **no se recrea un paquete workspace** ni se duplica una pieza que ya existe. El
+  supervisor marca como hallazgo cualquier intento de reintroducir el paquete o un segundo skill de DS.
+  Cierra la iniciativa #662 (invertir la fuente de verdad hacia el paquete — abandonada por esta
+  decisión); los trackers de migración por pantalla (#612) y handoff (#605) siguen vigentes sobre `src/`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

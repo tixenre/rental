@@ -11,7 +11,7 @@ que Excel renderice bien acentos y ñ.
 import csv
 import io
 
-from database import to_iso
+from database import to_iso, MARCA_SUBQUERY
 
 
 def _csv_from_rows(columns: list[str], rows: list) -> str:
@@ -43,10 +43,10 @@ def export_equipos_csv(conn) -> str:
         "precio_jornada", "precio_usd", "dueno", "estado", "visible_catalogo",
         "serie", "fecha_compra", "specs",
     ]
-    rows = conn.execute("""
+    rows = conn.execute(f"""
         SELECT
             e.id, e.nombre,
-            (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+            {MARCA_SUBQUERY},
             e.modelo,
             (SELECT string_agg(c.nombre, ' / ' ORDER BY c.nombre)
                FROM equipo_categorias ec

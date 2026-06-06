@@ -43,7 +43,7 @@ import base64
 import html
 import json
 import os
-from datetime import datetime, date
+from datetime import datetime
 
 # Helpers de precios del repo — mismos imports que el pdf.py original.
 try:
@@ -152,9 +152,27 @@ _ESTADOS = {
     "cancelado":   ("oklch(0.62 0.22 27)", "color-mix(in oklch, oklch(0.62 0.22 27) 14%, transparent)"),
 }
 
+# ── Tamaño de hoja A4 (fuente única, consumida por `_DOC_CSS`) ────────────────
+def _a4_page(margin: str = "14mm 0") -> str:
+    """CSS `@page` que fija la hoja en **A4** para TODOS los documentos.
+
+    Fuente ÚNICA del tamaño de hoja A4 + sus márgenes: la consume `_DOC_CSS`, el
+    shell compartido por los 5 documentos (presupuesto · albarán · contrato ·
+    packing list · reportes). No declarar `@page` / tamaños de hoja ad-hoc en
+    ningún template — una sola verdad de la hoja (modularidad).
+
+    `margin` son los márgenes **verticales** del @page; los laterales van como
+    padding de `.paper` (0 en el @page) para que las barras amber full-bleed
+    puedan sangrar a los bordes izq/der vía margin negativo (Chromium clipea lo
+    que cae en el margen lateral del @page). La 1ª hoja arranca a tope arriba
+    (`@page:first{margin-top:0}`) para que la barra del membrete sangre al borde
+    superior. `_render_pdf` ya rasteriza en A4; esto alinea el HTML con esa hoja
+    para que el preview y la paginación coincidan."""
+    return f"@page{{size:A4;margin:{margin}}}@page:first{{margin-top:0}}"
+
+
 # ── Hoja de estilos del documento (tokens del DS, A4 print) ──────────────────
-_DOC_CSS = r"""
-:root{
+_DOC_CSS = r""":root{
   --amber:#FAB428; --amber-soft:color-mix(in oklch,#FAB428 18%,transparent);
   --ink:oklch(0.14 0.01 60); --muted:oklch(0.42 0.01 70);
   --hairline:oklch(0.18 0.01 60 / 12%);
@@ -164,14 +182,10 @@ _DOC_CSS = r"""
   --r-sm:8px; --r-md:10px; --r-lg:12px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-/* Márgenes verticales en el @page; los LATERALES van como padding de .paper.
-   Así la barra amber del membrete puede sangrar a los bordes izq/der de verdad
-   (con margin negativo cancela el padding de .paper) — Chromium clipea lo que
-   cae en el margen lateral del @page, por eso el lateral NO va en @page. */
-@page{size:A4;margin:14mm 0}
-/* La 1ª hoja arranca a tope arriba para que la barra amber sangre al borde
-   superior (margin-top:0; el margen negativo arriba lo clipearía el @page). */
-@page:first{margin-top:0}
+/* Tamaño de hoja A4 + márgenes: fuente única en `_a4_page()` (arriba). Verticales
+   en el @page; los laterales van como padding de `.paper` para que las barras
+   amber full-bleed sangren a los bordes vía margin negativo. */
+""" + _a4_page() + r"""
 body{font-family:var(--font-sans);color:var(--ink);background:#fff;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 .paper{display:flex;flex-direction:column;min-height:269mm;padding:0 14mm}
@@ -539,7 +553,7 @@ def _pedido_html(pedido):
     if desc > 0:
         pct = f" ({desc_pct:g}%)" if desc_pct else ""
         tr.append(f'<div class="total-row"><span class="tl">Descuento{pct}</span><span class="tv">− {_fmt_ars(desc)}</span></div>')
-    iva_suffix = f'<span class="iva-suffix">+ IVA</span>' if es_ri else ""
+    iva_suffix = '<span class="iva-suffix">+ IVA</span>' if es_ri else ""
     tr.append(f'<div class="total-row grand"><span class="tl">Total</span>'
               f'<span class="tv">{_fmt_ars(neto)}{iva_suffix}</span></div>')
 

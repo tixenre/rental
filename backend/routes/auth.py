@@ -228,7 +228,7 @@ def auth_callback(request: Request):
     # Intercambiar código por token
     client = _oauth_client()
     try:
-        token = client.fetch_token(GOOGLE_TOKEN_URL, code=code)
+        client.fetch_token(GOOGLE_TOKEN_URL, code=code)
     except Exception as e:
         logger.warning("Admin OAuth token_error: %s", e, exc_info=True)
         _record_fail(ip)
@@ -303,6 +303,12 @@ def _safe_next_path(raw: str | None) -> str | None:
     if not s.startswith("/"):
         return None
     if s.startswith("//") or s.startswith("/\\"):  # protocol-relative → otro host
+        return None
+    # XSS hardening: el valor se embebe en el HTML+JS del callback
+    # (<script>…replace("{next}")…</script>). Rechazar caracteres que permitan
+    # romper ese contexto (`<`/`>` → `</script>`, comillas, backtick, backslash)
+    # o whitespace/control — un path interno legítimo no los necesita.
+    if any(c in s for c in "<>\"'`\\") or any(c.isspace() or ord(c) < 0x20 for c in s):
         return None
     if ":" in s.split("/", 2)[1] if "/" in s[1:] else False:  # noqa: E501
         # Defensivo: si algún componente trae ':' antes de un '/' adicional,
@@ -400,13 +406,10 @@ def cliente_auth_callback(request: Request):
         return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=no_email", status_code=303)
 
     # ¿El cliente ya existe en la BD?
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute(
             "SELECT id FROM clientes WHERE LOWER(email) = LOWER(?)", (email,)
         ).fetchone()
-    finally:
-        conn.close()
 
     if row:
         # Cliente conocido → crear sesión directamente. Si llegó `next` válido

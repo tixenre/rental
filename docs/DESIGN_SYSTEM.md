@@ -5,8 +5,8 @@
 > tiene que decidir un color, un tamaño tipográfico, un radio, una
 > animación o un texto — empezás acá.
 >
-> La fuente canónica del design system es este doc + `packages/design-system/` +
-> `src/styles.css` (ver "Source-of-truth ladder" más abajo).
+> La fuente canónica del design system es este doc + `src/styles/` (tokens/tipografía/utilities/
+> fuentes; entry `src/ds-styles.css`) + `src/components/` (primitivos y piezas).
 
 ---
 

@@ -1,6 +1,5 @@
 """Tests de helpers de pdf.py — formato de fechas, montos, nombres."""
 
-import os
 
 import pytest
 

@@ -1,0 +1,20 @@
+/* ============================================================
+   Rambla Rental — Typography & radii tokens  (CANONICAL)
+   @theme puro → font-display/sans/mono + rounded-sm…4xl.
+   Reglas: Champ Black solo display/wordmark · TT Commons UI ·
+   JetBrains Mono precios/fechas/IDs/eyebrows. @font-face → ../fonts.css.
+   ============================================================ */
+
+@theme {
+  --font-display: "Champ Black", "TT Commons", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "TT Commons", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-4xl: 28px;
+}

@@ -92,15 +92,3 @@ export function MonthYearPicker({
     </div>
   );
 }
-
-/**
- * Display human-readable de un valor YYYY-MM. Ej: "2024-03" → "marzo 2024".
- */
-// eslint-disable-next-line react-refresh/only-export-components -- helper acoplado a parseValue/MESES_ES del archivo; moverlo arrastraría esos internals
-export function formatMonthYear(value: string | null | undefined): string {
-  const { year, month } = parseValue(value);
-  if (!year || !month) return "—";
-  const monthIdx = parseInt(month, 10) - 1;
-  if (monthIdx < 0 || monthIdx > 11) return "—";
-  return `${MESES_ES[monthIdx].toLowerCase()} ${year}`;
-}

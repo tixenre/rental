@@ -72,6 +72,13 @@ class FakeConn:
             return FakeCursor(self.items)
         return FakeCursor([])
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
     def close(self):
         self.closed = True
 

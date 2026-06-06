@@ -5,16 +5,10 @@ Contiene los templates HTML y el renderer compartido.
 
 import asyncio
 import html
-import json
 import os
 import re
 from datetime import datetime
 
-from services.precios import (
-    jornadas_periodo,
-    es_responsable_inscripto,
-    IVA_PCT,
-)
 
 # Documentos de pedido (rediseño DS v1): los 4 builders
 # (presupuesto/albarán/contrato/packing) viven en `pdf_templates.py` (port
@@ -26,6 +20,7 @@ from pdf_templates import (  # noqa: F401
     _albaran_html,
     _contrato_html,
     _packing_list_html,
+    _a4_page,
 )
 
 # ── Datos del locador (configurar en variables de entorno) ────────────────────
@@ -134,13 +129,6 @@ def _fmt_date_long(s) -> str:
     d = _as_dt(s)
     return _es_month(d.strftime("%-d de %B de %Y")) if d else str(s)
 
-def _fmt_date_long_time(s) -> str:
-    """Formatea fecha+hora como '5 de marzo de 2025, 14:30'."""
-    if not s:
-        return "—"
-    d = _as_dt(s)
-    return _es_month(d.strftime("%-d de %B de %Y, %H:%M")) if d else str(s)
-
 def _fmt_ars(n, zero_dash: bool = True) -> str:
     """Formatea número como peso argentino ('$1.234.567').
     zero_dash=True → retorna '—' para 0; False → retorna '$0'.
@@ -243,17 +231,6 @@ async def _render_pdf(html: str) -> bytes:
     finally:
         await page.close()
     return pdf_bytes
-
-
-def _a4_page(margin: str = "18mm 14mm") -> str:
-    """CSS `@page` que fija la hoja en **A4** para TODOS los documentos.
-
-    El tamaño A4 es la regla compartida (requisito: todo PDF que se manda es A4);
-    el margen es lo único por-documento. Fuente única — no declarar `@page` /
-    tamaños de hoja ad-hoc en cada template (modularidad: una sola verdad de la
-    hoja). `_render_pdf` ya rasteriza en A4; esto alinea el HTML con esa hoja para
-    que el preview y la paginación coincidan."""
-    return f"@page {{ size: A4; margin: {margin}; }}"
 
 
 # ── Reporte de liquidación (#88) ──────────────────────────────────────────────

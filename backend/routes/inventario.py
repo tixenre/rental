@@ -25,8 +25,7 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
     Solo cuenta equipos activos (eliminado_at IS NULL). Un equipo se considera
     "faltante" en un campo si está NULL o vacío.
     """
-    conn = get_db()
-    try:
+    with get_db() as conn:
         # Total de equipos activos.
         total = conn.execute(
             "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL AND es_recurso_interno = FALSE"
@@ -81,8 +80,6 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
             "completos_pct": completos_pct,
             "faltantes": faltantes,
         }
-    finally:
-        conn.close()
 
 
 # ── Sugerencias automáticas (#352) ───────────────────────────────────────────
@@ -209,9 +206,9 @@ def _detect_categoria_sospechosa(conn) -> list[dict]:
     if not any(keyword_to_cats.values()):
         return []  # no hay categorías matcheables en la BD
 
-    rows = conn.execute("""
+    rows = conn.execute(f"""
         SELECT
-          e.id, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+          e.id, e.nombre, {MARCA_SUBQUERY},
           COALESCE(
             (SELECT array_agg(ec.categoria_id) FROM equipo_categorias ec WHERE ec.equipo_id = e.id),
             ARRAY[]::int[]
@@ -311,8 +308,7 @@ def _load_ignoradas(conn) -> set[tuple[str, str]]:
 def get_sugerencias(_admin: dict = Depends(require_admin)):
     """Devuelve la lista de sugerencias detectadas, filtrando las ignoradas
     persistidas en sugerencias_ignoradas. No muta nada."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         items: list[dict] = []
         items += _detect_marcas_duplicadas(conn)
         items += _detect_precio_sin_usd(conn)
@@ -320,16 +316,13 @@ def get_sugerencias(_admin: dict = Depends(require_admin)):
         ignoradas = _load_ignoradas(conn)
         items = [s for s in items if (s["tipo"], s["ref"]) not in ignoradas]
         return {"items": items, "total": len(items)}
-    finally:
-        conn.close()
 
 
 @router.post("/inventario/sugerencias/ignorar")
 def ignorar_sugerencia(body: AplicarSugerenciaBody, _admin: dict = Depends(require_admin)):
     """Persiste un (tipo, ref) en sugerencias_ignoradas para que no
     vuelva a aparecer en GET /sugerencias."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         conn.execute("""
             INSERT INTO sugerencias_ignoradas (tipo, ref)
             VALUES (?, ?)
@@ -337,15 +330,12 @@ def ignorar_sugerencia(body: AplicarSugerenciaBody, _admin: dict = Depends(requi
         """, (body.tipo, body.ref))
         conn.commit()
         return {"ok": True, "message": "Sugerencia ignorada."}
-    finally:
-        conn.close()
 
 
 @router.post("/inventario/sugerencias/aplicar")
 def aplicar_sugerencia(body: AplicarSugerenciaBody, _admin: dict = Depends(require_admin)):
     """Aplica una sugerencia. Devuelve { ok: True, message: ... } o falla 400."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         if body.tipo == "marcas_duplicadas":
             return _apply_fusionar_marcas(conn, clave=body.ref)
         if body.tipo == "precio_sin_usd":
@@ -362,8 +352,6 @@ def aplicar_sugerencia(body: AplicarSugerenciaBody, _admin: dict = Depends(requi
             except (ValueError, AttributeError):
                 raise HTTPException(400, "ref inválido para categoria_sospechosa.")
         raise HTTPException(400, f"Tipo de sugerencia desconocido: {body.tipo}")
-    finally:
-        conn.close()
 
 
 def _apply_fusionar_marcas(conn, clave: str) -> dict:

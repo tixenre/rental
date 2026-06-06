@@ -51,7 +51,6 @@ class TestFotoPathEstudio:
         assert path.endswith(".webp")
 
     def test_paths_unicos(self):
-        import time
         from routes.estudio import _foto_path_estudio
         paths = {_foto_path_estudio() for _ in range(5)}
         # Si el reloj corre muy rápido puede colapsar; aceptamos ≥ 1 único
@@ -223,6 +222,20 @@ def _estudio_row(**overrides):
     }
     defaults.update(overrides)
     return defaults
+
+
+class _ConnCM:
+    """Mixin que da a los fakes de conexión el protocolo context-manager, igual
+    que el `PGConnection` real — las rutas ahora hacen `with get_db() as conn:`."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        close = getattr(self, "close", None)
+        if close:
+            close()
+        return False
 
 
 class _Cur:
@@ -516,7 +529,7 @@ class _CurLastrowid:
         return self._lastrowid
 
 
-class _NamesConn:
+class _NamesConn(_ConnCM):
     """Responde solo la query de nombres de _pack_disponible."""
 
     def __init__(self, names):
@@ -573,7 +586,7 @@ class TestPackDisponible:
         assert out[0]["foto_url"] == "https://cdn/hmi.webp"
 
 
-class _PackTablaConn:
+class _PackTablaConn(_ConnCM):
     """Responde la query de _pack_equipo_ids (tabla curada estudio_pack_equipos)."""
 
     def __init__(self, ids):
@@ -597,7 +610,7 @@ class TestPackEquipoIds:
         assert estudio_mod._pack_equipo_ids(_PackTablaConn([])) == []
 
 
-class _PackCrudConn:
+class _PackCrudConn(_ConnCM):
     """Fake conn para el CRUD del pack: graba INSERT/DELETE y responde el equipo."""
 
     def __init__(self, equipo=None):
@@ -679,7 +692,7 @@ class TestPackCrud:
         assert out == {"pack": []}
 
 
-class _RecordingConn:
+class _RecordingConn(_ConnCM):
     """Graba INSERTs de alquileres/items para verificar la orquestación del POST."""
 
     def __init__(self, pedido_id=555):
@@ -817,7 +830,7 @@ class TestIterMesesYPrimerDia:
         assert d.month == 6 and d.day <= 7
 
 
-class _SlotBloqueoConn:
+class _SlotBloqueoConn(_ConnCM):
     """Fake conn para _slot_bloqueante: filtra los slots como la query real."""
 
     def __init__(self, slots):
@@ -892,7 +905,7 @@ class TestSlotBloqueante:
         assert _slot_bloqueante(conn, fd, fh) == "Filmar"
 
 
-class _SlotRegenConn:
+class _SlotRegenConn(_ConnCM):
     """Fake conn para _regenerar_pedidos_slot: graba INSERT/DELETE de alquileres."""
 
     def __init__(self, existing=None):

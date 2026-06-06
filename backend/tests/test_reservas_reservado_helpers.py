@@ -133,24 +133,54 @@ def test_reservado_total_suma_directo_y_via_compuesto():
 
 # ── Guard estructural: gate e hipotético comparten el helper ─────────────────
 
-def test_gate_e_hipotetico_comparten_el_helper():
-    """El gate y el chequeo hipotético usan el helper de consumo compartido
-    (`reservado_total`, con o sin alias `_`) en vez de re-copiar la subquery (evita
-    que vuelvan a divergir, ahora a cualquier profundidad). El gate vive en
-    `reservas.gate.validar_stock`; el hipotético en `cliente_portal` lo importa con
-    alias `_reservado_total` — ambos cuentan."""
-    from reservas import validar_stock
+def test_gate_e_hipotetico_comparten_el_nucleo():
+    """El gate AUTORITATIVO y el dry-run del portal son la MISMA pieza: ambos
+    delegan en el núcleo único `reservas.gate._validar_demanda`, que es quien usa
+    el helper de consumo compartido (`reservado_total`) — así no pueden volver a
+    divergir a ninguna profundidad (MEMORIA 2026-05-30 / 2026-05-31).
+
+    Verifica tres cosas:
+      1. El núcleo `_validar_demanda` usa `reservado_total` y NO re-copia la
+         subquery cruda de reserva directa.
+      2. Las dos entradas del motor (`validar_stock`, `validar_stock_hipotetico`)
+         delegan en `_validar_demanda` y tampoco re-inlinean la subquery.
+      3. El wrapper del portal (`_check_stock_hipotetico`) delega en el motor
+         (`validar_stock_hipotetico`) en vez de re-implementar la expansión.
+    """
+    from reservas import validar_stock, validar_stock_hipotetico
+    from reservas.gate import _validar_demanda
     from routes.cliente_portal import _check_stock_hipotetico
 
-    for fn in (validar_stock, _check_stock_hipotetico):
-        src = inspect.getsource(fn)
-        names = {n.id for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Name)}
-        usa_helper = "reservado_total" in names or "_reservado_total" in names
-        assert usa_helper, f"{fn.__name__} no usa el helper compartido de consumo"
-        # Y no re-inlinea la subquery cruda de reserva directa.
-        assert "FROM alquiler_items pi2" not in src, (
-            f"{fn.__name__} re-copia la subquery en vez de usar el helper"
+    def _names(fn):
+        return {n.id for n in ast.walk(ast.parse(inspect.getsource(fn)))
+                if isinstance(n, ast.Name)}
+
+    # 1. El núcleo usa el helper de consumo y no re-copia la subquery.
+    nucleo_names = _names(_validar_demanda)
+    assert "reservado_total" in nucleo_names, (
+        "_validar_demanda no usa el helper compartido de consumo (reservado_total)"
+    )
+    assert "FROM alquiler_items pi2" not in inspect.getsource(_validar_demanda), (
+        "_validar_demanda re-copia la subquery en vez de usar el helper"
+    )
+
+    # 2. Las dos entradas del motor delegan en el núcleo y no inlinean la subquery.
+    for fn in (validar_stock, validar_stock_hipotetico):
+        assert "_validar_demanda" in _names(fn), (
+            f"{fn.__name__} no delega en el núcleo único _validar_demanda"
         )
+        assert "FROM alquiler_items pi2" not in inspect.getsource(fn), (
+            f"{fn.__name__} re-copia la subquery en vez de delegar en el núcleo"
+        )
+
+    # 3. El wrapper del portal delega en el motor (no re-implementa nada).
+    portal_names = _names(_check_stock_hipotetico)
+    assert "validar_stock_hipotetico" in portal_names, (
+        "_check_stock_hipotetico no delega en reservas.validar_stock_hipotetico"
+    )
+    assert "FROM alquiler_items pi2" not in inspect.getsource(_check_stock_hipotetico), (
+        "_check_stock_hipotetico re-copia la subquery en vez de delegar en el motor"
+    )
 
 
 # ── _check_stock_hipotetico — conducta (cuenta consumo recursivo) ────────────

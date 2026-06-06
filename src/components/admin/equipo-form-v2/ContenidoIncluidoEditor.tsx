@@ -109,7 +109,7 @@ function ContenidoItemRow({
         title="Subir foto"
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
-        className="relative h-10 w-10 shrink-0 rounded bg-muted/30 overflow-hidden hover:opacity-80 transition"
+        className="relative h-11 w-11 shrink-0 rounded bg-muted/30 overflow-hidden hover:opacity-80 transition"
       >
         {uploading ? (
           <div className="absolute inset-0 flex items-center justify-center">

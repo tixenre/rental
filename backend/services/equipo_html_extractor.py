@@ -210,7 +210,7 @@ def _extract_via_lentes_parser(html_content: str) -> dict:
     """
     from lentes_parser import (  # type: ignore
         BHSpecsParser, _clean_title, _extract_brand, _classify,
-        _normalize_mount, jsonld_specs, _build_lens_id, _build_filter_id,
+        _build_lens_id, _build_filter_id,
         _build_adapter_id, _build_accesorio_model,
         map_lente_specs, map_filtro_specs, map_adaptador_specs,
         map_lente_extras, map_accesorio_extras,

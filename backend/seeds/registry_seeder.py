@@ -34,7 +34,7 @@ except ImportError:
     from specs import REGISTRY, CategoriaRegistry, SpecDef  # type: ignore
 
 if TYPE_CHECKING:
-    from psycopg.cursor import Cursor
+    pass
 
 
 def _ensure_categoria_raiz(
@@ -44,66 +44,32 @@ def _ensure_categoria_raiz(
     grupo_visual: str | None = None,
     dry_run: bool = False,
 ) -> int | None:
-    """Asegura que la categoría raíz EXISTA (para que las specs cuelguen de
-    ella). Devuelve su id.
+    """Busca la categoría raíz EXISTENTE (para que las specs cuelguen de ella).
+    Devuelve su id, o None si no existe.
 
-    No-destructivo: si ya existe, NO la toca (ni parent_id ni grupo_visual).
-    El catálogo es web-managed — el registry solo bootstrapea lo que falta,
-    así las ediciones hechas en la web persisten entre deploys.
+    Ya NO crea la categoría: el árbol del catálogo (lo que ve el usuario) lo
+    maneja el dueño 100% a mano — no se siembran categorías. Si la raíz no
+    existe, esta categoría del registry se saltea en el seeding de specs (ver
+    `seed_categoria_from_registry`). Las specs son un sistema aparte que se
+    mantiene solo; las categorías no.
     """
     row = conn.execute(
         "SELECT id FROM categorias WHERE nombre = %s", (nombre,)
     ).fetchone()
-    if row:
-        return row["id"]
-    if dry_run:
-        return None
-    cur = conn.execute(
-        """
-        INSERT INTO categorias (nombre, prioridad, parent_id, grupo_visual)
-        VALUES (%s, %s, NULL, %s)
-        ON CONFLICT (nombre) DO NOTHING
-        RETURNING id
-        """,
-        (nombre, prioridad, grupo_visual),
-    )
-    new = cur.fetchone()
-    if new:
-        return new[0] if isinstance(new, tuple) else new["id"]
-    # Carrera: alguien la insertó entre el SELECT y el INSERT.
-    again = conn.execute("SELECT id FROM categorias WHERE nombre = %s", (nombre,)).fetchone()
-    return again["id"] if again else None
+    return row["id"] if row else None
 
 
 def _ensure_subcategoria(
     conn, nombre: str, prioridad: int, parent_id: int, dry_run: bool = False
 ) -> int | None:
-    """Crea una sub-categoría si falta. Devuelve id.
+    """Busca una sub-categoría EXISTENTE. Devuelve id o None si no existe.
 
-    No-destructivo: si ya existe, NO la toca (ni parent_id ni prioridad). El
-    árbol del catálogo es web-managed; el registry solo bootstrapea lo que
-    falta, así las ediciones de la web persisten entre deploys.
+    Ya NO crea subcategorías: el árbol del catálogo lo maneja el dueño a mano.
+    Las subcategorías no alimentan el sistema de specs (las specs cuelgan de la
+    raíz), así que una subcat ausente no tiene consecuencia para el seeder.
     """
     row = conn.execute("SELECT id FROM categorias WHERE nombre = %s", (nombre,)).fetchone()
-    if row:
-        return row["id"]
-    if dry_run:
-        return None
-    cur = conn.execute(
-        """
-        INSERT INTO categorias (nombre, prioridad, parent_id)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (nombre) DO NOTHING
-        RETURNING id
-        """,
-        (nombre, prioridad, parent_id),
-    )
-    new = cur.fetchone()
-    if new:
-        return new[0] if isinstance(new, tuple) else new["id"]
-    # Carrera: alguien la insertó entre el SELECT y el INSERT.
-    again = conn.execute("SELECT id FROM categorias WHERE nombre = %s", (nombre,)).fetchone()
-    return again["id"] if again else None
+    return row["id"] if row else None
 
 
 def _upsert_spec_definition(
@@ -218,7 +184,8 @@ def seed_categoria_from_registry(
         "dry_run": dry_run,
     }
 
-    # 1) Raíz
+    # 1) Raíz — solo se BUSCA, ya no se crea. Si el dueño la borró (o nunca
+    #    existió), se saltea esta categoría: no se siembra nada que el usuario ve.
     raiz_id = _ensure_categoria_raiz(
         conn,
         cat_reg.nombre,
@@ -226,31 +193,22 @@ def seed_categoria_from_registry(
         grupo_visual=cat_reg.grupo_visual,
         dry_run=dry_run,
     )
-    if raiz_id is None and not dry_run:
-        raise RuntimeError(f"No se pudo crear categoría raíz '{cat_reg.nombre}'")
+    if raiz_id is None:
+        stats["categoria_ausente"] = True
+        return {
+            "raiz_id": None,
+            "subcat_ids": {},
+            "spec_def_ids": {},
+            "stats": stats,
+        }
 
-    # 2) Sub-categorías (con soporte de niveles vía `parent`)
+    # 2) Sub-categorías — solo se RESUELVEN si ya existen (no se crean). No
+    #    alimentan specs, así que el orden/parent no importa: un único lookup.
     subcat_ids: dict[str, int] = {}
-    # Primer pase: sin parent (van bajo raíz)
     for sub in cat_reg.sub_categorias:
-        if sub.parent is None:
-            sid = _ensure_subcategoria(conn, sub.nombre, sub.prioridad, raiz_id, dry_run)
-            if sid is not None:
-                subcat_ids[sub.nombre] = sid
-                stats["subcategorias_creadas"] += 1
-    # Segundo pase: con parent (van bajo sub-cat existente)
-    for sub in cat_reg.sub_categorias:
-        if sub.parent is not None:
-            parent_sid = subcat_ids.get(sub.parent)
-            if parent_sid is None and not dry_run:
-                raise RuntimeError(
-                    f"Sub-categoría '{sub.nombre}' referencia parent '{sub.parent}' "
-                    "que no está en el registry"
-                )
-            sid = _ensure_subcategoria(conn, sub.nombre, sub.prioridad, parent_sid or raiz_id, dry_run)
-            if sid is not None:
-                subcat_ids[sub.nombre] = sid
-                stats["subcategorias_creadas"] += 1
+        sid = _ensure_subcategoria(conn, sub.nombre, sub.prioridad, raiz_id, dry_run)
+        if sid is not None:
+            subcat_ids[sub.nombre] = sid
 
     # 3) spec_definitions
     spec_def_ids: dict[str, int] = {}

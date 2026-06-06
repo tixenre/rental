@@ -18,7 +18,6 @@ from services.spec_render import (
     _is_empty_value,
     render_spec_value,
     _render_tabla_best_effort,
-    _format_value_by_tipo,
 )
 
 

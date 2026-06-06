@@ -11,7 +11,7 @@ interface StepperPillProps {
    * Tamaño de los botones:
    * - `sm` = 28px (grid card / lista desktop)
    * - `md` = 30px (mobile — total ≈ 44px con el número, target táctil OK)
-   * - `lg` = 40px (CartDrawer)
+   * - `lg` = 44px (CartDrawer — tap target HIG)
    */
   size?: "sm" | "md" | "lg";
   maxReached?: boolean;
@@ -37,7 +37,7 @@ export function StepperPill({
   maxReached = false,
   className,
 }: StepperPillProps) {
-  const btnCls = size === "lg" ? "h-10 w-10" : size === "md" ? "h-[30px] w-[30px]" : "h-7 w-7";
+  const btnCls = size === "lg" ? "h-11 w-11" : size === "md" ? "h-[30px] w-[30px]" : "h-7 w-7";
 
   return (
     <div

@@ -90,8 +90,7 @@ def feed_ical(request: Request, token: str = ""):
     """
     vevents: list[str] = []
     try:
-        conn = get_db()
-        try:
+        with get_db() as conn:
             real = _get_token(conn)
             # compare_digest evita timing attacks; si no hay token configurado,
             # el feed está deshabilitado → 404 ante cualquier valor.
@@ -120,8 +119,6 @@ def feed_ical(request: Request, token: str = ""):
                 )
                 if ve:
                     vevents.append(ve)
-        finally:
-            conn.close()
     except Exception:
         logger.error("feed_ical: error generando el calendario", exc_info=True)
         vevents = []
@@ -174,11 +171,8 @@ def get_calendar_feed(request: Request):
     """Devuelve la URL del feed (genera el token la primera vez)."""
     session = require_admin(request)
     actor = _actor(session)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         token = _ensure_token(conn, actor)
-    finally:
-        conn.close()
     return {"url": _feed_url(token), "token": token, "enabled": bool(token)}
 
 
@@ -187,10 +181,7 @@ def regenerate_calendar_feed(request: Request):
     """Rota el token → la URL anterior deja de funcionar."""
     session = require_admin(request)
     actor = _actor(session)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         token = secrets.token_urlsafe(32)
         _set_token(conn, token, actor)
-    finally:
-        conn.close()
     return {"url": _feed_url(token), "token": token, "enabled": True}

@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
-from database import get_db, row_to_dict, to_datetime, to_iso, now_ar
+from database import get_db, row_to_dict, to_datetime, to_iso, now_ar, MARCA_SUBQUERY, marca_subquery
 from rate_limit import limiter
 from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin, is_admin_email
@@ -30,8 +30,8 @@ from config import SITE_URL
 # es la constante canónica del dominio. El resto de las primitivas se importan
 # directo de `reservas` donde se usan (routes.estudio, routes.cliente_portal).
 # Ver issue #501, Fase 1.
-from reservas import ESTADOS_RESERVADO
 from reservas import (
+    ESTADOS_RESERVADO,  # noqa: F401 — re-export canónico (guard: test_reservas_sql_safety)
     calcular_disponibilidad as _calcular_disponibilidad,
     dias_no_disponibles as _dias_no_disponibles,
     validar_stock as _check_stock,
@@ -71,9 +71,9 @@ def _maybe_finalizar(conn, pedido_id: int):
 
 
 def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
-    rows = conn.execute("""
+    rows = conn.execute(f"""
         SELECT pi.*, e.nombre,
-               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+               {MARCA_SUBQUERY},
                e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo,
                ef.contenido_incluido_json
@@ -92,7 +92,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     equipo_ids = list({item["equipo_id"] for item in items})
     placeholders = ",".join("?" for _ in equipo_ids)
     comp_rows = conn.execute(f"""
-        SELECT kc.*, ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.foto_url, ec.cantidad AS stock_total,
+        SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.cantidad AS stock_total,
                ec.nombre_publico, ec.nombre_publico_largo
         FROM kit_componentes kc
         JOIN equipos ec ON ec.id = kc.componente_id
@@ -156,7 +156,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     ph = ",".join(["?"] * len(pedido_ids))
     rows = conn.execute(f"""
         SELECT pi.*, e.nombre,
-               (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca,
+               {MARCA_SUBQUERY},
                e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
@@ -171,7 +171,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     if equipo_ids:
         cph = ",".join(["?"] * len(equipo_ids))
         comp_rows = conn.execute(f"""
-            SELECT kc.*, ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca, ec.foto_url, ec.cantidad AS stock_total,
+            SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.cantidad AS stock_total,
                    ec.nombre_publico, ec.nombre_publico_largo
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
@@ -568,11 +568,8 @@ def get_disponibilidad_dias(
         parsed[eid] = max(parsed.get(eid, 0), max(1, qty))
     if not parsed:
         return {"dias_bloqueados": []}
-    conn = get_db()
-    try:
+    with get_db() as conn:
         return {"dias_bloqueados": _dias_no_disponibles(conn, parsed, desde, hasta)}
-    finally:
-        conn.close()
 
 
 @router.get("/disponibilidad")
@@ -584,11 +581,8 @@ def get_disponibilidad(
     """Endpoint fino: abre la conexión y delega en la fuente única de lectura
     `reservas.calcular_disponibilidad`. Lo llaman también `routes.estudio` y
     `routes.cliente_portal` con esta misma firma."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         return _calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id)
-    finally:
-        conn.close()
 
 
 @router.post("/admin/recordatorios/retiro/run")
@@ -604,11 +598,8 @@ def run_recordatorios_retiro(request: Request, dry_run: bool = Query(True)):
     require_admin(request)
     from jobs.recordatorios import enviar_recordatorios_retiro
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         return enviar_recordatorios_retiro(conn, dry_run=dry_run)
-    finally:
-        conn.close()
 
 
 # ── Rutas de pedidos ─────────────────────────────────────────────────────────
@@ -823,8 +814,7 @@ def cotizar(data: CotizarRequest, request: Request):
     números tal cual. Reemplaza el cálculo duplicado del front
     (`src/lib/cart-total.ts`). Ver #617.
     """
-    conn = get_db()
-    try:
+    with get_db() as conn:
         # Jornadas: misma fórmula única (ceil/24h). Sin fechas → 1.
         d0 = to_datetime(data.fecha_desde) if data.fecha_desde else None
         d1 = to_datetime(data.fecha_hasta) if data.fecha_hasta else None
@@ -912,8 +902,6 @@ def cotizar(data: CotizarRequest, request: Request):
             "descuento_origen": descuento_origen,
             **desglose,
         }
-    finally:
-        conn.close()  # devuelve la conexión al pool (sin esto se agota: maxconn=10)
 
 
 @router.post("/alquileres", status_code=201)
@@ -932,97 +920,95 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
     if not data.items and data.estado != "borrador":
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
 
-    conn = get_db()
     cliente_nombre   = data.cliente_nombre
     cliente_email    = data.cliente_email
     cliente_telefono = data.cliente_telefono
 
-    try:
-        descuento_pct = 0.0
-        if data.cliente_id:
-            c = conn.execute("SELECT * FROM clientes WHERE id=?", (data.cliente_id,)).fetchone()
-            if c:
-                cliente_nombre   = nombre_completo_cliente(c["nombre"], c["apellido"])
-                cliente_email    = cliente_email    or c["email"]
-                cliente_telefono = cliente_telefono or c["telefono"]
-                descuento_pct    = c["descuento"] or 0.0
+    with get_db() as conn:
+        try:
+            descuento_pct = 0.0
+            if data.cliente_id:
+                c = conn.execute("SELECT * FROM clientes WHERE id=?", (data.cliente_id,)).fetchone()
+                if c:
+                    cliente_nombre   = nombre_completo_cliente(c["nombre"], c["apellido"])
+                    cliente_email    = cliente_email    or c["email"]
+                    cliente_telefono = cliente_telefono or c["telefono"]
+                    descuento_pct    = c["descuento"] or 0.0
 
-        # Ambas fechas o ninguna: un pedido con una sola fecha es incoherente
-        # (no se puede calcular jornadas ni chequear stock).
-        if bool(data.fecha_desde) != bool(data.fecha_hasta):
-            raise HTTPException(400, "Indicá fecha de retiro y devolución, o ninguna")
+            # Ambas fechas o ninguna: un pedido con una sola fecha es incoherente
+            # (no se puede calcular jornadas ni chequear stock).
+            if bool(data.fecha_desde) != bool(data.fecha_hasta):
+                raise HTTPException(400, "Indicá fecha de retiro y devolución, o ninguna")
 
-        if data.fecha_desde and data.fecha_hasta:
-            d0 = to_datetime(data.fecha_desde)
-            d1 = to_datetime(data.fecha_hasta)
-            hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
+            if data.fecha_desde and data.fecha_hasta:
+                d0 = to_datetime(data.fecha_desde)
+                d1 = to_datetime(data.fecha_hasta)
+                hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
 
-            if d0 >= d1:
-                raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
-            # El admin puede crear pedidos con fecha pasada (carga retroactiva);
-            # el cliente no. La distinción la pasa `create_pedido_endpoint`.
-            if d0 < hoy and not es_admin:
-                raise HTTPException(400, "fecha_desde no puede ser en el pasado")
+                if d0 >= d1:
+                    raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
+                # El admin puede crear pedidos con fecha pasada (carga retroactiva);
+                # el cliente no. La distinción la pasa `create_pedido_endpoint`.
+                if d0 < hoy and not es_admin:
+                    raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
-            jornadas = jornadas_periodo(d0, d1)
-        else:
-            jornadas = 1
+                jornadas = jornadas_periodo(d0, d1)
+            else:
+                jornadas = 1
 
-        items_rows = []
-        for it in data.items:
-            if not conn.execute("SELECT id FROM equipos WHERE id=?", (it.equipo_id,)).fetchone():
-                raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
-            subtotal = it.precio_jornada * it.cantidad * jornadas
-            items_rows.append((it.equipo_id, it.cantidad, it.precio_jornada, subtotal))
+            items_rows = []
+            for it in data.items:
+                if not conn.execute("SELECT id FROM equipos WHERE id=?", (it.equipo_id,)).fetchone():
+                    raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
+                subtotal = it.precio_jornada * it.cantidad * jornadas
+                items_rows.append((it.equipo_id, it.cantidad, it.precio_jornada, subtotal))
 
-        descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
-        total_desglose = calcular_total(
-            items=[
-                {"equipo_id": it.equipo_id, "cantidad": it.cantidad,
-                 "precio_jornada": it.precio_jornada}
-                for it in data.items
-            ],
-            jornadas=jornadas,
-            descuento_cliente_pct=descuento_pct,
-            descuento_jornadas_pct=descuento_jornadas_pct,
-            # monto_total se persiste NETO (sin IVA). IVA es derivado al
-            # mostrar, no se persiste.
-            perfil_impuestos=None,
-        )
-        monto_total = total_desglose["neto"]
+            descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+            total_desglose = calcular_total(
+                items=[
+                    {"equipo_id": it.equipo_id, "cantidad": it.cantidad,
+                     "precio_jornada": it.precio_jornada}
+                    for it in data.items
+                ],
+                jornadas=jornadas,
+                descuento_cliente_pct=descuento_pct,
+                descuento_jornadas_pct=descuento_jornadas_pct,
+                # monto_total se persiste NETO (sin IVA). IVA es derivado al
+                # mostrar, no se persiste.
+                perfil_impuestos=None,
+            )
+            monto_total = total_desglose["neto"]
 
-        estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
-        next_num = _next_numero_pedido(conn)
-        cur = conn.execute("""
-            INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
-                                 cliente_id, notas, fecha_desde, fecha_hasta,
-                                 monto_total, estado, numero_pedido,
-                                 descuento_pct, descuento_jornadas_pct)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (cliente_nombre, cliente_email, cliente_telefono,
-              data.cliente_id, data.notas, data.fecha_desde or None, data.fecha_hasta or None,
-              monto_total, estado_inicial, next_num,
-              descuento_pct, descuento_jornadas_pct))
-        pedido_id = cur.lastrowid
+            estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
+            next_num = _next_numero_pedido(conn)
+            cur = conn.execute("""
+                INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
+                                     cliente_id, notas, fecha_desde, fecha_hasta,
+                                     monto_total, estado, numero_pedido,
+                                     descuento_pct, descuento_jornadas_pct)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (cliente_nombre, cliente_email, cliente_telefono,
+                  data.cliente_id, data.notas, data.fecha_desde or None, data.fecha_hasta or None,
+                  monto_total, estado_inicial, next_num,
+                  descuento_pct, descuento_jornadas_pct))
+            pedido_id = cur.lastrowid
 
-        conn.executemany("""
-            INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-            VALUES (?,?,?,?,?)
-        """, [(pedido_id, *row) for row in items_rows])
+            conn.executemany("""
+                INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
+                VALUES (?,?,?,?,?)
+            """, [(pedido_id, *row) for row in items_rows])
 
-        if estado_inicial == "presupuesto" and data.fecha_desde and data.fecha_hasta:
-            problemas = _check_stock(conn, pedido_id, data.fecha_desde, data.fecha_hasta)
-            if problemas:
-                raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
+            if estado_inicial == "presupuesto" and data.fecha_desde and data.fecha_hasta:
+                problemas = _check_stock(conn, pedido_id, data.fecha_desde, data.fecha_hasta)
+                if problemas:
+                    raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
 
-        conn.commit()
-        pedido = _get_alquiler_detail(conn, pedido_id)
-    except Exception:
-        logger.error("Error creando pedido", exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            conn.commit()
+            pedido = _get_alquiler_detail(conn, pedido_id)
+        except Exception:
+            logger.error("Error creando pedido", exc_info=True)
+            conn.rollback()
+            raise
 
     # Mails fuera del try/finally del DB: si fallan no rollbackean el pedido
     # (igual send_email no propaga, pero por las dudas). Solo se mandan si
@@ -1053,12 +1039,11 @@ def list_pedidos(
     sort_dir: Optional[str] = Query("desc"),
 ):
     require_admin(request)
-    conn   = get_db()
     offset = (page - 1) * per_page
     params: list = []
     where  = "WHERE 1=1"
 
-    try:
+    with get_db() as conn:
         if estado:
             where += " AND p.estado = ?"
             params.append(estado)
@@ -1118,39 +1103,32 @@ def list_pedidos(
             p["tiene_solicitud_pendiente"] = p["id"] in pendientes
 
         return {"total": total, "page": page, "per_page": per_page, "items": pedidos}
-    finally:
-        conn.close()
 
 
 @router.get("/alquileres/{id}")
 def get_pedido(id: int, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         pedido = _get_alquiler_detail(conn, id)
-    finally:
-        conn.close()
     return pedido
 
 
 @router.delete("/alquileres/{id}", status_code=204)
 def delete_pedido(id: int, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
-        if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
-            raise HTTPException(404, "Pedido no encontrado")
-        # Borrar ítems, pagos e historicos asociados (FK cascade si está activada, pero por las dudas)
-        conn.execute("DELETE FROM alquiler_items  WHERE pedido_id=?", (id,))
-        conn.execute("DELETE FROM alquiler_pagos  WHERE pedido_id=?", (id,))
-        conn.execute("DELETE FROM alquileres       WHERE id=?",        (id,))
-        conn.commit()
-    except Exception:
-        logger.error("Error eliminando pedido %s", id, exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
+                raise HTTPException(404, "Pedido no encontrado")
+            # Borrar ítems, pagos e historicos asociados (FK cascade si está activada, pero por las dudas)
+            conn.execute("DELETE FROM alquiler_items  WHERE pedido_id=?", (id,))
+            conn.execute("DELETE FROM alquiler_pagos  WHERE pedido_id=?", (id,))
+            conn.execute("DELETE FROM alquileres       WHERE id=?",        (id,))
+            conn.commit()
+        except Exception:
+            logger.error("Error eliminando pedido %s", id, exc_info=True)
+            conn.rollback()
+            raise
 
 
 ESTADOS_REQUIEREN_FECHAS = {"confirmado", "retirado", "devuelto", "finalizado"}
@@ -1167,94 +1145,92 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
     if data.estado not in ESTADOS_VALIDOS:
         raise HTTPException(400, f"Estado inválido. Usar: {', '.join(sorted(ESTADOS_VALIDOS))}")
 
-    conn  = get_db()
-    try:
-        p_row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
-        if not p_row:
-            raise HTTPException(404, "Pedido no encontrado")
+    with get_db() as conn:
+        try:
+            p_row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+            if not p_row:
+                raise HTTPException(404, "Pedido no encontrado")
 
-        # ── Validaciones para estados que requieren fechas y stock ──────────────
-        if data.estado in ESTADOS_REQUIEREN_FECHAS and not _es_historico(p_row["fuente"]):
-            errores = []
-            if not p_row["fecha_desde"] or not p_row["fecha_hasta"]:
-                errores.append("El pedido no tiene fechas de inicio y fin.")
-            else:
-                try:
-                    d0 = to_datetime(p_row["fecha_desde"])
-                    d1 = to_datetime(p_row["fecha_hasta"])
+            # ── Validaciones para estados que requieren fechas y stock ──────────────
+            if data.estado in ESTADOS_REQUIEREN_FECHAS and not _es_historico(p_row["fuente"]):
+                errores = []
+                if not p_row["fecha_desde"] or not p_row["fecha_hasta"]:
+                    errores.append("El pedido no tiene fechas de inicio y fin.")
+                else:
+                    try:
+                        d0 = to_datetime(p_row["fecha_desde"])
+                        d1 = to_datetime(p_row["fecha_hasta"])
 
-                    if d0 >= d1:
-                        errores.append("fecha_hasta debe ser posterior a fecha_desde")
-                    # Endpoint admin-only (require_admin arriba): el admin puede
-                    # avanzar pedidos con fecha de retiro pasada (carga
-                    # retroactiva), así que no se rechaza el pasado acá.
-                except ValueError:
-                    errores.append("Las fechas tienen formato inválido")
+                        if d0 >= d1:
+                            errores.append("fecha_hasta debe ser posterior a fecha_desde")
+                        # Endpoint admin-only (require_admin arriba): el admin puede
+                        # avanzar pedidos con fecha de retiro pasada (carga
+                        # retroactiva), así que no se rechaza el pasado acá.
+                    except ValueError:
+                        errores.append("Las fechas tienen formato inválido")
 
-            if not conn.execute(
-                "SELECT 1 FROM alquiler_items WHERE pedido_id=?", (id,)
-            ).fetchone():
-                errores.append("El pedido no tiene equipos cargados.")
-            if p_row["fecha_desde"] and p_row["fecha_hasta"] and not errores:
+                if not conn.execute(
+                    "SELECT 1 FROM alquiler_items WHERE pedido_id=?", (id,)
+                ).fetchone():
+                    errores.append("El pedido no tiene equipos cargados.")
+                if p_row["fecha_desde"] and p_row["fecha_hasta"] and not errores:
+                    sin_stock = _check_stock(conn, id, p_row["fecha_desde"], p_row["fecha_hasta"])
+                    for s in sin_stock:
+                        errores.append(f"Sin stock suficiente: {s}")
+                if errores:
+                    raise HTTPException(422, {"errores": errores})
+
+            # Cualquier transición a un estado que reserva stock debe re-validar,
+            # incluyendo "presupuesto" (que no exige fechas pero sí reserva si las
+            # tiene). Salteamos si la transición no cambia el flag de "reserva"
+            # (ej. confirmado → confirmado, o presupuesto → confirmado ya validado
+            # arriba).
+            elif (
+                data.estado in ESTADOS_QUE_RESERVAN
+                and p_row["estado"] not in ESTADOS_QUE_RESERVAN
+                and not _es_historico(p_row["fuente"])
+                and p_row["fecha_desde"] and p_row["fecha_hasta"]
+            ):
                 sin_stock = _check_stock(conn, id, p_row["fecha_desde"], p_row["fecha_hasta"])
-                for s in sin_stock:
-                    errores.append(f"Sin stock suficiente: {s}")
-            if errores:
-                raise HTTPException(422, {"errores": errores})
+                if sin_stock:
+                    raise HTTPException(
+                        422,
+                        {"errores": [f"Sin stock suficiente: {s}" for s in sin_stock]},
+                    )
 
-        # Cualquier transición a un estado que reserva stock debe re-validar,
-        # incluyendo "presupuesto" (que no exige fechas pero sí reserva si las
-        # tiene). Salteamos si la transición no cambia el flag de "reserva"
-        # (ej. confirmado → confirmado, o presupuesto → confirmado ya validado
-        # arriba).
-        elif (
-            data.estado in ESTADOS_QUE_RESERVAN
-            and p_row["estado"] not in ESTADOS_QUE_RESERVAN
-            and not _es_historico(p_row["fuente"])
-            and p_row["fecha_desde"] and p_row["fecha_hasta"]
-        ):
-            sin_stock = _check_stock(conn, id, p_row["fecha_desde"], p_row["fecha_hasta"])
-            if sin_stock:
-                raise HTTPException(
-                    422,
-                    {"errores": [f"Sin stock suficiente: {s}" for s in sin_stock]},
+            es_historico    = _es_historico(p_row["fuente"])
+            estado_anterior = p_row["estado"]
+            updates         = {"estado": data.estado}
+
+            if data.estado == "confirmado" and not p_row["numero_pedido"]:
+                next_n = _next_numero_pedido(conn)
+                updates["numero_pedido"] = next_n
+
+            set_clause = ", ".join(f"{k}=?" for k in updates)
+            conn.execute(f"UPDATE alquileres SET {set_clause} WHERE id=?", (*updates.values(), id))
+
+            # Si el pedido se va a un estado fuera de los modificables, las
+            # solicitudes pendientes quedan huérfanas. Las cancelamos en la
+            # misma transacción para no confundir al cliente ni al admin.
+            # Import diferido para evitar ciclo con cliente_portal.
+            from routes.cliente_portal import (
+                ESTADOS_MODIFICABLES, _cancelar_solicitudes_pendientes,
+            )
+            if data.estado not in ESTADOS_MODIFICABLES:
+                _cancelar_solicitudes_pendientes(
+                    conn, id,
+                    motivo=f"El pedido pasó a estado '{data.estado}'.",
+                    actor="system",
                 )
 
-        es_historico    = _es_historico(p_row["fuente"])
-        estado_anterior = p_row["estado"]
-        updates         = {"estado": data.estado}
+            _maybe_finalizar(conn, id)
+            conn.commit()
 
-        if data.estado == "confirmado" and not p_row["numero_pedido"]:
-            next_n = _next_numero_pedido(conn)
-            updates["numero_pedido"] = next_n
-
-        set_clause = ", ".join(f"{k}=?" for k in updates)
-        conn.execute(f"UPDATE alquileres SET {set_clause} WHERE id=?", (*updates.values(), id))
-
-        # Si el pedido se va a un estado fuera de los modificables, las
-        # solicitudes pendientes quedan huérfanas. Las cancelamos en la
-        # misma transacción para no confundir al cliente ni al admin.
-        # Import diferido para evitar ciclo con cliente_portal.
-        from routes.cliente_portal import (
-            ESTADOS_MODIFICABLES, _cancelar_solicitudes_pendientes,
-        )
-        if data.estado not in ESTADOS_MODIFICABLES:
-            _cancelar_solicitudes_pendientes(
-                conn, id,
-                motivo=f"El pedido pasó a estado '{data.estado}'.",
-                actor="system",
-            )
-
-        _maybe_finalizar(conn, id)
-        conn.commit()
-
-        pedido = _get_alquiler_detail(conn, id)
-    except Exception:
-        logger.error("Error actualizando estado del pedido %s", id, exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            pedido = _get_alquiler_detail(conn, id)
+        except Exception:
+            logger.error("Error actualizando estado del pedido %s", id, exc_info=True)
+            conn.rollback()
+            raise
 
     # Notif al cliente cuando pasamos a 'confirmado' (solo si veníamos de
     # otro estado — no re-mandamos si ya estaba confirmado).
@@ -1277,33 +1253,31 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
 def registrar_pago(id: int, data: PagoParcial, request: Request):
     require_admin(request)
     """Endpoint legacy: setea monto_pagado directamente (sin registro en tabla pagos)."""
-    conn = get_db()
-    try:
-        p = conn.execute(
-            "SELECT id, monto_total FROM alquileres WHERE id=?", (id,)
-        ).fetchone()
-        if not p:
-            raise HTTPException(404, "Pedido no encontrado")
-        if data.monto_pagado < 0:
-            raise HTTPException(400, "El monto pagado no puede ser negativo")
-        monto_total = (p["monto_total"] or 0) if isinstance(p, dict) else (p[1] or 0)
-        if data.monto_pagado > monto_total:
-            raise HTTPException(
-                400,
-                f"El monto pagado ({data.monto_pagado}) no puede exceder el "
-                f"total del pedido ({monto_total})",
-            )
-        conn.execute("UPDATE alquileres SET monto_pagado=? WHERE id=?", (data.monto_pagado, id))
-        _maybe_finalizar(conn, id)
-        conn.commit()
-        pedido = _get_alquiler_detail(conn, id)
-        return pedido
-    except Exception:
-        logger.error("Error actualizando monto_pagado del pedido %s", id, exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            p = conn.execute(
+                "SELECT id, monto_total FROM alquileres WHERE id=?", (id,)
+            ).fetchone()
+            if not p:
+                raise HTTPException(404, "Pedido no encontrado")
+            if data.monto_pagado < 0:
+                raise HTTPException(400, "El monto pagado no puede ser negativo")
+            monto_total = (p["monto_total"] or 0) if isinstance(p, dict) else (p[1] or 0)
+            if data.monto_pagado > monto_total:
+                raise HTTPException(
+                    400,
+                    f"El monto pagado ({data.monto_pagado}) no puede exceder el "
+                    f"total del pedido ({monto_total})",
+                )
+            conn.execute("UPDATE alquileres SET monto_pagado=? WHERE id=?", (data.monto_pagado, id))
+            _maybe_finalizar(conn, id)
+            conn.commit()
+            pedido = _get_alquiler_detail(conn, id)
+            return pedido
+        except Exception:
+            logger.error("Error actualizando monto_pagado del pedido %s", id, exc_info=True)
+            conn.rollback()
+            raise
 
 
 # ── Registro de pagos ────────────────────────────────────────────────────────
@@ -1311,14 +1285,11 @@ def registrar_pago(id: int, data: PagoParcial, request: Request):
 @router.get("/alquileres/{id}/pagos")
 def list_pagos(id: int, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
             raise HTTPException(404, "Pedido no encontrado")
         pagos = _get_alquiler_pagos(conn, id)
         return pagos
-    finally:
-        conn.close()
 
 
 @router.post("/alquileres/{id}/pagos", status_code=201)
@@ -1327,64 +1298,60 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
     require_admin(request)
     if data.monto <= 0:
         raise HTTPException(400, "El monto debe ser mayor a 0")
-    conn = get_db()
-    try:
-        p = conn.execute("SELECT estado FROM alquileres WHERE id=?", (id,)).fetchone()
-        if not p:
-            raise HTTPException(404, "Pedido no encontrado")
-        if p["estado"] in ("cancelado",):
-            raise HTTPException(400, "No se pueden agregar pagos a un pedido cancelado")
+    with get_db() as conn:
+        try:
+            p = conn.execute("SELECT estado FROM alquileres WHERE id=?", (id,)).fetchone()
+            if not p:
+                raise HTTPException(404, "Pedido no encontrado")
+            if p["estado"] in ("cancelado",):
+                raise HTTPException(400, "No se pueden agregar pagos a un pedido cancelado")
 
-        fecha = data.fecha or datetime.date.today().isoformat()
-        conn.execute("""
-            INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha)
-            VALUES (?,?,?,?)
-        """, (id, data.monto, data.concepto, fecha))
+            fecha = data.fecha or datetime.date.today().isoformat()
+            conn.execute("""
+                INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha)
+                VALUES (?,?,?,?)
+            """, (id, data.monto, data.concepto, fecha))
 
-        _recalcular_monto_pagado(conn, id)
-        _maybe_finalizar(conn, id)
-        conn.commit()
+            _recalcular_monto_pagado(conn, id)
+            _maybe_finalizar(conn, id)
+            conn.commit()
 
-        pedido = _get_alquiler_detail(conn, id)
-        return pedido
-    except Exception:
-        logger.error("Error agregando pago al pedido %s", id, exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            pedido = _get_alquiler_detail(conn, id)
+            return pedido
+        except Exception:
+            logger.error("Error agregando pago al pedido %s", id, exc_info=True)
+            conn.rollback()
+            raise
 
 
 @router.delete("/alquileres/{id}/pagos/{pago_id}", status_code=200)
 def eliminar_pago(id: int, pago_id: int, request: Request):
     require_admin(request)
     """Elimina una entrada de pago y recalcula monto_pagado."""
-    conn = get_db()
-    try:
-        if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
-            raise HTTPException(404, "Pedido no encontrado")
-        if not conn.execute(
-            "SELECT id FROM alquiler_pagos WHERE id=? AND pedido_id=?", (pago_id, id)
-        ).fetchone():
-            raise HTTPException(404, "Pago no encontrado")
+    with get_db() as conn:
+        try:
+            if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
+                raise HTTPException(404, "Pedido no encontrado")
+            if not conn.execute(
+                "SELECT id FROM alquiler_pagos WHERE id=? AND pedido_id=?", (pago_id, id)
+            ).fetchone():
+                raise HTTPException(404, "Pago no encontrado")
 
-        conn.execute("DELETE FROM alquiler_pagos WHERE id=?", (pago_id,))
-        _recalcular_monto_pagado(conn, id)
+            conn.execute("DELETE FROM alquiler_pagos WHERE id=?", (pago_id,))
+            _recalcular_monto_pagado(conn, id)
 
-        # Si se quitó pago, puede que ya no esté finalizado → revertir si aplica
-        p = conn.execute("SELECT estado, monto_total, monto_pagado FROM alquileres WHERE id=?", (id,)).fetchone()
-        if p and p["estado"] == "finalizado" and (p["monto_pagado"] or 0) < (p["monto_total"] or 0):
-            conn.execute("UPDATE alquileres SET estado='devuelto' WHERE id=?", (id,))
+            # Si se quitó pago, puede que ya no esté finalizado → revertir si aplica
+            p = conn.execute("SELECT estado, monto_total, monto_pagado FROM alquileres WHERE id=?", (id,)).fetchone()
+            if p and p["estado"] == "finalizado" and (p["monto_pagado"] or 0) < (p["monto_total"] or 0):
+                conn.execute("UPDATE alquileres SET estado='devuelto' WHERE id=?", (id,))
 
-        conn.commit()
-        pedido = _get_alquiler_detail(conn, id)
-        return pedido
-    except Exception:
-        logger.error("Error registrando pago en pedido %s", id, exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            conn.commit()
+            pedido = _get_alquiler_detail(conn, id)
+            return pedido
+        except Exception:
+            logger.error("Error registrando pago en pedido %s", id, exc_info=True)
+            conn.rollback()
+            raise
 
 
 def _recalcular_total_pedido(conn, id: int) -> None:
@@ -1592,48 +1559,44 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
 @router.patch("/alquileres/{id}/datos")
 def update_pedido_datos(id: int, data: PedidoDatos, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
-        pedido = _apply_pedido_datos(conn, id, data, es_admin=True)
-        conn.commit()
-        return pedido
-    except Exception:
-        logger.error("Error actualizando datos del pedido %s", id, exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    with get_db() as conn:
+        try:
+            pedido = _apply_pedido_datos(conn, id, data, es_admin=True)
+            conn.commit()
+            return pedido
+        except Exception:
+            logger.error("Error actualizando datos del pedido %s", id, exc_info=True)
+            conn.rollback()
+            raise
 
 
 @router.put("/alquileres/{id}/items")
 def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
-        pedido = _apply_pedido_items(conn, id, data.items)
+    with get_db() as conn:
+        try:
+            pedido = _apply_pedido_items(conn, id, data.items)
 
-        # Si el pedido está en estado que reserva stock, validar después de
-        # aplicar los nuevos items. Sin esto el admin podía sumar cantidades
-        # que excedieran el stock disponible y crear doble booking silencioso.
-        p = conn.execute(
-            "SELECT estado, fecha_desde, fecha_hasta FROM alquileres WHERE id=?", (id,)
-        ).fetchone()
-        if (
-            p["estado"] in {"presupuesto", "confirmado", "retirado"}
-            and p["fecha_desde"] and p["fecha_hasta"]
-        ):
-            problemas = _check_stock(conn, id, p["fecha_desde"], p["fecha_hasta"])
-            if problemas:
-                raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
+            # Si el pedido está en estado que reserva stock, validar después de
+            # aplicar los nuevos items. Sin esto el admin podía sumar cantidades
+            # que excedieran el stock disponible y crear doble booking silencioso.
+            p = conn.execute(
+                "SELECT estado, fecha_desde, fecha_hasta FROM alquileres WHERE id=?", (id,)
+            ).fetchone()
+            if (
+                p["estado"] in {"presupuesto", "confirmado", "retirado"}
+                and p["fecha_desde"] and p["fecha_hasta"]
+            ):
+                problemas = _check_stock(conn, id, p["fecha_desde"], p["fecha_hasta"])
+                if problemas:
+                    raise HTTPException(409, "Sin stock: " + "; ".join(problemas))
 
-        conn.commit()
-        return pedido
-    except Exception:
-        logger.error("Error actualizando items del pedido %s", id, exc_info=True)
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            conn.commit()
+            return pedido
+        except Exception:
+            logger.error("Error actualizando items del pedido %s", id, exc_info=True)
+            conn.rollback()
+            raise
 
 
 # ── PDFs ─────────────────────────────────────────────────────────────────────
@@ -1656,8 +1619,8 @@ DOCUMENTOS = {
 def _add_componentes(conn, items: list[dict]) -> None:
     """Agrega `componentes` a cada item (kits). Compartido por albarán y contrato."""
     for item in items:
-        comp_rows = conn.execute("""
-            SELECT ec.nombre, (SELECT nombre FROM marcas WHERE id = ec.brand_id) AS marca,
+        comp_rows = conn.execute(f"""
+            SELECT ec.nombre, {marca_subquery('ec')},
                    ec.modelo, ec.serie, ec.valor_reposicion,
                    ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
             FROM kit_componentes kc
@@ -1686,8 +1649,8 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
-        items = conn.execute("""
-            SELECT pi.cantidad, e.nombre, (SELECT nombre FROM marcas WHERE id = e.brand_id) AS marca, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
+        items = conn.execute(f"""
+            SELECT pi.cantidad, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
                    e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
             FROM alquiler_items pi
             JOIN equipos e ON e.id = pi.equipo_id
@@ -1723,11 +1686,8 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
 async def pedido_pdf(id: int, request: Request, format: str = "pdf"):
     """`format=html` devuelve el preview HTML sin pasar por el renderer."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         html, filename = _doc_html(conn, id, "pdf")
-    finally:
-        conn.close()
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
@@ -1743,11 +1703,8 @@ async def pedido_pdf(id: int, request: Request, format: str = "pdf"):
 async def pedido_albaran(id: int, request: Request, format: str = "pdf"):
     """`format=html` devuelve el preview HTML sin pasar por el renderer."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         html, filename = _doc_html(conn, id, "albaran")
-    finally:
-        conn.close()
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
@@ -1763,11 +1720,8 @@ async def pedido_albaran(id: int, request: Request, format: str = "pdf"):
 async def pedido_packing_list(id: int, request: Request, format: str = "pdf"):
     """`format=html` devuelve el preview HTML sin pasar por el renderer."""
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         html_content, filename = _doc_html(conn, id, "packing-list")
-    finally:
-        conn.close()
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html_content, headers=_DOC_NO_CACHE)
@@ -1783,11 +1737,8 @@ async def pedido_packing_list(id: int, request: Request, format: str = "pdf"):
 async def pedido_contrato(id: int, request: Request, format: str = "pdf"):
     """Genera el PDF del contrato de alquiler."""
     require_admin(request)
-    conn    = get_db()
-    try:
+    with get_db() as conn:
         html, filename = _doc_html(conn, id, "contrato")
-    finally:
-        conn.close()
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
@@ -1900,8 +1851,7 @@ async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
         raise HTTPException(400, f"Plantilla inválida: {template}")
 
     # Resolver destinatario + metadatos del pedido (dentro de la conexión).
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
@@ -1924,8 +1874,6 @@ async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
         ctx = None
         if template:
             _, ctx = _ctx_mail_pedido(conn, id, docs, data.mensaje, ped=ped)
-    finally:
-        conn.close()
 
     # Renderizar los PDFs fuera de la conexión (Playwright, async).
     adjuntos: list[Attachment] = []
@@ -1982,8 +1930,7 @@ def mail_preview(id: int, data: MailPreviewRequest, request: Request):
     if template and template not in PLANTILLAS_ENVIO_CLIENTE:
         raise HTTPException(400, f"Plantilla inválida: {template}")
 
-    conn = get_db()
-    try:
+    with get_db() as conn:
         row = conn.execute(
             "SELECT numero_pedido, cliente_nombre FROM alquileres WHERE id=?", (id,)
         ).fetchone()
@@ -1996,8 +1943,6 @@ def mail_preview(id: int, data: MailPreviewRequest, request: Request):
             numero = ped.get("numero_pedido") or id
             nombre = (ped.get("cliente_nombre") or "").strip()
             subject, body_html, text = _cuerpo_mail_simple(numero, nombre, docs, data.mensaje)
-    finally:
-        conn.close()
 
     # Renderizado fuera de la conexión (cada uno abre la suya: render_template /
     # wrap_preview) — mismo patrón que el envío.
@@ -2016,14 +1961,11 @@ class DescuentoJornadaIn(BaseModel):
 @router.get("/descuentos-jornada")
 def get_descuentos_jornada():
     """Devuelve los puntos ancla de descuentos por jornadas (público — lo usa el carrito)."""
-    conn = get_db()
-    try:
+    with get_db() as conn:
         rows = conn.execute(
             "SELECT id, jornadas, pct FROM descuentos_jornada ORDER BY jornadas ASC"
         ).fetchall()
         return [row_to_dict(r) for r in rows]
-    finally:
-        conn.close()
 
 
 @router.post("/admin/descuentos-jornada", status_code=201)
@@ -2033,8 +1975,7 @@ def create_descuento_jornada(data: DescuentoJornadaIn, request: Request):
         raise HTTPException(400, "jornadas debe ser >= 1")
     if not (0 <= data.pct <= 100):
         raise HTTPException(400, "pct debe estar entre 0 y 100")
-    conn = get_db()
-    try:
+    with get_db() as conn:
         conn.execute(
             "INSERT INTO descuentos_jornada (jornadas, pct) VALUES (?, ?) "
             "ON CONFLICT (jornadas) DO UPDATE SET pct = EXCLUDED.pct",
@@ -2046,16 +1987,11 @@ def create_descuento_jornada(data: DescuentoJornadaIn, request: Request):
             (data.jornadas,)
         ).fetchone()
         return row_to_dict(row)
-    finally:
-        conn.close()
 
 
 @router.delete("/admin/descuentos-jornada/{id}", status_code=204)
 def delete_descuento_jornada(id: int, request: Request):
     require_admin(request)
-    conn = get_db()
-    try:
+    with get_db() as conn:
         conn.execute("DELETE FROM descuentos_jornada WHERE id = ?", (id,))
         conn.commit()
-    finally:
-        conn.close()
