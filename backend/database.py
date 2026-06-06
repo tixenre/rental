@@ -11,6 +11,7 @@ import psycopg2.pool
 from datetime import datetime
 
 from config import settings
+from busqueda.motor import CAMPO_PLANTILLA
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +258,21 @@ def init_db():
     raw_conn.set_isolation_level(0)  # Autocommit
     conn = PGConnection(raw_conn)
 
+    # ── Búsqueda fuzzy: extensiones + helper inmutable ────────────────────────
+    # `pg_trgm` (similitud por trigramas → typos + ranking) y `unaccent` (folding
+    # de acentos: "bateria" = "Batería"). El motor único vive en backend/busqueda;
+    # acá garantizamos que la infra de BD que necesita exista. `unaccent()` es
+    # STABLE (no indexable); `f_unaccent` la envuelve IMMUTABLE — la forma
+    # canónica que usan tanto las queries (busqueda.campo_sql) como los índices
+    # GIN trigram de abajo. Idempotente. Ver decisión 2026-06-06 (motor de búsqueda).
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS unaccent")
+    conn.execute(
+        "CREATE OR REPLACE FUNCTION f_unaccent(text) RETURNS text AS "
+        "$$ SELECT public.unaccent('public.unaccent', $1) $$ "
+        "LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT"
+    )
+
     # Crear tablas
     conn.execute("""
         CREATE TABLE IF NOT EXISTS equipos (
@@ -379,6 +395,14 @@ def init_db():
     # Functional index sobre LOWER(email): el UNIQUE no se usa porque las
     # queries hacen WHERE LOWER(email) = LOWER(?) (auth.py, cliente_portal.py).
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_email_lower ON clientes(LOWER(email))")
+    # Índices GIN trigram para la búsqueda fuzzy (backend/busqueda). La expresión
+    # es la canónica única (CAMPO_PLANTILLA) — la misma que arma busqueda.campo_sql
+    # en las queries, para que el planner los pueda usar. El combinado
+    # nombre+apellido permite que "santiago perez" rankee por prefijo.
+    _nombre_apellido = CAMPO_PLANTILLA.format(expr="(nombre || ' ' || apellido)")
+    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_clientes_nombre_apellido_trgm ON clientes USING gin ({_nombre_apellido} gin_trgm_ops)")
+    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_clientes_email_trgm ON clientes USING gin ({CAMPO_PLANTILLA.format(expr='email')} gin_trgm_ops)")
+    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_clientes_cuit_trgm ON clientes USING gin ({CAMPO_PLANTILLA.format(expr='cuit')} gin_trgm_ops)")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
@@ -941,6 +965,11 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_equipos_ranking "
         "ON equipos(relevancia_manual ASC, popularidad_score DESC, nombre ASC)"
     )
+    # Índices GIN trigram para la búsqueda fuzzy (backend/busqueda). La expresión
+    # es la canónica única (CAMPO_PLANTILLA), la misma que arma busqueda.campo_sql.
+    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_equipos_nombre_trgm ON equipos USING gin ({CAMPO_PLANTILLA.format(expr='nombre')} gin_trgm_ops)")
+    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_equipos_modelo_trgm ON equipos USING gin ({CAMPO_PLANTILLA.format(expr='modelo')} gin_trgm_ops)")
+    conn.execute(f"CREATE INDEX IF NOT EXISTS idx_equipos_serie_trgm ON equipos USING gin ({CAMPO_PLANTILLA.format(expr='serie')} gin_trgm_ops)")
 
     # NOTA: el seed de spec_templates se movió a `seed_spec_templates_after_migrations`
     # invocado desde main.py después de alembic upgrade. El motivo: la migración
@@ -1361,6 +1390,24 @@ def init_db():
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_search_queries_created ON search_queries(created_at)"
+    )
+    # Click-through: qué resultado abre el usuario tras una búsqueda. Es la señal
+    # que faltaba para, a futuro, aprender qué encontró la gente (ranking por
+    # comportamiento, sinónimos). Cada fila liga una search_queries con el equipo
+    # que se abrió. Acompaña a la migración s3t4u5v6w7x8 (esquema en dos capas).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS search_clicks (
+            id           SERIAL PRIMARY KEY,
+            query_id     INTEGER NOT NULL REFERENCES search_queries(id) ON DELETE CASCADE,
+            equipo_id    INTEGER REFERENCES equipos(id) ON DELETE SET NULL,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_search_clicks_query ON search_clicks(query_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_search_clicks_equipo ON search_clicks(equipo_id)"
     )
     # Seed idempotente: inserta la fila singleton si no existe, con los valores
     # del copy original de src/data/studio.ts. Precios en 0 (el dueño los setea).
