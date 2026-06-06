@@ -116,7 +116,7 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
             <Link
               to={userLinkTo}
               className={cn(
-                "flex items-center justify-center w-10 h-10 rounded-full border hairline transition",
+                "flex items-center justify-center w-11 h-11 rounded-full border hairline transition",
                 isLogged
                   ? "bg-amber text-ink border-amber hover:opacity-90"
                   : "hover:border-foreground/40",

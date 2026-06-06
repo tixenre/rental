@@ -118,7 +118,7 @@ export function DiscoverySheet({
             <div className="flex items-center gap-2 px-3 py-3">
               <button
                 onClick={() => onOpenChange(false)}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full hover:bg-muted"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-muted"
                 aria-label="Volver"
               >
                 <ArrowLeft className="h-5 w-5" />

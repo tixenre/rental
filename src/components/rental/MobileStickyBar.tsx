@@ -74,7 +74,7 @@ export function MobileStickyBar({
 
         <button
           onClick={() => openDiscovery("search")}
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-full border hairline bg-surface hover:border-amber relative"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full border hairline bg-surface hover:border-amber relative"
           aria-label="Buscar"
         >
           <Search className="h-4 w-4" />
@@ -83,7 +83,7 @@ export function MobileStickyBar({
 
         <button
           onClick={() => openDiscovery("filters")}
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-full border hairline bg-surface hover:border-amber relative"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full border hairline bg-surface hover:border-amber relative"
           aria-label="Filtros"
         >
           <SlidersHorizontal className="h-4 w-4" />
