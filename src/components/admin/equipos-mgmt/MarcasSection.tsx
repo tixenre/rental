@@ -143,6 +143,11 @@ export function MarcasSection() {
   const allMarcas = useMemo(() => listQ.data?.items ?? [], [listQ.data?.items]);
 
   // ── Detección de duplicadas (intacta vs versión anterior) ──────────────
+  // NO usa el motor de búsqueda (`lib/search/normalize`) a propósito: acá se
+  // agrupa por la PRIMERA palabra plegando solo case+acentos, conservando la
+  // puntuación interna. La normalización de búsqueda colapsa los no-alfanuméricos
+  // a espacio ("B&H" → "b h"), lo que partiría mal la marca y agruparía falsos
+  // duplicados. Es otra operación, no una variante ad-hoc de la búsqueda.
   const duplicateGroups = useMemo(() => {
     const norm = (s: string) =>
       s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim().split(/\s+/)[0] ?? "";
