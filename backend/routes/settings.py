@@ -144,8 +144,15 @@ ALLOWED_SETTINGS_KEYS = {
     "usd_rate",          # ARS por 1 USD. Float.
     "roi_pct_default",   # % default para nuevos equipos. Float.
     "shipping_usd",      # Envío default en USD para cálculo de reposición. Float.
-    "logo_url",          # URL pública del logo (imagen). String.
+    "logo_url",          # URL pública del logo del top bar (imagen). String.
     "og_image_url",      # URL pública del OG image para preview en redes (1200x630).
+    # ── Marca: SVG masters + assets derivados (motor services/branding) ──
+    "wordmark_svg_url",       # SVG master del wordmark (subido desde el back-office).
+    "isologo_svg_url",        # SVG master del isologo.
+    "email_logo_url",         # Wordmark blanco/transparente derivado → header del mail.
+    "favicon_url",            # Favicon derivado del isologo (tile amber + ink).
+    "apple_touch_icon_url",   # Ícono iOS derivado del isologo.
+    "icon_512_url",           # Ícono cuadrado 512 derivado del isologo (no es el og:image).
     "whatsapp_phone",    # Teléfono del negocio para click-to-chat (formato +5492235852510).
     "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
@@ -727,6 +734,99 @@ async def upload_og_image(request: Request):
         return {"ok": True, "url": versioned_url}
     finally:
         conn.close()
+
+
+# ── Marca: subir SVG (wordmark + isologo) → derivar assets ────────────────────
+
+def _save_settings(conn, mapping: dict, actor: str) -> None:
+    """Upsert de varias settings en una transacción."""
+    for key, value in mapping.items():
+        conn.execute(
+            """
+            INSERT INTO app_settings (key, value, updated_at, updated_by)
+            VALUES (%s, %s, CURRENT_TIMESTAMP, %s)
+            ON CONFLICT (key) DO UPDATE
+            SET value = EXCLUDED.value,
+                updated_at = CURRENT_TIMESTAMP,
+                updated_by = EXCLUDED.updated_by
+            """,
+            (key, value, actor),
+        )
+    conn.commit()
+
+
+async def _upload_brand_svg(request: Request, kind: str):
+    """Sube un SVG master de marca (`wordmark` | `isologo`) a R2 y deriva los
+    assets raster que consume el sistema (mail / favicon / íconos).
+
+    Solo acepta SVG: es la fuente vectorial themable de la que se rasteriza todo
+    (motor `services.branding`). El master + cada derivado se guardan en
+    `app_settings` con su URL versionada (cache-buster).
+    """
+    from services.branding import derive_from_isologo, derive_from_wordmark
+    from services.media.storage import put as _r2_put
+    from services.media_fastapi import media_http
+
+    session = require_admin(request)
+    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file'")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Archivo muy grande (máx 5MB)")
+
+    filename = (getattr(file, "filename", "") or "").lower()
+    ctype_in = (getattr(file, "content_type", "") or "").lower()
+    is_svg = filename.endswith(".svg") or "svg" in ctype_in or b"<svg" in raw[:1024].lower()
+    if not is_svg:
+        raise HTTPException(400, "Solo se admite SVG (es la fuente vectorial de la marca)")
+
+    try:
+        svg_text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(400, "El SVG no es UTF-8 válido")
+
+    # Master a R2 (path fijo → sobreescribe).
+    with media_http():
+        master_url = _r2_put(f"branding/{kind}.svg", raw, "image/svg+xml")
+    import time as _time
+
+    master_key = f"{kind}_svg_url"
+    settings_out = {master_key: f"{master_url}?v={int(_time.time())}"}
+
+    # Derivar los assets raster del master.
+    try:
+        if kind == "wordmark":
+            settings_out.update(await derive_from_wordmark(svg_text))
+        else:
+            settings_out.update(await derive_from_isologo(svg_text))
+    except Exception as e:
+        raise HTTPException(500, f"No se pudieron derivar los assets: {e}")
+
+    conn = get_db()
+    try:
+        _save_settings(conn, settings_out, actor)
+    finally:
+        conn.close()
+    return {"ok": True, "settings": settings_out}
+
+
+@router.post("/admin/settings/upload-wordmark")
+async def upload_wordmark(request: Request):
+    """SVG del wordmark → deriva el logo del mail (blanco sobre transparente)."""
+    return await _upload_brand_svg(request, "wordmark")
+
+
+@router.post("/admin/settings/upload-isologo")
+async def upload_isologo(request: Request):
+    """SVG del isologo → deriva favicon + apple-touch + icon-512 (tile amber + ink)."""
+    return await _upload_brand_svg(request, "isologo")
 
 
 # ── Backup manual ─────────────────────────────────────────────────────────────
