@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { adminApi } from "@/lib/admin/api";
+import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
 
 const fmtArs = (n: number) => formatARS(n);
@@ -42,6 +42,9 @@ export function RegistrarPagoModal({
     pagado === 0 ? String(sena50) : String(saldo),
   );
   const [concepto, setConcepto] = useState(pagado === 0 ? "Seña" : "Saldo final");
+  // A quién se cobró y cómo. Default del dueño: Tincho + transferencia.
+  const [destinatario, setDestinatario] = useState<string>("Tincho");
+  const [metodo, setMetodo] = useState<string>("transferencia");
 
   const monto = Math.max(0, Number(montoInput) || 0);
 
@@ -49,6 +52,8 @@ export function RegistrarPagoModal({
   // editarse desde que se montó el modal → los presets deben reflejar lo vigente).
   useEffect(() => {
     if (!open) return;
+    setDestinatario("Tincho");
+    setMetodo("transferencia");
     if (pagado === 0) {
       setPreset("sena");
       setMontoInput(String(Math.round(total * 0.5)));
@@ -86,11 +91,13 @@ export function RegistrarPagoModal({
   };
 
   const addMut = useMutation({
-    mutationFn: () => adminApi.addPago(pedidoId, monto, concepto || undefined),
+    mutationFn: () =>
+      adminApi.addPago(pedidoId, monto, concepto || undefined, undefined, destinatario, metodo),
     onSuccess: () => {
       toast.success("Pago registrado");
       qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
+      qc.invalidateQueries({ queryKey: ["admin", "pagos-log"] });
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -173,6 +180,54 @@ export function RegistrarPagoModal({
             placeholder="Seña, saldo final…"
             className="h-9 text-sm"
           />
+        </div>
+
+        {/* Destinatario + método */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              Cobró
+            </Label>
+            <div className="flex gap-1.5">
+              {DESTINATARIOS_PAGO.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDestinatario(d)}
+                  className={cn(
+                    "flex-1 rounded-md border px-2 py-1.5 text-xs font-medium capitalize transition",
+                    destinatario === d
+                      ? "border-ink bg-ink text-background"
+                      : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              Método
+            </Label>
+            <div className="flex gap-1.5">
+              {METODOS_PAGO.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMetodo(m)}
+                  className={cn(
+                    "flex-1 rounded-md border px-2 py-1.5 text-xs font-medium capitalize transition",
+                    metodo === m
+                      ? "border-ink bg-ink text-background"
+                      : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
+                  )}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* CTA */}

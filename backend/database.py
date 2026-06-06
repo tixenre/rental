@@ -1032,18 +1032,27 @@ def init_db():
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquiler_pagos (
-            id         SERIAL PRIMARY KEY,
-            pedido_id  INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
-            monto      INTEGER NOT NULL,
-            concepto   TEXT,
-            fecha      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id           SERIAL PRIMARY KEY,
+            pedido_id    INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
+            monto        INTEGER NOT NULL,
+            concepto     TEXT,
+            destinatario TEXT,
+            metodo       TEXT,
+            fecha        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_pagos_pedido ON alquiler_pagos(pedido_id)
     """)
+
+    # destinatario (a quién se cobró: Tincho/Pablo) + metodo (transferencia/
+    # efectivo) — esquema en dos capas (MEMORIA 2026-06-03): también en la
+    # migración u5v6w7x8y9z0. Nullable a propósito: los pagos previos a junio
+    # 2026 son import del sistema anterior y quedan sin especificar ("—").
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS destinatario TEXT")
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS metodo TEXT")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS solicitudes_modificacion (

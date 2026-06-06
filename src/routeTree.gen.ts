@@ -36,6 +36,7 @@ const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
 const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
+const AdminPagosLazyRouteImport = createFileRoute('/admin/pagos')()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
@@ -146,6 +147,11 @@ const AdminSettingsLazyRoute = AdminSettingsLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/settings.lazy').then((d) => d.Route),
 )
+const AdminPagosLazyRoute = AdminPagosLazyRouteImport.update({
+  id: '/pagos',
+  path: '/pagos',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() => import('./routes/admin/pagos.lazy').then((d) => d.Route))
 const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
   id: '/estadisticas',
   path: '/estadisticas',
@@ -351,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/pagos': typeof AdminPagosLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/unidades': typeof AdminUnidadesLazyRoute
@@ -391,6 +398,7 @@ export interface FileRoutesByTo {
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/pagos': typeof AdminPagosLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/unidades': typeof AdminUnidadesLazyRoute
@@ -436,6 +444,7 @@ export interface FileRoutesById {
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/pagos': typeof AdminPagosLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
   '/admin/solicitudes': typeof AdminSolicitudesLazyRoute
   '/admin/unidades': typeof AdminUnidadesLazyRoute
@@ -482,6 +491,7 @@ export interface FileRouteTypes {
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
+    | '/admin/pagos'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/unidades'
@@ -522,6 +532,7 @@ export interface FileRouteTypes {
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
+    | '/admin/pagos'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/unidades'
@@ -566,6 +577,7 @@ export interface FileRouteTypes {
     | '/admin/diseno'
     | '/admin/email-templates'
     | '/admin/estadisticas'
+    | '/admin/pagos'
     | '/admin/settings'
     | '/admin/solicitudes'
     | '/admin/unidades'
@@ -691,6 +703,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pagos': {
+      id: '/admin/pagos'
+      path: '/pagos'
+      fullPath: '/admin/pagos'
+      preLoaderRoute: typeof AdminPagosLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/estadisticas': {
@@ -945,6 +964,7 @@ interface AdminRouteChildren {
   AdminDisenoLazyRoute: typeof AdminDisenoLazyRoute
   AdminEmailTemplatesLazyRoute: typeof AdminEmailTemplatesLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
+  AdminPagosLazyRoute: typeof AdminPagosLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
   AdminSolicitudesLazyRoute: typeof AdminSolicitudesLazyRoute
   AdminUnidadesLazyRoute: typeof AdminUnidadesLazyRoute
@@ -966,6 +986,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDisenoLazyRoute: AdminDisenoLazyRoute,
   AdminEmailTemplatesLazyRoute: AdminEmailTemplatesLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
+  AdminPagosLazyRoute: AdminPagosLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
   AdminSolicitudesLazyRoute: AdminSolicitudesLazyRoute,
   AdminUnidadesLazyRoute: AdminUnidadesLazyRoute,
