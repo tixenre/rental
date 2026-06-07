@@ -111,6 +111,8 @@ function RendicionDetalle({
 }) {
   return (
     <div className="space-y-6">
+      <CierreControl mes={mes} cerrado={data.cierre_contable} onChanged={onChanged} />
+
       {/* Alertas de integridad */}
       {data.advertencias.length > 0 && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-1">
@@ -198,6 +200,70 @@ function RendicionDetalle({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CierreControl({
+  mes,
+  cerrado,
+  onChanged,
+}: {
+  mes: string;
+  cerrado: boolean;
+  onChanged: () => void;
+}) {
+  const cerrar = useMutation({
+    mutationFn: () => adminApi.cerrarMesContable(mes),
+    onSuccess: () => {
+      toast.success("Mes cerrado");
+      onChanged();
+    },
+    onError: (e) => toast.error("No se pudo cerrar", { description: (e as Error).message }),
+  });
+  const reabrir = useMutation({
+    mutationFn: () => adminApi.reabrirMesContable(mes),
+    onSuccess: () => {
+      toast.success("Mes reabierto");
+      onChanged();
+    },
+    onError: (e) => toast.error("No se pudo reabrir", { description: (e as Error).message }),
+  });
+
+  if (cerrado) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-lg border hairline bg-muted/20 p-3">
+        <span className="text-sm text-ink">
+          🔒 Mes cerrado — los movimientos de este mes están trabados.
+        </span>
+        <button
+          type="button"
+          onClick={() => reabrir.mutate()}
+          disabled={reabrir.isPending}
+          className="h-8 shrink-0 rounded-md border hairline px-3 text-xs hover:bg-muted/40"
+        >
+          Reabrir
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex justify-end">
+      <button
+        type="button"
+        onClick={() => {
+          if (
+            window.confirm(
+              "¿Cerrar el mes? Vas a trabar la edición de sus movimientos (se puede reabrir).",
+            )
+          )
+            cerrar.mutate();
+        }}
+        disabled={cerrar.isPending}
+        className="h-8 rounded-md border hairline px-3 text-xs hover:bg-muted/40"
+      >
+        Cerrar mes
+      </button>
     </div>
   );
 }

@@ -115,6 +115,51 @@ function ContabilidadTablero() {
           </div>
         </>
       )}
+
+      <ReconciliacionPanel />
+    </div>
+  );
+}
+
+function ReconciliacionPanel() {
+  const q = useQuery({
+    queryKey: ["admin", "contabilidad", "reconciliacion"],
+    queryFn: () => adminApi.getReconciliacionContable(),
+  });
+  const r = q.data;
+  if (!r) return null;
+
+  const problemas: string[] = [];
+  if (r.saldos_negativos.cantidad > 0)
+    problemas.push(`${r.saldos_negativos.cantidad} caja(s) con saldo negativo`);
+  if (r.pagos_sin_socio.cantidad > 0)
+    problemas.push(
+      `${r.pagos_sin_socio.cantidad} cobro(s) sin socio asignado (${formatARS(r.pagos_sin_socio.monto)})`,
+    );
+  if (r.movimientos_cuenta_inactiva.cantidad > 0)
+    problemas.push(
+      `${r.movimientos_cuenta_inactiva.cantidad} movimiento(s) en cuentas dadas de baja`,
+    );
+  if (!r.reporte.ok) problemas.push("el reporte de liquidación tiene observaciones");
+
+  return (
+    <div
+      className={`rounded-lg border p-4 ${
+        r.ok ? "hairline bg-muted/10" : "border-destructive/40 bg-destructive/5"
+      }`}
+    >
+      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1">
+        Reconciliación
+      </div>
+      {r.ok ? (
+        <div className="text-sm text-ink">✓ Todo cuadra.</div>
+      ) : (
+        <ul className="text-sm text-destructive list-disc pl-5 space-y-0.5">
+          {problemas.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
