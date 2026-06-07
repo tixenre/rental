@@ -1563,7 +1563,13 @@ export const adminApi = {
   // reemplazar items completos del pedido (PUT, requiere ≥1 ítem)
   updatePedidoItems: (
     id: number,
-    items: { equipo_id: number; cantidad: number; precio_jornada: number }[],
+    items: {
+      equipo_id: number | null;
+      cantidad: number;
+      precio_jornada: number;
+      nombre_libre?: string | null;
+      cobro_modo?: CobroModo;
+    }[],
   ) =>
     authedJson<Pedido>(`/api/alquileres/${id}/items`, {
       method: "PUT",
@@ -1587,6 +1593,10 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
   },
+  generarLinkVerificacion: (clienteId: number) =>
+    authedJson<{ session_id: string; url: string }>(`/api/admin/verificacion/sesion/${clienteId}`, {
+      method: "POST",
+    }),
 
   // calendario
   getCalendario: (desde: string, hasta: string) => {
@@ -2002,6 +2012,15 @@ export type Cliente = {
   cuit: string | null;
   descuento: number | null;
   perfil_impuestos: string | null;
+  // Verificación de identidad Didit
+  dni_validado_at: string | null;
+  dni: string | null;
+  cuil: string | null;
+  nombre_renaper: string | null;
+  apellido_renaper: string | null;
+  fecha_nacimiento_renaper: string | null;
+  direccion_renaper: string | null;
+  apodo: string | null;
 };
 export type ClientesListResp = {
   total: number;
@@ -2037,10 +2056,13 @@ export type PedidoCreateInput = {
 /** @deprecated Usar EstadoPedido importado de @/lib/pedido-estados */
 export type PedidoEstado = EstadoPedido;
 
+export type CobroModo = "jornada" | "fijo";
+
 export type PedidoItem = {
   id: number;
   pedido_id: number;
-  equipo_id: number;
+  /** null = línea personalizada (#805): no es del catálogo, no reserva stock. */
+  equipo_id: number | null;
   cantidad: number;
   precio_jornada: number;
   subtotal: number;
@@ -2049,6 +2071,9 @@ export type PedidoItem = {
   nombre_publico?: string | null;
   nombre_publico_largo?: string | null;
   foto_url?: string | null;
+  /** Línea personalizada (#805): nombre libre + modo de cobro por línea. */
+  nombre_libre?: string | null;
+  cobro_modo?: CobroModo;
 };
 
 export type PedidoPago = {

@@ -60,6 +60,7 @@ const items: NavItem[] = [
     icon: LayoutDashboard,
     exact: true,
   },
+  { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
   {
     title: "Inventario",
     url: "/admin/equipos",
@@ -74,7 +75,6 @@ const items: NavItem[] = [
     ],
   },
   { title: "Estudio", url: "/admin/estudio", icon: Clapperboard },
-  { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
   { title: "Solicitudes", url: "/admin/solicitudes", icon: Inbox },
   { title: "Clientes", url: "/admin/clientes", icon: Users },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
@@ -107,7 +107,7 @@ export function AdminSidebar({ email }: { email: string }) {
   // Estado open/closed de cada grupo, persistido en localStorage para que el
   // dueño no tenga que re-abrir el inventario cada vez que entra.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    const fallback = { "/admin/equipos": true };
+    const fallback: Record<string, boolean> = {};
     if (typeof window === "undefined") return fallback;
     try {
       const raw = window.localStorage.getItem("admin-sidebar:openGroups");

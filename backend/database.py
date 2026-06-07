@@ -417,6 +417,26 @@ def init_db():
     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_clientes_nombre_apellido_trgm ON clientes USING gin ({_nombre_apellido} gin_trgm_ops)")
     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_clientes_email_trgm ON clientes USING gin ({CAMPO_PLANTILLA.format(expr='email')} gin_trgm_ops)")
     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_clientes_cuit_trgm ON clientes USING gin ({CAMPO_PLANTILLA.format(expr='cuit')} gin_trgm_ops)")
+    # Verificación de identidad Didit (DNI + selfie → RENAPER). Esquema en dos
+    # capas (MEMORIA 2026-06-03): espejo idempotente de la migración v6w7x8y9z0a1.
+    # — dni: número de documento validado (sin foto — Didit no la entrega).
+    # — cuil: CUIL personal confirmado por RENAPER (puede diferir del `cuit` de
+    #   facturación, que puede ser la razón social de una empresa).
+    # — dni_validado_at: timestamp de la aprobación (NULL = no verificado todavía).
+    # — didit_session_id: ID de la sesión de Didit para auditoría y trazabilidad.
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cuil TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_validado_at TIMESTAMP")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS didit_session_id TEXT")
+    # Datos completos de RENAPER (extraídos por Didit del documento + base RENAPER).
+    # Solo se persiste texto — no hay imagen ni biométrico (Ley 25.326).
+    # Todos los campos son NULL hasta completar la verificación.
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nombre_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apellido_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_nacimiento_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion_renaper TEXT")
+    # apodo: alias opcional para saludos informales en mails (siempre editable).
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apodo TEXT")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
@@ -461,12 +481,28 @@ def init_db():
         CREATE TABLE IF NOT EXISTS alquiler_items (
             id             SERIAL PRIMARY KEY,
             pedido_id      INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
-            equipo_id      INTEGER NOT NULL REFERENCES equipos(id),
+            -- equipo_id NULL = línea personalizada (texto libre, #805): no es del
+            -- catálogo, no reserva stock. Su nombre vive en `nombre_libre`.
+            equipo_id      INTEGER REFERENCES equipos(id),
             cantidad       INTEGER NOT NULL DEFAULT 1,
             precio_jornada INTEGER NOT NULL DEFAULT 0,
-            subtotal       INTEGER NOT NULL DEFAULT 0
+            subtotal       INTEGER NOT NULL DEFAULT 0,
+            -- Orden manual de las líneas dentro del pedido (drag-reorder, #806).
+            -- Se asigna por posición al guardar; los displays ordenan por `orden, id`.
+            orden          INTEGER NOT NULL DEFAULT 0,
+            -- Línea personalizada (#805): nombre libre + modo de cobro por línea.
+            -- `cobro_modo`: 'jornada' (× jornadas, default = equipos) | 'fijo' (monto único).
+            nombre_libre   TEXT,
+            cobro_modo     TEXT NOT NULL DEFAULT 'jornada'
         )
     """)
+    # Idempotente para tablas ya creadas antes de estas features (esquema en dos capas).
+    conn.execute("ALTER TABLE alquiler_items ADD COLUMN IF NOT EXISTS orden INTEGER NOT NULL DEFAULT 0")
+    conn.execute("ALTER TABLE alquiler_items ADD COLUMN IF NOT EXISTS nombre_libre TEXT")
+    conn.execute("ALTER TABLE alquiler_items ADD COLUMN IF NOT EXISTS cobro_modo TEXT NOT NULL DEFAULT 'jornada'")
+    # Línea personalizada (#805): equipo_id deja de ser NOT NULL para permitir
+    # líneas libres. Idempotente para tablas viejas con la constraint.
+    conn.execute("ALTER TABLE alquiler_items ALTER COLUMN equipo_id DROP NOT NULL")
 
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_pedido_items_pedido ON alquiler_items(pedido_id)

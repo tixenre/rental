@@ -32,14 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
-import {
-  AdminCard,
-  AdminCardHeader,
-  AdminCardMeta,
-  AdminCardFooter,
-  AdminCardPrice,
-  FAB,
-} from "@/components/mobile";
+import { AdminCard, FAB } from "@/components/mobile";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaCorta } from "@/lib/format";
 
@@ -182,14 +175,14 @@ function PedidosPage() {
   return (
     <div className="flex flex-col h-[calc(100dvh-var(--admin-topbar-h,56px))] min-h-0">
       {/* Header */}
-      <div className="px-4 md:px-6 pt-5 pb-3 shrink-0">
+      <div className="px-4 md:px-6 pt-3 md:pt-5 pb-2 md:pb-3 shrink-0">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
               Operaciones · Pedidos
             </div>
-            <h1 className="font-display text-3xl text-ink">Pedidos</h1>
-            <p className="text-sm text-muted-foreground mt-1 max-w-[540px]">
+            <h1 className="font-display text-2xl md:text-3xl text-ink">Pedidos</h1>
+            <p className="hidden md:block text-sm text-muted-foreground mt-1 max-w-[540px]">
               Reservas activas y solicitudes de cambio de tus clientes.{" "}
               {pedidosQ.isLoading ? "Cargando…" : `${total} en total.`}
             </p>
@@ -205,7 +198,7 @@ function PedidosPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 border-b hairline mt-4 -mb-px">
+        <div className="flex items-center gap-1 border-b hairline mt-3 md:mt-4 -mb-px">
           <TabBtn active={tab === "todos"} onClick={() => setTab("todos")}>
             Todos
           </TabBtn>
@@ -222,14 +215,14 @@ function PedidosPage() {
         </div>
 
         {/* Smart-chips */}
-        <div className="flex flex-wrap items-center gap-1.5 mt-3">
+        <div className="flex items-center gap-1 mt-2 overflow-x-auto pb-0.5 md:flex-wrap md:gap-1.5 md:mt-3">
           {smartChips.map((c) => (
             <button
               key={c.id}
               type="button"
               onClick={() => setSmart(smart === c.id ? null : c.id)}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                 smart === c.id
                   ? "border-ink bg-surface text-ink"
                   : "border-hairline text-muted-foreground hover:text-ink hover:border-ink",
@@ -243,7 +236,7 @@ function PedidosPage() {
         </div>
 
         {/* Búsqueda + chips de estado */}
-        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-3">
+        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-2 md:mt-3">
           <div className="relative md:max-w-sm flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -254,14 +247,14 @@ function PedidosPage() {
             />
           </div>
           {tab === "todos" && (
-            <div className="flex flex-wrap items-center gap-1.5 md:ml-auto">
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 md:flex-wrap md:gap-1.5 md:ml-auto">
               {ESTADO_FILTERS.map((f) => (
                 <button
                   key={f.id}
                   type="button"
                   onClick={() => setEstadoF(f.id)}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                    "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
                     estadoF === f.id
                       ? "bg-ink text-amber border-ink"
                       : "border-hairline text-muted-foreground hover:text-ink hover:border-ink",
@@ -325,7 +318,7 @@ function PedidosPage() {
       </div>
 
       {/* Mobile: cards */}
-      <div className="md:hidden flex-1 overflow-y-auto px-4 pb-24 space-y-3 border-t hairline pt-3">
+      <div className="md:hidden flex-1 overflow-y-auto px-4 pb-24 space-y-2 border-t hairline pt-3">
         {pedidosQ.isLoading &&
           Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-28 w-full rounded-xl" />
@@ -335,26 +328,36 @@ function PedidosPage() {
         )}
         {items.map((p) => (
           <AdminCard key={p.id} onClick={() => openEditor(p.id)}>
-            <AdminCardHeader
-              label={`#${p.numero_pedido ?? p.id}`}
-              title={p.cliente_nombre || "Sin cliente"}
-              subtitle={p.cliente_email ?? undefined}
-              badge={<EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />}
-            />
-            <AdminCardMeta>
-              {hoyTag(p) ?? (
-                <>
-                  {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
-                </>
-              )}
-            </AdminCardMeta>
-            <AdminCardFooter>
-              <AdminCardPrice
-                total={p.monto_total ?? 0}
-                saldo={saldoDe(p) > 0 ? saldoDe(p) : null}
-              />
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="mb-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  #{p.numero_pedido ?? p.id}
+                </div>
+                <div className="truncate font-medium text-ink">
+                  {p.cliente_nombre || "Sin cliente"}
+                </div>
+              </div>
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                <EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />
+                <span
+                  className={cn(
+                    "font-semibold text-sm tabular-nums",
+                    (p.monto_total ?? 0) === 0 ? "text-muted-foreground" : "text-ink",
+                  )}
+                >
+                  {formatARS(p.monto_total ?? 0)}
+                </span>
+                {tieneSaldo(p) && (
+                  <span className="text-xs tabular-nums text-destructive">
+                    saldo {formatARS(saldoDe(p))}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+              <span>{hoyTag(p) ?? `${fechaDia(p.fecha_desde)} → ${fechaDia(p.fecha_hasta)}`}</span>
               <WhatsAppButton pedido={p} phone={p.cliente_telefono} variant="icon" />
-            </AdminCardFooter>
+            </div>
           </AdminCard>
         ))}
       </div>

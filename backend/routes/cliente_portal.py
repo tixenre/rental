@@ -178,7 +178,10 @@ def cliente_me(request: Request):
             """SELECT id, nombre, apellido, email, telefono, direccion, cuit,
                       perfil_impuestos, descuento, direccion_maps_url,
                       razon_social, domicilio_fiscal, email_facturacion,
-                      created_at
+                      created_at,
+                      dni, cuil, dni_validado_at,
+                      nombre_renaper, apellido_renaper, fecha_nacimiento_renaper,
+                      direccion_renaper, apodo
                FROM clientes WHERE id = ?""",
             (cliente_id,)
         ).fetchone()
@@ -193,6 +196,7 @@ class PerfilUpdate(BaseModel):
     telefono:  Optional[str] = None
     direccion: Optional[str] = None
     cuit:      Optional[str] = None
+    apodo:     Optional[str] = None
     # Datos fiscales (cliente puede actualizar para Factura A).
     perfil_impuestos:  Optional[str] = None
     razon_social:      Optional[str] = None
@@ -203,9 +207,32 @@ class PerfilUpdate(BaseModel):
 @router.patch("/api/cliente/me")
 def cliente_update_me(data: PerfilUpdate, request: Request):
     """Permite al cliente actualizar sus datos personales.
-    NO se permite cambiar email (clave de identidad OAuth) ni descuento."""
+
+    Tras verificar identidad (dni_validado_at IS NOT NULL) solo `telefono` y
+    `apodo` son editables — el resto queda bloqueado (los datos legales los
+    certifica RENAPER). NO se permite cambiar email (clave de identidad OAuth)
+    ni descuento.
+    """
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
+
+    with get_db() as conn:
+        row_actual = conn.execute(
+            "SELECT dni_validado_at FROM clientes WHERE id = ?", (cliente_id,)
+        ).fetchone()
+    verificado = bool(row_actual and row_actual["dni_validado_at"])
+
+    # Campos bloqueados post-verificación (datos que certifica RENAPER).
+    _BLOQUEADOS = ("nombre", "apellido", "direccion", "cuit",
+                   "perfil_impuestos", "razon_social", "domicilio_fiscal", "email_facturacion")
+    if verificado:
+        for campo in _BLOQUEADOS:
+            if getattr(data, campo, None) is not None:
+                raise HTTPException(
+                    403,
+                    "Los datos personales no pueden modificarse tras la verificación de identidad. "
+                    "Solo podés editar teléfono y apodo.",
+                )
 
     sets, vals = [], []
     if data.nombre is not None:
@@ -221,6 +248,8 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
         sets.append("direccion = ?"); vals.append(data.direccion.strip())
     if data.cuit is not None:
         sets.append("cuit = ?"); vals.append(data.cuit.strip() or None)
+    if data.apodo is not None:
+        sets.append("apodo = ?"); vals.append(data.apodo.strip() or None)
     if data.perfil_impuestos is not None:
         p = data.perfil_impuestos.strip()
         if p not in ("consumidor_final", "responsable_inscripto", "monotributo", "exento"):
@@ -245,7 +274,10 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
             row = conn.execute(
                 """SELECT id, nombre, apellido, email, telefono, direccion, cuit,
                           perfil_impuestos, descuento, direccion_maps_url,
-                          razon_social, domicilio_fiscal, email_facturacion
+                          razon_social, domicilio_fiscal, email_facturacion,
+                          dni, cuil, dni_validado_at,
+                          nombre_renaper, apellido_renaper, fecha_nacimiento_renaper,
+                          direccion_renaper, apodo
                    FROM clientes WHERE id = ?""",
                 (cliente_id,),
             ).fetchone()
@@ -287,9 +319,23 @@ class PedidoClienteCreate(BaseModel):
 def cliente_crear_pedido(
     data: PedidoClienteCreate, request: Request, background: BackgroundTasks,
 ):
-    """Crea un pedido (estado 'presupuesto') ligado al cliente autenticado."""
+    """Crea un pedido (estado 'presupuesto') ligado al cliente autenticado.
+
+    Requiere identidad verificada (dni_validado_at IS NOT NULL).
+    """
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
+
+    with get_db() as conn:
+        row_cli = conn.execute(
+            "SELECT dni_validado_at FROM clientes WHERE id = ?", (cliente_id,)
+        ).fetchone()
+    if not row_cli or not row_cli["dni_validado_at"]:
+        raise HTTPException(
+            403,
+            "Verificá tu identidad antes de hacer un pedido. "
+            "Andá a la sección Identidad en tu perfil.",
+        )
 
     if not data.items:
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
@@ -385,11 +431,13 @@ def cliente_pedidos(request: Request):
             d = row_to_dict(p)
             items = conn.execute(f"""
                 SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                       e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
+                       COALESCE(e.nombre, ai.nombre_libre) AS nombre,
+                       {MARCA_SUBQUERY}, e.modelo, e.foto_url,
                        e.nombre_publico, e.nombre_publico_largo
                 FROM alquiler_items ai
-                JOIN equipos e ON e.id = ai.equipo_id
+                LEFT JOIN equipos e ON e.id = ai.equipo_id
                 WHERE ai.pedido_id = ?
+                ORDER BY ai.orden, ai.id
             """, (p["id"],)).fetchall()
             d["items"] = [row_to_dict(i) for i in items]
 
@@ -438,11 +486,13 @@ def cliente_pedido_detalle(id: int, request: Request):
 
         items = conn.execute(f"""
             SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                   e.id AS equipo_id, e.nombre, {MARCA_SUBQUERY}, e.foto_url,
+                   ai.equipo_id, COALESCE(e.nombre, ai.nombre_libre) AS nombre,
+                   {MARCA_SUBQUERY}, e.foto_url,
                    e.nombre_publico, e.nombre_publico_largo
             FROM alquiler_items ai
-            JOIN equipos e ON e.id = ai.equipo_id
+            LEFT JOIN equipos e ON e.id = ai.equipo_id
             WHERE ai.pedido_id = ?
+            ORDER BY ai.orden, ai.id
         """, (id,)).fetchall()
         d["items"] = [row_to_dict(i) for i in items]
 
@@ -635,6 +685,32 @@ def _items_payload_to_pedido_items(items: list[ModificacionItemIn], precios: dic
     ]
 
 
+def _lineas_libres_actuales(conn, pedido_id: int) -> list:
+    """Líneas personalizadas (#805, equipo_id NULL) ya guardadas en el pedido,
+    como `PedidoItem`. El portal del cliente NO las maneja (solo ítems de
+    catálogo) → hay que preservarlas al reaplicar los ítems. Sin esto, el
+    DELETE+reinsert de `_apply_pedido_items` las borraría en silencio cuando el
+    cliente edita su pedido: un flete/servicio que agregó el admin desaparecería
+    y cambiaría el total cobrado (pérdida de plata)."""
+    from routes.alquileres import PedidoItem
+    rows = conn.execute(
+        "SELECT cantidad, precio_jornada, nombre_libre, cobro_modo "
+        "FROM alquiler_items WHERE pedido_id=? AND equipo_id IS NULL "
+        "ORDER BY orden, id",
+        (pedido_id,),
+    ).fetchall()
+    return [
+        PedidoItem(
+            equipo_id=None,
+            cantidad=r["cantidad"],
+            precio_jornada=r["precio_jornada"],
+            nombre_libre=r["nombre_libre"],
+            cobro_modo=r["cobro_modo"],
+        )
+        for r in rows
+    ]
+
+
 def _precios_actuales(conn, pedido_id: int) -> dict[int, int]:
     """Mapa equipo_id → precio_jornada usado actualmente en el pedido.
 
@@ -722,7 +798,10 @@ def cliente_modificar_pedido(
                 if datos_kwargs:
                     _apply_pedido_datos(conn, id, PedidoDatos(**datos_kwargs))
 
+                # Preservar las líneas personalizadas (#805): el portal solo manda
+                # ítems de catálogo; sin esto el reinsert las borraría.
                 pedido_items = _items_payload_to_pedido_items(data.items, precios)
+                pedido_items += _lineas_libres_actuales(conn, id)
                 _apply_pedido_items(conn, id, pedido_items)
 
                 # Re-validar stock con el rango nuevo
@@ -1110,10 +1189,12 @@ def admin_responder_solicitud(
                 if datos_kwargs:
                     _apply_pedido_datos(conn, sm["pedido_id"], PedidoDatos(**datos_kwargs))
 
+                # Preservar las líneas personalizadas (#805) — ver nota en el caso directo.
                 pedido_items = _items_payload_to_pedido_items(
                     [ModificacionItemIn(**it) for it in cambios.get("items") or []],
                     precios,
                 )
+                pedido_items += _lineas_libres_actuales(conn, sm["pedido_id"])
                 _apply_pedido_items(conn, sm["pedido_id"], pedido_items)
 
                 # Re-validar stock con el rango nuevo
@@ -1168,13 +1249,14 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
     pedido = row_to_dict(row)
 
     items = conn.execute(f"""
-        SELECT pi.cantidad, e.id AS equipo_id, e.nombre, {MARCA_SUBQUERY}, e.modelo,
+        SELECT pi.cantidad, pi.equipo_id, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
+               {MARCA_SUBQUERY}, e.modelo,
                e.serie, e.valor_reposicion, e.foto_url, pi.precio_jornada, pi.subtotal,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
-        JOIN equipos e ON e.id = pi.equipo_id
+        LEFT JOIN equipos e ON e.id = pi.equipo_id
         WHERE pi.pedido_id = ?
-        ORDER BY e.nombre
+        ORDER BY pi.orden, pi.id
     """, (pedido_id,)).fetchall()
     pedido["items"] = [row_to_dict(i) for i in items]
 
@@ -1188,21 +1270,27 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
         """, (item['equipo_id'],)).fetchall()
         item['componentes'] = [row_to_dict(c) for c in comp_rows]
 
-    # Datos del cliente para el contrato + Factura A si aplica
+    # Datos del cliente para el contrato + Factura A si aplica.
+    # Nombre y dirección: preferir datos RENAPER si la identidad fue verificada.
     cli = conn.execute(
         """SELECT nombre, apellido, email, telefono, direccion, cuit,
                   perfil_impuestos, razon_social, domicilio_fiscal,
-                  email_facturacion
+                  email_facturacion,
+                  dni, nombre_renaper, apellido_renaper, direccion_renaper
            FROM clientes WHERE id = ?""",
         (cliente_id,),
     ).fetchone()
     if cli:
         c = row_to_dict(cli)
-        pedido["cliente_nombre"] = f"{c.get('nombre','')} {c.get('apellido','')}".strip()
+        if c.get("nombre_renaper"):
+            pedido["cliente_nombre"] = f"{c['nombre_renaper']} {c.get('apellido_renaper', '')}".strip()
+        else:
+            pedido["cliente_nombre"] = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip()
         pedido["cliente_email"] = c.get("email")
         pedido["cliente_telefono"] = c.get("telefono")
-        pedido["cliente_direccion"] = c.get("direccion")
+        pedido["cliente_direccion"] = c.get("direccion_renaper") or c.get("direccion")
         pedido["cliente_cuit"] = c.get("cuit")
+        pedido["cliente_dni"] = c.get("dni")
         pedido["cliente_perfil_impuestos"] = c.get("perfil_impuestos")
         pedido["cliente_razon_social"] = c.get("razon_social")
         pedido["cliente_domicilio_fiscal"] = c.get("domicilio_fiscal")

@@ -34,18 +34,10 @@ import { FlyToCartLayer } from "@/components/rental/FlyToCartLayer";
 import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { BrandCarousel } from "@/components/rental/BrandCarousel";
-import { ListFilters } from "@/components/rental/ListFilters";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
 import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
 import { PreviewPane } from "@/components/rental/PreviewPane";
-import { SpecFilters } from "@/components/rental/SpecFilters";
-import {
-  useEquipos,
-  useCategorias,
-  useMarcas,
-  discoverFilterableSpecs,
-  type SpecFilterDef,
-} from "@/hooks/useEquipos";
+import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useFavoritos } from "@/hooks/useFavoritos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
@@ -425,22 +417,6 @@ function Index() {
   }, [query, filtered.length]);
 
   // Specs filtrables — descubiertas del subset cat/brand/query (sin
-  // aplicar spec-filters todavía, para que los valores disponibles no
-  // desaparezcan al elegir uno).
-  const filterableSpecs = useMemo(() => {
-    const base = allEquipos.filter((e) => {
-      if (selectedCats.size > 0) {
-        const inCat =
-          selectedCats.has(e.category) ||
-          (e.categorias ?? []).some((c) => selectedCats.has(c.nombre));
-        if (!inCat) return false;
-      }
-      if (brand && e.brand !== brand) return false;
-      return true;
-    });
-    return discoverFilterableSpecs(base);
-  }, [allEquipos, selectedCats, brand]);
-
   const jumpToCategory = (c: string) => {
     setSelectedCats(new Set([c]));
     setMode("grid");
@@ -755,7 +731,6 @@ function Index() {
         <ListMode
           allEquipos={allEquipos}
           apiCategories={apiCategories}
-          marcas={marcas}
           query={query}
           setQuery={setQuery}
           selectedCats={selectedCats}
@@ -775,9 +750,6 @@ function Index() {
             setSelectedCats(new Set([c]));
             setQuery("");
           }}
-          filterableSpecs={filterableSpecs}
-          specFilters={specFilters}
-          setSpecFilters={setSpecFilters}
         />
       )}
 
@@ -856,7 +828,7 @@ function GridMode({
   );
 
   return (
-    <div className="space-y-10 py-6 sm:space-y-12 sm:py-8 lg:py-12">
+    <div className="space-y-10 pt-2 pb-6 sm:space-y-12 sm:pt-3 sm:pb-8 lg:pt-4 lg:pb-12">
       {isFiltered && (
         <div className="px-4 lg:px-12">
           <div className="flex flex-wrap items-center gap-2">
@@ -1026,7 +998,6 @@ function SearchEmptyState({
 function ListMode({
   allEquipos,
   apiCategories,
-  marcas,
   query,
   setQuery,
   selectedCats,
@@ -1037,13 +1008,9 @@ function ListMode({
   filtered,
   getDisponible,
   onSuggestCategory,
-  filterableSpecs,
-  specFilters,
-  setSpecFilters,
 }: {
   allEquipos: Equipment[];
   apiCategories: string[];
-  marcas: BackendMarca[];
   query: string;
   setQuery: (v: string) => void;
   selectedCats: Set<string>;
@@ -1054,9 +1021,6 @@ function ListMode({
   filtered: Equipment[];
   getDisponible: (item: Equipment) => number | undefined;
   onSuggestCategory: (c: string) => void;
-  filterableSpecs: SpecFilterDef[];
-  specFilters: Record<string, string>;
-  setSpecFilters: Dispatch<SetStateAction<Record<string, string>>>;
 }) {
   const PAGE_SIZE = 20;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -1117,16 +1081,6 @@ function ListMode({
 
   return (
     <>
-      <ListFilters
-        categories={apiCategories}
-        brands={marcas}
-        selectedCategories={selectedCats}
-        onToggleCategory={toggleCat}
-        selectedBrand={brand}
-        onBrand={setBrand}
-        onClear={onClear}
-      />
-
       <div className="flex">
         <div className="flex-1 min-w-0 px-3 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-32 lg:px-12 lg:pb-32">
           <ActiveFiltersChips
@@ -1138,26 +1092,6 @@ function ListMode({
             onQuery={setQuery}
             onClear={onClear}
           />
-          {/* Filtros dinámicos por specs estructuradas (Fase H).
-              Solo aparece si el dataset filtrado por cat/brand tiene
-              specs con `en_filtros=true` y 2+ valores únicos. */}
-          {filterableSpecs.length > 0 && (
-            <div className="mb-3 rounded-lg border hairline bg-card/40 p-3">
-              <SpecFilters
-                filterableSpecs={filterableSpecs}
-                selected={specFilters}
-                onChange={(key, value) => {
-                  setSpecFilters((prev) => {
-                    const next = { ...prev };
-                    if (value == null) delete next[key];
-                    else next[key] = value;
-                    return next;
-                  });
-                }}
-                layout="stacked"
-              />
-            </div>
-          )}
           {filtered.length === 0 ? (
             <SearchEmptyState
               query={query || "los filtros activos"}

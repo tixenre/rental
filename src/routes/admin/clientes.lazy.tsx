@@ -1,7 +1,18 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
-import { Plus, Search, Pencil, Trash2, Eye, MoreHorizontal } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Eye,
+  MoreHorizontal,
+  ShieldCheck,
+  ShieldAlert,
+  Copy,
+  Check,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -137,7 +148,15 @@ function ClientesPage() {
                 onClick={() => setViewing(c)}
               >
                 <TableCell>
-                  <div className="text-ink">{nombreCliente(c)}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-ink">{nombreCliente(c)}</span>
+                    {c.dni_validado_at ? (
+                      <ShieldCheck
+                        className="h-3.5 w-3.5 shrink-0 text-verde"
+                        aria-label="Identidad verificada"
+                      />
+                    ) : null}
+                  </div>
                   {c.perfil_impuestos && (
                     <div className="text-xs text-muted-foreground">{c.perfil_impuestos}</div>
                   )}
@@ -267,6 +286,15 @@ function ClienteHistorialSheet({
   onEdit: (c: Cliente) => void;
 }) {
   const navigate = useNavigate();
+  const [linkVerif, setLinkVerif] = useState<string | null>(null);
+  const [generando, setGenerando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    setLinkVerif(null);
+    setCopiado(false);
+  }, [cliente?.id]);
+
   const pedidosQ = useQuery({
     queryKey: ["admin", "cliente-pedidos", cliente?.id],
     queryFn: () => adminApi.getClientePedidos(cliente!.id),
@@ -296,6 +324,109 @@ function ClienteHistorialSheet({
               <Info label="Dirección" value={cliente.direccion || "—"} className="col-span-2" />
               <Info label="Perfil" value={cliente.perfil_impuestos || "—"} />
             </div>
+
+            {/* Identidad Didit */}
+            {cliente.dni_validado_at ? (
+              <div className="rounded-lg border border-verde/30 bg-verde/8 px-3 py-2.5 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-verde text-sm font-semibold">
+                  <ShieldCheck className="h-4 w-4 shrink-0" />
+                  Identidad verificada
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink">
+                  {cliente.nombre_renaper && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Nombre legal: </span>
+                      {cliente.nombre_renaper} {cliente.apellido_renaper}
+                    </div>
+                  )}
+                  {cliente.dni && (
+                    <div>
+                      <span className="text-muted-foreground">DNI: </span>
+                      <span className="font-mono">{cliente.dni}</span>
+                    </div>
+                  )}
+                  {cliente.cuil && (
+                    <div>
+                      <span className="text-muted-foreground">CUIL: </span>
+                      <span className="font-mono">{cliente.cuil}</span>
+                    </div>
+                  )}
+                  {cliente.fecha_nacimiento_renaper && (
+                    <div>
+                      <span className="text-muted-foreground">Nacimiento: </span>
+                      {cliente.fecha_nacimiento_renaper}
+                    </div>
+                  )}
+                  {cliente.direccion_renaper && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Domicilio: </span>
+                      {cliente.direccion_renaper}
+                    </div>
+                  )}
+                </div>
+                <div className="text-[10px] text-muted-foreground font-mono">
+                  Verificado {fmtFecha(cliente.dni_validado_at)}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border hairline px-3 py-2.5 space-y-2.5">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                  Identidad sin verificar
+                </div>
+                {linkVerif ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      Mandále este link al cliente (WhatsApp, mail, etc.):
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={linkVerif}
+                        className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-[11px] text-ink outline-none truncate"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(linkVerif);
+                          setCopiado(true);
+                          setTimeout(() => setCopiado(false), 2000);
+                        }}
+                        className="flex items-center gap-1 rounded-md border hairline bg-surface px-2.5 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors shrink-0 h-[30px]"
+                      >
+                        {copiado ? (
+                          <Check className="h-3.5 w-3.5 text-verde" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                        {copiado ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={generando}
+                    onClick={async () => {
+                      if (!cliente) return;
+                      setGenerando(true);
+                      try {
+                        const r = await adminApi.generarLinkVerificacion(cliente.id);
+                        setLinkVerif(r.url);
+                      } catch {
+                        toast.error("No se pudo generar el link de verificación");
+                      } finally {
+                        setGenerando(false);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 rounded-md border hairline bg-surface px-3 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors disabled:opacity-50 h-[30px]"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {generando ? "Generando…" : "Generar link de verificación"}
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={() => onEdit(cliente)}>

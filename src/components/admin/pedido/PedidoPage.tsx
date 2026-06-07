@@ -912,15 +912,16 @@ function ItemsCard({
   const [openSearch, setOpenSearch] = useState(false);
   const isCliente = mode === "cliente";
 
-  const updateItem = (equipoId: number, patch: Partial<DraftItem>) =>
-    setItems(items.map((it) => (it.equipo_id === equipoId ? { ...it, ...patch } : it)));
+  // Las líneas se identifican por `uid` (las personalizadas no tienen equipo_id, #805).
+  const updateItem = (uid: string, patch: Partial<DraftItem>) =>
+    setItems(items.map((it) => (it.uid === uid ? { ...it, ...patch } : it)));
 
-  const removeItem = (equipoId: number) => {
+  const removeItem = (uid: string) => {
     if (items.length === 1) {
       toast.error("El pedido debe tener al menos un equipo.");
       return;
     }
-    setItems(items.filter((it) => it.equipo_id !== equipoId));
+    setItems(items.filter((it) => it.uid !== uid));
   };
 
   return (
@@ -994,7 +995,7 @@ function ItemsCard({
                 </div>
                 <button
                   type="button"
-                  onClick={() => removeItem(it.equipo_id)}
+                  onClick={() => removeItem(it.uid)}
                   className="rounded p-1 text-muted-foreground hover:text-destructive transition shrink-0"
                 >
                   <X className="h-4 w-4" />
@@ -1008,9 +1009,7 @@ function ItemsCard({
                     size="icon"
                     variant="outline"
                     className="h-9 w-9 sm:h-7 sm:w-7"
-                    onClick={() =>
-                      updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })
-                    }
+                    onClick={() => updateItem(it.uid, { cantidad: Math.max(1, it.cantidad - 1) })}
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
@@ -1019,7 +1018,7 @@ function ItemsCard({
                     min={1}
                     value={it.cantidad}
                     onChange={(e) =>
-                      updateItem(it.equipo_id, { cantidad: parseInt(e.target.value) || 1 })
+                      updateItem(it.uid, { cantidad: parseInt(e.target.value) || 1 })
                     }
                     className={cn(
                       "h-9 w-10 text-center text-sm p-0 sm:h-7",
@@ -1030,7 +1029,7 @@ function ItemsCard({
                     size="icon"
                     variant="outline"
                     className="h-9 w-9 sm:h-7 sm:w-7"
-                    onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
+                    onClick={() => updateItem(it.uid, { cantidad: it.cantidad + 1 })}
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
@@ -1046,7 +1045,7 @@ function ItemsCard({
                       min={0}
                       value={it.precio_jornada}
                       onChange={(e) =>
-                        updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })
+                        updateItem(it.uid, { precio_jornada: parseInt(e.target.value) || 0 })
                       }
                       className="h-9 w-24 text-sm text-base sm:text-sm sm:h-7"
                     />
@@ -1073,18 +1072,20 @@ function ItemsCard({
           const display = eq.nombre_publico || eq.nombre;
           const idx = items.findIndex((i) => i.equipo_id === eq.id);
           if (idx >= 0) {
-            updateItem(eq.id, { cantidad: items[idx].cantidad + 1 });
+            updateItem(items[idx].uid, { cantidad: items[idx].cantidad + 1 });
             toast.success(`+1 ${display}`);
           } else {
             setItems([
               ...items,
               {
+                uid: `e${eq.id}`,
                 equipo_id: eq.id,
                 cantidad: 1,
                 precio_jornada: eq.precio_jornada ?? 0,
                 nombre: eq.nombre,
                 marca: eq.marca,
                 nombre_publico: eq.nombre_publico ?? null,
+                cobro_modo: "jornada",
               },
             ]);
             toast.success(`Agregado: ${display}`);
@@ -1513,7 +1514,7 @@ function SolicitudDiffDialog({
     fecha_desde: string | null;
     fecha_hasta: string | null;
     items: {
-      equipo_id: number;
+      equipo_id: number | null;
       cantidad: number;
       nombre: string;
       nombre_publico?: string | null;
@@ -1528,14 +1529,18 @@ function SolicitudDiffDialog({
   const origHasta = (original.fecha_hasta ?? "").slice(0, 10);
   const fechasCambian = origDesde !== datos.fecha_desde || origHasta !== datos.fecha_hasta;
 
+  // Diff por equipo (cliente no maneja líneas personalizadas #805 → equipo_id null fuera).
   const beforeQty = new Map<number, number>();
-  for (const it of original.items) beforeQty.set(it.equipo_id, it.cantidad);
+  for (const it of original.items)
+    if (it.equipo_id != null) beforeQty.set(it.equipo_id, it.cantidad);
   const afterQty = new Map<number, number>();
-  for (const it of items) afterQty.set(it.equipo_id, it.cantidad);
+  for (const it of items) if (it.equipo_id != null) afterQty.set(it.equipo_id, it.cantidad);
   const nombres = new Map<number, string>();
-  for (const it of original.items) nombres.set(it.equipo_id, it.nombre_publico || it.nombre);
+  for (const it of original.items)
+    if (it.equipo_id != null) nombres.set(it.equipo_id, it.nombre_publico || it.nombre);
   for (const it of items) {
-    if (!nombres.has(it.equipo_id)) nombres.set(it.equipo_id, it.nombre_publico || it.nombre);
+    if (it.equipo_id != null && !nombres.has(it.equipo_id))
+      nombres.set(it.equipo_id, it.nombre_publico || it.nombre);
   }
   const equipoIds = new Set<number>([...beforeQty.keys(), ...afterQty.keys()]);
   const itemsDiff = Array.from(equipoIds)

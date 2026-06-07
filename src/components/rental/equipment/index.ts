@@ -20,4 +20,5 @@ export { PriceBlock } from "./shared/PriceBlock";
 export { FavButton } from "./shared/FavButton";
 export { ShareButton } from "./shared/ShareButton";
 export { SpecsGrid } from "./shared/SpecsGrid";
+export { IncludesLine } from "./shared/IncludesLine";
 export type { EquipmentViewMode } from "./types";

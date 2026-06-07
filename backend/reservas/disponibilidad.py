@@ -51,6 +51,7 @@ def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=No
         FROM alquiler_items pi
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND pi.equipo_id IS NOT NULL
           AND p.fecha_desde < ?
           AND p.fecha_hasta > ?
           AND (? IS NULL OR p.id != ?)
@@ -187,6 +188,7 @@ def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> 
         FROM alquiler_items pi
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND pi.equipo_id IS NOT NULL
           AND p.fecha_hasta > ? AND p.fecha_desde < ?
         """,
         (win_lo, win_hi),
@@ -291,3 +293,161 @@ def _dias_bloqueados(stock, segs, mant, items, d_desde, d_hasta, buf) -> list[st
                 bloqueados.append((dia0 + i * one).date().isoformat())
                 break
     return bloqueados
+
+
+# ── Calendario de disponibilidad por equipo (#808) ──────────────────────────
+#
+# Estado por día de UN equipo, catálogo-facing: 🟢 libre / 🟠 parcial / 🔴 reservado.
+# A diferencia de `dias_no_disponibles` (que colapsa a "¿se puede reservar el día
+# entero?" con buffer, vía diff-array que SUMA todo segmento que toca el día), acá
+# hace falta un BARRIDO TEMPORAL real: distinguir "1 unidad ocupada todo el día"
+# (rojo) de "liberada a las 10am" (naranja) necesita la ocupación CONCURRENTE
+# instante a instante, no la suma por día. Por eso `_estado_diario` es un sweep de
+# eventos. SIN buffer: el calendario muestra ocupación FÍSICA (lo que el dueño
+# describió), no bookability — puede diferir del date-picker a propósito.
+
+
+def _estado_diario(stock, segs, mant, d_desde, d_hasta) -> dict[str, str]:
+    """Cómputo PURO (testeable sin DB): estado por día de un equipo.
+
+    `stock`: unidades totales. `segs`/`mant`: listas de `(desde, hasta, cantidad)`
+    (datetimes) de reservas y de mantenimiento — ambos OCUPAN unidades. Devuelve
+    `{YYYY-MM-DD: 'libre'|'parcial'|'reservado'}` para cada día en [d_desde, d_hasta].
+
+    Barrido de eventos (+c al empezar, −c al terminar) ordenado en el tiempo; por
+    cada día se toma el `max` y el `min` de la ocupación concurrente. Con
+    `free = stock − ocupacion`:
+      - `libre`     ⟺ max_ocupacion == 0 (nada encima en todo el día).
+      - `reservado` ⟺ free_max == 0  (min_ocupacion ≥ stock: 0 libres todo el día).
+      - `parcial`   ⟺ resto (quedan algunas unidades, o se libera/ocupa a mitad de día).
+    """
+    one = datetime.timedelta(days=1)
+    dia0 = d_desde.replace(hour=0, minute=0, second=0, microsecond=0)
+    fin0 = d_hasta.replace(hour=0, minute=0, second=0, microsecond=0)
+    n = (fin0 - dia0).days + 1
+    if n <= 0:
+        return {}
+
+    # Eventos de ocupación (reservas + mantenimiento). Cada segmento [sd, sh) suma
+    # su cantidad mientras está activo. Segmentos vacíos/invertidos se ignoran.
+    eventos: list[tuple] = []
+    for (sd, sh, c) in list(segs) + list(mant):
+        if sd is None or sh is None or sh <= sd:
+            continue
+        eventos.append((sd, c))
+        eventos.append((sh, -c))
+    eventos.sort(key=lambda e: e[0])
+
+    resultado: dict[str, str] = {}
+    ei = 0
+    ocup = 0
+    # Consumir lo que arranca ANTES del primer día (carry-in).
+    while ei < len(eventos) and eventos[ei][0] < dia0:
+        ocup += eventos[ei][1]
+        ei += 1
+    for i in range(n):
+        day_start = dia0 + i * one
+        day_end = day_start + one
+        # Aplicar los eventos EXACTAMENTE al inicio del día (medianoche) ANTES de
+        # medir: una reserva que arranca/termina a las 00:00 define la ocupación
+        # del primer instante del día (half-open [day_start, day_end)).
+        while ei < len(eventos) and eventos[ei][0] <= day_start:
+            ocup += eventos[ei][1]
+            ei += 1
+        # Ocupación al inicio del día (carry) + en cada cambio dentro del día.
+        mn = mx = ocup
+        while ei < len(eventos) and eventos[ei][0] < day_end:
+            ocup += eventos[ei][1]
+            ei += 1
+            if ocup < mn:
+                mn = ocup
+            if ocup > mx:
+                mx = ocup
+        if mx <= 0:
+            estado = "libre"
+        elif stock - mn <= 0:   # free_max == 0 → 0 libres en todo instante
+            estado = "reservado"
+        else:
+            estado = "parcial"
+        resultado[(dia0 + i * one).date().isoformat()] = estado
+    return resultado
+
+
+def estado_diario_equipo(conn, equipo_id: int, desde: str, hasta: str) -> dict:
+    """Estado por día de UN equipo en [desde, hasta] — para el calendario de la
+    ficha (#808). Devuelve `{'stock': N, 'dias': {YYYY-MM-DD: estado}}`.
+
+    Reúne los datos con los MISMOS primitivos que `dias_no_disponibles`: stock de
+    `equipos.cantidad`; segmentos de reserva (estados activos, `equipo_id IS NOT
+    NULL`) expandidos recursivamente con `componentes_de` + `_expandir_mult` para
+    que una reserva de un kit/combo que CONTIENE el equipo cuente (a cualquier
+    profundidad); mantenimiento que bloquea stock. SIN buffer (ocupación física).
+    """
+    d_desde = to_datetime(desde)
+    d_hasta = to_datetime(hasta)
+    if d_desde is None or d_hasta is None or d_hasta < d_desde:
+        return {"stock": 0, "dias": {}}
+
+    row = conn.execute(
+        "SELECT cantidad FROM equipos WHERE id = ? AND eliminado_at IS NULL",
+        (equipo_id,),
+    ).fetchone()
+    if not row:
+        return None  # el route traduce a 404
+    stock = row["cantidad"] or 0
+
+    # Ventana exacta (sin buffer). half-open: traer lo que pisa [dia0, fin+1día).
+    win_lo = d_desde.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    win_hi = (d_hasta.replace(hour=0, minute=0, second=0, microsecond=0)
+              + datetime.timedelta(days=1)).isoformat()
+
+    # Segmentos de reserva expandidos hasta este equipo (backward, vía la receta).
+    graph = componentes_de(conn)
+    exp_cache: dict[int, dict] = {}
+    segs: list[tuple] = []
+    res_rows = conn.execute(
+        f"""
+        SELECT pi.equipo_id AS eid, p.fecha_desde AS fd, p.fecha_hasta AS fh, pi.cantidad AS cant
+        FROM alquiler_items pi
+        JOIN alquileres p ON p.id = pi.pedido_id
+        WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND pi.equipo_id IS NOT NULL
+          AND p.fecha_hasta > ? AND p.fecha_desde < ?
+        """,
+        (win_lo, win_hi),
+    ).fetchall()
+    for r in res_rows:
+        e = r["eid"]
+        consumo = exp_cache.get(e)
+        if consumo is None:
+            consumo = _expandir_mult({e: 1}, graph, solo_esenciales=False)
+            exp_cache[e] = consumo
+        mult = consumo.get(equipo_id)
+        if mult:
+            segs.append((to_datetime(r["fd"]), to_datetime(r["fh"]), (r["cant"] or 0) * mult))
+
+    # Mantenimiento que bloquea stock. Sin `fecha_hasta` → bloquea ese día completo.
+    # `>= win_lo` (no `>` como en las queries gemelas con buffer): acá la ventana NO
+    # tiene buffer, así que un mantenimiento puntual del PRIMER día (solo `fecha`,
+    # COALESCE == win_lo == medianoche de `desde`) debe entrar; con `>` se perdería.
+    mant: list[tuple] = []
+    mrows = conn.execute(
+        """
+        SELECT fecha AS fd, fecha_hasta AS fh, cantidad AS cant
+        FROM equipo_mantenimiento
+        WHERE bloquea_stock = TRUE
+          AND equipo_id = ?
+          AND COALESCE(fecha_hasta, fecha) >= ? AND fecha < ?
+        """,
+        (equipo_id, win_lo, win_hi),
+    ).fetchall()
+    for r in mrows:
+        fd = to_datetime(r["fd"])
+        fh = to_datetime(r["fh"]) if r["fh"] else None
+        if fd is None:
+            continue
+        if fh is None or fh <= fd:
+            fh = fd.replace(hour=0, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
+        mant.append((fd, fh, r["cant"] or 0))
+
+    return {"stock": stock, "dias": _estado_diario(stock, segs, mant, d_desde, d_hasta)}

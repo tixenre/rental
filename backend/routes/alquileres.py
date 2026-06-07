@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Query, HTTPException, Request
 from fastapi.responses import Response
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from database import get_db, row_to_dict, to_datetime, to_iso, now_ar, MARCA_SUBQUERY, marca_subquery
 from rate_limit import limiter
@@ -20,7 +20,7 @@ from routes.clientes import nombre_completo_cliente
 from services.email import send_email, send_raw_email, render_template, wrap_preview, Attachment
 from services.email.service import get_admin_to, primer_nombre
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
-from services.precios import calcular_total, jornadas_periodo, precio_combo
+from services.precios import bruto_linea, calcular_total, jornadas_periodo, precio_combo
 from config import SITE_URL
 
 # Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
@@ -72,15 +72,16 @@ def _maybe_finalizar(conn, pedido_id: int):
 
 def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     rows = conn.execute(f"""
-        SELECT pi.*, e.nombre,
+        SELECT pi.*, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
                {MARCA_SUBQUERY},
                e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo,
                ef.contenido_incluido_json
         FROM alquiler_items pi
-        JOIN equipos e ON e.id = pi.equipo_id
+        LEFT JOIN equipos e ON e.id = pi.equipo_id
         LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
         WHERE pi.pedido_id = ?
+        ORDER BY pi.orden, pi.id
     """, (pedido_id,)).fetchall()
     items = [row_to_dict(r) for r in rows]
     if not items:
@@ -88,8 +89,13 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
 
     # Batch fetch de componentes de kits: 1 query agregada en lugar de N+1
     # (antes hacía 1 query por cada item del pedido). Para pedidos con 10
-    # items con kits, baja de 11 queries a 2.
-    equipo_ids = list({item["equipo_id"] for item in items})
+    # items con kits, baja de 11 queries a 2. Las líneas personalizadas (#805)
+    # no tienen equipo → se excluyen del set (equipo_id None).
+    equipo_ids = list({item["equipo_id"] for item in items if item["equipo_id"] is not None})
+    for item in items:
+        item.setdefault("componentes", [])
+    if not equipo_ids:
+        return items
     placeholders = ",".join("?" for _ in equipo_ids)
     comp_rows = conn.execute(f"""
         SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.cantidad AS stock_total,
@@ -155,17 +161,19 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
 
     ph = ",".join(["?"] * len(pedido_ids))
     rows = conn.execute(f"""
-        SELECT pi.*, e.nombre,
+        SELECT pi.*, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
                {MARCA_SUBQUERY},
                e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
-        JOIN equipos e ON e.id = pi.equipo_id
+        LEFT JOIN equipos e ON e.id = pi.equipo_id
         WHERE pi.pedido_id IN ({ph})
+        ORDER BY pi.orden, pi.id
     """, pedido_ids).fetchall()
 
     all_items   = [row_to_dict(r) for r in rows]
-    equipo_ids  = list({item["equipo_id"] for item in all_items})
+    # Las líneas personalizadas (#805) no tienen equipo → fuera del set de kits.
+    equipo_ids  = list({item["equipo_id"] for item in all_items if item["equipo_id"] is not None})
     comp_map: dict[int, list[dict]] = {eid: [] for eid in equipo_ids}
 
     if equipo_ids:
@@ -302,7 +310,7 @@ def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
         return pedido
     row = conn.execute(
         """SELECT perfil_impuestos, razon_social, domicilio_fiscal,
-                  email_facturacion
+                  email_facturacion, cuit
            FROM clientes WHERE id = ?""",
         (cid,),
     ).fetchone()
@@ -313,21 +321,29 @@ def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
     pedido["cliente_razon_social"] = c.get("razon_social")
     pedido["cliente_domicilio_fiscal"] = c.get("domicilio_fiscal")
     pedido["cliente_email_facturacion"] = c.get("email_facturacion")
+    if c.get("cuit"):
+        pedido["cliente_cuit"] = c["cuit"]
     return pedido
 
 
 def _aplicar_contacto_cliente(pedido: dict, c: dict) -> None:
     """Sobrescribe nombre/email/teléfono del pedido con los datos `c` del cliente.
 
-    El nombre se arma "Nombre Apellido" (helper único `nombre_completo_cliente`).
-    El email/teléfono se sobrescriben solo si el cliente tiene un valor — si está
-    vacío en la ficha, se conserva la foto del pedido para no perder el contacto.
+    El nombre: si hay datos RENAPER (identidad verificada), se usa el nombre
+    legal confirmado; si no, el nombre ingresado por el cliente. El email/teléfono
+    se sobrescriben solo si el cliente tiene un valor. También pone `cliente_dni`
+    si el DNI fue verificado por RENAPER.
     """
-    pedido["cliente_nombre"] = nombre_completo_cliente(c["nombre"], c["apellido"])
+    if c.get("nombre_renaper"):
+        pedido["cliente_nombre"] = f"{c['nombre_renaper']} {c.get('apellido_renaper', '')}".strip()
+    else:
+        pedido["cliente_nombre"] = nombre_completo_cliente(c.get("nombre", ""), c.get("apellido", ""))
     if c.get("email"):
         pedido["cliente_email"] = c["email"]
     if c.get("telefono"):
         pedido["cliente_telefono"] = c["telefono"]
+    if c.get("dni"):
+        pedido["cliente_dni"] = c["dni"]
 
 
 def _enriquecer_pedido_con_cliente(conn, pedido: dict) -> dict:
@@ -345,7 +361,9 @@ def _enriquecer_pedido_con_cliente(conn, pedido: dict) -> dict:
     if not cid:
         return pedido
     row = conn.execute(
-        "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = ?",
+        """SELECT nombre, apellido, email, telefono,
+                  dni, nombre_renaper, apellido_renaper
+           FROM clientes WHERE id = ?""",
         (cid,),
     ).fetchone()
     if row:
@@ -360,7 +378,9 @@ def _enriquecer_pedidos_con_cliente(conn, pedidos: list[dict]) -> None:
         return
     ph = ",".join(["?"] * len(ids))
     rows = conn.execute(
-        f"SELECT id, nombre, apellido, email, telefono FROM clientes WHERE id IN ({ph})",
+        f"""SELECT id, nombre, apellido, email, telefono,
+                   dni, nombre_renaper, apellido_renaper
+            FROM clientes WHERE id IN ({ph})""",
         ids,
     ).fetchall()
     by_id = {r["id"]: row_to_dict(r) for r in rows}
@@ -417,9 +437,14 @@ def _validar_fecha_iso(v):
 
 
 class PedidoItem(BaseModel):
-    equipo_id:      int
+    # equipo_id None = línea personalizada (#805): no es del catálogo, no reserva
+    # stock; lleva `nombre_libre`. `cobro_modo`: 'jornada' (× jornadas, default) |
+    # 'fijo' (monto único).
+    equipo_id:      Optional[int] = None
     cantidad:       int
     precio_jornada: int = 0
+    nombre_libre:   Optional[str] = None
+    cobro_modo:     str = "jornada"
 
     @field_validator("precio_jornada", mode="before")
     @classmethod
@@ -441,6 +466,24 @@ class PedidoItem(BaseModel):
         if v is not None and v < 0:
             raise ValueError("precio_jornada no puede ser negativo")
         return v
+
+    @field_validator("cobro_modo")
+    @classmethod
+    def validate_cobro_modo(cls, v):
+        if v not in ("jornada", "fijo"):
+            raise ValueError("cobro_modo debe ser 'jornada' o 'fijo'")
+        return v
+
+    @model_validator(mode="after")
+    def validate_linea_libre(self):
+        # Una línea personalizada (sin equipo_id) necesita un nombre; una de
+        # catálogo no puede cobrarse 'fijo' (eso es solo para líneas libres).
+        if self.equipo_id is None:
+            if not (self.nombre_libre or "").strip():
+                raise ValueError("una línea personalizada necesita un nombre")
+        elif self.cobro_modo != "jornada":
+            raise ValueError("solo las líneas personalizadas pueden cobrarse 'fijo'")
+        return self
 
 
 class PedidoCreate(BaseModel):
@@ -469,7 +512,7 @@ class PedidoEstado(BaseModel):
 # Cualquiera de los tres puede cobrar; el default es Rambla (en transferencia).
 # Cada destinatario mapea a una caja en Contabilidad (Pablo/Tincho → su caja de
 # socio; Rambla → Fondo Rambla), donde la plata cobrada se atribuye sola.
-DESTINATARIOS_PAGO = ("Rambla", "Tincho", "Pablo")
+from contabilidad.cuentas import COBRADORES as DESTINATARIOS_PAGO  # fuente única
 METODOS_PAGO = ("transferencia", "efectivo")
 DESTINATARIO_PAGO_DEFAULT = "Rambla"
 METODO_PAGO_DEFAULT = "transferencia"
@@ -801,8 +844,12 @@ def _dispatch_pedido_creado_emails(background: Optional[BackgroundTasks], pedido
 
 
 class CotizarItem(BaseModel):
-    equipo_id: int
+    # equipo_id None = línea personalizada (#805): su precio y modo de cobro
+    # vienen del front (el admin la edita libre); no se busca en `equipos`.
+    equipo_id: Optional[int] = None
     cantidad: int
+    precio_jornada: Optional[int] = None
+    cobro_modo: Optional[str] = None
 
 
 class CotizarRequest(BaseModel):
@@ -855,6 +902,17 @@ def cotizar(data: CotizarRequest, request: Request):
         for it in data.items:
             if it.cantidad <= 0:
                 continue
+            # Línea personalizada (#805): no es del catálogo → su precio y modo de
+            # cobro los pone el front (el admin la edita libre, igual que ya confía
+            # el precio editable por línea en PUT /items). No reserva stock.
+            if it.equipo_id is None:
+                items_para_total.append({
+                    "equipo_id": None,
+                    "cantidad": it.cantidad,
+                    "precio_jornada": int(it.precio_jornada or 0),
+                    "cobro_modo": it.cobro_modo or "jornada",
+                })
+                continue
             row = conn.execute(
                 "SELECT precio_jornada, tipo FROM equipos WHERE id=? AND eliminado_at IS NULL",
                 (it.equipo_id,),
@@ -871,6 +929,7 @@ def cotizar(data: CotizarRequest, request: Request):
                 "equipo_id": it.equipo_id,
                 "cantidad": it.cantidad,
                 "precio_jornada": precio,
+                "cobro_modo": "jornada",
             })
         subtotal_por_jornada = sum(
             it["precio_jornada"] * it["cantidad"] for it in items_para_total
@@ -1424,18 +1483,23 @@ def _recalcular_total_pedido(conn, id: int) -> None:
     d1 = to_datetime(p["fecha_hasta"]) if p["fecha_hasta"] else None
     jornadas = jornadas_periodo(d0, d1)
     items = conn.execute(
-        "SELECT id, equipo_id, cantidad, precio_jornada FROM alquiler_items WHERE pedido_id=?",
+        "SELECT id, equipo_id, cantidad, precio_jornada, cobro_modo FROM alquiler_items WHERE pedido_id=?",
         (id,),
     ).fetchall()
-    # Subtotales persistidos por línea (los usan los visores).
+    # Subtotales persistidos por línea (los usan los visores). `bruto_linea`
+    # respeta el modo de cobro (las líneas 'fijo' no multiplican por jornadas).
     for it in items:
-        sub = it["precio_jornada"] * it["cantidad"] * jornadas
+        sub = bruto_linea(
+            {"precio_jornada": it["precio_jornada"], "cantidad": it["cantidad"],
+             "cobro_modo": it["cobro_modo"]},
+            jornadas,
+        )
         conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
     descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
     total_desglose = calcular_total(
         items=[
             {"equipo_id": it["equipo_id"], "cantidad": it["cantidad"],
-             "precio_jornada": it["precio_jornada"]}
+             "precio_jornada": it["precio_jornada"], "cobro_modo": it["cobro_modo"]}
             for it in items
         ],
         jornadas=jornadas,
@@ -1554,32 +1618,49 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     d1 = to_datetime(p["fecha_hasta"]) if p["fecha_hasta"] else None
     jornadas = jornadas_periodo(d0, d1)
 
-    # Consolidar duplicados del mismo equipo (sumar cantidades) antes de
-    # insertar. Sino dos rows con cantidad=2 cada una pasan el check de
-    # stock (que sí consolida) pero quedan 2 rows en `alquiler_items`.
-    consolidado: dict[int, dict] = {}
+    # Armar las líneas preservando el orden de llegada (= el orden que arma el
+    # front, incl. drag-reorder #806). Las de catálogo se CONSOLIDAN por equipo
+    # (sumar cantidades) — sino dos rows del mismo equipo pasan el gate (que
+    # consolida) pero quedan dos filas. Las líneas personalizadas (#805, sin
+    # equipo_id) NO se consolidan: cada una es única (nombre/precio/modo propios).
+    lineas: list[dict] = []
+    equipo_idx: dict[int, int] = {}  # equipo_id → índice en `lineas`
     for it in items:
-        key = it.equipo_id
-        if key in consolidado:
-            consolidado[key]["cantidad"] += it.cantidad
-            # Si vienen precios distintos para el mismo equipo, usamos el
-            # mayor (defensivo — no debería pasar).
-            consolidado[key]["precio_jornada"] = max(
-                consolidado[key]["precio_jornada"], it.precio_jornada,
-            )
+        if it.equipo_id is None:
+            lineas.append({
+                "equipo_id": None,
+                "cantidad": it.cantidad,
+                "precio_jornada": it.precio_jornada,
+                "nombre_libre": (it.nombre_libre or "").strip(),
+                "cobro_modo": it.cobro_modo or "jornada",
+            })
+        elif it.equipo_id in equipo_idx:
+            e = lineas[equipo_idx[it.equipo_id]]
+            e["cantidad"] += it.cantidad
+            # Precios distintos para el mismo equipo: usamos el mayor (defensivo).
+            e["precio_jornada"] = max(e["precio_jornada"], it.precio_jornada)
         else:
-            consolidado[key] = {
+            equipo_idx[it.equipo_id] = len(lineas)
+            lineas.append({
                 "equipo_id": it.equipo_id,
                 "cantidad": it.cantidad,
                 "precio_jornada": it.precio_jornada,
-            }
+                "nombre_libre": None,
+                "cobro_modo": "jornada",
+            })
 
+    # `orden` por posición; subtotal por línea vía `bruto_linea` (respeta cobro_modo).
     rows = []
-    for it in consolidado.values():
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (it["equipo_id"],)).fetchone():
-            raise HTTPException(404, f"Equipo {it['equipo_id']} no encontrado")
-        subtotal = it["precio_jornada"] * it["cantidad"] * jornadas
-        rows.append((id, it["equipo_id"], it["cantidad"], it["precio_jornada"], subtotal))
+    for orden, ln in enumerate(lineas):
+        if ln["equipo_id"] is not None and not conn.execute(
+            "SELECT id FROM equipos WHERE id=?", (ln["equipo_id"],)
+        ).fetchone():
+            raise HTTPException(404, f"Equipo {ln['equipo_id']} no encontrado")
+        subtotal = bruto_linea(ln, jornadas)
+        rows.append((
+            id, ln["equipo_id"], ln["cantidad"], ln["precio_jornada"],
+            subtotal, orden, ln["nombre_libre"], ln["cobro_modo"],
+        ))
 
     # Re-aplicar AMBOS descuentos (cliente + jornadas), como hacen las
     # otras 2 sedes. Antes solo se aplicaba el del cliente → editar ítems
@@ -1587,7 +1668,7 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     # en memoria (los que estamos por insertar), no desde la base.
     descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
     total_desglose = calcular_total(
-        items=list(consolidado.values()),
+        items=lineas,  # incluye cobro_modo por línea (líneas 'fijo' no × jornadas)
         jornadas=jornadas,
         descuento_cliente_pct=p["descuento_pct"] or 0,
         descuento_jornadas_pct=descuento_jornadas_pct,
@@ -1597,8 +1678,8 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
 
     conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (id,))
     conn.executemany("""
-        INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-        VALUES (?,?,?,?,?)
+        INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, orden, nombre_libre, cobro_modo)
+        VALUES (?,?,?,?,?,?,?,?)
     """, rows)
     conn.execute(
         "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
@@ -1682,6 +1763,79 @@ def _add_componentes(conn, items: list[dict]) -> None:
         item["componentes"] = [row_to_dict(c) for c in comp_rows]
 
 
+def _ordenar_items_en_grupos(items: list[dict], cat_de_equipo: dict) -> list[dict]:
+    """Parte PURA (testeable sin DB) de la agrupación por categoría (#814).
+
+    Dada la primera categoría por equipo (`cat_de_equipo: {equipo_id: (prioridad,
+    nombre)}`), arma la lista de grupos ordenada por `prioridad` asc (luego nombre),
+    preservando el orden de `items` dentro de cada grupo (el orden manual #806).
+    Equipos sin categoría y líneas personalizadas (#805, equipo_id None) caen en
+    'Otros', que va siempre al final.
+    """
+    OTROS = "Otros"
+    grupos: dict[str, list] = {}
+    prioridad: dict[str, float] = {}
+    for it in items:
+        cat = cat_de_equipo.get(it.get("equipo_id"))
+        nombre, p = (cat[1], cat[0]) if cat else (OTROS, float("inf"))
+        if nombre not in grupos:
+            grupos[nombre] = []
+            prioridad[nombre] = p
+        grupos[nombre].append(it)
+    nombres = sorted(grupos, key=lambda nm: (prioridad[nm], nm.lower()))
+    return [{"categoria": nm, "items": grupos[nm]} for nm in nombres]
+
+
+def _agrupar_items_por_categoria(conn, items: list[dict]) -> list[dict]:
+    """Agrupa los ítems del pedido por la categoría RAÍZ (sector) de su primera
+    categoría — para los documentos de check físico (packing list + albarán, #814).
+
+    Cada equipo cae bajo su primera categoría (menor `equipo_categorias.orden`,
+    misma convención que `attach_categorias`) y de ahí se SUBE por `parent_id`
+    hasta la raíz: el agrupado es por sector (Cámaras, Lentes, Iluminación, …),
+    no por la hoja/hija/nieta. Los grupos se ordenan por la `prioridad` de la
+    raíz (igual que el catálogo público). La parte pura (`_ordenar_items_en_grupos`)
+    hace el armado; acá solo se resuelve la raíz de cada equipo con una query única.
+    """
+    eq_ids = list({it["equipo_id"] for it in items if it.get("equipo_id") is not None})
+    cat_de_equipo: dict[int, tuple] = {}
+    if eq_ids:
+        ph = ",".join("?" for _ in eq_ids)
+        # `first_cat`: la primera categoría de cada equipo (misma convención que
+        # arriba). `climb`: trepa recursivamente por `parent_id` hasta la raíz
+        # (parent_id IS NULL) — soporta cualquier profundidad (hija/nieta/…).
+        rows = conn.execute(f"""
+            WITH RECURSIVE first_cat AS (
+                SELECT equipo_id, categoria_id FROM (
+                    SELECT ec.equipo_id, ec.categoria_id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY ec.equipo_id
+                               ORDER BY ec.orden, c.prioridad, c.id
+                           ) AS rn
+                    FROM equipo_categorias ec
+                    JOIN categorias c ON c.id = ec.categoria_id
+                    WHERE ec.equipo_id IN ({ph})
+                ) t WHERE rn = 1
+            ),
+            climb AS (
+                SELECT fc.equipo_id, c.id, c.parent_id
+                FROM first_cat fc
+                JOIN categorias c ON c.id = fc.categoria_id
+                UNION ALL
+                SELECT cl.equipo_id, p.id, p.parent_id
+                FROM climb cl
+                JOIN categorias p ON p.id = cl.parent_id
+            )
+            SELECT cl.equipo_id, c.nombre, c.prioridad
+            FROM climb cl
+            JOIN categorias c ON c.id = cl.id
+            WHERE cl.parent_id IS NULL
+        """, tuple(eq_ids)).fetchall()
+        for r in rows:
+            cat_de_equipo[r["equipo_id"]] = (r["prioridad"], r["nombre"])
+    return _ordenar_items_en_grupos(items, cat_de_equipo)
+
+
 def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
     """Construye el HTML + filename de un documento del pedido. Fuente ÚNICA
     usada por los GET de descarga y por el envío por mail."""
@@ -1702,16 +1856,19 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
         items = conn.execute(f"""
-            SELECT pi.cantidad, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
+            SELECT pi.cantidad, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
+                   {MARCA_SUBQUERY}, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
                    e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
             FROM alquiler_items pi
-            JOIN equipos e ON e.id = pi.equipo_id
+            LEFT JOIN equipos e ON e.id = pi.equipo_id
             WHERE pi.pedido_id = ?
-            ORDER BY e.nombre
+            ORDER BY pi.orden, pi.id
         """, (id,)).fetchall()
         pedido["items"] = [row_to_dict(i) for i in items]
         _add_componentes(conn, pedido["items"])
         _enriquecer_pedido_con_cliente(conn, pedido)
+        # Check físico → agrupar por categoría (#814).
+        pedido["grupos"] = _agrupar_items_por_categoria(conn, pedido["items"])
         return _albaran_html(pedido), _pedido_filename(pedido, doc="albaran")
 
     if kind == "packing-list":
@@ -1721,8 +1878,10 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         pedido = row_to_dict(row)
         _enriquecer_pedido_con_cliente(conn, pedido)
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
+        # `_get_alquiler_items` ya ordena por el orden manual (orden, id, #806).
         pedido["items"] = _get_alquiler_items(conn, id)
-        pedido["items"].sort(key=lambda it: (it.get("nombre") or "").lower())
+        # Check físico → agrupar por categoría (#814).
+        pedido["grupos"] = _agrupar_items_por_categoria(conn, pedido["items"])
         return _packing_list_html(pedido), _pedido_filename(pedido, doc="packing-list")
 
     if kind == "contrato":

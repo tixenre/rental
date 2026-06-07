@@ -246,6 +246,11 @@ body{font-family:var(--font-sans);color:var(--ink);background:#fff;
 .items td.num,.items td.r{white-space:nowrap}
 .items .comp td{color:var(--muted)}
 .items .comp .eq-name{font-weight:500;color:var(--muted)}
+/* Encabezado de grupo por categoría (packing list + albarán, #814) */
+.items .cat-row td{font-family:var(--font-mono);font-size:9px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink);
+  background:var(--surface);padding:7px 12px;
+  border-bottom:1px solid var(--ink);border-top:1px solid var(--hairline)}
 .comp-mark{color:color-mix(in oklch,var(--amber) 70%,var(--ink));
   font-family:var(--font-mono);margin-right:4px}
 .eq-thumb{width:46px;height:46px;border-radius:var(--r-sm);object-fit:cover;
@@ -475,6 +480,8 @@ def _footer():
 def _cliente_block(pedido):
     out = ['<div class="meta-block"><div class="meta-label">Cliente</div>'
            f'<div class="meta-val">{html.escape(pedido.get("cliente_nombre") or "—")}</div>']
+    if pedido.get("cliente_dni"):
+        out.append(f'<div class="meta-sub mono">DNI {html.escape(pedido["cliente_dni"])}</div>')
     if pedido.get("cliente_cuit"):
         out.append(f'<div class="meta-sub mono">CUIT {html.escape(pedido["cliente_cuit"])}</div>')
     if pedido.get("cliente_email"):
@@ -604,7 +611,9 @@ def _albaran_html(pedido):
                 f'{_fmt_ars(unit)} × {cant}</div>'
                 f'<div style="font-weight:600">{_fmt_ars(unit * cant)}</div></div>')
 
-    for it in items:
+    def _emit(it):
+        """Fila del equipo + sus componentes de kit."""
+        nonlocal n, unidades, valor_total
         cant = it.get("cantidad", 1); unidades += cant
         valor = _parse_int(it.get("valor_reposicion")); valor_total += valor * cant
         rows.append(
@@ -626,6 +635,17 @@ def _albaran_html(pedido):
                 f'<td class="mono">{html.escape(c.get("serie") or "—")}</td>'
                 f'<td class="r">{_valor(cvalor, ccant)}</td></tr>'
             ); n += 1
+
+    # Agrupado por categoría (#814) para el check físico; fallback a lista plana.
+    grupos = pedido.get("grupos")
+    if grupos:
+        for g in grupos:
+            rows.append(f'<tr class="cat-row"><td colspan="6">{html.escape(g["categoria"])}</td></tr>')
+            for it in g["items"]:
+                _emit(it)
+    else:
+        for it in items:
+            _emit(it)
 
     entrega = (
         '<div class="meta-block"><div class="meta-label">Entrega / devolución</div>'
@@ -816,7 +836,9 @@ def _packing_list_html(pedido):
             '<td class="chk"><span class="pk-check"></span></td></tr>'
         )
 
-    for it in items:
+    def _emit(it):
+        """Fila del equipo + sus accesorios/componentes anidados."""
+        nonlocal n, unidades
         cant = it.get("cantidad", 1); unidades += cant
         rows.append(_eq_row(it, n)); n += 1
         primero = True
@@ -828,6 +850,17 @@ def _packing_list_html(pedido):
         for c in it.get("componentes", []):
             ccant = c.get("cantidad", 1) * cant; unidades += ccant
             rows.append(_sub_row(_nombre_para_pdf(c).split(" · ")[0], ccant, primero)); primero = False
+
+    # Agrupado por categoría (#814) para el check físico; fallback a lista plana.
+    grupos = pedido.get("grupos")
+    if grupos:
+        for g in grupos:
+            rows.append(f'<tr class="cat-row"><td colspan="6">{html.escape(g["categoria"])}</td></tr>')
+            for it in g["items"]:
+                _emit(it)
+    else:
+        for it in items:
+            _emit(it)
 
     salida = (
         '<div class="meta-block"><div class="meta-label">Salida / retorno</div>'
