@@ -83,9 +83,15 @@ import { formatARS } from "@/lib/format";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mis pedidos — Rambla Rental" }] }),
-  validateSearch: (search: Record<string, unknown>): { nuevo?: number } => {
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { nuevo?: number; verificacion?: "pendiente" } => {
+    const out: { nuevo?: number; verificacion?: "pendiente" } = {};
     const n = Number(search.nuevo);
-    return Number.isFinite(n) && n > 0 ? { nuevo: n } : {};
+    if (Number.isFinite(n) && n > 0) out.nuevo = n;
+    // Retorno del flujo Didit: el usuario vuelve con ?verificacion=pendiente.
+    if (search.verificacion === "pendiente") out.verificacion = "pendiente";
+    return out;
   },
   component: ClientePortal,
 });
@@ -236,7 +242,7 @@ function fmtTime(s?: string) {
 
 export default function ClientePortal() {
   const navigate = useNavigate();
-  const { nuevo } = Route.useSearch();
+  const { nuevo, verificacion } = Route.useSearch();
   const fav = useFavoritos();
   const { data: allEquipos = [] } = useEquipos();
   const favEquipos = useMemo(
@@ -253,6 +259,10 @@ export default function ClientePortal() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const nuevoHandledRef = useRef(false);
+  // Verificación Didit: true mientras esperamos que llegue el webhook (asíncrono)
+  // después de que el usuario vuelve del flujo con ?verificacion=pendiente.
+  const [confirmandoVerif, setConfirmandoVerif] = useState(false);
+  const verifHandledRef = useRef(false);
   const [tab, setTab] = useState<Filtro>("todos");
   const [query, setQuery] = useState<string>("");
   const [ventanaHoras, setVentanaHoras] = useState<number>(24);
@@ -292,6 +302,58 @@ export default function ClientePortal() {
       alive = false;
     };
   }, [navigate]);
+
+  // Retorno del flujo Didit (?verificacion=pendiente): el usuario terminó el
+  // DNI+selfie y volvió, pero el webhook que confirma la identidad es asíncrono
+  // y puede tardar unos segundos. Aterrizamos en el tab Identidad y consultamos
+  // /api/cliente/me hasta ver dni_validado_at (o agotar los intentos). Se corre
+  // una sola vez por retorno (guard por ref) y limpia el query param al terminar.
+  useEffect(() => {
+    if (verificacion !== "pendiente" || verifHandledRef.current) return;
+    verifHandledRef.current = true;
+    setActiveTab("identidad");
+    setConfirmandoVerif(true);
+
+    let alive = true;
+    let intentos = 0;
+    const MAX_INTENTOS = 8; // ~24s (cada 3s)
+
+    const limpiar = (verificado: boolean) => {
+      if (!alive) return;
+      setConfirmandoVerif(false);
+      if (verificado) toast.success("¡Identidad verificada!");
+      navigate({ to: "/cliente/portal", search: {}, replace: true });
+    };
+
+    const tick = async () => {
+      if (!alive) return;
+      try {
+        const r = await authedFetch("/api/cliente/me");
+        if (r.ok) {
+          const p: Perfil = await r.json();
+          if (alive) setPerfil(p);
+          if (p.dni_validado_at) {
+            limpiar(true);
+            return;
+          }
+        }
+      } catch {
+        /* reintentamos en el próximo tick */
+      }
+      intentos += 1;
+      if (intentos >= MAX_INTENTOS) {
+        limpiar(false);
+        return;
+      }
+      timer = window.setTimeout(tick, 3000);
+    };
+
+    let timer = window.setTimeout(tick, 1500);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [verificacion, navigate]);
 
   useEffect(() => {
     const nuevos: Array<{ pedidoId: number; numero: string; tipo: DocTipo }> = [];
@@ -697,7 +759,11 @@ export default function ClientePortal() {
 
           {/* TAB: IDENTIDAD */}
           {activeTab === "identidad" && perfil && (
-            <IdentidadSection perfil={perfil} onPerfilChange={setPerfil} />
+            <IdentidadSection
+              perfil={perfil}
+              onPerfilChange={setPerfil}
+              confirmando={confirmandoVerif}
+            />
           )}
         </main>
       </div>
@@ -850,9 +916,12 @@ function NotificacionesSection() {
 function IdentidadSection({
   perfil,
   onPerfilChange,
+  confirmando = false,
 }: {
   perfil: Perfil;
   onPerfilChange: (p: Perfil) => void;
+  /** True mientras esperamos el webhook tras volver del flujo Didit. */
+  confirmando?: boolean;
 }) {
   const verificado = Boolean(perfil.dni_validado_at);
   const [iniciando, setIniciando] = useState(false);
@@ -905,29 +974,46 @@ function IdentidadSection({
         identidad.
       </h2>
 
-      {/* Estado de verificación */}
-      <div
-        className={cn(
-          "flex items-center gap-3 rounded-xl border px-4 py-4 mb-6",
-          verificado ? "border-verde/30 bg-verde/8" : "border-amber bg-amber-soft",
-        )}
-      >
-        {verificado ? (
-          <BadgeCheck className="h-7 w-7 text-verde shrink-0" />
-        ) : (
-          <ShieldAlert className="h-7 w-7 text-amber shrink-0" />
-        )}
-        <div>
-          <div className="font-sans font-semibold text-[15px] text-ink">
-            {verificado ? "Identidad verificada" : "Identidad sin verificar"}
-          </div>
-          <div className="font-sans text-xs text-muted-foreground mt-0.5">
-            {verificado
-              ? "Tus datos fueron confirmados por RENAPER vía Didit."
-              : "Necesitás verificar tu DNI + selfie para hacer pedidos."}
+      {/* Estado de verificación. NOTA: el estado "confirmando" (vuelta de Didit,
+          esperando webhook) es un interino honesto con tokens del DS — el diseño
+          pulido de proceso/éxito/rechazo viene por handoff de Claude Design
+          (ver docs/design-brief-verificacion-identidad.md). */}
+      {confirmando && !verificado ? (
+        <div className="flex items-center gap-3 rounded-xl border hairline bg-surface px-4 py-4 mb-6">
+          <ShieldCheck className="h-7 w-7 text-muted-foreground shrink-0 animate-pulse" />
+          <div>
+            <div className="font-sans font-semibold text-[15px] text-ink">
+              Confirmando tu verificación…
+            </div>
+            <div className="font-sans text-xs text-muted-foreground mt-0.5">
+              Estamos esperando la respuesta de RENAPER. Puede tardar unos segundos.
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div
+          className={cn(
+            "flex items-center gap-3 rounded-xl border px-4 py-4 mb-6",
+            verificado ? "border-verde/30 bg-verde/8" : "border-amber bg-amber-soft",
+          )}
+        >
+          {verificado ? (
+            <BadgeCheck className="h-7 w-7 text-verde shrink-0" />
+          ) : (
+            <ShieldAlert className="h-7 w-7 text-amber shrink-0" />
+          )}
+          <div>
+            <div className="font-sans font-semibold text-[15px] text-ink">
+              {verificado ? "Identidad verificada" : "Identidad sin verificar"}
+            </div>
+            <div className="font-sans text-xs text-muted-foreground mt-0.5">
+              {verificado
+                ? "Tus datos fueron confirmados por RENAPER vía Didit."
+                : "Necesitás verificar tu DNI + selfie para hacer pedidos."}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Datos RENAPER (solo si verificado) */}
       {verificado && (
@@ -993,8 +1079,8 @@ function IdentidadSection({
         </div>
       )}
 
-      {/* Botón de verificación (solo si no verificado) */}
-      {!verificado && (
+      {/* Botón de verificación (solo si no verificado y no estamos confirmando) */}
+      {!verificado && !confirmando && (
         <div className="mb-6">
           <p className="font-sans text-[13px] text-muted-foreground mb-4 leading-[1.5]">
             La verificación usa tu DNI y una selfie. Tarda menos de 2 minutos y la hace Didit, que
