@@ -464,9 +464,14 @@ def init_db():
             equipo_id      INTEGER NOT NULL REFERENCES equipos(id),
             cantidad       INTEGER NOT NULL DEFAULT 1,
             precio_jornada INTEGER NOT NULL DEFAULT 0,
-            subtotal       INTEGER NOT NULL DEFAULT 0
+            subtotal       INTEGER NOT NULL DEFAULT 0,
+            -- Orden manual de las líneas dentro del pedido (drag-reorder, #806).
+            -- Se asigna por posición al guardar; los displays ordenan por `orden, id`.
+            orden          INTEGER NOT NULL DEFAULT 0
         )
     """)
+    # Idempotente para tablas ya creadas antes de #806 (esquema en dos capas).
+    conn.execute("ALTER TABLE alquiler_items ADD COLUMN IF NOT EXISTS orden INTEGER NOT NULL DEFAULT 0")
 
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_pedido_items_pedido ON alquiler_items(pedido_id)

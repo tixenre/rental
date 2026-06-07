@@ -22,8 +22,26 @@ import {
   Download,
   Info,
   Trash2,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
@@ -141,6 +159,13 @@ function PedidoEditorPage() {
   // perdería la hora en el round-trip del autosave.
   const draft = usePedidoDraft(p, { mode: "admin", keepDateTime: true });
   const [openDateModal, setOpenDateModal] = useState(false);
+
+  // Sensores del drag-reorder de líneas (#806). Hook → antes de cualquier
+  // early return para no violar las reglas de hooks.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   // Disponibilidad (stock) — enabled cuando hay ambas fechas
   const dispoQ = useQuery({
@@ -267,6 +292,21 @@ function PedidoEditorPage() {
 
   const removeItem = (equipoId: number) =>
     setItems((its) => (its ?? []).filter((it) => it.equipo_id !== equipoId));
+
+  // Drag-reorder de líneas (#806). El nuevo orden viaja en el array de items;
+  // el autosave lo persiste (el backend asigna `orden` por posición). `sensors`
+  // es un hook → vive arriba con el resto (declarado antes de los early returns).
+  const handleItemsDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    setItems((its) => {
+      if (!its) return its;
+      const oldIndex = its.findIndex((it) => it.equipo_id === active.id);
+      const newIndex = its.findIndex((it) => it.equipo_id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return its;
+      return arrayMove(its, oldIndex, newIndex);
+    });
+  };
 
   const goList = () => navigate({ to: "/admin/pedidos" });
 
@@ -439,121 +479,37 @@ function PedidoEditorPage() {
               <span>Buscar para añadir equipos…</span>
             </button>
 
-            <ul className="divide-y hairline">
-              {items.map((it) => {
-                const stock = stockMap[String(it.equipo_id)];
-                const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
-                const disponible = max - it.cantidad;
-                const overstock = it.cantidad > max && !!stock;
-                const subtotal = it.precio_jornada * it.cantidad * Math.max(1, jornadas);
-
-                return (
-                  <li key={it.equipo_id} className="py-2.5 space-y-1.5">
-                    <div className="flex items-center gap-3">
-                      <EquipoThumb
-                        src={it.foto_url}
-                        alt={it.nombre_publico || it.nombre}
-                        className="h-10 w-10"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm text-ink truncate">
-                          {it.nombre_publico || it.nombre}
-                        </div>
-                        <div className="font-mono text-[11px] text-muted-foreground flex items-center gap-1.5">
-                          <span>{fmtArs(it.precio_jornada)} / jornada</span>
-                          {stock && (
-                            <span
-                              className={cn(
-                                "inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
-                                disponible <= 0
-                                  ? "bg-destructive/10 text-destructive"
-                                  : "bg-muted text-muted-foreground",
-                              )}
-                            >
-                              {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="font-mono text-sm font-semibold tabular-nums w-24 text-right shrink-0">
-                        {fmtArs(subtotal)}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(it.equipo_id)}
-                        aria-label="Quitar equipo"
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    {/* Stepper + precio editable */}
-                    <div className="flex items-center gap-2 pl-13">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-9 w-9"
-                          onClick={() =>
-                            updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })
-                          }
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={it.cantidad}
-                          onChange={(e) =>
-                            updateItem(it.equipo_id, {
-                              cantidad: parseInt(e.target.value) || 1,
-                            })
-                          }
-                          className={cn(
-                            "h-9 w-10 text-center text-sm p-0",
-                            overstock && "border-destructive text-destructive",
-                          )}
-                        />
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-9 w-9"
-                          onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-1 ml-2">
-                        <Input
-                          type="number"
-                          min={0}
-                          value={it.precio_jornada}
-                          onChange={(e) =>
-                            updateItem(it.equipo_id, {
-                              precio_jornada: parseInt(e.target.value) || 0,
-                            })
-                          }
-                          className="h-9 w-24 text-sm"
-                        />
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          /día
-                        </span>
-                      </div>
-                      {overstock && (
-                        <div className="ml-auto text-[11px] text-destructive flex items-center gap-1">
-                          <AlertTriangle className="h-3 w-3" /> Excede stock ({max})
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-              {items.length === 0 && (
+            {items.length === 0 ? (
+              <ul className="divide-y hairline">
                 <li className="py-4 text-sm text-muted-foreground">
                   Sin equipos. Agregá al menos uno para confirmar.
                 </li>
-              )}
-            </ul>
+              </ul>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleItemsDragEnd}
+              >
+                <SortableContext
+                  items={items.map((it) => it.equipo_id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <ul className="divide-y hairline">
+                    {items.map((it) => (
+                      <ItemRow
+                        key={it.equipo_id}
+                        it={it}
+                        stock={stockMap[String(it.equipo_id)]}
+                        jornadas={jornadas}
+                        updateItem={updateItem}
+                        removeItem={removeItem}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
+            )}
 
             <EquipoSearchSheet
               open={openSearchSheet}
@@ -863,6 +819,129 @@ function PagoRow({
 }
 
 // ── Subcomponentes ───────────────────────────────────────────────────────────
+
+/** Fila de equipo del pedido, arrastrable para reordenar (#806). El handle
+ * (grip) lleva los listeners del drag; el resto de la fila queda libre para
+ * editar cantidad/precio sin disparar el arrastre. */
+function ItemRow({
+  it,
+  stock,
+  jornadas,
+  updateItem,
+  removeItem,
+}: {
+  it: DraftItem;
+  stock?: { cantidad: number; reservado: number };
+  jornadas: number;
+  updateItem: (equipoId: number, patch: Partial<DraftItem>) => void;
+  removeItem: (equipoId: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: it.equipo_id,
+  });
+  const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
+  const disponible = max - it.cantidad;
+  const overstock = it.cantidad > max && !!stock;
+  const subtotal = it.precio_jornada * it.cantidad * Math.max(1, jornadas);
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn("py-2.5 space-y-1.5 bg-surface", isDragging && "opacity-60")}
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Reordenar equipo"
+          className="inline-flex h-11 w-11 -ml-3 items-center justify-center text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <EquipoThumb src={it.foto_url} alt={it.nombre_publico || it.nombre} className="h-10 w-10" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
+          <div className="font-mono text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <span>{fmtArs(it.precio_jornada)} / jornada</span>
+            {stock && (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
+                  disponible <= 0
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
+                {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="font-mono text-sm font-semibold tabular-nums w-24 text-right shrink-0">
+          {fmtArs(subtotal)}
+        </div>
+        <button
+          type="button"
+          onClick={() => removeItem(it.equipo_id)}
+          aria-label="Quitar equipo"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      {/* Stepper + precio editable */}
+      <div className="flex items-center gap-2 pl-13">
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-9 w-9"
+            onClick={() => updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })}
+          >
+            <Minus className="h-3 w-3" />
+          </Button>
+          <Input
+            type="number"
+            min={1}
+            value={it.cantidad}
+            onChange={(e) => updateItem(it.equipo_id, { cantidad: parseInt(e.target.value) || 1 })}
+            className={cn(
+              "h-9 w-10 text-center text-sm p-0",
+              overstock && "border-destructive text-destructive",
+            )}
+          />
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-9 w-9"
+            onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-1 ml-2">
+          <Input
+            type="number"
+            min={0}
+            value={it.precio_jornada}
+            onChange={(e) =>
+              updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })
+            }
+            className="h-9 w-24 text-sm"
+          />
+          <span className="text-xs text-muted-foreground whitespace-nowrap">/día</span>
+        </div>
+        {overstock && (
+          <div className="ml-auto text-[11px] text-destructive flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" /> Excede stock ({max})
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
 
 function BackLink({ onClick }: { onClick: () => void }) {
   return (
