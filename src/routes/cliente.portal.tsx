@@ -697,10 +697,7 @@ export default function ClientePortal() {
 
           {/* TAB: IDENTIDAD */}
           {activeTab === "identidad" && perfil && (
-            <IdentidadSection
-              perfil={perfil}
-              onPerfilChange={setPerfil}
-            />
+            <IdentidadSection perfil={perfil} onPerfilChange={setPerfil} />
           )}
         </main>
       </div>
@@ -912,13 +909,11 @@ function IdentidadSection({
       <div
         className={cn(
           "flex items-center gap-3 rounded-xl border px-4 py-4 mb-6",
-          verificado
-            ? "border-green-200 bg-green-50"
-            : "border-amber bg-amber-soft",
+          verificado ? "border-verde/30 bg-verde/8" : "border-amber bg-amber-soft",
         )}
       >
         {verificado ? (
-          <BadgeCheck className="h-7 w-7 text-green-600 shrink-0" />
+          <BadgeCheck className="h-7 w-7 text-verde shrink-0" />
         ) : (
           <ShieldAlert className="h-7 w-7 text-amber shrink-0" />
         )}
@@ -1002,9 +997,9 @@ function IdentidadSection({
       {!verificado && (
         <div className="mb-6">
           <p className="font-sans text-[13px] text-muted-foreground mb-4 leading-[1.5]">
-            La verificación usa tu DNI y una selfie. Tarda menos de 2 minutos y la hace
-            Didit, que consulta la base de RENAPER. Solo guardamos tu nombre, DNI y dirección
-            oficial — nunca la foto.
+            La verificación usa tu DNI y una selfie. Tarda menos de 2 minutos y la hace Didit,
+            que consulta la base de RENAPER. Solo guardamos tu nombre, DNI y dirección oficial —
+            nunca la foto.
           </p>
           <button
             type="button"
@@ -1042,8 +1037,8 @@ function IdentidadSection({
           </button>
         </div>
         <p className="mt-1.5 font-sans text-xs text-muted-foreground">
-          Lo usamos para saludarte en los mails (ej. "Hola Nacho"). Tu nombre oficial sigue
-          siendo el del DNI.
+          Lo usamos para saludarte en los mails (ej. "Hola Nacho"). Tu nombre oficial sigue siendo
+          el del DNI.
         </p>
       </div>
     </div>
