@@ -124,7 +124,8 @@ function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () =
     onError: (e) => toast.error("No se pudo dar de baja", { description: (e as Error).message }),
   });
 
-  const esSocio = cuenta.tipo === "socio";
+  // Caja de cobrador (Pablo/Tincho/Rambla): recibe cobros automáticos, no se da de baja.
+  const esCobrador = Boolean(cuenta.socio);
 
   return (
     <tr className="border-b hairline last:border-0">
@@ -185,14 +186,18 @@ function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () =
             )
               baja.mutate();
           }}
-          disabled={baja.isPending || esSocio}
+          disabled={baja.isPending || esCobrador}
           className={cn(
             "text-xs underline",
-            esSocio
+            esCobrador
               ? "text-muted-foreground/40 cursor-not-allowed no-underline"
               : "text-muted-foreground hover:text-destructive",
           )}
-          title={esSocio ? "Las cajas de socio no se dan de baja" : "Dar de baja"}
+          title={
+            esCobrador
+              ? "Las cajas de cobrador (Pablo/Tincho/Rambla) no se dan de baja"
+              : "Dar de baja"
+          }
         >
           Baja
         </button>

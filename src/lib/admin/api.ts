@@ -582,7 +582,7 @@ export type EquipoPendienteCompat = {
 
 // Pagos: destinatario (a quién se cobró) y método. Espeja las constantes del
 // backend (`routes/alquileres.py`); los defaults se aplican en el modal.
-export const DESTINATARIOS_PAGO = ["Tincho", "Pablo"] as const;
+export const DESTINATARIOS_PAGO = ["Rambla", "Tincho", "Pablo"] as const;
 export const METODOS_PAGO = ["transferencia", "efectivo"] as const;
 
 export interface PagoLogRow {

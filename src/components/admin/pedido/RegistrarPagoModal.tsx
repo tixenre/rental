@@ -43,7 +43,7 @@ export function RegistrarPagoModal({
   );
   const [concepto, setConcepto] = useState(pagado === 0 ? "Seña" : "Saldo final");
   // A quién se cobró y cómo. Default del dueño: Tincho + transferencia.
-  const [destinatario, setDestinatario] = useState<string>("Tincho");
+  const [destinatario, setDestinatario] = useState<string>("Rambla");
   const [metodo, setMetodo] = useState<string>("transferencia");
 
   const monto = Math.max(0, Number(montoInput) || 0);

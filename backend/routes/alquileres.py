@@ -466,10 +466,12 @@ class PedidoEstado(BaseModel):
 
 # Pagos: a quién se cobró (destinatario) y cómo (método). Fuente única de los
 # valores admitidos — la usan la validación del endpoint y la vista de logs.
-# Tincho/Pablo son los mismos dueños del modelo de comisiones (reportes).
-DESTINATARIOS_PAGO = ("Tincho", "Pablo")
+# Cualquiera de los tres puede cobrar; el default es Rambla (en transferencia).
+# Cada destinatario mapea a una caja en Contabilidad (Pablo/Tincho → su caja de
+# socio; Rambla → Fondo Rambla), donde la plata cobrada se atribuye sola.
+DESTINATARIOS_PAGO = ("Rambla", "Tincho", "Pablo")
 METODOS_PAGO = ("transferencia", "efectivo")
-DESTINATARIO_PAGO_DEFAULT = "Tincho"
+DESTINATARIO_PAGO_DEFAULT = "Rambla"
 METODO_PAGO_DEFAULT = "transferencia"
 
 
