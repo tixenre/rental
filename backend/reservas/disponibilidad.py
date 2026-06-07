@@ -427,6 +427,9 @@ def estado_diario_equipo(conn, equipo_id: int, desde: str, hasta: str) -> dict:
             segs.append((to_datetime(r["fd"]), to_datetime(r["fh"]), (r["cant"] or 0) * mult))
 
     # Mantenimiento que bloquea stock. Sin `fecha_hasta` → bloquea ese día completo.
+    # `>= win_lo` (no `>` como en las queries gemelas con buffer): acá la ventana NO
+    # tiene buffer, así que un mantenimiento puntual del PRIMER día (solo `fecha`,
+    # COALESCE == win_lo == medianoche de `desde`) debe entrar; con `>` se perdería.
     mant: list[tuple] = []
     mrows = conn.execute(
         """
