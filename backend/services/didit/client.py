@@ -28,12 +28,16 @@ class DiditSession:
     url: str
 
 
-def create_session(*, callback_url: str, vendor_data: str) -> DiditSession:
+def create_session(*, return_url: str, vendor_data: str) -> DiditSession:
     """Crea una sesión de verificación en Didit y devuelve el session_id + URL.
 
     Args:
-        callback_url: URL del webhook que Didit llamará al finalizar
-                      (siempre es nuestra URL canónica /api/webhooks/didit).
+        return_url:   URL a la que Didit **redirige al usuario** cuando termina
+                      el flujo (campo `callback` de la API). NO es el webhook:
+                      el webhook server-to-server se configura aparte, una sola
+                      vez, en el Console de Didit (de ahí sale DIDIT_WEBHOOK_SECRET).
+                      Acá va una URL del portal para que el cliente vuelva a una
+                      pantalla nuestra, no a un endpoint técnico.
         vendor_data:  String opaco para correlacionar el webhook con nuestro
                       cliente. Usamos str(cliente_id).
 
@@ -49,7 +53,7 @@ def create_session(*, callback_url: str, vendor_data: str) -> DiditSession:
         raise DiditNotConfiguredError("DIDIT_API_KEY no configurada")
 
     payload = {
-        "callback": callback_url,
+        "callback": return_url,
         "vendor_data": vendor_data,
     }
     resp = httpx.post(

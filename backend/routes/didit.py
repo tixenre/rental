@@ -41,8 +41,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# URL canónica del webhook (la que le damos a Didit al crear la sesión).
-_WEBHOOK_PATH = "/api/webhooks/didit"
+# El webhook (server-to-server) NO se pasa por sesión: se configura una sola vez
+# en el Console de Didit apuntando a /api/webhooks/didit (de ahí sale el secret).
+# Lo que SÍ se pasa por sesión es la URL de **retorno del usuario**: a dónde lo
+# manda Didit cuando termina el flujo. Lo devolvemos al portal con un flag para
+# que la pantalla de Identidad muestre el estado "confirmando…" mientras llega
+# el webhook (el webhook es asíncrono, puede tardar unos segundos).
+_RETURN_PATH = "/cliente/portal?verificacion=pendiente"
 
 
 # ── Admin: crear sesión ──────────────────────────────────────────────────────
@@ -67,10 +72,10 @@ def iniciar_verificacion(cliente_id: int, request: Request):
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
 
-    callback_url = f"{settings.SITE_URL}{_WEBHOOK_PATH}"
+    return_url = f"{settings.SITE_URL}{_RETURN_PATH}"
     try:
         sesion = create_session(
-            callback_url=callback_url,
+            return_url=return_url,
             vendor_data=str(cliente_id),
         )
     except DiditNotConfiguredError:
@@ -101,10 +106,10 @@ def cliente_iniciar_verificacion(request: Request):
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
 
-    callback_url = f"{settings.SITE_URL}{_WEBHOOK_PATH}"
+    return_url = f"{settings.SITE_URL}{_RETURN_PATH}"
     try:
         sesion = create_session(
-            callback_url=callback_url,
+            return_url=return_url,
             vendor_data=str(cliente_id),
         )
     except DiditNotConfiguredError:
