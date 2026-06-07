@@ -19,7 +19,6 @@ from reportes.liquidacion import SALDADO_CTE, liquidar
 from reportes.cierres import rango_mes, snapshot_de, validar_mes
 
 PARTES = ("Pablo", "Tincho", "Rambla")
-_SOCIOS = ("Pablo", "Tincho")
 
 
 def _netting(corresponde: dict, cobrado: dict, ya_transferido: dict) -> dict:
@@ -77,20 +76,21 @@ def cobrado_por_socio(conn, desde: str, hasta: str) -> dict:
         JOIN en_rango r ON r.pedido_id = ap.pedido_id
         GROUP BY 1
     """
-    out = {"Pablo": 0, "Tincho": 0, "sin_asignar": 0}
+    out = {p: 0 for p in PARTES}  # Pablo, Tincho, Rambla — los tres pueden cobrar
+    out["sin_asignar"] = 0
     for row in conn.execute(sql, (desde, hasta)).fetchall():
         quien, monto = row["quien"], int(row["monto"] or 0)
-        if quien in _SOCIOS:
+        if quien in PARTES:
             out[quien] += monto
         else:
             out["sin_asignar"] += monto
-    out["total"] = out["Pablo"] + out["Tincho"] + out["sin_asignar"]
+    out["total"] = sum(out[p] for p in PARTES) + out["sin_asignar"]
     return out
 
 
 def _parte_de_cuenta(socio, tipo, nombre) -> str | None:
     """Mapea una cuenta a su parte de rendición (Pablo/Tincho/Rambla) o None."""
-    if socio in _SOCIOS:
+    if socio in PARTES:
         return socio
     if tipo == "fondo" or (nombre or "").strip().lower() == "fondo rambla":
         return "Rambla"
@@ -139,19 +139,21 @@ def _movimientos_rendicion(conn, mes: str) -> list[dict]:
 
 
 def cuenta_de_parte(conn, parte: str) -> int | None:
-    """La cuenta que representa a una parte: Caja del socio, o el Fondo Rambla."""
-    if parte in _SOCIOS:
-        row = conn.execute(
-            "SELECT id FROM cuentas WHERE socio = ? AND activa = TRUE", (parte,)
-        ).fetchone()
-    elif parte == "Rambla":
+    """La caja que representa a una parte (vínculo por la columna `socio`):
+    Caja Pablo/Tincho, o Fondo Rambla."""
+    if parte not in PARTES:
+        return None
+    row = conn.execute(
+        "SELECT id FROM cuentas WHERE socio = ? AND activa = TRUE", (parte,)
+    ).fetchone()
+    if row:
+        return row[0]
+    if parte == "Rambla":  # fallback si el Fondo no quedó vinculado al cobrador
         row = conn.execute(
             """SELECT id FROM cuentas
                WHERE activa = TRUE AND (tipo = 'fondo' OR nombre = 'Fondo Rambla')
                ORDER BY id LIMIT 1"""
         ).fetchone()
-    else:
-        return None
     return row[0] if row else None
 
 
@@ -169,7 +171,7 @@ def rendicion(conn, mes: str) -> dict:
     total_reporte = int(data["resumen"]["total"])
 
     cob = cobrado_por_socio(conn, desde, hasta)
-    cobrado = {"Pablo": cob["Pablo"], "Tincho": cob["Tincho"], "Rambla": 0}
+    cobrado = {p: cob[p] for p in PARTES}  # los tres pueden cobrar (incluida Rambla)
     ya = ya_transferido(conn, mes)
 
     net = _netting(corresponde, cobrado, ya)

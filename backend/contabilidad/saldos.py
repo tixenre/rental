@@ -3,7 +3,7 @@
 El saldo de una cuenta es:
 
     saldo = saldo_inicial
-          + ingresos_alquiler   (solo cajas de socio: Σ alquiler_pagos del socio)
+          + ingresos_alquiler   (caja de cobrador: Σ alquiler_pagos del cobrador)
           + entradas            (Σ movimientos donde la cuenta es destino)
           − egresos             (Σ movimientos donde la cuenta es origen)
 
