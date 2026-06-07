@@ -19,7 +19,7 @@ _SESSION_ENDPOINT = "https://verification.didit.me/v3/session/"
 
 
 class DiditNotConfiguredError(Exception):
-    """DIDIT_API_KEY no está configurada — la feature está apagada."""
+    """DIDIT_API_KEY o DIDIT_WORKFLOW_ID no configurados — feature apagada."""
 
 
 @dataclass
@@ -45,20 +45,27 @@ def create_session(*, return_url: str, vendor_data: str) -> DiditSession:
         DiditSession con session_id y url (redirigir al cliente a esta URL).
 
     Raises:
-        DiditNotConfiguredError: DIDIT_API_KEY vacía — feature apagada.
+        DiditNotConfiguredError: DIDIT_API_KEY o DIDIT_WORKFLOW_ID vacíos.
         httpx.HTTPStatusError:   La API de Didit devolvió un error HTTP.
         httpx.TimeoutException:  Timeout de red.
     """
     if not settings.DIDIT_API_KEY:
         raise DiditNotConfiguredError("DIDIT_API_KEY no configurada")
+    if not settings.DIDIT_WORKFLOW_ID:
+        raise DiditNotConfiguredError("DIDIT_WORKFLOW_ID no configurado")
 
+    # API v3: auth por header `x-api-key` (NO Bearer); `workflow_id` obligatorio.
     payload = {
+        "workflow_id": settings.DIDIT_WORKFLOW_ID,
         "callback": return_url,
         "vendor_data": vendor_data,
     }
     resp = httpx.post(
         _SESSION_ENDPOINT,
-        headers={"Authorization": f"Bearer {settings.DIDIT_API_KEY}"},
+        headers={
+            "x-api-key": settings.DIDIT_API_KEY,
+            "Content-Type": "application/json",
+        },
         json=payload,
         timeout=30.0,
     )
