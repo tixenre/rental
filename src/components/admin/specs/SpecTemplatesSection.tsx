@@ -17,6 +17,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Pencil, X, GripVertical } from "lucide-react";
+import { ModalBackdrop } from "@/components/ui/modal-backdrop";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -737,16 +738,13 @@ function SpecTemplateFormModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={onClose}
+    <ModalBackdrop
+      onClose={onClose}
+      className="z-50 bg-black/60 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
     >
-      <div
-        className="bg-background rounded-lg border hairline w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="bg-background rounded-lg border hairline w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
         <header className="flex items-center justify-between border-b hairline px-4 py-3">
           <div className="min-w-0">
             <div className="font-display text-base text-ink">
@@ -933,7 +931,7 @@ function SpecTemplateFormModal({
           </Button>
         </footer>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 

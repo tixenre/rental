@@ -282,7 +282,7 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
       datosMut.mutate(datos);
     }, DEBOUNCE_MS);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave con debounce: dispara por datos/pedido/flag; incluir datosMut reiniciaría el timer en cada render
   }, [datos, pedido?.id, autosaveAdmin]);
 
   useEffect(() => {
@@ -294,7 +294,7 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
       itemsMut.mutate(items);
     }, DEBOUNCE_MS);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave con debounce: dispara por items/pedido/flag; incluir itemsMut reiniciaría el timer en cada render
   }, [items, pedido?.id, autosaveAdmin]);
 
   // Payload pendiente de enviar (autosave cliente). Si el cliente navega
@@ -319,7 +319,7 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
       pendingFlushRef.current = null;
     }, DEBOUNCE_MS);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave con debounce: dispara por datos/items/pedido/flag; incluir clienteMut reiniciaría el timer en cada render
   }, [datos, items, pedido?.id, autosaveCliente]);
 
   // Flush en unmount: si quedó un cambio sin enviar (el cliente navegó
@@ -332,7 +332,7 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
         pendingFlushRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush best-effort solo al desmontar (efecto mount-once); deps vacías a propósito
   }, []);
 
   // ── Submit explícito (propose) ─────────────────────────────────────────

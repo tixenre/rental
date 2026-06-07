@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Send, Eye, Pencil, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ModalBackdrop } from "@/components/ui/modal-backdrop";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -555,11 +556,9 @@ function TemplateEditorModal({ tplKey, onClose }: { tplKey: string; onClose: () 
   });
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <ModalBackdrop
+      onClose={onClose}
+      className="z-50 bg-black/60 flex items-center justify-center p-4"
     >
       <div className="w-full max-w-4xl max-h-[92vh] rounded-lg bg-background border hairline shadow-lg flex flex-col">
         <header className="border-b hairline px-4 py-3 shrink-0">
@@ -615,7 +614,7 @@ function TemplateEditorModal({ tplKey, onClose }: { tplKey: string; onClose: () 
           )}
         </footer>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 

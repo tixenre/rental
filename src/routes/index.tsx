@@ -202,7 +202,7 @@ function Index() {
     toast("Actualizamos tu carrito: algunos equipos ya no están disponibles.", {
       duration: 5000,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- limpia fantasmas solo cuando carga el catálogo; incluir items/setQty re-dispararía en cada cambio del carrito
   }, [allEquipos, isLoading]);
   const { data: backendCats = [] } = useCategorias();
   const { data: marcasData } = useMarcas();

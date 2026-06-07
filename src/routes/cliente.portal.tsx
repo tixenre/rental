@@ -68,6 +68,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ModalBackdrop } from "@/components/ui/modal-backdrop";
 import { useBusinessPhone } from "@/lib/business";
 import { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";
 import { whatsappLink } from "@/lib/whatsapp";
@@ -228,7 +229,7 @@ export default function ClientePortal() {
   const { data: allEquipos = [] } = useEquipos();
   const favEquipos = useMemo(
     () => allEquipos.filter((e) => fav.has(String(e.id))),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- depende de fav.items (los datos), no de fav.has (método recreado por render)
     [allEquipos, fav.items],
   );
 
@@ -315,7 +316,7 @@ export default function ClientePortal() {
     verPedido(nuevo);
     setHighlightId(nuevo);
     navigate({ to: "/cliente/portal", search: {}, replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- maneja ?nuevo= una sola vez (guard por ref); verPedido/setHighlightId quedan fuera a propósito
   }, [loading, nuevo, pedidos, navigate]);
 
   useEffect(() => {
@@ -1726,14 +1727,11 @@ function DocPreviewModal({
   }, [onClose]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-stretch sm:items-center justify-center sm:p-6"
-      onClick={onClose}
+    <ModalBackdrop
+      onClose={onClose}
+      className="z-50 bg-black/60 flex items-stretch sm:items-center justify-center sm:p-6"
     >
-      <div
-        className="bg-background w-full sm:max-w-4xl sm:max-h-[90vh] h-full sm:h-auto flex flex-col sm:rounded-lg overflow-hidden shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="bg-background w-full sm:max-w-4xl sm:max-h-[90vh] h-full sm:h-auto flex flex-col sm:rounded-lg overflow-hidden shadow-xl">
         <header className="flex items-center justify-between gap-2 border-b hairline px-3 sm:px-4 py-3 shrink-0">
           <h2 className="font-display text-base text-ink truncate min-w-0">{title}</h2>
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
@@ -1758,7 +1756,7 @@ function DocPreviewModal({
         </header>
         <iframe src={url} title={title} className="flex-1 w-full bg-white border-0" />
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 

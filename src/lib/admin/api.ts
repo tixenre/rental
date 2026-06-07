@@ -580,6 +580,28 @@ export type EquipoPendienteCompat = {
   motivo: "nunca_analizado" | "modificado" | "al_dia";
 };
 
+// Pagos: destinatario (a quién se cobró) y método. Espeja las constantes del
+// backend (`routes/alquileres.py`); los defaults se aplican en el modal.
+export const DESTINATARIOS_PAGO = ["Tincho", "Pablo"] as const;
+export const METODOS_PAGO = ["transferencia", "efectivo"] as const;
+
+export interface PagoLogRow {
+  id: number;
+  pedido_id: number;
+  monto: number;
+  concepto: string | null;
+  destinatario: string | null;
+  metodo: string | null;
+  fecha: string;
+  numero_pedido: number | null;
+  cliente_nombre: string | null;
+}
+export interface PagosLogResp {
+  pagos: PagoLogRow[];
+  total: number;
+  count: number;
+}
+
 export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
   dashboardUso: (dias_sin_uso = 90) =>
@@ -1318,8 +1340,36 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
   },
-  addPago: (id: number, monto: number, concepto?: string, fecha?: string) =>
-    authedPostJson<Pedido>(`/api/alquileres/${id}/pagos`, { monto, concepto, fecha }),
+  addPago: (
+    id: number,
+    monto: number,
+    concepto?: string,
+    fecha?: string,
+    destinatario?: string,
+    metodo?: string,
+  ) =>
+    authedPostJson<Pedido>(`/api/alquileres/${id}/pagos`, {
+      monto,
+      concepto,
+      fecha,
+      destinatario,
+      metodo,
+    }),
+  /** Ledger global de pagos — vista de logs del back-office. */
+  listPagosLog: (params?: {
+    destinatario?: string;
+    metodo?: string;
+    desde?: string;
+    hasta?: string;
+  }) => {
+    const sp = new URLSearchParams();
+    if (params?.destinatario) sp.set("destinatario", params.destinatario);
+    if (params?.metodo) sp.set("metodo", params.metodo);
+    if (params?.desde) sp.set("desde", params.desde);
+    if (params?.hasta) sp.set("hasta", params.hasta);
+    const qs = sp.toString();
+    return authedJson<PagosLogResp>(`/api/admin/pagos${qs ? `?${qs}` : ""}`);
+  },
   deletePago: async (id: number, pagoId: number) => {
     const res = await authedFetch(`/api/alquileres/${id}/pagos/${pagoId}`, { method: "DELETE" });
     if (!res.ok) {
