@@ -243,3 +243,50 @@ class TestCalcularTotal:
             descuento_cliente_pct=15.0,
         )
         assert r["neto"] == 196605
+
+
+# ── cobro_modo: líneas personalizadas fijo vs jornada (#805) ──────────────
+
+
+class TestCobroModo:
+    def test_bruto_linea_jornada_multiplica_por_jornadas(self):
+        from services.precios import bruto_linea
+        it = {"cantidad": 2, "precio_jornada": 5000, "cobro_modo": "jornada"}
+        assert bruto_linea(it, jornadas=3) == 2 * 5000 * 3
+
+    def test_bruto_linea_fijo_ignora_jornadas(self):
+        from services.precios import bruto_linea
+        it = {"cantidad": 2, "precio_jornada": 5000, "cobro_modo": "fijo"}
+        # 'fijo' = monto único: precio × cantidad, sin × jornadas.
+        assert bruto_linea(it, jornadas=3) == 2 * 5000
+
+    def test_bruto_linea_default_es_jornada(self):
+        from services.precios import bruto_linea
+        it = {"cantidad": 1, "precio_jornada": 1000}  # sin cobro_modo
+        assert bruto_linea(it, jornadas=4) == 4000
+
+    def test_total_mezcla_equipo_y_linea_fija(self):
+        # Equipo: 10.000 × 1 × 3 jornadas = 30.000.
+        # Línea fija (flete): 20.000 × 1, NO × jornadas = 20.000.
+        # Bruto = 50.000.
+        r = calcular_total(
+            items=[
+                {"equipo_id": 1, "cantidad": 1, "precio_jornada": 10000, "cobro_modo": "jornada"},
+                {"equipo_id": None, "cantidad": 1, "precio_jornada": 20000, "cobro_modo": "fijo"},
+            ],
+            jornadas=3,
+        )
+        assert r["bruto"] == 50000
+
+    def test_descuento_aplica_a_toda_la_mezcla(self):
+        # El dueño quiere las líneas libres tratadas como cualquier equipo para
+        # descuento: 50.000 bruto − 10% = 45.000 neto.
+        r = calcular_total(
+            items=[
+                {"equipo_id": 1, "cantidad": 1, "precio_jornada": 10000, "cobro_modo": "jornada"},
+                {"equipo_id": None, "cantidad": 1, "precio_jornada": 20000, "cobro_modo": "fijo"},
+            ],
+            jornadas=3,
+            descuento_cliente_pct=10.0,
+        )
+        assert r["neto"] == 45000

@@ -75,12 +75,12 @@ def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
         SELECT r.fecha_saldado::date                              AS fecha,
                al.id                                              AS pedido_id,
                COALESCE(e.dueno, 'Rambla')                        AS dueno,
-               e.nombre                                           AS equipo,
+               COALESCE(e.nombre, pi.nombre_libre)                AS equipo,
                al.monto_total * pi.subtotal::numeric / NULLIF(t.suma_items, 0) AS monto
         FROM en_rango r
         JOIN alquileres al ON al.id = r.pedido_id
         JOIN alquiler_items pi ON pi.pedido_id = al.id
-        JOIN equipos e ON e.id = pi.equipo_id
+        LEFT JOIN equipos e ON e.id = pi.equipo_id
         JOIN tot t ON t.pedido_id = al.id
     """
     rows = conn.execute(sql, (desde, hasta)).fetchall()

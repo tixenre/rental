@@ -18,14 +18,28 @@ import { adminApi, type Pedido, type PedidoEstado } from "@/lib/admin/api";
 import { clienteApi } from "@/lib/cliente/api";
 
 export type DraftItem = {
-  equipo_id: number;
+  /** Key estable para render + drag (#806). equipo_id no sirve: las líneas
+   * personalizadas (#805) no lo tienen y puede haber varias. */
+  uid: string;
+  /** null = línea personalizada (#805): no es del catálogo, no reserva stock. */
+  equipo_id: number | null;
   cantidad: number;
   precio_jornada: number;
   nombre: string;
   marca: string | null;
   nombre_publico?: string | null;
   foto_url?: string | null;
+  /** Línea personalizada (#805): nombre libre + modo de cobro. */
+  nombre_libre?: string | null;
+  cobro_modo?: "jornada" | "fijo";
 };
+
+let _uidSeq = 0;
+/** uid para una línea nueva agregada en el cliente (antes de persistir). */
+export function nuevoUidLinea(prefix = "tmp"): string {
+  _uidSeq += 1;
+  return `${prefix}-${Date.now()}-${_uidSeq}`;
+}
 
 export type DraftDatos = {
   cliente_id: number | null;
@@ -64,6 +78,9 @@ function pedidoToDatos(p: Pedido, keepDateTime = false): DraftDatos {
 
 function pedidoToItems(p: Pedido): DraftItem[] {
   return p.items.map((it) => ({
+    // uid estable desde el server: equipo → `e<equipo_id>` (consolidado, único);
+    // línea personalizada → `c<id de la fila>`.
+    uid: it.equipo_id != null ? `e${it.equipo_id}` : `c${it.id}`,
     equipo_id: it.equipo_id,
     cantidad: it.cantidad,
     precio_jornada: it.precio_jornada,
@@ -71,6 +88,8 @@ function pedidoToItems(p: Pedido): DraftItem[] {
     marca: it.marca,
     nombre_publico: it.nombre_publico ?? null,
     foto_url: it.foto_url ?? null,
+    nombre_libre: it.nombre_libre ?? null,
+    cobro_modo: it.cobro_modo ?? "jornada",
   }));
 }
 
@@ -93,7 +112,10 @@ function shallowItemsEq(a: DraftItem[], b: DraftItem[]): boolean {
     if (
       a[i].equipo_id !== b[i].equipo_id ||
       a[i].cantidad !== b[i].cantidad ||
-      a[i].precio_jornada !== b[i].precio_jornada
+      a[i].precio_jornada !== b[i].precio_jornada ||
+      // Líneas personalizadas (#805): nombre y modo también cuentan como cambio.
+      (a[i].nombre_libre ?? "") !== (b[i].nombre_libre ?? "") ||
+      (a[i].cobro_modo ?? "jornada") !== (b[i].cobro_modo ?? "jornada")
     )
       return false;
   }
@@ -180,6 +202,8 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
           equipo_id: it.equipo_id,
           cantidad: it.cantidad,
           precio_jornada: it.precio_jornada,
+          nombre_libre: it.equipo_id == null ? (it.nombre_libre ?? "") : null,
+          cobro_modo: it.cobro_modo ?? "jornada",
         })),
       ),
     onSuccess: (p) => {
@@ -199,10 +223,14 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
       clienteApi.enviarModificacion(pedido!.id, {
         fecha_desde: payload.d.fecha_desde || null,
         fecha_hasta: payload.d.fecha_hasta || null,
-        items: payload.its.map((it) => ({
-          equipo_id: it.equipo_id,
-          cantidad: it.cantidad,
-        })),
+        // El portal del cliente no maneja líneas personalizadas (#805) → solo
+        // ítems de catálogo (con equipo_id).
+        items: payload.its
+          .filter((it) => it.equipo_id != null)
+          .map((it) => ({
+            equipo_id: it.equipo_id as number,
+            cantidad: it.cantidad,
+          })),
         mensaje: mensaje || null,
       }),
     onSuccess: (resp) => {
