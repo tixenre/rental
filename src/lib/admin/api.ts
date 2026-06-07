@@ -640,6 +640,7 @@ export interface SugeridoRendicion {
 }
 export interface TableroData {
   mes: string;
+  cierre: { cerrado: boolean; cerrado_por: string | null; cerrado_at: string | null };
   disponible: SaldosData;
   ganancia_mes: { mes: string; ingresos: number; gastos: number; neta: number };
   rendicion_pendiente: {
@@ -668,11 +669,19 @@ export interface RendicionMovimiento {
   origen: string | null;
   destino: string | null;
 }
+export interface ReconciliacionContable {
+  ok: boolean;
+  saldos_negativos: { cantidad: number; cuentas: { cuenta: string; saldo: number }[] };
+  pagos_sin_socio: { cantidad: number; monto: number };
+  movimientos_cuenta_inactiva: { cantidad: number };
+  reporte: { ok: boolean };
+}
 export interface RendicionData {
   mes: string;
   desde: string;
   hasta: string;
   cerrado: boolean;
+  cierre_contable: boolean;
   corresponde: Record<string, number>;
   cobrado: Record<string, number>;
   sin_asignar: number;
@@ -1709,6 +1718,20 @@ export const adminApi = {
       ganancia_neta: number;
       gastos_por_categoria: { categoria: string; monto: number }[];
     }>(`/api/admin/contabilidad/pyl/${mes}`),
+  getReconciliacionContable: () =>
+    authedJson<ReconciliacionContable>("/api/admin/contabilidad/reconciliacion"),
+  cerrarMesContable: (mes: string) =>
+    authedJson<{ mes: string; cerrado: boolean }>(`/api/admin/contabilidad/cierres/${mes}`, {
+      method: "POST",
+    }),
+  reabrirMesContable: async (mes: string) => {
+    const res = await authedFetch(`/api/admin/contabilidad/cierres/${mes}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+    return res.json().catch(() => ({}));
+  },
 
   uploadOgImage: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();

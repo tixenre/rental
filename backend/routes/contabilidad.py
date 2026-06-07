@@ -30,6 +30,8 @@ from contabilidad.movimientos import (
 from contabilidad.tablero import tablero as _tablero
 from contabilidad.pyl import ganancia_neta
 from contabilidad.rendicion import rendicion as _rendicion, saldar as _saldar
+from contabilidad.cierres import cerrar_mes as _cerrar_mes, reabrir_mes as _reabrir_mes
+from contabilidad.reconciliacion import reconciliar as _reconciliar
 
 router = APIRouter()
 
@@ -384,3 +386,38 @@ def post_saldar(request: Request, mes: str, body: SaldarBody):
         except Exception:
             conn.rollback()
             raise
+
+
+# ── Reconciliación + cierre contable del mes ────────────────────────────────
+
+@router.get("/admin/contabilidad/reconciliacion")
+def get_reconciliacion(request: Request):
+    """Semáforo de confianza: chequea que la plata del módulo cuadre."""
+    require_admin(request)
+    with get_db() as conn:
+        return _reconciliar(conn)
+
+
+@router.post("/admin/contabilidad/cierres/{mes}")
+def post_cierre(request: Request, mes: str):
+    """Cierra un mes contable: congela la foto y traba la edición de sus
+    movimientos. Idempotente."""
+    admin = require_admin(request)
+    with get_db() as conn:
+        try:
+            return _cerrar_mes(conn, mes, admin.get("email"))
+        except ValueError as e:
+            conn.rollback()
+            raise HTTPException(400, str(e))
+
+
+@router.delete("/admin/contabilidad/cierres/{mes}")
+def delete_cierre(request: Request, mes: str):
+    """Reabre un mes contable cerrado."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            reabierto = _reabrir_mes(conn, mes)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+    return {"mes": mes, "cerrado": False, "reabierto": reabierto}

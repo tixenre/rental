@@ -247,6 +247,41 @@ def test_rendicion_cierra_en_cero_y_saldar(conn):
     assert all(p["pendiente"] == 0 for p in r2["personas"])
 
 
+def test_cierre_traba_la_edicion_del_mes(conn):
+    from contabilidad.cierres import cerrar_mes, mes_cerrado, reabrir_mes
+    from contabilidad.movimientos import crear_movimiento
+
+    MES = "2026-08"
+    reabrir_mes(conn, MES)  # idempotente: limpia un cierre colgado de una corrida previa
+    assert mes_cerrado(conn, MES) is False
+    try:
+        cerrar_mes(conn, MES, "test")
+        assert mes_cerrado(conn, MES) is True
+        # Un gasto fechado en el mes cerrado queda trabado.
+        with pytest.raises(ValueError):
+            crear_movimiento(
+                conn, tipo="gasto", monto=1000, cuenta_origen_id=_cuenta_id(conn, "Efectivo"),
+                categoria_id=_categoria_id(conn), fecha="2026-08-10", por="test",
+            )
+    finally:
+        reabrir_mes(conn, MES)
+    assert mes_cerrado(conn, MES) is False
+    # Reabierto, el mismo gasto entra.
+    m = crear_movimiento(
+        conn, tipo="gasto", monto=1000, cuenta_origen_id=_cuenta_id(conn, "Efectivo"),
+        categoria_id=_categoria_id(conn), fecha="2026-08-10", por="test",
+    )
+    assert m["id"]
+
+
+def test_reconciliar_corre(conn):
+    from contabilidad.reconciliacion import reconciliar
+
+    r = reconciliar(conn)
+    assert "ok" in r
+    assert "saldos_negativos" in r and "pagos_sin_socio" in r
+
+
 def test_crear_y_desactivar_cuenta_vacia(conn):
     from contabilidad.cuentas import crear_cuenta, desactivar_cuenta
 

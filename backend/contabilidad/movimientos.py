@@ -71,6 +71,24 @@ def _cuentas_validas(conn) -> set[int]:
     return {r["id"] for r in rows}
 
 
+def _mes_de_fecha(fecha) -> str:
+    from datetime import date
+    if not fecha:
+        return date.today().strftime("%Y-%m")
+    return str(fecha)[:7]
+
+
+def _exigir_mes_abierto(conn, fecha) -> None:
+    """Traba tocar un movimiento cuyo mes contable está cerrado (#809 Fase 6)."""
+    from contabilidad.cierres import mes_cerrado
+
+    mes = _mes_de_fecha(fecha)
+    if mes_cerrado(conn, mes):
+        raise ValueError(
+            f"El mes {mes} está cerrado. Reabrilo desde Rendición para tocar movimientos de esa fecha."
+        )
+
+
 def listar_movimientos(conn, *, tipo=None, cuenta_id=None, categoria_id=None,
                        desde=None, hasta=None, incluir_anulados=False, limit=500) -> list[dict]:
     """Movimientos con nombres de cuenta/categoría resueltos, filtrables. Más
@@ -136,6 +154,7 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
     monto = int(monto or 0)
     validar_estructura_movimiento(tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id)
     _validar_metodo(metodo)
+    _exigir_mes_abierto(conn, fecha)
 
     validas = _cuentas_validas(conn)
     for cid in (cuenta_origen_id, cuenta_destino_id):
@@ -173,6 +192,9 @@ def editar_movimiento(conn, mov_id: int, *, campos: dict, por=None) -> dict:
         raise ValueError("El movimiento no existe.")
     if actual["anulado"]:
         raise ValueError("No se puede editar un movimiento anulado.")
+    _exigir_mes_abierto(conn, actual["fecha"])
+    if "fecha" in campos:
+        _exigir_mes_abierto(conn, campos["fecha"])
 
     propuesta = dict(actual)
     for k in _CAMPOS_EDITABLES:
@@ -218,6 +240,7 @@ def anular_movimiento(conn, mov_id: int, *, motivo, por=None) -> dict:
         raise ValueError("El movimiento no existe.")
     if actual["anulado"]:
         return actual
+    _exigir_mes_abierto(conn, actual["fecha"])
     conn.execute(
         """UPDATE movimientos
            SET anulado = TRUE, anulado_por = ?, anulado_at = CURRENT_TIMESTAMP, anulado_motivo = ?
