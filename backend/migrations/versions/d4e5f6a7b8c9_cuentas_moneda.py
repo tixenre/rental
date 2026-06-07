@@ -30,7 +30,7 @@ def upgrade() -> None:
     ))
     bind.execute(sa.text(
         "INSERT INTO cuentas (nombre, tipo, moneda, orden) "
-        "VALUES ('Dólares', 'caja', 'USD', 6) ON CONFLICT (nombre) DO NOTHING"
+        "VALUES ('Dólares', 'caja', 'USD', 6) ON CONFLICT (nombre) WHERE activa DO NOTHING"
     ))
 
 
