@@ -17,7 +17,7 @@ crean juntas aunque la UI de gastos/categorías llegue en una fase posterior —
 esquema del libro va completo de una para no alterarlo después.
 
 Revision ID: x8y9z0a1b2c3
-Revises: w7x8y9z0a1b2
+Revises: u5v6w7x8y9z0
 Create Date: 2026-06-07
 """
 
@@ -27,7 +27,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "x8y9z0a1b2c3"
-down_revision: Union[str, Sequence[str], None] = "w7x8y9z0a1b2"
+down_revision: Union[str, Sequence[str], None] = "u5v6w7x8y9z0"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -1198,7 +1198,7 @@ def init_db():
     # #722); el saldo de la caja de un socio se calcula sumando sus pagos. Acá
     # solo van los movimientos manuales (gasto/transferencia/retiro/aporte) y las
     # cuentas con su saldo inicial. Esquema en dos capas (decisión 2026-06-03):
-    # también en la migración v6w7x8y9z0a1.
+    # también en la migración x8y9z0a1b2c3.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS cuentas (
             id             SERIAL PRIMARY KEY,
