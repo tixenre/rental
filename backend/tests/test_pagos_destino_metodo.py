@@ -1,7 +1,7 @@
 """Defaults + validación del destinatario/método de un pago (#722).
 
 Pieza pura `_resolver_destino_metodo`: aplica los defaults del dueño
-(Tincho / transferencia) y rechaza valores fuera de la lista.
+(Rambla / transferencia) y rechaza valores fuera de la lista.
 """
 
 import pytest
@@ -16,14 +16,15 @@ from routes.alquileres import (
 pytestmark = pytest.mark.unit
 
 
-def test_defaults_tincho_transferencia():
-    assert _resolver_destino_metodo(None, None) == ("Tincho", "transferencia")
-    assert _resolver_destino_metodo("", "") == ("Tincho", "transferencia")
+def test_defaults_rambla_transferencia():
+    assert _resolver_destino_metodo(None, None) == ("Rambla", "transferencia")
+    assert _resolver_destino_metodo("", "") == ("Rambla", "transferencia")
 
 
 def test_acepta_valores_validos():
     assert _resolver_destino_metodo("Pablo", "efectivo") == ("Pablo", "efectivo")
     assert _resolver_destino_metodo("Tincho", "efectivo") == ("Tincho", "efectivo")
+    assert _resolver_destino_metodo("Rambla", "transferencia") == ("Rambla", "transferencia")
 
 
 def test_destinatario_invalido_rechazado():
@@ -40,5 +41,5 @@ def test_metodo_invalido_rechazado():
 
 def test_constantes_son_la_fuente_unica():
     # El default tiene que pertenecer a la lista (no quedar huérfano).
-    assert "Tincho" in DESTINATARIOS_PAGO
+    assert "Rambla" in DESTINATARIOS_PAGO
     assert "transferencia" in METODOS_PAGO

@@ -7,7 +7,7 @@ Cubre la validación de cuentas y el cálculo de saldos (la matemática: saldo_i
 
 import pytest
 
-from contabilidad.cuentas import SOCIOS, TIPOS_CUENTA, validar_cuenta
+from contabilidad.cuentas import COBRADORES, TIPOS_CUENTA, validar_cuenta
 from contabilidad.saldos import calcular_saldos
 
 
@@ -33,9 +33,18 @@ class TestValidarCuenta:
         with pytest.raises(ValueError):
             validar_cuenta({"nombre": "X", "tipo": "billetera"})
 
-    def test_rechaza_socio_en_cuenta_no_socio(self):
+    def test_fondo_rambla_como_cobrador_ok(self):
+        # Rambla también cobra: el Fondo Rambla (tipo fondo) la representa.
+        validar_cuenta({"nombre": "Fondo Rambla", "tipo": "fondo", "socio": "Rambla"})
+
+    def test_rechaza_cobrador_invalido(self):
         with pytest.raises(ValueError):
-            validar_cuenta({"nombre": "Efectivo", "tipo": "caja", "socio": "Pablo"})
+            validar_cuenta({"nombre": "X", "tipo": "caja", "socio": "Mariano"})
+
+    def test_socio_caja_con_rambla_falla(self):
+        # Una caja de tipo 'socio' es de un socio humano, no de Rambla.
+        with pytest.raises(ValueError):
+            validar_cuenta({"nombre": "Caja X", "tipo": "socio", "socio": "Rambla"})
 
     def test_rechaza_socio_invalido(self):
         with pytest.raises(ValueError):
@@ -49,8 +58,8 @@ class TestValidarCuenta:
         with pytest.raises(ValueError):
             validar_cuenta({"nombre": "X", "tipo": "caja", "saldo_inicial": "1000"})
 
-    def test_socios_son_los_dos_fisicos(self):
-        assert set(SOCIOS) == {"Pablo", "Tincho"}
+    def test_cobradores_son_los_tres(self):
+        assert set(COBRADORES) == {"Pablo", "Tincho", "Rambla"}
 
 
 class TestCalcularSaldos:

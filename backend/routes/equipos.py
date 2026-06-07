@@ -8,7 +8,7 @@ import logging
 import os
 import re
 import unicodedata
-from datetime import date as _date
+from datetime import date as _date, timedelta
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -1408,6 +1408,42 @@ def get_ficha(id: int):
         # nombre_publico_template, keywords_json + columnas legacy que el
         # catálogo público todavía usa).
         return base
+
+
+@router.get("/equipos/{id}/disponibilidad-calendario")
+def disponibilidad_calendario(
+    id: int,
+    desde: Optional[str] = Query(None),
+    hasta: Optional[str] = Query(None),
+):
+    """Estado de disponibilidad por día de UN equipo (#808), catálogo-facing.
+
+    Devuelve `{'stock': N, 'dias': {YYYY-MM-DD: 'parcial'|'reservado'}}` — los días
+    `libre` se OMITEN (default en el front). Lectura sobre el motor de reservas
+    (`estado_diario_equipo`), sin recalcular overlap. Sin auth (igual que el catálogo).
+    """
+    from reservas.disponibilidad import estado_diario_equipo
+
+    hoy = _date.today()
+    d_desde = desde or hoy.isoformat()
+    d_hasta = hasta or (hoy + timedelta(days=90)).isoformat()
+    # Cap defensivo del rango (≤ 180 días) para no abusar de la lectura.
+    try:
+        span = (_date.fromisoformat(d_hasta[:10]) - _date.fromisoformat(d_desde[:10])).days
+    except ValueError:
+        raise HTTPException(400, "Fechas inválidas (usar YYYY-MM-DD)")
+    if span < 0:
+        raise HTTPException(400, "El rango es inválido (hasta < desde)")
+    if span > 180:
+        raise HTTPException(400, "El rango no puede superar 180 días")
+
+    with get_db() as conn:
+        res = estado_diario_equipo(conn, id, d_desde, d_hasta)
+    if res is None:
+        raise HTTPException(404, "Equipo no encontrado")
+    # Slim: solo días no-libres (libre = ausente).
+    res["dias"] = {d: e for d, e in res["dias"].items() if e != "libre"}
+    return res
 
 
 @router.put("/equipos/{id}/ficha")

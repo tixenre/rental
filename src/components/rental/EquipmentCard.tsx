@@ -13,6 +13,7 @@ import { StepperPill } from "./equipment/shared/StepperPill";
 import { PriceBlock } from "./equipment/shared/PriceBlock";
 import { FavButton } from "./equipment/shared/FavButton";
 import { ShareButton } from "./equipment/shared/ShareButton";
+import { IncludesLine } from "./equipment/shared/IncludesLine";
 
 /**
  * EquipmentCard — grid card del catálogo público.
@@ -65,14 +66,6 @@ export function EquipmentCard({
   // fallback al nombre interno). No re-concatenar `item.brand` acá: duplicaba
   // la marca en los equipos con template configurado.
   const nombrePublico = item.name;
-
-  // Incluye: texto inline de lo que viene con el equipo.
-  const includesText = item.includes?.length
-    ? item.includes
-        .slice(0, 3)
-        .map((i) => (i.qty && i.qty > 1 ? `${i.name} ×${i.qty}` : i.name))
-        .join(" · ") + (item.includes.length > 3 ? ` · +${item.includes.length - 3}` : "")
-    : null;
 
   const handleAdd = (e: MouseEvent<HTMLButtonElement>) => {
     if (sinStock || reachedMax) return;
@@ -165,11 +158,7 @@ export function EquipmentCard({
         <p className="line-clamp-2 font-sans text-[15px] font-bold leading-tight text-ink">
           {nombrePublico}
         </p>
-        {includesText && (
-          <p className="truncate font-mono text-[9px] tracking-[0.1em] text-muted-foreground">
-            {includesText}
-          </p>
-        )}
+        <IncludesLine includes={item.includes} />
       </div>
 
       {/* ── Footer: precio + acción ──────────────────────────── */}

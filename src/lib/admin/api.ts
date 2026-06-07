@@ -582,7 +582,7 @@ export type EquipoPendienteCompat = {
 
 // Pagos: destinatario (a quién se cobró) y método. Espeja las constantes del
 // backend (`routes/alquileres.py`); los defaults se aplican en el modal.
-export const DESTINATARIOS_PAGO = ["Tincho", "Pablo"] as const;
+export const DESTINATARIOS_PAGO = ["Rambla", "Tincho", "Pablo"] as const;
 export const METODOS_PAGO = ["transferencia", "efectivo"] as const;
 
 export interface PagoLogRow {
@@ -633,8 +633,66 @@ export interface SaldosData {
   total_disponible: number;
   as_of: string;
 }
+export interface SugeridoRendicion {
+  de: string;
+  a: string;
+  monto: number;
+}
 export interface TableroData {
+  mes: string;
+  cierre: { cerrado: boolean; cerrado_por: string | null; cerrado_at: string | null };
   disponible: SaldosData;
+  ganancia_mes: { mes: string; ingresos: number; gastos: number; neta: number };
+  rendicion_pendiente: {
+    mes: string;
+    total: number;
+    sugeridos: SugeridoRendicion[];
+    cuadra: boolean;
+  };
+}
+export interface RendicionPersona {
+  persona: string;
+  le_corresponde: number;
+  cobro: number;
+  ya_rindio: number;
+  pendiente: number;
+}
+export interface RendicionMovimiento {
+  id: number;
+  monto: number;
+  fecha: string;
+  metodo: string | null;
+  nota: string | null;
+  anulado: boolean;
+  created_by: string | null;
+  created_at: string;
+  origen: string | null;
+  destino: string | null;
+}
+export interface ReconciliacionContable {
+  ok: boolean;
+  saldos_negativos: { cantidad: number; cuentas: { cuenta: string; saldo: number }[] };
+  pagos_sin_socio: { cantidad: number; monto: number };
+  movimientos_cuenta_inactiva: { cantidad: number };
+  reporte: { ok: boolean };
+}
+export interface RendicionData {
+  mes: string;
+  desde: string;
+  hasta: string;
+  cerrado: boolean;
+  cierre_contable: boolean;
+  corresponde: Record<string, number>;
+  cobrado: Record<string, number>;
+  sin_asignar: number;
+  ya_transferido: Record<string, number>;
+  personas: RendicionPersona[];
+  sugeridos: SugeridoRendicion[];
+  total_reporte: number;
+  total_cobrado: number;
+  cuadra: boolean;
+  advertencias: string[];
+  movimientos: RendicionMovimiento[];
 }
 export interface CuentaInput {
   nombre: string;
@@ -643,6 +701,51 @@ export interface CuentaInput {
   saldo_inicial?: number;
   fecha_apertura?: string | null;
   orden?: number;
+}
+
+export const TIPOS_MOVIMIENTO = ["gasto", "transferencia", "retiro", "aporte", "ajuste"] as const;
+export type TipoMovimiento = (typeof TIPOS_MOVIMIENTO)[number];
+
+export interface GastoCategoria {
+  id: number;
+  nombre: string;
+  activa: boolean;
+  orden: number;
+}
+export interface Movimiento {
+  id: number;
+  tipo: TipoMovimiento;
+  monto: number;
+  cuenta_origen_id: number | null;
+  cuenta_destino_id: number | null;
+  categoria_id: number | null;
+  metodo: string | null;
+  fecha: string;
+  nota: string | null;
+  comprobante_url: string | null;
+  es_rendicion: boolean;
+  rendicion_mes: string | null;
+  anulado: boolean;
+  anulado_motivo: string | null;
+  created_by: string | null;
+  created_at: string;
+  cuenta_origen_nombre: string | null;
+  cuenta_destino_nombre: string | null;
+  categoria_nombre: string | null;
+}
+export interface MovimientoInput {
+  tipo: TipoMovimiento;
+  monto: number;
+  cuenta_origen_id?: number | null;
+  cuenta_destino_id?: number | null;
+  categoria_id?: number | null;
+  metodo?: string | null;
+  fecha?: string | null;
+  nota?: string | null;
+}
+export interface GastosPorCategoria {
+  por_categoria: { categoria: string; monto: number }[];
+  total: number;
 }
 
 export const adminApi = {
@@ -1529,7 +1632,8 @@ export const adminApi = {
 
   // Contabilidad (#809) — Fase 1: cuentas/cajas con saldo + tablero. Los ingresos
   // por alquiler salen derivados de alquiler_pagos (no se cargan a mano).
-  getTablero: () => authedJson<TableroData>("/api/admin/contabilidad/tablero"),
+  getTablero: (mes?: string) =>
+    authedJson<TableroData>(`/api/admin/contabilidad/tablero${mes ? `?mes=${mes}` : ""}`),
   getSaldos: () => authedJson<SaldosData>("/api/admin/contabilidad/saldos"),
   listCuentas: (incluirInactivas = false) =>
     authedJson<{ cuentas: Cuenta[] }>(
@@ -1545,6 +1649,89 @@ export const adminApi = {
     }),
   deactivateCuenta: async (id: number) => {
     const res = await authedFetch(`/api/admin/contabilidad/cuentas/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+    return res.json().catch(() => ({}));
+  },
+
+  // Contabilidad — movimientos (gasto/transferencia/retiro/aporte/ajuste) + categorías
+  listMovimientos: (params?: {
+    tipo?: string;
+    cuenta_id?: number;
+    categoria_id?: number;
+    desde?: string;
+    hasta?: string;
+    incluir_anulados?: boolean;
+  }) => {
+    const sp = new URLSearchParams();
+    if (params?.tipo) sp.set("tipo", params.tipo);
+    if (params?.cuenta_id) sp.set("cuenta_id", String(params.cuenta_id));
+    if (params?.categoria_id) sp.set("categoria_id", String(params.categoria_id));
+    if (params?.desde) sp.set("desde", params.desde);
+    if (params?.hasta) sp.set("hasta", params.hasta);
+    if (params?.incluir_anulados) sp.set("incluir_anulados", "true");
+    const qs = sp.toString();
+    return authedJson<{ movimientos: Movimiento[]; count: number }>(
+      `/api/admin/contabilidad/movimientos${qs ? `?${qs}` : ""}`,
+    );
+  },
+  createMovimiento: (data: MovimientoInput) =>
+    authedPostJson<Movimiento>("/api/admin/contabilidad/movimientos", data),
+  updateMovimiento: (id: number, data: Partial<MovimientoInput>) =>
+    authedJson<Movimiento>(`/api/admin/contabilidad/movimientos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  anularMovimiento: (id: number, motivo: string) =>
+    authedPostJson<Movimiento>(`/api/admin/contabilidad/movimientos/${id}/anular`, { motivo }),
+  uploadComprobante: async (id: number, file: File): Promise<{ comprobante_url: string }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await authedFetch(`/api/admin/contabilidad/movimientos/${id}/comprobante`, {
+      method: "POST",
+      body: fd,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.detail ?? `POST → ${res.status}`);
+    return json;
+  },
+  listGastoCategorias: () =>
+    authedJson<{ categorias: GastoCategoria[] }>("/api/admin/contabilidad/categorias"),
+  createGastoCategoria: (nombre: string) =>
+    authedPostJson<GastoCategoria>("/api/admin/contabilidad/categorias", { nombre }),
+  getGastos: (desde?: string, hasta?: string) => {
+    const sp = new URLSearchParams();
+    if (desde) sp.set("desde", desde);
+    if (hasta) sp.set("hasta", hasta);
+    const qs = sp.toString();
+    return authedJson<GastosPorCategoria>(`/api/admin/contabilidad/gastos${qs ? `?${qs}` : ""}`);
+  },
+  // Rendición de cuentas mensual entre socios
+  getRendicion: (mes: string) =>
+    authedJson<RendicionData>(`/api/admin/contabilidad/rendicion/${mes}`),
+  saldarRendicion: (
+    mes: string,
+    body: { de: string; a: string; monto: number; metodo?: string | null; nota?: string | null },
+  ) => authedPostJson<Movimiento>(`/api/admin/contabilidad/rendicion/${mes}/saldar`, body),
+  getPyl: (mes: string) =>
+    authedJson<{
+      mes: string;
+      ingresos: number;
+      gastos: number;
+      ganancia_neta: number;
+      gastos_por_categoria: { categoria: string; monto: number }[];
+    }>(`/api/admin/contabilidad/pyl/${mes}`),
+  getReconciliacionContable: () =>
+    authedJson<ReconciliacionContable>("/api/admin/contabilidad/reconciliacion"),
+  cerrarMesContable: (mes: string) =>
+    authedJson<{ mes: string; cerrado: boolean }>(`/api/admin/contabilidad/cierres/${mes}`, {
+      method: "POST",
+    }),
+  reabrirMesContable: async (mes: string) => {
+    const res = await authedFetch(`/api/admin/contabilidad/cierres/${mes}`, { method: "DELETE" });
     if (!res.ok && res.status !== 204) {
       const detail = await res.json().catch(() => ({}));
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);

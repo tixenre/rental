@@ -531,6 +531,46 @@
   Cierra la iniciativa #662 (invertir la fuente de verdad hacia el paquete — abandonada por esta
   decisión); los trackers de migración por pantalla (#612) y handoff (#605) siguen vigentes sobre `src/`.
 
+### 2026-06-07 — `backend/contabilidad/` = motor único de la plata "de adentro" (cierra #809)
+
+- **Contexto:** la iniciativa #809 construyó el módulo contable del back-office (sección Finanzas):
+  cuentas/cajas con saldo, libro de movimientos (gasto/transferencia/retiro/aporte/ajuste),
+  rendición mensual entre socios, ganancia neta (P&L), cierre contable y reconciliación. Es lógica
+  de **plata** con alto costo si se duplica o diverge.
+- **Decisión:** toda la plata "de adentro" del negocio (cajas, movimientos, saldos, rendición,
+  ganancia, cierre contable, reconciliación) vive en el paquete **`backend/contabilidad/`**; los
+  routes son solo transporte HTTP. Materializa el mismo principio que `backend/reservas/`
+  (_2026-05-30_) y `backend/reportes/` (_2026-06-03_): el dominio tiene una **dirección física
+  única**. Invariantes:
+  - **Los ingresos por alquiler DERIVAN de `alquiler_pagos`** (única fuente del cobro, #722): el
+    saldo de la caja de un socio se calcula sumando sus pagos por `destinatario`; **nunca** se
+    re-carga un movimiento por un cobro de cliente → cero doble-contabilización por construcción.
+  - **La plata no se borra:** anular un movimiento es soft-delete con motivo (deja de contar para
+    los saldos pero queda trazable). Auditoría `created_by/updated_by/anulado_por`.
+  - **Enteros ARS** en todo el cálculo (como el resto del sistema), no `NUMERIC`.
+  - **Devengado vs percibido, a propósito:** la **ganancia/P&L** se mide por **ingreso devengado**
+    (= total del reporte de liquidación del mes); el **saldo de caja** se mueve por **plata
+    entrante** (incluidas señas). Pueden no coincidir mes a mes — no es un bug.
+  - **Rendición** atada al MISMO universo de pedidos saldados que el reporte (reusa `SALDADO_CTE`)
+    → cierra en cero; un saldado se registra como **transferencia `es_rendicion`** en el mismo
+    libro (no un sistema paralelo). **Los tres cobran** (Pablo/Tincho/Rambla; **Rambla es el
+    cobrador por defecto** desde 2026-06-07): la plata cobrada se atribuye a la caja del cobrador
+    (Pablo/Tincho → su caja de socio; Rambla → Fondo Rambla) vía la columna `cuentas.socio` (= a qué
+    cobrador representa la caja). La **parte de Rambla NO se reparte** entre Pablo y Tincho. Los
+    cobradores válidos viven en la constante única `COBRADORES` (los tres) + `SOCIOS_HUMANOS`
+    (Pablo/Tincho, los únicos válidos para una caja de tipo `socio`).
+  - **Cierre contable DISTINTO del de liquidación (#721):** aquel congela el reparto del reporte;
+    este congela el estado de cajas/movimientos y **traba la edición de movimientos del mes por la
+    fecha del movimiento** (`_exigir_mes_abierto` en crear/editar/anular). Esquema en dos capas
+    (`init_db()` + migración) para toda tabla nueva.
+- **Quién hace cumplir:** el supervisor marca como hallazgo cualquier cálculo de plata interna
+  ad-hoc fuera del paquete; un endpoint que escriba `movimientos` sin pasar por el motor (se
+  saltearía el candado de mes cerrado); recargar ingresos de alquiler a mano; o duplicar el valor
+  de los cobradores fuera de `COBRADORES`. Extiende _2026-05-30_ (`reservas/`) y _2026-06-03_ (`reportes/`).
+- **Pendiente conocido:** las partes de la rendición son fijas (Pablo/Tincho/Rambla). Si alguna vez
+  el modelo de comisiones reparte a un **cuarto beneficiario**, esa parte quedaría fuera del cuadro
+  y el total no cuadraría → habría que generalizar las partes. Hoy no es un caso real.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
