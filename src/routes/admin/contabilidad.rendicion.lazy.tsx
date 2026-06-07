@@ -240,7 +240,7 @@ function CierreControl({
           type="button"
           onClick={() => reabrir.mutate()}
           disabled={reabrir.isPending}
-          className="h-8 shrink-0 rounded-md border hairline px-3 text-xs hover:bg-muted/40"
+          className="h-9 shrink-0 rounded-md border hairline px-3 text-xs hover:bg-muted/40"
         >
           Reabrir
         </button>
@@ -260,7 +260,7 @@ function CierreControl({
             cerrar.mutate();
         }}
         disabled={cerrar.isPending}
-        className="h-8 rounded-md border hairline px-3 text-xs hover:bg-muted/40"
+        className="h-9 rounded-md border hairline px-3 text-xs hover:bg-muted/40"
       >
         Cerrar mes
       </button>

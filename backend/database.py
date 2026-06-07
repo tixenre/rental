@@ -1282,7 +1282,7 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_mov_rendicion ON movimientos(rendicion_mes) WHERE es_rendicion"
     )
     # Cierres contables (#809, Fase 6): congelan un mes (foto + traba la edición de
-    # movimientos de ese mes). Espejo de la migración z0a1b2c3d4e5.
+    # movimientos de ese mes). Espejo de la migración b2c3d4e5f6a7.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS contabilidad_cierres (
             mes           VARCHAR(7) PRIMARY KEY,
