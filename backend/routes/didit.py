@@ -208,7 +208,12 @@ def _guardar_verificacion(
     fecha_nacimiento_renaper: str | None = None,
     direccion_renaper: str | None = None,
 ) -> None:
-    """Persiste los datos verificados por RENAPER en clientes. Idempotente."""
+    """Persiste los datos verificados por RENAPER en clientes. Idempotente.
+
+    Solo actualiza si el didit_session_id almacenado coincide con el de este
+    webhook — previene que un vendor_data forjado marque como verificado a otro
+    cliente (el payload ya está firmado con HMAC, esto es defensa en profundidad).
+    """
     ahora = now_ar()
     with get_db() as conn:
         conn.execute(
@@ -222,10 +227,10 @@ def _guardar_verificacion(
                    fecha_nacimiento_renaper=COALESCE(?, fecha_nacimiento_renaper),
                    direccion_renaper=COALESCE(?, direccion_renaper),
                    updated_at=?
-               WHERE id=?""",
+               WHERE id=? AND didit_session_id=?""",
             (dni, cuil, ahora, session_id,
              nombre_renaper, apellido_renaper, fecha_nacimiento_renaper, direccion_renaper,
-             ahora, cliente_id),
+             ahora, cliente_id, session_id),
         )
         conn.commit()
     logger.info(

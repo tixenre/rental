@@ -1804,6 +1804,15 @@ export type Cliente = {
   cuit: string | null;
   descuento: number | null;
   perfil_impuestos: string | null;
+  // Verificación de identidad Didit
+  dni_validado_at: string | null;
+  dni: string | null;
+  cuil: string | null;
+  nombre_renaper: string | null;
+  apellido_renaper: string | null;
+  fecha_nacimiento_renaper: string | null;
+  direccion_renaper: string | null;
+  apodo: string | null;
 };
 export type ClientesListResp = {
   total: number;
