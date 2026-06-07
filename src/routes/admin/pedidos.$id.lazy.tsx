@@ -854,7 +854,7 @@ function ItemRow({
         <button
           type="button"
           aria-label="Reordenar equipo"
-          className="inline-flex h-11 w-6 -ml-1 items-center justify-center text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
+          className="inline-flex h-11 w-11 -ml-3 items-center justify-center text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
