@@ -1,4 +1,4 @@
-import { Calendar, ShoppingBag, Truck, ArrowRight } from "lucide-react";
+import { Calendar, Phone, MapPin, ArrowRight } from "lucide-react";
 
 interface ComoFuncionaProps {
   onDateOpen: () => void;
@@ -9,22 +9,22 @@ export function ComoFunciona({ onDateOpen }: ComoFuncionaProps) {
     {
       n: "01",
       Icon: Calendar,
-      title: "Elegí tus fechas",
-      desc: "Indicá retiro y devolución. Calculamos jornadas y disponibilidad al instante.",
+      title: "Seleccioná fechas y equipos",
+      desc: "Elegí tus fechas de retiro y devolución, sumá los equipos al carrito y armá tu pedido.",
       cta: true,
     },
     {
       n: "02",
-      Icon: ShoppingBag,
-      title: "Armá tu pedido",
-      desc: "Sumá cámaras, luces, audio y soportes al carrito. Vas viendo el total en vivo.",
+      Icon: Phone,
+      title: "Lo confirmamos con vos",
+      desc: "Revisamos tu pedido, te contactamos y coordinamos todos los detalles.",
       cta: false,
     },
     {
       n: "03",
-      Icon: Truck,
-      title: "Retiralo o te lo llevamos",
-      desc: "Pasá por el local en Mar del Plata o coordinamos envío. Confirmás y listo.",
+      Icon: MapPin,
+      title: "Retiralo por Rambla Estudio",
+      desc: "Pasá a buscar los equipos al estudio en Mar del Plata. Confirmás y listo.",
       cta: false,
     },
   ];
