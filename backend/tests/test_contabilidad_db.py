@@ -289,6 +289,14 @@ def test_reconciliar_corre(conn):
     assert "saldos_negativos" in r and "pagos_sin_socio" in r
 
 
+def test_cobros_mensuales_agrega_por_mes(conn):
+    from contabilidad.movimientos import cobros_mensuales
+
+    _pedido_y_pago(conn, 120000, "Tincho", fecha="2026-06-15T10:00:00")
+    junio = [r for r in cobros_mensuales(conn, cobrador="Tincho") if r["mes"] == "2026-06"]
+    assert junio and junio[0]["monto"] >= 120000  # agrega el cobro del mes
+
+
 def test_caja_usd_existe_y_totales_por_moneda(conn):
     from contabilidad.saldos import saldos
 

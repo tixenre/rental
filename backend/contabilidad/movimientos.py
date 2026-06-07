@@ -283,3 +283,34 @@ def gastos_por_categoria(conn, desde=None, hasta=None) -> list[dict]:
         params.append(hasta)
     sql += " GROUP BY gc.nombre ORDER BY monto DESC"
     return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
+
+
+def cobros_mensuales(conn, desde=None, hasta=None, cobrador=None) -> list[dict]:
+    """Cobros de pedidos (de `alquiler_pagos`) agregados por mes — una línea por
+    mes con el total cobrado. Es la cara READ-ONLY de los cobros dentro de la vista
+    unificada de movimientos: la plata entra, pero se carga desde el pedido (Pagos),
+    no se edita acá. Mismo recorte que los saldos (≥ clean start, destinatario
+    asignado). Si `cobrador` se pasa, solo los de ese cobrador. Devuelve filas
+    {mes:'YYYY-MM', monto, cantidad} más nuevas primero."""
+    from database import row_to_dict
+    from reportes.liquidacion import LIQUIDACION_INICIO
+
+    sql = """
+        SELECT to_char(fecha, 'YYYY-MM') AS mes,
+               COALESCE(SUM(monto), 0) AS monto,
+               COUNT(*) AS cantidad
+        FROM alquiler_pagos
+        WHERE destinatario IS NOT NULL AND fecha::date >= ?::date
+    """
+    params: list = [LIQUIDACION_INICIO]
+    if cobrador:
+        sql += " AND destinatario = ?"
+        params.append(cobrador)
+    if desde:
+        sql += " AND fecha::date >= ?::date"
+        params.append(desde)
+    if hasta:
+        sql += " AND fecha::date <= ?::date"
+        params.append(hasta)
+    sql += " GROUP BY 1 ORDER BY 1 DESC"
+    return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
