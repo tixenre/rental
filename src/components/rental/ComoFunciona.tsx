@@ -30,9 +30,9 @@ export function ComoFunciona({ onDateOpen }: ComoFuncionaProps) {
   ];
 
   return (
-    <section className="py-[clamp(1.75rem,3.5vw,2.5rem)] bg-background">
+    <section className="py-[clamp(1.25rem,2.5vw,1.75rem)] bg-background">
       <div className="max-w-[1180px] mx-auto px-[clamp(16px,4vw,28px)]">
-        <div className="mb-[clamp(0.9rem,2.2vw,1.35rem)]">
+        <div className="mb-[clamp(0.7rem,1.8vw,1rem)]">
           <p className="font-mono text-[0.6875rem] tracking-[0.25em] uppercase text-muted-foreground">
             Cómo funciona
           </p>
@@ -40,13 +40,13 @@ export function ComoFunciona({ onDateOpen }: ComoFuncionaProps) {
             Alquilar es en tres pasos.
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {pasos.map(({ n, Icon: PasoIcon, title, desc, cta }) => (
             <div
               key={n}
-              className="bg-card border hairline rounded-2xl p-4 flex flex-col gap-1.5 transition-[transform,box-shadow] duration-200 hover:-translate-y-[3px] hover:shadow-md"
+              className="bg-card border hairline rounded-2xl p-3.5 flex flex-col gap-1 transition-[transform,box-shadow] duration-200 hover:-translate-y-[3px] hover:shadow-md"
             >
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-1">
                 <span className="font-mono text-[0.8125rem] font-bold tracking-[0.1em] text-amber">
                   {n}
                 </span>
@@ -59,7 +59,7 @@ export function ComoFunciona({ onDateOpen }: ComoFuncionaProps) {
               {cta && (
                 <button
                   onClick={onDateOpen}
-                  className="mt-1.5 inline-flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink w-fit transition-[gap] duration-150 hover:gap-2.5"
+                  className="mt-1 inline-flex items-center gap-1.5 text-[0.8125rem] font-bold text-ink w-fit transition-[gap] duration-150 hover:gap-2.5"
                 >
                   Elegí fechas <ArrowRight size={13} strokeWidth={2.4} />
                 </button>
