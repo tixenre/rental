@@ -18,7 +18,7 @@
 > **Triage del dueño (2026-06-06):** línea personalizada → SÍ (#805). Drag-reorder → SÍ (#806).
 > Calendario de disponibilidad → SÍ pero reformulado a **catálogo-facing** (#808, con pregunta de
 > diseño abierta). Depósito/garantía → **futuro**, atado a un repensado del sistema de pagos (#807).
-> Check-out/check-in asistido → el dueño no conoce el flujo; **pendiente de evaluar** tras explicación.
+> Check-out/check-in asistido → **descartado**: el **packing list** ya cubre la necesidad.
 
 ---
 
@@ -93,14 +93,13 @@ de robarle a Booqable el detalle de pedido".
   (disponibilidad), no recalcular overlap. Reusar la fuente que ya bloquea días en `RentalDateModal`.
 - **Estado:** issue #808. Empezar por la ficha (decidido); grid/lista en stand-by hasta diseño.
 
-### 2.2 — Check-out / check-in del equipo (retiro y devolución asistidos) → ⏳ pendiente de evaluar
+### 2.2 — Check-out / check-in del equipo (retiro y devolución asistidos) → ❌ descartado
 - **Booqable:** al retirar/devolver marcás ítem por ítem (con escaneo de código de barras/QR
   opcional) qué salió y qué volvió, y detecta faltantes.
 - **Rambla hoy:** el packing list (PDF con checkboxes) cubre la versión en papel; el estado
-  `retirado`/`devuelto` es a nivel pedido, no ítem por ítem en pantalla.
-- **Por qué importa:** menos errores de qué volvió y qué no; base para "equipo dañado/faltante".
-- **Estado (2026-06-06):** el dueño **no conoce este flujo** → primero hay que explicárselo y que
-  decida si lo quiere. Sin issue hasta entonces.
+  `retirado`/`devuelto` es a nivel pedido.
+- **Decisión del dueño (2026-06-06):** **no se adopta** — el **packing list** ya cubre la necesidad
+  para la operación actual.
 
 ### 2.3 — Activar los mails (no es feature, es ops)
 - **Rambla hoy:** infra de mails 100% construida pero en modo `test` (no envía). Falta setear
