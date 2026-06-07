@@ -25,7 +25,7 @@ function ContabilidadTablero() {
     queryFn: () => adminApi.getTablero(),
   });
 
-  const saldos = q.data?.disponible;
+  const data = q.data;
 
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
@@ -55,26 +55,63 @@ function ContabilidadTablero() {
         </div>
       )}
 
-      {saldos && (
+      {data && (
         <>
-          {/* Plata disponible (total) */}
-          <div className="rounded-xl border hairline bg-surface-elevated p-5">
-            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-              Plata disponible
+          {/* KPIs: disponible · ganancia del mes · rendición pendiente */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border hairline bg-surface-elevated p-5">
+              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                Plata disponible
+              </div>
+              <div className="font-mono text-3xl font-semibold tabular-nums text-ink mt-1">
+                {formatARS(data.disponible.total_disponible)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Suma de las cajas · al {data.disponible.as_of}
+              </div>
             </div>
-            <div className="font-mono text-4xl font-semibold tabular-nums text-ink mt-1">
-              {formatARS(saldos.total_disponible)}
+
+            <div className="rounded-xl border hairline bg-surface-elevated p-5">
+              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                Ganancia neta · {data.ganancia_mes.mes}
+              </div>
+              <div
+                className={`font-mono text-3xl font-semibold tabular-nums mt-1 ${
+                  data.ganancia_mes.neta >= 0 ? "text-ink" : "text-destructive"
+                }`}
+              >
+                {formatARS(data.ganancia_mes.neta)}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Ingresos {formatARS(data.ganancia_mes.ingresos)} − gastos{" "}
+                {formatARS(data.ganancia_mes.gastos)}
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Suma de todas las cajas · al {saldos.as_of}
-            </div>
+
+            <Link
+              to="/admin/contabilidad/rendicion"
+              className="rounded-xl border hairline bg-surface-elevated p-5 hover:bg-muted/30 transition"
+            >
+              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                Rendición pendiente · {data.rendicion_pendiente.mes}
+              </div>
+              <div className="font-mono text-3xl font-semibold tabular-nums text-ink mt-1">
+                {formatARS(data.rendicion_pendiente.total)}
+              </div>
+              <div className="text-xs text-amber mt-1">Ver rendición →</div>
+            </Link>
           </div>
 
           {/* Por caja */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            {saldos.cuentas.map((c) => (
-              <CajaCard key={c.id} cuenta={c} />
-            ))}
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
+              Por caja
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {data.disponible.cuentas.map((c) => (
+                <CajaCard key={c.id} cuenta={c} />
+              ))}
+            </div>
           </div>
         </>
       )}

@@ -200,6 +200,53 @@ def test_gasto_necesita_categoria(conn):
                          cuenta_origen_id=_cuenta_id(conn, "Efectivo"), por="test")
 
 
+def test_rendicion_cierra_en_cero_y_saldar(conn):
+    # El invariante de oro: la rendición está atada al universo del reporte, así
+    # que lo cobrado == el total del reporte. Y registrar los sugeridos deja todo
+    # saldado. Mes futuro aislado para no chocar con datos de otros tests.
+    from contabilidad.rendicion import rendicion, saldar
+
+    MES = "2026-09"
+    EQ, PED2 = 9_400_900, 9_400_901
+    conn.execute(
+        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (?,?,?,?)",
+        (EQ, "Equipo Rend", 3, "Pablo"),
+    )
+    conn.execute(
+        """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
+                                   monto_total, monto_pagado)
+           VALUES (?,?,?,?,?,?,?)""",
+        (PED2, "Cli rend", "finalizado", "2026-09-05T08:00:00", "2026-09-06T20:00:00",
+         100000, 100000),
+    )
+    conn.execute(
+        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (?,?,?,?)",
+        (PED2, EQ, 1, 100000),
+    )
+    conn.execute(
+        """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
+           VALUES (?,?,?,?,?,?)""",
+        (PED2, 100000, "pago", "Tincho", "transferencia", "2026-09-15T10:00:00"),
+    )
+
+    r = rendicion(conn, MES)
+    assert r["total_cobrado"] == r["total_reporte"] == 100000, r
+    assert r["cuadra"] is True
+    by = {p["persona"]: p for p in r["personas"]}
+    assert by["Pablo"]["le_corresponde"] == 50000  # equipo de Pablo → 50/45/5
+    assert by["Rambla"]["le_corresponde"] == 45000
+    assert by["Tincho"]["le_corresponde"] == 5000
+    assert by["Tincho"]["cobro"] == 100000  # todo lo cobró Tincho
+    assert sum(p["pendiente"] for p in r["personas"]) == 0  # cierra en cero
+
+    # Registrar los sugeridos deja todo saldado.
+    for s in r["sugeridos"]:
+        saldar(conn, MES, de=s["de"], a=s["a"], monto=s["monto"], por="test")
+    r2 = rendicion(conn, MES)
+    assert r2["sugeridos"] == []
+    assert all(p["pendiente"] == 0 for p in r2["personas"])
+
+
 def test_crear_y_desactivar_cuenta_vacia(conn):
     from contabilidad.cuentas import crear_cuenta, desactivar_cuenta
 

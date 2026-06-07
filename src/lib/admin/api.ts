@@ -633,8 +633,57 @@ export interface SaldosData {
   total_disponible: number;
   as_of: string;
 }
+export interface SugeridoRendicion {
+  de: string;
+  a: string;
+  monto: number;
+}
 export interface TableroData {
+  mes: string;
   disponible: SaldosData;
+  ganancia_mes: { mes: string; ingresos: number; gastos: number; neta: number };
+  rendicion_pendiente: {
+    mes: string;
+    total: number;
+    sugeridos: SugeridoRendicion[];
+    cuadra: boolean;
+  };
+}
+export interface RendicionPersona {
+  persona: string;
+  le_corresponde: number;
+  cobro: number;
+  ya_rindio: number;
+  pendiente: number;
+}
+export interface RendicionMovimiento {
+  id: number;
+  monto: number;
+  fecha: string;
+  metodo: string | null;
+  nota: string | null;
+  anulado: boolean;
+  created_by: string | null;
+  created_at: string;
+  origen: string | null;
+  destino: string | null;
+}
+export interface RendicionData {
+  mes: string;
+  desde: string;
+  hasta: string;
+  cerrado: boolean;
+  corresponde: Record<string, number>;
+  cobrado: Record<string, number>;
+  sin_asignar: number;
+  ya_transferido: Record<string, number>;
+  personas: RendicionPersona[];
+  sugeridos: SugeridoRendicion[];
+  total_reporte: number;
+  total_cobrado: number;
+  cuadra: boolean;
+  advertencias: string[];
+  movimientos: RendicionMovimiento[];
 }
 export interface CuentaInput {
   nombre: string;
@@ -1574,7 +1623,8 @@ export const adminApi = {
 
   // Contabilidad (#809) — Fase 1: cuentas/cajas con saldo + tablero. Los ingresos
   // por alquiler salen derivados de alquiler_pagos (no se cargan a mano).
-  getTablero: () => authedJson<TableroData>("/api/admin/contabilidad/tablero"),
+  getTablero: (mes?: string) =>
+    authedJson<TableroData>(`/api/admin/contabilidad/tablero${mes ? `?mes=${mes}` : ""}`),
   getSaldos: () => authedJson<SaldosData>("/api/admin/contabilidad/saldos"),
   listCuentas: (incluirInactivas = false) =>
     authedJson<{ cuentas: Cuenta[] }>(
@@ -1650,6 +1700,21 @@ export const adminApi = {
     const qs = sp.toString();
     return authedJson<GastosPorCategoria>(`/api/admin/contabilidad/gastos${qs ? `?${qs}` : ""}`);
   },
+  // Rendición de cuentas mensual entre socios
+  getRendicion: (mes: string) =>
+    authedJson<RendicionData>(`/api/admin/contabilidad/rendicion/${mes}`),
+  saldarRendicion: (
+    mes: string,
+    body: { de: string; a: string; monto: number; metodo?: string | null; nota?: string | null },
+  ) => authedPostJson<Movimiento>(`/api/admin/contabilidad/rendicion/${mes}/saldar`, body),
+  getPyl: (mes: string) =>
+    authedJson<{
+      mes: string;
+      ingresos: number;
+      gastos: number;
+      ganancia_neta: number;
+      gastos_por_categoria: { categoria: string; monto: number }[];
+    }>(`/api/admin/contabilidad/pyl/${mes}`),
 
   uploadOgImage: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();

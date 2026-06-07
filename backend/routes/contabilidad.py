@@ -27,6 +27,9 @@ from contabilidad.movimientos import (
     listar_movimientos,
     obtener_movimiento,
 )
+from contabilidad.tablero import tablero as _tablero
+from contabilidad.pyl import ganancia_neta
+from contabilidad.rendicion import rendicion as _rendicion, saldar as _saldar
 
 router = APIRouter()
 
@@ -58,12 +61,15 @@ def get_saldos(request: Request):
 
 
 @router.get("/admin/contabilidad/tablero")
-def get_tablero(request: Request):
-    """Tablero financiero. Fase 1: solo 'disponible' (plata por caja + total).
-    En fases siguientes se suman ganancia neta del mes y rendición pendiente."""
+def get_tablero(request: Request, mes: str | None = None):
+    """Tablero financiero: plata disponible por caja + ganancia neta del mes +
+    rendición pendiente. `mes` opcional ('YYYY-MM', default: mes actual)."""
     require_admin(request)
     with get_db() as conn:
-        return {"disponible": _saldos(conn)}
+        try:
+            return _tablero(conn, mes)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
 
 @router.get("/admin/contabilidad/cuentas")
@@ -322,3 +328,59 @@ def get_gastos(request: Request, desde: str | None = None, hasta: str | None = N
     with get_db() as conn:
         filas = gastos_por_categoria(conn, desde, hasta)
     return {"por_categoria": filas, "total": sum(f["monto"] for f in filas)}
+
+
+@router.get("/admin/contabilidad/pyl/{mes}")
+def get_pyl(request: Request, mes: str):
+    """Ganancia neta del mes (ingresos devengados − gastos)."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            return ganancia_neta(conn, mes)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+
+# ── Rendición de cuentas mensual entre socios ───────────────────────────────
+
+class SaldarBody(BaseModel):
+    de: str
+    a: str
+    monto: int
+    metodo: str | None = None
+    fecha: str | None = None
+    nota: str | None = None
+
+
+@router.get("/admin/contabilidad/rendicion/{mes}")
+def get_rendicion(request: Request, mes: str):
+    """Rendición del mes: cuánto le corresponde y cuánto cobró cada parte, el
+    saldo pendiente, los movimientos sugeridos y lo ya rendido."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            return _rendicion(conn, mes)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+
+@router.post("/admin/contabilidad/rendicion/{mes}/saldar")
+def post_saldar(request: Request, mes: str, body: SaldarBody):
+    """Registra un saldado real de rendición (transferencia entre las cajas de las
+    partes, marcada como rendición en el libro)."""
+    admin = require_admin(request)
+    with get_db() as conn:
+        try:
+            mov = _saldar(
+                conn, mes, de=body.de, a=body.a, monto=body.monto,
+                metodo=body.metodo, fecha=body.fecha, nota=body.nota,
+                por=admin.get("email"),
+            )
+            conn.commit()
+            return mov
+        except ValueError as e:
+            conn.rollback()
+            raise HTTPException(400, str(e))
+        except Exception:
+            conn.rollback()
+            raise
