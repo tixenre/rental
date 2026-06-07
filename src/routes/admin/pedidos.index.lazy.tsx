@@ -32,14 +32,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
-import {
-  AdminCard,
-  AdminCardHeader,
-  AdminCardMeta,
-  AdminCardFooter,
-  AdminCardPrice,
-  FAB,
-} from "@/components/mobile";
+import { AdminCard, FAB } from "@/components/mobile";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaCorta } from "@/lib/format";
 
@@ -335,26 +328,36 @@ function PedidosPage() {
         )}
         {items.map((p) => (
           <AdminCard key={p.id} onClick={() => openEditor(p.id)}>
-            <AdminCardHeader
-              label={`#${p.numero_pedido ?? p.id}`}
-              title={p.cliente_nombre || "Sin cliente"}
-              subtitle={p.cliente_email ?? undefined}
-              badge={<EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />}
-            />
-            <AdminCardMeta>
-              {hoyTag(p) ?? (
-                <>
-                  {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
-                </>
-              )}
-            </AdminCardMeta>
-            <AdminCardFooter>
-              <AdminCardPrice
-                total={p.monto_total ?? 0}
-                saldo={saldoDe(p) > 0 ? saldoDe(p) : null}
-              />
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="mb-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  #{p.numero_pedido ?? p.id}
+                </div>
+                <div className="truncate font-medium text-ink">
+                  {p.cliente_nombre || "Sin cliente"}
+                </div>
+              </div>
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                <EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />
+                <span
+                  className={cn(
+                    "font-semibold text-sm tabular-nums",
+                    (p.monto_total ?? 0) === 0 ? "text-muted-foreground" : "text-ink",
+                  )}
+                >
+                  {formatARS(p.monto_total ?? 0)}
+                </span>
+                {tieneSaldo(p) && (
+                  <span className="text-xs tabular-nums text-destructive">
+                    saldo {formatARS(saldoDe(p))}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+              <span>{hoyTag(p) ?? `${fechaDia(p.fecha_desde)} → ${fechaDia(p.fecha_hasta)}`}</span>
               <WhatsAppButton pedido={p} phone={p.cliente_telefono} variant="icon" />
-            </AdminCardFooter>
+            </div>
           </AdminCard>
         ))}
       </div>
