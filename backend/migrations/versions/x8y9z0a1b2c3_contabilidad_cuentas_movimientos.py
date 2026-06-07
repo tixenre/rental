@@ -65,7 +65,7 @@ def upgrade() -> None:
             ('Efectivo',    'caja',  NULL,      3),
             ('Banco',       'banco', NULL,      4),
             ('Fondo Rambla','fondo', NULL,      5)
-        ON CONFLICT (nombre) DO NOTHING
+        ON CONFLICT (nombre) WHERE activa DO NOTHING
     """))
 
     # ── gasto_categorias (rubros de gasto, editables) ────────────────────────

@@ -70,18 +70,19 @@ def _cuenta_id(conn, nombre: str):
     return row[0] if row else None
 
 
-def _pedido_y_pago(conn, monto, destinatario, fecha="2026-06-15T10:00:00"):
+def _pedido_y_pago(conn, monto, destinatario, fecha="2026-06-15T10:00:00",
+                   fecha_desde="2026-06-05T08:00:00", ped=PED):
     conn.execute(
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
            VALUES (?,?,?,?,?,?,?)""",
-        (PED, "Cliente contab", "finalizado", "2026-06-05T08:00:00",
+        (ped, "Cliente contab", "finalizado", fecha_desde,
          "2026-06-06T20:00:00", monto, monto),
     )
     conn.execute(
         """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
            VALUES (?,?,?,?,?,?)""",
-        (PED, monto, "pago", destinatario, "transferencia", fecha),
+        (ped, monto, "pago", destinatario, "transferencia", fecha),
     )
 
 
@@ -121,6 +122,40 @@ def test_ingresos_derivados_agrupan_por_destinatario(conn):
     base = ingresos_derivados(conn).get("Tincho", 0)
     _pedido_y_pago(conn, 150000, "Tincho")
     assert ingresos_derivados(conn).get("Tincho", 0) - base == 150000
+
+
+def test_alquiler_previo_al_clean_start_no_entra_a_finanzas(conn):
+    # Clean start por FECHA DEL ALQUILER (no de pago): un pedido cuyo alquiler fue
+    # antes de junio, aunque se cobre en junio, NO suma al saldo de la caja del socio
+    # ni a los cobros mensuales. Queda "cobrado y listo" en el pedido, fuera de Finanzas.
+    from contabilidad.saldos import ingresos_derivados
+    from contabilidad.movimientos import cobros_mensuales
+
+    base_caja = _saldo(conn, "Caja Tincho")
+    base_ing = ingresos_derivados(conn).get("Tincho", 0)
+    base_cobros = sum(r["monto"] for r in cobros_mensuales(conn, cobrador="Tincho"))
+
+    _pedido_y_pago(conn, 300000, "Tincho",
+                   fecha="2026-06-15T10:00:00", fecha_desde="2026-05-20T08:00:00",
+                   ped=9_400_050)
+
+    assert _saldo(conn, "Caja Tincho") == base_caja  # la caja no se mueve
+    assert ingresos_derivados(conn).get("Tincho", 0) == base_ing  # no deriva ingreso
+    assert sum(r["monto"] for r in cobros_mensuales(conn, cobrador="Tincho")) == base_cobros
+
+
+def test_nombre_se_libera_al_dar_de_baja(conn):
+    # El nombre es único solo entre activas: dar de baja una cuenta libera su
+    # nombre, así se puede reusar (caso real: renombrar a un nombre que tenía una
+    # cuenta vieja de baja).
+    from contabilidad.cuentas import crear_cuenta, desactivar_cuenta
+
+    nombre = "Reuso Test 9400"
+    c1 = crear_cuenta(conn, nombre=nombre, tipo="caja", por="test")
+    desactivar_cuenta(conn, c1["id"], por="test")  # saldo 0 → baja OK
+    c2 = crear_cuenta(conn, nombre=nombre, tipo="caja", por="test")
+    assert c2["id"] != c1["id"]
+    assert c2["nombre"] == nombre
 
 
 def test_gasto_baja_el_saldo_de_la_caja_de_origen(conn):

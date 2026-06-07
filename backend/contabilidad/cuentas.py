@@ -7,6 +7,9 @@ Una cuenta es una caja física/financiera (Efectivo, Banco), la "mano" de un soc
 cobrado por Tincho. Por eso `socio` solo es válido cuando `tipo='socio'`, y solo
 puede valer uno de los socios físicos.
 
+El nombre es único SOLO entre cuentas ACTIVAS (índice parcial `cuentas_nombre_activa_uq`):
+una cuenta dada de baja (baja lógica) deja de bloquear su nombre y se puede reusar.
+
 `validar_cuenta` es pura (testeable sin DB). El resto toca la conexión.
 """
 
