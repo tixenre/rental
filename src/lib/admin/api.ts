@@ -752,6 +752,12 @@ export interface GastosPorCategoria {
   por_categoria: { categoria: string; monto: number }[];
   total: number;
 }
+// Cobros de pedidos agregados por mes (read-only) para la vista unificada de movimientos.
+export interface CobroMensual {
+  mes: string;
+  monto: number;
+  cantidad: number;
+}
 
 export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
@@ -1678,7 +1684,7 @@ export const adminApi = {
     if (params?.hasta) sp.set("hasta", params.hasta);
     if (params?.incluir_anulados) sp.set("incluir_anulados", "true");
     const qs = sp.toString();
-    return authedJson<{ movimientos: Movimiento[]; count: number }>(
+    return authedJson<{ movimientos: Movimiento[]; cobros: CobroMensual[]; count: number }>(
       `/api/admin/contabilidad/movimientos${qs ? `?${qs}` : ""}`,
     );
   },
