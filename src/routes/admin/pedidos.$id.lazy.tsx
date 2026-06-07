@@ -23,6 +23,7 @@ import {
   Info,
   Trash2,
   GripVertical,
+  Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -67,7 +68,11 @@ import {
   type PedidoEstado,
   type Equipo,
 } from "@/lib/admin/api";
-import { usePedidoDraft, type DraftItem } from "@/components/admin/pedido/usePedidoDraft";
+import {
+  usePedidoDraft,
+  nuevoUidLinea,
+  type DraftItem,
+} from "@/components/admin/pedido/usePedidoDraft";
 import { ClienteAutocomplete } from "@/components/admin/pedido/ClienteAutocomplete";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
@@ -183,7 +188,12 @@ function PedidoEditorPage() {
 
   // Cotización en vivo (useCotizacion) — recalcula al editar items/fechas/descuento
   const cotizacionQ = useCotizacion({
-    items: (draft.items ?? []).map((it) => ({ equipoId: it.equipo_id, cantidad: it.cantidad })),
+    items: (draft.items ?? []).map((it) => ({
+      equipoId: it.equipo_id,
+      cantidad: it.cantidad,
+      precioJornada: it.precio_jornada,
+      cobroModo: it.cobro_modo,
+    })),
     fechaDesde: draft.datos?.fecha_desde || null,
     fechaHasta: draft.datos?.fecha_hasta || null,
     clienteId: p?.cliente_id ?? null,
@@ -285,13 +295,27 @@ function PedidoEditorPage() {
     return it.cantidad > Math.max(0, s.cantidad - s.reservado);
   });
 
-  const updateItem = (equipoId: number, patch: Partial<DraftItem>) =>
-    setItems((its) =>
-      (its ?? []).map((it) => (it.equipo_id === equipoId ? { ...it, ...patch } : it)),
-    );
+  // Las líneas se identifican por `uid` (las personalizadas no tienen equipo_id).
+  const updateItem = (uid: string, patch: Partial<DraftItem>) =>
+    setItems((its) => (its ?? []).map((it) => (it.uid === uid ? { ...it, ...patch } : it)));
 
-  const removeItem = (equipoId: number) =>
-    setItems((its) => (its ?? []).filter((it) => it.equipo_id !== equipoId));
+  const removeItem = (uid: string) => setItems((its) => (its ?? []).filter((it) => it.uid !== uid));
+
+  // Agregar línea personalizada (#805): ítem de texto libre, fuera del catálogo.
+  const addLineaLibre = () =>
+    setItems((its) => [
+      ...(its ?? []),
+      {
+        uid: nuevoUidLinea(),
+        equipo_id: null,
+        cantidad: 1,
+        precio_jornada: 0,
+        nombre: "",
+        marca: null,
+        nombre_libre: "",
+        cobro_modo: "jornada",
+      },
+    ]);
 
   // Drag-reorder de líneas (#806). El nuevo orden viaja en el array de items;
   // el autosave lo persiste (el backend asigna `orden` por posición). `sensors`
@@ -301,8 +325,8 @@ function PedidoEditorPage() {
     if (!over || active.id === over.id) return;
     setItems((its) => {
       if (!its) return its;
-      const oldIndex = its.findIndex((it) => it.equipo_id === active.id);
-      const newIndex = its.findIndex((it) => it.equipo_id === over.id);
+      const oldIndex = its.findIndex((it) => it.uid === active.id);
+      const newIndex = its.findIndex((it) => it.uid === over.id);
       if (oldIndex < 0 || newIndex < 0) return its;
       return arrayMove(its, oldIndex, newIndex);
     });
@@ -492,15 +516,15 @@ function PedidoEditorPage() {
                 onDragEnd={handleItemsDragEnd}
               >
                 <SortableContext
-                  items={items.map((it) => it.equipo_id)}
+                  items={items.map((it) => it.uid)}
                   strategy={verticalListSortingStrategy}
                 >
                   <ul className="divide-y hairline">
                     {items.map((it) => (
                       <ItemRow
-                        key={it.equipo_id}
+                        key={it.uid}
                         it={it}
-                        stock={stockMap[String(it.equipo_id)]}
+                        stock={it.equipo_id != null ? stockMap[String(it.equipo_id)] : undefined}
                         jornadas={jornadas}
                         updateItem={updateItem}
                         removeItem={removeItem}
@@ -511,6 +535,16 @@ function PedidoEditorPage() {
               </DndContext>
             )}
 
+            {/* Agregar línea personalizada (#805): ítem libre fuera del catálogo */}
+            <button
+              type="button"
+              onClick={addLineaLibre}
+              className="mt-2 flex w-full items-center gap-2.5 px-3 py-2.5 rounded-md border border-dashed hairline text-sm text-muted-foreground hover:bg-muted/30 transition"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              <span>Agregar línea personalizada (flete, servicio, etc.)</span>
+            </button>
+
             <EquipoSearchSheet
               open={openSearchSheet}
               onOpenChange={setOpenSearchSheet}
@@ -520,12 +554,13 @@ function PedidoEditorPage() {
                 const display = eq.nombre_publico || eq.nombre;
                 const existing = items.find((i) => i.equipo_id === eq.id);
                 if (existing) {
-                  updateItem(eq.id, { cantidad: existing.cantidad + 1 });
+                  updateItem(existing.uid, { cantidad: existing.cantidad + 1 });
                   toast.success(`+1 ${display}`);
                 } else {
                   setItems((its) => [
                     ...(its ?? []),
                     {
+                      uid: `e${eq.id}`,
                       equipo_id: eq.id,
                       cantidad: 1,
                       precio_jornada: eq.precio_jornada ?? 0,
@@ -533,6 +568,7 @@ function PedidoEditorPage() {
                       marca: eq.marca,
                       nombre_publico: eq.nombre_publico ?? null,
                       foto_url: eq.foto_url ?? null,
+                      cobro_modo: "jornada",
                     },
                   ]);
                   toast.success(`Agregado: ${display}`);
@@ -820,9 +856,10 @@ function PagoRow({
 
 // ── Subcomponentes ───────────────────────────────────────────────────────────
 
-/** Fila de equipo del pedido, arrastrable para reordenar (#806). El handle
- * (grip) lleva los listeners del drag; el resto de la fila queda libre para
- * editar cantidad/precio sin disparar el arrastre. */
+/** Fila de línea del pedido, arrastrable para reordenar (#806). El handle (grip)
+ * lleva los listeners del drag; el resto queda libre para editar. Soporta líneas
+ * de catálogo (equipo_id) y líneas personalizadas (#805, equipo_id null): nombre
+ * libre + toggle de modo de cobro (fijo / por jornada). */
 function ItemRow({
   it,
   stock,
@@ -833,16 +870,19 @@ function ItemRow({
   it: DraftItem;
   stock?: { cantidad: number; reservado: number };
   jornadas: number;
-  updateItem: (equipoId: number, patch: Partial<DraftItem>) => void;
-  removeItem: (equipoId: number) => void;
+  updateItem: (uid: string, patch: Partial<DraftItem>) => void;
+  removeItem: (uid: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: it.equipo_id,
+    id: it.uid,
   });
+  const esLibre = it.equipo_id == null;
+  const fijo = (it.cobro_modo ?? "jornada") === "fijo";
   const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
   const disponible = max - it.cantidad;
   const overstock = it.cantidad > max && !!stock;
-  const subtotal = it.precio_jornada * it.cantidad * Math.max(1, jornadas);
+  // Subtotal: las líneas 'fijo' no multiplican por jornadas (espeja bruto_linea del backend).
+  const subtotal = it.precio_jornada * it.cantidad * (fijo ? 1 : Math.max(1, jornadas));
 
   return (
     <li
@@ -853,39 +893,60 @@ function ItemRow({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          aria-label="Reordenar equipo"
+          aria-label="Reordenar línea"
           className="inline-flex h-11 w-11 -ml-3 items-center justify-center text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <EquipoThumb src={it.foto_url} alt={it.nombre_publico || it.nombre} className="h-10 w-10" />
-        <div className="min-w-0 flex-1">
-          <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
-          <div className="font-mono text-[11px] text-muted-foreground flex items-center gap-1.5">
-            <span>{fmtArs(it.precio_jornada)} / jornada</span>
-            {stock && (
-              <span
-                className={cn(
-                  "inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
-                  disponible <= 0
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-muted text-muted-foreground",
-                )}
-              >
-                {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
-              </span>
-            )}
+        {esLibre ? (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-dashed hairline text-muted-foreground/60">
+            <Tag className="h-4 w-4" />
           </div>
+        ) : (
+          <EquipoThumb
+            src={it.foto_url}
+            alt={it.nombre_publico || it.nombre}
+            className="h-10 w-10"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          {esLibre ? (
+            <Input
+              value={it.nombre_libre ?? ""}
+              placeholder="Descripción (ej. Flete, Operador…)"
+              onChange={(e) => updateItem(it.uid, { nombre_libre: e.target.value })}
+              className="h-8 text-sm"
+            />
+          ) : (
+            <>
+              <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
+              <div className="font-mono text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <span>{fmtArs(it.precio_jornada)} / jornada</span>
+                {stock && (
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
+                      disponible <= 0
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
+                  </span>
+                )}
+              </div>
+            </>
+          )}
         </div>
         <div className="font-mono text-sm font-semibold tabular-nums w-24 text-right shrink-0">
           {fmtArs(subtotal)}
         </div>
         <button
           type="button"
-          onClick={() => removeItem(it.equipo_id)}
-          aria-label="Quitar equipo"
+          onClick={() => removeItem(it.uid)}
+          aria-label="Quitar línea"
           className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
         >
           <X className="h-4 w-4" />
@@ -898,7 +959,7 @@ function ItemRow({
             size="icon"
             variant="outline"
             className="h-9 w-9"
-            onClick={() => updateItem(it.equipo_id, { cantidad: Math.max(1, it.cantidad - 1) })}
+            onClick={() => updateItem(it.uid, { cantidad: Math.max(1, it.cantidad - 1) })}
           >
             <Minus className="h-3 w-3" />
           </Button>
@@ -906,7 +967,7 @@ function ItemRow({
             type="number"
             min={1}
             value={it.cantidad}
-            onChange={(e) => updateItem(it.equipo_id, { cantidad: parseInt(e.target.value) || 1 })}
+            onChange={(e) => updateItem(it.uid, { cantidad: parseInt(e.target.value) || 1 })}
             className={cn(
               "h-9 w-10 text-center text-sm p-0",
               overstock && "border-destructive text-destructive",
@@ -916,7 +977,7 @@ function ItemRow({
             size="icon"
             variant="outline"
             className="h-9 w-9"
-            onClick={() => updateItem(it.equipo_id, { cantidad: it.cantidad + 1 })}
+            onClick={() => updateItem(it.uid, { cantidad: it.cantidad + 1 })}
           >
             <Plus className="h-3 w-3" />
           </Button>
@@ -926,12 +987,24 @@ function ItemRow({
             type="number"
             min={0}
             value={it.precio_jornada}
-            onChange={(e) =>
-              updateItem(it.equipo_id, { precio_jornada: parseInt(e.target.value) || 0 })
-            }
+            onChange={(e) => updateItem(it.uid, { precio_jornada: parseInt(e.target.value) || 0 })}
             className="h-9 w-24 text-sm"
           />
-          <span className="text-xs text-muted-foreground whitespace-nowrap">/día</span>
+          {esLibre ? (
+            <select
+              value={it.cobro_modo ?? "jornada"}
+              onChange={(e) =>
+                updateItem(it.uid, { cobro_modo: e.target.value as "jornada" | "fijo" })
+              }
+              className="h-9 rounded-md border hairline bg-surface-elevated px-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Modo de cobro"
+            >
+              <option value="jornada">/jornada</option>
+              <option value="fijo">fijo</option>
+            </select>
+          ) : (
+            <span className="text-xs text-muted-foreground whitespace-nowrap">/día</span>
+          )}
         </div>
         {overstock && (
           <div className="ml-auto text-[11px] text-destructive flex items-center gap-1">

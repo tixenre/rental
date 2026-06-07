@@ -58,8 +58,11 @@ def validar_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> l
     consumo y mantenimiento) en el núcleo único `_validar_demanda`. El propio
     pedido se excluye del consumo de OTROS pedidos (`excl_pedido_id=pedido_id`).
     """
+    # `equipo_id IS NOT NULL` excluye las líneas personalizadas (#805): no son del
+    # catálogo y no reservan stock, así que no entran al gate.
     items = conn.execute(
-        "SELECT equipo_id, cantidad FROM alquiler_items WHERE pedido_id = ?",
+        "SELECT equipo_id, cantidad FROM alquiler_items "
+        "WHERE pedido_id = ? AND equipo_id IS NOT NULL",
         (pedido_id,),
     ).fetchall()
 
@@ -94,8 +97,11 @@ def validar_stock_hipotetico(
         return []
 
     # Consolidar la propuesta sumando duplicados del mismo equipo (issue #102).
+    # Las líneas personalizadas (#805, sin equipo_id) no reservan stock → se saltean.
     roots: dict[int, int] = {}
     for it in items:
+        if getattr(it, "equipo_id", None) is None:
+            continue
         roots[it.equipo_id] = roots.get(it.equipo_id, 0) + it.cantidad
 
     return _validar_demanda(conn, roots, excl_pedido_id, fecha_desde, fecha_hasta)
