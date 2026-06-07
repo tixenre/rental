@@ -13,10 +13,9 @@ puede valer uno de los socios físicos.
 TIPOS_CUENTA = ("caja", "banco", "socio", "fondo")
 
 # Cobradores = quiénes pueden cobrar un pago de cliente (el `destinatario` del
-# pago). Cada uno se vincula a una caja (la columna `socio` de `cuentas` guarda a
+# pago). Fuente única — `routes.alquileres` importa de acá como DESTINATARIOS_PAGO.
+# Cada uno se vincula a una caja (la columna `socio` de `cuentas` guarda a
 # qué cobrador representa): Pablo/Tincho → su caja de socio; Rambla → Fondo Rambla.
-# Espeja `routes.alquileres.DESTINATARIOS_PAGO` (no se importa para no acoplar el
-# motor al route pesado); el test de drift exige que coincidan.
 COBRADORES = ("Rambla", "Tincho", "Pablo")
 # Socios humanos (subconjunto): los únicos válidos para una caja de tipo 'socio'.
 SOCIOS_HUMANOS = ("Pablo", "Tincho")

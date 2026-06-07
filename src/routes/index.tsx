@@ -875,12 +875,14 @@ function GridMode({
       )}
 
       {!isFiltered && !isSearching && marcas.length > 0 && (
-        <BrandCarousel
-          brands={marcas}
-          allEquipos={allEquipos}
-          selectedBrand={selectedBrand}
-          onBrandSelect={onBrandSelect}
-        />
+        <div className="hidden sm:block">
+          <BrandCarousel
+            brands={marcas}
+            allEquipos={allEquipos}
+            selectedBrand={selectedBrand}
+            onBrandSelect={onBrandSelect}
+          />
+        </div>
       )}
 
       {visibleCategories.map((c) => {
