@@ -319,23 +319,16 @@ class PedidoClienteCreate(BaseModel):
 def cliente_crear_pedido(
     data: PedidoClienteCreate, request: Request, background: BackgroundTasks,
 ):
-    """Crea un pedido (estado 'presupuesto') ligado al cliente autenticado.
-
-    Requiere identidad verificada (dni_validado_at IS NOT NULL).
-    """
+    """Crea un pedido (estado 'presupuesto') ligado al cliente autenticado."""
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
 
     with get_db() as conn:
         row_cli = conn.execute(
-            "SELECT dni_validado_at FROM clientes WHERE id = ?", (cliente_id,)
+            "SELECT id FROM clientes WHERE id = ?", (cliente_id,)
         ).fetchone()
-    if not row_cli or not row_cli["dni_validado_at"]:
-        raise HTTPException(
-            403,
-            "Verificá tu identidad antes de hacer un pedido. "
-            "Andá a la sección Identidad en tu perfil.",
-        )
+    if not row_cli:
+        raise HTTPException(404, "Cliente no encontrado.")
 
     if not data.items:
         raise HTTPException(400, "El pedido debe tener al menos un ítem")
