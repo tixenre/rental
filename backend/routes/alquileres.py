@@ -1761,6 +1761,60 @@ def _add_componentes(conn, items: list[dict]) -> None:
         item["componentes"] = [row_to_dict(c) for c in comp_rows]
 
 
+def _ordenar_items_en_grupos(items: list[dict], cat_de_equipo: dict) -> list[dict]:
+    """Parte PURA (testeable sin DB) de la agrupación por categoría (#814).
+
+    Dada la primera categoría por equipo (`cat_de_equipo: {equipo_id: (prioridad,
+    nombre)}`), arma la lista de grupos ordenada por `prioridad` asc (luego nombre),
+    preservando el orden de `items` dentro de cada grupo (el orden manual #806).
+    Equipos sin categoría y líneas personalizadas (#805, equipo_id None) caen en
+    'Otros', que va siempre al final.
+    """
+    OTROS = "Otros"
+    grupos: dict[str, list] = {}
+    prioridad: dict[str, float] = {}
+    for it in items:
+        cat = cat_de_equipo.get(it.get("equipo_id"))
+        nombre, p = (cat[1], cat[0]) if cat else (OTROS, float("inf"))
+        if nombre not in grupos:
+            grupos[nombre] = []
+            prioridad[nombre] = p
+        grupos[nombre].append(it)
+    nombres = sorted(grupos, key=lambda nm: (prioridad[nm], nm.lower()))
+    return [{"categoria": nm, "items": grupos[nm]} for nm in nombres]
+
+
+def _agrupar_items_por_categoria(conn, items: list[dict]) -> list[dict]:
+    """Agrupa los ítems del pedido por su PRIMERA categoría — para los documentos
+    de check físico (packing list + albarán, #814).
+
+    Cada equipo cae bajo su primera categoría (menor `equipo_categorias.orden`,
+    misma convención que `attach_categorias`); los grupos se ordenan por
+    `categorias.prioridad` (igual que el catálogo público). La parte pura
+    (`_ordenar_items_en_grupos`) hace el armado; acá solo se resuelve la categoría
+    de cada equipo con una query única.
+    """
+    eq_ids = list({it["equipo_id"] for it in items if it.get("equipo_id") is not None})
+    cat_de_equipo: dict[int, tuple] = {}
+    if eq_ids:
+        ph = ",".join("?" for _ in eq_ids)
+        rows = conn.execute(f"""
+            SELECT equipo_id, nombre, prioridad FROM (
+                SELECT ec.equipo_id, c.nombre, c.prioridad,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY ec.equipo_id
+                           ORDER BY ec.orden, c.prioridad, c.id
+                       ) AS rn
+                FROM equipo_categorias ec
+                JOIN categorias c ON c.id = ec.categoria_id
+                WHERE ec.equipo_id IN ({ph})
+            ) t WHERE rn = 1
+        """, tuple(eq_ids)).fetchall()
+        for r in rows:
+            cat_de_equipo[r["equipo_id"]] = (r["prioridad"], r["nombre"])
+    return _ordenar_items_en_grupos(items, cat_de_equipo)
+
+
 def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
     """Construye el HTML + filename de un documento del pedido. Fuente ÚNICA
     usada por los GET de descarga y por el envío por mail."""
@@ -1792,6 +1846,8 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         pedido["items"] = [row_to_dict(i) for i in items]
         _add_componentes(conn, pedido["items"])
         _enriquecer_pedido_con_cliente(conn, pedido)
+        # Check físico → agrupar por categoría (#814).
+        pedido["grupos"] = _agrupar_items_por_categoria(conn, pedido["items"])
         return _albaran_html(pedido), _pedido_filename(pedido, doc="albaran")
 
     if kind == "packing-list":
@@ -1803,6 +1859,8 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
         # `_get_alquiler_items` ya ordena por el orden manual (orden, id, #806).
         pedido["items"] = _get_alquiler_items(conn, id)
+        # Check físico → agrupar por categoría (#814).
+        pedido["grupos"] = _agrupar_items_por_categoria(conn, pedido["items"])
         return _packing_list_html(pedido), _pedido_filename(pedido, doc="packing-list")
 
     if kind == "contrato":

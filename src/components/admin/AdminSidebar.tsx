@@ -78,7 +78,16 @@ const items: NavItem[] = [
   { title: "Solicitudes", url: "/admin/solicitudes", icon: Inbox },
   { title: "Clientes", url: "/admin/clientes", icon: Users },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
-  { title: "Pagos", url: "/admin/pagos", icon: Wallet },
+  {
+    title: "Finanzas",
+    url: "/admin/contabilidad",
+    icon: Wallet,
+    children: [
+      { title: "Tablero", url: "/admin/contabilidad", icon: LayoutDashboard },
+      { title: "Cuentas", url: "/admin/contabilidad/cuentas", icon: Wallet },
+      { title: "Pagos", url: "/admin/pagos", icon: List },
+    ],
+  },
   { title: "Diseño y marca", url: "/admin/diseno", icon: Palette },
   { title: "Novedades", url: "/admin/novedades", icon: Sparkles },
   { title: "Datos y backups", url: "/admin/dataio", icon: HardDriveDownload },
