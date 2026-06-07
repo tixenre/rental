@@ -9,7 +9,7 @@ import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { adminApi, type CuentaSaldo } from "@/lib/admin/api";
-import { formatARS } from "@/lib/format";
+import { formatARS, formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/components/ui/badge";
 
@@ -64,8 +64,13 @@ function ContabilidadTablero() {
                 Plata disponible
               </div>
               <div className="font-mono text-3xl font-semibold tabular-nums text-ink mt-1">
-                {formatARS(data.disponible.total_disponible)}
+                {formatMoney(data.disponible.totales.ARS ?? 0, "ARS")}
               </div>
+              {(data.disponible.totales.USD ?? 0) !== 0 && (
+                <div className="font-mono text-lg font-semibold tabular-nums text-ink">
+                  {formatMoney(data.disponible.totales.USD, "USD")}
+                </div>
+              )}
               <div className="text-xs text-muted-foreground mt-1">
                 Suma de las cajas · al {data.disponible.as_of}
               </div>
@@ -174,17 +179,24 @@ function CajaCard({ cuenta }: { cuenta: CuentaSaldo }) {
         </Badge>
       </div>
       <div className="font-mono text-2xl font-semibold tabular-nums text-ink">
-        {formatARS(cuenta.saldo)}
+        {formatMoney(cuenta.saldo, cuenta.moneda)}
       </div>
       <dl className="text-[11px] text-muted-foreground space-y-0.5">
         {cuenta.saldo_inicial !== 0 && (
-          <Row label="Saldo inicial" value={formatARS(cuenta.saldo_inicial)} />
+          <Row label="Saldo inicial" value={formatMoney(cuenta.saldo_inicial, cuenta.moneda)} />
         )}
         {cuenta.ingresos_alquiler !== 0 && (
-          <Row label="Cobros de alquiler" value={formatARS(cuenta.ingresos_alquiler)} />
+          <Row
+            label="Cobros de alquiler"
+            value={formatMoney(cuenta.ingresos_alquiler, cuenta.moneda)}
+          />
         )}
-        {cuenta.entradas !== 0 && <Row label="Entradas" value={formatARS(cuenta.entradas)} />}
-        {cuenta.egresos !== 0 && <Row label="Salidas" value={`− ${formatARS(cuenta.egresos)}`} />}
+        {cuenta.entradas !== 0 && (
+          <Row label="Entradas" value={formatMoney(cuenta.entradas, cuenta.moneda)} />
+        )}
+        {cuenta.egresos !== 0 && (
+          <Row label="Salidas" value={`− ${formatMoney(cuenta.egresos, cuenta.moneda)}`} />
+        )}
       </dl>
     </div>
   );
