@@ -113,7 +113,11 @@ async def webhook_didit(request: Request):
     try:
         payload = await request.json()
     except Exception:
-        raise HTTPException(400, "Body inválido")
+        # Body malformado pero firma válida — raro en la práctica (Didit firmó
+        # su propio JSON). Devolvemos 200 para que Didit no reintente; logueamos
+        # para diagnóstico.
+        logger.error("didit webhook: body no es JSON válido session_id=%s", request.headers.get("X-Didit-Session-Id", ""))
+        return {"ok": True}
 
     session_id = payload.get("session_id", "")
     status = payload.get("status", "")
