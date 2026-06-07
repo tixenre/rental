@@ -138,6 +138,16 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_reportes_liquidacion_db.py -v --tb=short -m integration
+      - name: Tests de agrupación por categoría raíz (#814)
+        run: |
+          cd backend
+          # Ejerce el SQL recursivo que trepa de la primera categoría del equipo
+          # hasta su raíz (sector) para agrupar packing list + albarán.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_agrupar_categoria_db.py -v --tb=short -m integration
 
   build:
     name: Build frontend
