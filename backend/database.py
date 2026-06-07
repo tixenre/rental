@@ -1202,7 +1202,7 @@ def init_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS cuentas (
             id             SERIAL PRIMARY KEY,
-            nombre         TEXT NOT NULL UNIQUE,
+            nombre         TEXT NOT NULL,
             tipo           TEXT NOT NULL DEFAULT 'caja',
             socio          TEXT,
             moneda         VARCHAR(3) NOT NULL DEFAULT 'ARS',
@@ -1219,6 +1219,14 @@ def init_db():
     # moneda por cuenta (ARS/USD) — a veces se guardan dólares. ADD COLUMN para
     # BDs que ya tenían la tabla (migración d4e5f6a7b8c9).
     conn.execute("ALTER TABLE cuentas ADD COLUMN IF NOT EXISTS moneda VARCHAR(3) NOT NULL DEFAULT 'ARS'")
+    # El nombre es único SOLO entre cuentas activas: una cuenta dada de baja
+    # (activa=FALSE) deja de bloquear su nombre, así se puede reusar (migración
+    # f6a7b8c9d0e1). Se baja el único global viejo y se crea el parcial.
+    conn.execute("ALTER TABLE cuentas DROP CONSTRAINT IF EXISTS cuentas_nombre_key")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS cuentas_nombre_activa_uq "
+        "ON cuentas(nombre) WHERE activa"
+    )
     # Un socio = exactamente una caja (puente 1:1 con alquiler_pagos.destinatario).
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_cuentas_socio "
@@ -1232,7 +1240,7 @@ def init_db():
             ('Banco',       'banco', NULL,      'ARS', 4),
             ('Fondo Rambla','fondo', 'Rambla',  'ARS', 5),
             ('Dólares',     'caja',  NULL,      'USD', 6)
-        ON CONFLICT (nombre) DO NOTHING
+        ON CONFLICT (nombre) WHERE activa DO NOTHING
     """)
     # Rambla también cobra (default): la caja Fondo Rambla representa al cobrador
     # 'Rambla'. Backfill para BDs que ya tenían la caja con socio NULL (migración

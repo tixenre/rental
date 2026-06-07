@@ -144,6 +144,20 @@ def test_alquiler_previo_al_clean_start_no_entra_a_finanzas(conn):
     assert sum(r["monto"] for r in cobros_mensuales(conn, cobrador="Tincho")) == base_cobros
 
 
+def test_nombre_se_libera_al_dar_de_baja(conn):
+    # El nombre es único solo entre activas: dar de baja una cuenta libera su
+    # nombre, así se puede reusar (caso real: renombrar a un nombre que tenía una
+    # cuenta vieja de baja).
+    from contabilidad.cuentas import crear_cuenta, desactivar_cuenta
+
+    nombre = "Reuso Test 9400"
+    c1 = crear_cuenta(conn, nombre=nombre, tipo="caja", por="test")
+    desactivar_cuenta(conn, c1["id"], por="test")  # saldo 0 → baja OK
+    c2 = crear_cuenta(conn, nombre=nombre, tipo="caja", por="test")
+    assert c2["id"] != c1["id"]
+    assert c2["nombre"] == nombre
+
+
 def test_gasto_baja_el_saldo_de_la_caja_de_origen(conn):
     base = _saldo(conn, "Efectivo")
     _mov(conn, "gasto", 25000, origen=_cuenta_id(conn, "Efectivo"))
