@@ -174,6 +174,9 @@ def rendicion(conn, mes: str) -> dict:
 
     net = _netting(corresponde, cobrado, ya)
 
+    from contabilidad.cierres import mes_cerrado
+    cierre_contable = mes_cerrado(conn, mes)
+
     advertencias = []
     if cob["sin_asignar"] > 0:
         advertencias.append(
@@ -192,6 +195,7 @@ def rendicion(conn, mes: str) -> dict:
         "desde": desde,
         "hasta": hasta,
         "cerrado": snap is not None,
+        "cierre_contable": cierre_contable,
         "corresponde": corresponde,
         "cobrado": cobrado,
         "sin_asignar": cob["sin_asignar"],
