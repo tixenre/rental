@@ -310,7 +310,7 @@ def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
         return pedido
     row = conn.execute(
         """SELECT perfil_impuestos, razon_social, domicilio_fiscal,
-                  email_facturacion
+                  email_facturacion, cuit
            FROM clientes WHERE id = ?""",
         (cid,),
     ).fetchone()
@@ -321,21 +321,29 @@ def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
     pedido["cliente_razon_social"] = c.get("razon_social")
     pedido["cliente_domicilio_fiscal"] = c.get("domicilio_fiscal")
     pedido["cliente_email_facturacion"] = c.get("email_facturacion")
+    if c.get("cuit"):
+        pedido["cliente_cuit"] = c["cuit"]
     return pedido
 
 
 def _aplicar_contacto_cliente(pedido: dict, c: dict) -> None:
     """Sobrescribe nombre/email/teléfono del pedido con los datos `c` del cliente.
 
-    El nombre se arma "Nombre Apellido" (helper único `nombre_completo_cliente`).
-    El email/teléfono se sobrescriben solo si el cliente tiene un valor — si está
-    vacío en la ficha, se conserva la foto del pedido para no perder el contacto.
+    El nombre: si hay datos RENAPER (identidad verificada), se usa el nombre
+    legal confirmado; si no, el nombre ingresado por el cliente. El email/teléfono
+    se sobrescriben solo si el cliente tiene un valor. También pone `cliente_dni`
+    si el DNI fue verificado por RENAPER.
     """
-    pedido["cliente_nombre"] = nombre_completo_cliente(c["nombre"], c["apellido"])
+    if c.get("nombre_renaper"):
+        pedido["cliente_nombre"] = f"{c['nombre_renaper']} {c.get('apellido_renaper', '')}".strip()
+    else:
+        pedido["cliente_nombre"] = nombre_completo_cliente(c.get("nombre", ""), c.get("apellido", ""))
     if c.get("email"):
         pedido["cliente_email"] = c["email"]
     if c.get("telefono"):
         pedido["cliente_telefono"] = c["telefono"]
+    if c.get("dni"):
+        pedido["cliente_dni"] = c["dni"]
 
 
 def _enriquecer_pedido_con_cliente(conn, pedido: dict) -> dict:
@@ -353,7 +361,9 @@ def _enriquecer_pedido_con_cliente(conn, pedido: dict) -> dict:
     if not cid:
         return pedido
     row = conn.execute(
-        "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = ?",
+        """SELECT nombre, apellido, email, telefono,
+                  dni, nombre_renaper, apellido_renaper
+           FROM clientes WHERE id = ?""",
         (cid,),
     ).fetchone()
     if row:
@@ -368,7 +378,9 @@ def _enriquecer_pedidos_con_cliente(conn, pedidos: list[dict]) -> None:
         return
     ph = ",".join(["?"] * len(ids))
     rows = conn.execute(
-        f"SELECT id, nombre, apellido, email, telefono FROM clientes WHERE id IN ({ph})",
+        f"""SELECT id, nombre, apellido, email, telefono,
+                   dni, nombre_renaper, apellido_renaper
+            FROM clientes WHERE id IN ({ph})""",
         ids,
     ).fetchall()
     by_id = {r["id"]: row_to_dict(r) for r in rows}
