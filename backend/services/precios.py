@@ -39,11 +39,18 @@ PERFIL_RI = "responsable_inscripto"
 # ── Tipos ────────────────────────────────────────────────────────────────
 
 
-class ItemPrecio(TypedDict):
-    """Forma mínima de un ítem para calcular total."""
-    equipo_id: int
+class ItemPrecio(TypedDict, total=False):
+    """Forma mínima de un ítem para calcular total.
+
+    `cobro_modo` (opcional, #805): 'jornada' (default — precio × cantidad ×
+    jornadas, como los equipos del catálogo) o 'fijo' (monto único — precio ×
+    cantidad, SIN multiplicar por jornadas; para líneas personalizadas tipo flete).
+    `equipo_id` puede faltar/ser None en líneas personalizadas (no del catálogo).
+    """
+    equipo_id: Optional[int]
     cantidad: int
     precio_jornada: int
+    cobro_modo: str
 
 
 class TotalDesglose(TypedDict):
@@ -136,6 +143,18 @@ def precio_combo(conn, equipo_id: int) -> int:
     return _precio_combo_calc(rows)
 
 
+def bruto_linea(it: ItemPrecio, jornadas: int) -> int:
+    """Bruto (neto sin descuento) de UNA línea — fuente única del subtotal por línea.
+
+    'jornada' (default): precio × cantidad × jornadas (equipos del catálogo).
+    'fijo' (#805, líneas personalizadas tipo flete): precio × cantidad, SIN jornadas.
+    """
+    cant = int(it.get("cantidad") or 0)
+    precio = int(it.get("precio_jornada") or 0)
+    mult = 1 if (it.get("cobro_modo") or "jornada") == "fijo" else max(1, int(jornadas or 1))
+    return precio * cant * mult
+
+
 def calcular_total(
     items: list[ItemPrecio],
     jornadas: int,
@@ -156,10 +175,7 @@ def calcular_total(
     El ``total_final`` (con IVA si aplica) es lo que se MUESTRA al cliente RI.
     """
     j = max(1, int(jornadas or 1))
-    bruto = sum(
-        int(it["precio_jornada"] or 0) * int(it["cantidad"] or 0) * j
-        for it in items
-    )
+    bruto = sum(bruto_linea(it, j) for it in items)
     pct = descuento_aplicable(descuento_cliente_pct, descuento_jornadas_pct)
     descuento_monto = int(round(bruto * pct / 100))
     neto = int(bruto - descuento_monto)

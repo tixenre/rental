@@ -51,6 +51,7 @@ def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=No
         FROM alquiler_items pi
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND pi.equipo_id IS NOT NULL
           AND p.fecha_desde < ?
           AND p.fecha_hasta > ?
           AND (? IS NULL OR p.id != ?)
@@ -187,6 +188,7 @@ def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> 
         FROM alquiler_items pi
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE p.estado IN {ESTADOS_RESERVADO}
+          AND pi.equipo_id IS NOT NULL
           AND p.fecha_hasta > ? AND p.fecha_desde < ?
         """,
         (win_lo, win_hi),

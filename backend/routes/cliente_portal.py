@@ -385,10 +385,11 @@ def cliente_pedidos(request: Request):
             d = row_to_dict(p)
             items = conn.execute(f"""
                 SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                       e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url,
+                       COALESCE(e.nombre, ai.nombre_libre) AS nombre,
+                       {MARCA_SUBQUERY}, e.modelo, e.foto_url,
                        e.nombre_publico, e.nombre_publico_largo
                 FROM alquiler_items ai
-                JOIN equipos e ON e.id = ai.equipo_id
+                LEFT JOIN equipos e ON e.id = ai.equipo_id
                 WHERE ai.pedido_id = ?
                 ORDER BY ai.orden, ai.id
             """, (p["id"],)).fetchall()
@@ -439,10 +440,11 @@ def cliente_pedido_detalle(id: int, request: Request):
 
         items = conn.execute(f"""
             SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                   e.id AS equipo_id, e.nombre, {MARCA_SUBQUERY}, e.foto_url,
+                   ai.equipo_id, COALESCE(e.nombre, ai.nombre_libre) AS nombre,
+                   {MARCA_SUBQUERY}, e.foto_url,
                    e.nombre_publico, e.nombre_publico_largo
             FROM alquiler_items ai
-            JOIN equipos e ON e.id = ai.equipo_id
+            LEFT JOIN equipos e ON e.id = ai.equipo_id
             WHERE ai.pedido_id = ?
             ORDER BY ai.orden, ai.id
         """, (id,)).fetchall()
@@ -1170,11 +1172,12 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
     pedido = row_to_dict(row)
 
     items = conn.execute(f"""
-        SELECT pi.cantidad, e.id AS equipo_id, e.nombre, {MARCA_SUBQUERY}, e.modelo,
+        SELECT pi.cantidad, pi.equipo_id, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
+               {MARCA_SUBQUERY}, e.modelo,
                e.serie, e.valor_reposicion, e.foto_url, pi.precio_jornada, pi.subtotal,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
-        JOIN equipos e ON e.id = pi.equipo_id
+        LEFT JOIN equipos e ON e.id = pi.equipo_id
         WHERE pi.pedido_id = ?
         ORDER BY pi.orden, pi.id
     """, (pedido_id,)).fetchall()

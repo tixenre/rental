@@ -89,8 +89,8 @@ def test_propaga_a_presupuestos_y_recotiza():
     # Dos presupuestos del cliente (id 10 y 11), cada uno 1 ítem 10.000 x 7 = 70.000.
     rows = {10: _pedido(10, descuento_pct=0), 11: _pedido(11, descuento_pct=0)}
     items = {
-        10: [{"id": 100, "equipo_id": 42, "cantidad": 1, "precio_jornada": 10000}],
-        11: [{"id": 101, "equipo_id": 42, "cantidad": 1, "precio_jornada": 10000}],
+        10: [{"id": 100, "equipo_id": 42, "cantidad": 1, "precio_jornada": 10000, "cobro_modo": "jornada"}],
+        11: [{"id": 101, "equipo_id": 42, "cantidad": 1, "precio_jornada": 10000, "cobro_modo": "jornada"}],
     }
     conn = FakeConn([10, 11], rows, items, descuentos_jornada=[(1, 0.0)])
 
@@ -115,7 +115,7 @@ def test_sin_presupuestos_no_hace_nada():
 def test_recalcular_usa_el_descuento_mayor():
     # descuento cliente 5% vs jornadas 10% → gana el mayor (no acumulativo).
     rows = {7: _pedido(7, descuento_pct=5)}
-    items = {7: [{"id": 70, "equipo_id": 1, "cantidad": 2, "precio_jornada": 5000}]}
+    items = {7: [{"id": 70, "equipo_id": 1, "cantidad": 2, "precio_jornada": 5000, "cobro_modo": "jornada"}]}
     # 2 x 5000 x 7 = 70.000 bruto. A 7 jornadas → 10%. → 63.000 neto.
     conn = FakeConn([7], rows, items, descuentos_jornada=[(1, 0.0), (7, 10.0)])
     _recalcular_total_pedido(conn, 7)
