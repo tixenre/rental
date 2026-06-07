@@ -11,7 +11,7 @@ Espeja init_db() (esquema en dos capas, MEMORIA 2026-06-03): `ADD COLUMN IF NOT
 EXISTS` hace esta migración idempotente aunque el bootstrap ya las haya creado.
 
 Revision ID: z0a1b2c3d4e5
-Revises: x8y9z0a1b2c3
+Revises: w7x8y9z0a1b2
 Create Date: 2026-06-07
 """
 
@@ -20,7 +20,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "z0a1b2c3d4e5"
-down_revision: Union[str, Sequence[str], None] = "x8y9z0a1b2c3"
+down_revision: Union[str, Sequence[str], None] = "w7x8y9z0a1b2"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

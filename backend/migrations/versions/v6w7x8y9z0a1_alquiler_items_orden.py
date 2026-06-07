@@ -10,7 +10,7 @@ columna se crea TAMBIÉN ahí con un ADD COLUMN idempotente. `ADD COLUMN IF NOT
 EXISTS` hace esta migración segura aunque el bootstrap ya la haya agregado.
 
 Revision ID: v6w7x8y9z0a1
-Revises: u5v6w7x8y9z0
+Revises: e5f6a7b8c9d0
 Create Date: 2026-06-07
 """
 from typing import Sequence, Union
@@ -18,7 +18,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "v6w7x8y9z0a1"
-down_revision: Union[str, Sequence[str], None] = "u5v6w7x8y9z0"
+down_revision: Union[str, Sequence[str], None] = "e5f6a7b8c9d0"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
