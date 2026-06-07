@@ -639,6 +639,32 @@ def _items_payload_to_pedido_items(items: list[ModificacionItemIn], precios: dic
     ]
 
 
+def _lineas_libres_actuales(conn, pedido_id: int) -> list:
+    """Líneas personalizadas (#805, equipo_id NULL) ya guardadas en el pedido,
+    como `PedidoItem`. El portal del cliente NO las maneja (solo ítems de
+    catálogo) → hay que preservarlas al reaplicar los ítems. Sin esto, el
+    DELETE+reinsert de `_apply_pedido_items` las borraría en silencio cuando el
+    cliente edita su pedido: un flete/servicio que agregó el admin desaparecería
+    y cambiaría el total cobrado (pérdida de plata)."""
+    from routes.alquileres import PedidoItem
+    rows = conn.execute(
+        "SELECT cantidad, precio_jornada, nombre_libre, cobro_modo "
+        "FROM alquiler_items WHERE pedido_id=? AND equipo_id IS NULL "
+        "ORDER BY orden, id",
+        (pedido_id,),
+    ).fetchall()
+    return [
+        PedidoItem(
+            equipo_id=None,
+            cantidad=r["cantidad"],
+            precio_jornada=r["precio_jornada"],
+            nombre_libre=r["nombre_libre"],
+            cobro_modo=r["cobro_modo"],
+        )
+        for r in rows
+    ]
+
+
 def _precios_actuales(conn, pedido_id: int) -> dict[int, int]:
     """Mapa equipo_id → precio_jornada usado actualmente en el pedido.
 
@@ -726,7 +752,10 @@ def cliente_modificar_pedido(
                 if datos_kwargs:
                     _apply_pedido_datos(conn, id, PedidoDatos(**datos_kwargs))
 
+                # Preservar las líneas personalizadas (#805): el portal solo manda
+                # ítems de catálogo; sin esto el reinsert las borraría.
                 pedido_items = _items_payload_to_pedido_items(data.items, precios)
+                pedido_items += _lineas_libres_actuales(conn, id)
                 _apply_pedido_items(conn, id, pedido_items)
 
                 # Re-validar stock con el rango nuevo
@@ -1114,10 +1143,12 @@ def admin_responder_solicitud(
                 if datos_kwargs:
                     _apply_pedido_datos(conn, sm["pedido_id"], PedidoDatos(**datos_kwargs))
 
+                # Preservar las líneas personalizadas (#805) — ver nota en el caso directo.
                 pedido_items = _items_payload_to_pedido_items(
                     [ModificacionItemIn(**it) for it in cambios.get("items") or []],
                     precios,
                 )
+                pedido_items += _lineas_libres_actuales(conn, sm["pedido_id"])
                 _apply_pedido_items(conn, sm["pedido_id"], pedido_items)
 
                 # Re-validar stock con el rango nuevo
