@@ -1592,10 +1592,9 @@ export const adminApi = {
     }
   },
   generarLinkVerificacion: (clienteId: number) =>
-    authedJson<{ session_id: string; url: string }>(
-      `/api/admin/verificacion/sesion/${clienteId}`,
-      { method: "POST" },
-    ),
+    authedJson<{ session_id: string; url: string }>(`/api/admin/verificacion/sesion/${clienteId}`, {
+      method: "POST",
+    }),
 
   // calendario
   getCalendario: (desde: string, hasta: string) => {

@@ -17,7 +17,7 @@ export function CategoryMosaic({
   if (categories.length === 0) return null;
 
   return (
-    <section className="py-8 lg:py-10">
+    <section className="pt-4 pb-6 lg:pt-5 lg:pb-8">
       <div className="mb-4 flex items-end justify-between px-6 lg:px-12">
         <div className="flex flex-col leading-none">
           <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">

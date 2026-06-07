@@ -856,7 +856,7 @@ function GridMode({
   );
 
   return (
-    <div className="space-y-10 py-6 sm:space-y-12 sm:py-8 lg:py-12">
+    <div className="space-y-10 pt-2 pb-6 sm:space-y-12 sm:pt-3 sm:pb-8 lg:pt-4 lg:pb-12">
       {isFiltered && (
         <div className="px-4 lg:px-12">
           <div className="flex flex-wrap items-center gap-2">
