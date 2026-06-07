@@ -19,7 +19,7 @@ import {
   type MovimientoInput,
   type TipoMovimiento,
 } from "@/lib/admin/api";
-import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -186,7 +186,9 @@ function MovimientoRow({ mov, onChanged }: { mov: Movimiento; onChanged: () => v
           </a>
         )}
       </td>
-      <td className="px-3 py-2 text-right font-mono tabular-nums">{formatARS(mov.monto)}</td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">
+        {formatMoney(mov.monto, mov.moneda)}
+      </td>
       <td className="px-3 py-2 text-right">
         {!mov.anulado && (
           <button

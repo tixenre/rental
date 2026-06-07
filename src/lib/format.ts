@@ -13,6 +13,15 @@ export const formatARS = (n: number) =>
     maximumFractionDigits: 0,
   }).format(Math.round(n));
 
+/** Formatea un monto en su moneda: ARS → "$97.500", USD → "US$ 1.200". */
+export const formatMoney = (n: number, moneda: string = "ARS") =>
+  moneda === "USD"
+    ? "US$ " +
+      new Intl.NumberFormat("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(
+        Math.round(n),
+      )
+    : formatARS(n);
+
 /** "6 may 11:00 → 7 may 10:00" o "Elegí tus fechas" */
 export function formatRentalRange(start?: Date, end?: Date, startTime?: string, endTime?: string) {
   if (!start || !end) return "Elegí tus fechas";

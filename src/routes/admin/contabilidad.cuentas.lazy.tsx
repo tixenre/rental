@@ -12,7 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { adminApi, type CuentaSaldo, type TipoCuenta } from "@/lib/admin/api";
-import { formatARS } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -82,15 +82,19 @@ function CuentasPage() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t hairline">
-                <td className="px-3 py-2 font-medium" colSpan={3}>
-                  Total disponible
-                </td>
-                <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
-                  {formatARS(q.data.total_disponible)}
-                </td>
-                <td />
-              </tr>
+              {Object.entries(q.data.totales)
+                .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b)))
+                .map(([moneda, total]) => (
+                  <tr key={moneda} className="border-t hairline">
+                    <td className="px-3 py-2 font-medium" colSpan={3}>
+                      Total disponible {moneda !== "ARS" ? `(${moneda})` : ""}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
+                      {formatMoney(total, moneda)}
+                    </td>
+                    <td />
+                  </tr>
+                ))}
             </tfoot>
           </table>
         </div>
@@ -170,12 +174,12 @@ function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () =
             className="font-mono tabular-nums hover:text-amber hover:underline"
             title="Editar saldo inicial"
           >
-            {formatARS(cuenta.saldo_inicial)}
+            {formatMoney(cuenta.saldo_inicial, cuenta.moneda)}
           </button>
         )}
       </td>
       <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
-        {formatARS(cuenta.saldo)}
+        {formatMoney(cuenta.saldo, cuenta.moneda)}
       </td>
       <td className="px-3 py-2 text-right">
         <button
@@ -209,6 +213,7 @@ function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () =
 function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<TipoCuenta>("caja");
+  const [moneda, setMoneda] = useState("ARS");
   const [saldoInicial, setSaldoInicial] = useState("0");
 
   const crear = useMutation({
@@ -216,12 +221,14 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
       adminApi.createCuenta({
         nombre: nombre.trim(),
         tipo,
+        moneda,
         saldo_inicial: Number(saldoInicial) || 0,
       }),
     onSuccess: () => {
       setNombre("");
       setSaldoInicial("0");
       setTipo("caja");
+      setMoneda("ARS");
       toast.success("Cuenta creada");
       onCreated();
     },
@@ -267,6 +274,19 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
                 {t}
               </option>
             ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            Moneda
+          </span>
+          <select
+            value={moneda}
+            onChange={(e) => setMoneda(e.target.value)}
+            className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+          >
+            <option value="ARS">Pesos (ARS)</option>
+            <option value="USD">Dólares (USD)</option>
           </select>
         </label>
         <label className="space-y-1">
