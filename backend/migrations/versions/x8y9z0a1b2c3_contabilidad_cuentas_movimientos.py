@@ -16,8 +16,8 @@ NOTHING) para convivir con el bootstrap.
 crean juntas aunque la UI de gastos/categorías llegue en una fase posterior — el
 esquema del libro va completo de una para no alterarlo después.
 
-Revision ID: v6w7x8y9z0a1
-Revises: u5v6w7x8y9z0
+Revision ID: x8y9z0a1b2c3
+Revises: w7x8y9z0a1b2
 Create Date: 2026-06-07
 """
 
@@ -26,8 +26,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "v6w7x8y9z0a1"
-down_revision: Union[str, Sequence[str], None] = "u5v6w7x8y9z0"
+revision: str = "x8y9z0a1b2c3"
+down_revision: Union[str, Sequence[str], None] = "w7x8y9z0a1b2"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
