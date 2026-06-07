@@ -9,7 +9,7 @@ reparto): este congela el estado de cajas/movimientos.
 Espejada en init_db() (esquema en dos capas, decisión 2026-06-03). Idempotente.
 
 Revision ID: b2c3d4e5f6a7
-Revises: y9z0a1b2c3d4
+Revises: x8y9z0a1b2c3
 Create Date: 2026-06-07
 """
 
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "b2c3d4e5f6a7"
-down_revision: Union[str, Sequence[str], None] = "y9z0a1b2c3d4"
+down_revision: Union[str, Sequence[str], None] = "x8y9z0a1b2c3"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
