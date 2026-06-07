@@ -464,14 +464,38 @@ class PedidoEstado(BaseModel):
     estado: str
 
 
-class PagoParcial(BaseModel):
-    monto_pagado: int
+# Pagos: a quién se cobró (destinatario) y cómo (método). Fuente única de los
+# valores admitidos — la usan la validación del endpoint y la vista de logs.
+# Tincho/Pablo son los mismos dueños del modelo de comisiones (reportes).
+DESTINATARIOS_PAGO = ("Tincho", "Pablo")
+METODOS_PAGO = ("transferencia", "efectivo")
+DESTINATARIO_PAGO_DEFAULT = "Tincho"
+METODO_PAGO_DEFAULT = "transferencia"
 
 
 class PagoCreate(BaseModel):
-    monto:    int
-    concepto: Optional[str] = None
-    fecha:    Optional[str] = None   # YYYY-MM-DD; si no viene usa hoy
+    monto:        int
+    concepto:     Optional[str] = None
+    fecha:        Optional[str] = None   # YYYY-MM-DD; si no viene usa hoy
+    destinatario: Optional[str] = None   # Tincho|Pablo (default Tincho)
+    metodo:       Optional[str] = None   # transferencia|efectivo (default transferencia)
+
+
+def _resolver_destino_metodo(
+    destinatario: Optional[str], metodo: Optional[str]
+) -> tuple[str, str]:
+    """Aplica defaults (Tincho/transferencia) y valida contra los valores admitidos.
+
+    Pieza pura (testeable sin DB): la usa `agregar_pago`. Lanza HTTP 400 si el
+    valor explícito no está en la lista permitida.
+    """
+    d = destinatario or DESTINATARIO_PAGO_DEFAULT
+    m = metodo or METODO_PAGO_DEFAULT
+    if d not in DESTINATARIOS_PAGO:
+        raise HTTPException(400, f"Destinatario inválido. Usar: {', '.join(DESTINATARIOS_PAGO)}")
+    if m not in METODOS_PAGO:
+        raise HTTPException(400, f"Método inválido. Usar: {', '.join(METODOS_PAGO)}")
+    return d, m
 
 
 class PedidoDatos(BaseModel):
@@ -1249,38 +1273,13 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
     return pedido
 
 
-@router.patch("/alquileres/{id}/pago")
-def registrar_pago(id: int, data: PagoParcial, request: Request):
-    require_admin(request)
-    """Endpoint legacy: setea monto_pagado directamente (sin registro en tabla pagos)."""
-    with get_db() as conn:
-        try:
-            p = conn.execute(
-                "SELECT id, monto_total FROM alquileres WHERE id=?", (id,)
-            ).fetchone()
-            if not p:
-                raise HTTPException(404, "Pedido no encontrado")
-            if data.monto_pagado < 0:
-                raise HTTPException(400, "El monto pagado no puede ser negativo")
-            monto_total = (p["monto_total"] or 0) if isinstance(p, dict) else (p[1] or 0)
-            if data.monto_pagado > monto_total:
-                raise HTTPException(
-                    400,
-                    f"El monto pagado ({data.monto_pagado}) no puede exceder el "
-                    f"total del pedido ({monto_total})",
-                )
-            conn.execute("UPDATE alquileres SET monto_pagado=? WHERE id=?", (data.monto_pagado, id))
-            _maybe_finalizar(conn, id)
-            conn.commit()
-            pedido = _get_alquiler_detail(conn, id)
-            return pedido
-        except Exception:
-            logger.error("Error actualizando monto_pagado del pedido %s", id, exc_info=True)
-            conn.rollback()
-            raise
-
-
 # ── Registro de pagos ────────────────────────────────────────────────────────
+#
+# `alquiler_pagos` (el ledger) es la ÚNICA fuente de verdad de "pagado": cada
+# cobro deja su fila y `monto_pagado` se DERIVA con `_recalcular_monto_pagado`.
+# Se retiró el endpoint legacy `PATCH /alquileres/{id}/pago` que seteaba
+# `monto_pagado` a pelo sin registrar el pago (rompía el reporte de liquidación
+# y desincronizaba dashboard vs reporte). Ver #722.
 
 @router.get("/alquileres/{id}/pagos")
 def list_pagos(id: int, request: Request):
@@ -1298,6 +1297,7 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
     require_admin(request)
     if data.monto <= 0:
         raise HTTPException(400, "El monto debe ser mayor a 0")
+    destinatario, metodo = _resolver_destino_metodo(data.destinatario, data.metodo)
     with get_db() as conn:
         try:
             p = conn.execute("SELECT estado FROM alquileres WHERE id=?", (id,)).fetchone()
@@ -1308,9 +1308,9 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
 
             fecha = data.fecha or datetime.date.today().isoformat()
             conn.execute("""
-                INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha)
-                VALUES (?,?,?,?)
-            """, (id, data.monto, data.concepto, fecha))
+                INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
+                VALUES (?,?,?,?,?,?)
+            """, (id, data.monto, data.concepto, destinatario, metodo, fecha))
 
             _recalcular_monto_pagado(conn, id)
             _maybe_finalizar(conn, id)
@@ -1352,6 +1352,56 @@ def eliminar_pago(id: int, pago_id: int, request: Request):
             logger.error("Error registrando pago en pedido %s", id, exc_info=True)
             conn.rollback()
             raise
+
+
+@router.get("/admin/pagos")
+def list_all_pagos(
+    request: Request,
+    destinatario: Optional[str] = Query(None),
+    metodo: Optional[str] = Query(None),
+    desde: Optional[str] = Query(None, description="YYYY-MM-DD inclusive"),
+    hasta: Optional[str] = Query(None, description="YYYY-MM-DD inclusive"),
+    limit: int = Query(500, le=2000),
+):
+    """Ledger global de pagos — vista de logs del back-office.
+
+    Lista las filas de `alquiler_pagos` (la fuente ÚNICA de "pagado") con su
+    pedido y cliente, ordenadas por fecha desc. Filtros opcionales por
+    destinatario, método y rango de fechas (inclusive). Devuelve también el
+    total del subconjunto filtrado.
+    """
+    require_admin(request)
+    where = ["1=1"]
+    params: list = []
+    if destinatario:
+        where.append("ap.destinatario = ?")
+        params.append(destinatario)
+    if metodo:
+        where.append("ap.metodo = ?")
+        params.append(metodo)
+    if desde:
+        where.append("ap.fecha::date >= ?")
+        params.append(desde)
+    if hasta:
+        where.append("ap.fecha::date <= ?")
+        params.append(hasta)
+    with get_db() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT ap.id, ap.pedido_id, ap.monto, ap.concepto,
+                   ap.destinatario, ap.metodo, ap.fecha,
+                   al.numero_pedido, al.cliente_nombre
+              FROM alquiler_pagos ap
+              JOIN alquileres al ON al.id = ap.pedido_id
+             WHERE {" AND ".join(where)}
+             ORDER BY ap.fecha DESC, ap.id DESC
+             LIMIT ?
+            """,
+            (*params, limit),
+        ).fetchall()
+        pagos = [row_to_dict(r) for r in rows]
+        total = sum((p["monto"] or 0) for p in pagos)
+        return {"pagos": pagos, "total": total, "count": len(pagos)}
 
 
 def _recalcular_total_pedido(conn, id: int) -> None:
