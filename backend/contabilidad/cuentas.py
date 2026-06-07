@@ -45,8 +45,16 @@ def validar_cuenta(data: dict) -> None:
     socio = socio.strip() if isinstance(socio, str) else socio
     if socio and socio not in COBRADORES:
         raise ValueError(f"El cobrador debe ser uno de {', '.join(COBRADORES)}.")
-    if tipo == "socio" and socio not in SOCIOS_HUMANOS:
-        raise ValueError(f"Una cuenta de socio debe representar a {', '.join(SOCIOS_HUMANOS)}.")
+    # Cada tipo acota qué cobrador puede representar: socio → Pablo/Tincho;
+    # fondo → Rambla (o ninguno); caja/banco → ningún cobrador.
+    if tipo == "socio":
+        if socio not in SOCIOS_HUMANOS:
+            raise ValueError(f"Una cuenta de socio debe representar a {', '.join(SOCIOS_HUMANOS)}.")
+    elif tipo == "fondo":
+        if socio and socio != "Rambla":
+            raise ValueError("Un fondo solo puede representar a Rambla (o a nadie).")
+    elif socio:
+        raise ValueError("Solo una caja de socio (Pablo/Tincho) o el fondo (Rambla) tienen cobrador.")
 
     si = data.get("saldo_inicial", 0)
     if si is None:

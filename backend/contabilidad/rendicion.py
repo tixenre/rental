@@ -6,11 +6,12 @@ ledger `alquiler_pagos`, por destinatario). Está atada al MISMO universo de
 pedidos saldados del mes que el reporte → los dos lados suman el mismo total y la
 rendición cierra en cero.
 
-Las partes son tres: **Pablo** y **Tincho** (los que cobran físicamente) y
-**Rambla** (el fondo de la empresa, que no cobra: su parte la tienen los socios en
-exceso y hay que apartarla). El netting dice qué transferencias saldan el mes; al
-registrarlas (`saldar`) se crean como `transferencia` en el libro de movimientos
-con `es_rendicion=True` — NO es un sistema paralelo.
+Las partes son tres: **Pablo**, **Tincho** y **Rambla** — los tres pueden cobrar
+(Rambla es el cobrador por defecto y su plata cae en la caja Fondo Rambla). El
+netting calcula quién le debe a quién para que cada parte termine con lo que le
+corresponde; la parte de Rambla NO se reparte entre Pablo y Tincho. Al registrar un
+saldado (`saldar`) se crea como `transferencia` en el libro de movimientos con
+`es_rendicion=True` — NO es un sistema paralelo.
 
 El núcleo (`_netting`) es puro y testeable sin DB.
 """
@@ -64,7 +65,7 @@ def _netting(corresponde: dict, cobrado: dict, ya_transferido: dict) -> dict:
 def cobrado_por_socio(conn, desde: str, hasta: str) -> dict:
     """Σ `alquiler_pagos.monto` por destinatario, SOLO sobre los pedidos saldados
     del mes (mismo `SALDADO_CTE` que el reporte). Devuelve
-    {'Pablo', 'Tincho', 'sin_asignar', 'total'}."""
+    {'Pablo', 'Tincho', 'Rambla', 'sin_asignar', 'total'}."""
     sql = f"""
         WITH {SALDADO_CTE},
         en_rango AS (

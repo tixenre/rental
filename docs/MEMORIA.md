@@ -553,8 +553,12 @@
     entrante** (incluidas señas). Pueden no coincidir mes a mes — no es un bug.
   - **Rendición** atada al MISMO universo de pedidos saldados que el reporte (reusa `SALDADO_CTE`)
     → cierra en cero; un saldado se registra como **transferencia `es_rendicion`** en el mismo
-    libro (no un sistema paralelo). **Rambla = tercero a apartar** (no cobra; su parte no se
-    reparte entre Pablo y Tincho). El valor de los socios vive en la constante única `SOCIOS`.
+    libro (no un sistema paralelo). **Los tres cobran** (Pablo/Tincho/Rambla; **Rambla es el
+    cobrador por defecto** desde 2026-06-07): la plata cobrada se atribuye a la caja del cobrador
+    (Pablo/Tincho → su caja de socio; Rambla → Fondo Rambla) vía la columna `cuentas.socio` (= a qué
+    cobrador representa la caja). La **parte de Rambla NO se reparte** entre Pablo y Tincho. Los
+    cobradores válidos viven en la constante única `COBRADORES` (los tres) + `SOCIOS_HUMANOS`
+    (Pablo/Tincho, los únicos válidos para una caja de tipo `socio`).
   - **Cierre contable DISTINTO del de liquidación (#721):** aquel congela el reparto del reporte;
     este congela el estado de cajas/movimientos y **traba la edición de movimientos del mes por la
     fecha del movimiento** (`_exigir_mes_abierto` en crear/editar/anular). Esquema en dos capas
@@ -562,7 +566,7 @@
 - **Quién hace cumplir:** el supervisor marca como hallazgo cualquier cálculo de plata interna
   ad-hoc fuera del paquete; un endpoint que escriba `movimientos` sin pasar por el motor (se
   saltearía el candado de mes cerrado); recargar ingresos de alquiler a mano; o duplicar el valor
-  de los socios fuera de `SOCIOS`. Extiende _2026-05-30_ (`reservas/`) y _2026-06-03_ (`reportes/`).
+  de los cobradores fuera de `COBRADORES`. Extiende _2026-05-30_ (`reservas/`) y _2026-06-03_ (`reportes/`).
 - **Pendiente conocido:** las partes de la rendición son fijas (Pablo/Tincho/Rambla). Si alguna vez
   el modelo de comisiones reparte a un **cuarto beneficiario**, esa parte quedaría fuera del cuadro
   y el total no cuadraría → habría que generalizar las partes. Hoy no es un caso real.
