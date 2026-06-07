@@ -8,6 +8,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { StepperPill } from "./equipment/shared/StepperPill";
+import { IncludesLine } from "./equipment/shared/IncludesLine";
 import { EmptyState } from "./EmptyState";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -398,6 +399,11 @@ export function CartDrawer({
                                 <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">
                                   {it.name}
                                 </div>
+                                <IncludesLine
+                                  includes={it.includes}
+                                  label="Incluye:"
+                                  className="mt-0.5 text-[10px]"
+                                />
                                 {noDisponible && (
                                   <div className="mt-1 flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-1 text-[10px] font-semibold text-destructive uppercase tracking-wide">
