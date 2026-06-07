@@ -127,9 +127,12 @@ def obtener_movimiento(conn, mov_id: int) -> dict | None:
 
 
 def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino_id=None,
-                     categoria_id=None, metodo=None, fecha=None, nota=None, por=None) -> dict:
+                     categoria_id=None, metodo=None, fecha=None, nota=None, por=None,
+                     es_rendicion=False, rendicion_mes=None) -> dict:
     """Crea un movimiento (valida estructura + existencia de cuentas/categoría).
-    `fecha` None → hoy. Devuelve el movimiento con nombres resueltos."""
+    `fecha` None → hoy. `es_rendicion`/`rendicion_mes` marcan un saldado de
+    rendición entre socios (lo usa `rendicion.saldar`, no la UI general).
+    Devuelve el movimiento con nombres resueltos."""
     monto = int(monto or 0)
     validar_estructura_movimiento(tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id)
     _validar_metodo(metodo)
@@ -148,11 +151,11 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
     cur = conn.execute(
         """INSERT INTO movimientos
                (tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
-                metodo, fecha, nota, created_by, updated_by)
-           VALUES (?, ?, ?, ?, ?, ?, COALESCE(?::date, CURRENT_DATE), ?, ?, ?)
+                metodo, fecha, nota, es_rendicion, rendicion_mes, created_by, updated_by)
+           VALUES (?, ?, ?, ?, ?, ?, COALESCE(?::date, CURRENT_DATE), ?, ?, ?, ?, ?)
            RETURNING id""",
         (tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
-         metodo, fecha, nota, por, por),
+         metodo, fecha, nota, bool(es_rendicion), rendicion_mes, por, por),
     )
     new_id = cur.fetchone()[0]
     movs = listar_movimientos(conn, incluir_anulados=True)
