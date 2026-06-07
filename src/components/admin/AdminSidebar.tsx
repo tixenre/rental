@@ -84,6 +84,7 @@ const items: NavItem[] = [
     icon: Wallet,
     children: [
       { title: "Tablero", url: "/admin/contabilidad", icon: LayoutDashboard },
+      { title: "Movimientos", url: "/admin/contabilidad/movimientos", icon: ClipboardList },
       { title: "Cuentas", url: "/admin/contabilidad/cuentas", icon: Wallet },
       { title: "Pagos", url: "/admin/pagos", icon: List },
     ],
