@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     # Orígenes permitidos para CORS con credenciales (coma-separados).
     FRONTEND_ORIGINS: str = "http://localhost:5173,http://localhost:8000"
 
+    # ── Didit — verificación de identidad (DNI + selfie → RENAPER) ──────────
+    # Se activa por configuración: si DIDIT_API_KEY está vacía, los endpoints de
+    # verificación devuelven 503. Mismo patrón que RESEND_API_KEY para mails.
+    DIDIT_API_KEY:        str = ""
+    DIDIT_WEBHOOK_SECRET: str = ""
+
     @field_validator("SITE_URL")
     @classmethod
     def _strip_trailing_slash(cls, v: str) -> str:
@@ -98,6 +104,10 @@ class Settings(BaseSettings):
     @property
     def frontend_origins(self) -> list[str]:
         return [o.strip() for o in self.FRONTEND_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def didit_enabled(self) -> bool:
+        return bool(self.DIDIT_API_KEY and self.DIDIT_WEBHOOK_SECRET)
 
 
 settings = Settings()

@@ -417,6 +417,17 @@ def init_db():
     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_clientes_nombre_apellido_trgm ON clientes USING gin ({_nombre_apellido} gin_trgm_ops)")
     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_clientes_email_trgm ON clientes USING gin ({CAMPO_PLANTILLA.format(expr='email')} gin_trgm_ops)")
     conn.execute(f"CREATE INDEX IF NOT EXISTS idx_clientes_cuit_trgm ON clientes USING gin ({CAMPO_PLANTILLA.format(expr='cuit')} gin_trgm_ops)")
+    # Verificación de identidad Didit (DNI + selfie → RENAPER). Esquema en dos
+    # capas (MEMORIA 2026-06-03): espejo idempotente de la migración v6w7x8y9z0a1.
+    # — dni: número de documento validado (sin foto — Didit no la entrega).
+    # — cuil: CUIL personal confirmado por RENAPER (puede diferir del `cuit` de
+    #   facturación, que puede ser la razón social de una empresa).
+    # — dni_validado_at: timestamp de la aprobación (NULL = no verificado todavía).
+    # — didit_session_id: ID de la sesión de Didit para auditoría y trazabilidad.
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cuil TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_validado_at TIMESTAMP")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS didit_session_id TEXT")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
