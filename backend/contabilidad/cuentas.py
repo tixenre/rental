@@ -21,6 +21,11 @@ COBRADORES = ("Rambla", "Tincho", "Pablo")
 # Socios humanos (subconjunto): los únicos válidos para una caja de tipo 'socio'.
 SOCIOS_HUMANOS = ("Pablo", "Tincho")
 
+# Monedas soportadas. Una caja es en pesos (default) o en dólares; los saldos NO
+# se mezclan entre monedas y las transferencias deben ser de la misma moneda.
+MONEDAS = ("ARS", "USD")
+
+# `moneda` se fija al crear (cambiarla con movimientos cargados rompería el saldo).
 _CAMPOS_EDITABLES = ("nombre", "saldo_inicial", "fecha_apertura", "orden", "activa")
 
 
@@ -60,7 +65,11 @@ def validar_cuenta(data: dict) -> None:
     if si is None:
         si = 0
     if isinstance(si, bool) or not isinstance(si, int):
-        raise ValueError("El saldo inicial debe ser un número entero (pesos, sin centavos).")
+        raise ValueError("El saldo inicial debe ser un número entero (sin centavos).")
+
+    moneda = data.get("moneda")
+    if moneda is not None and moneda not in MONEDAS:
+        raise ValueError(f"La moneda debe ser una de {', '.join(MONEDAS)}.")
 
 
 def listar_cuentas(conn, incluir_inactivas: bool = False) -> list[dict]:
@@ -68,7 +77,7 @@ def listar_cuentas(conn, incluir_inactivas: bool = False) -> list[dict]:
     from database import row_to_dict
 
     sql = """
-        SELECT id, nombre, tipo, socio, saldo_inicial, fecha_apertura, activa, orden,
+        SELECT id, nombre, tipo, socio, moneda, saldo_inicial, fecha_apertura, activa, orden,
                created_by, created_at, updated_by, updated_at
         FROM cuentas
     """
@@ -83,7 +92,7 @@ def obtener_cuenta(conn, cuenta_id: int) -> dict | None:
     from database import row_to_dict
 
     row = conn.execute(
-        """SELECT id, nombre, tipo, socio, saldo_inicial, fecha_apertura, activa, orden,
+        """SELECT id, nombre, tipo, socio, moneda, saldo_inicial, fecha_apertura, activa, orden,
                   created_by, created_at, updated_by, updated_at
            FROM cuentas WHERE id = ?""",
         (cuenta_id,),
@@ -91,22 +100,24 @@ def obtener_cuenta(conn, cuenta_id: int) -> dict | None:
     return row_to_dict(row) if row else None
 
 
-def crear_cuenta(conn, *, nombre, tipo, socio=None, saldo_inicial=0,
+def crear_cuenta(conn, *, nombre, tipo, socio=None, moneda="ARS", saldo_inicial=0,
                  fecha_apertura=None, orden=0, por=None) -> dict:
     """Crea una cuenta (valida primero). Devuelve la cuenta creada.
 
     `fecha_apertura` None → default de la tabla (clean start 2026-06-01).
+    `moneda` ARS (default) o USD.
     """
-    data = {"nombre": (nombre or "").strip(), "tipo": tipo,
+    moneda = (moneda or "ARS")
+    data = {"nombre": (nombre or "").strip(), "tipo": tipo, "moneda": moneda,
             "socio": (socio or None), "saldo_inicial": int(saldo_inicial or 0)}
     validar_cuenta(data)
     socio_val = data["socio"] if tipo == "socio" else None
 
     cur = conn.execute(
-        """INSERT INTO cuentas (nombre, tipo, socio, saldo_inicial, fecha_apertura, orden, created_by, updated_by)
-           VALUES (?, ?, ?, ?, COALESCE(?::date, '2026-06-01'::date), ?, ?, ?)
+        """INSERT INTO cuentas (nombre, tipo, socio, moneda, saldo_inicial, fecha_apertura, orden, created_by, updated_by)
+           VALUES (?, ?, ?, ?, ?, COALESCE(?::date, '2026-06-01'::date), ?, ?, ?)
            RETURNING id""",
-        (data["nombre"], tipo, socio_val, data["saldo_inicial"], fecha_apertura,
+        (data["nombre"], tipo, socio_val, moneda, data["saldo_inicial"], fecha_apertura,
          int(orden or 0), por, por),
     )
     new_id = cur.fetchone()[0]

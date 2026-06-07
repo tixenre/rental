@@ -88,8 +88,10 @@ def calcular_saldos(cuentas: list[dict], movimientos: list[dict], ingresos: dict
     for c in cuentas:
         cid = c["id"]
         socio = c.get("socio")
+        moneda = c.get("moneda") or "ARS"
         saldo_inicial = int(c.get("saldo_inicial") or 0)
-        ingresos_alquiler = int(ingresos.get(socio, 0)) if socio else 0
+        # Los cobros de clientes son en ARS → solo alimentan cajas en pesos.
+        ingresos_alquiler = int(ingresos.get(socio, 0)) if (socio and moneda == "ARS") else 0
         entradas = int(entradas_por.get(cid, 0))
         egresos = int(egresos_por.get(cid, 0))
         saldo = saldo_inicial + ingresos_alquiler + entradas - egresos
@@ -98,6 +100,7 @@ def calcular_saldos(cuentas: list[dict], movimientos: list[dict], ingresos: dict
             "nombre": c["nombre"],
             "tipo": c["tipo"],
             "socio": socio,
+            "moneda": moneda,
             "saldo_inicial": saldo_inicial,
             "ingresos_alquiler": ingresos_alquiler,
             "entradas": entradas,
@@ -107,16 +110,26 @@ def calcular_saldos(cuentas: list[dict], movimientos: list[dict], ingresos: dict
     return filas
 
 
+def _totales_por_moneda(filas: list[dict]) -> dict[str, int]:
+    """Suma de saldos agrupada por moneda (no se mezclan ARS y USD). PURA."""
+    tot: dict[str, int] = defaultdict(int)
+    for f in filas:
+        tot[f.get("moneda") or "ARS"] += int(f["saldo"])
+    return dict(tot)
+
+
 def saldos(conn, as_of: str | None = None) -> dict:
-    """Saldos de todas las cuentas activas + total disponible. Compone la
+    """Saldos de todas las cuentas activas + totales por moneda. Compone la
     derivación de ingresos con el libro de movimientos."""
     cuentas = _cuentas_activas(conn)
     movs = movimientos_planos(conn)
     ingresos = ingresos_derivados(conn)
     filas = calcular_saldos(cuentas, movs, ingresos)
+    totales = _totales_por_moneda(filas)
     return {
         "cuentas": filas,
-        "total_disponible": sum(f["saldo"] for f in filas),
+        "totales": totales,
+        "total_disponible": totales.get("ARS", 0),  # ARS (compat); USD va en `totales`
         "as_of": as_of or date.today().isoformat(),
     }
 

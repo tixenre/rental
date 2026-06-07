@@ -102,6 +102,7 @@ def listar_movimientos(conn, *, tipo=None, cuenta_id=None, categoria_id=None,
                m.anulado, m.anulado_motivo, m.created_by, m.created_at,
                co.nombre AS cuenta_origen_nombre,
                cd.nombre AS cuenta_destino_nombre,
+               COALESCE(co.moneda, cd.moneda) AS moneda,
                gc.nombre AS categoria_nombre
         FROM movimientos m
         LEFT JOIN cuentas co ON co.id = m.cuenta_origen_id
@@ -160,6 +161,16 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
     for cid in (cuenta_origen_id, cuenta_destino_id):
         if cid and cid not in validas:
             raise ValueError("La cuenta indicada no existe o está inactiva.")
+    # Una transferencia/ajuste entre dos cuentas debe ser de la misma moneda
+    # (no hay conversión automática; los saldos no se mezclan).
+    if cuenta_origen_id and cuenta_destino_id:
+        rows = conn.execute(
+            "SELECT id, moneda FROM cuentas WHERE id IN (?, ?)",
+            (cuenta_origen_id, cuenta_destino_id),
+        ).fetchall()
+        mon = {r["id"]: r["moneda"] for r in rows}
+        if mon.get(cuenta_origen_id) != mon.get(cuenta_destino_id):
+            raise ValueError("No se puede transferir entre cuentas de distinta moneda.")
     if categoria_id:
         ok = conn.execute(
             "SELECT 1 FROM gasto_categorias WHERE id = ? AND activa = TRUE", (categoria_id,)

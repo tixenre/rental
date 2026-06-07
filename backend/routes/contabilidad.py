@@ -40,6 +40,7 @@ class CuentaCreate(BaseModel):
     nombre: str
     tipo: str
     socio: str | None = None
+    moneda: str = "ARS"
     saldo_inicial: int = 0
     fecha_apertura: str | None = None
     orden: int = 0
@@ -94,6 +95,7 @@ def post_cuenta(request: Request, body: CuentaCreate):
                 nombre=body.nombre,
                 tipo=body.tipo,
                 socio=body.socio,
+                moneda=body.moneda,
                 saldo_inicial=body.saldo_inicial,
                 fecha_apertura=body.fecha_apertura,
                 orden=body.orden,

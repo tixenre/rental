@@ -289,6 +289,27 @@ def test_reconciliar_corre(conn):
     assert "saldos_negativos" in r and "pagos_sin_socio" in r
 
 
+def test_caja_usd_existe_y_totales_por_moneda(conn):
+    from contabilidad.saldos import saldos
+
+    s = saldos(conn)
+    by = {c["nombre"]: c for c in s["cuentas"]}
+    assert by["Dólares"]["moneda"] == "USD"  # caja en dólares seedeada
+    assert "USD" in s["totales"] and "ARS" in s["totales"]
+
+
+def test_transferencia_entre_monedas_distintas_falla(conn):
+    from contabilidad.movimientos import crear_movimiento
+
+    with pytest.raises(ValueError):
+        crear_movimiento(
+            conn, tipo="transferencia", monto=1000,
+            cuenta_origen_id=_cuenta_id(conn, "Efectivo"),   # ARS
+            cuenta_destino_id=_cuenta_id(conn, "Dólares"),   # USD
+            por="test",
+        )
+
+
 def test_crear_y_desactivar_cuenta_vacia(conn):
     from contabilidad.cuentas import crear_cuenta, desactivar_cuenta
 
