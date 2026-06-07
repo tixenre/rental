@@ -232,6 +232,9 @@ def editar_movimiento(conn, mov_id: int, *, campos: dict, por=None) -> dict:
         elif k == "monto":
             sets.append("monto = ?")
             campos[k] = int(campos[k] or 0)
+        elif k == "beneficiario":
+            sets.append("beneficiario = ?")
+            campos[k] = (campos[k] or "").strip() or None  # mismo saneo que al crear
         else:
             sets.append(f"{k} = ?")
         params.append(campos[k])
