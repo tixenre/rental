@@ -475,6 +475,8 @@ def _footer():
 def _cliente_block(pedido):
     out = ['<div class="meta-block"><div class="meta-label">Cliente</div>'
            f'<div class="meta-val">{html.escape(pedido.get("cliente_nombre") or "—")}</div>']
+    if pedido.get("cliente_dni"):
+        out.append(f'<div class="meta-sub mono">DNI {html.escape(pedido["cliente_dni"])}</div>')
     if pedido.get("cliente_cuit"):
         out.append(f'<div class="meta-sub mono">CUIT {html.escape(pedido["cliente_cuit"])}</div>')
     if pedido.get("cliente_email"):

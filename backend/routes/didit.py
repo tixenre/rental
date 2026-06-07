@@ -1,34 +1,35 @@
 """routes/didit.py — Verificación de identidad con Didit (DNI + selfie → RENAPER).
 
-Expone dos endpoints:
+Expone tres endpoints:
 
   POST /api/admin/verificacion/sesion/{cliente_id}
-      Admin crea una sesión de Didit para un cliente dado y guarda el session_id.
-      Devuelve la URL a la que hay que redirigir al cliente para el flujo de
-      verificación (puede enviarse por mail o copiarse en el portal).
-      Requiere sesión admin. Si DIDIT_API_KEY no está seteada devuelve 503.
+      Admin crea una sesión de Didit para un cliente dado. Requiere sesión admin.
+      Si DIDIT_API_KEY no está seteada devuelve 503.
+
+  POST /api/cliente/verificacion/sesion
+      El cliente autenticado crea su propia sesión. Requiere sesión cliente.
+      Devuelve la URL a la que hay que redirigir al cliente para el flujo Didit.
 
   POST /api/webhooks/didit
       Webhook público — Didit llama aquí al finalizar una verificación.
-      No requiere sesión de usuario; la autenticación es la firma HMAC-SHA256
-      (X-Signature-V2) + freshness del X-Timestamp.
-      En estado "Approved": guarda dni, cuil, dni_validado_at en clientes.
+      Autenticado solo por firma HMAC-SHA256 (X-Signature-V2) + freshness (X-Timestamp).
+      En estado "Approved": guarda dni, cuil, nombre/apellido/fecha-nacimiento/
+      dirección de RENAPER y marca dni_validado_at en clientes.
 
 Datos personales (Ley 25.326):
-  - Solo se guardan el DNI número, CUIL y timestamp de validación.
+  - Solo se persiste texto plano (nombre, DNI, CUIL, fecha nacimiento, dirección).
   - La foto del DNI nunca llega a nuestra base (Didit la procesa internamente).
-  - Accesos admin-only a los campos sensibles.
   - No se loguea el body del webhook (puede contener datos RENAPER).
 """
 
 import logging
-from datetime import timezone, datetime
 
 from fastapi import APIRouter, HTTPException, Request
 
 from admin_guard import require_admin
 from config import settings
 from database import get_db, now_ar
+from routes.cliente_portal import require_cliente
 from services.didit import (
     DiditNotConfiguredError,
     DiditSignatureError,
@@ -86,6 +87,40 @@ def iniciar_verificacion(cliente_id: int, request: Request):
     return {"session_id": sesion.session_id, "url": sesion.url}
 
 
+# ── Cliente: crear sesión propia ─────────────────────────────────────────────
+
+@router.post("/cliente/verificacion/sesion", status_code=201)
+def cliente_iniciar_verificacion(request: Request):
+    """El cliente autenticado crea su propia sesión de verificación Didit.
+
+    Guarda el didit_session_id para correlacionar el webhook con el cliente.
+    Devuelve la URL a la que hay que redirigir al cliente para el flujo Didit.
+
+    503 si DIDIT_API_KEY no está configurada.
+    """
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+
+    callback_url = f"{settings.SITE_URL}{_WEBHOOK_PATH}"
+    try:
+        sesion = create_session(
+            callback_url=callback_url,
+            vendor_data=str(cliente_id),
+        )
+    except DiditNotConfiguredError:
+        raise HTTPException(503, "Verificación de identidad no habilitada")
+
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE clientes SET didit_session_id=?, updated_at=? WHERE id=?",
+            (sesion.session_id, now_ar(), cliente_id),
+        )
+        conn.commit()
+
+    logger.info("didit: cliente %s inició verificación session_id=%s", cliente_id, sesion.session_id)
+    return {"session_id": sesion.session_id, "url": sesion.url}
+
+
 # ── Webhook público ──────────────────────────────────────────────────────────
 
 @router.post("/webhooks/didit", status_code=200)
@@ -127,11 +162,19 @@ async def webhook_didit(request: Request):
         # Otros estados (Processing, Declined, etc.) se ignoran por ahora.
         return {"ok": True}
 
-    # Extraer datos validados por RENAPER.
+    # Extraer datos validados por RENAPER. No se logea el body completo (Ley 25.326).
     kyc = payload.get("kyc") or {}
     doc = kyc.get("document") or {}
     dni = (doc.get("document_number") or "").strip() or None
     cuil = (doc.get("tax_id") or doc.get("cuil") or "").strip() or None
+    nombre_renaper = (doc.get("first_name") or "").strip() or None
+    apellido_renaper = (doc.get("last_name") or "").strip() or None
+    fecha_nacimiento_renaper = (doc.get("date_of_birth") or "").strip() or None
+    addr_raw = doc.get("full_address") or doc.get("address") or {}
+    if isinstance(addr_raw, dict):
+        direccion_renaper = (addr_raw.get("formatted_address") or "").strip() or None
+    else:
+        direccion_renaper = (str(addr_raw)).strip() or None
 
     # vendor_data es el cliente_id que pasamos al crear la sesión.
     vendor_data = payload.get("vendor_data", "")
@@ -146,6 +189,10 @@ async def webhook_didit(request: Request):
         session_id=session_id,
         dni=dni,
         cuil=cuil,
+        nombre_renaper=nombre_renaper,
+        apellido_renaper=apellido_renaper,
+        fecha_nacimiento_renaper=fecha_nacimiento_renaper,
+        direccion_renaper=direccion_renaper,
     )
     return {"ok": True}
 
@@ -156,8 +203,12 @@ def _guardar_verificacion(
     session_id: str,
     dni: str | None,
     cuil: str | None,
+    nombre_renaper: str | None = None,
+    apellido_renaper: str | None = None,
+    fecha_nacimiento_renaper: str | None = None,
+    direccion_renaper: str | None = None,
 ) -> None:
-    """Persiste los datos verificados en clientes. Idempotente."""
+    """Persiste los datos verificados por RENAPER en clientes. Idempotente."""
     ahora = now_ar()
     with get_db() as conn:
         conn.execute(
@@ -166,9 +217,15 @@ def _guardar_verificacion(
                    cuil=COALESCE(?, cuil),
                    dni_validado_at=?,
                    didit_session_id=?,
+                   nombre_renaper=COALESCE(?, nombre_renaper),
+                   apellido_renaper=COALESCE(?, apellido_renaper),
+                   fecha_nacimiento_renaper=COALESCE(?, fecha_nacimiento_renaper),
+                   direccion_renaper=COALESCE(?, direccion_renaper),
                    updated_at=?
                WHERE id=?""",
-            (dni, cuil, ahora, session_id, ahora, cliente_id),
+            (dni, cuil, ahora, session_id,
+             nombre_renaper, apellido_renaper, fecha_nacimiento_renaper, direccion_renaper,
+             ahora, cliente_id),
         )
         conn.commit()
     logger.info(

@@ -47,6 +47,9 @@ import {
   Bell,
   User,
   Package,
+  ShieldCheck,
+  ShieldAlert,
+  BadgeCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -101,6 +104,15 @@ type Perfil = {
   descuento?: number;
   direccion_maps_url?: string | null;
   created_at?: string | null;
+  // Identidad / RENAPER
+  dni?: string | null;
+  cuil?: string | null;
+  dni_validado_at?: string | null;
+  nombre_renaper?: string | null;
+  apellido_renaper?: string | null;
+  fecha_nacimiento_renaper?: string | null;
+  direccion_renaper?: string | null;
+  apodo?: string | null;
 };
 
 type Item = {
@@ -150,7 +162,7 @@ type Pedido = {
 };
 
 // ── Nuevo: tipo de tab del portal ─────────────────────────────────────────────
-type PortalTab = "pedidos" | "notificaciones" | "perfil";
+type PortalTab = "pedidos" | "notificaciones" | "perfil" | "identidad";
 
 const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "retirado"]);
 const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
@@ -469,6 +481,12 @@ export default function ClientePortal() {
               active={activeTab === "perfil"}
               onClick={() => setActiveTab("perfil")}
             />
+            <SidebarNavItem
+              icon={<ShieldCheck className="h-4 w-4" />}
+              label="Identidad"
+              active={activeTab === "identidad"}
+              onClick={() => setActiveTab("identidad")}
+            />
           </div>
 
           {/* Logout al fondo */}
@@ -489,6 +507,26 @@ export default function ClientePortal() {
           {/* TAB: PEDIDOS */}
           {activeTab === "pedidos" && (
             <div className="px-5 lg:px-10 pt-8">
+              {/* Banner: identidad no verificada */}
+              {perfil && !perfil.dni_validado_at && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("identidad")}
+                  className="w-full mb-5 flex items-center gap-3 rounded-xl border border-amber bg-amber-soft px-4 py-3 text-left transition hover:bg-amber/20"
+                >
+                  <ShieldAlert className="h-5 w-5 text-amber shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-sans text-sm font-semibold text-ink">
+                      Verificá tu identidad para hacer pedidos
+                    </div>
+                    <div className="font-sans text-xs text-muted-foreground">
+                      Necesitás tu DNI + selfie. Tarda menos de 2 minutos.
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </button>
+              )}
+
               {/* Stats */}
               {pedidos.length > 0 && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-9">
@@ -656,6 +694,14 @@ export default function ClientePortal() {
               onLogout={handleLogout}
             />
           )}
+
+          {/* TAB: IDENTIDAD */}
+          {activeTab === "identidad" && perfil && (
+            <IdentidadSection
+              perfil={perfil}
+              onPerfilChange={setPerfil}
+            />
+          )}
         </main>
       </div>
 
@@ -665,7 +711,7 @@ export default function ClientePortal() {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="Navegación del portal"
       >
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           <BottomNavItem
             icon={<Package className="h-5 w-5" />}
             label="Pedidos"
@@ -674,7 +720,7 @@ export default function ClientePortal() {
           />
           <BottomNavItem
             icon={<Bell className="h-5 w-5" />}
-            label="Notificaciones"
+            label="Alertas"
             active={activeTab === "notificaciones"}
             onClick={() => setActiveTab("notificaciones")}
           />
@@ -683,6 +729,12 @@ export default function ClientePortal() {
             label="Perfil"
             active={activeTab === "perfil"}
             onClick={() => setActiveTab("perfil")}
+          />
+          <BottomNavItem
+            icon={<ShieldCheck className="h-5 w-5" />}
+            label="Identidad"
+            active={activeTab === "identidad"}
+            onClick={() => setActiveTab("identidad")}
           />
         </div>
       </nav>
@@ -791,6 +843,208 @@ function NotificacionesSection() {
           Cuando haya novedades sobre tus pedidos o documentos aparecerán acá.
         </div>
         {/* TODO: conectar a /api/cliente/notificaciones cuando el endpoint esté disponible */}
+      </div>
+    </div>
+  );
+}
+
+// ── Tab: Identidad ───────────────────────────────────────────────────────────
+
+function IdentidadSection({
+  perfil,
+  onPerfilChange,
+}: {
+  perfil: Perfil;
+  onPerfilChange: (p: Perfil) => void;
+}) {
+  const verificado = Boolean(perfil.dni_validado_at);
+  const [iniciando, setIniciando] = useState(false);
+  const [apodo, setApodo] = useState(perfil.apodo ?? "");
+  const [guardandoApodo, setGuardandoApodo] = useState(false);
+
+  async function iniciarVerificacion() {
+    setIniciando(true);
+    try {
+      const r = await authedFetch("/api/cliente/verificacion/sesion", { method: "POST" });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        toast.error(err.detail ?? "No se pudo iniciar la verificación");
+        return;
+      }
+      const { url } = await r.json();
+      window.location.href = url;
+    } catch {
+      toast.error("Error de red al iniciar la verificación");
+    } finally {
+      setIniciando(false);
+    }
+  }
+
+  async function guardarApodo() {
+    setGuardandoApodo(true);
+    try {
+      const r = await authedFetch("/api/cliente/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apodo: apodo.trim() || null }),
+      });
+      if (!r.ok) {
+        toast.error("No se pudo guardar el apodo");
+        return;
+      }
+      const updated = await r.json();
+      onPerfilChange({ ...perfil, ...updated });
+      toast.success("Apodo guardado");
+    } catch {
+      toast.error("Error de red");
+    } finally {
+      setGuardandoApodo(false);
+    }
+  }
+
+  return (
+    <div className="px-5 lg:px-10 pt-8 max-w-xl">
+      <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-6">
+        identidad.
+      </h2>
+
+      {/* Estado de verificación */}
+      <div
+        className={cn(
+          "flex items-center gap-3 rounded-xl border px-4 py-4 mb-6",
+          verificado
+            ? "border-green-200 bg-green-50"
+            : "border-amber bg-amber-soft",
+        )}
+      >
+        {verificado ? (
+          <BadgeCheck className="h-7 w-7 text-green-600 shrink-0" />
+        ) : (
+          <ShieldAlert className="h-7 w-7 text-amber shrink-0" />
+        )}
+        <div>
+          <div className="font-sans font-semibold text-[15px] text-ink">
+            {verificado ? "Identidad verificada" : "Identidad sin verificar"}
+          </div>
+          <div className="font-sans text-xs text-muted-foreground mt-0.5">
+            {verificado
+              ? "Tus datos fueron confirmados por RENAPER vía Didit."
+              : "Necesitás verificar tu DNI + selfie para hacer pedidos."}
+          </div>
+        </div>
+      </div>
+
+      {/* Datos RENAPER (solo si verificado) */}
+      {verificado && (
+        <div className="rounded-lg border hairline bg-card divide-y divide-hairline mb-6">
+          {(perfil.nombre_renaper || perfil.apellido_renaper) && (
+            <div className="flex items-start gap-3 px-4 py-3">
+              <User className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+              <div>
+                <div className="font-sans text-sm text-ink">
+                  {[perfil.nombre_renaper, perfil.apellido_renaper].filter(Boolean).join(" ")}
+                </div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                  Nombre legal (RENAPER)
+                </div>
+              </div>
+              <Lock className="h-3 w-3 text-muted-foreground shrink-0 ml-auto mt-1" />
+            </div>
+          )}
+          {perfil.dni && (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1">
+                <span className="font-sans text-sm text-ink">DNI {perfil.dni}</span>
+              </div>
+              <Lock className="h-3 w-3 text-muted-foreground shrink-0" />
+            </div>
+          )}
+          {perfil.cuil && (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Receipt className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1">
+                <span className="font-sans text-sm text-ink">CUIL {perfil.cuil}</span>
+              </div>
+              <Lock className="h-3 w-3 text-muted-foreground shrink-0" />
+            </div>
+          )}
+          {perfil.fecha_nacimiento_renaper && (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1">
+                <span className="font-sans text-sm text-ink">
+                  {perfil.fecha_nacimiento_renaper}
+                </span>
+                <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                  Fecha de nacimiento
+                </div>
+              </div>
+              <Lock className="h-3 w-3 text-muted-foreground shrink-0" />
+            </div>
+          )}
+          {perfil.direccion_renaper && (
+            <div className="flex items-start gap-3 px-4 py-3">
+              <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="font-sans text-sm text-ink">{perfil.direccion_renaper}</span>
+                <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                  Domicilio (RENAPER)
+                </div>
+              </div>
+              <Lock className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Botón de verificación (solo si no verificado) */}
+      {!verificado && (
+        <div className="mb-6">
+          <p className="font-sans text-[13px] text-muted-foreground mb-4 leading-[1.5]">
+            La verificación usa tu DNI y una selfie. Tarda menos de 2 minutos y la hace
+            Didit, que consulta la base de RENAPER. Solo guardamos tu nombre, DNI y dirección
+            oficial — nunca la foto.
+          </p>
+          <button
+            type="button"
+            onClick={iniciarVerificacion}
+            disabled={iniciando}
+            className="w-full flex items-center justify-center gap-2 rounded-[10px] bg-ink h-[46px] font-sans text-[15px] font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-50"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            {iniciando ? "Iniciando…" : "Verificar mi identidad"}
+          </button>
+        </div>
+      )}
+
+      {/* Apodo (siempre editable) */}
+      <div className="mb-2">
+        <label className="block font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
+          Apodo (opcional)
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={apodo}
+            onChange={(e) => setApodo(e.target.value)}
+            placeholder="Ej: Nacho, Sofi, Toto…"
+            maxLength={40}
+            className="flex-1 rounded-lg border hairline bg-surface px-3.5 py-2.5 font-sans text-sm text-ink outline-none transition placeholder:text-muted-foreground hover:border-ink/30 focus:border-ink focus:bg-card"
+          />
+          <button
+            type="button"
+            onClick={guardarApodo}
+            disabled={guardandoApodo || apodo.trim() === (perfil.apodo ?? "")}
+            className="rounded-lg bg-ink px-4 font-sans text-sm font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-40"
+          >
+            {guardandoApodo ? "…" : "Guardar"}
+          </button>
+        </div>
+        <p className="mt-1.5 font-sans text-xs text-muted-foreground">
+          Lo usamos para saludarte en los mails (ej. "Hola Nacho"). Tu nombre oficial sigue
+          siendo el del DNI.
+        </p>
       </div>
     </div>
   );

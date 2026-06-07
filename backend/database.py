@@ -428,6 +428,15 @@ def init_db():
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cuil TEXT")
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_validado_at TIMESTAMP")
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS didit_session_id TEXT")
+    # Datos completos de RENAPER (extraídos por Didit del documento + base RENAPER).
+    # Solo se persiste texto — no hay imagen ni biométrico (Ley 25.326).
+    # Todos los campos son NULL hasta completar la verificación.
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nombre_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apellido_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_nacimiento_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion_renaper TEXT")
+    # apodo: alias opcional para saludos informales en mails (siempre editable).
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apodo TEXT")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
