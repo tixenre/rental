@@ -80,7 +80,14 @@ function adaptar(r: CotizarResp): Cotizacion {
   };
 }
 
-export type CotizarItemInput = { equipoId: number; cantidad: number };
+export type CotizarItemInput = {
+  /** null = línea personalizada (#805): manda su precio y modo (no se busca en `equipos`). */
+  equipoId: number | null;
+  cantidad: number;
+  /** Línea personalizada: precio libre y modo de cobro. */
+  precioJornada?: number;
+  cobroModo?: "jornada" | "fijo";
+};
 
 /**
  * Cotiza el carrito contra el backend. Refetch automático al cambiar ítems o
@@ -103,7 +110,15 @@ export function useCotizacion(args: {
   const body = {
     items: items
       .filter((i) => i.cantidad > 0)
-      .map((i) => ({ equipo_id: i.equipoId, cantidad: i.cantidad })),
+      .map((i) => ({
+        equipo_id: i.equipoId,
+        cantidad: i.cantidad,
+        // Solo relevantes para líneas personalizadas (equipoId null); el backend
+        // ignora estos campos en ítems de catálogo (toma el precio de la DB).
+        ...(i.equipoId == null
+          ? { precio_jornada: i.precioJornada ?? 0, cobro_modo: i.cobroModo ?? "jornada" }
+          : {}),
+      })),
     fecha_desde: fechaDesde ?? null,
     fecha_hasta: fechaHasta ?? null,
     cliente_id: clienteId ?? null,
