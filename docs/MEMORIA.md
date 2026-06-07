@@ -558,6 +558,15 @@
   - **Devengado vs percibido, a propósito:** la **ganancia/P&L** se mide por **ingreso devengado**
     (= total del reporte de liquidación del mes); el **saldo de caja** se mueve por **plata
     entrante** (incluidas señas). Pueden no coincidir mes a mes — no es un bug.
+  - **Vista unificada de Movimientos (2026-06-07):** la pantalla Movimientos muestra, junto a los
+    movimientos manuales, los **cobros de pedidos agregados por mes** (una línea read-only "Cobro
+    alquileres &lt;mes&gt;", derivada de `alquiler_pagos`, NUNCA una fila en `movimientos` → cero doble
+    conteo). El monto lleva **guía debe/haber**: entra (haber) en `text-verde`, sale (debe) en
+    `text-destructive`, interno (transferencia/ajuste 2 cajas) neutro — el verde "éxito" se usa como
+    semáforo de plata **a propósito** (decisión del dueño), aunque el DS lo reserve a status/charts.
+    Cada movimiento puede llevar un **`beneficiario`** (a quién/para qué, ej. "Jimena"): etiqueta de
+    texto reutilizable (autocompletado de los usados + filtrable para ver su historial), **NO un
+    sistema de empleados**. "Pagos" se renombró a "Cobros de pedidos".
   - **Rendición** atada al MISMO universo de pedidos saldados que el reporte (reusa `SALDADO_CTE`)
     → cierra en cero; un saldado se registra como **transferencia `es_rendicion`** en el mismo
     libro (no un sistema paralelo). **Los tres cobran** (Pablo/Tincho/Rambla; **Rambla es el
