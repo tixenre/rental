@@ -30,11 +30,7 @@ class FakeRow(dict):
 
 
 class FakeConn:
-    """Conn fake que devuelve precios desde un mapa {equipo_id: precio}.
-
-    Simula un cliente verificado (dni_validado_at no-NULL) para que el gate de
-    verificación en cliente_crear_pedido no bloquee los tests de seguridad de precios.
-    """
+    """Conn fake que devuelve precios desde un mapa {equipo_id: precio}."""
     def __init__(self, precios_catalogo: dict[int, int]):
         self._precios = precios_catalogo
         self._pending_eq_id: int | None = None
@@ -48,9 +44,9 @@ class FakeConn:
 
     def fetchone(self):
         sql = self._pending_query
-        # Gate de verificación de identidad: devuelve cliente verificado.
-        if "dni_validado_at" in sql and "FROM clientes" in sql:
-            return FakeRow(dni_validado_at="2026-01-01T00:00:00")
+        # Verificación de existencia del cliente (SELECT id FROM clientes).
+        if "FROM clientes" in sql and "WHERE id" in sql:
+            return FakeRow(id=42)
         eq_id = self._pending_eq_id
         self._pending_eq_id = None
         if eq_id is None or eq_id not in self._precios:

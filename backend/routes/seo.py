@@ -82,7 +82,7 @@ def sitemap():
                 SELECT e.id, {MARCA_SUBQUERY}, e.nombre,
                        COALESCE(e.updated_at, e.created_at) AS lastmod
                 FROM equipos e
-                WHERE COALESCE(e.visible_catalogo, true) = true
+                WHERE COALESCE(e.visible_catalogo, 1) != 0
                 ORDER BY e.id
             """).fetchall()
             # Categorías visibles. Filtramos las que no tienen equipos para no
@@ -95,7 +95,7 @@ def sitemap():
                     SELECT 1 FROM equipo_categorias ec
                     JOIN equipos e ON e.id = ec.equipo_id
                     WHERE ec.categoria_id = c.id
-                      AND COALESCE(e.visible_catalogo, true) = true
+                      AND COALESCE(e.visible_catalogo, 1) != 0
                   )
                 ORDER BY c.nombre
             """).fetchall()
