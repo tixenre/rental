@@ -49,6 +49,7 @@ from routes.alquileres       import router as alquileres_router
 from routes.clientes         import router as clientes_router
 from routes.estadisticas     import router as estadisticas_router
 from routes.reportes         import router as reportes_router
+from routes.contabilidad     import router as contabilidad_router
 from routes.busquedas        import router as busquedas_router
 from routes.dashboard        import router as dashboard_router
 from routes.auth             import router as auth_router
@@ -146,6 +147,7 @@ app.include_router(alquileres_router,     prefix="/api")
 app.include_router(clientes_router,       prefix="/api")
 app.include_router(estadisticas_router,   prefix="/api")
 app.include_router(reportes_router,       prefix="/api")
+app.include_router(contabilidad_router,   prefix="/api")
 app.include_router(busquedas_router,      prefix="/api")
 app.include_router(dashboard_router,      prefix="/api")
 app.include_router(settings_router,       prefix="/api")
