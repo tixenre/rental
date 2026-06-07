@@ -80,6 +80,9 @@ def iniciar_verificacion(cliente_id: int, request: Request):
         )
     except DiditNotConfiguredError:
         raise HTTPException(503, "Verificación de identidad no habilitada (DIDIT_API_KEY)")
+    except Exception as exc:
+        logger.error("didit: error al crear sesión admin cliente_id=%s — %s", cliente_id, exc)
+        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
 
     with get_db() as conn:
         conn.execute(
@@ -114,6 +117,9 @@ def cliente_iniciar_verificacion(request: Request):
         )
     except DiditNotConfiguredError:
         raise HTTPException(503, "Verificación de identidad no habilitada")
+    except Exception as exc:
+        logger.error("didit: error al crear sesión cliente_id=%s — %s", cliente_id, exc)
+        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
 
     with get_db() as conn:
         conn.execute(
