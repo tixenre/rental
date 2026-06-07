@@ -602,6 +602,49 @@ export interface PagosLogResp {
   count: number;
 }
 
+// Contabilidad (#809) — cuentas/cajas con saldo. Los ingresos por alquiler ya
+// vienen DERIVADOS de alquiler_pagos (no se cargan a mano).
+export const TIPOS_CUENTA = ["caja", "banco", "socio", "fondo"] as const;
+export type TipoCuenta = (typeof TIPOS_CUENTA)[number];
+
+export interface Cuenta {
+  id: number;
+  nombre: string;
+  tipo: TipoCuenta;
+  socio: string | null;
+  saldo_inicial: number;
+  fecha_apertura: string;
+  activa: boolean;
+  orden: number;
+}
+export interface CuentaSaldo {
+  id: number;
+  nombre: string;
+  tipo: TipoCuenta;
+  socio: string | null;
+  saldo_inicial: number;
+  ingresos_alquiler: number;
+  entradas: number;
+  egresos: number;
+  saldo: number;
+}
+export interface SaldosData {
+  cuentas: CuentaSaldo[];
+  total_disponible: number;
+  as_of: string;
+}
+export interface TableroData {
+  disponible: SaldosData;
+}
+export interface CuentaInput {
+  nombre: string;
+  tipo: TipoCuenta;
+  socio?: string | null;
+  saldo_inicial?: number;
+  fecha_apertura?: string | null;
+  orden?: number;
+}
+
 export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
   dashboardUso: (dias_sin_uso = 90) =>
@@ -1477,6 +1520,31 @@ export const adminApi = {
       `/api/admin/reportes/cierres/${mes}`,
       { method: "DELETE" },
     ),
+
+  // Contabilidad (#809) — Fase 1: cuentas/cajas con saldo + tablero. Los ingresos
+  // por alquiler salen derivados de alquiler_pagos (no se cargan a mano).
+  getTablero: () => authedJson<TableroData>("/api/admin/contabilidad/tablero"),
+  getSaldos: () => authedJson<SaldosData>("/api/admin/contabilidad/saldos"),
+  listCuentas: (incluirInactivas = false) =>
+    authedJson<{ cuentas: Cuenta[] }>(
+      `/api/admin/contabilidad/cuentas${incluirInactivas ? "?incluir_inactivas=true" : ""}`,
+    ),
+  createCuenta: (data: CuentaInput) =>
+    authedPostJson<Cuenta>("/api/admin/contabilidad/cuentas", data),
+  updateCuenta: (id: number, data: Partial<CuentaInput> & { activa?: boolean }) =>
+    authedJson<Cuenta>(`/api/admin/contabilidad/cuentas/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  deactivateCuenta: async (id: number) => {
+    const res = await authedFetch(`/api/admin/contabilidad/cuentas/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+    return res.json().catch(() => ({}));
+  },
 
   uploadOgImage: async (file: File): Promise<{ ok: true; url: string }> => {
     const fd = new FormData();
