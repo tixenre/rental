@@ -548,6 +548,13 @@
   - **La plata no se borra:** anular un movimiento es soft-delete con motivo (deja de contar para
     los saldos pero queda trazable). Auditoría `created_by/updated_by/anulado_por`.
   - **Enteros ARS** en todo el cálculo (como el resto del sistema), no `NUMERIC`.
+  - **Multi-moneda por caja (2026-06-07):** cada caja tiene `moneda` (ARS default / USD). Los saldos
+    **NO se mezclan** entre monedas (`saldos.totales` por moneda; `total_disponible` = ARS, campo de
+    compat); transferencia/ajuste exigen **misma moneda** (sin conversión automática); los cobros de
+    clientes son **ARS** y solo alimentan cajas ARS; el **P&L es en ARS** (los gastos pagados desde
+    una caja USD no suman al P&L en pesos). La **moneda es inmutable tras crear** (cambiarla
+    reinterpretaría saldos pasados — NO "arreglar" eso pensando que es un bug). Una conversión real
+    entre cajas, si hace falta, va como flujo aparte y explícito, no como edición de campo.
   - **Devengado vs percibido, a propósito:** la **ganancia/P&L** se mide por **ingreso devengado**
     (= total del reporte de liquidación del mes); el **saldo de caja** se mueve por **plata
     entrante** (incluidas señas). Pueden no coincidir mes a mes — no es un bug.

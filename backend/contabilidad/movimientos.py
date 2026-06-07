@@ -262,14 +262,17 @@ def anular_movimiento(conn, mov_id: int, *, motivo, por=None) -> dict:
 
 
 def gastos_por_categoria(conn, desde=None, hasta=None) -> list[dict]:
-    """Σ de gastos (no anulados) agrupados por categoría, en la ventana. Para el
-    tablero / P&L. Más gastado primero."""
+    """Σ de gastos en PESOS (no anulados) agrupados por categoría, en la ventana.
+    Para el tablero / P&L (que es en ARS). Filtra por la moneda de la caja de
+    origen: un gasto pagado desde una caja USD NO se suma al P&L en pesos (no se
+    mezclan monedas). Más gastado primero."""
     from database import row_to_dict
     sql = """
         SELECT gc.nombre AS categoria, COALESCE(SUM(m.monto), 0) AS monto
         FROM movimientos m
         JOIN gasto_categorias gc ON gc.id = m.categoria_id
-        WHERE m.tipo = 'gasto' AND m.anulado = FALSE
+        JOIN cuentas co ON co.id = m.cuenta_origen_id
+        WHERE m.tipo = 'gasto' AND m.anulado = FALSE AND co.moneda = 'ARS'
     """
     params: list = []
     if desde:

@@ -231,6 +231,11 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
   const cuentas: Cuenta[] = cuentasQ.data?.cuentas ?? [];
   const categorias = catsQ.data?.categorias ?? [];
 
+  // Una transferencia/ajuste no cruza monedas: el destino se limita a la moneda
+  // del origen elegido (el backend igual lo valida).
+  const monedaOrigen = cuentas.find((c) => String(c.id) === origen)?.moneda;
+  const cuentasDestino = monedaOrigen ? cuentas.filter((c) => c.moneda === monedaOrigen) : cuentas;
+
   const muestra = useMemo(
     () => ({
       origen:
@@ -328,7 +333,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
         )}
         {muestra.destino && (
           <Field label="Entra a">
-            <CuentaSelect cuentas={cuentas} value={destino} onChange={setDestino} />
+            <CuentaSelect cuentas={cuentasDestino} value={destino} onChange={setDestino} />
           </Field>
         )}
         {muestra.categoria && (
