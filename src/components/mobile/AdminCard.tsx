@@ -14,7 +14,7 @@ export function AdminCard({
     <div
       onClick={onClick}
       className={cn(
-        "w-full rounded-xl border hairline bg-surface p-4 space-y-2.5 transition",
+        "w-full rounded-xl border hairline bg-surface p-3 space-y-2 transition",
         onClick && "cursor-pointer active:bg-muted",
         className,
       )}

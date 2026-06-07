@@ -182,14 +182,14 @@ function PedidosPage() {
   return (
     <div className="flex flex-col h-[calc(100dvh-var(--admin-topbar-h,56px))] min-h-0">
       {/* Header */}
-      <div className="px-4 md:px-6 pt-5 pb-3 shrink-0">
+      <div className="px-4 md:px-6 pt-3 md:pt-5 pb-2 md:pb-3 shrink-0">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
               Operaciones · Pedidos
             </div>
-            <h1 className="font-display text-3xl text-ink">Pedidos</h1>
-            <p className="text-sm text-muted-foreground mt-1 max-w-[540px]">
+            <h1 className="font-display text-2xl md:text-3xl text-ink">Pedidos</h1>
+            <p className="hidden md:block text-sm text-muted-foreground mt-1 max-w-[540px]">
               Reservas activas y solicitudes de cambio de tus clientes.{" "}
               {pedidosQ.isLoading ? "Cargando…" : `${total} en total.`}
             </p>
@@ -205,7 +205,7 @@ function PedidosPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 border-b hairline mt-4 -mb-px">
+        <div className="flex items-center gap-1 border-b hairline mt-3 md:mt-4 -mb-px">
           <TabBtn active={tab === "todos"} onClick={() => setTab("todos")}>
             Todos
           </TabBtn>
@@ -222,14 +222,14 @@ function PedidosPage() {
         </div>
 
         {/* Smart-chips */}
-        <div className="flex flex-wrap items-center gap-1.5 mt-3">
+        <div className="flex items-center gap-1 mt-2 overflow-x-auto pb-0.5 md:flex-wrap md:gap-1.5 md:mt-3">
           {smartChips.map((c) => (
             <button
               key={c.id}
               type="button"
               onClick={() => setSmart(smart === c.id ? null : c.id)}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                 smart === c.id
                   ? "border-ink bg-surface text-ink"
                   : "border-hairline text-muted-foreground hover:text-ink hover:border-ink",
@@ -243,7 +243,7 @@ function PedidosPage() {
         </div>
 
         {/* Búsqueda + chips de estado */}
-        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-3">
+        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-2 md:mt-3">
           <div className="relative md:max-w-sm flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -254,14 +254,14 @@ function PedidosPage() {
             />
           </div>
           {tab === "todos" && (
-            <div className="flex flex-wrap items-center gap-1.5 md:ml-auto">
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 md:flex-wrap md:gap-1.5 md:ml-auto">
               {ESTADO_FILTERS.map((f) => (
                 <button
                   key={f.id}
                   type="button"
                   onClick={() => setEstadoF(f.id)}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                    "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
                     estadoF === f.id
                       ? "bg-ink text-amber border-ink"
                       : "border-hairline text-muted-foreground hover:text-ink hover:border-ink",
@@ -325,7 +325,7 @@ function PedidosPage() {
       </div>
 
       {/* Mobile: cards */}
-      <div className="md:hidden flex-1 overflow-y-auto px-4 pb-24 space-y-3 border-t hairline pt-3">
+      <div className="md:hidden flex-1 overflow-y-auto px-4 pb-24 space-y-2 border-t hairline pt-3">
         {pedidosQ.isLoading &&
           Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-28 w-full rounded-xl" />
