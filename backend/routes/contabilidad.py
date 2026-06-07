@@ -21,6 +21,7 @@ from contabilidad.saldos import saldos as _saldos
 from contabilidad.categorias import crear_categoria, listar_categorias
 from contabilidad.movimientos import (
     anular_movimiento,
+    cobros_mensuales,
     crear_movimiento,
     editar_movimiento,
     gastos_por_categoria,
@@ -215,12 +216,31 @@ def get_movimientos(
     limit: int = 500,
 ):
     require_admin(request)
+    _MANUALES = ("gasto", "transferencia", "retiro", "aporte", "ajuste")
     with get_db() as conn:
-        movs = listar_movimientos(
-            conn, tipo=tipo, cuenta_id=cuenta_id, categoria_id=categoria_id,
-            desde=desde, hasta=hasta, incluir_anulados=incluir_anulados, limit=limit,
+        # Movimientos manuales (salvo que se filtre solo cobros).
+        movs = (
+            []
+            if tipo == "cobro"
+            else listar_movimientos(
+                conn, tipo=tipo, cuenta_id=cuenta_id, categoria_id=categoria_id,
+                desde=desde, hasta=hasta, incluir_anulados=incluir_anulados, limit=limit,
+            )
         )
-    return {"movimientos": movs, "count": len(movs)}
+        # Cobros de pedidos agregados por mes (read-only) — se muestran junto a los
+        # movimientos salvo que se filtre por un tipo manual o por categoría.
+        cobros: list = []
+        if tipo in (None, "", "cobro") and not categoria_id:
+            cobrador = None
+            if cuenta_id:
+                row = conn.execute("SELECT socio FROM cuentas WHERE id = ?", (cuenta_id,)).fetchone()
+                cobrador = row["socio"] if row else None
+                # Caja sin cobrador (Efectivo/Banco/Dólares) → no recibe cobros.
+                if not cobrador:
+                    cobros = []
+                    return {"movimientos": movs, "cobros": cobros, "count": len(movs)}
+            cobros = cobros_mensuales(conn, desde=desde, hasta=hasta, cobrador=cobrador)
+    return {"movimientos": movs, "cobros": cobros, "count": len(movs)}
 
 
 @router.post("/admin/contabilidad/movimientos")
