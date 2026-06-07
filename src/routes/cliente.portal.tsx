@@ -1031,7 +1031,7 @@ function IdentidadSection({
             type="button"
             onClick={guardarApodo}
             disabled={guardandoApodo || apodo.trim() === (perfil.apodo ?? "")}
-            className="rounded-lg bg-ink px-4 font-sans text-sm font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-40"
+            className="h-11 rounded-lg bg-ink px-4 font-sans text-sm font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-40"
           >
             {guardandoApodo ? "…" : "Guardar"}
           </button>
