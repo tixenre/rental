@@ -645,6 +645,51 @@ export interface CuentaInput {
   orden?: number;
 }
 
+export const TIPOS_MOVIMIENTO = ["gasto", "transferencia", "retiro", "aporte", "ajuste"] as const;
+export type TipoMovimiento = (typeof TIPOS_MOVIMIENTO)[number];
+
+export interface GastoCategoria {
+  id: number;
+  nombre: string;
+  activa: boolean;
+  orden: number;
+}
+export interface Movimiento {
+  id: number;
+  tipo: TipoMovimiento;
+  monto: number;
+  cuenta_origen_id: number | null;
+  cuenta_destino_id: number | null;
+  categoria_id: number | null;
+  metodo: string | null;
+  fecha: string;
+  nota: string | null;
+  comprobante_url: string | null;
+  es_rendicion: boolean;
+  rendicion_mes: string | null;
+  anulado: boolean;
+  anulado_motivo: string | null;
+  created_by: string | null;
+  created_at: string;
+  cuenta_origen_nombre: string | null;
+  cuenta_destino_nombre: string | null;
+  categoria_nombre: string | null;
+}
+export interface MovimientoInput {
+  tipo: TipoMovimiento;
+  monto: number;
+  cuenta_origen_id?: number | null;
+  cuenta_destino_id?: number | null;
+  categoria_id?: number | null;
+  metodo?: string | null;
+  fecha?: string | null;
+  nota?: string | null;
+}
+export interface GastosPorCategoria {
+  por_categoria: { categoria: string; monto: number }[];
+  total: number;
+}
+
 export const adminApi = {
   dashboard: () => authedJson<DashboardData>("/api/dashboard"),
   dashboardUso: (dias_sin_uso = 90) =>
@@ -1550,6 +1595,60 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
     return res.json().catch(() => ({}));
+  },
+
+  // Contabilidad — movimientos (gasto/transferencia/retiro/aporte/ajuste) + categorías
+  listMovimientos: (params?: {
+    tipo?: string;
+    cuenta_id?: number;
+    categoria_id?: number;
+    desde?: string;
+    hasta?: string;
+    incluir_anulados?: boolean;
+  }) => {
+    const sp = new URLSearchParams();
+    if (params?.tipo) sp.set("tipo", params.tipo);
+    if (params?.cuenta_id) sp.set("cuenta_id", String(params.cuenta_id));
+    if (params?.categoria_id) sp.set("categoria_id", String(params.categoria_id));
+    if (params?.desde) sp.set("desde", params.desde);
+    if (params?.hasta) sp.set("hasta", params.hasta);
+    if (params?.incluir_anulados) sp.set("incluir_anulados", "true");
+    const qs = sp.toString();
+    return authedJson<{ movimientos: Movimiento[]; count: number }>(
+      `/api/admin/contabilidad/movimientos${qs ? `?${qs}` : ""}`,
+    );
+  },
+  createMovimiento: (data: MovimientoInput) =>
+    authedPostJson<Movimiento>("/api/admin/contabilidad/movimientos", data),
+  updateMovimiento: (id: number, data: Partial<MovimientoInput>) =>
+    authedJson<Movimiento>(`/api/admin/contabilidad/movimientos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  anularMovimiento: (id: number, motivo: string) =>
+    authedPostJson<Movimiento>(`/api/admin/contabilidad/movimientos/${id}/anular`, { motivo }),
+  uploadComprobante: async (id: number, file: File): Promise<{ comprobante_url: string }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await authedFetch(`/api/admin/contabilidad/movimientos/${id}/comprobante`, {
+      method: "POST",
+      body: fd,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.detail ?? `POST → ${res.status}`);
+    return json;
+  },
+  listGastoCategorias: () =>
+    authedJson<{ categorias: GastoCategoria[] }>("/api/admin/contabilidad/categorias"),
+  createGastoCategoria: (nombre: string) =>
+    authedPostJson<GastoCategoria>("/api/admin/contabilidad/categorias", { nombre }),
+  getGastos: (desde?: string, hasta?: string) => {
+    const sp = new URLSearchParams();
+    if (desde) sp.set("desde", desde);
+    if (hasta) sp.set("hasta", hasta);
+    const qs = sp.toString();
+    return authedJson<GastosPorCategoria>(`/api/admin/contabilidad/gastos${qs ? `?${qs}` : ""}`);
   },
 
   uploadOgImage: async (file: File): Promise<{ ok: true; url: string }> => {

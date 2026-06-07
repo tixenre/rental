@@ -157,6 +157,49 @@ def test_desactivar_falla_si_la_cuenta_tiene_saldo(conn):
         desactivar_cuenta(conn, c["id"])
 
 
+def _categoria_id(conn, nombre="Otros"):
+    row = conn.execute("SELECT id FROM gasto_categorias WHERE nombre = ?", (nombre,)).fetchone()
+    return row[0] if row else None
+
+
+def test_crear_gasto_baja_caja_y_anular_lo_restaura(conn):
+    # El engine (no SQL crudo): un gasto baja la caja; anularlo la restaura, porque
+    # los movimientos anulados no cuentan para el saldo.
+    from contabilidad.movimientos import anular_movimiento, crear_movimiento
+
+    base = _saldo(conn, "Efectivo")
+    mov = crear_movimiento(
+        conn, tipo="gasto", monto=12000, cuenta_origen_id=_cuenta_id(conn, "Efectivo"),
+        categoria_id=_categoria_id(conn), por="test",
+    )
+    assert _saldo(conn, "Efectivo") - base == -12000
+    anular_movimiento(conn, mov["id"], motivo="cargado por error", por="test")
+    assert _saldo(conn, "Efectivo") == base  # restaurado
+
+
+def test_listar_movimientos_resuelve_nombres(conn):
+    from contabilidad.movimientos import crear_movimiento, listar_movimientos
+
+    crear_movimiento(
+        conn, tipo="transferencia", monto=5000,
+        cuenta_origen_id=_cuenta_id(conn, "Caja Pablo"),
+        cuenta_destino_id=_cuenta_id(conn, "Banco"), por="test",
+    )
+    movs = listar_movimientos(conn, tipo="transferencia")
+    assert any(
+        m["cuenta_origen_nombre"] == "Caja Pablo" and m["cuenta_destino_nombre"] == "Banco"
+        for m in movs
+    )
+
+
+def test_gasto_necesita_categoria(conn):
+    from contabilidad.movimientos import crear_movimiento
+
+    with pytest.raises(ValueError):
+        crear_movimiento(conn, tipo="gasto", monto=1000,
+                         cuenta_origen_id=_cuenta_id(conn, "Efectivo"), por="test")
+
+
 def test_crear_y_desactivar_cuenta_vacia(conn):
     from contabilidad.cuentas import crear_cuenta, desactivar_cuenta
 
