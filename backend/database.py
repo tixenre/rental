@@ -1226,9 +1226,15 @@ def init_db():
             ('Caja Pablo',  'socio', 'Pablo',  2),
             ('Efectivo',    'caja',  NULL,      3),
             ('Banco',       'banco', NULL,      4),
-            ('Fondo Rambla','fondo', NULL,      5)
+            ('Fondo Rambla','fondo', 'Rambla',  5)
         ON CONFLICT (nombre) DO NOTHING
     """)
+    # Rambla también cobra (default): la caja Fondo Rambla representa al cobrador
+    # 'Rambla'. Backfill para BDs que ya tenían la caja con socio NULL (migración
+    # c3d4e5f6a7b8). Idempotente.
+    conn.execute(
+        "UPDATE cuentas SET socio = 'Rambla' WHERE nombre = 'Fondo Rambla' AND socio IS NULL"
+    )
     conn.execute("""
         CREATE TABLE IF NOT EXISTS gasto_categorias (
             id     SERIAL PRIMARY KEY,

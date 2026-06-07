@@ -12,11 +12,14 @@ puede valer uno de los socios físicos.
 
 TIPOS_CUENTA = ("caja", "banco", "socio", "fondo")
 
-# Socios físicos = los únicos `destinatario` posibles de un cobro. Espeja
-# `routes.alquileres.DESTINATARIOS_PAGO` (no se importa para no acoplar el motor
-# al route pesado); el test de drift en `test_contabilidad_db.py` exige que
-# coincidan.
-SOCIOS = ("Pablo", "Tincho")
+# Cobradores = quiénes pueden cobrar un pago de cliente (el `destinatario` del
+# pago). Cada uno se vincula a una caja (la columna `socio` de `cuentas` guarda a
+# qué cobrador representa): Pablo/Tincho → su caja de socio; Rambla → Fondo Rambla.
+# Espeja `routes.alquileres.DESTINATARIOS_PAGO` (no se importa para no acoplar el
+# motor al route pesado); el test de drift exige que coincidan.
+COBRADORES = ("Rambla", "Tincho", "Pablo")
+# Socios humanos (subconjunto): los únicos válidos para una caja de tipo 'socio'.
+SOCIOS_HUMANOS = ("Pablo", "Tincho")
 
 _CAMPOS_EDITABLES = ("nombre", "saldo_inicial", "fecha_apertura", "orden", "activa")
 
@@ -26,8 +29,8 @@ def validar_cuenta(data: dict) -> None:
 
     - `nombre`: string no vacío.
     - `tipo`: uno de TIPOS_CUENTA.
-    - `socio`: solo si `tipo='socio'`, y debe ser uno de SOCIOS; en cualquier
-      otro tipo debe venir vacío.
+    - `socio` (= el cobrador que la caja representa): si viene, uno de COBRADORES;
+      una caja de tipo 'socio' debe representar a un socio humano (Pablo/Tincho).
     - `saldo_inicial`: entero (ARS, sin centavos).
     """
     nombre = (data.get("nombre") or "").strip()
@@ -40,11 +43,18 @@ def validar_cuenta(data: dict) -> None:
 
     socio = data.get("socio")
     socio = socio.strip() if isinstance(socio, str) else socio
+    if socio and socio not in COBRADORES:
+        raise ValueError(f"El cobrador debe ser uno de {', '.join(COBRADORES)}.")
+    # Cada tipo acota qué cobrador puede representar: socio → Pablo/Tincho;
+    # fondo → Rambla (o ninguno); caja/banco → ningún cobrador.
     if tipo == "socio":
-        if socio not in SOCIOS:
-            raise ValueError(f"Una cuenta de socio debe tener socio en {', '.join(SOCIOS)}.")
+        if socio not in SOCIOS_HUMANOS:
+            raise ValueError(f"Una cuenta de socio debe representar a {', '.join(SOCIOS_HUMANOS)}.")
+    elif tipo == "fondo":
+        if socio and socio != "Rambla":
+            raise ValueError("Un fondo solo puede representar a Rambla (o a nadie).")
     elif socio:
-        raise ValueError("Solo las cuentas de tipo 'socio' pueden tener un socio asignado.")
+        raise ValueError("Solo una caja de socio (Pablo/Tincho) o el fondo (Rambla) tienen cobrador.")
 
     si = data.get("saldo_inicial", 0)
     if si is None:

@@ -6,7 +6,7 @@ Chequeos de integridad que verifican que la plata del módulo cuadre. Devuelve
 
 from reportes.liquidacion import LIQUIDACION_INICIO
 
-from contabilidad.cuentas import SOCIOS
+from contabilidad.cuentas import COBRADORES
 
 
 def reconciliar(conn) -> dict:
@@ -22,15 +22,15 @@ def reconciliar(conn) -> dict:
     ]
     out["saldos_negativos"] = {"cantidad": len(negativos), "cuentas": negativos}
 
-    # 2. Cobros (≥ clean start) sin un socio válido como destinatario → no entran a
-    #    ninguna caja y rompen la derivación de ingresos.
-    _socios_ph = ", ".join("?" for _ in SOCIOS)
+    # 2. Cobros (≥ clean start) sin un cobrador válido como destinatario → no entran
+    #    a ninguna caja y rompen la derivación de ingresos.
+    _ph = ", ".join("?" for _ in COBRADORES)
     row = conn.execute(
         f"""SELECT COUNT(*) AS n, COALESCE(SUM(monto), 0) AS m
            FROM alquiler_pagos
            WHERE fecha::date >= ?::date
-             AND (destinatario IS NULL OR destinatario NOT IN ({_socios_ph}))""",
-        (LIQUIDACION_INICIO, *SOCIOS),
+             AND (destinatario IS NULL OR destinatario NOT IN ({_ph}))""",
+        (LIQUIDACION_INICIO, *COBRADORES),
     ).fetchone()
     out["pagos_sin_socio"] = {"cantidad": int(row["n"]), "monto": int(row["m"] or 0)}
 

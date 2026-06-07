@@ -108,6 +108,13 @@ def test_el_cobro_no_toca_la_caja_del_otro_socio(conn):
     assert _saldo(conn, "Caja Pablo") == base_pablo  # Pablo no se mueve
 
 
+def test_cobro_de_rambla_alimenta_el_fondo_rambla(conn):
+    # Rambla también cobra (default): su plata cae en la caja Fondo Rambla.
+    base = _saldo(conn, "Fondo Rambla")
+    _pedido_y_pago(conn, 80000, "Rambla")
+    assert _saldo(conn, "Fondo Rambla") - base == 80000
+
+
 def test_ingresos_derivados_agrupan_por_destinatario(conn):
     from contabilidad.saldos import ingresos_derivados
 
@@ -143,10 +150,10 @@ def test_socios_coinciden_con_destinatarios_de_pago(conn):
     # Anti-drift: los socios del módulo contable son exactamente los destinatarios
     # posibles de un cobro (si alguien agrega un tercero, este test obliga a tocar
     # los dos lados).
-    from contabilidad.cuentas import SOCIOS
+    from contabilidad.cuentas import COBRADORES
     from routes.alquileres import DESTINATARIOS_PAGO
 
-    assert set(SOCIOS) == set(DESTINATARIOS_PAGO)
+    assert set(COBRADORES) == set(DESTINATARIOS_PAGO)
 
 
 def test_desactivar_falla_si_la_cuenta_tiene_saldo(conn):
