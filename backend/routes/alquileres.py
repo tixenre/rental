@@ -1785,30 +1785,49 @@ def _ordenar_items_en_grupos(items: list[dict], cat_de_equipo: dict) -> list[dic
 
 
 def _agrupar_items_por_categoria(conn, items: list[dict]) -> list[dict]:
-    """Agrupa los ítems del pedido por su PRIMERA categoría — para los documentos
-    de check físico (packing list + albarán, #814).
+    """Agrupa los ítems del pedido por la categoría RAÍZ (sector) de su primera
+    categoría — para los documentos de check físico (packing list + albarán, #814).
 
     Cada equipo cae bajo su primera categoría (menor `equipo_categorias.orden`,
-    misma convención que `attach_categorias`); los grupos se ordenan por
-    `categorias.prioridad` (igual que el catálogo público). La parte pura
-    (`_ordenar_items_en_grupos`) hace el armado; acá solo se resuelve la categoría
-    de cada equipo con una query única.
+    misma convención que `attach_categorias`) y de ahí se SUBE por `parent_id`
+    hasta la raíz: el agrupado es por sector (Cámaras, Lentes, Iluminación, …),
+    no por la hoja/hija/nieta. Los grupos se ordenan por la `prioridad` de la
+    raíz (igual que el catálogo público). La parte pura (`_ordenar_items_en_grupos`)
+    hace el armado; acá solo se resuelve la raíz de cada equipo con una query única.
     """
     eq_ids = list({it["equipo_id"] for it in items if it.get("equipo_id") is not None})
     cat_de_equipo: dict[int, tuple] = {}
     if eq_ids:
         ph = ",".join("?" for _ in eq_ids)
+        # `first_cat`: la primera categoría de cada equipo (misma convención que
+        # arriba). `climb`: trepa recursivamente por `parent_id` hasta la raíz
+        # (parent_id IS NULL) — soporta cualquier profundidad (hija/nieta/…).
         rows = conn.execute(f"""
-            SELECT equipo_id, nombre, prioridad FROM (
-                SELECT ec.equipo_id, c.nombre, c.prioridad,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY ec.equipo_id
-                           ORDER BY ec.orden, c.prioridad, c.id
-                       ) AS rn
-                FROM equipo_categorias ec
-                JOIN categorias c ON c.id = ec.categoria_id
-                WHERE ec.equipo_id IN ({ph})
-            ) t WHERE rn = 1
+            WITH RECURSIVE first_cat AS (
+                SELECT equipo_id, categoria_id FROM (
+                    SELECT ec.equipo_id, ec.categoria_id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY ec.equipo_id
+                               ORDER BY ec.orden, c.prioridad, c.id
+                           ) AS rn
+                    FROM equipo_categorias ec
+                    JOIN categorias c ON c.id = ec.categoria_id
+                    WHERE ec.equipo_id IN ({ph})
+                ) t WHERE rn = 1
+            ),
+            climb AS (
+                SELECT fc.equipo_id, c.id, c.parent_id
+                FROM first_cat fc
+                JOIN categorias c ON c.id = fc.categoria_id
+                UNION ALL
+                SELECT cl.equipo_id, p.id, p.parent_id
+                FROM climb cl
+                JOIN categorias p ON p.id = cl.parent_id
+            )
+            SELECT cl.equipo_id, c.nombre, c.prioridad
+            FROM climb cl
+            JOIN categorias c ON c.id = cl.id
+            WHERE cl.parent_id IS NULL
         """, tuple(eq_ids)).fetchall()
         for r in rows:
             cat_de_equipo[r["equipo_id"]] = (r["prioridad"], r["nombre"])
