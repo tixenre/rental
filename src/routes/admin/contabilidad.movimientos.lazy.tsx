@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import {
   adminApi,
   TIPOS_MOVIMIENTO,
+  type CobroMensual,
   type Cuenta,
   type Movimiento,
   type MovimientoInput,
@@ -53,6 +54,24 @@ function descMovimiento(m: Movimiento): string {
   }
 }
 
+type Fila =
+  | { kind: "mov"; fecha: string; mov: Movimiento }
+  | { kind: "cobro"; fecha: string; cobro: CobroMensual };
+
+// Fecha del último día del mes (para ordenar la línea de cobro al cierre del mes).
+function finDeMes(mes: string): string {
+  const [y, m] = mes.split("-").map(Number);
+  const dia = new Date(y, m, 0).getDate();
+  return `${mes}-${String(dia).padStart(2, "0")}`;
+}
+
+function mesLabel(mes: string): string {
+  return new Date(`${mes}-01T00:00:00`).toLocaleDateString("es-AR", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function MovimientosPage() {
   useDocumentTitle("Movimientos · Finanzas");
   const qc = useQueryClient();
@@ -65,7 +84,15 @@ function MovimientosPage() {
     queryFn: () => adminApi.listMovimientos({ tipo: tipoFiltro || undefined }),
   });
 
-  const movimientos = movsQ.data?.movimientos ?? [];
+  // Vista unificada: movimientos manuales + cobros de pedidos (agregados por mes,
+  // read-only), ordenados por fecha.
+  const filas: Fila[] = [];
+  if (movsQ.data) {
+    for (const m of movsQ.data.movimientos) filas.push({ kind: "mov", fecha: m.fecha, mov: m });
+    for (const c of movsQ.data.cobros ?? [])
+      filas.push({ kind: "cobro", fecha: finDeMes(c.mes), cobro: c });
+    filas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }
 
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
@@ -76,8 +103,8 @@ function MovimientosPage() {
           </div>
           <h1 className="font-display text-3xl text-ink">Movimientos</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Gastos, transferencias entre cajas, retiros y aportes. Los cobros de clientes entran
-            solos desde Pagos.
+            Toda la plata de las cajas: los cobros de pedidos (que entran solos, una línea por mes)
+            más los gastos, transferencias, retiros y aportes.
           </p>
         </div>
         <Link
@@ -94,6 +121,7 @@ function MovimientosPage() {
       <div className="flex flex-wrap gap-1">
         {[
           ["", "Todos"],
+          ["cobro", "Cobros"],
           ...TIPOS_MOVIMIENTO.map((t) => [t, TIPO_LABEL[t]] as [string, string]),
         ].map(([val, lbl]) => (
           <button
@@ -121,13 +149,13 @@ function MovimientosPage() {
         </div>
       )}
 
-      {movsQ.data && movimientos.length === 0 && (
+      {movsQ.data && filas.length === 0 && (
         <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
           Todavía no hay movimientos para este filtro.
         </div>
       )}
 
-      {movimientos.length > 0 && (
+      {filas.length > 0 && (
         <div className="overflow-x-auto rounded-lg border hairline">
           <table className="w-full text-sm">
             <thead>
@@ -140,9 +168,13 @@ function MovimientosPage() {
               </tr>
             </thead>
             <tbody>
-              {movimientos.map((m) => (
-                <MovimientoRow key={m.id} mov={m} onChanged={invalidar} />
-              ))}
+              {filas.map((f) =>
+                f.kind === "mov" ? (
+                  <MovimientoRow key={`m${f.mov.id}`} mov={f.mov} onChanged={invalidar} />
+                ) : (
+                  <CobroRow key={`c${f.cobro.mes}`} cobro={f.cobro} />
+                ),
+              )}
             </tbody>
           </table>
         </div>
@@ -204,6 +236,32 @@ function MovimientoRow({ mov, onChanged }: { mov: Movimiento; onChanged: () => v
           </button>
         )}
       </td>
+    </tr>
+  );
+}
+
+function CobroRow({ cobro }: { cobro: CobroMensual }) {
+  return (
+    <tr className="border-b hairline last:border-0 bg-muted/10">
+      <td className="px-3 py-2 whitespace-nowrap capitalize text-muted-foreground">
+        {mesLabel(cobro.mes)}
+      </td>
+      <td className="px-3 py-2">
+        <Badge variant="secondary">Cobros</Badge>
+      </td>
+      <td className="px-3 py-2">
+        <span className="capitalize text-ink">Cobro alquileres · {mesLabel(cobro.mes)}</span>
+        <div className="text-[11px] text-muted-foreground">
+          {cobro.cantidad} pago(s) ·{" "}
+          <Link to="/admin/pagos" className="text-amber hover:underline">
+            ver detalle
+          </Link>
+        </div>
+      </td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums text-ink">
+        {formatMoney(cobro.monto, "ARS")}
+      </td>
+      <td className="px-3 py-2 text-right text-[11px] text-muted-foreground">automático</td>
     </tr>
   );
 }

@@ -87,7 +87,7 @@ const items: NavItem[] = [
       { title: "Movimientos", url: "/admin/contabilidad/movimientos", icon: ClipboardList },
       { title: "Rendición", url: "/admin/contabilidad/rendicion", icon: Users },
       { title: "Cuentas", url: "/admin/contabilidad/cuentas", icon: Wallet },
-      { title: "Pagos", url: "/admin/pagos", icon: List },
+      { title: "Cobros de pedidos", url: "/admin/pagos", icon: List },
     ],
   },
   { title: "Diseño y marca", url: "/admin/diseno", icon: Palette },
