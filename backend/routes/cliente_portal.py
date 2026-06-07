@@ -390,6 +390,7 @@ def cliente_pedidos(request: Request):
                 FROM alquiler_items ai
                 JOIN equipos e ON e.id = ai.equipo_id
                 WHERE ai.pedido_id = ?
+                ORDER BY ai.orden, ai.id
             """, (p["id"],)).fetchall()
             d["items"] = [row_to_dict(i) for i in items]
 
@@ -443,6 +444,7 @@ def cliente_pedido_detalle(id: int, request: Request):
             FROM alquiler_items ai
             JOIN equipos e ON e.id = ai.equipo_id
             WHERE ai.pedido_id = ?
+            ORDER BY ai.orden, ai.id
         """, (id,)).fetchall()
         d["items"] = [row_to_dict(i) for i in items]
 
@@ -1174,7 +1176,7 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
         FROM alquiler_items pi
         JOIN equipos e ON e.id = pi.equipo_id
         WHERE pi.pedido_id = ?
-        ORDER BY e.nombre
+        ORDER BY pi.orden, pi.id
     """, (pedido_id,)).fetchall()
     pedido["items"] = [row_to_dict(i) for i in items]
 

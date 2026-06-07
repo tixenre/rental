@@ -81,6 +81,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
         JOIN equipos e ON e.id = pi.equipo_id
         LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
         WHERE pi.pedido_id = ?
+        ORDER BY pi.orden, pi.id
     """, (pedido_id,)).fetchall()
     items = [row_to_dict(r) for r in rows]
     if not items:
@@ -162,6 +163,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
         FROM alquiler_items pi
         JOIN equipos e ON e.id = pi.equipo_id
         WHERE pi.pedido_id IN ({ph})
+        ORDER BY pi.orden, pi.id
     """, pedido_ids).fetchall()
 
     all_items   = [row_to_dict(r) for r in rows]
@@ -1572,12 +1574,15 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
                 "precio_jornada": it.precio_jornada,
             }
 
+    # El orden de `consolidado` preserva el orden de llegada (dict ordenado en
+    # py3.7+), que es el orden que arma el front (incl. drag-reorder, #806). Se
+    # persiste como `orden` por posición; los displays ordenan por `orden, id`.
     rows = []
-    for it in consolidado.values():
+    for orden, it in enumerate(consolidado.values()):
         if not conn.execute("SELECT id FROM equipos WHERE id=?", (it["equipo_id"],)).fetchone():
             raise HTTPException(404, f"Equipo {it['equipo_id']} no encontrado")
         subtotal = it["precio_jornada"] * it["cantidad"] * jornadas
-        rows.append((id, it["equipo_id"], it["cantidad"], it["precio_jornada"], subtotal))
+        rows.append((id, it["equipo_id"], it["cantidad"], it["precio_jornada"], subtotal, orden))
 
     # Re-aplicar AMBOS descuentos (cliente + jornadas), como hacen las
     # otras 2 sedes. Antes solo se aplicaba el del cliente → editar ítems
@@ -1595,8 +1600,8 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
 
     conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (id,))
     conn.executemany("""
-        INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-        VALUES (?,?,?,?,?)
+        INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, orden)
+        VALUES (?,?,?,?,?,?)
     """, rows)
     conn.execute(
         "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
@@ -1705,7 +1710,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
             FROM alquiler_items pi
             JOIN equipos e ON e.id = pi.equipo_id
             WHERE pi.pedido_id = ?
-            ORDER BY e.nombre
+            ORDER BY pi.orden, pi.id
         """, (id,)).fetchall()
         pedido["items"] = [row_to_dict(i) for i in items]
         _add_componentes(conn, pedido["items"])
@@ -1719,8 +1724,8 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         pedido = row_to_dict(row)
         _enriquecer_pedido_con_cliente(conn, pedido)
         _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
+        # `_get_alquiler_items` ya ordena por el orden manual (orden, id, #806).
         pedido["items"] = _get_alquiler_items(conn, id)
-        pedido["items"].sort(key=lambda it: (it.get("nombre") or "").lower())
         return _packing_list_html(pedido), _pedido_filename(pedido, doc="packing-list")
 
     if kind == "contrato":
