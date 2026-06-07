@@ -297,28 +297,30 @@ def cobros_mensuales(conn, desde=None, hasta=None, cobrador=None) -> list[dict]:
     """Cobros de pedidos (de `alquiler_pagos`) agregados por mes — una línea por
     mes con el total cobrado. Es la cara READ-ONLY de los cobros dentro de la vista
     unificada de movimientos: la plata entra, pero se carga desde el pedido (Pagos),
-    no se edita acá. Mismo recorte que los saldos (≥ clean start, destinatario
-    asignado). Si `cobrador` se pasa, solo los de ese cobrador. Devuelve filas
-    {mes:'YYYY-MM', monto, cantidad} más nuevas primero."""
+    no se edita acá. Mismo recorte que los saldos (clean start por fecha del alquiler
+    `fecha_desde >= LIQUIDACION_INICIO`, destinatario asignado). Si `cobrador` se pasa,
+    solo los de ese cobrador. Devuelve filas {mes:'YYYY-MM', monto, cantidad} más
+    nuevas primero."""
     from database import row_to_dict
     from reportes.liquidacion import LIQUIDACION_INICIO
 
     sql = """
-        SELECT to_char(fecha, 'YYYY-MM') AS mes,
-               COALESCE(SUM(monto), 0) AS monto,
+        SELECT to_char(ap.fecha, 'YYYY-MM') AS mes,
+               COALESCE(SUM(ap.monto), 0) AS monto,
                COUNT(*) AS cantidad
-        FROM alquiler_pagos
-        WHERE destinatario IS NOT NULL AND fecha::date >= ?::date
+        FROM alquiler_pagos ap
+        JOIN alquileres al ON al.id = ap.pedido_id
+        WHERE ap.destinatario IS NOT NULL AND al.fecha_desde >= ?::date
     """
     params: list = [LIQUIDACION_INICIO]
     if cobrador:
-        sql += " AND destinatario = ?"
+        sql += " AND ap.destinatario = ?"
         params.append(cobrador)
     if desde:
-        sql += " AND fecha::date >= ?::date"
+        sql += " AND ap.fecha::date >= ?::date"
         params.append(desde)
     if hasta:
-        sql += " AND fecha::date <= ?::date"
+        sql += " AND ap.fecha::date <= ?::date"
         params.append(hasta)
     sql += " GROUP BY 1 ORDER BY 1 DESC"
     return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
