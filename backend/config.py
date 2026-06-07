@@ -63,8 +63,11 @@ class Settings(BaseSettings):
     # ── Didit — verificación de identidad (DNI + selfie → RENAPER) ──────────
     # Se activa por configuración: si DIDIT_API_KEY está vacía, los endpoints de
     # verificación devuelven 503. Mismo patrón que RESEND_API_KEY para mails.
+    # DIDIT_WORKFLOW_ID es obligatorio para crear sesiones (identifica el flujo
+    # de verificación configurado en el Console de Didit).
     DIDIT_API_KEY:        str = ""
     DIDIT_WEBHOOK_SECRET: str = ""
+    DIDIT_WORKFLOW_ID:    str = ""
 
     @field_validator("SITE_URL")
     @classmethod
