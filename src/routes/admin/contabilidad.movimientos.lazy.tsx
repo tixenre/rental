@@ -325,7 +325,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
           </Field>
         )}
         {muestra.destino && (
-          <Field label={tipo === "aporte" ? "Entra a" : "Entra a"}>
+          <Field label="Entra a">
             <CuentaSelect cuentas={cuentas} value={destino} onChange={setDestino} />
           </Field>
         )}
