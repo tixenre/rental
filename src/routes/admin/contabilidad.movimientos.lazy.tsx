@@ -72,16 +72,43 @@ function mesLabel(mes: string): string {
   });
 }
 
+// Dirección de la plata (guía visual estilo debe/haber): entra (haber, verde +),
+// sale (debe, rojo −) o interno (transferencia/ajuste entre dos cajas, neutro).
+type Direccion = "in" | "out" | "neutral";
+function direccionMov(m: Movimiento): Direccion {
+  const origen = !!m.cuenta_origen_id;
+  const destino = !!m.cuenta_destino_id;
+  if (origen && !destino) return "out";
+  if (destino && !origen) return "in";
+  return "neutral";
+}
+function montoClass(dir: Direccion): string {
+  return dir === "in" ? "text-verde" : dir === "out" ? "text-destructive" : "text-ink";
+}
+function montoSigno(dir: Direccion): string {
+  return dir === "in" ? "+ " : dir === "out" ? "− " : "";
+}
+
 function MovimientosPage() {
   useDocumentTitle("Movimientos · Finanzas");
   const qc = useQueryClient();
   const [tipoFiltro, setTipoFiltro] = useState<string>("");
+  const [beneficiarioFiltro, setBeneficiarioFiltro] = useState<string>("");
 
   const invalidar = () => qc.invalidateQueries({ queryKey: ["admin", "contabilidad"] });
 
   const movsQ = useQuery({
-    queryKey: ["admin", "contabilidad", "movimientos", { tipo: tipoFiltro }],
-    queryFn: () => adminApi.listMovimientos({ tipo: tipoFiltro || undefined }),
+    queryKey: [
+      "admin",
+      "contabilidad",
+      "movimientos",
+      { tipo: tipoFiltro, ben: beneficiarioFiltro },
+    ],
+    queryFn: () =>
+      adminApi.listMovimientos({
+        tipo: tipoFiltro || undefined,
+        beneficiario: beneficiarioFiltro || undefined,
+      }),
   });
 
   // Vista unificada: movimientos manuales + cobros de pedidos (agregados por mes,
@@ -149,6 +176,22 @@ function MovimientosPage() {
         </div>
       )}
 
+      {beneficiarioFiltro && (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Beneficiario:</span>
+          <span className="rounded-md bg-ink px-2 py-0.5 text-xs text-background">
+            {beneficiarioFiltro}
+          </span>
+          <button
+            type="button"
+            onClick={() => setBeneficiarioFiltro("")}
+            className="text-xs text-muted-foreground hover:text-ink underline"
+          >
+            quitar
+          </button>
+        </div>
+      )}
+
       {movsQ.data && filas.length === 0 && (
         <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
           Todavía no hay movimientos para este filtro.
@@ -170,7 +213,12 @@ function MovimientosPage() {
             <tbody>
               {filas.map((f) =>
                 f.kind === "mov" ? (
-                  <MovimientoRow key={`m${f.mov.id}`} mov={f.mov} onChanged={invalidar} />
+                  <MovimientoRow
+                    key={`m${f.mov.id}`}
+                    mov={f.mov}
+                    onChanged={invalidar}
+                    onBeneficiario={setBeneficiarioFiltro}
+                  />
                 ) : (
                   <CobroRow key={`c${f.cobro.mes}`} cobro={f.cobro} />
                 ),
@@ -183,7 +231,15 @@ function MovimientosPage() {
   );
 }
 
-function MovimientoRow({ mov, onChanged }: { mov: Movimiento; onChanged: () => void }) {
+function MovimientoRow({
+  mov,
+  onChanged,
+  onBeneficiario,
+}: {
+  mov: Movimiento;
+  onChanged: () => void;
+  onBeneficiario: (b: string) => void;
+}) {
   const anular = useMutation({
     mutationFn: (motivo: string) => adminApi.anularMovimiento(mov.id, motivo),
     onSuccess: () => {
@@ -192,6 +248,8 @@ function MovimientoRow({ mov, onChanged }: { mov: Movimiento; onChanged: () => v
     },
     onError: (e) => toast.error("No se pudo anular", { description: (e as Error).message }),
   });
+
+  const dir = direccionMov(mov);
 
   return (
     <tr className={cn("border-b hairline last:border-0", mov.anulado && "opacity-50")}>
@@ -203,6 +261,18 @@ function MovimientoRow({ mov, onChanged }: { mov: Movimiento; onChanged: () => v
       </td>
       <td className="px-3 py-2">
         <span className={cn(mov.anulado && "line-through")}>{descMovimiento(mov)}</span>
+        {mov.beneficiario && (
+          <div>
+            <button
+              type="button"
+              onClick={() => onBeneficiario(mov.beneficiario!)}
+              className="text-[11px] text-amber hover:underline"
+              title="Ver el historial de este beneficiario"
+            >
+              {mov.beneficiario}
+            </button>
+          </div>
+        )}
         {mov.nota && <div className="text-[11px] text-muted-foreground">{mov.nota}</div>}
         {mov.anulado && mov.anulado_motivo && (
           <div className="text-[11px] text-destructive">Anulado: {mov.anulado_motivo}</div>
@@ -218,7 +288,8 @@ function MovimientoRow({ mov, onChanged }: { mov: Movimiento; onChanged: () => v
           </a>
         )}
       </td>
-      <td className="px-3 py-2 text-right font-mono tabular-nums">
+      <td className={cn("px-3 py-2 text-right font-mono tabular-nums", montoClass(dir))}>
+        {montoSigno(dir)}
         {formatMoney(mov.monto, mov.moneda)}
       </td>
       <td className="px-3 py-2 text-right">
@@ -258,8 +329,8 @@ function CobroRow({ cobro }: { cobro: CobroMensual }) {
           </Link>
         </div>
       </td>
-      <td className="px-3 py-2 text-right font-mono tabular-nums text-ink">
-        {formatMoney(cobro.monto, "ARS")}
+      <td className="px-3 py-2 text-right font-mono tabular-nums text-verde">
+        + {formatMoney(cobro.monto, "ARS")}
       </td>
       <td className="px-3 py-2 text-right text-[11px] text-muted-foreground">automático</td>
     </tr>
@@ -275,6 +346,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
   const [metodo, setMetodo] = useState("");
   const [fecha, setFecha] = useState("");
   const [nota, setNota] = useState("");
+  const [beneficiario, setBeneficiario] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
   const cuentasQ = useQuery({
@@ -285,9 +357,14 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
     queryKey: ["admin", "contabilidad", "categorias"],
     queryFn: () => adminApi.listGastoCategorias(),
   });
+  const benQ = useQuery({
+    queryKey: ["admin", "contabilidad", "beneficiarios"],
+    queryFn: () => adminApi.listBeneficiarios(),
+  });
 
   const cuentas: Cuenta[] = cuentasQ.data?.cuentas ?? [];
   const categorias = catsQ.data?.categorias ?? [];
+  const beneficiarios = benQ.data?.beneficiarios ?? [];
 
   // Una transferencia/ajuste no cruza monedas: el destino se limita a la moneda
   // del origen elegido (el backend igual lo valida).
@@ -312,6 +389,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
     setMetodo("");
     setFecha("");
     setNota("");
+    setBeneficiario("");
     setFile(null);
   };
 
@@ -326,6 +404,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
         metodo: metodo || null,
         fecha: fecha || null,
         nota: nota || null,
+        beneficiario: beneficiario || null,
       };
       const mov = await adminApi.createMovimiento(body);
       if (file) await adminApi.uploadComprobante(mov.id, file);
@@ -432,6 +511,20 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
+        <Field label="Beneficiario (opcional)">
+          <input
+            value={beneficiario}
+            onChange={(e) => setBeneficiario(e.target.value)}
+            list="benef-list"
+            placeholder="Ej. Jimena (CM)"
+            className="h-9 w-56 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+          />
+          <datalist id="benef-list">
+            {beneficiarios.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
+        </Field>
         <Field label="Nota (opcional)">
           <input
             value={nota}
