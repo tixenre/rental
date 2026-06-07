@@ -17,13 +17,21 @@ def mes_actual() -> str:
 
 
 def tablero(conn, mes: str | None = None) -> dict:
+    from contabilidad.cierres import cierre_de
+
     mes = mes or mes_actual()
     disponible = saldos(conn)
     gan = ganancia_neta(conn, mes)
     rend = rendicion(conn, mes)
     pendiente_total = sum(int(s["monto"]) for s in rend["sugeridos"])
+    c = cierre_de(conn, mes)
     return {
         "mes": mes,
+        "cierre": {
+            "cerrado": c is not None,
+            "cerrado_por": c["cerrado_por"] if c else None,
+            "cerrado_at": c["cerrado_at"] if c else None,
+        },
         "disponible": disponible,
         "ganancia_mes": {
             "mes": mes,
