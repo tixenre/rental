@@ -21,6 +21,7 @@ from contabilidad.saldos import saldos as _saldos
 from contabilidad.categorias import crear_categoria, listar_categorias
 from contabilidad.movimientos import (
     anular_movimiento,
+    beneficiarios_usados,
     cobros_mensuales,
     crear_movimiento,
     editar_movimiento,
@@ -161,6 +162,14 @@ def get_categorias(request: Request):
         return {"categorias": listar_categorias(conn)}
 
 
+@router.get("/admin/contabilidad/beneficiarios")
+def get_beneficiarios(request: Request):
+    """Beneficiarios ya usados, para el autocompletado del formulario."""
+    require_admin(request)
+    with get_db() as conn:
+        return {"beneficiarios": beneficiarios_usados(conn)}
+
+
 @router.post("/admin/contabilidad/categorias")
 def post_categoria(request: Request, body: CategoriaCreate):
     require_admin(request)
@@ -188,6 +197,7 @@ class MovimientoCreate(BaseModel):
     metodo: str | None = None
     fecha: str | None = None
     nota: str | None = None
+    beneficiario: str | None = None
 
 
 class MovimientoUpdate(BaseModel):
@@ -198,6 +208,7 @@ class MovimientoUpdate(BaseModel):
     metodo: str | None = None
     fecha: str | None = None
     nota: str | None = None
+    beneficiario: str | None = None
 
 
 class AnularBody(BaseModel):
@@ -210,13 +221,13 @@ def get_movimientos(
     tipo: str | None = None,
     cuenta_id: int | None = None,
     categoria_id: int | None = None,
+    beneficiario: str | None = None,
     desde: str | None = None,
     hasta: str | None = None,
     incluir_anulados: bool = False,
     limit: int = 500,
 ):
     require_admin(request)
-    _MANUALES = ("gasto", "transferencia", "retiro", "aporte", "ajuste")
     with get_db() as conn:
         # Movimientos manuales (salvo que se filtre solo cobros).
         movs = (
@@ -224,13 +235,15 @@ def get_movimientos(
             if tipo == "cobro"
             else listar_movimientos(
                 conn, tipo=tipo, cuenta_id=cuenta_id, categoria_id=categoria_id,
-                desde=desde, hasta=hasta, incluir_anulados=incluir_anulados, limit=limit,
+                beneficiario=beneficiario, desde=desde, hasta=hasta,
+                incluir_anulados=incluir_anulados, limit=limit,
             )
         )
         # Cobros de pedidos agregados por mes (read-only) — se muestran junto a los
-        # movimientos salvo que se filtre por un tipo manual o por categoría.
+        # movimientos salvo que se filtre por tipo manual / categoría / beneficiario
+        # (los cobros no tienen esos atributos).
         cobros: list = []
-        if tipo in (None, "", "cobro") and not categoria_id:
+        if tipo in (None, "", "cobro") and not categoria_id and not beneficiario:
             cobrador = None
             if cuenta_id:
                 row = conn.execute("SELECT socio FROM cuentas WHERE id = ?", (cuenta_id,)).fetchone()
@@ -254,7 +267,8 @@ def post_movimiento(request: Request, body: MovimientoCreate):
                 cuenta_origen_id=body.cuenta_origen_id,
                 cuenta_destino_id=body.cuenta_destino_id,
                 categoria_id=body.categoria_id, metodo=body.metodo,
-                fecha=body.fecha, nota=body.nota, por=admin.get("email"),
+                fecha=body.fecha, nota=body.nota, beneficiario=body.beneficiario,
+                por=admin.get("email"),
             )
             conn.commit()
             return mov

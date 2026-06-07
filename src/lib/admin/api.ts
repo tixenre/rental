@@ -726,6 +726,7 @@ export interface Movimiento {
   metodo: string | null;
   fecha: string;
   nota: string | null;
+  beneficiario: string | null;
   comprobante_url: string | null;
   es_rendicion: boolean;
   rendicion_mes: string | null;
@@ -747,6 +748,7 @@ export interface MovimientoInput {
   metodo?: string | null;
   fecha?: string | null;
   nota?: string | null;
+  beneficiario?: string | null;
 }
 export interface GastosPorCategoria {
   por_categoria: { categoria: string; monto: number }[];
@@ -1666,6 +1668,7 @@ export const adminApi = {
     tipo?: string;
     cuenta_id?: number;
     categoria_id?: number;
+    beneficiario?: string;
     desde?: string;
     hasta?: string;
     incluir_anulados?: boolean;
@@ -1674,6 +1677,7 @@ export const adminApi = {
     if (params?.tipo) sp.set("tipo", params.tipo);
     if (params?.cuenta_id) sp.set("cuenta_id", String(params.cuenta_id));
     if (params?.categoria_id) sp.set("categoria_id", String(params.categoria_id));
+    if (params?.beneficiario) sp.set("beneficiario", params.beneficiario);
     if (params?.desde) sp.set("desde", params.desde);
     if (params?.hasta) sp.set("hasta", params.hasta);
     if (params?.incluir_anulados) sp.set("incluir_anulados", "true");
@@ -1682,6 +1686,8 @@ export const adminApi = {
       `/api/admin/contabilidad/movimientos${qs ? `?${qs}` : ""}`,
     );
   },
+  listBeneficiarios: () =>
+    authedJson<{ beneficiarios: string[] }>("/api/admin/contabilidad/beneficiarios"),
   createMovimiento: (data: MovimientoInput) =>
     authedPostJson<Movimiento>("/api/admin/contabilidad/movimientos", data),
   updateMovimiento: (id: number, data: Partial<MovimientoInput>) =>

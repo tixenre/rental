@@ -1256,6 +1256,9 @@ def init_db():
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_mov_rendicion ON movimientos(rendicion_mes) WHERE es_rendicion"
     )
+    # beneficiario: a quién / para qué es el movimiento (ej. "Jimena") — etiqueta
+    # parseable y reutilizable (migración e5f6a7b8c9d0).
+    conn.execute("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS beneficiario TEXT")
     # Cierres contables (#809, Fase 6): congelan un mes (foto + traba la edición de
     # movimientos de ese mes). Espejo de la migración b2c3d4e5f6a7.
     conn.execute("""
