@@ -24,7 +24,7 @@ METODOS_MOVIMIENTO = ("transferencia", "efectivo")
 # Campos que se pueden editar de un movimiento ya creado (el tipo no se cambia:
 # cambiar de gasto a transferencia es otro movimiento, se anula y se rehace).
 _CAMPOS_EDITABLES = ("monto", "cuenta_origen_id", "cuenta_destino_id", "categoria_id",
-                     "metodo", "fecha", "nota")
+                     "metodo", "fecha", "nota", "beneficiario")
 
 
 def validar_estructura_movimiento(tipo, monto, origen, destino, categoria_id) -> None:
@@ -90,14 +90,15 @@ def _exigir_mes_abierto(conn, fecha) -> None:
 
 
 def listar_movimientos(conn, *, tipo=None, cuenta_id=None, categoria_id=None,
-                       desde=None, hasta=None, incluir_anulados=False, limit=500) -> list[dict]:
+                       desde=None, hasta=None, beneficiario=None,
+                       incluir_anulados=False, limit=500) -> list[dict]:
     """Movimientos con nombres de cuenta/categoría resueltos, filtrables. Más
     nuevos primero. Por defecto excluye los anulados."""
     from database import row_to_dict
 
     sql = """
         SELECT m.id, m.tipo, m.monto, m.cuenta_origen_id, m.cuenta_destino_id,
-               m.categoria_id, m.metodo, m.fecha, m.nota,
+               m.categoria_id, m.metodo, m.fecha, m.nota, m.beneficiario,
                m.comprobante_url, m.es_rendicion, m.rendicion_mes,
                m.anulado, m.anulado_motivo, m.created_by, m.created_at,
                co.nombre AS cuenta_origen_nombre,
@@ -122,6 +123,9 @@ def listar_movimientos(conn, *, tipo=None, cuenta_id=None, categoria_id=None,
     if categoria_id:
         sql += " AND m.categoria_id = ?"
         params.append(categoria_id)
+    if beneficiario:
+        sql += " AND m.beneficiario = ?"
+        params.append(beneficiario)
     if desde:
         sql += " AND m.fecha >= ?::date"
         params.append(desde)
@@ -137,7 +141,7 @@ def obtener_movimiento(conn, mov_id: int) -> dict | None:
     from database import row_to_dict
     row = conn.execute(
         """SELECT id, tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
-                  metodo, fecha, nota, comprobante_url, comprobante_key, es_rendicion,
+                  metodo, fecha, nota, beneficiario, comprobante_url, comprobante_key, es_rendicion,
                   rendicion_mes, anulado, anulado_motivo, created_by, created_at
            FROM movimientos WHERE id = ?""",
         (mov_id,),
@@ -146,8 +150,8 @@ def obtener_movimiento(conn, mov_id: int) -> dict | None:
 
 
 def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino_id=None,
-                     categoria_id=None, metodo=None, fecha=None, nota=None, por=None,
-                     es_rendicion=False, rendicion_mes=None) -> dict:
+                     categoria_id=None, metodo=None, fecha=None, nota=None, beneficiario=None,
+                     por=None, es_rendicion=False, rendicion_mes=None) -> dict:
     """Crea un movimiento (valida estructura + existencia de cuentas/categoría).
     `fecha` None → hoy. `es_rendicion`/`rendicion_mes` marcan un saldado de
     rendición entre socios (lo usa `rendicion.saldar`, no la UI general).
@@ -178,14 +182,15 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
         if not ok:
             raise ValueError("La categoría indicada no existe o está inactiva.")
 
+    beneficiario = (beneficiario or "").strip() or None
     cur = conn.execute(
         """INSERT INTO movimientos
                (tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
-                metodo, fecha, nota, es_rendicion, rendicion_mes, created_by, updated_by)
-           VALUES (?, ?, ?, ?, ?, ?, COALESCE(?::date, CURRENT_DATE), ?, ?, ?, ?, ?)
+                metodo, fecha, nota, beneficiario, es_rendicion, rendicion_mes, created_by, updated_by)
+           VALUES (?, ?, ?, ?, ?, ?, COALESCE(?::date, CURRENT_DATE), ?, ?, ?, ?, ?, ?)
            RETURNING id""",
         (tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
-         metodo, fecha, nota, bool(es_rendicion), rendicion_mes, por, por),
+         metodo, fecha, nota, beneficiario, bool(es_rendicion), rendicion_mes, por, por),
     )
     new_id = cur.fetchone()[0]
     movs = listar_movimientos(conn, incluir_anulados=True)
@@ -314,3 +319,14 @@ def cobros_mensuales(conn, desde=None, hasta=None, cobrador=None) -> list[dict]:
         params.append(hasta)
     sql += " GROUP BY 1 ORDER BY 1 DESC"
     return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
+
+
+def beneficiarios_usados(conn) -> list[str]:
+    """Beneficiarios ya usados (distintos, no anulados), para el autocompletado del
+    formulario — así "Jimena" se elige en vez de reescribirse."""
+    rows = conn.execute(
+        """SELECT DISTINCT beneficiario FROM movimientos
+           WHERE beneficiario IS NOT NULL AND beneficiario <> '' AND NOT anulado
+           ORDER BY beneficiario"""
+    ).fetchall()
+    return [r["beneficiario"] for r in rows]

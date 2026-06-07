@@ -289,6 +289,19 @@ def test_reconciliar_corre(conn):
     assert "saldos_negativos" in r and "pagos_sin_socio" in r
 
 
+def test_beneficiario_se_guarda_y_autocompleta(conn):
+    from contabilidad.movimientos import beneficiarios_usados, crear_movimiento, listar_movimientos
+
+    crear_movimiento(
+        conn, tipo="gasto", monto=125000, cuenta_origen_id=_cuenta_id(conn, "Efectivo"),
+        categoria_id=_categoria_id(conn), beneficiario="Jimena", por="test",
+    )
+    assert "Jimena" in beneficiarios_usados(conn)
+    # filtrable para ver el historial de esa persona
+    movs = listar_movimientos(conn, beneficiario="Jimena")
+    assert movs and all(m["beneficiario"] == "Jimena" for m in movs)
+
+
 def test_cobros_mensuales_agrega_por_mes(conn):
     from contabilidad.movimientos import cobros_mensuales
 
