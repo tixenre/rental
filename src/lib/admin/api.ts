@@ -1591,6 +1591,11 @@ export const adminApi = {
       throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
     }
   },
+  generarLinkVerificacion: (clienteId: number) =>
+    authedJson<{ session_id: string; url: string }>(
+      `/api/admin/verificacion/sesion/${clienteId}`,
+      { method: "POST" },
+    ),
 
   // calendario
   getCalendario: (desde: string, hasta: string) => {

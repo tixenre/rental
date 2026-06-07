@@ -10,6 +10,8 @@ import {
   MoreHorizontal,
   ShieldCheck,
   ShieldAlert,
+  Copy,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -284,6 +286,15 @@ function ClienteHistorialSheet({
   onEdit: (c: Cliente) => void;
 }) {
   const navigate = useNavigate();
+  const [linkVerif, setLinkVerif] = useState<string | null>(null);
+  const [generando, setGenerando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    setLinkVerif(null);
+    setCopiado(false);
+  }, [cliente?.id]);
+
   const pedidosQ = useQuery({
     queryKey: ["admin", "cliente-pedidos", cliente?.id],
     queryFn: () => adminApi.getClientePedidos(cliente!.id),
@@ -358,9 +369,62 @@ function ClienteHistorialSheet({
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 rounded-lg border hairline px-3 py-2 text-sm text-muted-foreground">
-                <ShieldAlert className="h-4 w-4 shrink-0" />
-                Identidad sin verificar
+              <div className="rounded-lg border hairline px-3 py-2.5 space-y-2.5">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                  Identidad sin verificar
+                </div>
+                {linkVerif ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      Mandále este link al cliente (WhatsApp, mail, etc.):
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={linkVerif}
+                        className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-[11px] text-ink outline-none truncate"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(linkVerif);
+                          setCopiado(true);
+                          setTimeout(() => setCopiado(false), 2000);
+                        }}
+                        className="flex items-center gap-1 rounded-md border hairline bg-surface px-2.5 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors shrink-0 h-[30px]"
+                      >
+                        {copiado ? (
+                          <Check className="h-3.5 w-3.5 text-verde" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                        {copiado ? "Copiado" : "Copiar"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={generando}
+                    onClick={async () => {
+                      if (!cliente) return;
+                      setGenerando(true);
+                      try {
+                        const r = await adminApi.generarLinkVerificacion(cliente.id);
+                        setLinkVerif(r.url);
+                      } catch {
+                        toast.error("No se pudo generar el link de verificación");
+                      } finally {
+                        setGenerando(false);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 rounded-md border hairline bg-surface px-3 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors disabled:opacity-50 h-[30px]"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {generando ? "Generando…" : "Generar link de verificación"}
+                  </button>
+                )}
               </div>
             )}
 
