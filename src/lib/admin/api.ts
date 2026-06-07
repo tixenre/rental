@@ -612,6 +612,7 @@ export interface Cuenta {
   nombre: string;
   tipo: TipoCuenta;
   socio: string | null;
+  moneda: string;
   saldo_inicial: number;
   fecha_apertura: string;
   activa: boolean;
@@ -622,6 +623,7 @@ export interface CuentaSaldo {
   nombre: string;
   tipo: TipoCuenta;
   socio: string | null;
+  moneda: string;
   saldo_inicial: number;
   ingresos_alquiler: number;
   entradas: number;
@@ -630,6 +632,7 @@ export interface CuentaSaldo {
 }
 export interface SaldosData {
   cuentas: CuentaSaldo[];
+  totales: Record<string, number>;
   total_disponible: number;
   as_of: string;
 }
@@ -698,6 +701,7 @@ export interface CuentaInput {
   nombre: string;
   tipo: TipoCuenta;
   socio?: string | null;
+  moneda?: string;
   saldo_inicial?: number;
   fecha_apertura?: string | null;
   orden?: number;
@@ -732,6 +736,7 @@ export interface Movimiento {
   cuenta_origen_nombre: string | null;
   cuenta_destino_nombre: string | null;
   categoria_nombre: string | null;
+  moneda: string;
 }
 export interface MovimientoInput {
   tipo: TipoMovimiento;

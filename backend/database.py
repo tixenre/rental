@@ -1205,6 +1205,7 @@ def init_db():
             nombre         TEXT NOT NULL UNIQUE,
             tipo           TEXT NOT NULL DEFAULT 'caja',
             socio          TEXT,
+            moneda         VARCHAR(3) NOT NULL DEFAULT 'ARS',
             saldo_inicial  INTEGER NOT NULL DEFAULT 0,
             fecha_apertura DATE NOT NULL DEFAULT '2026-06-01',
             activa         BOOLEAN NOT NULL DEFAULT TRUE,
@@ -1215,18 +1216,22 @@ def init_db():
             updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # moneda por cuenta (ARS/USD) — a veces se guardan dólares. ADD COLUMN para
+    # BDs que ya tenían la tabla (migración d4e5f6a7b8c9).
+    conn.execute("ALTER TABLE cuentas ADD COLUMN IF NOT EXISTS moneda VARCHAR(3) NOT NULL DEFAULT 'ARS'")
     # Un socio = exactamente una caja (puente 1:1 con alquiler_pagos.destinatario).
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_cuentas_socio "
         "ON cuentas(socio) WHERE socio IS NOT NULL"
     )
     conn.execute("""
-        INSERT INTO cuentas (nombre, tipo, socio, orden) VALUES
-            ('Caja Tincho', 'socio', 'Tincho', 1),
-            ('Caja Pablo',  'socio', 'Pablo',  2),
-            ('Efectivo',    'caja',  NULL,      3),
-            ('Banco',       'banco', NULL,      4),
-            ('Fondo Rambla','fondo', 'Rambla',  5)
+        INSERT INTO cuentas (nombre, tipo, socio, moneda, orden) VALUES
+            ('Caja Tincho', 'socio', 'Tincho', 'ARS', 1),
+            ('Caja Pablo',  'socio', 'Pablo',  'ARS', 2),
+            ('Efectivo',    'caja',  NULL,      'ARS', 3),
+            ('Banco',       'banco', NULL,      'ARS', 4),
+            ('Fondo Rambla','fondo', 'Rambla',  'ARS', 5),
+            ('Dólares',     'caja',  NULL,      'USD', 6)
         ON CONFLICT (nombre) DO NOTHING
     """)
     # Rambla también cobra (default): la caja Fondo Rambla representa al cobrador

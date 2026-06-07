@@ -19,7 +19,7 @@ import {
   type MovimientoInput,
   type TipoMovimiento,
 } from "@/lib/admin/api";
-import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -186,7 +186,9 @@ function MovimientoRow({ mov, onChanged }: { mov: Movimiento; onChanged: () => v
           </a>
         )}
       </td>
-      <td className="px-3 py-2 text-right font-mono tabular-nums">{formatARS(mov.monto)}</td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">
+        {formatMoney(mov.monto, mov.moneda)}
+      </td>
       <td className="px-3 py-2 text-right">
         {!mov.anulado && (
           <button
@@ -228,6 +230,11 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
 
   const cuentas: Cuenta[] = cuentasQ.data?.cuentas ?? [];
   const categorias = catsQ.data?.categorias ?? [];
+
+  // Una transferencia/ajuste no cruza monedas: el destino se limita a la moneda
+  // del origen elegido (el backend igual lo valida).
+  const monedaOrigen = cuentas.find((c) => String(c.id) === origen)?.moneda;
+  const cuentasDestino = monedaOrigen ? cuentas.filter((c) => c.moneda === monedaOrigen) : cuentas;
 
   const muestra = useMemo(
     () => ({
@@ -326,7 +333,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
         )}
         {muestra.destino && (
           <Field label="Entra a">
-            <CuentaSelect cuentas={cuentas} value={destino} onChange={setDestino} />
+            <CuentaSelect cuentas={cuentasDestino} value={destino} onChange={setDestino} />
           </Field>
         )}
         {muestra.categoria && (

@@ -58,6 +58,13 @@ class TestValidarCuenta:
         with pytest.raises(ValueError):
             validar_cuenta({"nombre": "X", "tipo": "caja", "saldo_inicial": "1000"})
 
+    def test_moneda_usd_ok(self):
+        validar_cuenta({"nombre": "Dólares", "tipo": "caja", "moneda": "USD"})
+
+    def test_rechaza_moneda_invalida(self):
+        with pytest.raises(ValueError):
+            validar_cuenta({"nombre": "X", "tipo": "caja", "moneda": "EUR"})
+
     def test_cobradores_son_los_tres(self):
         assert set(COBRADORES) == {"Pablo", "Tincho", "Rambla"}
 
@@ -111,3 +118,24 @@ class TestCalcularSaldos:
 
     def test_sin_cuentas_da_lista_vacia(self):
         assert calcular_saldos([], [], {}) == []
+
+    def test_totales_por_moneda_no_mezcla(self):
+        from contabilidad.saldos import _totales_por_moneda
+
+        filas = [
+            {"moneda": "ARS", "saldo": 100},
+            {"moneda": "ARS", "saldo": 50},
+            {"moneda": "USD", "saldo": 7},
+        ]
+        assert _totales_por_moneda(filas) == {"ARS": 150, "USD": 7}
+
+    def test_cobros_ars_no_alimentan_caja_usd(self):
+        cuentas = [
+            {"id": 1, "nombre": "Caja Tincho", "tipo": "socio", "socio": "Tincho",
+             "moneda": "ARS", "saldo_inicial": 0},
+            {"id": 9, "nombre": "Dólares", "tipo": "caja", "socio": None,
+             "moneda": "USD", "saldo_inicial": 0},
+        ]
+        by = {f["nombre"]: f for f in calcular_saldos(cuentas, [], {"Tincho": 500})}
+        assert by["Caja Tincho"]["saldo"] == 500
+        assert by["Dólares"]["saldo"] == 0  # los cobros ARS no caen en la caja USD
