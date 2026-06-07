@@ -1155,6 +1155,121 @@ def init_db():
         )
     """)
 
+    # ── Contabilidad (#809): cuentas + gasto_categorias + movimientos ───────
+    # Módulo contable (backend/contabilidad/, espejo de reportes/): el libro
+    # único de movimientos entre cuentas/cajas con saldos. El ingreso por
+    # alquiler NO vive acá — DERIVA de alquiler_pagos (única fuente del cobro,
+    # #722); el saldo de la caja de un socio se calcula sumando sus pagos. Acá
+    # solo van los movimientos manuales (gasto/transferencia/retiro/aporte) y las
+    # cuentas con su saldo inicial. Esquema en dos capas (decisión 2026-06-03):
+    # también en la migración x8y9z0a1b2c3.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cuentas (
+            id             SERIAL PRIMARY KEY,
+            nombre         TEXT NOT NULL UNIQUE,
+            tipo           TEXT NOT NULL DEFAULT 'caja',
+            socio          TEXT,
+            moneda         VARCHAR(3) NOT NULL DEFAULT 'ARS',
+            saldo_inicial  INTEGER NOT NULL DEFAULT 0,
+            fecha_apertura DATE NOT NULL DEFAULT '2026-06-01',
+            activa         BOOLEAN NOT NULL DEFAULT TRUE,
+            orden          INTEGER NOT NULL DEFAULT 0,
+            created_by     TEXT,
+            created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_by     TEXT,
+            updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # moneda por cuenta (ARS/USD) — a veces se guardan dólares. ADD COLUMN para
+    # BDs que ya tenían la tabla (migración d4e5f6a7b8c9).
+    conn.execute("ALTER TABLE cuentas ADD COLUMN IF NOT EXISTS moneda VARCHAR(3) NOT NULL DEFAULT 'ARS'")
+    # Un socio = exactamente una caja (puente 1:1 con alquiler_pagos.destinatario).
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_cuentas_socio "
+        "ON cuentas(socio) WHERE socio IS NOT NULL"
+    )
+    conn.execute("""
+        INSERT INTO cuentas (nombre, tipo, socio, moneda, orden) VALUES
+            ('Caja Tincho', 'socio', 'Tincho', 'ARS', 1),
+            ('Caja Pablo',  'socio', 'Pablo',  'ARS', 2),
+            ('Efectivo',    'caja',  NULL,      'ARS', 3),
+            ('Banco',       'banco', NULL,      'ARS', 4),
+            ('Fondo Rambla','fondo', 'Rambla',  'ARS', 5),
+            ('Dólares',     'caja',  NULL,      'USD', 6)
+        ON CONFLICT (nombre) DO NOTHING
+    """)
+    # Rambla también cobra (default): la caja Fondo Rambla representa al cobrador
+    # 'Rambla'. Backfill para BDs que ya tenían la caja con socio NULL (migración
+    # c3d4e5f6a7b8). Idempotente.
+    conn.execute(
+        "UPDATE cuentas SET socio = 'Rambla' WHERE nombre = 'Fondo Rambla' AND socio IS NULL"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS gasto_categorias (
+            id     SERIAL PRIMARY KEY,
+            nombre TEXT NOT NULL UNIQUE,
+            activa BOOLEAN NOT NULL DEFAULT TRUE,
+            orden  INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    conn.execute("""
+        INSERT INTO gasto_categorias (nombre, orden) VALUES
+            ('Alquiler local', 1), ('Sueldos', 2), ('Equipos', 3),
+            ('Mantenimiento', 4), ('Impuestos', 5), ('Servicios', 6),
+            ('Otros', 99)
+        ON CONFLICT (nombre) DO NOTHING
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS movimientos (
+            id                SERIAL PRIMARY KEY,
+            tipo              TEXT NOT NULL,
+            monto             INTEGER NOT NULL CHECK (monto > 0),
+            cuenta_origen_id  INTEGER REFERENCES cuentas(id),
+            cuenta_destino_id INTEGER REFERENCES cuentas(id),
+            categoria_id      INTEGER REFERENCES gasto_categorias(id),
+            metodo            TEXT,
+            fecha             DATE NOT NULL DEFAULT CURRENT_DATE,
+            nota              TEXT,
+            comprobante_url   TEXT,
+            comprobante_key   TEXT,
+            rendicion_mes     VARCHAR(7),
+            es_rendicion      BOOLEAN NOT NULL DEFAULT FALSE,
+            created_by        TEXT,
+            created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_by        TEXT,
+            updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            anulado           BOOLEAN NOT NULL DEFAULT FALSE,
+            anulado_por       TEXT,
+            anulado_at        TIMESTAMP,
+            anulado_motivo    TEXT,
+            CONSTRAINT mov_tiene_cuenta CHECK (cuenta_origen_id IS NOT NULL OR cuenta_destino_id IS NOT NULL),
+            CONSTRAINT mov_cuentas_distintas CHECK (cuenta_origen_id IS DISTINCT FROM cuenta_destino_id)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_mov_fecha ON movimientos(fecha)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mov_origen ON movimientos(cuenta_origen_id) WHERE NOT anulado"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mov_destino ON movimientos(cuenta_destino_id) WHERE NOT anulado"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mov_rendicion ON movimientos(rendicion_mes) WHERE es_rendicion"
+    )
+    # beneficiario: a quién / para qué es el movimiento (ej. "Jimena") — etiqueta
+    # parseable y reutilizable (migración e5f6a7b8c9d0).
+    conn.execute("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS beneficiario TEXT")
+    # Cierres contables (#809, Fase 6): congelan un mes (foto + traba la edición de
+    # movimientos de ese mes). Espejo de la migración b2c3d4e5f6a7.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS contabilidad_cierres (
+            mes           VARCHAR(7) PRIMARY KEY,
+            snapshot_json TEXT NOT NULL,
+            cerrado_por   VARCHAR(255),
+            cerrado_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # ── Reconciliación con migraciones ──────────────────────────────────────
     # Estas tablas/columnas históricamente vivían SOLO en migraciones Alembic.
     # Las replicamos acá (idempotente) para que init_db produzca un esquema

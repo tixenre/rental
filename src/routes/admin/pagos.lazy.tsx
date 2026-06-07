@@ -20,7 +20,7 @@ export const Route = createLazyFileRoute("/admin/pagos")({
 });
 
 function PagosLogPage() {
-  useDocumentTitle("Pagos · Back Office");
+  useDocumentTitle("Cobros de pedidos · Back Office");
 
   const [destinatario, setDestinatario] = useState<string>("");
   const [metodo, setMetodo] = useState<string>("");
@@ -47,10 +47,10 @@ function PagosLogPage() {
         <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
           Back-office · Finanzas
         </div>
-        <h1 className="font-display text-3xl text-ink">Pagos</h1>
+        <h1 className="font-display text-3xl text-ink">Cobros de pedidos</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Registro de todos los cobros (la fuente única de "pagado"). Cada pago lleva a quién se
-          cobró y el método.
+          Registro de todos los cobros de pedidos (la fuente única de "pagado"). Cada cobro lleva a
+          quién se cobró y el método. El resumen por mes también aparece en Movimientos.
         </p>
       </header>
 

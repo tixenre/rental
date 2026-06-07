@@ -1,0 +1,313 @@
+/**
+ * contabilidad.cuentas.lazy.tsx — Cuentas/cajas con saldo (#809, Fase 1).
+ *
+ * Lista cada caja con su saldo (derivado: saldo inicial + cobros de alquiler +
+ * entradas − salidas), y permite crear cajas nuevas, editar el saldo inicial y
+ * dar de baja una caja vacía. Las cajas de socio (Caja Tincho / Caja Pablo) las
+ * crea el sistema y reciben los cobros automáticamente, por eso no se crean acá.
+ */
+import { createLazyFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { adminApi, type CuentaSaldo, type TipoCuenta } from "@/lib/admin/api";
+import { formatMoney } from "@/lib/format";
+import { useDocumentTitle } from "@/lib/use-document-title";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+// El socio se crea desde el sistema (seed); acá solo cajas/cuentas genéricas.
+const TIPOS_CREABLES: TipoCuenta[] = ["caja", "banco", "fondo"];
+
+export const Route = createLazyFileRoute("/admin/contabilidad/cuentas")({
+  component: CuentasPage,
+});
+
+function CuentasPage() {
+  useDocumentTitle("Cuentas · Finanzas");
+  const qc = useQueryClient();
+
+  const q = useQuery({
+    queryKey: ["admin", "contabilidad", "saldos"],
+    queryFn: () => adminApi.getSaldos(),
+  });
+
+  const invalidar = () => qc.invalidateQueries({ queryKey: ["admin", "contabilidad"] });
+
+  const cuentas = q.data?.cuentas ?? [];
+
+  return (
+    <div className="px-4 md:px-6 py-6 space-y-6 max-w-4xl mx-auto">
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            Back-office · Finanzas
+          </div>
+          <h1 className="font-display text-3xl text-ink">Cuentas</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Cada caja y su saldo. Lo de cada socio sale solo de los cobros que cargás en Pagos.
+          </p>
+        </div>
+        <Link
+          to="/admin/contabilidad"
+          className="shrink-0 h-9 rounded-md border hairline px-3 text-sm flex items-center hover:bg-muted/40"
+        >
+          ← Tablero
+        </Link>
+      </header>
+
+      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando cuentas…</div>}
+      {q.isError && (
+        <div className="text-sm text-destructive">
+          Error cargando las cuentas. {(q.error as Error)?.message}
+        </div>
+      )}
+
+      {q.data && (
+        <div className="overflow-x-auto rounded-lg border hairline">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b hairline text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                <th className="px-3 py-2 font-medium">Cuenta</th>
+                <th className="px-3 py-2 font-medium">Tipo</th>
+                <th className="px-3 py-2 font-medium text-right">Saldo inicial</th>
+                <th className="px-3 py-2 font-medium text-right">Saldo actual</th>
+                <th className="px-3 py-2 font-medium text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cuentas.map((c) => (
+                <CuentaRow key={c.id} cuenta={c} onChanged={invalidar} />
+              ))}
+            </tbody>
+            <tfoot>
+              {Object.entries(q.data.totales)
+                .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b)))
+                .map(([moneda, total]) => (
+                  <tr key={moneda} className="border-t hairline">
+                    <td className="px-3 py-2 font-medium" colSpan={3}>
+                      Total disponible {moneda !== "ARS" ? `(${moneda})` : ""}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
+                      {formatMoney(total, moneda)}
+                    </td>
+                    <td />
+                  </tr>
+                ))}
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      <NuevaCuentaForm onCreated={invalidar} />
+    </div>
+  );
+}
+
+function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => void }) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState(String(cuenta.saldo_inicial));
+
+  const guardar = useMutation({
+    mutationFn: () => adminApi.updateCuenta(cuenta.id, { saldo_inicial: Number(valor) || 0 }),
+    onSuccess: () => {
+      setEditando(false);
+      toast.success("Saldo inicial actualizado");
+      onChanged();
+    },
+    onError: (e) => toast.error("No se pudo actualizar", { description: (e as Error).message }),
+  });
+
+  const baja = useMutation({
+    mutationFn: () => adminApi.deactivateCuenta(cuenta.id),
+    onSuccess: () => {
+      toast.success("Cuenta dada de baja");
+      onChanged();
+    },
+    onError: (e) => toast.error("No se pudo dar de baja", { description: (e as Error).message }),
+  });
+
+  // Caja de cobrador (Pablo/Tincho/Rambla): recibe cobros automáticos, no se da de baja.
+  const esCobrador = Boolean(cuenta.socio);
+
+  return (
+    <tr className="border-b hairline last:border-0">
+      <td className="px-3 py-2 font-medium text-ink">{cuenta.nombre}</td>
+      <td className="px-3 py-2">
+        <Badge variant="secondary" className="capitalize">
+          {cuenta.tipo}
+        </Badge>
+      </td>
+      <td className="px-3 py-2 text-right">
+        {editando ? (
+          <div className="flex items-center justify-end gap-1">
+            <input
+              type="number"
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              className="h-8 w-28 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            />
+            <button
+              type="button"
+              onClick={() => guardar.mutate()}
+              disabled={guardar.isPending}
+              className="h-8 rounded-md bg-ink px-2 text-xs text-background"
+            >
+              Guardar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditando(false);
+                setValor(String(cuenta.saldo_inicial));
+              }}
+              className="h-8 rounded-md border hairline px-2 text-xs"
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditando(true)}
+            className="font-mono tabular-nums hover:text-amber hover:underline"
+            title="Editar saldo inicial"
+          >
+            {formatMoney(cuenta.saldo_inicial, cuenta.moneda)}
+          </button>
+        )}
+      </td>
+      <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
+        {formatMoney(cuenta.saldo, cuenta.moneda)}
+      </td>
+      <td className="px-3 py-2 text-right">
+        <button
+          type="button"
+          onClick={() => {
+            if (
+              window.confirm(`¿Dar de baja "${cuenta.nombre}"? Solo se puede si su saldo es cero.`)
+            )
+              baja.mutate();
+          }}
+          disabled={baja.isPending || esCobrador}
+          className={cn(
+            "text-xs underline",
+            esCobrador
+              ? "text-muted-foreground/40 cursor-not-allowed no-underline"
+              : "text-muted-foreground hover:text-destructive",
+          )}
+          title={
+            esCobrador
+              ? "Las cajas de cobrador (Pablo/Tincho/Rambla) no se dan de baja"
+              : "Dar de baja"
+          }
+        >
+          Baja
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
+  const [nombre, setNombre] = useState("");
+  const [tipo, setTipo] = useState<TipoCuenta>("caja");
+  const [moneda, setMoneda] = useState("ARS");
+  const [saldoInicial, setSaldoInicial] = useState("0");
+
+  const crear = useMutation({
+    mutationFn: () =>
+      adminApi.createCuenta({
+        nombre: nombre.trim(),
+        tipo,
+        moneda,
+        saldo_inicial: Number(saldoInicial) || 0,
+      }),
+    onSuccess: () => {
+      setNombre("");
+      setSaldoInicial("0");
+      setTipo("caja");
+      setMoneda("ARS");
+      toast.success("Cuenta creada");
+      onCreated();
+    },
+    onError: (e) =>
+      toast.error("No se pudo crear la cuenta", { description: (e as Error).message }),
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!nombre.trim()) return;
+        crear.mutate();
+      }}
+      className="rounded-lg border hairline p-4 space-y-3"
+    >
+      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        Nueva cuenta
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="space-y-1">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            Nombre
+          </span>
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ej. Mercado Pago"
+            className="h-9 w-48 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            Tipo
+          </span>
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as TipoCuenta)}
+            className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm capitalize"
+          >
+            {TIPOS_CREABLES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            Moneda
+          </span>
+          <select
+            value={moneda}
+            onChange={(e) => setMoneda(e.target.value)}
+            className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+          >
+            <option value="ARS">Pesos (ARS)</option>
+            <option value="USD">Dólares (USD)</option>
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            Saldo inicial
+          </span>
+          <input
+            type="number"
+            value={saldoInicial}
+            onChange={(e) => setSaldoInicial(e.target.value)}
+            className="h-9 w-32 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={crear.isPending || !nombre.trim()}
+          className="h-9 rounded-md bg-ink px-4 text-sm text-background disabled:opacity-50"
+        >
+          {crear.isPending ? "Creando…" : "Crear"}
+        </button>
+      </div>
+    </form>
+  );
+}

@@ -37,6 +37,18 @@ const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
 const AdminPagosLazyRouteImport = createFileRoute('/admin/pagos')()
+const AdminContabilidadCuentasLazyRouteImport = createFileRoute(
+  '/admin/contabilidad/cuentas',
+)()
+const AdminContabilidadMovimientosLazyRouteImport = createFileRoute(
+  '/admin/contabilidad/movimientos',
+)()
+const AdminContabilidadRendicionLazyRouteImport = createFileRoute(
+  '/admin/contabilidad/rendicion',
+)()
+const AdminContabilidadIndexLazyRouteImport = createFileRoute(
+  '/admin/contabilidad/',
+)()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
@@ -152,6 +164,38 @@ const AdminPagosLazyRoute = AdminPagosLazyRouteImport.update({
   path: '/pagos',
   getParentRoute: () => AdminRoute,
 } as any).lazy(() => import('./routes/admin/pagos.lazy').then((d) => d.Route))
+const AdminContabilidadCuentasLazyRoute =
+  AdminContabilidadCuentasLazyRouteImport.update({
+    id: '/contabilidad/cuentas',
+    path: '/contabilidad/cuentas',
+    getParentRoute: () => AdminRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/contabilidad.cuentas.lazy').then((d) => d.Route),
+  )
+const AdminContabilidadMovimientosLazyRoute =
+  AdminContabilidadMovimientosLazyRouteImport.update({
+    id: '/contabilidad/movimientos',
+    path: '/contabilidad/movimientos',
+    getParentRoute: () => AdminRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/contabilidad.movimientos.lazy').then((d) => d.Route),
+  )
+const AdminContabilidadRendicionLazyRoute =
+  AdminContabilidadRendicionLazyRouteImport.update({
+    id: '/contabilidad/rendicion',
+    path: '/contabilidad/rendicion',
+    getParentRoute: () => AdminRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/contabilidad.rendicion.lazy').then((d) => d.Route),
+  )
+const AdminContabilidadIndexLazyRoute =
+  AdminContabilidadIndexLazyRouteImport.update({
+    id: '/contabilidad/',
+    path: '/contabilidad/',
+    getParentRoute: () => AdminRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/contabilidad.index.lazy').then((d) => d.Route),
+  )
 const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
   id: '/estadisticas',
   path: '/estadisticas',
@@ -377,6 +421,10 @@ export interface FileRoutesByFullPath {
   '/admin/specs/': typeof AdminSpecsIndexLazyRoute
   '/cliente/pedidos/$id/editar': typeof ClientePedidosIdEditarRoute
   '/admin/equipos/$id/editar': typeof AdminEquiposIdEditarLazyRoute
+  '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
+  '/admin/contabilidad/movimientos': typeof AdminContabilidadMovimientosLazyRoute
+  '/admin/contabilidad/rendicion': typeof AdminContabilidadRendicionLazyRoute
+  '/admin/contabilidad/': typeof AdminContabilidadIndexLazyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -418,6 +466,10 @@ export interface FileRoutesByTo {
   '/admin/specs': typeof AdminSpecsIndexLazyRoute
   '/cliente/pedidos/$id/editar': typeof ClientePedidosIdEditarRoute
   '/admin/equipos/$id/editar': typeof AdminEquiposIdEditarLazyRoute
+  '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
+  '/admin/contabilidad/movimientos': typeof AdminContabilidadMovimientosLazyRoute
+  '/admin/contabilidad/rendicion': typeof AdminContabilidadRendicionLazyRoute
+  '/admin/contabilidad': typeof AdminContabilidadIndexLazyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -464,6 +516,10 @@ export interface FileRoutesById {
   '/admin/specs/': typeof AdminSpecsIndexLazyRoute
   '/cliente/pedidos/$id/editar': typeof ClientePedidosIdEditarRoute
   '/admin/equipos/$id/editar': typeof AdminEquiposIdEditarLazyRoute
+  '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
+  '/admin/contabilidad/movimientos': typeof AdminContabilidadMovimientosLazyRoute
+  '/admin/contabilidad/rendicion': typeof AdminContabilidadRendicionLazyRoute
+  '/admin/contabilidad/': typeof AdminContabilidadIndexLazyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -511,6 +567,10 @@ export interface FileRouteTypes {
     | '/admin/specs/'
     | '/cliente/pedidos/$id/editar'
     | '/admin/equipos/$id/editar'
+    | '/admin/contabilidad/cuentas'
+    | '/admin/contabilidad/movimientos'
+    | '/admin/contabilidad/rendicion'
+    | '/admin/contabilidad/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -552,6 +612,10 @@ export interface FileRouteTypes {
     | '/admin/specs'
     | '/cliente/pedidos/$id/editar'
     | '/admin/equipos/$id/editar'
+    | '/admin/contabilidad/cuentas'
+    | '/admin/contabilidad/movimientos'
+    | '/admin/contabilidad/rendicion'
+    | '/admin/contabilidad'
   id:
     | '__root__'
     | '/'
@@ -597,6 +661,10 @@ export interface FileRouteTypes {
     | '/admin/specs/'
     | '/cliente/pedidos/$id/editar'
     | '/admin/equipos/$id/editar'
+    | '/admin/contabilidad/cuentas'
+    | '/admin/contabilidad/movimientos'
+    | '/admin/contabilidad/rendicion'
+    | '/admin/contabilidad/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -710,6 +778,34 @@ declare module '@tanstack/react-router' {
       path: '/pagos'
       fullPath: '/admin/pagos'
       preLoaderRoute: typeof AdminPagosLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/contabilidad/cuentas': {
+      id: '/admin/contabilidad/cuentas'
+      path: '/contabilidad/cuentas'
+      fullPath: '/admin/contabilidad/cuentas'
+      preLoaderRoute: typeof AdminContabilidadCuentasLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/contabilidad/movimientos': {
+      id: '/admin/contabilidad/movimientos'
+      path: '/contabilidad/movimientos'
+      fullPath: '/admin/contabilidad/movimientos'
+      preLoaderRoute: typeof AdminContabilidadMovimientosLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/contabilidad/rendicion': {
+      id: '/admin/contabilidad/rendicion'
+      path: '/contabilidad/rendicion'
+      fullPath: '/admin/contabilidad/rendicion'
+      preLoaderRoute: typeof AdminContabilidadRendicionLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/contabilidad/': {
+      id: '/admin/contabilidad/'
+      path: '/contabilidad'
+      fullPath: '/admin/contabilidad/'
+      preLoaderRoute: typeof AdminContabilidadIndexLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/estadisticas': {
@@ -965,6 +1061,10 @@ interface AdminRouteChildren {
   AdminEmailTemplatesLazyRoute: typeof AdminEmailTemplatesLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
   AdminPagosLazyRoute: typeof AdminPagosLazyRoute
+  AdminContabilidadCuentasLazyRoute: typeof AdminContabilidadCuentasLazyRoute
+  AdminContabilidadMovimientosLazyRoute: typeof AdminContabilidadMovimientosLazyRoute
+  AdminContabilidadRendicionLazyRoute: typeof AdminContabilidadRendicionLazyRoute
+  AdminContabilidadIndexLazyRoute: typeof AdminContabilidadIndexLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
   AdminSolicitudesLazyRoute: typeof AdminSolicitudesLazyRoute
   AdminUnidadesLazyRoute: typeof AdminUnidadesLazyRoute
@@ -987,6 +1087,10 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEmailTemplatesLazyRoute: AdminEmailTemplatesLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
   AdminPagosLazyRoute: AdminPagosLazyRoute,
+  AdminContabilidadCuentasLazyRoute: AdminContabilidadCuentasLazyRoute,
+  AdminContabilidadMovimientosLazyRoute: AdminContabilidadMovimientosLazyRoute,
+  AdminContabilidadRendicionLazyRoute: AdminContabilidadRendicionLazyRoute,
+  AdminContabilidadIndexLazyRoute: AdminContabilidadIndexLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,
   AdminSolicitudesLazyRoute: AdminSolicitudesLazyRoute,
   AdminUnidadesLazyRoute: AdminUnidadesLazyRoute,
