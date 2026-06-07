@@ -997,9 +997,9 @@ function IdentidadSection({
       {!verificado && (
         <div className="mb-6">
           <p className="font-sans text-[13px] text-muted-foreground mb-4 leading-[1.5]">
-            La verificación usa tu DNI y una selfie. Tarda menos de 2 minutos y la hace Didit,
-            que consulta la base de RENAPER. Solo guardamos tu nombre, DNI y dirección oficial —
-            nunca la foto.
+            La verificación usa tu DNI y una selfie. Tarda menos de 2 minutos y la hace Didit, que
+            consulta la base de RENAPER. Solo guardamos tu nombre, DNI y dirección oficial — nunca
+            la foto.
           </p>
           <button
             type="button"
