@@ -9,9 +9,10 @@ El saldo de una cuenta es:
 
 `ingresos_alquiler` DERIVA de `alquiler_pagos` (única fuente del cobro, #722): no
 se carga ningún movimiento por un cobro de cliente → cero doble-contabilización.
-La ventana arranca en el clean start (`LIQUIDACION_INICIO`, misma constante que la
-liquidación) — los pagos previos quedaron con `destinatario` NULL a propósito y no
-suman.
+El clean start se aplica por la **fecha del alquiler** del pedido (`fecha_desde >=
+LIQUIDACION_INICIO`), MISMO corte que la liquidación y la rendición — un alquiler
+de antes de junio NO entra a Finanzas aunque se cobre después (decisión 2026-06-03:
+el corte es por fecha del alquiler, NO de pago).
 
 `calcular_saldos` es pura (testeable sin DB). El SQL solo trae filas planas.
 """
@@ -23,23 +24,25 @@ from reportes.liquidacion import LIQUIDACION_INICIO
 
 
 def ingresos_derivados(conn, desde: str | None = None, hasta: str | None = None) -> dict[str, int]:
-    """Σ de `alquiler_pagos.monto` por `destinatario` (Pablo/Tincho), desde el
-    clean start. Devuelve `{'Tincho': 480000, 'Pablo': 120000}`. Ventana opcional
-    `desde`/`hasta` (por fecha de pago, inclusive por día)."""
+    """Σ de `alquiler_pagos.monto` por `destinatario` (Pablo/Tincho/Rambla), solo de
+    pedidos cuyo ALQUILER cae en el clean start (`fecha_desde >= LIQUIDACION_INICIO`).
+    Devuelve `{'Tincho': 480000, 'Pablo': 120000}`. Ventana opcional `desde`/`hasta`
+    (por fecha de pago, inclusive por día)."""
     sql = """
-        SELECT destinatario, COALESCE(SUM(monto), 0) AS total
-        FROM alquiler_pagos
-        WHERE destinatario IS NOT NULL
-          AND fecha::date >= ?::date
+        SELECT ap.destinatario, COALESCE(SUM(ap.monto), 0) AS total
+        FROM alquiler_pagos ap
+        JOIN alquileres al ON al.id = ap.pedido_id
+        WHERE ap.destinatario IS NOT NULL
+          AND al.fecha_desde >= ?::date
     """
     params: list = [LIQUIDACION_INICIO]
     if desde:
-        sql += " AND fecha::date >= ?::date"
+        sql += " AND ap.fecha::date >= ?::date"
         params.append(desde)
     if hasta:
-        sql += " AND fecha::date <= ?::date"
+        sql += " AND ap.fecha::date <= ?::date"
         params.append(hasta)
-    sql += " GROUP BY destinatario"
+    sql += " GROUP BY ap.destinatario"
     rows = conn.execute(sql, tuple(params)).fetchall()
     return {r["destinatario"]: int(r["total"] or 0) for r in rows}
 

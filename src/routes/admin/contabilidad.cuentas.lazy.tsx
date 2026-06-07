@@ -2,8 +2,8 @@
  * contabilidad.cuentas.lazy.tsx — Cuentas/cajas con saldo (#809, Fase 1).
  *
  * Lista cada caja con su saldo (derivado: saldo inicial + cobros de alquiler +
- * entradas − salidas), y permite crear cajas nuevas, editar el saldo inicial y
- * dar de baja una caja vacía. Las cajas de socio (Caja Tincho / Caja Pablo) las
+ * entradas − salidas), y permite crear cajas nuevas, editar su nombre y saldo
+ * inicial, y dar de baja una caja vacía. Las cajas de socio (Caja Tincho / Caja Pablo) las
  * crea el sistema y reciben los cobros automáticamente, por eso no se crean acá.
  */
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
@@ -107,13 +107,24 @@ function CuentasPage() {
 
 function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => void }) {
   const [editando, setEditando] = useState(false);
+  const [nombre, setNombre] = useState(cuenta.nombre);
   const [valor, setValor] = useState(String(cuenta.saldo_inicial));
 
+  const cerrar = () => {
+    setEditando(false);
+    setNombre(cuenta.nombre);
+    setValor(String(cuenta.saldo_inicial));
+  };
+
   const guardar = useMutation({
-    mutationFn: () => adminApi.updateCuenta(cuenta.id, { saldo_inicial: Number(valor) || 0 }),
+    mutationFn: () =>
+      adminApi.updateCuenta(cuenta.id, {
+        nombre: nombre.trim(),
+        saldo_inicial: Number(valor) || 0,
+      }),
     onSuccess: () => {
       setEditando(false);
-      toast.success("Saldo inicial actualizado");
+      toast.success("Cuenta actualizada");
       onChanged();
     },
     onError: (e) => toast.error("No se pudo actualizar", { description: (e as Error).message }),
@@ -133,7 +144,17 @@ function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () =
 
   return (
     <tr className="border-b hairline last:border-0">
-      <td className="px-3 py-2 font-medium text-ink">{cuenta.nombre}</td>
+      <td className="px-3 py-2 font-medium text-ink">
+        {editando ? (
+          <input
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            className="h-8 w-44 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+          />
+        ) : (
+          cuenta.nombre
+        )}
+      </td>
       <td className="px-3 py-2">
         <Badge variant="secondary" className="capitalize">
           {cuenta.tipo}
@@ -141,70 +162,77 @@ function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () =
       </td>
       <td className="px-3 py-2 text-right">
         {editando ? (
-          <div className="flex items-center justify-end gap-1">
-            <input
-              type="number"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              className="h-8 w-28 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
-            />
-            <button
-              type="button"
-              onClick={() => guardar.mutate()}
-              disabled={guardar.isPending}
-              className="h-8 rounded-md bg-ink px-2 text-xs text-background"
-            >
-              Guardar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditando(false);
-                setValor(String(cuenta.saldo_inicial));
-              }}
-              className="h-8 rounded-md border hairline px-2 text-xs"
-            >
-              Cancelar
-            </button>
-          </div>
+          <input
+            type="number"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            className="h-8 w-28 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+          />
         ) : (
-          <button
-            type="button"
-            onClick={() => setEditando(true)}
-            className="font-mono tabular-nums hover:text-amber hover:underline"
-            title="Editar saldo inicial"
-          >
+          <span className="font-mono tabular-nums">
             {formatMoney(cuenta.saldo_inicial, cuenta.moneda)}
-          </button>
+          </span>
         )}
       </td>
       <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
         {formatMoney(cuenta.saldo, cuenta.moneda)}
       </td>
       <td className="px-3 py-2 text-right">
-        <button
-          type="button"
-          onClick={() => {
-            if (
-              window.confirm(`¿Dar de baja "${cuenta.nombre}"? Solo se puede si su saldo es cero.`)
-            )
-              baja.mutate();
-          }}
-          disabled={baja.isPending || esCobrador}
-          className={cn(
-            "text-xs underline",
-            esCobrador
-              ? "text-muted-foreground/40 cursor-not-allowed no-underline"
-              : "text-muted-foreground hover:text-destructive",
-          )}
-          title={
-            esCobrador
-              ? "Las cajas de cobrador (Pablo/Tincho/Rambla) no se dan de baja"
-              : "Dar de baja"
-          }
-        >
-          Baja
-        </button>
+        {editando ? (
+          <div className="flex items-center justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => guardar.mutate()}
+              disabled={guardar.isPending || !nombre.trim()}
+              className="h-8 rounded-md bg-ink px-2 text-xs text-background disabled:opacity-50"
+            >
+              Guardar
+            </button>
+            <button
+              type="button"
+              onClick={cerrar}
+              className="h-8 rounded-md border hairline px-2 text-xs"
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setEditando(true)}
+              className="text-xs text-muted-foreground underline hover:text-amber"
+              title="Editar nombre y saldo inicial"
+            >
+              Editar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `¿Dar de baja "${cuenta.nombre}"? Solo se puede si su saldo es cero.`,
+                  )
+                )
+                  baja.mutate();
+              }}
+              disabled={baja.isPending || esCobrador}
+              className={cn(
+                "text-xs underline",
+                esCobrador
+                  ? "text-muted-foreground/40 cursor-not-allowed no-underline"
+                  : "text-muted-foreground hover:text-destructive",
+              )}
+              title={
+                esCobrador
+                  ? "Las cajas de cobrador (Pablo/Tincho/Rambla) no se dan de baja"
+                  : "Dar de baja"
+              }
+            >
+              Baja
+            </button>
+          </div>
+        )}
       </td>
     </tr>
   );

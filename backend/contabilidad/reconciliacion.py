@@ -22,14 +22,16 @@ def reconciliar(conn) -> dict:
     ]
     out["saldos_negativos"] = {"cantidad": len(negativos), "cuentas": negativos}
 
-    # 2. Cobros (≥ clean start) sin un cobrador válido como destinatario → no entran
-    #    a ninguna caja y rompen la derivación de ingresos.
+    # 2. Cobros de pedidos dentro del clean start (por fecha del alquiler) sin un
+    #    cobrador válido como destinatario → no entran a ninguna caja y rompen la
+    #    derivación de ingresos. Mismo recorte que `ingresos_derivados`.
     _ph = ", ".join("?" for _ in COBRADORES)
     row = conn.execute(
-        f"""SELECT COUNT(*) AS n, COALESCE(SUM(monto), 0) AS m
-           FROM alquiler_pagos
-           WHERE fecha::date >= ?::date
-             AND (destinatario IS NULL OR destinatario NOT IN ({_ph}))""",
+        f"""SELECT COUNT(*) AS n, COALESCE(SUM(ap.monto), 0) AS m
+           FROM alquiler_pagos ap
+           JOIN alquileres al ON al.id = ap.pedido_id
+           WHERE al.fecha_desde >= ?::date
+             AND (ap.destinatario IS NULL OR ap.destinatario NOT IN ({_ph}))""",
         (LIQUIDACION_INICIO, *COBRADORES),
     ).fetchone()
     out["pagos_sin_socio"] = {"cantidad": int(row["n"]), "monto": int(row["m"] or 0)}
