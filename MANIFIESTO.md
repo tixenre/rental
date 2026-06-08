@@ -109,7 +109,7 @@ Body explica el **por qué**, no el **qué**. Bullets si hay varios efectos.
   - **Opt-out por PR**: pedir explícitamente "no mergees esta sola" — se deja para que el dueño la mergee.
 - Conflicts con main: rebase / merge desde el branch (no force-push a main).
 
-Detalle completo del flow en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
+El método de mantenimiento (auditar/fixear/commits/PR) vive en el skill [`limpieza`](.claude/skills/limpieza/SKILL.md); el **mobile gate** + el prompt del auditor, en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
 ### Issues — labels
 

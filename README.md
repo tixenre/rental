@@ -116,7 +116,7 @@ CI corre `pytest` automáticamente en cada PR a `main` (job `python-tests` en `.
 
 Branch + PR siempre: una **iniciativa** = una **rama** (`claude/<descripcion>`) = una **PR** con N commits atómicos. Antes de mergear corre el agente `supervisor` (revisión de scope/forma/drift) y CI tiene que estar verde. Merge según tamaño (trivial → auto-merge; sensible → draft + prueba del dueño). Después de mergear: borrar la branch local y remota.
 
-El contexto se auto-carga vía [`CLAUDE.md`](CLAUDE.md). Detalle del flow + decisiones en [`MANIFIESTO.md`](MANIFIESTO.md); memoria viva (decisiones + preferencias) en [`docs/MEMORIA.md`](docs/MEMORIA.md); protocolo de auditoría + PRs en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
+El contexto se auto-carga vía [`CLAUDE.md`](CLAUDE.md). Detalle del flow + decisiones en [`MANIFIESTO.md`](MANIFIESTO.md); memoria viva (digest enforceable) en [`docs/MEMORIA.md`](docs/MEMORIA.md) + log on-demand [`docs/DECISIONES.md`](docs/DECISIONES.md); prompt del auditor + mobile gate en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
 ## Tracking (GitHub Issues)
 
@@ -135,9 +135,10 @@ Producción corre en Railway. Detalle de variables, build, troubleshooting:
 ## Docs
 
 - [MANIFIESTO.md](MANIFIESTO.md) — contexto del proyecto para sesiones con Claude (workflow, decisiones, estado actual)
-- [docs/PROTOCOLO.md](docs/PROTOCOLO.md) — protocolo de auditoría + PRs
+- [docs/PROTOCOLO.md](docs/PROTOCOLO.md) — prompt del auditor + mobile gate (método de mantenimiento → skill `limpieza`)
 - [docs/DEPLOY_RAILWAY.md](docs/DEPLOY_RAILWAY.md) — setup de Railway
 - [docs/SISTEMA_SPECS.md](docs/SISTEMA_SPECS.md) — manual técnico del sistema de specs / catálogo / datasets / compat
 - [docs/DATASET_ILUMINACION.md](docs/DATASET_ILUMINACION.md) — dataset curado de luces + workflow seed por categoría
-- [docs/MEMORIA.md](docs/MEMORIA.md) — memoria viva: decisiones de criterio + preferencias (curado)
+- [docs/MEMORIA.md](docs/MEMORIA.md) — memoria viva: digest enforceable de decisiones + preferencias (curado, auto-cargado)
+- [docs/DECISIONES.md](docs/DECISIONES.md) — log ADR completo: el *por qué* de cada decisión (on-demand)
 - [docs/archive/](docs/archive/) — histórico archivado (auditoría de bugs y backlog de mayo 2026)
