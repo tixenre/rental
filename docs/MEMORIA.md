@@ -32,15 +32,15 @@ prueba — no pide permiso**. **Gates del dueño:** probar en staging + aprobar 
 `rama→dev` = squash (`tipo: desc (#PR)`); `dev→main` = merge commit (revert por PR); directos a `dev`
 sin squash. Commits atómicos, Conventional Commits en español.
 
-### 2026-06-08 — Issues: la cola espeja el código (Closes #N → auto-cierre en dev→main; roadmap aparte)
+### 2026-06-08 — Issues: la cola espeja el código (Closes #N → auto-cierre en dev→main; diferido aparte)
 
 Refina _Memoria en capas_ ("Issues = cola"). **Issue solo para trabajo diferido / multi-sesión /
 brain-dump del dueño**; lo hecho-y-mergeado en la misma sesión **no lleva issue** (el commit es el
 registro). Toda issue trabajada lleva **`Closes #N`** en el commit (directo a `dev`) o el PR; como la
 branch default es **`main`**, se **auto-cierra al promover `dev → main`** (cuando shippea a prod) —
 citar la issue, no solo el `#PR`. La **promoción `dev → main` reconcilia**: su PR lista las issues que
-cierra el lote → cierre en bloque con evidencia. Features grandes diferidas con label **`roadmap`**
-(separa roadmap de la cola activa; no es deuda sin cerrar). Triage **liviano y seguido** vía skill
+cierra el lote → cierre en bloque con evidencia. Features grandes diferidas con label **`someday`**
+(separa lo diferido de la cola activa; no es deuda sin cerrar). Triage **liviano y seguido** vía skill
 `limpieza` (frente D): verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
 tracking (no uno por fase).
 

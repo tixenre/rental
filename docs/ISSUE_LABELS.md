@@ -42,7 +42,7 @@ Cross-cutting. Aplicar **además** de las 3 obligatorias. Cero o más por issue.
 
 | Label | Cuándo |
 |---|---|
-| `roadmap` | Feature grande **diferida** ("para algún día") — separa el backlog de la cola accionable. No es deuda sin cerrar: queda asentada pero fuera de la vista "qué hago ahora". Ver MEMORIA _2026-06-08 — Issues_. |
+| `someday` | Feature grande **diferida** ("para algún día") — separa el backlog de la cola accionable. No es deuda sin cerrar: queda asentada pero fuera de la vista "qué hago ahora". Ver MEMORIA _2026-06-08 — Issues_. |
 | `launch-blocker` | Indispensable antes de publicar a producción |
 | `infrastructure` | CI, deploy, monitoreo |
 | `backend` | Cambia código del backend (FastAPI / DB / etc.) |
