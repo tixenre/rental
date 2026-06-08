@@ -44,13 +44,16 @@ if (existsSync(join(ROOT, DIGEST)) && existsSync(join(ROOT, LOG))) {
   const ls = new Set(l);
   for (const h of d) if (!ls.has(h)) errors.push(`Header en ${DIGEST} sin par en ${LOG}: "${h}"`);
   for (const h of l) if (!ds.has(h)) errors.push(`Header en ${LOG} sin par en ${DIGEST}: "${h}"`);
-  if (d.length !== ds.size) errors.push(`${DIGEST} tiene headers \`### fecha — título\` duplicados.`);
+  if (d.length !== ds.size)
+    errors.push(`${DIGEST} tiene headers \`### fecha — título\` duplicados.`);
   if (l.length !== ls.size) errors.push(`${LOG} tiene headers \`### fecha — título\` duplicados.`);
 }
 
 // ── 2. El import auto-cargado tiene que seguir presente ──────────────────────────────────────
 if (!/^@docs\/MEMORIA\.md\s*$/m.test(read(join(ROOT, "CLAUDE.md")))) {
-  errors.push("CLAUDE.md ya no auto-carga `@docs/MEMORIA.md` (se rompería el digest en cada sesión).");
+  errors.push(
+    "CLAUDE.md ya no auto-carga `@docs/MEMORIA.md` (se rompería el digest en cada sesión).",
+  );
 }
 
 // ── 3. Links vivos en los docs de gobernanza ─────────────────────────────────────────────────
@@ -90,7 +93,9 @@ for (const file of govFiles) {
     if (!existsSync(resolved)) {
       errors.push(`Link roto en ${relative(ROOT, file)}: "${target}" no existe.`);
     } else if (target.endsWith(".md") && statSync(resolved).isDirectory()) {
-      errors.push(`Link en ${relative(ROOT, file)}: "${target}" apunta a una carpeta, no a un .md.`);
+      errors.push(
+        `Link en ${relative(ROOT, file)}: "${target}" apunta a una carpeta, no a un .md.`,
+      );
     }
   }
 }
@@ -99,7 +104,9 @@ for (const file of govFiles) {
 if (errors.length) {
   console.error("✗ Drift de docs de gobernanza:\n");
   for (const e of errors) console.error(`  • ${e}`);
-  console.error(`\n${errors.length} problema(s). Ver decisión 2026-06-08 (memoria en dos sub-capas).`);
+  console.error(
+    `\n${errors.length} problema(s). Ver decisión 2026-06-08 (memoria en dos sub-capas).`,
+  );
   process.exit(1);
 }
 
