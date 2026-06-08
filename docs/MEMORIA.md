@@ -1,6 +1,6 @@
 # Memoria viva — Rambla Rental (digest enforceable)
 
-> **Reglas vivas de criterio + preferencias, en una línea cada una.** Este es el **digest
+> **Reglas vivas de criterio + preferencias, en 1-3 líneas cada una.** Este es el **digest
 > auto-cargado** (vía `@` desde `CLAUDE.md`): la línea base que el **supervisor hace cumplir** y que la
 > sesión tiene siempre en contexto. El **_por qué_ completo** de cada entrada (Contexto / Why /
 > Consecuencias / gotchas) vive en el log on-demand [`DECISIONES.md`](DECISIONES.md), **bajo el mismo
