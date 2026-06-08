@@ -45,12 +45,10 @@ Detalles de setup en [`README.md`](README.md). Detalles de Railway en [`docs/DEP
 
 ### Workflow
 
-**Branch + PR para lo grande; bugfixes chicos directo a `dev`.** Lo grande / sensible / arquitectónico / que toca el core de reservas o lo que ve el usuario va en una rama dedicada y se mergea por PR — corra Claude donde corra (apps de Mac/iPhone sobre sesiones en la nube, o la CLI local). Los **bugfixes chicos se commitean directo a `dev`** y se promueven en lote con un solo PR `dev → main` (ver `docs/MEMORIA.md` *2026-06-03*). **Nunca se commitea directo a `main`.**
-
-Una **iniciativa** (lo grande) = una **rama** (`claude/<descripcion>`) = una **PR** con N commits atómicos adentro. El deploy de staging (`dev`) refleja los cambios para probar.
+**Fuente única:** todo el flujo de cambios —routing por riesgo, `dev` = staging, quién mergea, los gates del dueño, métodos de merge— está definido en **una sola decisión**: `docs/MEMORIA.md` → _2026-06-08 — Workflow de cambios_ (con el _por qué_ en `docs/DECISIONES.md`). **No se repite acá.** Lo de abajo es solo el detalle de convención (nombres de rama, tipos de commit, formato de PR) que esa decisión usa.
 
 ```
-Edit → commit atómico en la rama → (N veces) → push → PR → supervisor + CI → merge
+Edit → verificar → (lo chico: push directo a `dev`=staging) | (lo grande/sensible: rama + PR → supervisor + CI → merge a `dev`) → el dueño prueba en staging → PR `dev → main` (su gate a prod)
 ```
 
 **La memoria del proyecto vive en capas** (detalle en §8):
@@ -76,7 +74,7 @@ Por qué: minimiza el costo de review + merge + deploy. Una iniciativa = 1 revie
 
 Cada commit dentro de la rama es atómico y revertible. La PR los publica en bloque.
 
-**Excepción explícita**: para algo chico y aislado (typo, una decisión de label puntual, un bug fix de 5 líneas que no está atado a una iniciativa más grande), pedir abrir una **PR separada** de forma explícita. Sin esa indicación, default es agregar al branch en curso.
+Esto aplica a **lo grande** (iniciativas). Lo **chico y aislado** (typo, label puntual, fix acotado) no lleva rama ni PR: va **directo a `dev`** según el routing por riesgo de la decisión _Workflow de cambios_.
 
 ### Branches
 
@@ -101,12 +99,7 @@ Body explica el **por qué**, no el **qué**. Bullets si hay varios efectos.
 - Si la iniciativa tiene issue de tracking: linkear con `Closes #N`.
 - **CI verde antes de mergear** (TypeScript typecheck, Python tests, Build frontend, mobile-smoke). La sesión **no propone merge con CI en rojo**.
 - **Antes de abrir/mergear: despachar el agente `supervisor`** — revisión read-only de scope / forma / drift, que resume en claro y deja el plan de prueba. (Instrucción, no gate de sistema: en las apps no hay hooks.)
-- **La sesión mergea a `dev`; el dueño gatea staging + promoción** (el supervisor ayuda a clasificar):
-  - Mergear a `dev` = mostrar en staging, no es prod → lo hace la **sesión**.
-  - **Trivial / small / mediano** con CI verde + supervisor OK → la sesión mergea a `dev` (directo, o **auto-merge** de GitHub si los checks corren). El dueño no clickea.
-  - **Sensible / arquitectónico / grande**, o que toca lo que ve el usuario → la sesión **avisa antes** de meterlo a `dev` (el dueño puede frenarlo), y después mergea.
-  - Los gates del dueño: **probar la conducta en staging** + **aprobar la promoción `dev → main`** (puerta a prod, siempre manual). Ver `docs/MEMORIA.md` *2026-06-03 — Quién clickea el merge*.
-  - **Opt-out por PR**: pedir explícitamente "no mergees esta sola" — se deja para que el dueño la mergee.
+- **Quién mergea y cuándo** (la sesión a `dev`, los gates del dueño, auto-merge, opt-out): definido en la decisión _Workflow de cambios_ del digest. No se repite acá.
 - Conflicts con main: rebase / merge desde el branch (no force-push a main).
 
 El método de mantenimiento (auditar/fixear/commits/PR) vive en el skill [`limpieza`](.claude/skills/limpieza/SKILL.md); el **mobile gate** + el prompt del auditor, en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).

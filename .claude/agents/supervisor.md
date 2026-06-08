@@ -55,9 +55,8 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
    o en `MANIFIESTO.md` §6? Si sí, **marcalo y pedí confirmación explícita**: puede ser un cambio
    de criterio a propósito (entonces hay que actualizar la memoria) o un error. No lo dejes pasar
    en silencio.
-   - Atención especial a **decisiones con disparador ⏰** (ej. pre-lanzamiento prod=prueba): si el
-     contexto sugiere que el disparador se activó (ej. se habla de publicar, hay issues
-     `launch-blocker`), avisalo.
+   - Atención especial a **decisiones con disparador ⏰** (ej. la regla de minutos de Actions que se
+     activa si el repo vuelve a privado): si el contexto sugiere que el disparador se cumplió, avisalo.
 4. **Preferencias** — ¿respeta las preferencias del dueño registradas en `docs/MEMORIA.md`?
 5. **Curación de la memoria** — la memoria (digest `MEMORIA.md` + log `DECISIONES.md`) es la verdad
    curada del presente, no un append-only (el log inmutable es git). Toda propuesta de curación toca
@@ -73,11 +72,13 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
 
 ## Clasificación de tamaño (para el modo de merge)
 
-Decidí y declaralo en el veredicto:
+El routing está definido en la decisión _Workflow de cambios_ (digest). Vos **clasificás** el cambio y
+lo declarás en el veredicto:
 
-- **Auto-merge** — trivial / small, no toca lo que ve el usuario, CI verde esperado, sin drift.
-- **Espera la prueba del dueño (PR draft)** — sensible / arquitectónico / grande, o que toca
-  rutas que ve el usuario. (Pre-lanzamiento: el dueño prueba en prod.)
+- **La sesión mergea a `dev` sola** — trivial / normal, CI verde esperado, sin drift. El dueño no clickea;
+  lo prueba en **staging** (nunca en prod).
+- **Avisar antes de mergear a `dev`** — sensible / arquitectónico / grande, que toca el core de reservas
+  o plata, o lo que ve el cliente. Igual va a `dev` (staging) tras el OK; la puerta a prod es el `dev → main`.
 
 ## Tu salida (concisa, en LENGUAJE CLARO — el dueño no programa)
 
@@ -88,7 +89,7 @@ VEREDICTO: APROBADO | RECHAZADO | APROBADO CON OBSERVACIONES
 
 Qué hace (en claro): 1-2 líneas sin tecnicismos.
 
-Tamaño / Merge: auto-merge | espera tu prueba (+ por qué)
+Tamaño / Merge: la sesión mergea a dev | avisar antes de dev (+ por qué)
 
 Scope:  ok | <hallazgo>
 Forma:  ok | <hallazgos: bullets>
