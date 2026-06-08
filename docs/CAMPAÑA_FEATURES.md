@@ -10,7 +10,7 @@
 ## Seleccionadas — entran a la campaña
 
 **• Alquilá El Estudio por horas**
-Reservá el espacio físico por la franja que necesites —no por día entero—, con galería de fotos, ubicación y un pack de equipos opcional para sumar a tu sesión.
+Reservá el espacio físico por la franja que necesites —no por día entero—, con un pack de equipos opcional para sumar a tu sesión. Mirá la ficha del espacio (superficie, ciclorama, amenities), la galería de fotos, el mapa interactivo con cómo llegar y la FAQ con las dudas más comunes.
 
 **• Catálogo en modo lista: ves todo y agregás al toque**
 La vista de lista te muestra todo el catálogo de un vistazo, sin perderte en fichas. Buscás, comparás y sumás al carrito en un clic. Buscador inteligente: escribís como hablás —sin tildes, con guiones, en cualquier orden— y aparece lo que buscás al instante.
@@ -25,10 +25,16 @@ Elegí fechas y horarios y la web te muestra al instante qué hay disponible. Fi
 Los kits muestran exactamente qué incluyen. Por ejemplo, el transmisor DJI lista todo lo que viene con el equipo —nada de sorpresas al retirar.
 
 **• Ficha técnica de cada equipo**
-Specs completas, qué incluye y contenido de caja. Sabés exactamente qué alquilás antes de pedirlo.
+Specs completas, contenido de caja y datos de conectividad y compatibilidad (qué conectores trae, con qué funciona). Sabés exactamente qué alquilás antes de pedirlo.
+
+**• Mirá el equipo en detalle antes de alquilar**
+Galería de fotos con zoom y swipe a pantalla completa, y video demo embebido en la ficha cuando está disponible.
 
 **• Precio claro, con descuento por días a la vista**
 En el carrito ves el desglose completo: cuanto más larga la jornada, más descuento —y se muestra cuánto ahorrás, equipo por equipo y en el total.
+
+**• Dejá instrucciones en tu pedido**
+Un campo de notas para pedirle algo puntual al equipo de Rambla: retiro fuera de horario, un extra, lo que necesites.
 
 **• Guardá tus favoritos**
 Marcá los equipos que más usás y encontralos rápido la próxima vez. Se guardan en tu cuenta.
@@ -78,6 +84,15 @@ Mientras está en presupuesto o confirmado, lo cancelás vos mismo.
 
 **• Filtros por specs técnicas**
 Filtrá el catálogo por características concretas de cada categoría.
+
+**• Descubrí sin buscar**
+Carruseles por categoría, mosaico de marcas y chips de búsquedas populares en la home.
+
+**• Badges en las fichas**
+"Nuevo", "Destacado" y "Parcialmente disponible" para ubicarte de un vistazo.
+
+**• Cómo funciona + FAQ en la home**
+Tres pasos para el que llega por primera vez, y las preguntas más comunes a mano.
 
 ---
 
