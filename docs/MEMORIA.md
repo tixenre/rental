@@ -192,9 +192,9 @@ Triagear **cada ítem en el acto** y devolver un mapa corto: **principio durable
 Regla **dormida** mientras el repo es público (Actions ilimitado). Higiene que vale siempre: batch de
 commits, `paths-ignore` de docs, `concurrency: cancel-in-progress`. ⏰ Si vuelve a privado, cuidar la cuota.
 
-### 2026-05-26 — Sesión local para trabajo visual/testeable _(reemplazada 2026-06-01)_
+### 2026-05-26 — Sesión local para trabajo visual/testeable _(reemplazada 2026-06-08)_
 
-Reemplazada por _Staging → Prod (2026-06-01)_: se pushea a `dev` y se ve en staging. La sesión local queda
+Reemplazada por _Workflow de cambios (2026-06-08)_: se pushea a `dev` y se ve en staging. La sesión local queda
 solo para debugging muy específico sin acceso a Railway, no es el flujo default.
 
 ### 2026-05-26 — Al actualizar gobernanza, barrer todo el sistema de supervisión

@@ -619,9 +619,9 @@ cancel-in-progress` ya cancela corridas viejas.
 - **⏰ Disparador:** si el repo vuelve a privado, el plan Free da 2.000 min/mes y el CI corre 6 jobs
   por push → ahí sí hay que cuidar la cuota (sacar `compileall`, cachear `npm ci`, terminar #487).
 
-### 2026-05-26 — Sesión local para trabajo visual/testeable _(reemplazada 2026-06-01)_
+### 2026-05-26 — Sesión local para trabajo visual/testeable _(reemplazada 2026-06-08)_
 
-- _(Reemplazada por la decisión 2026-06-01 — Staging → Prod. El staging de Railway cubre
+- _(Reemplazada por la decisión 2026-06-08 — Workflow de cambios. El staging de Railway cubre
   la necesidad de ver cambios en vivo. Ya no hace falta arrancar local para validar UX/flujos;
   se pushea a `dev` y se ve en staging. La sesión local sigue siendo válida para debugging
   muy específico sin acceso a Railway, pero no es el flujo default.)_
