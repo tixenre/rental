@@ -36,9 +36,11 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 
 ## Memoria — dónde vive qué
 
-- **Decisiones de criterio + preferencias** → [`docs/MEMORIA.md`](docs/MEMORIA.md) (curado; lo
-  hace cumplir el supervisor). Agregar entradas **SOLO con aprobación explícita del dueño**; el
-  supervisor propone, no escribe.
+- **Decisiones de criterio + preferencias** → [`docs/MEMORIA.md`](docs/MEMORIA.md) — el **digest
+  enforceable** (regla de cada decisión en una línea, auto-cargado abajo); el **_por qué_ completo**
+  vive en el log on-demand [`docs/DECISIONES.md`](docs/DECISIONES.md) (mismo `fecha — título`). Lo
+  hace cumplir el supervisor. Escribir/editar/podar **SOLO con aprobación explícita del dueño** (toca
+  ambos archivos en paridad); el supervisor propone, no escribe.
 - **Trabajo pendiente** → GitHub Issues (la cola). Iniciativa multi-sesión → 1 issue de tracking
   por iniciativa, auto-mantenido por la sesión.
 - **Registro de cambios** → commit history.
@@ -50,7 +52,8 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 | Doc                                                                          | Para qué                                                                                                                                                                                                    |
 | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`MANIFIESTO.md`](MANIFIESTO.md)                                             | Qué es, stack, glosario, mapa de código, decisiones de arquitectura                                                                                                                                         |
-| [`docs/MEMORIA.md`](docs/MEMORIA.md)                                         | Decisiones + preferencias vivas (importado abajo)                                                                                                                                                           |
+| [`docs/MEMORIA.md`](docs/MEMORIA.md)                                         | **Digest enforceable** de decisiones + preferencias vivas, una línea c/u (importado abajo)                                                                                                                  |
+| [`docs/DECISIONES.md`](docs/DECISIONES.md)                                   | Log ADR completo (el _por qué_ de cada decisión), on-demand — mismo `fecha — título` que el digest                                                                                                          |
 | [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md)                             | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido`                                                                                                                         |
 | [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md)                                     | Playbook de auditoría + PRs + mobile gate                                                                                                                                                                   |
 | [`docs/ISSUE_LABELS.md`](docs/ISSUE_LABELS.md)                               | Labels (3 dimensiones obligatorias)                                                                                                                                                                         |

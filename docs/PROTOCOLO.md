@@ -262,7 +262,7 @@ gh auth login
 ## Fase 5 — Después del merge
 
 - [ ] Items pendientes priorizados → crear/actualizar GitHub Issues (el tracking activo vive ahí).
-- [ ] Si hubo un bug que indica una clase de error recurrente (ej. "secuencias desincronizadas"), registrarlo en [`docs/MEMORIA.md`](MEMORIA.md) como preferencia/decisión (formato **What / Why / How to apply**) para no volver a caer.
+- [ ] Si hubo un bug que indica una clase de error recurrente (ej. "secuencias desincronizadas"), registrarlo como preferencia/decisión (con aprobación del dueño): la **regla** en una línea al digest [`docs/MEMORIA.md`](MEMORIA.md) + el desarrollo **What / Why / How to apply** al log [`docs/DECISIONES.md`](DECISIONES.md), mismo `fecha — título`, para no volver a caer.
 - [ ] Si un bug requirió arreglo en runtime (database, infra) además del código, dejar nota en commit message + PR description.
 - [ ] Borrar la branch local: `git branch -d chore/audit-and-fixes-YYYY-MM-DD`.
 
