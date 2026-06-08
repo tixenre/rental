@@ -30,7 +30,16 @@ PUBLIC_API_READONLY = (
     "/api/equipos",
     "/api/categorias",
     "/api/etiquetas",
+    "/api/marcas",       # lista de marcas: dato público del catálogo (hermano de /api/categorias).
     "/api/disponibilidad",
+    # Config pública del sitio. Sólo GET; cada handler valida adentro lo suyo:
+    #  · GET /api/settings/{key} sirve sin sesión SOLO las keys de
+    #    PUBLIC_SETTINGS_KEYS (settings.py); el resto exige sesión en el handler.
+    #  · GET /api/settings (lista) devuelve el subconjunto público a anónimos y
+    #    todo a una sesión admin (gate fino en el handler).
+    #  · /api/analytics-config devuelve el GA4 id (no secreto) y gatea por entorno.
+    "/api/settings",
+    "/api/analytics-config",
 )
 
 # Prefijos públicos que aceptan POST a propósito (cada uno valida adentro lo suyo).

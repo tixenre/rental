@@ -181,6 +181,35 @@ ALLOWED_SETTINGS_KEYS = {
     "recordatorios_dias_antes",   # Días de anticipación. Int 1-14.
 }
 
+# Subconjunto de settings que el catálogo PÚBLICO (visitante anónimo) necesita
+# leer para renderizarse: precio (usd_rate), branding (logo/favicon/og), datos
+# del negocio (contacto, horarios), contenido editable (FAQ, taglines) y la
+# ventana de disponibilidad. Estas keys NO son secretas — ya quedan visibles en
+# el sitio público. El resto de ALLOWED_SETTINGS_KEYS (email_from/email_admin_to,
+# comisiones, recordatorios, roi/shipping internos, los *_svg_url de origen) sigue
+# requiriendo sesión: se leen solo desde el back-office.
+#
+# El `auth_middleware` exime GET /api/settings/{key} (ver middleware.py); este
+# subconjunto es el gate fino que decide qué key se sirve sin sesión.
+PUBLIC_SETTINGS_KEYS = {
+    "usd_rate",
+    "buffer_horas_alquiler",
+    "horarios_retiro",
+    "hero_taglines",
+    "faq_json",
+    "og_image_url",
+    "wordmark_svg",
+    "favicon_url",
+    "apple_touch_icon_url",
+    "icon_512_url",
+    "whatsapp_phone",
+    "business_address",
+    "business_maps_url",
+    "business_phone_display",
+    "business_email",
+    "business_instagram",
+}
+
 # Keys cuyo valor puede borrarse (volver al default) desde la UI. El resto
 # rechaza string vacía para no romper cálculos / settings críticas.
 CLEARABLE_SETTINGS_KEYS = {
@@ -218,11 +247,17 @@ def analytics_config():
 
 
 @router.get("/settings/{key}")
-def get_setting(key: str):
-    """Devuelve el valor de una setting. Lectura pública (el USD rate
-    afecta cálculos en el frontend público también)."""
+def get_setting(key: str, request: Request):
+    """Devuelve el valor de una setting.
+
+    Las keys de `PUBLIC_SETTINGS_KEYS` son lectura pública (el catálogo anónimo
+    las necesita: USD rate para el precio, branding, contacto, horarios, FAQ…).
+    El resto de `ALLOWED_SETTINGS_KEYS` exige sesión (se leen solo del back-office).
+    El `auth_middleware` exime el path; este handler es el gate fino por key."""
     if key not in ALLOWED_SETTINGS_KEYS:
         raise HTTPException(404, f"Setting '{key}' no existe")
+    if key not in PUBLIC_SETTINGS_KEYS:
+        require_admin(request)  # 401 si no hay sesión
     with get_db() as conn:
         row = conn.execute(
             "SELECT value, updated_at, updated_by FROM app_settings WHERE key = ?",
@@ -239,8 +274,11 @@ def get_setting(key: str):
 
 
 @router.get("/settings")
-def list_settings():
-    """Lista todas las settings públicas. Útil para el panel admin."""
+def list_settings(request: Request):
+    """Lista settings. Para un visitante anónimo devuelve SOLO las públicas
+    (`PUBLIC_SETTINGS_KEYS` — el footer público las usa vía `useBusinessContact`);
+    con sesión devuelve todas las `ALLOWED_SETTINGS_KEYS` (panel admin)."""
+    visibles = ALLOWED_SETTINGS_KEYS if get_session(request) else PUBLIC_SETTINGS_KEYS
     with get_db() as conn:
         rows = conn.execute(
             "SELECT key, value, updated_at, updated_by FROM app_settings ORDER BY key"
@@ -254,7 +292,7 @@ def list_settings():
                     "updated_by": r["updated_by"],
                 }
                 for r in rows
-                if r["key"] in ALLOWED_SETTINGS_KEYS
+                if r["key"] in visibles
             ]
         }
 
