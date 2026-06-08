@@ -283,6 +283,42 @@ def auth_dev_login():
     )
 
 
+@router.get("/auth/dev-login-cliente")
+def auth_dev_login_cliente(email: str | None = None):
+    """Login de cliente sin OAuth — solo en dev (ADMIN_BYPASS_AUTH=1, nunca en
+    prod, ver `dev_bypass_enabled`). Espeja la sesión que arma el callback de
+    OAuth de cliente (role='cliente' + cliente_id) para poder recorrer el portal
+    en local con datos del seed. Si no se pasa `email`, usa el primer cliente.
+    """
+    if not dev_bypass_enabled():
+        raise HTTPException(404, "No encontrado.")
+    from database import get_db
+    with get_db() as conn:
+        if email:
+            row = conn.execute(
+                "SELECT id, nombre, email FROM clientes WHERE LOWER(email) = LOWER(?)",
+                (email,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT id, nombre, email FROM clientes ORDER BY id LIMIT 1"
+            ).fetchone()
+    if not row:
+        raise HTTPException(404, "No hay clientes en la base (corré el seed de demo).")
+    token = signer.dumps({
+        "email": row["email"], "name": row["nombre"],
+        "role": "cliente", "cliente_id": row["id"],
+    })
+    res = HTMLResponse(
+        '<!DOCTYPE html><html><head>'
+        f'<script>window.location.replace("{FRONTEND_BASE}/cliente/portal")</script>'
+        '</head><body>Redirigiendo...</body></html>'
+    )
+    res.set_cookie("session", token, httponly=True, samesite="lax",
+                   secure=COOKIE_SECURE, max_age=SESSION_MAX_AGE)
+    return res
+
+
 @router.get("/api/public/maps-key")
 def public_maps_key():
     return {"key": MAPS_API_KEY or None}
