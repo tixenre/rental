@@ -55,7 +55,7 @@ Edit → commit atómico en la rama → (N veces) → push → PR → supervisor
 
 **La memoria del proyecto vive en capas** (detalle en §8):
 
-- **[`docs/MEMORIA.md`](docs/MEMORIA.md)** — decisiones de criterio + preferencias (el *por qué*, curado y duradero). Lo que el supervisor hace cumplir.
+- **[`docs/MEMORIA.md`](docs/MEMORIA.md)** — decisiones de criterio + preferencias, **digest enforceable** (la regla de cada una, auto-cargado). Lo que el supervisor hace cumplir. El **_por qué_ completo** (el desarrollo ADR) vive en [`docs/DECISIONES.md`](docs/DECISIONES.md), on-demand, bajo el mismo `fecha — título`.
 - **Commit history** — registro de cambios. Conventional Commits en español; `git log --grep="^fix"` / `"^feat"` son el log buscable.
 - **GitHub Issues** — trabajo pendiente (la cola). No es obligatorio por commit.
 
@@ -109,7 +109,7 @@ Body explica el **por qué**, no el **qué**. Bullets si hay varios efectos.
   - **Opt-out por PR**: pedir explícitamente "no mergees esta sola" — se deja para que el dueño la mergee.
 - Conflicts con main: rebase / merge desde el branch (no force-push a main).
 
-Detalle completo del flow en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
+El método de mantenimiento (auditar/fixear/commits/PR) vive en el skill [`limpieza`](.claude/skills/limpieza/SKILL.md); el **mobile gate** + el prompt del auditor, en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
 ### Issues — labels
 
@@ -261,22 +261,24 @@ La memoria está separada por propósito (no se duplica):
 
 | Querés saber… | Dónde |
 |---|---|
-| **Por qué decidimos algo / cómo quiere el dueño que se hagan las cosas** | [`docs/MEMORIA.md`](docs/MEMORIA.md) — decisiones de criterio + preferencias, curado y fechado. **El supervisor lo hace cumplir.** |
+| **Por qué decidimos algo / cómo quiere el dueño que se hagan las cosas** | [`docs/MEMORIA.md`](docs/MEMORIA.md) — digest enforceable de decisiones + preferencias (la regla de cada una). El *por qué* completo → [`docs/DECISIONES.md`](docs/DECISIONES.md). Curado y fechado. **El supervisor lo hace cumplir.** |
 | Decisiones de arquitectura fundacionales | §6 de este manifiesto (baseline congelado) |
 | Qué hay pendiente / en curso | GitHub Issues (la cola). `gh issue list` localmente, o las tools de GitHub en la nube |
 | Qué cambió y cuándo | Commit history (`git log --grep="^feat"` / `"^fix"`) |
 
-Regla: **trabajo pendiente** → Issues. **Registro de cambios** → commits/PRs. **El *por qué* y las
-preferencias** → `docs/MEMORIA.md` (curado, no exhaustivo: solo lo que tiene consecuencia
-duradera o se repite). Si una funcionalidad existe en código y no está trackeada, crear el issue.
+Regla: **trabajo pendiente** → Issues. **Registro de cambios** → commits/PRs. **Las reglas de criterio
+y preferencias** → `docs/MEMORIA.md` (digest, auto-cargado); **su *por qué* completo** → `docs/DECISIONES.md`
+(on-demand). Curado, no exhaustivo: solo lo que tiene consecuencia duradera o se repite. Si una
+funcionalidad existe en código y no está trackeada, crear el issue.
 Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`).
 
 ### Docs auxiliares
 
 | Archivo | Cuándo |
 |---|---|
-| [`docs/MEMORIA.md`](docs/MEMORIA.md) | Decisiones de criterio + preferencias (memoria viva, curada) |
-| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Workflow de PRs, auditoría, mobile gate |
+| [`docs/MEMORIA.md`](docs/MEMORIA.md) | Digest enforceable de decisiones + preferencias (memoria viva, curada; auto-cargado) |
+| [`docs/DECISIONES.md`](docs/DECISIONES.md) | Log ADR completo: el *por qué* de cada decisión (on-demand) |
+| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Prompt del auditor + mobile gate (método de mantenimiento → skill `limpieza`) |
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/SISTEMA_SPECS.md`](docs/SISTEMA_SPECS.md) | **Manual técnico del sistema de specs / catálogo / datasets / autocompletar / compat** |
 | [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido` |

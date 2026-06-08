@@ -79,22 +79,11 @@ gh issue list --state open --label "mobile"
 3. Recorrer todas las páginas listadas abajo, marcando cada checkpoint.
 4. Reportar cualquier problema nuevo como issue con label `bug,priority:high`.
 
-### Automatizado (futuro — issue separado)
+### Automatizado (en CI)
 
-Sistema sugerido: **Playwright** con viewports preset. Cada PR corre smoke tests:
-
-```ts
-test.use({ viewport: { width: 375, height: 667 } }); // iPhone SE
-test("home no tiene scroll horizontal", async ({ page }) => {
-  await page.goto("/");
-  const overflowX = await page.evaluate(
-    () => document.documentElement.scrollWidth > window.innerWidth,
-  );
-  expect(overflowX).toBe(false);
-});
-```
-
-Aún no implementado.
+**Playwright** con viewport iPhone SE (375×667) corre como **smoke test en cada PR** —
+`.github/workflows/mobile-smoke.yml` (specs en `e2e/`). Caza regresiones gruesas (scroll
+horizontal, rutas que no montan), **no reemplaza** la validación visual del gate de abajo.
 
 ---
 
@@ -163,45 +152,15 @@ Para cada página, verificar **todos** estos puntos antes de marcar como OK:
 
 ---
 
-## Hallazgos resueltos en esta PR
+## Hallazgos pendientes (polish, baja prioridad)
 
-### Inputs disparaban zoom en iOS
-
-**Problema:** iOS hace zoom automático al focus en cualquier input con `font-size < 16px`. Los formularios de `/cliente/perfil`, `/cliente/registro` y otros usaban `text-sm` (14px).
-
-**Fix:** regla CSS global en `styles.css`:
-
-```css
-@media (max-width: 767px) {
-  input, textarea, select {
-    font-size: max(16px, 1em);
-  }
-}
-```
-
-Fixea **todos** los inputs del proyecto sin tocar componentes. Desktop (`md+`) sigue con `text-sm` si lo tiene.
-
-### Botón usuario en TopBar muy chico
-
-**Problema:** mobile tenía `w-8 h-8` (32px) — bajo el mínimo Apple HIG de 44px.
-
-**Fix:** `w-10 h-10` (40px) en mobile. Suficientemente grande sin desbalancear el header.
-
-### Imágenes sin lazy loading
-
-**Problema:** `EquipmentRow` y la lista de pedidos del cliente mostraban imágenes sin `loading="lazy"` — el browser las descargaba todas al cargar.
-
-**Fix:** `loading="lazy"` agregado.
-
----
-
-## Hallazgos pendientes (issues abiertos)
+El detalle de fixes históricos vive en el commit history; lo pendiente se trackea en **GitHub
+Issues** con label `mobile`. Polish abierto conocido:
 
 | | |
 |---|---|
 | Tap targets en cards/rows (+/- buttons) | h-7 (28px) dentro de pill con padding — funcional pero podríamos ir a h-9. Bajo prioridad. |
 | Touch feedback en botones | Falta `:active` con animación clara. UX polish. |
-| Sistema de auditoría automatizada | Playwright + viewport tests — issue separado. |
 
 ---
 
@@ -210,8 +169,8 @@ Fixea **todos** los inputs del proyecto sin tocar componentes. Desktop (`md+`) s
 Esta sección define **cuándo no se puede mergear** sin haber validado mobile:
 
 - **En cada PR** que toque rutas cliente, `/admin/pedidos` o `/admin/dashboard`
-  (gate explícito de merge — ver PROTOCOLO.md Fase 1.5). Sin auditoría mobile
-  validada, el PR queda en draft.
+  (gate explícito de merge — ver [`PROTOCOLO.md`](PROTOCOLO.md) → Mobile pass + gate). Sin
+  auditoría mobile validada, el PR queda en draft.
 - Se agregue una página nueva → agregarla a la tabla de páginas, evaluarla
   contra el criterio, marcar 🟢/🟡/🔴.
 - Se cambie el diseño de TopBar, Cart, DateModal o Footer (componentes

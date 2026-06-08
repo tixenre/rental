@@ -1,0 +1,37 @@
+name: Docs lint
+
+# El CI de código (ci.yml) IGNORA los cambios de docs (paths-ignore: **/*.md, docs/**),
+# así que el drift documental nunca se cazaba. Este workflow cubre justo ese hueco: corre
+# SOLO cuando cambian docs o el sistema de gobernanza (.claude/**), y valida con
+# scripts/check-docs.mjs (paridad digest↔log, import presente, links vivos).
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "**/*.md"
+      - ".claude/**"
+      - "scripts/check-docs.mjs"
+      - ".github/workflows/docs-lint.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "**/*.md"
+      - ".claude/**"
+      - "scripts/check-docs.mjs"
+      - ".github/workflows/docs-lint.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-docs:
+    name: Drift de docs de gobernanza
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # Sin deps: check-docs.mjs usa solo módulos nativos de Node → no hace falta npm ci.
+      - run: node scripts/check-docs.mjs

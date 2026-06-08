@@ -19,8 +19,11 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
 2. `MANIFIESTO.md` — §3 (convenciones de trabajo), §6 (decisiones de arquitectura fundacionales),
    §7 (puntero al sistema de specs) y el glosario/mapa de código según haga falta. El manual técnico
    del sistema de specs / catálogo vive en `docs/SISTEMA_SPECS.md`.
-3. `docs/MEMORIA.md` — **decisiones de criterio + preferencias vivas. Esto es lo que más tenés
-   que hacer cumplir.**
+3. `docs/MEMORIA.md` — **el digest de decisiones de criterio + preferencias vivas, en una línea cada
+   una. Esto es lo que más tenés que hacer cumplir.** El **_por qué_ completo** de cada entrada
+   (Contexto / Why / Consecuencias / gotchas) vive en el log `docs/DECISIONES.md`, bajo el **mismo
+   `### fecha — título`** → abrilo on-demand cuando necesites el desarrollo de una regla para juzgar
+   un drift fino o para curar. Ambos archivos se mantienen en paridad (lo verifica `scripts/check-docs.mjs`).
 4. `docs/PROTOCOLO.md`, `docs/ISSUE_LABELS.md`, `docs/MOBILE_AUDIT.md` — según lo que toque el cambio.
 5. El cambio en sí:
    ```bash
@@ -56,9 +59,10 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
      contexto sugiere que el disparador se activó (ej. se habla de publicar, hay issues
      `launch-blocker`), avisalo.
 4. **Preferencias** — ¿respeta las preferencias del dueño registradas en `docs/MEMORIA.md`?
-5. **Curación de la memoria** — `MEMORIA.md` es la verdad curada del presente, no un log (el log
-   inmutable es git). En cada revisión, además de cazar drift, **proponé mantenerla chica y
-   vigente**:
+5. **Curación de la memoria** — la memoria (digest `MEMORIA.md` + log `DECISIONES.md`) es la verdad
+   curada del presente, no un append-only (el log inmutable es git). Toda propuesta de curación toca
+   **los dos** archivos en paridad (misma fecha-título). En cada revisión, además de cazar drift,
+   **proponé mantenerla chica y vigente**:
    - **Retirar** entradas cuyo disparador ⏰ ya se cumplió (ej. una decisión "vence cuando X" y X ya
      pasó), o que perdieron consecuencia.
    - **Fusionar** entradas redundantes / que se solapan.
@@ -95,8 +99,8 @@ Cómo probarlo (plan de prueba):
   2. Hacé <acción>
   3. Tenés que ver <resultado esperado>
 
-Propuestas de memoria (si hay): agregar (entradas What/Why/How candidatas), retirar (entradas
-  vencidas/sin consecuencia) o fusionar (redundantes) en docs/MEMORIA.md
+Propuestas de memoria (si hay): agregar (regla al digest MEMORIA.md + desarrollo al log
+  DECISIONES.md, en paridad), retirar (entradas vencidas/sin consecuencia) o fusionar (redundantes)
   — el dueño decide. (Vos NO las escribís.)
 ```
 
