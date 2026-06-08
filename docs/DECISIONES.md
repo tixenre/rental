@@ -64,6 +64,36 @@
   corre, el supervisor gatea lo grande, y prod sigue blindado por el PR `dev → main` + la aprobación del
   dueño. El gate humano del dueño es **probar la conducta en staging**, no revisar código.
 
+### 2026-06-08 — Issues: la cola espeja el código (Closes #N → auto-cierre en dev→main; roadmap aparte)
+
+> Refina _Memoria en capas (2026-05-25)_: "Issues = cola" se precisa en cómo se abren, cierran e
+> integran con el _Workflow de cambios (2026-06-08)_.
+
+- **Contexto:** 36 issues abiertas, ~la mitad sin tocar desde mayo; sensación de catarata. Causa real
+  del "no se cierran": los commits citan el **PR** (`#843`) pero **no la issue**, así que GitHub nunca
+  las auto-cierra aunque el trabajo ya shippeó. Y el roadmap (features grandes "para algún día")
+  mezclado con lo accionable hace sentir todo como una pila.
+- **Qué merece issue (anti-catarata):** trabajo **diferido** (no ahora), **multi-sesión**, o un
+  **brain-dump / idea** del dueño que no se hace en el momento. Lo que se **hace y mergea en la misma
+  sesión NO lleva issue** — el commit history es su registro; crear una para cerrarla al toque es
+  burocracia.
+- **Cierre = shippeó a prod.** Toda issue que se trabaja lleva **`Closes #N`** en el commit (directo a
+  `dev`) o en el PR (lo grande). Como la **branch default es `main`**, GitHub la **auto-cierra cuando
+  el trabajo llega a `main`** (en la promoción `dev → main`) → la issue se cierra cuando el dueño puede
+  usar la cosa en prod, no antes. Citar la **issue**, no solo el `#PR`.
+- **La promoción `dev → main` es el checkpoint de reconciliación:** el PR de promoción lista en su
+  cuerpo las issues que cierra el lote (`Closes #N` c/u) → se cierran **en bloque, con evidencia**, al
+  ritmo de prod. Nunca más cerrar a mano de a una.
+- **Roadmap aparte:** las features grandes diferidas llevan label **`roadmap`** (definido en
+  `docs/ISSUE_LABELS.md`) → se filtran de la vista "qué hago ahora". La cola accionable queda chica; el
+  roadmap queda **asentado pero separado** — no es deuda sin cerrar, es backlog. El brain-dump del
+  dueño va a issue igual (no se pierde), con `roadmap` si es "algún día".
+- **Triage liviano y seguido**, no masivo: el método es el skill `limpieza` (frente D) — **verificar
+  que shippeó antes de cerrar** (las tools y la intuición mienten), con evidencia. Hacerlo en cada
+  promoción, no dejar acumular meses.
+- **Una iniciativa multi-sesión = un issue de tracking** (decisión _Modus operandi durable_), que
+  cierra cuando la iniciativa shippea a prod. **No** un issue por fase.
+
 ### 2026-05-25 — Modus operandi durable, sesión efímera
 
 - **Contexto:** las sesiones son efímeras; el plan de una iniciativa larga no puede vivir solo en
