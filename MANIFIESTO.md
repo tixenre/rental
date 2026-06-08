@@ -278,7 +278,7 @@ Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`
 |---|---|
 | [`docs/MEMORIA.md`](docs/MEMORIA.md) | Digest enforceable de decisiones + preferencias (memoria viva, curada; auto-cargado) |
 | [`docs/DECISIONES.md`](docs/DECISIONES.md) | Log ADR completo: el *por qué* de cada decisión (on-demand) |
-| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Workflow de PRs, auditoría, mobile gate |
+| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Prompt del auditor + mobile gate (método de mantenimiento → skill `limpieza`) |
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/SISTEMA_SPECS.md`](docs/SISTEMA_SPECS.md) | **Manual técnico del sistema de specs / catálogo / datasets / autocompletar / compat** |
 | [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido` |
