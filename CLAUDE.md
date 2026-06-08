@@ -12,27 +12,19 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 
 ## Cómo trabajamos (esencial)
 
-- **Branch + PR para lo grande; bugfixes chicos van directo a `dev`.** Lo grande / sensible /
-  arquitectónico / que toca reservas o lo que ve el usuario = una rama (`claude/<desc>`) = una PR.
-  Los **bugfixes chicos se commitean directo a `dev`** (se ven juntos en staging; un solo PR
-  `dev → main` cuando el lote está listo) — ver `docs/MEMORIA.md` _2026-06-03_. Commits atómicos
-  (Conventional Commits en español: `feat(scope):`, `fix(scope):`, `refactor`, `chore`, `docs`, ...).
-  **Nunca commitear directo a `main`.**
-- **La conversación es para decisiones y la forma de hacer las cosas — no para el ruido de cada
-  commit/diff.** El trabajo de revisión pesada va al subagente `supervisor` (contexto aislado).
+- **El workflow de cambios tiene _fuente única_:** la decisión _2026-06-08 — Workflow de cambios_ del
+  digest (auto-cargada abajo). En una línea: **routing por riesgo** (trivial/normal → push directo a
+  `dev` = staging; grande / sensible / core de reservas o plata / lo que ve el cliente → rama
+  (`claude/<desc>`) + PR), **la sesión mergea a `dev` y avisa con plan de prueba**, los **gates del
+  dueño** son probar en staging + aprobar `dev → main`. **Nunca a `main` directo; no mergear con CI en
+  rojo.** El detalle y el _por qué_ no se repiten acá — viven en esa decisión.
 - **Antes de abrir/mergear una PR: despachar el agente `supervisor`** — revisión read-only de
   scope / forma / drift, que resume en lenguaje claro y deja el plan de prueba. (Instrucción, no
   gate de sistema: en las apps de Mac/iPhone no hay hooks.)
-- **La sesión mergea a `dev`; el dueño gatea staging + promoción.** Mergear a `dev` = mostrar en
-  staging (no es prod) → lo hace la sesión: chico/mediano con supervisor OK + checks verdes se
-  mergea solo (directo o con auto-merge de GitHub); grande / sensible / que toca reservas o lo que
-  ve el usuario se **avisa antes** de meterlo a `dev`. El dueño no clickea merges ya verificados —
-  sus gates son **probar en staging** y **aprobar la promoción `dev → main`** (la puerta a prod).
-  Ver `docs/MEMORIA.md` _2026-06-03 — Quién clickea el merge_.
-- **No proponer ni hacer merge con CI en rojo.**
+- **La conversación es para decisiones y la forma de hacer las cosas — no para el ruido de cada
+  commit/diff.** El trabajo de revisión pesada va al subagente `supervisor` (contexto aislado).
 - **El dueño testea, no revisa código.** Acompañar cada cambio testeable con un **plan de prueba
-  en lenguaje claro** ("andá a /X, hacé Y, tenés que ver Z"). El dueño prueba en **staging**; la
-  promoción `dev → main` es su gate a prod.
+  en lenguaje claro** ("andá a /X, hacé Y, tenés que ver Z"). El dueño prueba en **staging**.
 
 ## Memoria — dónde vive qué
 

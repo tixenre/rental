@@ -18,15 +18,19 @@
 
 ## Decisiones (ADR-lite)
 
-### 2026-05-25 — Branch + PR siempre (se deprecá local-first sobre main)
+### 2026-06-08 — Workflow de cambios (fuente única): dev = staging, routing por riesgo, gates del dueño
 
-Lo grande/sensible/arquitectónico va en **rama dedicada (`claude/<desc>`) + PR**. **Nunca** commitear
-directo a `main`. (Matiz 2026-06-03: los bugfixes chicos van directo a `dev`.)
-
-### 2026-05-25 — Merge según tamaño
-
-Trivial/chico con CI verde + supervisor OK → auto-merge. Sensible/arquitectónico/grande o que toca lo
-que ve el usuario → el dueño prueba (en **staging**, matiz 2026-06-03) antes de promover.
+**Fuente única del workflow** (consolida 6 decisiones de flujo previas; no se restatea en otros docs).
+`dev` (rama `dev`) = **staging** en Railway (auto-deploy en cada push; base copiada de prod, sin
+clientes); `main` = **prod** (sagrado, no se prueba ahí). **Lo que muestra algo en staging es el push a
+`dev`, no el PR.** **Routing por riesgo:** trivial/normal → **push directo a `dev`** (la sesión verifica
+local antes para no romper staging); grande/sensible/core de reservas o plata/lo que ve el cliente →
+**rama (`claude/<desc>`) + PR** (CI + supervisor gatean antes de tocar `dev`); **ante la duda, PR**. El
+**CI corre en cada push** a `dev`/`main` (red incluso sin PR); **nunca a `main` directo**; **no mergear
+con CI en rojo**. **La sesión mergea/pushea a `dev` sola** (supervisor OK + verde) y **avisa con plan de
+prueba — no pide permiso**. **Gates del dueño:** probar en staging + aprobar `dev → main`. Merge:
+`rama→dev` = squash (`tipo: desc (#PR)`); `dev→main` = merge commit (revert por PR); directos a `dev`
+sin squash. Commits atómicos, Conventional Commits en español.
 
 ### 2026-05-25 — Modus operandi durable, sesión efímera
 
@@ -37,11 +41,6 @@ Iniciativa multi-sesión = **un issue de tracking** (checklist de fases adentro,
 
 Issues = cola de trabajo; commits/PRs = registro de cambios; memoria (digest `MEMORIA.md` + log
 `DECISIONES.md`) = decisiones de criterio + preferencias, curada y enforceable por el supervisor.
-
-### 2026-06-01 — Staging → Prod: flujo desde v1.0.0 (reemplaza "producción = ambiente de prueba")
-
-**Prod es sagrado — no se prueba ahí.** Flujo: trabajar en `dev` (o ramas que mergean a `dev`) → ver en
-Railway staging → PR `dev → main` → prod. La BD de staging es copia de prod del 2026-06-01.
 
 ### 2026-05-25 — Gate de estilo en CI: formato + lógica de React bloquean
 
@@ -90,11 +89,6 @@ Toda expansión de composición (forward + backward) es **recursiva hasta las ho
 `_expandir_mult` (`reservas/semantics.py`); gate lockea en `ORDER BY id`; `FOR UPDATE`/transacción
 **byte-idénticos**. No reintroducir expansión inline de 1 nivel ni "otra función parecida".
 
-### 2026-06-01 — Método de merge según etapa del flujo (squash a `dev`, merge-commit a `main`)
-
-**`rama → dev` = squash** (título `tipo: desc (#PR)`, 1 commit limpio en staging). **`dev → main` =
-merge commit** (NO squash → revert quirúrgico por PR en prod). Los bugfixes chicos a `dev` no llevan squash.
-
 ### 2026-06-01 — Gotcha de Railway: fork de ambiente desincroniza la contraseña del Postgres
 
 Ante `password authentication failed` en un ambiente recién forkeado: **resetear la contraseña en la BD**
@@ -111,17 +105,6 @@ no-prod nuevo**: agregar su nombre a `is_production` o dejar `VITE_GA4_ID` vací
 **Toda tabla/columna nueva va TAMBIÉN en `backend/database.py::init_db()`** (idempotente), no solo en una
 migración Alembic. La visibilidad del estado de migraciones es fuente única en `migration_state.py`. El
 supervisor marca tablas/columnas solo-en-migración o chequeos de estado reimplementados.
-
-### 2026-06-03 — Bugfixes chicos: push directo a `dev`; rama+PR solo para lo grande
-
-Los **bugfixes chicos van directo a `dev`** (sin PR), se ven juntos en staging, un PR `dev → main` por
-lote. Lo grande/sensible/arquitectónico/que toca el core o lo que ve el usuario = rama + PR. Nunca a `main`.
-
-### 2026-06-03 — Quién clickea el merge: la sesión mergea a `dev`; el dueño gatea staging + promoción
-
-**La sesión mergea a `dev`** (chico/mediano con supervisor OK + verde → solo o con auto-merge; grande →
-**avisa antes**). Los gates del dueño: **probar en staging** + **aprobar la promoción `dev → main`**.
-Nunca mergear con **CI en rojo**.
 
 ### 2026-06-03 — `backend/reportes/` = motor único de reportes financieros (espeja `backend/reservas/`)
 
@@ -209,9 +192,9 @@ Triagear **cada ítem en el acto** y devolver un mapa corto: **principio durable
 Regla **dormida** mientras el repo es público (Actions ilimitado). Higiene que vale siempre: batch de
 commits, `paths-ignore` de docs, `concurrency: cancel-in-progress`. ⏰ Si vuelve a privado, cuidar la cuota.
 
-### 2026-05-26 — Sesión local para trabajo visual/testeable _(reemplazada 2026-06-01)_
+### 2026-05-26 — Sesión local para trabajo visual/testeable _(reemplazada 2026-06-08)_
 
-Reemplazada por _Staging → Prod (2026-06-01)_: se pushea a `dev` y se ve en staging. La sesión local queda
+Reemplazada por _Workflow de cambios (2026-06-08)_: se pushea a `dev` y se ve en staging. La sesión local queda
 solo para debugging muy específico sin acceso a Railway, no es el flujo default.
 
 ### 2026-05-26 — Al actualizar gobernanza, barrer todo el sistema de supervisión

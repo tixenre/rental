@@ -29,28 +29,40 @@
 
 ## Decisiones (ADR-lite)
 
-### 2026-05-25 — Branch + PR siempre (se deprecá local-first sobre main)
+### 2026-06-08 — Workflow de cambios (fuente única): dev = staging, routing por riesgo, gates del dueño
 
-- **Contexto:** el manifiesto documentaba un flujo local-first commiteando directo a `main`, que
-  ya no es como se trabaja (las sesiones corren en la nube desde apps Mac/iPhone).
-- **Decisión:** todo cambio va en una rama dedicada y se mergea por PR. No se commitea directo a
-  `main`. Una iniciativa = una rama = una PR con N commits atómicos.
-- **Consecuencias:** trazabilidad uniforme corra Claude donde corra; se descarta el modo
-  local-first.
-- **Matiz (2026-06-03):** el "rama+PR siempre" se relajó **solo para bugfixes chicos**, que pueden
-  ir **directo a `dev`** sin PR por feature (ver decisión _2026-06-03 — Bugfixes chicos_). Lo
-  inamovible es **nunca commitear directo a `main`** — eso no cambió.
+> **Fuente única del workflow.** Consolida y reemplaza las 6 decisiones de flujo previas (Branch+PR
+> siempre, Merge según tamaño, Staging→Prod, Método de merge por etapa, Bugfixes chicos, Quién clickea
+> el merge). No restatear el workflow en otros docs: CLAUDE.md y MANIFIESTO apuntan acá.
 
-### 2026-05-25 — Merge según tamaño
-
-- **Contexto:** auto-merge para todo era riesgoso para cambios sensibles; bloquear todo era lento.
-- **Decisión:** trivial/small con CI verde + supervisor OK → auto-merge. Sensible / arquitectónico
-  / grande, o que toca lo que ve el usuario → PR draft + el dueño prueba antes de mergear.
-- **Consecuencias:** el supervisor clasifica el tamaño en su veredicto.
-- **Matiz (2026-06-03):** en el flujo de dos etapas, el "el dueño prueba antes de mergear" se
-  **reubica** — el dueño prueba en **staging** (después del merge a `dev`), no antes; lo que el dueño
-  mergea con su criterio es la **promoción `dev → main`** (la puerta a prod). El merge a `dev` lo
-  hace la **sesión** (ver decisión _2026-06-03 — Quién clickea el merge_).
+- **Contexto:** las reglas de flujo estaban dispersas en 6 entradas que se solapaban + repetidas en
+  CLAUDE.md y MANIFIESTO §3 → drift y fricción (la sesión preguntaba "¿lo ves en staging o hago el PR?"
+  como si fueran alternativas). La aclaración que ordenó todo: **`dev` y "staging" son lo mismo** — el
+  environment Railway `dev` (atado a la rama `dev`) ES el staging; su base es una **copia de prod**
+  (2026-06-01), sin clientes reales. Railway **auto-deploya en cada push** a `dev` (staging) y a `main`
+  (prod). Por eso lo que muestra algo en staging es el **push a `dev`**, no el PR.
+- **Ambientes:** `dev` (rama `dev`) = **staging**; `main` = **prod**. **Prod es sagrado: no se prueba ahí.**
+- **Routing por RIESGO (no por trámite):**
+  - **Trivial / normal** (typo, copy, fix acotado, feature chica, UI puntual) → **push directo a `dev`**;
+    la sesión **verifica local antes** (typecheck/tests) para no romper el staging compartido.
+  - **Grande / sensible / core de reservas o plata / lo que ve el cliente** → **rama (`claude/<desc>`) +
+    PR**: el PR es el portón donde **CI + supervisor gatean ANTES** de tocar `dev`. **Ante la duda → PR.**
+  - **`main` nunca** recibe push/commit directo.
+- **Red de seguridad:** el **CI corre en cada push** a `dev` y `main` (lint/typecheck/tests/build/
+  migraciones/mobile-smoke), haya PR o no. Con PR gatea **antes** de entrar a `dev`; con push directo es
+  la **red de abajo** (te enterás aunque ya esté en staging). **No mergear/pushear con CI en rojo.**
+- **Quién mueve qué:** **la sesión mergea/pushea a `dev` sola** (supervisor OK en lo que pasó por PR + CI
+  verde) y **avisa al dueño con plan de prueba** ("andá a /X, probá Y, tenés que ver Z") — **no pide
+  permiso**. El **supervisor** se despacha antes de abrir/mergear un PR.
+- **Gates del dueño (los únicos dos):** (1) **probar en staging** lo que la sesión avisa; (2) **aprobar
+  la promoción `dev → main`** (la puerta a prod). El dueño no clickea merges a `dev` ya verificados.
+- **Métodos de merge:** `rama → dev` = **squash** (título `tipo: desc (#PR)`, 1 commit limpio). `dev →
+  main` = **merge commit** (NO squash → revert quirúrgico por PR en prod). Commits directos a `dev` no
+  llevan squash. Commits atómicos, Conventional Commits en español (`feat(scope):`, `fix`, `chore`, ...).
+- **Why:** `dev` es seguro (copia, sin clientes) → lo peor de un push roto es molestar el testeo del
+  dueño, nunca tocar prod. Reservar el PR para lo riesgoso baja la fricción sin perder red: el CI siempre
+  corre, el supervisor gatea lo grande, y prod sigue blindado por el PR `dev → main` + la aprobación del
+  dueño. El gate humano del dueño es **probar la conducta en staging**, no revisar código.
 
 ### 2026-05-25 — Modus operandi durable, sesión efímera
 
@@ -69,18 +81,6 @@
 - **Decisión:** Issues = cola de trabajo; commits/PRs = registro de cambios; `docs/MEMORIA.md` =
   decisiones de criterio + preferencias (curado, enforceable por el supervisor).
 - **Consecuencias:** el criterio del proyecto queda cargado en cada sesión y revisable.
-
-### 2026-06-01 — Staging → Prod: flujo desde v1.0.0 (reemplaza "producción = ambiente de prueba")
-
-- **Contexto:** v1.0.0 en prod. Se creó un ambiente Railway `dev` (rama `dev`) como staging.
-  El disparador ⏰ de la entrada anterior se cumplió — hay staging, no se prueba en prod.
-- **Decisión:** **prod es sagrado — no se prueba ahí.** El flujo es:
-  trabajar en `dev` (o branches que mergean a `dev`) → ver en Railway staging → PR `dev → main` → prod.
-- **Why:** prod tiene clientes potenciales y datos reales; un error visible no tiene red de contención.
-  El staging de Railway cubre la necesidad de ver cambios en vivo antes de mandar a prod.
-- **How to apply:** todo cambio va a `dev` primero. Solo se mergea a `main` cuando el staging
-  muestra que funciona. La BD de staging es una copia de prod del 2026-06-01; las migraciones
-  de `dev` corren en staging y no tocan prod hasta el merge.
 
 ### 2026-05-25 — Gate de estilo en CI: formato + lógica de React bloquean
 
@@ -230,26 +230,6 @@
   (`test_gate_caracterizacion_c4.py`) + correctitud/concurrencia anidada real
   (`test_reservas_nested_db.py`, opt-in).
 
-### 2026-06-01 — Método de merge según etapa del flujo (squash a `dev`, merge-commit a `main`)
-
-- **Contexto:** el flujo es de dos etapas (`rama → dev → main`, decisión 2026-06-01 Staging→Prod).
-  Las ramas de feature suelen tener commits de ruido ("wip", "fix lint") que no aportan al historial.
-- **Decisión:** el método de merge depende de la etapa:
-  - **`rama → dev` = squash.** Cada PR queda como **un commit limpio** en staging (1 PR = 1 unidad de
-    cambio entendible, con su `#PR`). El detalle commit-por-commit no se pierde: vive en la PR.
-  - **`dev → main` = merge commit** (NO squash). Así cada PR ya squasheada en `dev` fluye a `main`
-    como **su propio commit**, preservando la trazabilidad PR-por-PR en prod.
-- **Why:** el _registro de cambios vive en el commit history_ (decisión Memoria en capas) y _prod es
-  sagrado_. Squashear `dev → main` aplastaría N PRs en un commit gigante → se pierde poder revertir
-  **una PR puntual** en prod. El patrón (squash en feature, merge en promoción) mantiene `dev`
-  prolijo **y** `main` con revert quirúrgico.
-- **How to apply:** al mergear una rama a `dev`, usar squash con título `tipo: desc (#PR)`. Al promover
-  `dev → main`, usar merge commit. No squashear nunca la PR de promoción a prod.
-- **Alcance (2026-06-03):** el `rama → dev = squash` aplica a las PRs que **sí** pasan por rama —es
-  decir, lo grande/sensible/arquitectónico. Los **bugfixes chicos van directo a `dev`** sin PR
-  (ver decisión _2026-06-03 — Bugfixes chicos_); ahí no hay squash. El `dev → main = merge commit`
-  no cambia: sigue siendo la única vía a prod y conserva el revert por unidad.
-
 ### 2026-06-01 — Gotcha de Railway: fork de ambiente desincroniza la contraseña del Postgres
 
 - **Contexto:** el backend de staging (`dev`) tiraba 500 en cascada con
@@ -321,48 +301,6 @@
   contra Postgres real y exige llegar al head. Modelo + runbook de reparación de prod en
   [`docs/RUNBOOK_MIGRACIONES.md`](RUNBOOK_MIGRACIONES.md). La **Parte B** (destrabar prod) sigue
   pendiente en #690.
-
-### 2026-06-03 — Bugfixes chicos: push directo a `dev`; rama+PR solo para lo grande
-
-- **Contexto:** abrir un PR a `dev` por cada bug chico, solo para verlo en staging, era pura fricción
-  cuando hay **varios fixes en paralelo** (el modo de trabajo habitual del dueño). El paso "PR para
-  previsualizar" no aportaba: el dueño no revisa diffs y prod no se toca en esa etapa.
-- **Decisión:** los **bugfixes chicos van directo a `dev`** (sin PR por feature). Se ven juntos en
-  staging y se abre **un** PR `dev → main` cuando el lote está listo. Lo **grande / sensible /
-  arquitectónico / que toca el core de reservas o lo que ve el usuario** sigue en **rama + PR
-  dedicada** — la regla _Merge según tamaño_ (2026-05-25) queda intacta; esto solo define el camino
-  del caso chico. El triage honesto es la pieza que carga el peso: en el momento en que un fix deja
-  de ser trivial, gradúa a rama+PR.
-- **Why (es seguro):** **prod es sagrado y no se toca acá** — solo se alcanza por el PR `dev → main`,
-  que conserva su gate completo (supervisor + CI + el dueño prueba). CI corre en cada push a `dev`;
-  la BD de staging es copia de prod (2026-06-01), no prod. Lo peor que puede pasar es romper staging,
-  que es justamente para lo que existe. Es trunk-based con rama de integración (`dev`): patrón sano
-  para un dueño solo + Claude + CI + supervisor al promover, no un atajo.
-- **Barandas:** (1) commits atómicos con Conventional Commits → revert por commit posible en `main`
-  aunque no se agrupe por PR; (2) el **supervisor corre antes de promover `dev → main`** (sobre el
-  lote); (3) **mantener `dev` cerca de `main`** (promover seguido, no dejar laburo a medias en `dev`
-  al promover) para no perder el todo-o-nada de la promoción.
-- **Consecuencias:** matiza _Branch + PR siempre_ (2026-05-25) y _Método de merge según etapa_
-  (2026-06-01) — ver las notas agregadas ahí. Lo inamovible: **nunca directo a `main`**.
-
-### 2026-06-03 — Quién clickea el merge: la sesión mergea a `dev`; el dueño gatea staging + promoción
-
-- **Contexto:** el dueño no quiere ser el botón de merge de cambios que la sesión ya aprobó
-  (supervisor OK) y con CI verde. El criterio de "el código está bien" lo cubren supervisor + CI;
-  clickear merge es trabajo mecánico sin valor.
-- **Decisión:** **mergear a `dev` = mostrar en staging**, no es la puerta a prod → lo hace **la
-  sesión**, no el dueño:
-  - **Chico / mediano** con supervisor OK + checks verdes → la sesión mergea a `dev` (directo si ya
-    están verdes; con **auto-merge de GitHub** si están corriendo, mergea solo al ponerse verde).
-    El dueño no toca nada.
-  - **Grande / sensible / que toca reservas o lo que ve el usuario** → la sesión **avisa antes** de
-    meterlo a `dev` (el dueño puede frenarlo), y recién después mergea.
-- **Los gates del dueño** (donde sí aporta criterio) quedan en: (1) **probar la conducta en
-  staging**, y (2) **aprobar la promoción `dev → main`** — esa es la puerta a prod (sagrada),
-  siempre manual del dueño. Nunca se mergea con **CI en rojo**.
-- **Consecuencias:** refina _Merge según tamaño_ (2026-05-25). Cada PR a `dev` llega con su plan de
-  prueba en lenguaje claro para que el dueño sepa qué tocar en staging. El supervisor sigue corriendo
-  antes de cada merge a `dev` (chico/mediano) y antes de la promoción.
 
 ### 2026-06-03 — `backend/reportes/` = motor único de reportes financieros (espeja `backend/reservas/`)
 
@@ -681,9 +619,9 @@ cancel-in-progress` ya cancela corridas viejas.
 - **⏰ Disparador:** si el repo vuelve a privado, el plan Free da 2.000 min/mes y el CI corre 6 jobs
   por push → ahí sí hay que cuidar la cuota (sacar `compileall`, cachear `npm ci`, terminar #487).
 
-### 2026-05-26 — Sesión local para trabajo visual/testeable _(reemplazada 2026-06-01)_
+### 2026-05-26 — Sesión local para trabajo visual/testeable _(reemplazada 2026-06-08)_
 
-- _(Reemplazada por la decisión 2026-06-01 — Staging → Prod. El staging de Railway cubre
+- _(Reemplazada por la decisión 2026-06-08 — Workflow de cambios. El staging de Railway cubre
   la necesidad de ver cambios en vivo. Ya no hace falta arrancar local para validar UX/flujos;
   se pushea a `dev` y se ve en staging. La sesión local sigue siendo válida para debugging
   muy específico sin acceso a Railway, pero no es el flujo default.)_

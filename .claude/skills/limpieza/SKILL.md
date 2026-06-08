@@ -325,7 +325,7 @@ sin auditar es la mentira más cara — tranquiliza al dueño sobre un agujero r
 1. **Mapear rama → PR.** Por cada rama remota, buscá su PR (`mcp__github__list_pull_requests` por
    `head`). Una rama es segura de borrar **solo si su PR está MERGED** (o el trabajo llegó a `dev` por
    otra vía verificable). Una rama **sin PR o con PR abierto/cerrado-sin-merge = se deja** y se reporta.
-2. **`git branch --merged` NO alcanza:** el flujo mergea con **squash** a `dev` (MEMORIA *2026-06-01*),
+2. **`git branch --merged` NO alcanza:** el flujo mergea con **squash** a `dev` (MEMORIA *2026-06-08 — Workflow de cambios*),
    así que la rama squasheada **no aparece** como merged por ancestría aunque su contenido ya esté en
    `dev`. La verdad es el **estado del PR** (MERGED), no el grafo de commits.
 3. **Limitación del entorno:** en el sandbox `git push origin --delete <rama>` da **HTTP 403** y no hay

@@ -114,7 +114,7 @@ CI corre `pytest` automáticamente en cada PR a `main` (job `python-tests` en `.
 
 ## Workflow de desarrollo
 
-Branch + PR siempre: una **iniciativa** = una **rama** (`claude/<descripcion>`) = una **PR** con N commits atómicos. Antes de mergear corre el agente `supervisor` (revisión de scope/forma/drift) y CI tiene que estar verde. Merge según tamaño (trivial → auto-merge; sensible → draft + prueba del dueño). Después de mergear: borrar la branch local y remota.
+El flujo de cambios (routing por riesgo, `dev` = staging, quién mergea, los gates del dueño) tiene **fuente única**: la decisión _2026-06-08 — Workflow de cambios_ en [`docs/MEMORIA.md`](docs/MEMORIA.md). En corto: lo chico va directo a `dev`; lo grande/sensible va en rama + PR (con `supervisor` + CI verde antes de tocar `dev`); el dueño prueba en staging y aprueba la promoción `dev → main`. Nunca directo a `main`.
 
 El contexto se auto-carga vía [`CLAUDE.md`](CLAUDE.md). Detalle del flow + decisiones en [`MANIFIESTO.md`](MANIFIESTO.md); memoria viva (digest enforceable) en [`docs/MEMORIA.md`](docs/MEMORIA.md) + log on-demand [`docs/DECISIONES.md`](docs/DECISIONES.md); prompt del auditor + mobile gate en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
