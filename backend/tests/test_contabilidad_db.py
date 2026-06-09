@@ -219,6 +219,42 @@ def test_crear_gasto_baja_caja_y_anular_lo_restaura(conn):
     assert _saldo(conn, "Efectivo") == base  # restaurado
 
 
+def test_reporte_mensual_cargo_a_socio_no_toca_ganancia(conn):
+    # Núcleo del reporte: un CARGO a un socio (Rambla le compró algo) es una
+    # transferencia, NO un gasto → aparece en socios_mes pero NO baja la ganancia.
+    from contabilidad.movimientos import crear_movimiento
+    from contabilidad.reporte_mensual import reporte_mensual
+
+    mes = "2026-06"
+    base = reporte_mensual(conn, mes)
+    cargo_base = base["socios_mes"]["cargos"]["Pablo"]
+    gan_base = base["ganancia_neta"]
+
+    crear_movimiento(
+        conn, tipo="transferencia", monto=50000,
+        cuenta_origen_id=_cuenta_id(conn, "Efectivo"),
+        cuenta_destino_id=_cuenta_id(conn, "Caja Pablo"),
+        fecha="2026-06-15", por="test",
+    )
+    rep = reporte_mensual(conn, mes)
+    assert rep["socios_mes"]["cargos"]["Pablo"] - cargo_base == 50000  # aparece como cargo
+    assert rep["ganancia_neta"] == gan_base  # NO toca la ganancia
+
+
+def test_reporte_mensual_gasto_si_baja_ganancia(conn):
+    # Contraste: un gasto real SÍ baja la ganancia neta.
+    from contabilidad.movimientos import crear_movimiento
+    from contabilidad.reporte_mensual import reporte_mensual
+
+    mes = "2026-06"
+    gan_base = reporte_mensual(conn, mes)["ganancia_neta"]
+    crear_movimiento(
+        conn, tipo="gasto", monto=20000, cuenta_origen_id=_cuenta_id(conn, "Efectivo"),
+        categoria_id=_categoria_id(conn), fecha="2026-06-10", por="test",
+    )
+    assert reporte_mensual(conn, mes)["ganancia_neta"] == gan_base - 20000
+
+
 def test_listar_movimientos_resuelve_nombres(conn):
     from contabilidad.movimientos import crear_movimiento, listar_movimientos
 
