@@ -714,6 +714,7 @@ function Index() {
       ) : mode === "grid" ? (
         <GridMode
           allEquipos={allEquipos}
+          filtered={filtered}
           apiCategories={apiCategories}
           rootApiCategories={rootApiCategories}
           rootSubtrees={rootSubtrees}
@@ -726,6 +727,10 @@ function Index() {
           query={query}
           disponiblesOnly={disponiblesOnly}
           getDisponible={getDisponible}
+          onSuggestCategory={(c) => {
+            setSelectedCats(new Set([c]));
+            setQuery("");
+          }}
         />
       ) : (
         <ListMode
@@ -763,6 +768,7 @@ function Index() {
 
 function GridMode({
   allEquipos,
+  filtered,
   apiCategories,
   rootApiCategories,
   rootSubtrees,
@@ -775,8 +781,10 @@ function GridMode({
   query,
   disponiblesOnly,
   getDisponible,
+  onSuggestCategory,
 }: {
   allEquipos: Equipment[];
+  filtered: Equipment[];
   apiCategories: string[];
   rootApiCategories: string[];
   rootSubtrees: Map<string, Set<string>>;
@@ -789,21 +797,20 @@ function GridMode({
   query: string;
   disponiblesOnly: boolean;
   getDisponible: (item: Equipment) => number | undefined;
+  onSuggestCategory: (c: string) => void;
 }) {
-  const q = query.trim().toLowerCase();
+  // Filtros de browse (sin búsqueda). La búsqueda NO se replica acá: cuando
+  // hay query, el Grid muestra `filtered` — el MISMO resultado canónico de
+  // `filtrarOrdenar` que usa la Lista. Si no, divergen: el agrupado por
+  // categorías raíz se traga los equipos sin categoría visible asignada.
   const matches = (e: Equipment) => {
     if (selectedBrand && e.brand !== selectedBrand) return false;
     if (disponiblesOnly && e.disponible !== undefined && e.disponible <= 0) return false;
-    if (!q) return true;
-    return (
-      (e.name ?? "").toLowerCase().includes(q) ||
-      (e.brand ?? "").toLowerCase().includes(q) ||
-      (e.category ?? "").toLowerCase().includes(q)
-    );
+    return true;
   };
 
   const isFiltered = selectedCats.size > 0 || !!selectedBrand;
-  const isSearching = q.length > 0;
+  const isSearching = query.trim().length > 0;
   // En browse mode mostramos solo categorías raíz. Al filtrar se usa la
   // selección directa (puede ser raíz o sub-cat).
   const visibleCategories = selectedCats.size > 0 ? Array.from(selectedCats) : rootApiCategories;
@@ -821,11 +828,6 @@ function GridMode({
 
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
-
-  const totalVisible = visibleCategories.reduce(
-    (acc, c) => acc + allEquipos.filter((e) => inCategory(e, c) && matches(e)).length,
-    0,
-  );
 
   return (
     <div className="space-y-10 pt-2 pb-6 sm:space-y-12 sm:pt-3 sm:pb-8 lg:pt-4 lg:pb-12">
@@ -885,72 +887,91 @@ function GridMode({
         </div>
       )}
 
-      {visibleCategories.map((c) => {
-        // NO re-sortear acá. allEquipos viene del backend ordenado por
-        // relevancia_manual ASC, popularidad_score DESC, nombre ASC.
-        // El filter preserva el orden, así que respeta el ranking automático.
-        const items = allEquipos.filter((e) => inCategory(e, c) && matches(e));
-        if (items.length === 0) return null;
+      {isSearching ? (
+        filtered.length === 0 ? (
+          <SearchEmptyState
+            query={query}
+            categories={apiCategories.slice(0, 6)}
+            onSuggestCategory={onSuggestCategory}
+          />
+        ) : (
+          <section className="px-4 lg:px-12">
+            <div className="mb-4 flex items-end justify-between gap-3">
+              <h2 className="font-display text-2xl sm:text-3xl">Resultados</h2>
+              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+                {filtered.length} {filtered.length === 1 ? "equipo" : "equipos"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
+              {filtered.map((item, i) => (
+                <EquipmentCard
+                  key={item.id}
+                  item={item}
+                  index={i}
+                  disponible={getDisponible(item)}
+                />
+              ))}
+            </div>
+          </section>
+        )
+      ) : (
+        visibleCategories.map((c) => {
+          // NO re-sortear acá. allEquipos viene del backend ordenado por
+          // relevancia_manual ASC, popularidad_score DESC, nombre ASC.
+          // El filter preserva el orden, así que respeta el ranking automático.
+          const items = allEquipos.filter((e) => inCategory(e, c) && matches(e));
+          if (items.length === 0) return null;
 
-        if (isFiltered) {
+          if (isFiltered) {
+            return (
+              <section key={c} id={`cat-${c}`} className="scroll-mt-40 px-4 lg:px-12">
+                <div className="mb-4 flex items-end justify-between gap-3">
+                  <h2 className="font-display text-2xl sm:text-3xl">{c}</h2>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+                    {items.length} {items.length === 1 ? "equipo" : "equipos"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {items.map((item, i) => (
+                    <EquipmentCard
+                      key={item.id}
+                      item={item}
+                      index={i}
+                      disponible={getDisponible(item)}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          }
+
           return (
-            <section key={c} id={`cat-${c}`} className="scroll-mt-40 px-4 lg:px-12">
-              <div className="mb-4 flex items-end justify-between gap-3">
-                <h2 className="font-display text-2xl sm:text-3xl">{c}</h2>
-                <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
-                  {items.length} {items.length === 1 ? "equipo" : "equipos"}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4 xl:grid-cols-5">
-                {items.map((item, i) => (
-                  <EquipmentCard
-                    key={item.id}
-                    item={item}
-                    index={i}
-                    disponible={getDisponible(item)}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        }
-
-        return (
-          <div key={c} id={`cat-${c}`} data-cat-section data-cat={c} className="scroll-mt-40">
-            <CarouselRow
-              title={c}
-              count={items.length}
-              action={
-                !isSearching ? (
+            <div key={c} id={`cat-${c}`} data-cat-section data-cat={c} className="scroll-mt-40">
+              <CarouselRow
+                title={c}
+                count={items.length}
+                action={
                   <button
                     onClick={() => onJumpToCategory(c)}
                     className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
                   >
                     Ver sólo {c} <ArrowRight className="h-3 w-3" />
                   </button>
-                ) : undefined
-              }
-            >
-              {items.map((item, i) => (
-                <EquipmentCard
-                  key={item.id}
-                  item={item}
-                  index={i}
-                  width={cardW}
-                  disponible={getDisponible(item)}
-                />
-              ))}
-            </CarouselRow>
-          </div>
-        );
-      })}
-
-      {isSearching && totalVisible === 0 && (
-        <SearchEmptyState
-          query={query}
-          categories={apiCategories.slice(0, 6)}
-          onSuggestCategory={onJumpToCategory}
-        />
+                }
+              >
+                {items.map((item, i) => (
+                  <EquipmentCard
+                    key={item.id}
+                    item={item}
+                    index={i}
+                    width={cardW}
+                    disponible={getDisponible(item)}
+                  />
+                ))}
+              </CarouselRow>
+            </div>
+          );
+        })
       )}
     </div>
   );
