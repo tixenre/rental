@@ -25,6 +25,7 @@ import {
   Clapperboard,
   Wallet,
   BookOpen,
+  Calculator,
 } from "lucide-react";
 
 import {
@@ -88,6 +89,7 @@ const items: NavItem[] = [
       { title: "Movimientos", url: "/admin/contabilidad/movimientos", icon: ClipboardList },
       { title: "Cuentas", url: "/admin/contabilidad/cuentas", icon: Wallet },
       { title: "Reporte mensual", url: "/admin/contabilidad/reporte", icon: BarChart3 },
+      { title: "Liquidación", url: "/admin/contabilidad/liquidacion", icon: Calculator },
       { title: "Cobros de pedidos", url: "/admin/pagos", icon: List },
       { title: "Glosario", url: "/admin/contabilidad/glosario", icon: BookOpen },
     ],
