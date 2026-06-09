@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
-from database import get_db, row_to_dict, to_datetime, now_ar, MARCA_SUBQUERY, marca_subquery
+from database import get_db, row_to_dict, to_datetime, now_ar
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
 from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
@@ -22,6 +22,26 @@ router = APIRouter()
 
 
 ESTADOS_MODIFICABLES = {"presupuesto", "confirmado"}
+
+# ── Items: fuente única + proyección por superficie ──────────────────────────
+# El portal lee los items de un pedido vía los helpers canónicos de
+# routes/alquileres (`_get_alquiler_items` / `_batch_get_alquiler_items` —
+# misma query y mismo batch de componentes que el admin) y PROYECTA solo
+# estos campos: al cliente no se le expone `pi.*` completo ni stock interno.
+_ITEM_CAMPOS_PORTAL = (
+    "cantidad", "precio_jornada", "subtotal", "equipo_id", "nombre", "marca",
+    "modelo", "foto_url", "nombre_publico", "nombre_publico_largo",
+)
+# Los documentos (contrato/remito) suman los campos de identificación del equipo.
+_ITEM_CAMPOS_DOC = _ITEM_CAMPOS_PORTAL + ("serie", "valor_reposicion")
+_COMP_CAMPOS_DOC = (
+    "cantidad", "nombre", "marca", "modelo", "serie", "valor_reposicion",
+    "nombre_publico", "nombre_publico_largo",
+)
+
+
+def _proyectar(item: dict, campos: tuple) -> dict:
+    return {k: item.get(k) for k in campos}
 
 
 def _modificacion_ventana_horas(conn) -> int:
@@ -419,20 +439,16 @@ def cliente_pedidos(request: Request):
             ORDER BY created_at DESC NULLS LAST, numero_pedido DESC
         """, (cliente_id,)).fetchall()
 
+        from routes.alquileres import _batch_get_alquiler_items
+        items_por_pedido = _batch_get_alquiler_items(conn, [p["id"] for p in pedidos])
+
         result = []
         for p in pedidos:
             d = row_to_dict(p)
-            items = conn.execute(f"""
-                SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                       COALESCE(e.nombre, ai.nombre_libre) AS nombre,
-                       {MARCA_SUBQUERY}, e.modelo, e.foto_url,
-                       e.nombre_publico, e.nombre_publico_largo
-                FROM alquiler_items ai
-                LEFT JOIN equipos e ON e.id = ai.equipo_id
-                WHERE ai.pedido_id = ?
-                ORDER BY ai.orden, ai.id
-            """, (p["id"],)).fetchall()
-            d["items"] = [row_to_dict(i) for i in items]
+            d["items"] = [
+                _proyectar(it, _ITEM_CAMPOS_PORTAL)
+                for it in items_por_pedido.get(p["id"], [])
+            ]
 
             pagos = conn.execute("""
                 SELECT monto, concepto, fecha
@@ -477,17 +493,10 @@ def cliente_pedido_detalle(id: int, request: Request):
 
         d = row_to_dict(pedido)
 
-        items = conn.execute(f"""
-            SELECT ai.cantidad, ai.precio_jornada, ai.subtotal,
-                   ai.equipo_id, COALESCE(e.nombre, ai.nombre_libre) AS nombre,
-                   {MARCA_SUBQUERY}, e.foto_url,
-                   e.nombre_publico, e.nombre_publico_largo
-            FROM alquiler_items ai
-            LEFT JOIN equipos e ON e.id = ai.equipo_id
-            WHERE ai.pedido_id = ?
-            ORDER BY ai.orden, ai.id
-        """, (id,)).fetchall()
-        d["items"] = [row_to_dict(i) for i in items]
+        from routes.alquileres import _get_alquiler_items
+        d["items"] = [
+            _proyectar(it, _ITEM_CAMPOS_PORTAL) for it in _get_alquiler_items(conn, id)
+        ]
 
         pagos = conn.execute("""
             SELECT monto, concepto, fecha FROM alquiler_pagos
@@ -1241,27 +1250,14 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
         raise HTTPException(404, "Pedido no encontrado")
     pedido = row_to_dict(row)
 
-    items = conn.execute(f"""
-        SELECT pi.cantidad, pi.equipo_id, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
-               {MARCA_SUBQUERY}, e.modelo,
-               e.serie, e.valor_reposicion, e.foto_url, pi.precio_jornada, pi.subtotal,
-               e.nombre_publico, e.nombre_publico_largo
-        FROM alquiler_items pi
-        LEFT JOIN equipos e ON e.id = pi.equipo_id
-        WHERE pi.pedido_id = ?
-        ORDER BY pi.orden, pi.id
-    """, (pedido_id,)).fetchall()
-    pedido["items"] = [row_to_dict(i) for i in items]
-
-    for item in pedido["items"]:
-        comp_rows = conn.execute(f"""
-            SELECT ec.nombre, {marca_subquery('ec')}, ec.modelo, ec.serie, ec.valor_reposicion,
-                   ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
-            FROM kit_componentes kc
-            JOIN equipos ec ON ec.id = kc.componente_id
-            WHERE kc.equipo_id = ?
-        """, (item['equipo_id'],)).fetchall()
-        item['componentes'] = [row_to_dict(c) for c in comp_rows]
+    from routes.alquileres import _get_alquiler_items
+    pedido["items"] = [
+        {
+            **_proyectar(it, _ITEM_CAMPOS_DOC),
+            "componentes": [_proyectar(c, _COMP_CAMPOS_DOC) for c in it["componentes"]],
+        }
+        for it in _get_alquiler_items(conn, pedido_id)
+    ]
 
     # Datos del cliente para el contrato + Factura A si aplica.
     # Nombre y dirección: preferir datos RENAPER si la identidad fue verificada.

@@ -74,6 +74,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     rows = conn.execute(f"""
         SELECT pi.*, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
                {MARCA_SUBQUERY},
+               e.modelo, e.serie, e.valor_reposicion,
                e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo,
                ef.contenido_incluido_json
@@ -99,6 +100,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     placeholders = ",".join("?" for _ in equipo_ids)
     comp_rows = conn.execute(f"""
         SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.cantidad AS stock_total,
+               ec.modelo, ec.serie, ec.valor_reposicion,
                ec.nombre_publico, ec.nombre_publico_largo
         FROM kit_componentes kc
         JOIN equipos ec ON ec.id = kc.componente_id
@@ -163,6 +165,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     rows = conn.execute(f"""
         SELECT pi.*, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
                {MARCA_SUBQUERY},
+               e.modelo, e.serie, e.valor_reposicion,
                e.foto_url, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
@@ -180,6 +183,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
         cph = ",".join(["?"] * len(equipo_ids))
         comp_rows = conn.execute(f"""
             SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.cantidad AS stock_total,
+                   ec.modelo, ec.serie, ec.valor_reposicion,
                    ec.nombre_publico, ec.nombre_publico_largo
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
