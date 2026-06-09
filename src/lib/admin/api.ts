@@ -657,12 +657,6 @@ export interface TableroData {
   cierre: { cerrado: boolean; cerrado_por: string | null; cerrado_at: string | null };
   disponible: SaldosData;
   ganancia_mes: { mes: string; ingresos: number; gastos: number; neta: number };
-  rendicion_pendiente: {
-    mes: string;
-    total: number;
-    sugeridos: SugeridoRendicion[];
-    cuadra: boolean;
-  };
 }
 export interface RendicionPersona {
   persona: string;

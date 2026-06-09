@@ -1,14 +1,15 @@
-"""Tablero financiero (#809) — compone las tres miradas en una sola respuesta.
+"""Tablero financiero (#809) — compone las miradas en una sola respuesta.
 
 1. **Disponible**: cuánta plata hay y dónde (saldos por caja). Plata percibida.
 2. **Ganancia del mes**: ingresos devengados − gastos. Resultado del negocio.
-3. **Rendición pendiente**: cuánto falta saldar entre los socios este mes.
+
+La rendición / quién le debe a quién vive en la cuenta corriente de socios
+(`saldos().socios`, que ya viaja en `disponible`).
 """
 
 from datetime import date
 
 from contabilidad.pyl import ganancia_neta
-from contabilidad.rendicion import rendicion
 from contabilidad.saldos import saldos
 
 
@@ -22,8 +23,6 @@ def tablero(conn, mes: str | None = None) -> dict:
     mes = mes or mes_actual()
     disponible = saldos(conn)
     gan = ganancia_neta(conn, mes)
-    rend = rendicion(conn, mes)
-    pendiente_total = sum(int(s["monto"]) for s in rend["sugeridos"])
     c = cierre_de(conn, mes)
     return {
         "mes": mes,
@@ -38,11 +37,5 @@ def tablero(conn, mes: str | None = None) -> dict:
             "ingresos": gan["ingresos"],
             "gastos": gan["gastos"],
             "neta": gan["ganancia_neta"],
-        },
-        "rendicion_pendiente": {
-            "mes": mes,
-            "total": pendiente_total,
-            "sugeridos": rend["sugeridos"],
-            "cuadra": rend["cuadra"],
         },
     }
