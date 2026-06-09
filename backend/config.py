@@ -5,9 +5,9 @@ solo lugar, en vez de ~69 `os.getenv` dispersos. Se instancia una vez
 (`settings`) al importar este módulo, así la validación de tipos corre al boot
 (fail-fast) en vez de explotar a mitad de un request. Ver #511.
 
-Migración incremental (issue #511): por ahora viven acá las **críticas**
-(auth / CORS / DB / seguridad / observabilidad). El resto (OAuth, email, SMTP,
-storage, owner, etc.) se irá migrando desde sus `os.getenv` actuales.
+Migración incremental (issue #511): viven acá las **críticas** (auth / CORS /
+DB / seguridad / observabilidad) + email + integraciones. El resto (OAuth,
+R2/storage, owner, etc.) se irá migrando desde sus `os.getenv` actuales.
 
 El parsing (listas, sets, bools derivados) vive en propiedades de `Settings`
 para que cada consumidor lea la forma ya cocida y no repita el split/lower.
@@ -68,6 +68,25 @@ class Settings(BaseSettings):
     DIDIT_API_KEY:        str = ""
     DIDIT_WEBHOOK_SECRET: str = ""
     DIDIT_WORKFLOW_ID:    str = ""
+
+    # ── Email — construido, no activado (MEMORIA 2026-05-27) ────────────
+    # El canal se activa por config, no por código: con RESEND_API_KEY (o
+    # SMTP_*) el mail sale de verdad; sin nada, backend `test` que solo
+    # loggea. EMAIL_PROVIDER fuerza el backend (resend | smtp | test).
+    EMAIL_PROVIDER: str = ""
+    RESEND_API_KEY: str = ""
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_TLS: bool = True
+    # from / admin_to: la env pisa el valor editable en app_settings
+    # (resolución en services/email/service.py).
+    EMAIL_FROM: str = ""
+    EMAIL_ADMIN_TO: str = ""
+
+    # ── Integraciones ────────────────────────────────────────────────────
+    GOOGLE_MAPS_API_KEY: str = ""
 
     @field_validator("SITE_URL")
     @classmethod

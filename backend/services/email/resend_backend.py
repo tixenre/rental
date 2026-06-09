@@ -5,9 +5,10 @@ API HTTP simple: POST a /emails con Bearer token. Devuelve `{ id: "uuid" }`.
 from __future__ import annotations
 
 import base64
-import os
 
 import httpx
+
+from config import settings
 
 from .base import Attachment, EmailBackend, EmailBackendError, SendResult
 
@@ -16,7 +17,7 @@ class ResendBackend(EmailBackend):
     name = "resend"
 
     def __init__(self, api_key: str | None = None):
-        self.api_key = api_key or os.environ.get("RESEND_API_KEY", "")
+        self.api_key = api_key or settings.RESEND_API_KEY
         if not self.api_key:
             raise EmailBackendError("RESEND_API_KEY no configurado")
 

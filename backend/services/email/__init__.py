@@ -10,7 +10,7 @@ Backends disponibles: resend, smtp, test.
 """
 from __future__ import annotations
 
-import os
+from config import settings
 
 from .base import Attachment, EmailBackend, EmailBackendError, SendResult
 from .service import send_email, send_raw_email, render_template, wrap_preview
@@ -37,12 +37,12 @@ def resolve_provider() -> str:
 
     Orden: EMAIL_PROVIDER explícito → RESEND_API_KEY → SMTP_HOST → test.
     """
-    provider = (os.environ.get("EMAIL_PROVIDER") or "").lower().strip()
+    provider = settings.EMAIL_PROVIDER.lower().strip()
     if provider in ("resend", "smtp", "test"):
         return provider
-    if os.environ.get("RESEND_API_KEY"):
+    if settings.RESEND_API_KEY:
         return "resend"
-    if os.environ.get("SMTP_HOST"):
+    if settings.SMTP_HOST:
         return "smtp"
     return "test"
 
