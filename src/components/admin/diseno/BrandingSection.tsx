@@ -153,6 +153,8 @@ export function BrandingSection() {
           <div className="w-full sm:w-64 aspect-[1200/630] rounded-md border hairline bg-muted overflow-hidden">
             {ogQ.data ? (
               <img
+                loading="lazy"
+                decoding="async"
                 src={ogQ.data}
                 alt="OG image actual"
                 className="w-full h-full object-cover"

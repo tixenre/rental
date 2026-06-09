@@ -194,6 +194,8 @@ export function DashboardUsoDialog({
                         <TableCell>
                           {e.foto_url ? (
                             <img
+                              loading="lazy"
+                              decoding="async"
                               src={e.foto_url}
                               alt=""
                               className="h-7 w-7 rounded object-cover bg-muted/30"
@@ -321,6 +323,8 @@ export function DashboardUsoDialog({
                           <TableCell>
                             {e.foto_url ? (
                               <img
+                                loading="lazy"
+                                decoding="async"
                                 src={e.foto_url}
                                 alt=""
                                 className="h-7 w-7 rounded object-cover bg-muted/30"

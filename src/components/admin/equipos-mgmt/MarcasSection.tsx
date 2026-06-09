@@ -512,6 +512,8 @@ function MarcaAvatar({ marca }: { marca: MarcaAdmin }) {
           className="h-8 w-8 rounded bg-muted/30 p-1 shrink-0 text-ink"
           fallback={
             <img
+              loading="lazy"
+              decoding="async"
               src={marca.logo_url}
               alt={marca.nombre}
               className="h-8 w-8 rounded object-contain bg-muted/30 shrink-0"
@@ -523,6 +525,8 @@ function MarcaAvatar({ marca }: { marca: MarcaAdmin }) {
     }
     return (
       <img
+        loading="lazy"
+        decoding="async"
         src={marca.logo_url}
         alt={marca.nombre}
         className="h-8 w-8 rounded object-contain bg-muted/30 shrink-0"
