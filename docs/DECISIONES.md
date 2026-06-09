@@ -550,6 +550,21 @@
     cobrador representa la caja). La **parte de Rambla NO se reparte** entre Pablo y Tincho. Los
     cobradores válidos viven en la constante única `COBRADORES` (los tres) + `SOCIOS_HUMANOS`
     (Pablo/Tincho, los únicos válidos para una caja de tipo `socio`).
+  - **Socios = cuenta corriente, no caja (2026-06-09):** Pablo/Tincho dejaron de modelarse como
+    "caja de plata" (un saldo de socio crecía al cobrar, lo cual confundía: cobrar ≠ ganar su parte)
+    y pasaron a **cuenta corriente** deudor/acreedor: `deuda = arranque + cobró − su parte ±
+    rendiciones`, donde **arranque** = `saldo_inicial` del socio (lo que cobró ANTES del sistema),
+    **cobró** = sus `alquiler_pagos`, **su parte** = su comisión devengada (de `reportes/liquidacion`,
+    `por_beneficiario`). **>0 → DEUDOR** (el socio le debe a Rambla), **<0 → ACREEDOR** (Rambla le
+    debe), **0 → saldado**. Las cuentas corrientes **NO suman al total disponible** (esa plata la
+    tiene el socio en mano, no es caja del negocio) y una **negativa (acreedor) NO es error** de
+    reconciliación — el chequeo de saldos negativos corre solo sobre cajas. **Rambla/Fondo Rambla
+    sigue siendo caja de plata real** (su parte NO se resta; lo que cobra es cash del negocio). La
+    dualidad devengado/percibido sigue valiendo (a un socio se le resta lo devengado de lo percibido);
+    lo que cambió es que la *caja de socio* del modelo viejo ahora se lee como cuenta corriente. La
+    pantalla Cuentas y el tablero separan "Socios · Cuenta corriente" de "Cajas · Plata del negocio".
+    La **rendición mensual** (foto del mes) y la **cuenta corriente** (saldo acumulado) son dos vistas
+    del mismo motor.
   - **Cierre contable DISTINTO del de liquidación (#721):** aquel congela el reparto del reporte;
     este congela el estado de cajas/movimientos y **traba la edición de movimientos del mes por la
     fecha del movimiento** (`_exigir_mes_abierto` en crear/editar/anular). Esquema en dos capas
