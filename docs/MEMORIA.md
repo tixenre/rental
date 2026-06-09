@@ -164,7 +164,11 @@ Toda la plata interna (cajas/movimientos/saldos/rendición/P&L/cierre/reconcilia
 `backend/contabilidad/`; los routes son transporte. Invariantes: ingresos de alquiler **derivan de
 `alquiler_pagos`** (nunca recargados); la plata no se borra (**soft-delete** con motivo); **enteros ARS**;
 **multi-moneda no se mezcla** (moneda inmutable tras crear); cobradores en la constante única `COBRADORES`
-(+ `SOCIOS_HUMANOS`). El supervisor marca cálculos de plata interna ad-hoc fuera del paquete.
+(+ `SOCIOS_HUMANOS`). **Socios (Pablo/Tincho) = cuenta corriente** (deudor/acreedor: `arranque + cobró −
+su parte ± rendiciones`), NO cajas de plata: **no** suman al total disponible (esa plata la tiene el socio
+en mano) y una cuenta corriente **negativa (acreedor) NO es error** de reconciliación; solo **Rambla/Fondo
+Rambla** es caja de plata real (su parte no se resta). El supervisor marca cálculos de plata interna ad-hoc
+fuera del paquete.
 
 ### 2026-06-08 — Memoria en dos sub-capas: digest enforceable + log de decisiones
 

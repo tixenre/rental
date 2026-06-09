@@ -15,10 +15,11 @@ def reconciliar(conn) -> dict:
     out: dict = {}
 
     # 1. Cajas con saldo negativo (no debería pasar: algo se cargó de más o falta
-    #    un ingreso/aporte).
+    #    un ingreso/aporte). Solo cajas de plata real — una cuenta corriente de socio
+    #    SÍ puede ser negativa (acreedor: Rambla le debe al socio), no es un error.
     s = saldos(conn)
     negativos = [
-        {"cuenta": c["nombre"], "saldo": c["saldo"]} for c in s["cuentas"] if c["saldo"] < 0
+        {"cuenta": c["nombre"], "saldo": c["saldo"]} for c in s["cajas"] if c["saldo"] < 0
     ]
     out["saldos_negativos"] = {"cantidad": len(negativos), "cuentas": negativos}
 

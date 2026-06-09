@@ -20,6 +20,10 @@ Reglas que NO se rompen:
 - **Devengado (P&L) ≠ percibido (saldo de caja)** a propósito: pueden no coincidir mes a mes.
 - **Cobradores en la constante única `COBRADORES`** (Pablo/Tincho/Rambla; Rambla = cobrador por
   defecto) + `SOCIOS_HUMANOS` (Pablo/Tincho). **No duplicar** esos valores fuera de la constante.
+- **Socios (Pablo/Tincho) = cuenta corriente, NO caja:** su saldo es `arranque + cobró − su parte ±
+  rendiciones` (>0 DEUDOR le debe a Rambla, <0 ACREEDOR Rambla le debe, 0 saldado); `su parte` sale de
+  la liquidación (`reportes/`). **No** suman al total disponible y una **negativa (acreedor) NO es
+  error** de reconciliación. Solo **Rambla/Fondo Rambla** es caja de plata real (su parte no se resta).
 - **Candado de mes cerrado:** crear/editar/anular pasa por el motor (`_exigir_mes_abierto`) — un
   endpoint que escriba `movimientos` por fuera se saltearía el candado. La rendición reusa `SALDADO_CTE`
   (mismo universo de pedidos que el reporte). Esquema en dos capas (`init_db()` + migración) para toda tabla nueva.
