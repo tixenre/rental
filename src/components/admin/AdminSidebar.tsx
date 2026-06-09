@@ -24,6 +24,7 @@ import {
   HardDriveDownload,
   Clapperboard,
   Wallet,
+  BookOpen,
 } from "lucide-react";
 
 import {
@@ -88,6 +89,7 @@ const items: NavItem[] = [
       { title: "Rendición", url: "/admin/contabilidad/rendicion", icon: Users },
       { title: "Cuentas", url: "/admin/contabilidad/cuentas", icon: Wallet },
       { title: "Cobros de pedidos", url: "/admin/pagos", icon: List },
+      { title: "Glosario", url: "/admin/contabilidad/glosario", icon: BookOpen },
     ],
   },
   { title: "Diseño y marca", url: "/admin/diseno", icon: Palette },
