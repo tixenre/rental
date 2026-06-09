@@ -682,7 +682,11 @@ export interface ReconciliacionContable {
   saldos_negativos: { cantidad: number; cuentas: { cuenta: string; saldo: number }[] };
   pagos_sin_socio: { cantidad: number; monto: number };
   movimientos_cuenta_inactiva: { cantidad: number };
-  reporte: { ok: boolean };
+  reporte: {
+    ok: boolean;
+    pagados_sin_ledger?: { cantidad: number; ids: number[] } | null;
+    sobrepagados?: { cantidad: number; ids: number[] } | null;
+  };
 }
 export interface RendicionData {
   mes: string;
