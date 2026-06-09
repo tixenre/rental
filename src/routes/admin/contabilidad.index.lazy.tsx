@@ -146,7 +146,22 @@ function ReconciliacionPanel() {
     problemas.push(
       `${r.movimientos_cuenta_inactiva.cantidad} movimiento(s) en cuentas dadas de baja`,
     );
-  if (!r.reporte.ok) problemas.push("el reporte de liquidación tiene observaciones");
+  if (!r.reporte.ok) {
+    const sl = r.reporte.pagados_sin_ledger;
+    const sp = r.reporte.sobrepagados;
+    if (sl && sl.cantidad > 0)
+      problemas.push(
+        `${sl.cantidad} pedido(s) marcados pagados pero sin pagos registrados ` +
+          `(no entran al reporte): #${sl.ids.join(", #")}`,
+      );
+    if (sp && sp.cantidad > 0)
+      problemas.push(
+        `${sp.cantidad} pedido(s) con más cobrado que su total (¿se editó el pedido ` +
+          `después de cobrar?): #${sp.ids.join(", #")}`,
+      );
+    if (!(sl && sl.cantidad > 0) && !(sp && sp.cantidad > 0))
+      problemas.push("el reporte de liquidación tiene observaciones — revisalas en Liquidación");
+  }
 
   return (
     <div
