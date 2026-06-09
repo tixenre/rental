@@ -725,7 +725,6 @@ function Index() {
           selectedCats={selectedCats}
           onClearCats={() => setSelectedCats(new Set())}
           query={query}
-          disponiblesOnly={disponiblesOnly}
           getDisponible={getDisponible}
           onSuggestCategory={(c) => {
             setSelectedCats(new Set([c]));
@@ -779,7 +778,6 @@ function GridMode({
   selectedCats,
   onClearCats,
   query,
-  disponiblesOnly,
   getDisponible,
   onSuggestCategory,
 }: {
@@ -795,19 +793,14 @@ function GridMode({
   selectedCats: Set<string>;
   onClearCats: () => void;
   query: string;
-  disponiblesOnly: boolean;
   getDisponible: (item: Equipment) => number | undefined;
   onSuggestCategory: (c: string) => void;
 }) {
-  // Filtros de browse (sin búsqueda). La búsqueda NO se replica acá: cuando
-  // hay query, el Grid muestra `filtered` — el MISMO resultado canónico de
-  // `filtrarOrdenar` que usa la Lista. Si no, divergen: el agrupado por
-  // categorías raíz se traga los equipos sin categoría visible asignada.
-  const matches = (e: Equipment) => {
-    if (selectedBrand && e.brand !== selectedBrand) return false;
-    if (disponiblesOnly && e.disponible !== undefined && e.disponible <= 0) return false;
-    return true;
-  };
+  // Los filtros NO se re-implementan acá: el Grid consume `filtered` — el
+  // MISMO resultado canónico (motor filtrarOrdenar + marca/disponibles/
+  // favoritos/specs) que usa la Lista. Con búsqueda activa se muestra plano
+  // y rankeado; en browse, las secciones se gatean por pertenencia.
+  const matchIds = useMemo(() => new Set(filtered.map((e) => e.id)), [filtered]);
 
   const isFiltered = selectedCats.size > 0 || !!selectedBrand;
   const isSearching = query.trim().length > 0;
@@ -816,15 +809,35 @@ function GridMode({
   const visibleCategories = selectedCats.size > 0 ? Array.from(selectedCats) : rootApiCategories;
 
   // inCategory: matchea equipo contra una categoría. Si la categoría es raíz
-  // (tiene subárbol) incluye todos los equipos de sus descendientes. Si es
-  // una sub-cat seleccionada directamente, matcheo exacto.
+  // (tiene subárbol) incluye todos los equipos de sus descendientes — tanto
+  // por el M2M `categorias` como por la categoría primaria/inferida
+  // (`e.category`), que es lo único que tiene un equipo sin categoría
+  // asignada en el admin. Si es una sub-cat seleccionada directamente,
+  // matcheo exacto.
   const inCategory = (e: Equipment, c: string) => {
     const subtree = rootSubtrees.get(c);
     if (subtree) {
-      return (e.categorias ?? []).some((cc) => subtree.has(cc.nombre));
+      return subtree.has(e.category) || (e.categorias ?? []).some((cc) => subtree.has(cc.nombre));
     }
     return e.category === c || (e.categorias ?? []).some((cc) => cc.nombre === c);
   };
+
+  // Secciones por categoría + bucket "Otros": todo equipo que pasa los
+  // filtros aparece en ALGUNA sección. Los que no caen en ninguna categoría
+  // visible (sin categoría asignada en el admin, #859) van a "Otros" en vez
+  // de desaparecer del Grid en silencio.
+  // NO re-sortear: allEquipos viene del backend ordenado por relevancia_manual
+  // ASC, popularidad_score DESC, nombre ASC; el filter preserva ese ranking.
+  const secciones = visibleCategories.map((c) => ({
+    cat: c,
+    items: allEquipos.filter((e) => inCategory(e, c) && matchIds.has(e.id)),
+    real: true,
+  }));
+  const enSeccion = new Set(secciones.flatMap((s) => s.items.map((e) => e.id)));
+  const huerfanos = filtered.filter((e) => !enSeccion.has(e.id));
+  if (huerfanos.length > 0) {
+    secciones.push({ cat: "Otros", items: huerfanos, real: false });
+  }
 
   // Ancho fijo de cards en carrusel para snap consistente
   const cardW = 260;
@@ -915,16 +928,17 @@ function GridMode({
           </section>
         )
       ) : (
-        visibleCategories.map((c) => {
-          // NO re-sortear acá. allEquipos viene del backend ordenado por
-          // relevancia_manual ASC, popularidad_score DESC, nombre ASC.
-          // El filter preserva el orden, así que respeta el ranking automático.
-          const items = allEquipos.filter((e) => inCategory(e, c) && matches(e));
+        secciones.map(({ cat: c, items, real }) => {
           if (items.length === 0) return null;
+          const key = real ? c : "__otros";
 
           if (isFiltered) {
             return (
-              <section key={c} id={`cat-${c}`} className="scroll-mt-40 px-4 lg:px-12">
+              <section
+                key={key}
+                id={real ? `cat-${c}` : undefined}
+                className="scroll-mt-40 px-4 lg:px-12"
+              >
                 <div className="mb-4 flex items-end justify-between gap-3">
                   <h2 className="font-display text-2xl sm:text-3xl">{c}</h2>
                   <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
@@ -946,17 +960,25 @@ function GridMode({
           }
 
           return (
-            <div key={c} id={`cat-${c}`} data-cat-section data-cat={c} className="scroll-mt-40">
+            <div
+              key={key}
+              id={real ? `cat-${c}` : undefined}
+              data-cat-section={real ? "" : undefined}
+              data-cat={real ? c : undefined}
+              className="scroll-mt-40"
+            >
               <CarouselRow
                 title={c}
                 count={items.length}
                 action={
-                  <button
-                    onClick={() => onJumpToCategory(c)}
-                    className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
-                  >
-                    Ver sólo {c} <ArrowRight className="h-3 w-3" />
-                  </button>
+                  real ? (
+                    <button
+                      onClick={() => onJumpToCategory(c)}
+                      className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
+                    >
+                      Ver sólo {c} <ArrowRight className="h-3 w-3" />
+                    </button>
+                  ) : undefined
                 }
               >
                 {items.map((item, i) => (
