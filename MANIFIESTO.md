@@ -80,7 +80,6 @@ Esto aplica a **lo grande** (iniciativas). Lo **chico y aislado** (typo, label p
 
 - `main` — siempre estable, deployable.
 - `claude/<descripcion>` — una rama por **iniciativa** (no por fase / no por commit). Múltiples commits dentro.
-- `bugs` / `features` — branches long-lived legacy del workflow viejo. **NO usar para nuevo trabajo**; quedaron porque hay docs que las mencionan.
 
 Después de mergear: **borrar la branch local** (`git branch -d`) **y remota** (`git push origin --delete`). Sin colgadas.
 
