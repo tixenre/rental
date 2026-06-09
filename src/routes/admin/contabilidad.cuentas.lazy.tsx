@@ -76,7 +76,7 @@ function CuentasPage() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {socios.map((s) => (
-              <SocioCard key={s.id} socio={s} onChanged={invalidar} />
+              <SocioCard key={s.id} socio={s} cajas={cajas} onChanged={invalidar} />
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
@@ -134,9 +134,57 @@ function CuentasPage() {
   );
 }
 
-function SocioCard({ socio, onChanged }: { socio: CuentaSaldo; onChanged: () => void }) {
+function SocioCard({
+  socio,
+  cajas,
+  onChanged,
+}: {
+  socio: CuentaSaldo;
+  cajas: CuentaSaldo[];
+  onChanged: () => void;
+}) {
   const [editando, setEditando] = useState(false);
   const [arranque, setArranque] = useState(String(socio.saldo_inicial));
+
+  // Cajas de la misma moneda que el socio (la transferencia no mezcla monedas).
+  const cajasMov = cajas.filter((c) => c.moneda === socio.moneda);
+  const [movAbierto, setMovAbierto] = useState(false);
+  const [dir, setDir] = useState<"pago" | "cargo">("pago");
+  const [montoMov, setMontoMov] = useState("");
+  const [cajaId, setCajaId] = useState<number | "">("");
+  const [notaMov, setNotaMov] = useState("");
+
+  const cerrarMov = () => {
+    setMovAbierto(false);
+    setMontoMov("");
+    setCajaId("");
+    setNotaMov("");
+    setDir("pago");
+  };
+
+  const registrarMov = useMutation({
+    mutationFn: () => {
+      const monto = Number(montoMov) || 0;
+      const caja = Number(cajaId);
+      // pago/rindió: el socio entrega → sale de su cuenta, entra a la caja (baja deuda).
+      // cargo: Rambla puso por él → sale de la caja, entra a su cuenta (sube deuda).
+      const origen = dir === "pago" ? socio.id : caja;
+      const destino = dir === "pago" ? caja : socio.id;
+      return adminApi.createMovimiento({
+        tipo: "transferencia",
+        monto,
+        cuenta_origen_id: origen,
+        cuenta_destino_id: destino,
+        nota: notaMov.trim() || null,
+      });
+    },
+    onSuccess: () => {
+      cerrarMov();
+      toast.success(dir === "pago" ? "Pago registrado" : "Cargo registrado");
+      onChanged();
+    },
+    onError: (e) => toast.error("No se pudo registrar", { description: (e as Error).message }),
+  });
 
   const guardar = useMutation({
     mutationFn: () => adminApi.updateCuenta(socio.id, { saldo_inicial: Number(arranque) || 0 }),
@@ -221,14 +269,94 @@ function SocioCard({ socio, onChanged }: { socio: CuentaSaldo; onChanged: () => 
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setEditando(true)}
-          className="text-xs text-muted-foreground underline hover:text-amber"
-          title="Editar el arranque (lo que cobró antes del sistema)"
-        >
-          Editar arranque
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setMovAbierto((v) => !v)}
+            className="text-xs text-ink underline hover:text-amber"
+          >
+            Registrar movimiento
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditando(true)}
+            className="text-xs text-muted-foreground underline hover:text-amber"
+            title="Editar el arranque (lo que cobró antes del sistema)"
+          >
+            Editar arranque
+          </button>
+        </div>
+      )}
+
+      {movAbierto && (
+        <div className="pt-2 mt-1 border-t hairline space-y-2">
+          <div className="flex gap-1">
+            {(["pago", "cargo"] as const).map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDir(d)}
+                className={cn(
+                  "flex-1 rounded-md border px-2 py-1.5 text-xs font-medium transition",
+                  dir === d
+                    ? "border-ink bg-ink text-background"
+                    : "border-muted-foreground/30 text-muted-foreground hover:border-ink",
+                )}
+              >
+                {d === "pago" ? "Me pagó / rindió" : "Le cargué"}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {dir === "pago"
+              ? `${socio.nombre} entrega plata → baja su deuda y entra a la caja.`
+              : `Rambla puso plata por ${socio.nombre} (ej. le compró algo) → sube su deuda y sale de la caja.`}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="number"
+              value={montoMov}
+              onChange={(e) => setMontoMov(e.target.value)}
+              placeholder="Monto"
+              className="h-8 w-28 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            />
+            <select
+              value={cajaId}
+              onChange={(e) => setCajaId(e.target.value ? Number(e.target.value) : "")}
+              className="h-8 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+            >
+              <option value="">{dir === "pago" ? "¿A qué caja?" : "¿De qué caja?"}</option>
+              {cajasMov.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <input
+            value={notaMov}
+            onChange={(e) => setNotaMov(e.target.value)}
+            placeholder="Nota (ej. adaptador de lente)"
+            className="h-8 w-full rounded-md border hairline bg-surface-elevated px-2 text-sm"
+          />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => registrarMov.mutate()}
+              disabled={registrarMov.isPending || !(Number(montoMov) > 0) || !cajaId}
+              className="h-8 rounded-md bg-ink px-3 text-xs text-background disabled:opacity-50"
+            >
+              Registrar
+            </button>
+            <button
+              type="button"
+              onClick={cerrarMov}
+              className="h-8 rounded-md border hairline px-2 text-xs"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
