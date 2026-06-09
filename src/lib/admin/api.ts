@@ -618,6 +618,7 @@ export interface Cuenta {
   activa: boolean;
   orden: number;
 }
+export type EstadoCuentaCorriente = "deudor" | "acreedor" | "saldado";
 export interface CuentaSaldo {
   id: number;
   nombre: string;
@@ -629,9 +630,19 @@ export interface CuentaSaldo {
   entradas: number;
   egresos: number;
   saldo: number;
+  /** Cuenta corriente de socio (Pablo/Tincho): deudor/acreedor, no caja de plata. */
+  es_cuenta_corriente: boolean;
+  /** Su parte (comisión devengada) — solo cuentas corrientes. */
+  su_parte: number;
+  estado: EstadoCuentaCorriente | null;
 }
 export interface SaldosData {
+  /** Todas (compat). Para mostrar, usar `cajas` y `socios` por separado. */
   cuentas: CuentaSaldo[];
+  /** Cajas de plata real del negocio (suman al total disponible). */
+  cajas: CuentaSaldo[];
+  /** Cuentas corrientes de socio (Pablo/Tincho) — deudor/acreedor. */
+  socios: CuentaSaldo[];
   totales: Record<string, number>;
   total_disponible: number;
   as_of: string;

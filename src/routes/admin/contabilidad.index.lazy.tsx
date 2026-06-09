@@ -107,13 +107,27 @@ function ContabilidadTablero() {
             </Link>
           </div>
 
+          {/* Socios · Cuenta corriente */}
+          {(data.disponible.socios?.length ?? 0) > 0 && (
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
+                Socios · Cuenta corriente
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {data.disponible.socios.map((s) => (
+                  <SocioCard key={s.id} socio={s} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Por caja */}
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
               Por caja
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {data.disponible.cuentas.map((c) => (
+              {data.disponible.cajas.map((c) => (
                 <CajaCard key={c.id} cuenta={c} />
               ))}
             </div>
@@ -165,6 +179,38 @@ function ReconciliacionPanel() {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function SocioCard({ socio }: { socio: CuentaSaldo }) {
+  const abs = Math.abs(socio.saldo);
+  const frase =
+    socio.estado === "deudor"
+      ? `${socio.nombre} le debe a Rambla`
+      : socio.estado === "acreedor"
+        ? `Rambla le debe a ${socio.nombre}`
+        : "A mano";
+  const color =
+    socio.estado === "deudor"
+      ? "text-destructive"
+      : socio.estado === "acreedor"
+        ? "text-verde"
+        : "text-ink";
+  const tag =
+    socio.estado === "deudor" ? "Deudor" : socio.estado === "acreedor" ? "Acreedor" : "Saldado";
+  return (
+    <div className="rounded-lg border hairline p-4 space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium text-ink">{socio.nombre}</span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          {tag}
+        </span>
+      </div>
+      <div className={`font-mono text-2xl font-semibold tabular-nums ${color}`}>
+        {formatMoney(abs, socio.moneda)}
+      </div>
+      <div className="text-xs text-muted-foreground">{frase}</div>
     </div>
   );
 }

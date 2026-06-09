@@ -1,10 +1,12 @@
 /**
- * contabilidad.cuentas.lazy.tsx — Cuentas/cajas con saldo (#809, Fase 1).
+ * contabilidad.cuentas.lazy.tsx — Cuentas/cajas con saldo (#809).
  *
- * Lista cada caja con su saldo (derivado: saldo inicial + cobros de alquiler +
- * entradas − salidas), y permite crear cajas nuevas, editar su nombre y saldo
- * inicial, y dar de baja una caja vacía. Las cajas de socio (Caja Tincho / Caja Pablo) las
- * crea el sistema y reciben los cobros automáticamente, por eso no se crean acá.
+ * Dos secciones, porque son dos cosas distintas:
+ *  - **Socios · Cuenta corriente** (Pablo/Tincho): NO son cajas de plata, son el
+ *    saldo de la rendición acumulada — DEUDOR (le debe a Rambla) / ACREEDOR (Rambla
+ *    le debe). Sale de: arranque + cobró − su parte ± rendiciones.
+ *  - **Cajas · Plata del negocio** (Efectivo/Banco/Fondo Rambla/Dólares…): plata
+ *    real; suben/bajan con movimientos. Se pueden crear, editar y dar de baja.
  */
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -35,10 +37,11 @@ function CuentasPage() {
 
   const invalidar = () => qc.invalidateQueries({ queryKey: ["admin", "contabilidad"] });
 
-  const cuentas = q.data?.cuentas ?? [];
+  const socios = q.data?.socios ?? [];
+  const cajas = q.data?.cajas ?? [];
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-4xl mx-auto">
+    <div className="px-4 md:px-6 py-6 space-y-8 max-w-4xl mx-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
@@ -46,7 +49,8 @@ function CuentasPage() {
           </div>
           <h1 className="font-display text-3xl text-ink">Cuentas</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Cada caja y su saldo. Lo de cada socio sale solo de los cobros que cargás en Pagos.
+            La cuenta corriente de cada socio (quién le debe a quién) y las cajas con la plata real
+            del negocio.
           </p>
         </div>
         <Link
@@ -64,40 +68,65 @@ function CuentasPage() {
         </div>
       )}
 
+      {/* Socios · Cuenta corriente */}
+      {socios.length > 0 && (
+        <section className="space-y-3">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Socios · Cuenta corriente
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {socios.map((s) => (
+              <SocioCard key={s.id} socio={s} onChanged={invalidar} />
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            El <strong>arranque</strong> es lo que cobró antes del sistema. Se va saldando con{" "}
+            <strong>su parte</strong> de lo que se alquila: cuando llega a cero están a mano, y si
+            se da vuelta, Rambla le debe a él.
+          </p>
+        </section>
+      )}
+
+      {/* Cajas · Plata del negocio */}
       {q.data && (
-        <div className="overflow-x-auto rounded-lg border hairline">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b hairline text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Cuenta</th>
-                <th className="px-3 py-2 font-medium">Tipo</th>
-                <th className="px-3 py-2 font-medium text-right">Saldo inicial</th>
-                <th className="px-3 py-2 font-medium text-right">Saldo actual</th>
-                <th className="px-3 py-2 font-medium text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cuentas.map((c) => (
-                <CuentaRow key={c.id} cuenta={c} onChanged={invalidar} />
-              ))}
-            </tbody>
-            <tfoot>
-              {Object.entries(q.data.totales)
-                .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b)))
-                .map(([moneda, total]) => (
-                  <tr key={moneda} className="border-t hairline">
-                    <td className="px-3 py-2 font-medium" colSpan={3}>
-                      Total disponible {moneda !== "ARS" ? `(${moneda})` : ""}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
-                      {formatMoney(total, moneda)}
-                    </td>
-                    <td />
-                  </tr>
+        <section className="space-y-3">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Cajas · Plata del negocio
+          </div>
+          <div className="overflow-x-auto rounded-lg border hairline">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b hairline text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Caja</th>
+                  <th className="px-3 py-2 font-medium">Tipo</th>
+                  <th className="px-3 py-2 font-medium text-right">Saldo inicial</th>
+                  <th className="px-3 py-2 font-medium text-right">Saldo actual</th>
+                  <th className="px-3 py-2 font-medium text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cajas.map((c) => (
+                  <CajaRow key={c.id} cuenta={c} onChanged={invalidar} />
                 ))}
-            </tfoot>
-          </table>
-        </div>
+              </tbody>
+              <tfoot>
+                {Object.entries(q.data.totales)
+                  .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b)))
+                  .map(([moneda, total]) => (
+                    <tr key={moneda} className="border-t hairline">
+                      <td className="px-3 py-2 font-medium" colSpan={3}>
+                        Total disponible {moneda !== "ARS" ? `(${moneda})` : ""}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
+                        {formatMoney(total, moneda)}
+                      </td>
+                      <td />
+                    </tr>
+                  ))}
+              </tfoot>
+            </table>
+          </div>
+        </section>
       )}
 
       <NuevaCuentaForm onCreated={invalidar} />
@@ -105,7 +134,107 @@ function CuentasPage() {
   );
 }
 
-function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => void }) {
+function SocioCard({ socio, onChanged }: { socio: CuentaSaldo; onChanged: () => void }) {
+  const [editando, setEditando] = useState(false);
+  const [arranque, setArranque] = useState(String(socio.saldo_inicial));
+
+  const guardar = useMutation({
+    mutationFn: () => adminApi.updateCuenta(socio.id, { saldo_inicial: Number(arranque) || 0 }),
+    onSuccess: () => {
+      setEditando(false);
+      toast.success("Arranque actualizado");
+      onChanged();
+    },
+    onError: (e) => toast.error("No se pudo actualizar", { description: (e as Error).message }),
+  });
+
+  const abs = Math.abs(socio.saldo);
+  const frase =
+    socio.estado === "deudor"
+      ? `${socio.nombre} le debe a Rambla`
+      : socio.estado === "acreedor"
+        ? `Rambla le debe a ${socio.nombre}`
+        : "A mano";
+  const color =
+    socio.estado === "deudor"
+      ? "text-destructive"
+      : socio.estado === "acreedor"
+        ? "text-verde"
+        : "text-ink";
+  const tag =
+    socio.estado === "deudor" ? "Deudor" : socio.estado === "acreedor" ? "Acreedor" : "Saldado";
+  const tagColor =
+    socio.estado === "deudor"
+      ? "bg-destructive/10 text-destructive"
+      : socio.estado === "acreedor"
+        ? "bg-verde/10 text-verde"
+        : "bg-muted text-muted-foreground";
+
+  return (
+    <div className="rounded-lg border hairline p-4 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-medium text-ink">{socio.nombre}</div>
+        <span
+          className={cn(
+            "font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full",
+            tagColor,
+          )}
+        >
+          {tag}
+        </span>
+      </div>
+      <div className={cn("font-mono text-2xl font-semibold tabular-nums", color)}>
+        {formatMoney(abs, socio.moneda)}
+      </div>
+      <div className="text-sm text-muted-foreground">{frase}</div>
+      <div className="font-mono text-[11px] text-muted-foreground tabular-nums">
+        arranque {formatMoney(socio.saldo_inicial, socio.moneda)} · cobró{" "}
+        {formatMoney(socio.ingresos_alquiler, socio.moneda)} · su parte{" "}
+        {formatMoney(socio.su_parte, socio.moneda)}
+      </div>
+      {editando ? (
+        <div className="flex items-center gap-1 pt-1">
+          <input
+            type="number"
+            value={arranque}
+            onChange={(e) => setArranque(e.target.value)}
+            className="h-8 w-32 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            aria-label="Arranque"
+          />
+          <button
+            type="button"
+            onClick={() => guardar.mutate()}
+            disabled={guardar.isPending}
+            className="h-8 rounded-md bg-ink px-2 text-xs text-background disabled:opacity-50"
+          >
+            Guardar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditando(false);
+              setArranque(String(socio.saldo_inicial));
+            }}
+            className="h-8 rounded-md border hairline px-2 text-xs"
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setEditando(true)}
+          className="text-xs text-muted-foreground underline hover:text-amber"
+          title="Editar el arranque (lo que cobró antes del sistema)"
+        >
+          Editar arranque
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => void }) {
   const [editando, setEditando] = useState(false);
   const [nombre, setNombre] = useState(cuenta.nombre);
   const [valor, setValor] = useState(String(cuenta.saldo_inicial));
@@ -139,7 +268,7 @@ function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () =
     onError: (e) => toast.error("No se pudo dar de baja", { description: (e as Error).message }),
   });
 
-  // Caja de cobrador (Pablo/Tincho/Rambla): recibe cobros automáticos, no se da de baja.
+  // El Fondo Rambla representa al cobrador Rambla: recibe cobros, no se da de baja.
   const esCobrador = Boolean(cuenta.socio);
 
   return (
@@ -223,11 +352,7 @@ function CuentaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () =
                   ? "text-muted-foreground/40 cursor-not-allowed no-underline"
                   : "text-muted-foreground hover:text-destructive",
               )}
-              title={
-                esCobrador
-                  ? "Las cajas de cobrador (Pablo/Tincho/Rambla) no se dan de baja"
-                  : "Dar de baja"
-              }
+              title={esCobrador ? "El Fondo Rambla no se da de baja" : "Dar de baja"}
             >
               Baja
             </button>
@@ -274,7 +399,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
       className="rounded-lg border hairline p-4 space-y-3"
     >
       <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-        Nueva cuenta
+        Nueva caja
       </div>
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1">
