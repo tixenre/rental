@@ -42,10 +42,16 @@ def _movimientos_socios_mes(conn, desde: str, hasta: str) -> dict:
     pagos = {s: 0 for s in SOCIOS_HUMANOS}
     for r in rows:
         monto = int(r["monto"] or 0)
-        if r["cargo_socio"] in cargos:
-            cargos[r["cargo_socio"]] += monto
-        if r["pago_socio"] in pagos:
-            pagos[r["pago_socio"]] += monto
+        destino_socio = r["cargo_socio"]  # caja real → socio = Rambla le cargó
+        origen_socio = r["pago_socio"]    # socio → caja real = el socio pagó/rindió
+        # Una transferencia socio↔socio es un arreglo interno, NO un cargo/pago de
+        # Rambla: no entra en estas columnas (su efecto ya está en la cuenta corriente).
+        if origen_socio in SOCIOS_HUMANOS and destino_socio in SOCIOS_HUMANOS:
+            continue
+        if destino_socio in SOCIOS_HUMANOS:
+            cargos[destino_socio] += monto
+        if origen_socio in SOCIOS_HUMANOS:
+            pagos[origen_socio] += monto
     return {
         "cargos": cargos,
         "pagos": pagos,
