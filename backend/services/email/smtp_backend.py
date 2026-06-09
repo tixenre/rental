@@ -6,10 +6,11 @@ Para Gmail: `SMTP_PASS` debe ser un App Password de 16 chars
 """
 from __future__ import annotations
 
-import os
 import smtplib
 import uuid
 from email.message import EmailMessage
+
+from config import settings
 
 from .base import Attachment, EmailBackend, EmailBackendError, SendResult
 
@@ -18,11 +19,11 @@ class SmtpBackend(EmailBackend):
     name = "smtp"
 
     def __init__(self):
-        self.host = os.environ.get("SMTP_HOST", "")
-        self.port = int(os.environ.get("SMTP_PORT", "587"))
-        self.user = os.environ.get("SMTP_USER", "")
-        self.password = os.environ.get("SMTP_PASS", "")
-        self.use_tls = os.environ.get("SMTP_TLS", "true").lower() != "false"
+        self.host = settings.SMTP_HOST
+        self.port = settings.SMTP_PORT
+        self.user = settings.SMTP_USER
+        self.password = settings.SMTP_PASS
+        self.use_tls = settings.SMTP_TLS
         if not self.host:
             raise EmailBackendError("SMTP_HOST no configurado")
 

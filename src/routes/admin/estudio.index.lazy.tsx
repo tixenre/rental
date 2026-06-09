@@ -281,7 +281,13 @@ function PackSection() {
             >
               <div className="relative aspect-square w-10 shrink-0 overflow-hidden rounded bg-muted/40">
                 {p.foto_url ? (
-                  <img src={p.foto_url} alt={p.nombre} className="h-full w-full object-cover" />
+                  <img
+                    loading="lazy"
+                    decoding="async"
+                    src={p.foto_url}
+                    alt={p.nombre}
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <div className="grid h-full w-full place-items-center">
                     <Package className="h-4 w-4 text-muted-foreground" />

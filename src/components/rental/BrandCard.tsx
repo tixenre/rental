@@ -103,11 +103,23 @@ export function BrandCard({
               url={logoUrl!}
               ariaLabel={brand.nombre}
               fallback={
-                <img src={logoUrl!} alt={brand.nombre} onError={() => setImgFailed(true)} />
+                <img
+                  loading="lazy"
+                  decoding="async"
+                  src={logoUrl!}
+                  alt={brand.nombre}
+                  onError={() => setImgFailed(true)}
+                />
               }
             />
           ) : (
-            <img src={logoUrl!} alt={brand.nombre} onError={() => setImgFailed(true)} />
+            <img
+              loading="lazy"
+              decoding="async"
+              src={logoUrl!}
+              alt={brand.nombre}
+              onError={() => setImgFailed(true)}
+            />
           )}
         </span>
       ) : (

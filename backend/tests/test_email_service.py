@@ -1,7 +1,7 @@
 """Tests del servicio de email.
 
 Cubre:
-- `get_backend()` resuelve el provider según env vars.
+- `get_backend()` resuelve el provider según la config (`Settings`).
 - `render_template()` renderiza con autoescape para HTML, sin para texto.
 - `send_email()` loggea con status='sent' en éxito.
 - `send_email()` loggea con status='failed' si el backend tira y no propaga.
@@ -9,6 +9,7 @@ Cubre:
 """
 import pytest
 
+from config import settings
 from services.email import get_backend, send_email, render_template
 from services.email.test_backend import SENT_MAILS, InMemoryBackend
 from services.email.resend_backend import ResendBackend
@@ -123,33 +124,33 @@ def clear_sent_mails():
 
 class TestGetBackend:
     def test_explicit_test(self, monkeypatch):
-        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "test")
         b = get_backend()
         assert isinstance(b, InMemoryBackend)
 
     def test_explicit_resend(self, monkeypatch):
-        monkeypatch.setenv("EMAIL_PROVIDER", "resend")
-        monkeypatch.setenv("RESEND_API_KEY", "re_fake")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "resend")
+        monkeypatch.setattr(settings, "RESEND_API_KEY", "re_fake")
         b = get_backend()
         assert isinstance(b, ResendBackend)
 
     def test_explicit_smtp(self, monkeypatch):
-        monkeypatch.setenv("EMAIL_PROVIDER", "smtp")
-        monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "smtp")
+        monkeypatch.setattr(settings, "SMTP_HOST", "smtp.example.com")
         b = get_backend()
         assert isinstance(b, SmtpBackend)
 
     def test_resend_inferred_from_api_key(self, monkeypatch):
-        monkeypatch.delenv("EMAIL_PROVIDER", raising=False)
-        monkeypatch.setenv("RESEND_API_KEY", "re_fake")
-        monkeypatch.delenv("SMTP_HOST", raising=False)
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "")
+        monkeypatch.setattr(settings, "RESEND_API_KEY", "re_fake")
+        monkeypatch.setattr(settings, "SMTP_HOST", "")
         b = get_backend()
         assert isinstance(b, ResendBackend)
 
     def test_fallback_to_test(self, monkeypatch):
-        monkeypatch.delenv("EMAIL_PROVIDER", raising=False)
-        monkeypatch.delenv("RESEND_API_KEY", raising=False)
-        monkeypatch.delenv("SMTP_HOST", raising=False)
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "")
+        monkeypatch.setattr(settings, "RESEND_API_KEY", "")
+        monkeypatch.setattr(settings, "SMTP_HOST", "")
         b = get_backend()
         assert isinstance(b, InMemoryBackend)
 
@@ -208,7 +209,7 @@ class TestBrandedLayout:
 
 class TestSendEmailOk:
     def test_envia_y_loggea(self, fake_db_with_templates, monkeypatch):
-        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "test")
         result = send_email(
             "pedido_creado_cliente",
             "cliente@ejemplo.com",
@@ -276,7 +277,7 @@ class TestSendEmailIdempotency:
     def test_segunda_llamada_misma_alquiler_id_es_skip(
         self, fake_db_with_templates, monkeypatch
     ):
-        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "test")
         ctx = {"cliente_nombre": "Ana", "numero_pedido": 99}
         r1 = send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=99)
         r2 = send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=99)
@@ -291,7 +292,7 @@ class TestSendEmailIdempotency:
     def test_alquiler_distinto_si_envia(
         self, fake_db_with_templates, monkeypatch
     ):
-        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "test")
         ctx = {"cliente_nombre": "Ana", "numero_pedido": 1}
         send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=1)
         send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=2)
@@ -303,7 +304,7 @@ class TestSendEmailIdempotency:
         self, fake_db_with_templates, monkeypatch
     ):
         # Sin alquiler_id no podemos chequear (test de admin, etc) → envía igual
-        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "test")
         ctx = {"cliente_nombre": "Ana", "numero_pedido": 1}
         send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=None)
         send_email("pedido_creado_cliente", "a@b.com", ctx, alquiler_id=None)
@@ -313,7 +314,7 @@ class TestSendEmailIdempotency:
         self, fake_db_with_templates, monkeypatch
     ):
         # pedido_creado_admin no está en el whitelist de idempotency
-        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "test")
         ctx = {"cliente_email": "a@b.com", "numero_pedido": 1}
         send_email("pedido_creado_admin", "admin@x.com", ctx, alquiler_id=5)
         send_email("pedido_creado_admin", "admin@x.com", ctx, alquiler_id=5)
@@ -324,7 +325,7 @@ class TestSendEmailIdempotency:
 
 class TestEnabledGate:
     def test_template_apagado_no_envia_ni_loggea(self, monkeypatch):
-        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "test")
         conn = FakeConn(
             templates={"pedido_creado_cliente": ("S", "<p>{{ numero_pedido }}</p>", "x")},
             disabled={"pedido_creado_cliente"},
@@ -338,7 +339,7 @@ class TestEnabledGate:
 
     def test_respect_enabled_false_ignora_el_apagado(self, monkeypatch):
         # El envío de prueba del admin (respect_enabled=False) manda igual.
-        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "test")
         conn = FakeConn(
             templates={"pedido_creado_cliente": ("S", "<p>{{ numero_pedido }}</p>", "x")},
             disabled={"pedido_creado_cliente"},
@@ -352,7 +353,7 @@ class TestEnabledGate:
         assert len(SENT_MAILS) == 1
 
     def test_template_prendido_envia_normal(self, monkeypatch):
-        monkeypatch.setenv("EMAIL_PROVIDER", "test")
+        monkeypatch.setattr(settings, "EMAIL_PROVIDER", "test")
         conn = FakeConn(
             templates={"pedido_creado_cliente": ("S", "<p>{{ numero_pedido }}</p>", "x")},
         )  # sin disabled → enabled

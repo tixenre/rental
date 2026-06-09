@@ -1335,7 +1335,13 @@ export function EquipoFormDialogV2({
                     disabled={isPicking}
                     className={`relative h-14 w-14 rounded border bg-background overflow-hidden ${isSelected ? "ring-2 ring-amber" : ""}`}
                   >
-                    <img src={u} alt="" className="h-full w-full object-contain" />
+                    <img
+                      loading="lazy"
+                      decoding="async"
+                      src={u}
+                      alt=""
+                      className="h-full w-full object-contain"
+                    />
                     {isPicking && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                         <Loader2 className="h-4 w-4 animate-spin text-white" />
@@ -1901,7 +1907,13 @@ ${fotoTag}
               <div className="rounded-lg border hairline bg-card overflow-hidden">
                 <div className="aspect-square bg-white grid place-items-center p-4">
                   {fotoActual ? (
-                    <img src={fotoActual} alt="" className="max-h-full max-w-full object-contain" />
+                    <img
+                      loading="lazy"
+                      decoding="async"
+                      src={fotoActual}
+                      alt=""
+                      className="max-h-full max-w-full object-contain"
+                    />
                   ) : (
                     <ImageIcon className="h-10 w-10 text-muted-foreground/30" />
                   )}
@@ -2131,7 +2143,13 @@ function PhotoCard({
       <div className="relative aspect-square rounded-md border hairline bg-muted/20 overflow-hidden">
         {url ? (
           <>
-            <img src={url} alt="" className="h-full w-full object-contain" />
+            <img
+              loading="lazy"
+              decoding="async"
+              src={url}
+              alt=""
+              className="h-full w-full object-contain"
+            />
             <button
               type="button"
               onClick={onClear}
