@@ -139,3 +139,67 @@ class TestCalcularSaldos:
         by = {f["nombre"]: f for f in calcular_saldos(cuentas, [], {"Tincho": 500})}
         assert by["Caja Tincho"]["saldo"] == 500
         assert by["Dólares"]["saldo"] == 0  # los cobros ARS no caen en la caja USD
+
+
+class TestCuentaCorrienteSocio:
+    """Pablo/Tincho son cuentas corrientes: deuda = arranque + cobró − su parte ± rendiciones.
+    Rambla (Fondo) es una caja de plata real (su parte NO se resta)."""
+
+    def _cuentas(self):
+        return [
+            {"id": 1, "nombre": "Pablo", "tipo": "socio", "socio": "Pablo", "saldo_inicial": 601000},
+            {"id": 2, "nombre": "Tincho", "tipo": "socio", "socio": "Tincho", "saldo_inicial": 30000},
+            {"id": 5, "nombre": "Fondo Rambla", "tipo": "fondo", "socio": "Rambla", "saldo_inicial": 0},
+        ]
+
+    def test_arranque_es_deuda(self):
+        # Sin cobros ni su parte: Pablo arranca DEUDOR por su arranque.
+        by = {f["nombre"]: f for f in calcular_saldos(self._cuentas(), [], {}, {})}
+        assert by["Pablo"]["es_cuenta_corriente"] is True
+        assert by["Pablo"]["saldo"] == 601000
+        assert by["Pablo"]["estado"] == "deudor"
+
+    def test_su_parte_baja_la_deuda(self):
+        # Pablo: arranque 601000 + cobró 200000 − su parte 261000 = 540000 (deudor).
+        by = {
+            f["nombre"]: f
+            for f in calcular_saldos(self._cuentas(), [], {"Pablo": 200000}, {"Pablo": 261000})
+        }
+        assert by["Pablo"]["saldo"] == 540000
+        assert by["Pablo"]["ingresos_alquiler"] == 200000
+        assert by["Pablo"]["su_parte"] == 261000
+        assert by["Pablo"]["estado"] == "deudor"
+
+    def test_se_da_vuelta_a_acreedor(self):
+        # Si su parte supera arranque+cobró → Rambla le debe (acreedor, saldo negativo).
+        by = {
+            f["nombre"]: f for f in calcular_saldos(self._cuentas(), [], {}, {"Pablo": 700000})
+        }
+        assert by["Pablo"]["saldo"] == -99000  # 601000 − 700000
+        assert by["Pablo"]["estado"] == "acreedor"
+
+    def test_saldado_en_cero(self):
+        by = {
+            f["nombre"]: f for f in calcular_saldos(self._cuentas(), [], {}, {"Pablo": 601000})
+        }
+        assert by["Pablo"]["saldo"] == 0
+        assert by["Pablo"]["estado"] == "saldado"
+
+    def test_rendir_baja_la_deuda_y_entra_a_la_caja(self):
+        # Pablo rinde 100000 (transfiere de su cuenta corriente al Fondo Rambla):
+        # su deuda baja y el Fondo (caja real) recibe la plata.
+        movs = [{"monto": 100000, "cuenta_origen_id": 1, "cuenta_destino_id": 5}]
+        by = {f["nombre"]: f for f in calcular_saldos(self._cuentas(), movs, {}, {})}
+        assert by["Pablo"]["saldo"] == 501000  # 601000 − 100000
+        assert by["Fondo Rambla"]["saldo"] == 100000
+
+    def test_rambla_es_caja_no_cuenta_corriente(self):
+        # El Fondo Rambla representa a Rambla pero es CAJA: su parte no se resta,
+        # lo que cobra suma como cash real.
+        by = {
+            f["nombre"]: f
+            for f in calcular_saldos(self._cuentas(), [], {"Rambla": 374000}, {"Rambla": 999})
+        }
+        assert by["Fondo Rambla"]["es_cuenta_corriente"] is False
+        assert by["Fondo Rambla"]["su_parte"] == 0
+        assert by["Fondo Rambla"]["saldo"] == 374000

@@ -13,6 +13,9 @@ export const formatARS = (n: number) =>
     maximumFractionDigits: 0,
   }).format(Math.round(n));
 
+/** Como `formatARS` pero tolera null/undefined (→ $0). Atajo común en reportes. */
+export const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
+
 /** Formatea un monto en su moneda: ARS → "$97.500", USD → "US$ 1.200". */
 export const formatMoney = (n: number, moneda: string = "ARS") =>
   moneda === "USD"

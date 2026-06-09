@@ -78,15 +78,13 @@ import {
   type SaveStatus,
   type PedidoMode,
 } from "./usePedidoDraft";
-import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoSearchSheet } from "./EquipoSearchSheet";
 import { ClienteAutocomplete } from "./ClienteAutocomplete";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "./EnviarDocsDialog";
 
 // ── Formatters ────────────────────────────────────────────────────────────
-
-const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 
 const fmtFecha = (s: string) => formatFechaDisplay(s);
 

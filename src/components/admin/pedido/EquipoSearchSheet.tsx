@@ -11,12 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BottomSheet } from "@/components/mobile";
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { formatARS } from "@/lib/format";
+import { fmtArs } from "@/lib/format";
 import { filtrarOrdenar } from "@/lib/search/normalize";
 import { EquipoThumb } from "./EquipoThumb";
 import type { DraftItem } from "./usePedidoDraft";
-
-const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 
 export function EquipoSearchSheet({
   open,

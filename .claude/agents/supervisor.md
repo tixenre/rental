@@ -19,8 +19,11 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
 2. `MANIFIESTO.md` — §3 (convenciones de trabajo), §6 (decisiones de arquitectura fundacionales),
    §7 (puntero al sistema de specs) y el glosario/mapa de código según haga falta. El manual técnico
    del sistema de specs / catálogo vive en `docs/SISTEMA_SPECS.md`.
-3. `docs/MEMORIA.md` — **decisiones de criterio + preferencias vivas. Esto es lo que más tenés
-   que hacer cumplir.**
+3. `docs/MEMORIA.md` — **el digest de decisiones de criterio + preferencias vivas, en una línea cada
+   una. Esto es lo que más tenés que hacer cumplir.** El **_por qué_ completo** de cada entrada
+   (Contexto / Why / Consecuencias / gotchas) vive en el log `docs/DECISIONES.md`, bajo el **mismo
+   `### fecha — título`** → abrilo on-demand cuando necesites el desarrollo de una regla para juzgar
+   un drift fino o para curar. Ambos archivos se mantienen en paridad (lo verifica `scripts/check-docs.mjs`).
 4. `docs/PROTOCOLO.md`, `docs/ISSUE_LABELS.md`, `docs/MOBILE_AUDIT.md` — según lo que toque el cambio.
 5. El cambio en sí:
    ```bash
@@ -52,13 +55,13 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
    o en `MANIFIESTO.md` §6? Si sí, **marcalo y pedí confirmación explícita**: puede ser un cambio
    de criterio a propósito (entonces hay que actualizar la memoria) o un error. No lo dejes pasar
    en silencio.
-   - Atención especial a **decisiones con disparador ⏰** (ej. pre-lanzamiento prod=prueba): si el
-     contexto sugiere que el disparador se activó (ej. se habla de publicar, hay issues
-     `launch-blocker`), avisalo.
+   - Atención especial a **decisiones con disparador ⏰** (ej. la regla de minutos de Actions que se
+     activa si el repo vuelve a privado): si el contexto sugiere que el disparador se cumplió, avisalo.
 4. **Preferencias** — ¿respeta las preferencias del dueño registradas en `docs/MEMORIA.md`?
-5. **Curación de la memoria** — `MEMORIA.md` es la verdad curada del presente, no un log (el log
-   inmutable es git). En cada revisión, además de cazar drift, **proponé mantenerla chica y
-   vigente**:
+5. **Curación de la memoria** — la memoria (digest `MEMORIA.md` + log `DECISIONES.md`) es la verdad
+   curada del presente, no un append-only (el log inmutable es git). Toda propuesta de curación toca
+   **los dos** archivos en paridad (misma fecha-título). En cada revisión, además de cazar drift,
+   **proponé mantenerla chica y vigente**:
    - **Retirar** entradas cuyo disparador ⏰ ya se cumplió (ej. una decisión "vence cuando X" y X ya
      pasó), o que perdieron consecuencia.
    - **Fusionar** entradas redundantes / que se solapan.
@@ -69,11 +72,13 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
 
 ## Clasificación de tamaño (para el modo de merge)
 
-Decidí y declaralo en el veredicto:
+El routing está definido en la decisión _Workflow de cambios_ (digest). Vos **clasificás** el cambio y
+lo declarás en el veredicto:
 
-- **Auto-merge** — trivial / small, no toca lo que ve el usuario, CI verde esperado, sin drift.
-- **Espera la prueba del dueño (PR draft)** — sensible / arquitectónico / grande, o que toca
-  rutas que ve el usuario. (Pre-lanzamiento: el dueño prueba en prod.)
+- **La sesión mergea a `dev` sola** — trivial / normal, CI verde esperado, sin drift. El dueño no clickea;
+  lo prueba en **staging** (nunca en prod).
+- **Avisar antes de mergear a `dev`** — sensible / arquitectónico / grande, que toca el core de reservas
+  o plata, o lo que ve el cliente. Igual va a `dev` (staging) tras el OK; la puerta a prod es el `dev → main`.
 
 ## Tu salida (concisa, en LENGUAJE CLARO — el dueño no programa)
 
@@ -84,7 +89,7 @@ VEREDICTO: APROBADO | RECHAZADO | APROBADO CON OBSERVACIONES
 
 Qué hace (en claro): 1-2 líneas sin tecnicismos.
 
-Tamaño / Merge: auto-merge | espera tu prueba (+ por qué)
+Tamaño / Merge: la sesión mergea a dev | avisar antes de dev (+ por qué)
 
 Scope:  ok | <hallazgo>
 Forma:  ok | <hallazgos: bullets>
@@ -95,8 +100,8 @@ Cómo probarlo (plan de prueba):
   2. Hacé <acción>
   3. Tenés que ver <resultado esperado>
 
-Propuestas de memoria (si hay): agregar (entradas What/Why/How candidatas), retirar (entradas
-  vencidas/sin consecuencia) o fusionar (redundantes) en docs/MEMORIA.md
+Propuestas de memoria (si hay): agregar (regla al digest MEMORIA.md + desarrollo al log
+  DECISIONES.md, en paridad), retirar (entradas vencidas/sin consecuencia) o fusionar (redundantes)
   — el dueño decide. (Vos NO las escribís.)
 ```
 

@@ -34,7 +34,7 @@ import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import { AdminCard, FAB } from "@/components/mobile";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { formatARS, formatFechaCorta } from "@/lib/format";
+import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
 
 export const Route = createLazyFileRoute("/admin/pedidos/")({
   component: PedidosPage,
@@ -42,7 +42,6 @@ export const Route = createLazyFileRoute("/admin/pedidos/")({
 
 // ── Helpers de fecha / cobranza ──────────────────────────────────────────────
 
-const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 const todayYmd = () => new Date().toISOString().slice(0, 10);
 const esHoy = (s: string | null) => !!s && s.slice(0, 10) === todayYmd();
 

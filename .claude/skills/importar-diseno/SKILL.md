@@ -186,8 +186,9 @@ Diferencias clave respecto del track web:
   **plata o legales** (IVA, descuentos, condición fiscal, cláusulas). El mockup puede implicar un
   cambio de esas reglas sin decirlo (caso testigo: el presupuesto pasó a mostrar el **IVA aparte**, no
   sumado al total — cambia la cifra que ve el cliente). **No lo infieras: preguntale al dueño** y, si
-  hay una decisión durable, proponé registrarla en `docs/MEMORIA.md` para que una sesión futura no la
-  "corrija" pensando que es un bug.
+  hay una decisión durable, proponé registrarla en la memoria (regla al digest `docs/MEMORIA.md` +
+  desarrollo al log `docs/DECISIONES.md`, en paridad) para que una sesión futura no la "corrija"
+  pensando que es un bug.
 
 El resto del flujo es igual: una iniciativa = rama + PR, supervisor antes de mergear, y el dueño
 prueba en staging (genera el PDF real desde `/admin/pedidos` o `/admin/reportes`). El core de reservas

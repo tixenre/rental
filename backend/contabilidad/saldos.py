@@ -1,26 +1,54 @@
 """Saldos por cuenta (#809) — el corazón del cálculo.
 
-El saldo de una cuenta es:
+Hay DOS tipos de cuenta, que se calculan distinto:
+
+**Cajas (plata real del negocio)** — Efectivo, Banco, Fondo Rambla, Dólares, etc.:
 
     saldo = saldo_inicial
-          + ingresos_alquiler   (caja de cobrador: Σ alquiler_pagos del cobrador)
+          + ingresos_alquiler   (cobrador Rambla: Σ alquiler_pagos del cobrador)
           + entradas            (Σ movimientos donde la cuenta es destino)
           − egresos             (Σ movimientos donde la cuenta es origen)
 
-`ingresos_alquiler` DERIVA de `alquiler_pagos` (única fuente del cobro, #722): no
-se carga ningún movimiento por un cobro de cliente → cero doble-contabilización.
-El clean start se aplica por la **fecha del alquiler** del pedido (`fecha_desde >=
-LIQUIDACION_INICIO`), MISMO corte que la liquidación y la rendición — un alquiler
-de antes de junio NO entra a Finanzas aunque se cobre después (decisión 2026-06-03:
-el corte es por fecha del alquiler, NO de pago).
+**Cuentas corrientes de socio (Pablo/Tincho)** — NO son cajas de plata, son el
+saldo de la rendición acumulada (quién le debe a quién). Un socio cobra en su
+bolsillo plata del negocio → debe esa plata, menos la parte que es suya:
 
-`calcular_saldos` es pura (testeable sin DB). El SQL solo trae filas planas.
+    saldo_cc = arranque           (saldo_inicial = lo que cobró de más PRE-sistema)
+             + cobrado            (Σ alquiler_pagos del socio — plata que agarró)
+             − su_parte           (su comisión devengada — la liquidación)
+             + entradas − egresos (rendiciones: al rendir, baja su deuda)
+
+    saldo_cc > 0 → DEUDOR   (el socio le debe a Rambla)
+    saldo_cc < 0 → ACREEDOR (Rambla le debe al socio)
+    saldo_cc = 0 → saldado (a mano)
+
+`ingresos_alquiler`/`cobrado` DERIVAN de `alquiler_pagos` (única fuente del cobro,
+#722): no se carga ningún movimiento por un cobro de cliente → cero doble-conteo.
+`su_parte` viene de la liquidación (`reportes/`, devengado). El clean start se aplica
+por la **fecha del alquiler** (`fecha_desde >= LIQUIDACION_INICIO`), MISMO corte que
+la liquidación y la rendición (decisión 2026-06-03: corte por fecha del alquiler).
+
+Las cuentas corrientes de socio NO suman al "total disponible" (esa plata la tiene
+el socio en mano, no es caja del negocio). `calcular_saldos` es pura (testeable sin
+DB). El SQL solo trae filas planas.
 """
 
 from collections import defaultdict
 from datetime import date
 
 from reportes.liquidacion import LIQUIDACION_INICIO
+
+from .cuentas import SOCIOS_HUMANOS
+
+
+def partes_socios(conn) -> dict[str, int]:
+    """Lo que le CORRESPONDE a cada socio (su parte / comisión) acumulado desde el
+    clean start hasta hoy, de la liquidación (`reportes/`). Devengado: solo pedidos
+    saldados. Es lo que se le RESTA a la deuda de su cuenta corriente."""
+    from reportes.liquidacion import liquidar
+
+    data = liquidar(conn, LIQUIDACION_INICIO, date.today().isoformat())
+    return {k: int(v) for k, v in data["resumen"]["por_beneficiario"].items()}
 
 
 def ingresos_derivados(conn, desde: str | None = None, hasta: str | None = None) -> dict[str, int]:
@@ -68,14 +96,24 @@ def movimientos_planos(conn, desde: str | None = None, hasta: str | None = None)
     return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
 
 
-def calcular_saldos(cuentas: list[dict], movimientos: list[dict], ingresos: dict[str, int]) -> list[dict]:
+def calcular_saldos(
+    cuentas: list[dict],
+    movimientos: list[dict],
+    ingresos: dict[str, int],
+    partes: dict[str, int] | None = None,
+) -> list[dict]:
     """PURA. Para cada cuenta, su saldo y el desglose. Devuelve una lista en el
     mismo orden que `cuentas`.
 
+    Una cuenta de socio HUMANO (Pablo/Tincho) se trata como **cuenta corriente**
+    (deudor/acreedor); el resto como **caja** de plata real. Ver el módulo arriba.
+
     `cuentas`: filas con id/nombre/tipo/socio/saldo_inicial.
     `movimientos`: filas con monto/cuenta_origen_id/cuenta_destino_id (no anulados).
-    `ingresos`: {socio: monto} derivado de alquiler_pagos.
+    `ingresos`: {socio: monto} derivado de alquiler_pagos (lo que cobró cada uno).
+    `partes`: {socio: monto} de la liquidación (su parte / comisión devengada).
     """
+    partes = partes or {}
     egresos_por: dict = defaultdict(int)   # cuenta es origen → sale plata
     entradas_por: dict = defaultdict(int)  # cuenta es destino → entra plata
     for m in movimientos:
@@ -93,23 +131,37 @@ def calcular_saldos(cuentas: list[dict], movimientos: list[dict], ingresos: dict
         socio = c.get("socio")
         moneda = c.get("moneda") or "ARS"
         saldo_inicial = int(c.get("saldo_inicial") or 0)
-        # Los cobros de clientes son en ARS → solo alimentan cajas en pesos.
-        ingresos_alquiler = int(ingresos.get(socio, 0)) if (socio and moneda == "ARS") else 0
+        # Los cobros de clientes son en ARS → solo alimentan cuentas en pesos.
+        cobrado = int(ingresos.get(socio, 0)) if (socio and moneda == "ARS") else 0
         entradas = int(entradas_por.get(cid, 0))
         egresos = int(egresos_por.get(cid, 0))
-        saldo = saldo_inicial + ingresos_alquiler + entradas - egresos
-        filas.append({
+        es_cc = socio in SOCIOS_HUMANOS
+
+        fila = {
             "id": cid,
             "nombre": c["nombre"],
             "tipo": c["tipo"],
             "socio": socio,
             "moneda": moneda,
             "saldo_inicial": saldo_inicial,
-            "ingresos_alquiler": ingresos_alquiler,
+            "ingresos_alquiler": cobrado,
             "entradas": entradas,
             "egresos": egresos,
-            "saldo": saldo,
-        })
+            "es_cuenta_corriente": es_cc,
+            "su_parte": 0,
+            "estado": None,
+        }
+        if es_cc:
+            # Cuenta corriente del socio: deuda = arranque + cobró − su parte ± rendiciones.
+            su_parte = int(partes.get(socio, 0))
+            saldo = saldo_inicial + cobrado - su_parte + entradas - egresos
+            fila["su_parte"] = su_parte
+            fila["estado"] = "deudor" if saldo > 0 else ("acreedor" if saldo < 0 else "saldado")
+            fila["saldo"] = saldo
+        else:
+            # Caja de plata real (incluye el Fondo Rambla, que sí es cash del negocio).
+            fila["saldo"] = saldo_inicial + cobrado + entradas - egresos
+        filas.append(fila)
     return filas
 
 
@@ -122,15 +174,22 @@ def _totales_por_moneda(filas: list[dict]) -> dict[str, int]:
 
 
 def saldos(conn, as_of: str | None = None) -> dict:
-    """Saldos de todas las cuentas activas + totales por moneda. Compone la
-    derivación de ingresos con el libro de movimientos."""
+    """Saldos de todas las cuentas activas. Separa las **cajas** (plata real del
+    negocio, que suman al total disponible) de las **cuentas corrientes de socio**
+    (deudor/acreedor — esa plata la tiene el socio en mano, no es caja). Compone la
+    derivación de ingresos + la liquidación (su parte) con el libro de movimientos."""
     cuentas = _cuentas_activas(conn)
     movs = movimientos_planos(conn)
     ingresos = ingresos_derivados(conn)
-    filas = calcular_saldos(cuentas, movs, ingresos)
-    totales = _totales_por_moneda(filas)
+    partes = partes_socios(conn)
+    filas = calcular_saldos(cuentas, movs, ingresos, partes)
+    cajas = [f for f in filas if not f["es_cuenta_corriente"]]
+    socios = [f for f in filas if f["es_cuenta_corriente"]]
+    totales = _totales_por_moneda(cajas)  # el disponible es solo plata real del negocio
     return {
-        "cuentas": filas,
+        "cuentas": filas,   # todas (compat: saldo_de_cuenta, baja lógica)
+        "cajas": cajas,
+        "socios": socios,
         "totales": totales,
         "total_disponible": totales.get("ARS", 0),  # ARS (compat); USD va en `totales`
         "as_of": as_of or date.today().isoformat(),
@@ -147,7 +206,9 @@ def saldo_de_cuenta(conn, cuenta_id: int) -> int:
     cuenta = obtener_cuenta(conn, cuenta_id)
     if not cuenta:
         return 0
-    filas = calcular_saldos([cuenta], movimientos_planos(conn), ingresos_derivados(conn))
+    filas = calcular_saldos(
+        [cuenta], movimientos_planos(conn), ingresos_derivados(conn), partes_socios(conn)
+    )
     return int(filas[0]["saldo"]) if filas else 0
 
 

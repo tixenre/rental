@@ -618,6 +618,7 @@ export interface Cuenta {
   activa: boolean;
   orden: number;
 }
+export type EstadoCuentaCorriente = "deudor" | "acreedor" | "saldado";
 export interface CuentaSaldo {
   id: number;
   nombre: string;
@@ -629,9 +630,19 @@ export interface CuentaSaldo {
   entradas: number;
   egresos: number;
   saldo: number;
+  /** Cuenta corriente de socio (Pablo/Tincho): deudor/acreedor, no caja de plata. */
+  es_cuenta_corriente: boolean;
+  /** Su parte (comisión devengada) — solo cuentas corrientes. */
+  su_parte: number;
+  estado: EstadoCuentaCorriente | null;
 }
 export interface SaldosData {
+  /** Todas (compat). Para mostrar, usar `cajas` y `socios` por separado. */
   cuentas: CuentaSaldo[];
+  /** Cajas de plata real del negocio (suman al total disponible). */
+  cajas: CuentaSaldo[];
+  /** Cuentas corrientes de socio (Pablo/Tincho) — deudor/acreedor. */
+  socios: CuentaSaldo[];
   totales: Record<string, number>;
   total_disponible: number;
   as_of: string;
@@ -646,12 +657,6 @@ export interface TableroData {
   cierre: { cerrado: boolean; cerrado_por: string | null; cerrado_at: string | null };
   disponible: SaldosData;
   ganancia_mes: { mes: string; ingresos: number; gastos: number; neta: number };
-  rendicion_pendiente: {
-    mes: string;
-    total: number;
-    sugeridos: SugeridoRendicion[];
-    cuadra: boolean;
-  };
 }
 export interface RendicionPersona {
   persona: string;
@@ -753,6 +758,23 @@ export interface MovimientoInput {
 export interface GastosPorCategoria {
   por_categoria: { categoria: string; monto: number }[];
   total: number;
+}
+export interface ReporteMensual {
+  mes: string;
+  desde: string;
+  hasta: string;
+  cerrado: boolean;
+  devengado: { total: number; pedidos: number; por_socio: Record<string, number> };
+  cobrado: { por_socio: Record<string, number>; total: number };
+  gastos: { total: number; por_categoria: { categoria: string; monto: number }[] };
+  ganancia_neta: number;
+  socios_mes: {
+    cargos: Record<string, number>;
+    pagos: Record<string, number>;
+    cargos_total: number;
+    pagos_total: number;
+  };
+  cuenta_corriente: CuentaSaldo[];
 }
 // Cobros de pedidos agregados por mes (read-only) para la vista unificada de movimientos.
 export interface CobroMensual {
@@ -1730,6 +1752,8 @@ export const adminApi = {
     const qs = sp.toString();
     return authedJson<GastosPorCategoria>(`/api/admin/contabilidad/gastos${qs ? `?${qs}` : ""}`);
   },
+  getReporteMensual: (mes: string) =>
+    authedJson<ReporteMensual>(`/api/admin/contabilidad/reporte/${mes}`),
   // Rendición de cuentas mensual entre socios
   getRendicion: (mes: string) =>
     authedJson<RendicionData>(`/api/admin/contabilidad/rendicion/${mes}`),

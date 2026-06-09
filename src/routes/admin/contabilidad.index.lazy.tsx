@@ -57,8 +57,8 @@ function ContabilidadTablero() {
 
       {data && (
         <>
-          {/* KPIs: disponible · ganancia del mes · rendición pendiente */}
-          <div className="grid gap-3 sm:grid-cols-3">
+          {/* KPIs: disponible · ganancia del mes (la rendición vive en la cuenta corriente) */}
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border hairline bg-surface-elevated p-5">
               <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
                 Plata disponible
@@ -92,20 +92,21 @@ function ContabilidadTablero() {
                 {formatARS(data.ganancia_mes.gastos)}
               </div>
             </div>
-
-            <Link
-              to="/admin/contabilidad/rendicion"
-              className="rounded-xl border hairline bg-surface-elevated p-5 hover:bg-muted/30 transition"
-            >
-              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                Rendición pendiente · {data.rendicion_pendiente.mes}
-              </div>
-              <div className="font-mono text-3xl font-semibold tabular-nums text-ink mt-1">
-                {formatARS(data.rendicion_pendiente.total)}
-              </div>
-              <div className="text-xs text-amber mt-1">Ver rendición →</div>
-            </Link>
           </div>
+
+          {/* Socios · Cuenta corriente */}
+          {(data.disponible.socios?.length ?? 0) > 0 && (
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
+                Socios · Cuenta corriente
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {data.disponible.socios.map((s) => (
+                  <SocioCard key={s.id} socio={s} />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Por caja */}
           <div>
@@ -113,7 +114,7 @@ function ContabilidadTablero() {
               Por caja
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {data.disponible.cuentas.map((c) => (
+              {data.disponible.cajas.map((c) => (
                 <CajaCard key={c.id} cuenta={c} />
               ))}
             </div>
@@ -165,6 +166,38 @@ function ReconciliacionPanel() {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function SocioCard({ socio }: { socio: CuentaSaldo }) {
+  const abs = Math.abs(socio.saldo);
+  const frase =
+    socio.estado === "deudor"
+      ? `${socio.nombre} le debe a Rambla`
+      : socio.estado === "acreedor"
+        ? `Rambla le debe a ${socio.nombre}`
+        : "A mano";
+  const color =
+    socio.estado === "deudor"
+      ? "text-destructive"
+      : socio.estado === "acreedor"
+        ? "text-verde"
+        : "text-ink";
+  const tag =
+    socio.estado === "deudor" ? "Deudor" : socio.estado === "acreedor" ? "Acreedor" : "Saldado";
+  return (
+    <div className="rounded-lg border hairline p-4 space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium text-ink">{socio.nombre}</span>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          {tag}
+        </span>
+      </div>
+      <div className={`font-mono text-2xl font-semibold tabular-nums ${color}`}>
+        {formatMoney(abs, socio.moneda)}
+      </div>
+      <div className="text-xs text-muted-foreground">{frase}</div>
     </div>
   );
 }

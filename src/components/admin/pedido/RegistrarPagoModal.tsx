@@ -13,9 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
-import { formatARS } from "@/lib/format";
-
-const fmtArs = (n: number) => formatARS(n);
+import { fmtArs } from "@/lib/format";
 
 export function RegistrarPagoModal({
   pedidoId,

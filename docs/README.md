@@ -6,8 +6,9 @@
 
 | Archivo | Para qué sirve |
 |---|---|
-| [MEMORIA.md](MEMORIA.md) | **Memoria viva**: decisiones de criterio + preferencias (curado, fechado). El supervisor la hace cumplir. |
-| [PROTOCOLO.md](PROTOCOLO.md) | Detalle del workflow de auditoría + PRs prolijos. Referenciado desde el manifiesto. |
+| [MEMORIA.md](MEMORIA.md) | **Memoria viva (digest enforceable)**: decisiones de criterio + preferencias, la regla de cada una (curado, fechado, auto-cargado). El supervisor la hace cumplir. |
+| [DECISIONES.md](DECISIONES.md) | **Log ADR completo**: el *por qué* de cada decisión del digest (on-demand, mismo `fecha — título`). |
+| [PROTOCOLO.md](PROTOCOLO.md) | Prompt del auditor + **mobile gate**. El método de mantenimiento (auditar/fixear/PR) vive en el skill `limpieza`. |
 | [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Setup de Railway: variables, build, dominio, troubleshooting. |
 | [SISTEMA_SPECS.md](SISTEMA_SPECS.md) | **Manual técnico** del sistema de specs / catálogo / datasets / autocompletar / compatibilidad. |
 | [MOBILE.md](MOBILE.md) + [MOBILE_AUDIT.md](MOBILE_AUDIT.md) | Guidelines mobile y checklist de audit. |
@@ -20,5 +21,5 @@
 
 - **Bugs activos** → GitHub Issues con label `bug`.
 - **Features activas** → GitHub Issues con label `feature`.
-- **Decisiones de criterio + preferencias** → [`MEMORIA.md`](MEMORIA.md) (curado, lo hace cumplir el supervisor).
+- **Decisiones de criterio + preferencias** → regla al digest [`MEMORIA.md`](MEMORIA.md) + desarrollo al log [`DECISIONES.md`](DECISIONES.md), en paridad (curado, lo hace cumplir el supervisor).
 - **Docs técnicas** (cómo funciona X, por qué la decisión Y) → archivo nuevo en `docs/`.
