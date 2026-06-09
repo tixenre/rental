@@ -15,7 +15,7 @@ import {
 import { toast } from "sonner";
 
 import { authedFetch, authedJson } from "@/lib/authedFetch";
-import { formatARS, formatFechaDisplay } from "@/lib/format";
+import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -75,9 +75,6 @@ type PedidoLite = {
 
 function fmtFecha(s?: string | null) {
   return formatFechaDisplay(s);
-}
-function fmtArs(n: number) {
-  return formatARS(n);
 }
 
 function SolicitudesPage() {

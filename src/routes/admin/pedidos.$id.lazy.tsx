@@ -81,7 +81,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useCotizacion } from "@/lib/cotizacion";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { formatARS, formatFechaCorta } from "@/lib/format";
+import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoSearchSheet } from "@/components/admin/pedido/EquipoSearchSheet";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "@/components/admin/pedido/EnviarDocsDialog";
@@ -143,8 +143,6 @@ function nextStep(
   const target = t[0];
   return { target, label: NEXT_LABEL[p.estado] ?? "Avanzar", blocked: blockReason(p, target) };
 }
-
-const fmtArs = (n: number | null | undefined) => formatARS(n ?? 0);
 
 // ── Página ───────────────────────────────────────────────────────────────────
 
