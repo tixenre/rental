@@ -57,8 +57,8 @@ function ContabilidadTablero() {
 
       {data && (
         <>
-          {/* KPIs: disponible · ganancia del mes · rendición pendiente */}
-          <div className="grid gap-3 sm:grid-cols-3">
+          {/* KPIs: disponible · ganancia del mes (la rendición vive en la cuenta corriente) */}
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border hairline bg-surface-elevated p-5">
               <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
                 Plata disponible
@@ -92,19 +92,6 @@ function ContabilidadTablero() {
                 {formatARS(data.ganancia_mes.gastos)}
               </div>
             </div>
-
-            <Link
-              to="/admin/contabilidad/rendicion"
-              className="rounded-xl border hairline bg-surface-elevated p-5 hover:bg-muted/30 transition"
-            >
-              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-                Rendición pendiente · {data.rendicion_pendiente.mes}
-              </div>
-              <div className="font-mono text-3xl font-semibold tabular-nums text-ink mt-1">
-                {formatARS(data.rendicion_pendiente.total)}
-              </div>
-              <div className="text-xs text-amber mt-1">Ver rendición →</div>
-            </Link>
           </div>
 
           {/* Socios · Cuenta corriente */}

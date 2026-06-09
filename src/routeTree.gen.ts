@@ -75,9 +75,6 @@ const AdminEquiposCategoriasLazyRouteImport = createFileRoute(
 const AdminEquiposCalidadLazyRouteImport = createFileRoute(
   '/admin/equipos/calidad',
 )()
-const AdminContabilidadRendicionLazyRouteImport = createFileRoute(
-  '/admin/contabilidad/rendicion',
-)()
 const AdminContabilidadMovimientosLazyRouteImport = createFileRoute(
   '/admin/contabilidad/movimientos',
 )()
@@ -342,14 +339,6 @@ const AdminEquiposCalidadLazyRoute = AdminEquiposCalidadLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/equipos.calidad.lazy').then((d) => d.Route),
 )
-const AdminContabilidadRendicionLazyRoute =
-  AdminContabilidadRendicionLazyRouteImport.update({
-    id: '/contabilidad/rendicion',
-    path: '/contabilidad/rendicion',
-    getParentRoute: () => AdminRoute,
-  } as any).lazy(() =>
-    import('./routes/admin/contabilidad.rendicion.lazy').then((d) => d.Route),
-  )
 const AdminContabilidadMovimientosLazyRoute =
   AdminContabilidadMovimientosLazyRouteImport.update({
     id: '/contabilidad/movimientos',
@@ -421,7 +410,6 @@ export interface FileRoutesByFullPath {
   '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
   '/admin/contabilidad/glosario': typeof AdminContabilidadGlosarioLazyRoute
   '/admin/contabilidad/movimientos': typeof AdminContabilidadMovimientosLazyRoute
-  '/admin/contabilidad/rendicion': typeof AdminContabilidadRendicionLazyRoute
   '/admin/equipos/calidad': typeof AdminEquiposCalidadLazyRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
@@ -467,7 +455,6 @@ export interface FileRoutesByTo {
   '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
   '/admin/contabilidad/glosario': typeof AdminContabilidadGlosarioLazyRoute
   '/admin/contabilidad/movimientos': typeof AdminContabilidadMovimientosLazyRoute
-  '/admin/contabilidad/rendicion': typeof AdminContabilidadRendicionLazyRoute
   '/admin/equipos/calidad': typeof AdminEquiposCalidadLazyRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
@@ -518,7 +505,6 @@ export interface FileRoutesById {
   '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
   '/admin/contabilidad/glosario': typeof AdminContabilidadGlosarioLazyRoute
   '/admin/contabilidad/movimientos': typeof AdminContabilidadMovimientosLazyRoute
-  '/admin/contabilidad/rendicion': typeof AdminContabilidadRendicionLazyRoute
   '/admin/equipos/calidad': typeof AdminEquiposCalidadLazyRoute
   '/admin/equipos/categorias': typeof AdminEquiposCategoriasLazyRoute
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
@@ -570,7 +556,6 @@ export interface FileRouteTypes {
     | '/admin/contabilidad/cuentas'
     | '/admin/contabilidad/glosario'
     | '/admin/contabilidad/movimientos'
-    | '/admin/contabilidad/rendicion'
     | '/admin/equipos/calidad'
     | '/admin/equipos/categorias'
     | '/admin/equipos/marcas'
@@ -616,7 +601,6 @@ export interface FileRouteTypes {
     | '/admin/contabilidad/cuentas'
     | '/admin/contabilidad/glosario'
     | '/admin/contabilidad/movimientos'
-    | '/admin/contabilidad/rendicion'
     | '/admin/equipos/calidad'
     | '/admin/equipos/categorias'
     | '/admin/equipos/marcas'
@@ -666,7 +650,6 @@ export interface FileRouteTypes {
     | '/admin/contabilidad/cuentas'
     | '/admin/contabilidad/glosario'
     | '/admin/contabilidad/movimientos'
-    | '/admin/contabilidad/rendicion'
     | '/admin/equipos/calidad'
     | '/admin/equipos/categorias'
     | '/admin/equipos/marcas'
@@ -993,13 +976,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEquiposCalidadLazyRouteImport
       parentRoute: typeof AdminEquiposRoute
     }
-    '/admin/contabilidad/rendicion': {
-      id: '/admin/contabilidad/rendicion'
-      path: '/contabilidad/rendicion'
-      fullPath: '/admin/contabilidad/rendicion'
-      preLoaderRoute: typeof AdminContabilidadRendicionLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/contabilidad/movimientos': {
       id: '/admin/contabilidad/movimientos'
       path: '/contabilidad/movimientos'
@@ -1092,7 +1068,6 @@ interface AdminRouteChildren {
   AdminContabilidadCuentasLazyRoute: typeof AdminContabilidadCuentasLazyRoute
   AdminContabilidadGlosarioLazyRoute: typeof AdminContabilidadGlosarioLazyRoute
   AdminContabilidadMovimientosLazyRoute: typeof AdminContabilidadMovimientosLazyRoute
-  AdminContabilidadRendicionLazyRoute: typeof AdminContabilidadRendicionLazyRoute
   AdminPedidosIdLazyRoute: typeof AdminPedidosIdLazyRoute
   AdminPedidosNuevoLazyRoute: typeof AdminPedidosNuevoLazyRoute
   AdminSpecsDefinitionsLazyRoute: typeof AdminSpecsDefinitionsLazyRoute
@@ -1119,7 +1094,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminContabilidadCuentasLazyRoute: AdminContabilidadCuentasLazyRoute,
   AdminContabilidadGlosarioLazyRoute: AdminContabilidadGlosarioLazyRoute,
   AdminContabilidadMovimientosLazyRoute: AdminContabilidadMovimientosLazyRoute,
-  AdminContabilidadRendicionLazyRoute: AdminContabilidadRendicionLazyRoute,
   AdminPedidosIdLazyRoute: AdminPedidosIdLazyRoute,
   AdminPedidosNuevoLazyRoute: AdminPedidosNuevoLazyRoute,
   AdminSpecsDefinitionsLazyRoute: AdminSpecsDefinitionsLazyRoute,
