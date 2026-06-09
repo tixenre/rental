@@ -379,6 +379,20 @@ def get_pyl(request: Request, mes: str):
             raise HTTPException(400, str(e))
 
 
+@router.get("/admin/contabilidad/reporte/{mes}")
+def get_reporte_mensual(request: Request, mes: str):
+    """Reporte mensual completo de Rambla: devengado + percibido + gastos +
+    ganancia + cargos de socios + cuenta corriente, derivado del motor."""
+    require_admin(request)
+    from contabilidad.reporte_mensual import reporte_mensual
+
+    with get_db() as conn:
+        try:
+            return reporte_mensual(conn, mes)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
+
 # ── Rendición de cuentas mensual entre socios ───────────────────────────────
 
 class SaldarBody(BaseModel):
