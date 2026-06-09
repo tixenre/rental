@@ -87,6 +87,7 @@ const items: NavItem[] = [
       { title: "Tablero", url: "/admin/contabilidad", icon: LayoutDashboard },
       { title: "Movimientos", url: "/admin/contabilidad/movimientos", icon: ClipboardList },
       { title: "Cuentas", url: "/admin/contabilidad/cuentas", icon: Wallet },
+      { title: "Reporte mensual", url: "/admin/contabilidad/reporte", icon: BarChart3 },
       { title: "Cobros de pedidos", url: "/admin/pagos", icon: List },
       { title: "Glosario", url: "/admin/contabilidad/glosario", icon: BookOpen },
     ],

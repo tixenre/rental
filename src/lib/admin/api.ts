@@ -765,6 +765,23 @@ export interface GastosPorCategoria {
   por_categoria: { categoria: string; monto: number }[];
   total: number;
 }
+export interface ReporteMensual {
+  mes: string;
+  desde: string;
+  hasta: string;
+  cerrado: boolean;
+  devengado: { total: number; pedidos: number; por_socio: Record<string, number> };
+  cobrado: { por_socio: Record<string, number>; total: number };
+  gastos: { total: number; por_categoria: { categoria: string; monto: number }[] };
+  ganancia_neta: number;
+  socios_mes: {
+    cargos: Record<string, number>;
+    pagos: Record<string, number>;
+    cargos_total: number;
+    pagos_total: number;
+  };
+  cuenta_corriente: CuentaSaldo[];
+}
 // Cobros de pedidos agregados por mes (read-only) para la vista unificada de movimientos.
 export interface CobroMensual {
   mes: string;
@@ -1741,6 +1758,8 @@ export const adminApi = {
     const qs = sp.toString();
     return authedJson<GastosPorCategoria>(`/api/admin/contabilidad/gastos${qs ? `?${qs}` : ""}`);
   },
+  getReporteMensual: (mes: string) =>
+    authedJson<ReporteMensual>(`/api/admin/contabilidad/reporte/${mes}`),
   // Rendición de cuentas mensual entre socios
   getRendicion: (mes: string) =>
     authedJson<RendicionData>(`/api/admin/contabilidad/rendicion/${mes}`),
