@@ -205,6 +205,8 @@ export function KitComponentEditor({ equipoId, mode }: { equipoId: number; mode:
             >
               {r.foto_url ? (
                 <img
+                  loading="lazy"
+                  decoding="async"
                   src={r.foto_url}
                   alt=""
                   className="h-7 w-7 object-contain rounded bg-muted/30 shrink-0"
@@ -329,6 +331,8 @@ function SortableItem({
 
         {item.foto_url ? (
           <img
+            loading="lazy"
+            decoding="async"
             src={item.foto_url}
             alt=""
             className="h-8 w-8 object-contain rounded bg-muted/30 shrink-0"
@@ -387,6 +391,8 @@ function SortableItem({
 
         {item.foto_url ? (
           <img
+            loading="lazy"
+            decoding="async"
             src={item.foto_url}
             alt=""
             className="h-8 w-8 object-contain rounded bg-muted/30 shrink-0"

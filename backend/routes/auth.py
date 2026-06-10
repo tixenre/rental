@@ -49,7 +49,7 @@ REDIRECT_URI         = os.getenv("REDIRECT_URI")         or f"{_OAUTH_BASE}/auth
 CLIENTE_REDIRECT_URI = os.getenv("CLIENTE_REDIRECT_URI") or f"{_OAUTH_BASE}/cliente/auth/callback"
 POST_LOGIN_URL       = os.getenv("POST_LOGIN_URL", "/admin")
 FRONTEND_BASE        = os.getenv("FRONTEND_BASE_URL", "")   # e.g. http://localhost:3000 en dev
-MAPS_API_KEY         = os.getenv("GOOGLE_MAPS_API_KEY", "")
+MAPS_API_KEY         = settings.GOOGLE_MAPS_API_KEY
 
 ALLOWED_EMAILS: set[str] = {
     e.strip().lower()

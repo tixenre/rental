@@ -8,10 +8,11 @@ interface StepperPillProps {
   onIncrement: (e: MouseEvent<HTMLButtonElement>) => void;
   onDecrement: (e: MouseEvent<HTMLButtonElement>) => void;
   /**
-   * Tamaño de los botones:
+   * Tamaño VISUAL de los botones (el área táctil es ≥44px en todos — en
+   * sm/md se extiende con un pseudo-elemento, ver `hitArea`):
    * - `sm` = 28px (grid card / lista desktop)
-   * - `md` = 30px (mobile — total ≈ 44px con el número, target táctil OK)
-   * - `lg` = 44px (CartDrawer — tap target HIG)
+   * - `md` = 30px (mobile)
+   * - `lg` = 44px (CartDrawer / ficha — tap target HIG nativo)
    */
   size?: "sm" | "md" | "lg";
   maxReached?: boolean;
@@ -39,6 +40,23 @@ export function StepperPill({
 }: StepperPillProps) {
   const btnCls = size === "lg" ? "h-11 w-11" : size === "md" ? "h-[30px] w-[30px]" : "h-7 w-7";
 
+  // Área táctil ≥44px sin agrandar el visual (HIG, MEMORIA 2026-06-05): en
+  // sm/md cada botón extiende su hit-area con un pseudo-elemento hacia afuera
+  // (vertical + flanco externo). No se expande hacia adentro para que la zona
+  // del número no dispare un botón por error.
+  const hitArea =
+    size === "lg"
+      ? { dec: "", inc: "" }
+      : size === "md"
+        ? {
+            dec: "relative before:absolute before:-inset-y-[7px] before:-left-[14px] before:right-0",
+            inc: "relative before:absolute before:-inset-y-[7px] before:-right-[14px] before:left-0",
+          }
+        : {
+            dec: "relative before:absolute before:-inset-y-2 before:-left-4 before:right-0",
+            inc: "relative before:absolute before:-inset-y-2 before:-right-4 before:left-0",
+          };
+
   return (
     <div
       className={cn(
@@ -53,6 +71,7 @@ export function StepperPill({
         className={cn(
           "grid place-items-center rounded-full text-ink transition-colors hover:bg-surface active:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-amber",
           btnCls,
+          hitArea.dec,
         )}
       >
         <Minus className="h-3 w-3" />
@@ -70,6 +89,7 @@ export function StepperPill({
         className={cn(
           "grid place-items-center rounded-full text-ink transition-colors hover:bg-surface active:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-amber disabled:cursor-not-allowed disabled:opacity-40",
           btnCls,
+          hitArea.inc,
         )}
       >
         <Plus className="h-3 w-3" />

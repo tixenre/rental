@@ -14,7 +14,6 @@ confirmar pedido) no deben fallar si el mail no se envía.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, Optional, Sequence, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -22,6 +21,7 @@ if TYPE_CHECKING:
 
 import jinja2
 
+from config import settings
 from database import get_db
 
 from . import branding as b
@@ -43,7 +43,7 @@ _IDEMPOTENT_PER_PEDIDO = {
 
 def _resolve_from(conn) -> str:
     """from address: env EMAIL_FROM > app_settings.email_from > fallback."""
-    env_val = os.environ.get("EMAIL_FROM", "").strip()
+    env_val = settings.EMAIL_FROM.strip()
     if env_val:
         return env_val
     row = conn.execute(
@@ -56,7 +56,7 @@ def _resolve_from(conn) -> str:
 
 def get_admin_to() -> Optional[str]:
     """`to` para notif al admin: env EMAIL_ADMIN_TO > app_settings.email_admin_to."""
-    env_val = os.environ.get("EMAIL_ADMIN_TO", "").strip()
+    env_val = settings.EMAIL_ADMIN_TO.strip()
     if env_val:
         return env_val
     conn = get_db()

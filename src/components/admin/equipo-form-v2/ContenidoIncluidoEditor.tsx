@@ -117,6 +117,8 @@ function ContenidoItemRow({
           </div>
         ) : item.foto_url ? (
           <img
+            loading="lazy"
+            decoding="async"
             src={item.foto_url}
             alt=""
             className="h-full w-full object-contain"

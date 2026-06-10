@@ -87,12 +87,20 @@ function Uploader({ kind }: { kind: Kind }) {
         >
           {previewUrl ? (
             <img
+              loading="lazy"
+              decoding="async"
               src={previewUrl}
               alt={`${kind} derivado`}
               className="object-contain w-full h-full p-2"
             />
           ) : masterUrl ? (
-            <img src={masterUrl} alt={kind} className="object-contain w-full h-full p-2" />
+            <img
+              loading="lazy"
+              decoding="async"
+              src={masterUrl}
+              alt={kind}
+              className="object-contain w-full h-full p-2"
+            />
           ) : (
             <span className="text-xs text-muted-foreground">Sin {kind}</span>
           )}

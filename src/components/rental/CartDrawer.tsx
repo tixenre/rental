@@ -384,6 +384,8 @@ export function CartDrawer({
                               <div className="h-16 w-20 shrink-0 overflow-hidden rounded">
                                 {it.fotoUrl ? (
                                   <img
+                                    loading="lazy"
+                                    decoding="async"
                                     src={it.fotoUrl}
                                     alt=""
                                     className="h-full w-full object-cover"

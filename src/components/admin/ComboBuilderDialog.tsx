@@ -179,6 +179,8 @@ export function ComboBuilderDialog({
               {filePreview ? (
                 <div className="relative w-24 h-24">
                   <img
+                    loading="lazy"
+                    decoding="async"
                     src={filePreview}
                     alt=""
                     className="w-full h-full object-contain rounded border hairline bg-muted/30"
