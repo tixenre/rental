@@ -13,7 +13,6 @@ from routes.equipos.core import (
     ESTADOS_RESERVADO,
     EquipoCreate,
     EquipoUpdate,
-    FichaUpdate,
     UploadFotoFromUrlInput,
     _attach_disponibilidad,
     _normalize_fecha_compra,
@@ -43,6 +42,7 @@ __all__ = [
 # tests/main consumen se importan por su símbolo; los que no, vía el tuple
 # `_SUBMODULOS` (que también los mantiene "usados" para ruff).
 from routes.equipos.dashboard import admin_dashboard_uso, admin_equipos_sin_serie
+from routes.equipos.ficha import FichaUpdate
 from routes.equipos.kit import KitItem, _crea_ciclo_kit
 from routes.equipos import mantenimiento as _mantenimiento
 
