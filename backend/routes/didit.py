@@ -12,14 +12,17 @@ Expone tres endpoints:
 
   POST /api/webhooks/didit
       Webhook público — Didit llama aquí al finalizar una verificación.
-      Autenticado solo por firma HMAC-SHA256 (X-Signature-V2) + freshness (X-Timestamp).
-      En estado "Approved": guarda dni, cuil, nombre/apellido/fecha-nacimiento/
-      dirección de RENAPER y marca dni_validado_at en clientes.
+      Autenticado solo por firma HMAC-SHA256 (X-Signature) + freshness (X-Timestamp).
+      En estado "Approved": guarda dni, cuil, nombre/apellido/nombre-completo/
+      fecha-nacimiento/dirección de RENAPER y marca dni_validado_at en clientes.
+      Los datos viven en `decision.id_verifications[]` (API v3) — ver
+      services/didit/decision.py.
 
 Datos personales (Ley 25.326):
   - Solo se persiste texto plano (nombre, DNI, CUIL, fecha nacimiento, dirección).
   - La foto del DNI nunca llega a nuestra base (Didit la procesa internamente).
-  - No se loguea el body del webhook (puede contener datos RENAPER).
+  - No se loguea el body del webhook (puede contener datos RENAPER); el log de
+    verificación registra solo PRESENCIA de cada campo (bool), no su valor.
 """
 
 import logging
@@ -32,9 +35,12 @@ from config import settings
 from database import get_db, now_ar
 from routes.cliente_portal import require_cliente
 from services.didit import (
+    DatosRenaper,
     DiditNotConfiguredError,
     DiditSignatureError,
     create_session,
+    extraer_datos_renaper,
+    retrieve_decision,
     verify_webhook,
 )
 
@@ -150,7 +156,9 @@ async def webhook_didit(request: Request):
       1. Lee el body raw (antes de parsear JSON).
       2. Verifica firma HMAC-SHA256 (X-Signature sobre el body crudo, con
          X-Signature-V2 canónico como respaldo) + freshness (X-Timestamp).
-      3. Si status == "Approved": actualiza clientes con dni, cuil, dni_validado_at.
+      3. Si status == "Approved": extrae los datos de RENAPER de
+         `decision.id_verifications[]` (API v3; respaldo: retrieve_decision) y
+         actualiza clientes (dni, cuil, nombre completo, dirección, etc.).
       4. Siempre devuelve 200 (Didit reintenta en 4xx/5xx — idempotente).
 
     No loguea el body completo (puede contener datos RENAPER / Ley 25.326).
@@ -183,20 +191,6 @@ async def webhook_didit(request: Request):
         # Otros estados (Processing, Declined, etc.) se ignoran por ahora.
         return {"ok": True}
 
-    # Extraer datos validados por RENAPER. No se logea el body completo (Ley 25.326).
-    kyc = payload.get("kyc") or {}
-    doc = kyc.get("document") or {}
-    dni = (doc.get("document_number") or "").strip() or None
-    cuil = (doc.get("tax_id") or doc.get("cuil") or "").strip() or None
-    nombre_renaper = (doc.get("first_name") or "").strip() or None
-    apellido_renaper = (doc.get("last_name") or "").strip() or None
-    fecha_nacimiento_renaper = (doc.get("date_of_birth") or "").strip() or None
-    addr_raw = doc.get("full_address") or doc.get("address") or {}
-    if isinstance(addr_raw, dict):
-        direccion_renaper = (addr_raw.get("formatted_address") or "").strip() or None
-    else:
-        direccion_renaper = (str(addr_raw)).strip() or None
-
     # vendor_data es el cliente_id que pasamos al crear la sesión.
     vendor_data = payload.get("vendor_data", "")
     try:
@@ -205,16 +199,18 @@ async def webhook_didit(request: Request):
         logger.error("didit webhook: vendor_data inválido %r session_id=%s", vendor_data, session_id)
         return {"ok": True}  # Devolvemos 200 para que Didit no reintente.
 
-    _guardar_verificacion(
-        cliente_id=cliente_id,
-        session_id=session_id,
-        dni=dni,
-        cuil=cuil,
-        nombre_renaper=nombre_renaper,
-        apellido_renaper=apellido_renaper,
-        fecha_nacimiento_renaper=fecha_nacimiento_renaper,
-        direccion_renaper=direccion_renaper,
-    )
+    # Datos validados por RENAPER. Viven en `decision.id_verifications[]` (API v3).
+    # Normalmente el webhook ya los trae embebidos; si llegara 'liviano' (sin
+    # `decision` o sin DNI), los pedimos por API a la fuente canónica. No se
+    # loguea el body completo (Ley 25.326).
+    datos = extraer_datos_renaper(payload.get("decision"))
+    if not datos.tiene_datos:
+        try:
+            datos = extraer_datos_renaper(retrieve_decision(session_id))
+        except Exception as exc:
+            logger.error("didit webhook: no se pudo recuperar la decisión session_id=%s — %s", session_id, exc)
+
+    _guardar_verificacion(cliente_id=cliente_id, session_id=session_id, datos=datos)
     return {"ok": True}
 
 
@@ -222,41 +218,47 @@ def _guardar_verificacion(
     *,
     cliente_id: int,
     session_id: str,
-    dni: str | None,
-    cuil: str | None,
-    nombre_renaper: str | None = None,
-    apellido_renaper: str | None = None,
-    fecha_nacimiento_renaper: str | None = None,
-    direccion_renaper: str | None = None,
+    datos: DatosRenaper,
 ) -> None:
     """Persiste los datos verificados por RENAPER en clientes. Idempotente.
 
     Solo actualiza si el didit_session_id almacenado coincide con el de este
     webhook — previene que un vendor_data forjado marque como verificado a otro
     cliente (el payload ya está firmado con HMAC, esto es defensa en profundidad).
+
+    Cada campo de datos va con COALESCE: una re-verificación o un webhook
+    incompleto no pisa con NULL lo que ya estaba guardado. `dni_validado_at` sí
+    se actualiza siempre (re-confirma la fecha de la última aprobación).
     """
     ahora = now_ar()
     with get_db() as conn:
         conn.execute(
             """UPDATE clientes
-               SET dni=?,
+               SET dni=COALESCE(?, dni),
                    cuil=COALESCE(?, cuil),
                    dni_validado_at=?,
                    didit_session_id=?,
                    nombre_renaper=COALESCE(?, nombre_renaper),
                    apellido_renaper=COALESCE(?, apellido_renaper),
+                   nombre_completo_renaper=COALESCE(?, nombre_completo_renaper),
                    fecha_nacimiento_renaper=COALESCE(?, fecha_nacimiento_renaper),
                    direccion_renaper=COALESCE(?, direccion_renaper),
                    updated_at=?
                WHERE id=? AND didit_session_id=?""",
-            (dni, cuil, ahora, session_id,
-             nombre_renaper, apellido_renaper, fecha_nacimiento_renaper, direccion_renaper,
+            (datos.dni, datos.cuil, ahora, session_id,
+             datos.nombre, datos.apellido, datos.nombre_completo,
+             datos.fecha_nacimiento, datos.direccion,
              ahora, cliente_id, session_id),
         )
         conn.commit()
+    # Logueamos solo PRESENCIA de cada campo (bool), nunca el valor: diagnóstico
+    # de "¿se capturó?" sin escribir datos personales en logs (Ley 25.326).
     logger.info(
-        "didit: cliente_id=%s verificado dni=%s session_id=%s",
+        "didit: cliente_id=%s verificado dni=%s cuil=%s nombre=%s direccion=%s session_id=%s",
         cliente_id,
-        dni,
+        bool(datos.dni),
+        bool(datos.cuil),
+        bool(datos.nombre_completo or datos.nombre),
+        bool(datos.direccion),
         session_id,
     )
