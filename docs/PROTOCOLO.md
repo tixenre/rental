@@ -1,9 +1,10 @@
 # Protocolo — pasada de calidad + mobile gate
 
 > El **método seguro** de mantenimiento (auditar → fixear con red de tests → commits atómicos →
-> PR → supervisor) vive en el skill [`limpieza`](../.claude/skills/limpieza/SKILL.md) (4 frentes:
-> código muerto/DRY · seguridad+bugs · ramas · issues). Este doc **no lo repite**: agrega lo propio
-> de una pasada de calidad que el skill no cubre — la **rúbrica de auditoría** y el **mobile gate**.
+> PR → supervisor) vive en el skill [`mantenimiento`](../.claude/skills/mantenimiento/SKILL.md) (5 frentes:
+> código muerto/DRY · seguridad+bugs · ramas · issues · modularización/split). Este doc agrega lo que
+> el skill **referencia** pero no contiene — la **rúbrica de auditoría** (su fase de diagnóstico) y el
+> **mobile gate**.
 
 ---
 
@@ -15,7 +16,7 @@
 - Como rutina: cada 2-4 semanas.
 
 El flujo concreto (qué tocar primero, cómo verificar, cómo no romper ni enterrar nada) → skill
-`limpieza`. Convención de commits/branches → [`MANIFIESTO.md`](../MANIFIESTO.md) §3. El trabajo
+`mantenimiento`. Convención de commits/branches → [`MANIFIESTO.md`](../MANIFIESTO.md) §3. El trabajo
 pendiente se trackea en **GitHub Issues** (no en archivos `.md` — los viejos `BUGS.md`/`MEJORAS.md`
 están en `docs/archive/`).
 
@@ -24,7 +25,7 @@ están en `docs/archive/`).
 ## Auditoría de calidad — rúbrica + método (read-only)
 
 Diagnóstico profundo y **repetible**: no toca código (los hallazgos se **ejecutan** vía el skill
-`limpieza`). Le da rigor al barrido informal — el Frente A (muerto/DRY/optimizar) y el Frente B
+`mantenimiento`). Le da rigor al barrido informal — el Frente A (muerto/DRY/optimizar) y el Frente B
 (seguridad+bugs) del skill se apoyan en esta rúbrica.
 
 ### Rúbrica — ejes (puntuar 1-5 por módulo; **N/A** si no aplica)
@@ -75,7 +76,7 @@ Diagnóstico profundo y **repetible**: no toca código (los hallazgos se **ejecu
    código**: los agentes exageran o se quedan cortos. Verificar también lo que "parece bien".
 5. **Consolidar** — ranking de deuda por área + veredicto (¿profesional? ¿qué reescribir vs dejar?).
 6. **Handoff** — los hallazgos priorizados → **GitHub Issues** (labels, ver `docs/ISSUE_LABELS.md`)
-   y se ejecutan vía `limpieza` (su red de tests + supervisor). Los 🔴 de **seguridad / plata /
+   y se ejecutan vía `mantenimiento` (su red de tests + supervisor). Los 🔴 de **seguridad / plata /
    reservas** → PR propia + supervisor + **test de regresión** (nunca un parche de apuro adentro
    del barrido).
 

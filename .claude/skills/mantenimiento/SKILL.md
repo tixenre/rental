@@ -1,33 +1,50 @@
 ---
-name: limpieza
-description: Flujo completo de mantenimiento del repo y el proyecto, en 4 frentes con la misma disciplina — (A) código muerto / imports / archivos / deps / duplicación (DRY) / modularización / optimización; (B) auditoría de seguridad + bugs; (C) ramas (borrar las mergeadas); (D) issues (triagear, cerrar lo hecho con evidencia, consolidar trackers/umbrellas solapados). Úsalo cuando el dueño pida "limpiar", "seguir limpiando", "housekeeping", "sacar lo que no se usa", "código muerto", "hay legacy dando vueltas", "revisá seguridad/bugs", "está todo seguro?", "limpiá ramas", "ordená/cerrá los issues", o cuando detectes cruft/drift mientras trabajás. El corazón NO es una lista de ítems, sino el MÉTODO seguro: verificar antes de ACTUAR (borrar/cerrar/afirmar — las herramientas Y la intuición mienten) → red de tests → no perder tracking → commits atómicos → supervisor. NO es para refactors de arquitectura ni tocar el core sagrado de reservas/plata en un barrido (eso va como iniciativa propia).
+name: mantenimiento
+description: El go-to para AUDITAR y MEJORAR el repo sin romper nada. Flujo completo de salud del repositorio — diagnosticar (rúbrica de calidad) → rutear por riesgo → ejecutar en 5 frentes con la misma disciplina — (A) código muerto/imports/archivos/deps/DRY/optimizar; (B) seguridad + bugs; (C) ramas; (D) issues; (E) modularización / split de god-modules (move-verbatim, gateado). Úsalo cuando el dueño pida "auditá", "mejorá el repo", "está bien hecho?", "es profesional?", "hay deuda?", "limpiá / housekeeping", "sacá lo que no se usa", "código muerto", "hay legacy", "revisá seguridad/bugs", "está todo seguro?", "limpiá ramas", "ordená los issues", "modularizá / partí ese god-module", o cuando detectes cruft/drift mientras trabajás. El corazón NO es una lista de ítems, sino el MÉTODO seguro: diagnosticar con rúbrica → verificar antes de ACTUAR (borrar/cerrar/afirmar — las herramientas Y la intuición mienten) → red de tests → no perder tracking → commits atómicos → supervisor. Los cortes grandes (Frente E, core sagrado) NO son barridos rápidos: van como iniciativa gateada, UNA PR por corte.
 ---
 
-# limpieza — mantenimiento del repo, sin romper nada
+# mantenimiento — auditar y mejorar el repo, sin romper nada
 
-Codifica **cómo** se mantiene Rambla sano: no la lista de lo ya hecho, sino la **lógica, el cuidado
-y los tests** para que cada pasada futura sea segura. Es el flujo completo de housekeeping en **4
-frentes** con la misma disciplina. Materializa la _Barra de calidad_ (MEMORIA *2026-05-25*):
-modularidad a prueba de balas, nada de hotfixes, y **el core de reservas es sagrado**.
+Codifica **cómo** se mantiene Rambla sano y se sube su calidad: no la lista de lo ya hecho, sino la
+**lógica, el cuidado y los tests** para que cada pasada futura sea segura. Materializa la _Barra de
+calidad_ (MEMORIA *2026-05-25*): modularidad a prueba de balas, nada de hotfixes, y **el core de
+reservas es sagrado**.
+
+## El flujo: diagnosticar → rutear → ejecutar
+
+1. **DIAGNOSTICAR (read-only).** Antes de tocar, mapear la deuda con la **rúbrica de auditoría**
+   (ejes A-O + scorecard + método de dispatch en paralelo) que vive en
+   [`docs/PROTOCOLO.md`](../../../docs/PROTOCOLO.md). La rúbrica es _el qué mirar_; este skill es _el
+   cómo arreglar sin romper_. El diagnóstico produce hallazgos `archivo:línea / eje / severidad /
+   propuesta` — esa es la entrada de los frentes de abajo.
+2. **RUTEAR por riesgo.** Cada hallazgo se clasifica (tabla de la fase 4): borrado puro / refactor
+   DRY / cambio de conducta / **core sagrado o split grande**. El cuidado es proporcional al radio
+   de explosión.
+3. **EJECUTAR por frente**, cada uno con su método + red de tests:
 
 | Frente | Qué barre | Acción que arriesga | Verificación antes de actuar |
 |---|---|---|---|
-| **A · Código** | muerto / imports / archivos / deps / DRY / modularizar / optimizar | borrar | grep repo-wide + suite verde |
+| **A · Código** | muerto / imports / archivos / deps / DRY / optimizar | borrar | grep repo-wide + suite verde |
 | **B · Seguridad + bugs** | authz/IDOR, injection, SSRF/XSS, overlap de reservas, plata | afirmar "está OK" / parchar | reproducir el exploit + test de regresión |
 | **C · Ramas** | ramas que no son `dev`/`main` ya mergeadas | borrar la rama | confirmar que su PR está mergeado |
 | **D · Issues** | triagear, cerrar lo hecho, consolidar trackers/umbrellas | cerrar el issue | evidencia (PR/commit) de que está hecho |
+| **E · Modularización** | partir god-modules en paquetes de concerns (move-verbatim) | mover/romper la superficie pública | set de rutas idéntico + suite + gate test, **1 PR por corte** |
 
-> ## Regla de oro (vale para los 4 frentes)
+**CIERRE (todos los frentes):** commits atómicos + body con "lo que se dejó" → **supervisor** → plan
+de prueba en lenguaje claro para el dueño (que prueba en staging).
+
+> ## Regla de oro (vale para los 5 frentes)
 >
-> **Verificá antes de ACTUAR — y "actuar" es borrar, cerrar o afirmar.** Las tres acciones son
+> **Verificá antes de ACTUAR — y "actuar" es borrar, cerrar, afirmar o mover.** Esas acciones son
 > irreversibles en la práctica (un issue cerrado se entierra, una rama borrada se olvida, un "está
-> todo seguro" tranquiliza de más). Nada se ejecuta sin evidencia: las **herramientas dan candidatos,
-> nunca sentencias** (knip/ruff/vulture mienten); **la intuición del dueño también se equivoca**
-> ("casi todos los issues se pueden cerrar" → varios eran backlog real; "¿está todo seguro?" → había
-> un agujero de authz crítico). El gate del dueño es *probar en staging*, no leer diffs → **"no
-> romper nada / no enterrar nada" pesa más que "cuánto limpiamos"**. Ante la duda, se **deja, se deja
-> abierto y se reporta** — nunca se borra/cierra a ciegas. **Honestidad > actividad:** si está limpio,
-> la respuesta correcta es decirlo, no fabricar churn.
+> todo seguro" tranquiliza de más, una ruta movida-mal rompe en silencio). Nada se ejecuta sin
+> evidencia: las **herramientas dan candidatos, nunca sentencias** (knip/ruff/vulture mienten); **la
+> intuición del dueño también se equivoca** ("casi todos los issues se pueden cerrar" → varios eran
+> backlog real; "¿está todo seguro?" → había un agujero de authz crítico). El gate del dueño es
+> *probar en staging*, no leer diffs → **"no romper nada / no enterrar nada" pesa más que "cuánto
+> mejoramos"**. Ante la duda, se **deja, se deja abierto y se reporta** — nunca se borra/cierra/mueve
+> a ciegas. **Honestidad > actividad:** si está limpio, la respuesta correcta es decirlo, no fabricar
+> churn.
 
 Casos testigo (de por qué la regla existe):
 
@@ -38,7 +55,9 @@ Casos testigo (de por qué la regla existe):
 - **La intuición mintió:** "casi todos los issues se pueden cerrar" — al triagear con evidencia,
   varios eran trabajo pendiente real (ej. #476, lint promovible a bloqueante) → se dejaron abiertos.
 - **El "todo OK" mintió:** ante "¿está todo seguro?", la auditoría destapó **escrituras de `/api/equipos`
-  sin `require_admin`** (cualquier anónimo creaba/borraba equipos) → fix #795. No era cosmético.
+  sin `require_admin`** (cualquier anónimo creaba/borraba equipos) → fix #795. No era cosmético. Y la
+  variante sutil: un `require_admin` **local** que solo chequea sesión (no `is_admin_email`) →
+  escalada cliente→admin (specs/settings/calendar/unidades). El guard tiene que ser el de `admin_guard`.
 
 La moraleja: la herramienta (o la corazonada) arranca el trabajo, **el suite, el grep y la evidencia
 lo terminan**.
@@ -173,6 +192,7 @@ bindings reales), o dejarlos.
 | **Borrado puro** | archivo / import / var muerta | tsc + eslint + build / pytest | bajo |
 | **Refactor DRY** | unificar duplicación vía helper (ej. `MARCA_SUBQUERY`) | **salida byte-idéntica** (verificada) + suite + Postgres real | medio |
 | **Cambio de conducta** | migrar a otra implementación (ej. normalizers a otro motor) | NO es limpieza pura → análisis de impacto + plan de prueba + **avisar antes** | alto |
+| **Split de god-module** | partir en paquete (Frente E) | move-verbatim + set de rutas idéntico + suite + gate, **1 PR/corte + supervisor** | alto |
 | **Core sagrado** | reservas / plata (`backend/reservas`, `reportes`) | **NO se toca en un barrido** → iniciativa propia, Opus | máximo |
 
 > **Refactor DRY = byte-idéntico.** Si extraés un helper, probá que genera **exactamente** la misma
@@ -243,16 +263,6 @@ npm run build                       # job `build` de CI
 
 ---
 
-## Qué NO tocar (lista negra)
-
-1. `backend/migrations/` — historia congelada.
-2. Core sagrado: `backend/reservas/`, `backend/reportes/` (y todo cálculo de stock/overlap/plata).
-3. Motores únicos: `backend/busqueda/`, `backend/services/branding/`.
-4. Barrel documentado `src/components/rental/equipment/index.ts` (MEMORIA *2026-05-29*).
-5. Primitivos shadcn `src/components/ui/*` + sus deps `@radix-ui/*` (librería del DS).
-6. Analytics (`src/lib/analytics.ts`) — eventos dinámicos (MEMORIA *2026-06-02*).
-7. Parámetros de funciones, imports/llamadas con efecto, scripts de tooling/skills.
-
 ## Más allá del código muerto: modularizar y optimizar
 
 Cuando el código muerto ya está barrido, el dueño suele pedir "¿y modularizar? ¿optimizar?".
@@ -283,6 +293,73 @@ y clasificá por riesgo (tabla de la fase 4). Reglas:
 
 ---
 
+## Frente E — Modularización / split de god-modules (move-verbatim)
+
+Cuando un módulo se volvió **god-module** (un `.py` de routes o `database.py` de >~1000 líneas que
+mezcla varios concerns), se parte en un **paquete de submódulos por concern**. Probado en `equipos`,
+`specs`, `cliente_portal`, `alquileres` y `database` (epic #501). **NO es un barrido rápido:** es una
+**iniciativa gateada — UN CORTE = UNA PR — con supervisor por corte.** El principio rector es
+**move-verbatim: cero cambio de comportamiento** (se mueve código tal cual; mejorar el código interno
+es un refactor aparte, después).
+
+### El patrón
+
+1. `git mv foo.py foo/core.py` → `core.py` = **spine**: el `router` único (o la conexión/pool) +
+   los helpers/modelos **compartidos** + la lógica reusable que importan otros módulos.
+2. Extraer **un concern** a `foo/concern.py`, que importa del spine
+   (`from foo.core import router, _helper, …`). **`core` NO importa de los submódulos** (dirección
+   única → sin ciclo). Cada submódulo de routes registra sus endpoints sobre el `router` compartido
+   al importarse.
+3. `foo/__init__.py` **re-exporta la superficie pública estable** → `from foo import X` (y
+   `foo.X` por atributo) sigue igual para **todos** los callers y tests. Listá explícitamente en
+   `__all__` lo que consumían `main`, otros routers y los tests.
+4. **Podá imports huérfanos** del spine tras cada extracción (ruff F401 los marca).
+5. Spine puro: cuando todos los concerns salieron, `core.py` puede quedar registrando **0 rutas**
+   (solo modelos + helpers compartidos), como `cliente_portal/core.py`.
+
+### Red de verificación — TODA, por cada corte
+
+- **ruff limpio** (`--select F,E9`) en el paquete.
+- **Set de rutas IDÉNTICO** — el invariante que prueba que no se perdió ni movió ninguna ruta:
+  diffeá `sorted({(método, path) for r in main.app.routes})` contra el baseline de antes del corte.
+  Byte-a-byte. (Se computa bajo el entorno de tests, que mockea la DB.)
+- **Suite completa verde** (`pytest -m "not db"`). Para `database`, además el job de CI **"Migraciones
+  Alembic (Postgres real)"** valida `init_db()` desde cero.
+- **Gate de reservas** (`test_gate_not_bypassed`) si el módulo inserta en `alquiler_items`: el
+  allowlist usa **path relativo a `routes/`** (`alquileres/core.py`) y el escaneo es **recursivo**
+  (`os.walk`) para alcanzar los `core.py` de los paquetes. Los `INSERT INTO alquiler_items` y el gate
+  `_check_stock` **se quedan en el spine** (no se mueven) → el path sagrado no se toca.
+- **Byte-idéntico:** confirmá por AST que las funciones movidas son idénticas a las de `dev` (no
+  "casi"). Es la prueba dura del move-verbatim.
+
+### Gotchas (los que pegamos de verdad)
+
+- **Colisión nombre submódulo ↔ función re-exportada:** un submódulo `cotizar.py` + una función
+  `cotizar` re-exportada → el `from foo.cotizar import cotizar` del `__init__` **rebindea** el
+  atributo del paquete `foo.cotizar` del módulo a la función → los tests que hacen
+  `import foo.cotizar as m; monkeypatch.setattr(m, "get_db", …)` reciben la función, no el módulo, y
+  rompen (`AttributeError`). **Solución:** nombrá el submódulo distinto de cualquier símbolo
+  re-exportado (`cotizacion.py`).
+- **Monkeypatch namespace:** un test que patchea `routes.foo.get_db` deja de tener efecto si la
+  función se movió a un submódulo (la función usa el binding de **su** módulo). Fix: patchear
+  `routes.foo.<submodulo>.get_db`, donde la función vive y se usa.
+- **Glob no-recursivo:** un test que escanea `routes/*.py` (glob o `os.listdir`) **no ve**
+  `routes/foo/core.py` tras la conversión a paquete → usar `rglob`/`os.walk` con el path relativo
+  como identificador. (Mismo arreglo: el gate test y el de columna-marca.)
+- **Test que lee el archivo por path:** un test que hace `(ROOT/"database.py").read_text()` rompe
+  cuando `database.py` pasa a ser el paquete `database/` → leer el paquete entero (`rglob("*.py")`).
+- **Import huérfano post-extracción:** mover un concern suele dejar imports sin uso en el spine
+  (ej. `from pdf import …` cuando los PDFs salieron) → ruff F401, podarlos.
+
+### Promoción
+
+Los cortes se mergean a `dev` (squash, 1 por PR) y se promueven en lote `dev→main` como **PR de
+promoción** (merge commit) con plan de prueba — gate del dueño (MEMORIA *2026-06-08 — Workflow de
+cambios*). Para un split sagrado-adyacente, la sesión puede **auto-probar en staging** los caminos
+clave vía `staging-login` (MEMORIA *2026-06-19*) antes de pasárselo al dueño.
+
+---
+
 ## Frente B — Seguridad + bugs
 
 Se dispara con "¿está todo seguro?", "¿no hay ningún bug posta?", "revisá seguridad", o como pasada
@@ -292,7 +369,8 @@ sin auditar es la mentira más cara — tranquiliza al dueño sobre un agujero r
 **Cómo se barre:**
 
 1. **Auditar con un agente read-only** (`Explore`/`general-purpose`) en paralelo a la revisión a mano
-   — fan-out por superficie, sin tocar nada. El barrido cubre estas superficies:
+   — fan-out por superficie, sin tocar nada. Es la fase de **diagnóstico** con la rúbrica (eje A
+   Seguridad de [`PROTOCOLO.md`](../../../docs/PROTOCOLO.md)). El barrido cubre estas superficies:
    - **Authz / IDOR:** ¿toda escritura sensible tiene su guard (`require_admin`/`require_cliente`)?
      ¿un endpoint lee/edita un recurso de **otro** cliente por id sin chequear dueño? Caso testigo
      **#795**: 12 handlers de escritura de `/api/equipos` (create/update/delete/ficha/mantenimiento/
@@ -310,12 +388,15 @@ sin auditar es la mentira más cara — tranquiliza al dueño sobre un agujero r
      en `auth.py` endurecido para rechazar `<>"'`\``, whitespace y control chars en el `?next=`.
    - **Core sagrado:** overlap de reservas (cero doble-booking) y cálculos de plata — un bug acá es
      de severidad máxima aunque no sea "seguridad" clásica.
-2. **Triage por severidad** (crítico / alto / medio / bajo). El crítico se arregla ya; lo medio/bajo
+2. **Verificar todo hallazgo 🔴 leyendo el código antes de reportarlo.** Los agentes exageran o se
+   quedan cortos: confirmá el claim en la fuente (un weak-guard reportado resultó **más** grave al
+   verificarlo; otros "críticos" eran falsa alarma). No se reporta de oídas.
+3. **Triage por severidad** (crítico / alto / medio / bajo). El crítico se arregla ya; lo medio/bajo
    puede ir a issue con label si no es urgente.
-3. **Verificar explotabilidad antes de tocar.** No parchar lo que no se reprodujo: confirmá el
+4. **Verificar explotabilidad antes de tocar.** No parchar lo que no se reprodujo: confirmá el
    exploit (ej. `TestClient` haciendo la escritura anónima → debe dar 401 después del fix; GET sigue
    200; admin pasa). Un "fix" de algo no explotable puede romper conducta legítima.
-4. **Test de regresión sí o sí.** Cada hallazgo arreglado deja un test que falla sin el fix (caso
+5. **Test de regresión sí o sí.** Cada hallazgo arreglado deja un test que falla sin el fix (caso
    testigo: `test_auth_guards.py` parametrizado por los 12 endpoints + el test XSS de `_safe_next_path`).
    Sin el test, el agujero vuelve en el próximo refactor.
 
@@ -361,31 +442,52 @@ porque la corazonada dice "ya está". Acá la regla de oro pesa doble: **cerrar 
    orden ("borrá 234 476 764…" — ojo a los typos: "476" era probablemente "477"). Ante un número dudoso,
    **confirmá** antes de cerrar.
 
-## Anti-objetivos (cuándo NO es este skill)
+---
 
-- **Refactor de arquitectura** o consolidación del core sagrado → iniciativa propia con plan + Opus,
-  no un barrido (`_check_stock_hipotetico` que reimplementa el gate es el caso típico: se reporta como
-  follow-up, no se toca acá).
+## Qué NO tocar (lista negra)
+
+1. `backend/migrations/` — historia congelada.
+2. Core sagrado: `backend/reservas/`, `backend/reportes/` (y todo cálculo de stock/overlap/plata).
+3. Motores únicos: `backend/busqueda/`, `backend/services/branding/`.
+4. Barrel documentado `src/components/rental/equipment/index.ts` (MEMORIA *2026-05-29*).
+5. Primitivos shadcn `src/components/ui/*` + sus deps `@radix-ui/*` (librería del DS).
+6. Analytics (`src/lib/analytics.ts`) — eventos dinámicos (MEMORIA *2026-06-02*).
+7. Parámetros de funciones, imports/llamadas con efecto, scripts de tooling/skills.
+
+## Anti-objetivos (cuándo NO es un barrido rápido)
+
+- **Core sagrado** (consolidar `_check_stock_hipotetico` que reimplementa el gate, tocar cálculos de
+  plata) → se **reporta** como follow-up; el fix va con plan + Opus + test, nunca dentro de un barrido.
+- **Split de god-module** → es Frente E, pero como **iniciativa gateada** (1 PR/corte + supervisor +
+  red de verificación), no un sweep de "borré tres cosas de paso".
 - **Cambios de conducta** disfrazados de limpieza → requieren plan de prueba y aviso.
 - **Borrar a ciegas** lo que diga la herramienta → la herramienta da candidatos, no sentencias.
 
-## Cheatsheet (el flow — 4 frentes)
+## Cheatsheet (el flow — diagnosticar → 5 frentes → cierre)
 
 ```
+0. DIAGNOSTICAR (read-only): rúbrica de PROTOCOLO (ejes A-O + scorecard, dispatch en paralelo)
+   → hallazgos archivo:línea / eje / severidad / propuesta
+
 A · CÓDIGO (6 fases)                      B · SEGURIDAD + BUGS
 1. setup venv + deps + npm ci            1. agente read-only por superficie (authz/inject/SSRF/XSS/core)
-2. ruff + vulture + knip → candidatos    2. triage por severidad
-3. triage: cazar falsos positivos        3. reproducir el exploit (no parchar lo no explotable)
-4. grep repo-wide por cada candidato     4. fix + test de regresión que falla sin él
-5. clasificar (puro/DRY/conducta/sagrado)
+2. ruff + vulture + knip → candidatos    2. VERIFICAR el 🔴 leyendo el código (los agentes exageran)
+3. triage: cazar falsos positivos        3. triage por severidad
+4. grep repo-wide por cada candidato     4. reproducir el exploit (no parchar lo no explotable)
+5. clasificar (puro/DRY/conducta/split/sagrado)  5. fix + test de regresión que falla sin él
 6. red de tests (pytest[+PG real] / prettier+tsc+eslint+build)
 
-C · RAMAS                                 D · ISSUES
-1. mapear rama → PR                       1. listar + agrupar por tópico
-2. borrable solo si PR=MERGED             2. cerrar SOLO con evidencia (state_reason + comentario)
-   (squash ≠ git branch --merged)        3. no enterrar backlog real (parciales = abiertos)
-3. sandbox no borra (403) →              4. consolidar trackers/umbrellas (rescatar únicos primero)
-   reportar lista + auto-delete           5. el dueño dirige, la sesión recomienda
+E · MODULARIZACIÓN (split, 1 PR/corte)    C · RAMAS
+1. git mv foo.py foo/core.py (spine)      1. mapear rama → PR
+2. extraer concern → submódulo            2. borrable solo si PR=MERGED (squash ≠ git branch --merged)
+3. __init__ re-exporta superficie         3. sandbox no borra (403) → reportar lista + auto-delete
+4. VERIFICAR: set de rutas idéntico +
+   ruff + suite + gate test + byte-AST    D · ISSUES
+5. el INSERT/gate de reservas NO se mueve 1. listar + agrupar por tópico
+   (queda en el spine)                    2. cerrar SOLO con evidencia (state_reason + comentario)
+                                          3. no enterrar backlog real (parciales = abiertos)
+                                          4. consolidar trackers/umbrellas (rescatar únicos primero)
+                                          5. el dueño dirige, la sesión recomienda
 
 CIERRE (todos los frentes): commits atómicos + body con "lo que se dejó" → supervisor → plan de prueba
 ```

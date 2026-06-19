@@ -135,7 +135,7 @@ Producción corre en Railway. Detalle de variables, build, troubleshooting:
 ## Docs
 
 - [MANIFIESTO.md](MANIFIESTO.md) — contexto del proyecto para sesiones con Claude (workflow, decisiones, estado actual)
-- [docs/PROTOCOLO.md](docs/PROTOCOLO.md) — rúbrica de auditoría + mobile gate (método de mantenimiento → skill `limpieza`)
+- [docs/PROTOCOLO.md](docs/PROTOCOLO.md) — rúbrica de auditoría + mobile gate (método de mantenimiento → skill `mantenimiento`)
 - [docs/DEPLOY_RAILWAY.md](docs/DEPLOY_RAILWAY.md) — setup de Railway
 - [docs/SISTEMA_SPECS.md](docs/SISTEMA_SPECS.md) — manual técnico del sistema de specs / catálogo / datasets / compat
 - [docs/DATASET_ILUMINACION.md](docs/DATASET_ILUMINACION.md) — dataset curado de luces + workflow seed por categoría
