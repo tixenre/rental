@@ -1,5 +1,9 @@
-"""
-routes/pedidos.py — CRUD de pedidos, disponibilidad y generación de PDFs.
+"""routes/alquileres/core.py — spine del paquete de alquileres (#501).
+
+El `router` compartido + los modelos del pedido + los helpers reusables
+(`create_pedido`, `_apply_pedido_*`, enriquecimiento, recálculo de total). Las
+superficies HTTP (pedidos CRUD, cotización, disponibilidad, pagos, documentos,
+descuentos) viven en submódulos que registran sus rutas sobre este router.
 """
 
 import datetime
