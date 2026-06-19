@@ -45,6 +45,12 @@ PUBLIC_API_ANY = (
     # vive bajo /api/estudio/reservas y tiene su propio `_require_cliente` en el
     # handler, así que el guard de cliente se sigue aplicando ahí.
     "/api/estudio",
+    # Webhooks server-to-server (Didit): los llama un tercero SIN cookie de
+    # sesión, así que el guard de sesión los cortaría con 401 antes del handler
+    # (y la verificación de identidad nunca se persistiría). Se autentican por
+    # firma HMAC-SHA256 dentro del handler (`verify_webhook`, fail-closed si el
+    # secret no está) — NO por sesión. Por eso van exentos del middleware.
+    "/api/webhooks/",
 )
 
 # Archivos estáticos que viven en la raíz del build de Vite (`public/` se copia
