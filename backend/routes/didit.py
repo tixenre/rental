@@ -29,6 +29,7 @@ import logging
 
 import httpx
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 
 from admin_guard import require_admin
 from config import settings
@@ -206,7 +207,11 @@ async def webhook_didit(request: Request):
     datos = extraer_datos_renaper(payload.get("decision"))
     if not datos.tiene_datos:
         try:
-            datos = extraer_datos_renaper(retrieve_decision(session_id))
+            # `retrieve_decision` hace un GET httpx SÍNCRONO (hasta el timeout):
+            # en este handler async bloquearía el event loop. Lo mandamos al
+            # threadpool para no congelar el servidor ante un webhook 'liviano'.
+            decision = await run_in_threadpool(retrieve_decision, session_id)
+            datos = extraer_datos_renaper(decision)
         except Exception as exc:
             logger.error("didit webhook: no se pudo recuperar la decisión session_id=%s — %s", session_id, exc)
 

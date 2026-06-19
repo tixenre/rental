@@ -111,7 +111,7 @@ def retrieve_decision(session_id: str) -> dict:
     resp = httpx.get(
         _DECISION_ENDPOINT.format(session_id=session_id),
         headers={"x-api-key": settings.DIDIT_API_KEY},
-        timeout=30.0,
+        timeout=10.0,
     )
     resp.raise_for_status()
     return resp.json()
