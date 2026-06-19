@@ -73,7 +73,7 @@ def _strip_string_literals_with_subquery(content: str) -> str:
     return "\n".join(out_lines)
 
 
-@pytest.mark.parametrize("path", sorted(ROUTES_DIR.glob("*.py")))
+@pytest.mark.parametrize("path", sorted(ROUTES_DIR.rglob("*.py")))
 def test_route_no_referencia_columna_marca_eliminada(path):
     """Ningún `.py` de routes/ debe tener queries SQL que accedan a
     `equipos.marca` como columna directa."""
@@ -95,7 +95,7 @@ def test_route_no_referencia_columna_marca_eliminada(path):
 
 def test_no_referencia_tabla_fichas_tecnicas():
     """La tabla `fichas_tecnicas` nunca existió — la real es `equipo_fichas`."""
-    for path in ROUTES_DIR.glob("*.py"):
+    for path in ROUTES_DIR.rglob("*.py"):
         content = path.read_text(encoding="utf-8")
         # Aceptamos menciones en comentarios (`# fichas_tecnicas`), pero
         # no en strings SQL.
@@ -120,7 +120,7 @@ def test_no_referencia_columna_raw_json():
     """`raw_json` fue dropeada en Fase E por la migración d7e9b3c5a8f2.
     Las menciones en docstrings (histórico, ej. "Fase E droppeó raw_json")
     son OK; lo que rompe es acceso runtime."""
-    for path in ROUTES_DIR.glob("*.py"):
+    for path in ROUTES_DIR.rglob("*.py"):
         content = path.read_text(encoding="utf-8")
         for pat in _RAW_JSON_RUNTIME_PATTERNS:
             match = pat.search(content)
