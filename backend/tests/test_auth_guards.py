@@ -332,6 +332,15 @@ class TestAuthMiddlewareStaticAssets:
         assert isinstance(res, JSONResponse)
         assert res.status_code == 401
 
+    @pytest.mark.parametrize("method", ["POST", "GET"])
+    async def test_webhook_es_publico(self, method):
+        """Regresión: los webhooks server-to-server (Didit) los llama un tercero
+        SIN cookie de sesión y se autentican por HMAC DENTRO del handler. Si el
+        middleware los corta con 401 (como pasaba), el handler nunca corre y la
+        verificación de identidad nunca se persiste. Deben PASAR el middleware
+        (POST incluido) → el HMAC decide adentro."""
+        assert await self._classify("/api/webhooks/didit", method=method) == "PASS"
+
 
 # ── Regresión por-endpoint del fix de authz de /api/equipos (#795) ──
 # Pega a CADA handler de escritura SIN sesión y exige rechazo. Si alguien saca el
