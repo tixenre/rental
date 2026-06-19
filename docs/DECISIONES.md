@@ -602,6 +602,39 @@
   supervisor marca como hallazgo una entrada que exista en uno y no en el otro, o una regla en el digest
   sin su rationale en el log.
 
+### 2026-06-19 — Staging-login: la sesión auto-prueba el back-office logueado
+
+- **Contexto:** el back-office (`/admin/*`) y sus endpoints `require_admin` solo se podían verificar a
+  ciegas. La sesión podía confirmar que rechazan al anónimo (401/403), pero no el **comportamiento logueado**
+  (que un GET admin devuelve datos reales, que un handler refactorizado sirve igual). La auth es **Google
+  OAuth**, así que no hay forma práctica de pasarle una cookie a la sesión, y el dueño no quería clickear el
+  back-office a mano para cada cambio. Disparador: el split de `equipos.py` (#501 fase a) — había que probar en
+  vivo que los submódulos (dashboard/mantenimiento/ficha/kit) servían bien **autenticados**, no solo que las
+  rutas existían.
+- **Decisión:** un login programático **solo de staging**, `POST /auth/staging-login`, que mintea la **misma
+  cookie de sesión firmada** que el OAuth real para una cuenta de servicio (`STAGING_LOGIN_EMAIL`, default
+  `staging-bot@rambla.local`). A diferencia de `/auth/dev-login` (apagado en CUALQUIER entorno Railway), este
+  corre en el `dev` de Railway. Con eso la sesión se loguea por `curl` y **smoke-testea flujos autenticados del
+  back-office en staging por sí misma**; de paso desbloquea los tests HTTP autenticados (antes solo cubrían el
+  401/403).
+- **Gate de doble llave (defensa en profundidad):** (1) **no-prod** vía `settings.is_production`, que **falla
+  hacia "sí prod"** ante un nombre de entorno desconocido → un ambiente nuevo mal nombrado queda con el login
+  APAGADO, no abierto; (2) **secreto configurado** (`STAGING_LOGIN_SECRET`): sin él el endpoint responde 404 ni
+  siquiera en dev. 404 cuando está deshabilitado (parece inexistente en prod), secreto comparado en **tiempo
+  constante** (`secrets.compare_digest`), rate-limit por IP compartido con el OAuth, cada intento logueado.
+- **Why / cómo es seguro:** el secreto es **obligatorio, no opcional**, porque la BD de `dev` es **copia de
+  prod → tiene PII real** (MEMORIA 2026-06-02); un login abierto en una URL pública de dev sería una fuga. La
+  **admin-ness NO se saltea**: la sesión se mintea pero el rol lo sigue resolviendo `is_admin_email` (fuente
+  única) → la cuenta debe estar en `ADMIN_EMAILS` de dev. **Refina —no reemplaza—** _El dueño testea, no revisa
+  código (2026-05-25)_: el gate humano sigue siendo el dueño probando en staging; esto solo deja que la sesión
+  cierre el loop de verificación logueada antes de pasárselo.
+- **How to apply / gotchas:** vars **solo en el entorno `dev`** de Railway: `STAGING_LOGIN_SECRET` (rotable) +
+  el mail del bot en `ADMIN_EMAILS` (o `STAGING_LOGIN_EMAIL` = un mail que ya sea admin). **Nunca** en prod (el
+  handler responde 404 igual, pero el secreto no debe existir fuera de dev). Para no mutar staging (que es copia
+  de prod), las escrituras de prueba van con **IDs inexistentes** (404 "no encontrado" = la auth pasó y el
+  handler corre, sin crear datos). Probado en vivo: login 200, `/auth/me` `is_admin: true`, lecturas admin 200,
+  escrituras a id falso 404. Setup detallado en `docs/DEPLOY_RAILWAY.md`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

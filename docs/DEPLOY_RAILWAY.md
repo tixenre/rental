@@ -76,6 +76,28 @@ OWNER_NOMBRE / OWNER_CUIL / OWNER_DIRECCION / ...          # datos del dueño en
 ⏰ **Al crear un ambiente no-prod nuevo**: agregar su nombre a `is_production`
 en `config.py` o dejar `VITE_GA4_ID` vacío (ver MEMORIA 2026-06-02).
 
+### Login programático de staging (solo `dev`)
+
+Para que un cliente automatizado pruebe flujos autenticados del back-office en
+staging (sin el OAuth de Google), `POST /auth/staging-login` mintea una sesión
+para una cuenta de servicio. Doble llave: **no-prod** (`is_production` falla
+hacia "sí prod") **y** secreto configurado. **Solo en el entorno `dev`:**
+
+```
+STAGING_LOGIN_SECRET=...   # secreto rotable; sin esto el endpoint no existe ni en dev
+STAGING_LOGIN_EMAIL=...    # opcional; default staging-bot@rambla.local
+```
+
+La cuenta debe estar en `ADMIN_EMAILS` del entorno `dev` para tener rol admin
+(la admin-ness la resuelve `is_admin_email`, fuente única — este login no la
+saltea). ⚠️ **Nunca** setear estas vars en prod: el handler responde 404 ahí,
+pero el secreto no tiene por qué existir fuera de `dev`. La BD de staging es
+copia de prod (PII real) → el secreto es obligatorio, no opcional.
+
+Uso: `curl -X POST -c jar.txt -H 'Content-Type: application/json' \
+  -d '{"secret":"..."}' https://rambla-rental-dev.up.railway.app/auth/staging-login`
+y reusar la cookie de `jar.txt` (`-b jar.txt`) en las llamadas autenticadas.
+
 ---
 
 ## 🗄️ Base de datos: schema y migraciones
