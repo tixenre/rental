@@ -8,7 +8,7 @@
 |---|---|
 | [MEMORIA.md](MEMORIA.md) | **Memoria viva (digest enforceable)**: decisiones de criterio + preferencias, la regla de cada una (curado, fechado, auto-cargado). El supervisor la hace cumplir. |
 | [DECISIONES.md](DECISIONES.md) | **Log ADR completo**: el *por qué* de cada decisión del digest (on-demand, mismo `fecha — título`). |
-| [PROTOCOLO.md](PROTOCOLO.md) | Prompt del auditor + **mobile gate**. El método de mantenimiento (auditar/fixear/PR) vive en el skill `limpieza`. |
+| [PROTOCOLO.md](PROTOCOLO.md) | Rúbrica de auditoría + **mobile gate**. El método de mantenimiento (auditar/fixear/PR) vive en el skill `limpieza`. |
 | [DEPLOY_RAILWAY.md](DEPLOY_RAILWAY.md) | Setup de Railway: variables, build, dominio, troubleshooting. |
 | [SISTEMA_SPECS.md](SISTEMA_SPECS.md) | **Manual técnico** del sistema de specs / catálogo / datasets / autocompletar / compatibilidad. |
 | [MOBILE.md](MOBILE.md) + [MOBILE_AUDIT.md](MOBILE_AUDIT.md) | Guidelines mobile y checklist de audit. |

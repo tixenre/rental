@@ -298,6 +298,10 @@ sin auditar es la mentira más cara — tranquiliza al dueño sobre un agujero r
      **#795**: 12 handlers de escritura de `/api/equipos` (create/update/delete/ficha/mantenimiento/
      kit/etiquetas/categorías) **sin `require_admin`** → anónimo total. El gate de público vivía en
      `middleware.PUBLIC_API`; se partió en `PUBLIC_API_READONLY` (GET/HEAD) vs `PUBLIC_API_ANY`.
+     **Variante sutil:** un guard **local más débil** que el canónico — un `require_admin`/`_require_admin`
+     definido en el route que solo hace `if not session` y NO valida `is_admin_email`. Pasa cualquier
+     sesión logueada (incluida la de un **cliente** del portal, que mintea la misma cookie `session`)
+     → escalada de privilegios. Chequear que el guard sea **el de `admin_guard`**, no una copia floja.
    - **Injection:** SQL siempre parametrizado (`?`→`%s` vía el wrapper PGCursor), nunca f-strings con
      input. Command/template injection en lo que toque shell o render.
    - **SSRF:** todo `fetch`/descarga de URL externa (media, webhooks) con allowlist + `follow_redirects=False`
