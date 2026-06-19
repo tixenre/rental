@@ -50,7 +50,7 @@ jobs:
       - run: npm run lint
 
   python-syntax:
-    name: Python syntax check
+    name: Python lint + syntax
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +59,21 @@ jobs:
           python-version: "3.11"
       - name: Compile all Python files
         run: python -m compileall -q backend/
+      - name: Ruff (lint — caza nombres indefinidos / imports al mover código)
+        run: |
+          # El gate que compileall no da: F821 (nombre indefinido) / F401 al
+          # refactorizar. Config conservadora en backend/ruff.toml. Versión
+          # pineada (= requirements-dev.txt) para que el gate sea reproducible.
+          pip install ruff==0.15.18
+          cd backend && ruff check .
+      - name: pip-audit (CVEs en dependencias de producción — informativo)
+        # NO bloquea el merge a propósito: un CVE nuevo en una dep transitiva sin
+        # fix disponible no debe frenar todos los PRs. Surfacea el hallazgo en el
+        # log; el equipo decide cuándo actuar (bump / ignore puntual).
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          cd backend && pip-audit -r requirements.txt
 
   python-tests:
     name: Python tests (pytest)
