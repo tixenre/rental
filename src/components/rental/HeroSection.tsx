@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Calendar, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useHeroPhotos } from "@/lib/studio/hero-photos";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 interface HeroSectionProps {
   tagline: [string, string];
@@ -13,13 +14,14 @@ interface HeroSectionProps {
 export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSectionProps) {
   const photos = useHeroPhotos();
   const [photoIdx, setPhotoIdx] = useState(0);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     setPhotoIdx(0);
-    if (photos.length <= 1) return;
+    if (photos.length <= 1 || reducedMotion) return;
     const id = setInterval(() => setPhotoIdx((i) => (i + 1) % photos.length), 4500);
     return () => clearInterval(id);
-  }, [photos.length]);
+  }, [photos.length, reducedMotion]);
 
   return (
     <>
@@ -64,7 +66,10 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
             <div>
               <button
                 onClick={onDateOpen}
-                className="inline-flex items-center gap-2.5 bg-ink text-amber rounded-full px-[26px] py-[14px] text-[0.9375rem] font-bold tracking-[-0.01em] whitespace-nowrap shadow-[0_4px_20px_oklch(0.14_0.01_60/24%)] transition-colors duration-150 hover:bg-black active:scale-[0.97]"
+                className={cn(
+                  "inline-flex items-center gap-2.5 bg-ink text-amber rounded-full px-[26px] py-[14px] text-[0.9375rem] font-bold tracking-[-0.01em] whitespace-nowrap shadow-[0_4px_20px_oklch(0.14_0.01_60/24%)] transition-colors duration-150 hover:bg-black active:scale-[0.97]",
+                  reducedMotion && "no-motion"
+                )}
               >
                 <Calendar size={16} /> Elegí fechas y reservá
               </button>
