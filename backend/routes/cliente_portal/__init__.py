@@ -1,0 +1,42 @@
+"""Paquete del router del portal del cliente (#501 — split del god-module
+`routes/cliente_portal.py`).
+
+`main` importa `router`; otros routers (estudio / didit / alquileres) y los tests
+importan helpers / modelos internos → este `__init__` re-exporta la superficie
+pública estable. El router es UNO solo (creado en `core`); cada submódulo registra
+sus rutas sobre ese mismo router al importarse.
+"""
+from routes.cliente_portal.core import (
+    router,
+    require_cliente,
+    get_session,
+    ESTADOS_MODIFICABLES,
+    _cancelar_solicitudes_pendientes,
+    _check_stock_hipotetico,
+    cliente_crear_pedido,
+    CartItemIn,
+    PedidoClienteCreate,
+    ModificacionItemIn,
+    _items_payload_to_pedido_items,
+    _lineas_libres_actuales,
+    _precios_actuales,
+)
+from routes.cliente_portal.documentos import _doc_response, _DOC_PREVIEW_HEADERS
+
+__all__ = [
+    "router",
+    "require_cliente",
+    "get_session",
+    "ESTADOS_MODIFICABLES",
+    "_cancelar_solicitudes_pendientes",
+    "_check_stock_hipotetico",
+    "cliente_crear_pedido",
+    "CartItemIn",
+    "PedidoClienteCreate",
+    "ModificacionItemIn",
+    "_items_payload_to_pedido_items",
+    "_lineas_libres_actuales",
+    "_precios_actuales",
+    "_doc_response",
+    "_DOC_PREVIEW_HEADERS",
+]
