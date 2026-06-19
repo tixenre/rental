@@ -14,5 +14,6 @@ from routes.specs import compatibilidad as _compatibilidad
 from routes.specs import nombres as _nombres
 from routes.specs import templates as _templates
 from routes.specs import diagnostico as _diagnostico
+from routes.specs import definitions as _definitions
 
-_SUBMODULOS = (_equipo_specs, _compatibilidad, _nombres, _templates, _diagnostico)
+_SUBMODULOS = (_equipo_specs, _compatibilidad, _nombres, _templates, _diagnostico, _definitions)
