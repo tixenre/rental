@@ -41,7 +41,7 @@ branch default es **`main`**, se **auto-cierra al promover `dev → main`** (cua
 citar la issue, no solo el `#PR`. La **promoción `dev → main` reconcilia**: su PR lista las issues que
 cierra el lote → cierre en bloque con evidencia. Features grandes diferidas con label **`someday`**
 (separa lo diferido de la cola activa; no es deuda sin cerrar). Triage **liviano y seguido** vía skill
-`limpieza` (frente D): verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
+`mantenimiento` (frente D): verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
 tracking (no uno por fase).
 
 ### 2026-05-25 — Modus operandi durable, sesión efímera

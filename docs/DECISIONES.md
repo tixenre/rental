@@ -88,7 +88,7 @@
   `docs/ISSUE_LABELS.md`) → se filtran de la vista "qué hago ahora". La cola accionable queda chica; lo
   diferido queda **asentado pero separado** — no es deuda sin cerrar, es backlog. El brain-dump del
   dueño va a issue igual (no se pierde), con `someday` si es "algún día".
-- **Triage liviano y seguido**, no masivo: el método es el skill `limpieza` (frente D) — **verificar
+- **Triage liviano y seguido**, no masivo: el método es el skill `mantenimiento` (frente D) — **verificar
   que shippeó antes de cerrar** (las tools y la intuición mienten), con evidencia. Hacerlo en cada
   promoción, no dejar acumular meses.
 - **Una iniciativa multi-sesión = un issue de tracking** (decisión _Modus operandi durable_), que
