@@ -68,8 +68,6 @@ def _maybe_finalizar(conn, pedido_id: int):
         conn.execute("UPDATE alquileres SET estado='finalizado' WHERE id=?", (pedido_id,))
 
 
-
-
 def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
     rows = conn.execute(f"""
         SELECT pi.*, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
@@ -2166,47 +2164,3 @@ def mail_preview(id: int, data: MailPreviewRequest, request: Request):
     return {"subject": subject, "html": wrap_preview(body_html), "text": text}
 
 
-# ── Descuentos por jornadas ───────────────────────────────────────────────────
-
-class DescuentoJornadaIn(BaseModel):
-    jornadas: int
-    pct: float
-
-
-@router.get("/descuentos-jornada")
-def get_descuentos_jornada():
-    """Devuelve los puntos ancla de descuentos por jornadas (público — lo usa el carrito)."""
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT id, jornadas, pct FROM descuentos_jornada ORDER BY jornadas ASC"
-        ).fetchall()
-        return [row_to_dict(r) for r in rows]
-
-
-@router.post("/admin/descuentos-jornada", status_code=201)
-def create_descuento_jornada(data: DescuentoJornadaIn, request: Request):
-    require_admin(request)
-    if data.jornadas < 1:
-        raise HTTPException(400, "jornadas debe ser >= 1")
-    if not (0 <= data.pct <= 100):
-        raise HTTPException(400, "pct debe estar entre 0 y 100")
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO descuentos_jornada (jornadas, pct) VALUES (?, ?) "
-            "ON CONFLICT (jornadas) DO UPDATE SET pct = EXCLUDED.pct",
-            (data.jornadas, data.pct)
-        )
-        conn.commit()
-        row = conn.execute(
-            "SELECT id, jornadas, pct FROM descuentos_jornada WHERE jornadas = ?",
-            (data.jornadas,)
-        ).fetchone()
-        return row_to_dict(row)
-
-
-@router.delete("/admin/descuentos-jornada/{id}", status_code=204)
-def delete_descuento_jornada(id: int, request: Request):
-    require_admin(request)
-    with get_db() as conn:
-        conn.execute("DELETE FROM descuentos_jornada WHERE id = ?", (id,))
-        conn.commit()
