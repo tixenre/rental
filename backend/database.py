@@ -92,15 +92,34 @@ def get_connection_params():
 
 # ── Pool de conexiones ────────────────────────────────────────────────────────
 # ThreadedConnectionPool es thread-safe (FastAPI corre handlers sync en threads).
-# minconn=2: siempre hay 2 conexiones listas. maxconn=10: techo para picos.
+# minconn: conexiones siempre listas. maxconn: techo para picos.
+#
+# CLAVE: `maxconn` tiene que cubrir la concurrencia real de requests. FastAPI
+# corre cada handler sync en el threadpool de Starlette (default 40 threads),
+# y cada uno toma una conexión del pool. Si más de `maxconn` handlers corren a
+# la vez, psycopg2 NO espera: lanza `PoolError: connection pool exhausted` al
+# instante → 500 en cascada (y el webhook de Didit no puede guardar la
+# verificación). Por eso el arranque (main.py) ACOTA el threadpool a `pool_max()`
+# menos un margen para los workers de fondo (scheduler, init, webhooks async):
+# así los requests de más hacen cola en vez de explotar. Ambos valores se tunean
+# por env (DB_POOL_MIN / DB_POOL_MAX) sin tocar código.
+import os as _os
+
+_POOL_MIN = int(_os.getenv("DB_POOL_MIN", "2"))
+_POOL_MAX = int(_os.getenv("DB_POOL_MAX", "25"))
 
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
+
+
+def pool_max() -> int:
+    """Techo de conexiones del pool (para que main.py acote el threadpool)."""
+    return _POOL_MAX
 
 
 def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     global _pool
     if _pool is None or _pool.closed:
-        _pool = psycopg2.pool.ThreadedConnectionPool(2, 10, **get_connection_params())
+        _pool = psycopg2.pool.ThreadedConnectionPool(_POOL_MIN, _POOL_MAX, **get_connection_params())
     return _pool
 
 

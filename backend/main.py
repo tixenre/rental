@@ -81,6 +81,27 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+@app.on_event("startup")
+async def _acotar_threadpool() -> None:
+    """Alinea el threadpool de Starlette con el pool de conexiones a la BD.
+
+    FastAPI corre los handlers sync en el threadpool de AnyIO (default 40). Cada
+    handler toma una conexión del pool (maxconn). Si los threads superan al pool,
+    el excedente NO espera: psycopg2 lanza `PoolError: connection pool exhausted`
+    → 500 en cascada (y el webhook de Didit no puede persistir la verificación).
+    Acotando el threadpool a `pool_max()` menos un margen para los workers de
+    fondo (scheduler, init de BD, webhooks async que tocan la BD), los requests
+    de más hacen cola unos ms en vez de explotar. Back-pressure, no errores.
+    """
+    import anyio.to_thread
+    from database import pool_max
+
+    margen_fondo = 4  # scheduler + init + webhooks async que comparten el pool
+    tokens = max(1, pool_max() - margen_fondo)
+    anyio.to_thread.current_default_thread_limiter().total_tokens = tokens
+    logger.info("Threadpool acotado a %d (pool_max=%d) para no agotar el pool de BD", tokens, pool_max())
+
+
 async def request_id_middleware(request: Request, call_next):
     """Inyecta un request_id único en context para que los logs lo incluyan.
 
