@@ -4,6 +4,7 @@ routes/auth.py — Google OAuth 2.0 + cookie de sesión firmada.
 
 import logging
 import os
+import secrets
 import time
 from collections import defaultdict
 
@@ -190,14 +191,19 @@ def auth_logout_post():
 @router.get("/auth/google")
 def auth_google(request: Request):
     """Redirige al usuario a la pantalla de selección de cuenta de Google."""
+    # State firmado: verificable por firma en el callback, sin depender de cookie.
+    # Resuelve state_mismatch en browsers con ITP/strict mode/ad-blockers.
+    state = signer.dumps({"nonce": secrets.token_urlsafe(16)})
     client = _oauth_client()
-    uri, state = client.create_authorization_url(
+    uri, _ = client.create_authorization_url(
         GOOGLE_AUTH_URL,
+        state=state,
         access_type="online",
         prompt="select_account",
     )
     res = RedirectResponse(uri, status_code=302)
-    # Guardamos el state en cookie para verificarlo en el callback
+    # Cookie como capa extra (browsers sin bloqueo la usan; los que bloquean
+    # pasan igual porque la firma del state es suficiente).
     res.set_cookie("oauth_state", state, httponly=True, samesite="lax",
                    secure=COOKIE_SECURE, max_age=600)
     return res
@@ -219,9 +225,19 @@ def auth_callback(request: Request):
     if not code:
         return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=no_code", status_code=303)
 
-    # Verificar state anti-CSRF
+    # Verificar state anti-CSRF: cookie match (ideal) o firma válida (fallback
+    # para browsers con ITP/strict mode/ad-blockers que bloquean la cookie).
     saved_state = request.cookies.get("oauth_state")
-    if not saved_state or saved_state != state:
+    state_ok = bool(saved_state and saved_state == state)
+    if not state_ok and state:
+        try:
+            signer.loads(state, max_age=600)
+            state_ok = True
+            if not saved_state:
+                logger.info("admin OAuth: state por firma (sin cookie) ip=%s", ip)
+        except (BadSignature, SignatureExpired):
+            pass
+    if not state_ok:
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=state_mismatch", status_code=303)
 
@@ -336,8 +352,10 @@ def cliente_auth_google(request: Request):
         redirect_uri=CLIENTE_REDIRECT_URI,
         scope="openid email profile",
     )
-    uri, state = client.create_authorization_url(
+    state = signer.dumps({"nonce": secrets.token_urlsafe(16)})
+    uri, _ = client.create_authorization_url(
         GOOGLE_AUTH_URL,
+        state=state,
         access_type="online",
         prompt="select_account",
     )
@@ -372,7 +390,16 @@ def cliente_auth_callback(request: Request):
         return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=no_code", status_code=303)
 
     saved_state = request.cookies.get("oauth_state_cliente")
-    if not saved_state or saved_state != state:
+    state_ok = bool(saved_state and saved_state == state)
+    if not state_ok and state:
+        try:
+            signer.loads(state, max_age=600)
+            state_ok = True
+            if not saved_state:
+                logger.info("cliente OAuth: state por firma (sin cookie) ip=%s", ip)
+        except (BadSignature, SignatureExpired):
+            pass
+    if not state_ok:
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=state_mismatch", status_code=303)
 
