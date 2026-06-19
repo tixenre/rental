@@ -1,0 +1,117 @@
+"""Disponibilidad + recordatorios (#501 — extraído del god-module `routes/alquileres.py`).
+
+Endpoints finos de lectura de disponibilidad (delegan en la fuente única
+`reservas.calcular_disponibilidad` / `dias_no_disponibles`), la validación de
+horarios habilitados del cliente, y el disparador on-demand de recordatorios de
+retiro. Registra sus rutas sobre el router compartido del paquete
+`routes.alquileres`.
+"""
+import json
+
+from fastapi import Request, HTTPException, Query
+
+from database import get_db, to_datetime
+from admin_guard import require_admin
+from reservas import (
+    calcular_disponibilidad as _calcular_disponibilidad,
+    dias_no_disponibles as _dias_no_disponibles,
+)
+from routes.alquileres.core import router
+
+
+# ── Disponibilidad ───────────────────────────────────────────────────────────
+
+_DIAS_HORARIO = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
+
+
+def _validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> None:
+    """Valida que retiro/devolución caigan en días/horas habilitados (setting
+    `horarios_retiro`). Sin config → no restringe. Pensado para el flujo del
+    cliente, que manda hora real (el admin carga date-only y no se restringe).
+    Lanza HTTPException 400 si algo cae fuera."""
+    row = conn.execute(
+        "SELECT value FROM app_settings WHERE key = ?", ("horarios_retiro",)
+    ).fetchone()
+    if not row or not row["value"]:
+        return
+    try:
+        horarios = json.loads(row["value"])
+    except (ValueError, TypeError):
+        return
+    if not isinstance(horarios, dict) or not horarios:
+        return
+
+    def _check(dt_raw, etiqueta: str):
+        if not dt_raw:
+            return
+        dt = to_datetime(dt_raw)
+        franja = horarios.get(_DIAS_HORARIO[dt.weekday()])
+        if not franja:
+            raise HTTPException(400, f"El {etiqueta} cae en un día no habilitado")
+        hhmm = dt.strftime("%H:%M")
+        if hhmm < franja["desde"] or hhmm > franja["hasta"]:
+            raise HTTPException(
+                400,
+                f"El horario de {etiqueta} ({hhmm}) está fuera del rango "
+                f"habilitado ({franja['desde']}–{franja['hasta']})",
+            )
+
+    _check(fecha_desde, "retiro")
+    _check(fecha_hasta, "devolución")
+
+
+@router.get("/disponibilidad-dias")
+def get_disponibilidad_dias(
+    items: str = Query(..., description="Lista 'equipo_id:cantidad' separada por coma"),
+    desde: str = Query(...),
+    hasta: str = Query(...),
+):
+    """Días sin disponibilidad para los equipos pedidos, en [desde, hasta].
+    Lo usa el calendario del cliente para bloquear días según las reservas
+    reales de los equipos que tiene en el carrito."""
+    parsed: dict[int, int] = {}
+    for tok in (items or "").split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        eid_str, _, qty_str = tok.partition(":")
+        try:
+            eid = int(eid_str)
+            qty = int(qty_str) if qty_str else 1
+        except ValueError:
+            raise HTTPException(400, f"Item inválido: '{tok}' (se espera 'id' o 'id:cantidad')")
+        parsed[eid] = max(parsed.get(eid, 0), max(1, qty))
+    if not parsed:
+        return {"dias_bloqueados": []}
+    with get_db() as conn:
+        return {"dias_bloqueados": _dias_no_disponibles(conn, parsed, desde, hasta)}
+
+
+@router.get("/disponibilidad")
+def get_disponibilidad(
+    fecha_desde: str = Query(...),
+    fecha_hasta: str = Query(...),
+    exclude_pedido_id: int = Query(None),
+):
+    """Endpoint fino: abre la conexión y delega en la fuente única de lectura
+    `reservas.calcular_disponibilidad`. Lo llaman también `routes.estudio` y
+    `routes.cliente_portal` con esta misma firma."""
+    with get_db() as conn:
+        return _calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id)
+
+
+@router.post("/admin/recordatorios/retiro/run")
+def run_recordatorios_retiro(request: Request, dry_run: bool = Query(True)):
+    """Dispara on-demand el barrido de recordatorios de retiro — para probar en
+    staging sin esperar al scheduler diario. `dry_run=true` (default) NO manda
+    nada: solo devuelve qué pedidos recibirían el recordatorio mañana. Pasar
+    `dry_run=false` manda de verdad (gateado igual por el canal de mail activo).
+
+    Import perezoso de `jobs.recordatorios` para no crear ciclo (ese módulo
+    importa helpers de este).
+    """
+    require_admin(request)
+    from jobs.recordatorios import enviar_recordatorios_retiro
+
+    with get_db() as conn:
+        return enviar_recordatorios_retiro(conn, dry_run=dry_run)
