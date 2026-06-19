@@ -24,11 +24,9 @@ from routes.alquileres.core import (
     propagar_descuento_a_presupuestos,
     # ── Helpers ──
     get_db,
-    _agrupar_items_por_categoria,
     _apply_pedido_datos,
     _apply_pedido_items,
     _batch_get_alquiler_items,
-    _cuerpo_mail_simple,
     _dispatch_pedido_creado_emails,
     _enriquecer_pedido_con_cliente,
     _enriquecer_pedido_con_total,
@@ -37,13 +35,18 @@ from routes.alquileres.core import (
     _get_alquiler_items,
     _ics_adjunto_pedido,
     _next_numero_pedido,
-    _ordenar_items_en_grupos,
     _parse_precio,
     _pedido_email_context,
     _recalcular_total_pedido,
     _resolver_destino_metodo,
     _validar_fecha_iso,
     _validar_horarios_habilitados,
+)
+# Helpers de documentos (PDFs + mail) consumidos por los tests vía este paquete.
+from routes.alquileres.documentos import (
+    _agrupar_items_por_categoria,
+    _ordenar_items_en_grupos,
+    _cuerpo_mail_simple,
 )
 
 __all__ = [
@@ -62,7 +65,8 @@ __all__ = [
 ]
 
 # Submódulos sin símbolos re-exportados: el import registra sus rutas sobre el
-# `router` compartido; el tuple los mantiene "usados" para ruff.
+# `router` compartido; el tuple los mantiene "usados" para ruff. (`documentos`
+# sí re-exporta helpers, arriba — su import ya registra sus rutas.)
 from routes.alquileres import descuentos as _descuentos
 
 _SUBMODULOS = (_descuentos,)
