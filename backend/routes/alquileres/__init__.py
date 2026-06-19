@@ -20,7 +20,6 @@ from routes.alquileres.core import (
     # ── Endpoints consumidos como función ──
     cotizar,
     create_pedido,
-    get_disponibilidad,
     propagar_descuento_a_presupuestos,
     # ── Helpers ──
     get_db,
@@ -40,6 +39,11 @@ from routes.alquileres.core import (
     _recalcular_total_pedido,
     _resolver_destino_metodo,
     _validar_fecha_iso,
+)
+# Disponibilidad + validación de horarios: endpoint y helper consumidos por
+# estudio / cliente_portal / tests vía este paquete.
+from routes.alquileres.disponibilidad import (
+    get_disponibilidad,
     _validar_horarios_habilitados,
 )
 # Helpers de documentos (PDFs + mail) consumidos por los tests vía este paquete.
