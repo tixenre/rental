@@ -14,7 +14,10 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
-from routes.auth import get_session
+# Guard CANÓNICO reexportado bajo el nombre del paquete (`_require_admin`): valida
+# email ∈ ADMIN_EMAILS (→ 403), no solo que exista sesión. Una copia local débil
+# dejaba pasar a cualquier logueado, incluido un cliente del portal.
+from admin_guard import require_admin as _require_admin
 
 
 router = APIRouter()
@@ -32,15 +35,6 @@ class UnidadUpdate(BaseModel):
     simbolo: Optional[str] = None
     nombre: Optional[str] = None
     dimension: Optional[str] = None
-
-
-# ── Auth helper ─────────────────────────────────────────────────────────
-
-def _require_admin(request: Request) -> dict:
-    session = get_session(request)
-    if not session:
-        raise HTTPException(401, "No autenticado")
-    return session
 
 
 # ── CRUD ────────────────────────────────────────────────────────────────

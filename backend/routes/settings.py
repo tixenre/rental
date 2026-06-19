@@ -13,7 +13,7 @@ import re
 
 from fastapi import APIRouter, Request, HTTPException
 from database import get_db, MARCA_SUBQUERY
-from routes.auth import get_session
+from admin_guard import require_admin
 from services.media.processing import _optimize_og_image
 
 router = APIRouter()
@@ -23,12 +23,9 @@ _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
-
-def require_admin(request: Request) -> dict:
-    session = get_session(request)
-    if not session:
-        raise HTTPException(401, "No autenticado")
-    return session
+# `require_admin` es el guard CANÓNICO (`admin_guard`): valida email ∈ ADMIN_EMAILS
+# (→ 403), no solo que exista sesión. Antes era una copia local débil que dejaba
+# pasar a cualquier logueado, incluido un cliente del portal.
 
 
 def _validar_horarios(value: str) -> str:
@@ -263,7 +260,7 @@ def list_settings():
 @router.put("/admin/settings/{key}")
 def update_setting(key: str, payload: dict, request: Request):
     """Actualiza una setting (solo admin)."""
-    session = require_admin(request)
+    guard = require_admin(request)
     if key not in ALLOWED_SETTINGS_KEYS:
         raise HTTPException(400, f"Setting '{key}' no es editable")
     value = payload.get("value")
@@ -337,7 +334,7 @@ def update_setting(key: str, payload: dict, request: Request):
         value = _validar_hero_taglines(value)
     if key == "comisiones_modelo":
         value = _validar_comisiones(value)
-    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+    actor = (guard.get("email") or "admin")[:255]
     with get_db() as conn:
         try:
             conn.execute("""
@@ -523,8 +520,8 @@ async def upload_og_image(request: Request):
     Es la imagen que ven WhatsApp / IG / Facebook al compartir el link de
     la home. Path fijo en R2 + cache-buster (?v=<ts>).
     """
-    session = require_admin(request)
-    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+    guard = require_admin(request)
+    actor = (guard.get("email") or "admin")[:255]
 
     form = await request.form()
     file = form.get("file")
@@ -596,8 +593,8 @@ async def _upload_brand_svg(request: Request, kind: str):
     from services.media.storage import put as _r2_put
     from services.media_fastapi import media_http
 
-    session = require_admin(request)
-    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+    guard = require_admin(request)
+    actor = (guard.get("email") or "admin")[:255]
 
     form = await request.form()
     file = form.get("file")
