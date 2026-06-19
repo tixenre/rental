@@ -79,10 +79,13 @@ class StockFakeConn:
         if "FROM APP_SETTINGS WHERE KEY = ?" in s_up:
             return FakeCursor([FakeRow(value=str(self.buffer_horas))])
 
-        # Unidades en mantenimiento que bloquean stock (por equipo, escalar).
+        # Unidades en mantenimiento que bloquean stock — batcheado (#626):
+        # IN + GROUP BY, params = (*equipo_ids, fecha_hasta, fecha_desde).
         if "FROM EQUIPO_MANTENIMIENTO" in s_up:
-            eq_id = params[0]
-            return FakeCursor([FakeRow({0: self.mantenimiento.get(eq_id, 0)})])
+            eq_ids = params[:-2]
+            return FakeCursor([
+                FakeRow({0: e, 1: self.mantenimiento.get(e, 0)}) for e in eq_ids
+            ])
 
         # Items del pedido (primera query del gate).
         if s_up.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
@@ -110,10 +113,13 @@ class StockFakeConn:
                 return FakeCursor([])
             return FakeCursor([FakeRow(cantidad=eq["cantidad"])])
 
-        # Reservas directas (suma de alquiler_items donde equipo_id == X).
-        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s_up:
-            eq_id = params[0]
-            return FakeCursor([FakeRow({0: self.reservas_directas.get(eq_id, 0)})])
+        # Reservas directas batcheadas (#626): IN + GROUP BY,
+        # params = (*equipo_ids, excl, fh_buf, fd_buf).
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID IN" in s_up:
+            eq_ids = params[:-3]
+            return FakeCursor([
+                FakeRow({0: e, 1: self.reservas_directas.get(e, 0)}) for e in eq_ids
+            ])
 
         # Fallback: vacío.
         return FakeCursor([])

@@ -279,9 +279,9 @@ class EstudioConflictoFakeConn:
         if "FROM APP_SETTINGS WHERE KEY = ?" in s:
             return _Cur([{"value": str(self.buffer_global)}])
 
-        # Mantenimiento — ninguno.
+        # Mantenimiento — ninguno (batcheado #626: sin filas → el gate default-ea a 0).
         if "FROM EQUIPO_MANTENIMIENTO" in s:
-            return _Cur([{0: 0}])
+            return _Cur([])
 
         # Items del pedido (1ra query del gate): el centinela.
         if s.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
@@ -300,15 +300,17 @@ class EstudioConflictoFakeConn:
             return _Cur([{"cantidad": self.stock}])
 
         # Reservas directas: sumamos las que se pisan con el rango consultado.
-        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s:
-            _eq, _excl, fh_consulta, fd_consulta = params
+        # Batcheado (#626): IN + GROUP BY, params = (*equipo_ids, excl, fh_buf, fd_buf).
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID IN" in s:
+            eq_ids = params[:-3]
+            fh_consulta, fd_consulta = params[-2], params[-1]
             fh_c = self._parse(fh_consulta)
             fd_c = self._parse(fd_consulta)
             total = 0
             for (fd_e, fh_e) in self.reservas:
                 if self._parse(fd_e) < fh_c and self._parse(fh_e) > fd_c:
                     total += 1
-            return _Cur([{0: total}])
+            return _Cur([{0: e, 1: total} for e in eq_ids])
 
         return _Cur([])
 

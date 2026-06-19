@@ -36,12 +36,14 @@ fija "mismo comportamiento donde no hay anidamiento" es el test diferencial
     conexión+transacción, no del módulo ni de la función).
 """
 from reservas.semantics import (
+    consumo_nodos,
     expandir_demanda,
     get_buffer_horas,
     parientes_de,
     rango_con_buffer,
+    reservado_directo_batch,
     reservado_total,
-    unidades_en_mantenimiento,
+    unidades_en_mantenimiento_batch,
 )
 
 
@@ -156,28 +158,47 @@ def _validar_demanda(
     buffer_horas = get_buffer_horas(conn)
     fd_buf, fh_buf = rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas)
 
-    # Grafo inverso (una sola lectura) + memo de reserva directa: al subir por
-    # antecesores compartidos entre nodos no repetimos sub-consultas. No cambian el
-    # resultado, solo evitan trabajo (el batch O(N)→1 de #626 queda diferido).
+    # Grafo inverso (una sola lectura), compartido por el conteo de consumo.
     rev_graph = parientes_de(conn)
-    rd_cache: dict[int, int] = {}
 
-    problemas = []
+    # ── Paso 1: tomar los locks. NÚCLEO SAGRADO — el `SELECT ... FOR UPDATE` va
+    # INLINE acá, byte-idéntico, UNA fila por iteración, en orden ascendente de id
+    # (ORDER BY id) para que el orden total de locking evite deadlocks entre
+    # transacciones concurrentes. No se factoriza a un sub-helper ni se batchea: el
+    # lock es lo único que NO se toca (MEMORIA 2026-05-31). El conteo se hace en el
+    # Paso 2, con TODOS los locks ya tomados → cada equipo se cuenta bajo su lock,
+    # igual de seguro que el interleave anterior (de hecho, estrictamente: ningún
+    # reservado se lee antes de tener su fila lockeada).
+    stock: dict[int, int | None] = {}
     for eid in ids:  # ascendente por id (ORDER BY id)
-        nombre = nombres.get(eid, f"equipo #{eid}")
-        # Lock la fila de equipo durante el chequeo para evitar race conditions.
-        # SELECT ... FOR UPDATE evita que otra transacción concurrente lea el stock
-        # mientras estamos validando.
         lock_result = conn.execute(
             "SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE",
             (eid,)
         ).fetchone()
+        stock[eid] = lock_result["cantidad"] if lock_result else None
 
-        if not lock_result:
+    # ── Paso 2: conteo BATCHEADO (#626) con todos los locks tomados. Reserva
+    # directa de TODOS los nodos del consumo (cada equipo + sus antecesores) en 1
+    # query, y mantenimiento en 1 query — en vez de O(N) por equipo. Prellenar el
+    # cache de `reservado_total` con esos directos hace que el Paso 3 no pegue una
+    # sola query más (el memo era el medio-paso; esto lo completa). El SQL de ambas
+    # subqueries vive en `semantics` (no se re-copia acá → guard anti-inyección y
+    # fuente única intactos).
+    nodos = consumo_nodos(rev_graph, ids)
+    rd_batch = reservado_directo_batch(conn, nodos, excl_pedido_id, fh_buf, fd_buf)
+    rd_cache: dict[int, int] = {n: rd_batch.get(n, 0) for n in nodos}
+    mant = unidades_en_mantenimiento_batch(conn, ids, fecha_desde, fecha_hasta)
+
+    # ── Paso 3: comparar (en memoria). `reservado_total` resuelve el consumo
+    # recursivo desde el cache prellenado → 0 queries, y sigue siendo el helper
+    # único compartido con el dry-run del portal (no pueden divergir). El orden de
+    # los problemas se mantiene ascendente por id, igual que antes.
+    problemas = []
+    for eid in ids:
+        nombre = nombres.get(eid, f"equipo #{eid}")
+        if stock[eid] is None:
             problemas.append(f"{nombre} (equipo no encontrado)")
             continue
-
-        stock_total = lock_result["cantidad"]
 
         # Consumo recursivo de este equipo por OTROS pedidos: directo + vía
         # cualquier compuesto que lo contenga, a cualquier profundidad (C4).
@@ -187,11 +208,9 @@ def _validar_demanda(
         )
 
         # Unidades fuera de servicio por mantenimiento (rango original).
-        en_mantenimiento = unidades_en_mantenimiento(
-            conn, eid, fecha_desde, fecha_hasta
-        )
+        en_mantenimiento = mant.get(eid, 0)
 
-        disponible = stock_total - reservado - en_mantenimiento
+        disponible = stock[eid] - reservado - en_mantenimiento
         if disponible < demanda[eid]:
             problemas.append(
                 f"{nombre} (necesitás {demanda[eid]}, disponible: {max(0, disponible)})"
