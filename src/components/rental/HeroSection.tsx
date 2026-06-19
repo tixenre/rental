@@ -14,14 +14,16 @@ interface HeroSectionProps {
 export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSectionProps) {
   const photos = useHeroPhotos();
   const [photoIdx, setPhotoIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
   const reducedMotion = useReducedMotion();
+  const autoPlayPaused = paused || reducedMotion;
 
   useEffect(() => {
     setPhotoIdx(0);
-    if (photos.length <= 1 || reducedMotion) return;
+    if (photos.length <= 1 || autoPlayPaused) return;
     const id = setInterval(() => setPhotoIdx((i) => (i + 1) % photos.length), 4500);
     return () => clearInterval(id);
-  }, [photos.length, reducedMotion]);
+  }, [photos.length, autoPlayPaused]);
 
   return (
     <>
@@ -107,14 +109,36 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
               </span>
             </div>
 
-            {/* Navigation dots */}
-            <div className="absolute right-4 bottom-6 z-[2] flex gap-[5px]">
+            {/* Navigation dots + pause button */}
+            <div
+              className="absolute right-4 bottom-6 z-[2] flex items-center gap-[5px]"
+              role="group"
+              aria-label="Fotos del estudio"
+            >
+              {photos.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setPaused((p) => !p); }}
+                  aria-label={paused ? "Reanudar presentación" : "Pausar presentación"}
+                  className="mr-1 grid h-5 w-5 place-items-center rounded-full bg-black/30 text-white/70 hover:bg-black/50 hover:text-white transition"
+                >
+                  {paused ? (
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden><polygon points="1,0 7,4 1,8" /></svg>
+                  ) : (
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden><rect x="1" y="0" width="2.5" height="8"/><rect x="4.5" y="0" width="2.5" height="8"/></svg>
+                  )}
+                </button>
+              )}
               {photos.map((_, i) => (
-                <i
+                <button
                   key={i}
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setPhotoIdx(i); }}
+                  aria-label={`Foto ${i + 1} de ${photos.length}`}
+                  aria-current={i === photoIdx ? "true" : undefined}
                   className={cn(
                     "block h-[6px] rounded-full transition-[width,background] duration-[250ms]",
-                    i === photoIdx ? "w-[17px] bg-amber" : "w-[6px] bg-white/50",
+                    i === photoIdx ? "w-[17px] bg-amber" : "w-[6px] bg-white/50 hover:bg-white/80",
                   )}
                 />
               ))}

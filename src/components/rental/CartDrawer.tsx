@@ -560,7 +560,14 @@ export function CartDrawer({
                       <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
                     </>
                   ) : (
-                    "Confirmar solicitud"
+                    <span className="flex items-center gap-2">
+                      Confirmar solicitud
+                      {list.length > 0 && totalNeto > 0 && (
+                        <span className="font-mono text-[11px] font-normal opacity-70 tracking-normal normal-case tabular-nums">
+                          · {formatARS(totalNeto)}{conIva ? " + IVA" : ""}
+                        </span>
+                      )}
+                    </span>
                   )}
                 </button>
 
