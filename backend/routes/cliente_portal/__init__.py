@@ -44,4 +44,6 @@ __all__ = [
 
 # Submódulos sin símbolos re-exportados: el import (arriba) registra sus rutas
 # sobre el `router` compartido; el tuple los mantiene "usados" para ruff.
-_SUBMODULOS = (_favoritos,)
+from routes.cliente_portal import cuenta as _cuenta  # registra sus rutas
+
+_SUBMODULOS = (_favoritos, _cuenta)
