@@ -73,7 +73,7 @@ def test_cliente_no_decide_precio_jornada(monkeypatch):
 
     # 1. Sesión cliente válida (saltea require_cliente).
     monkeypatch.setattr(
-        "routes.cliente_portal.require_cliente",
+        "routes.cliente_portal.pedidos.require_cliente",
         lambda req: {"cliente_id": 42, "email": "cliente@test.com"},
     )
 
@@ -86,7 +86,7 @@ def test_cliente_no_decide_precio_jornada(monkeypatch):
     # 3. Conn fake con precio de catálogo conocido.
     precios_catalogo = {7: 50000}
     monkeypatch.setattr(
-        "routes.cliente_portal.get_db",
+        "routes.cliente_portal.pedidos.get_db",
         lambda: FakeConn(precios_catalogo),
     )
 
@@ -129,7 +129,7 @@ def test_equipo_inexistente_devuelve_404(monkeypatch):
     from fastapi import HTTPException
 
     monkeypatch.setattr(
-        "routes.cliente_portal.require_cliente",
+        "routes.cliente_portal.pedidos.require_cliente",
         lambda req: {"cliente_id": 42, "email": "cliente@test.com"},
     )
     monkeypatch.setattr(
@@ -137,7 +137,7 @@ def test_equipo_inexistente_devuelve_404(monkeypatch):
         lambda conn, desde, hasta: None,
     )
     monkeypatch.setattr(
-        "routes.cliente_portal.get_db",
+        "routes.cliente_portal.pedidos.get_db",
         lambda: FakeConn({}),  # catálogo vacío
     )
 

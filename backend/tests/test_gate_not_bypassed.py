@@ -30,8 +30,10 @@ GATE_SYMBOLS = {"_check_stock", "_check_stock_hipotetico", "_centinela_libre"}
 #     debe llamar a _check_stock si corresponde".
 #   - _agregar_items_pack (estudio): el pack es best-effort; crear_reserva_estudio
 #     llama _check_stock tras insertarlo y revierte si no hay stock.
+# Clave = path relativo a routes/ (ej. "alquileres/core.py"), así desambigua entre
+# los varios core.py de los paquetes split (#501).
 ALLOWLIST_DELEGADORES = {
-    ("alquileres.py", "_apply_pedido_items"),
+    ("alquileres/core.py", "_apply_pedido_items"),
     ("estudio.py", "_agregar_items_pack"),
 }
 
@@ -50,10 +52,15 @@ def _funciones_que_insertan_reservas():
     """Devuelve [(archivo, funcname, referencia_gate?)] por cada sitio que
     inserta en alquiler_items, en todos los módulos de routes/."""
     hallazgos = []
-    for fname in sorted(os.listdir(ROUTES_DIR)):
-        if not fname.endswith(".py"):
-            continue
-        path = os.path.join(ROUTES_DIR, fname)
+    archivos = []
+    for dirpath, _dirs, files in os.walk(ROUTES_DIR):
+        for fname in files:
+            if fname.endswith(".py"):
+                archivos.append(os.path.join(dirpath, fname))
+    for path in sorted(archivos):
+        # Identificador = path relativo a routes/ (ej. "alquileres/core.py"),
+        # así desambigua entre los varios core.py de los paquetes split (#501).
+        rel = os.path.relpath(path, ROUTES_DIR)
         with open(path, encoding="utf-8") as fh:
             tree = ast.parse(fh.read())
         funcs = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
@@ -65,10 +72,10 @@ def _funciones_que_insertan_reservas():
             ):
                 fn = _func_envolvente(funcs, node.lineno)
                 if fn is None:
-                    hallazgos.append((fname, "<module>", False))
+                    hallazgos.append((rel, "<module>", False))
                     continue
                 nombres = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name)}
-                hallazgos.append((fname, fn.name, bool(GATE_SYMBOLS & nombres)))
+                hallazgos.append((rel, fn.name, bool(GATE_SYMBOLS & nombres)))
     return hallazgos
 
 
