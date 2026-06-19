@@ -11,5 +11,6 @@ __all__ = ["router"]
 # importarse; el tuple los mantiene "usados" para ruff).
 from routes.specs import equipo_specs as _equipo_specs
 from routes.specs import compatibilidad as _compatibilidad
+from routes.specs import nombres as _nombres
 
-_SUBMODULOS = (_equipo_specs, _compatibilidad)
+_SUBMODULOS = (_equipo_specs, _compatibilidad, _nombres)
