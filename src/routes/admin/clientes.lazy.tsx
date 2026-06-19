@@ -356,6 +356,52 @@ function ClienteHistorialSheet({
                       {cliente.fecha_nacimiento_renaper}
                     </div>
                   )}
+                  {cliente.genero_renaper && (
+                    <div>
+                      <span className="text-muted-foreground">Género: </span>
+                      {cliente.genero_renaper === "M"
+                        ? "Masculino"
+                        : cliente.genero_renaper === "F"
+                          ? "Femenino"
+                          : cliente.genero_renaper}
+                    </div>
+                  )}
+                  {cliente.nacionalidad_renaper && (
+                    <div>
+                      <span className="text-muted-foreground">Nacionalidad: </span>
+                      {cliente.nacionalidad_renaper}
+                    </div>
+                  )}
+                  {cliente.lugar_nacimiento_renaper && (
+                    <div>
+                      <span className="text-muted-foreground">Lugar de nacimiento: </span>
+                      {cliente.lugar_nacimiento_renaper}
+                    </div>
+                  )}
+                  {cliente.estado_civil_renaper && (
+                    <div>
+                      <span className="text-muted-foreground">Estado civil: </span>
+                      {cliente.estado_civil_renaper}
+                    </div>
+                  )}
+                  {cliente.tipo_documento_renaper && (
+                    <div>
+                      <span className="text-muted-foreground">Tipo doc.: </span>
+                      {cliente.tipo_documento_renaper}
+                    </div>
+                  )}
+                  {cliente.emision_documento_renaper && (
+                    <div>
+                      <span className="text-muted-foreground">Emisión: </span>
+                      {cliente.emision_documento_renaper}
+                    </div>
+                  )}
+                  {cliente.vencimiento_documento_renaper && (
+                    <div>
+                      <span className="text-muted-foreground">Vencimiento: </span>
+                      {cliente.vencimiento_documento_renaper}
+                    </div>
+                  )}
                   {cliente.direccion_renaper && (
                     <div className="col-span-2">
                       <span className="text-muted-foreground">Domicilio: </span>

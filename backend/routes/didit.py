@@ -243,11 +243,21 @@ def _guardar_verificacion(
                    nombre_completo_renaper=COALESCE(?, nombre_completo_renaper),
                    fecha_nacimiento_renaper=COALESCE(?, fecha_nacimiento_renaper),
                    direccion_renaper=COALESCE(?, direccion_renaper),
+                   genero_renaper=COALESCE(?, genero_renaper),
+                   nacionalidad_renaper=COALESCE(?, nacionalidad_renaper),
+                   lugar_nacimiento_renaper=COALESCE(?, lugar_nacimiento_renaper),
+                   vencimiento_documento_renaper=COALESCE(?, vencimiento_documento_renaper),
+                   emision_documento_renaper=COALESCE(?, emision_documento_renaper),
+                   tipo_documento_renaper=COALESCE(?, tipo_documento_renaper),
+                   estado_civil_renaper=COALESCE(?, estado_civil_renaper),
                    updated_at=?
                WHERE id=? AND didit_session_id=?""",
             (datos.dni, datos.cuil, ahora, session_id,
              datos.nombre, datos.apellido, datos.nombre_completo,
              datos.fecha_nacimiento, datos.direccion,
+             datos.genero, datos.nacionalidad, datos.lugar_nacimiento,
+             datos.vencimiento_documento, datos.emision_documento,
+             datos.tipo_documento, datos.estado_civil,
              ahora, cliente_id, session_id),
         )
         conn.commit()
