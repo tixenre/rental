@@ -723,35 +723,10 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 if d0 < hoy and not es_admin:
                     raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
-                jornadas = jornadas_periodo(d0, d1)
-            else:
-                jornadas = 1
-
-            items_rows = []
-            for it in data.items:
-                if not conn.execute("SELECT id FROM equipos WHERE id=?", (it.equipo_id,)).fetchone():
-                    raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
-                subtotal = it.precio_jornada * it.cantidad * jornadas
-                items_rows.append((it.equipo_id, it.cantidad, it.precio_jornada, subtotal))
-
-            descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
-            total_desglose = calcular_total(
-                items=[
-                    {"equipo_id": it.equipo_id, "cantidad": it.cantidad,
-                     "precio_jornada": it.precio_jornada}
-                    for it in data.items
-                ],
-                jornadas=jornadas,
-                descuento_cliente_pct=descuento_pct,
-                descuento_jornadas_pct=descuento_jornadas_pct,
-                # monto_total se persiste NETO (sin IVA). IVA es derivado al
-                # mostrar, no se persiste.
-                perfil_impuestos=None,
-            )
-            monto_total = total_desglose["neto"]
-
             estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
             next_num = _next_numero_pedido(conn)
+            # Cabecera primero con totales en 0; los ítems se aplican vía el helper
+            # canónico, que recalcula monto_total y descuento_jornadas_pct.
             cur = conn.execute("""
                 INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
                                      cliente_id, notas, fecha_desde, fecha_hasta,
@@ -760,14 +735,17 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
             """, (cliente_nombre, cliente_email, cliente_telefono,
                   data.cliente_id, data.notas, data.fecha_desde or None, data.fecha_hasta or None,
-                  monto_total, estado_inicial, next_num,
-                  descuento_pct, descuento_jornadas_pct))
+                  0, estado_inicial, next_num,
+                  descuento_pct, 0.0))
             pedido_id = cur.lastrowid
 
-            conn.executemany("""
-                INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-                VALUES (?,?,?,?,?)
-            """, [(pedido_id, *row) for row in items_rows])
+            # Ítems vía la fuente única `_apply_pedido_items` (#805): preserva las
+            # líneas personalizadas (equipo_id None → nombre_libre/cobro_modo/orden),
+            # consolida las de catálogo y respeta cobro_modo='fijo' (no × jornadas).
+            # El armado inline anterior asumía equipo_id válido → 404 al crear con una
+            # línea libre, y descartaba nombre_libre/cobro_modo. Borradores: sin ítems.
+            if data.items:
+                _apply_pedido_items(conn, pedido_id, data.items)
 
             if estado_inicial == "presupuesto" and data.fecha_desde and data.fecha_hasta:
                 problemas = _check_stock(conn, pedido_id, data.fecha_desde, data.fecha_hasta)

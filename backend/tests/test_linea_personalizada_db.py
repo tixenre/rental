@@ -193,3 +193,53 @@ def test_edicion_del_portal_preserva_lineas_libres(setup):
     finally:
         conn.rollback()
         conn.close()
+
+
+def test_create_pedido_arma_la_linea_personalizada(setup, monkeypatch):
+    """create_pedido (#805): crear un pedido con una línea personalizada (equipo_id
+    None) NO debe dar 404 ni perder nombre_libre/cobro_modo. Antes armaba los ítems
+    inline asumiendo equipo_id válido (lookup con None → 404, INSERT de solo 5
+    columnas); ahora delega en `_apply_pedido_items`. Regresión de punta a punta."""
+    import routes.alquileres.core as ac
+    from database import get_db
+    from routes.alquileres import PedidoCreate, PedidoItem, create_pedido, _get_alquiler_items
+
+    monkeypatch.setattr(ac, "_dispatch_pedido_creado_emails", lambda *a, **k: None)
+
+    pedido = create_pedido(
+        PedidoCreate(
+            cliente_nombre="Cliente #805",
+            fecha_desde=FD,
+            fecha_hasta=FH,
+            estado="presupuesto",
+            items=[
+                PedidoItem(equipo_id=EQ, cantidad=1, precio_jornada=5000),
+                PedidoItem(equipo_id=None, cantidad=2, nombre_libre="Flete",
+                           cobro_modo="fijo", precio_jornada=20000),
+            ],
+        ),
+        es_admin=True,
+    )
+    assert pedido is not None
+    pid = pedido["id"]
+    try:
+        conn = get_db()
+        try:
+            items = _get_alquiler_items(conn, pid)
+            libres = [i for i in items if i["equipo_id"] is None]
+            assert len(libres) == 1, "la línea personalizada no se persistió (¿404 al crear?)"
+            assert libres[0]["nombre"] == "Flete"
+            assert libres[0]["cobro_modo"] == "fijo"
+            # 'fijo' NO multiplica por jornadas: subtotal = precio × cantidad = 20000×2.
+            assert libres[0]["subtotal"] == 40000
+            assert len([i for i in items if i["equipo_id"] == EQ]) == 1
+        finally:
+            conn.close()
+    finally:
+        conn = get_db()
+        try:
+            conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (pid,))
+            conn.execute("DELETE FROM alquileres WHERE id=?", (pid,))
+            conn.commit()
+        finally:
+            conn.close()
