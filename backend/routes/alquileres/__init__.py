@@ -9,8 +9,6 @@ importarse.
 from routes.alquileres.core import (
     router,
     # ── Modelos / constantes ──
-    CotizarItem,
-    CotizarRequest,
     PedidoCreate,
     PedidoDatos,
     PedidoItem,
@@ -18,7 +16,6 @@ from routes.alquileres.core import (
     METODOS_PAGO,
     ESTADOS_RESERVADO,
     # ── Endpoints consumidos como función ──
-    cotizar,
     create_pedido,
     propagar_descuento_a_presupuestos,
     # ── Helpers ──
@@ -39,6 +36,15 @@ from routes.alquileres.core import (
     _recalcular_total_pedido,
     _resolver_destino_metodo,
     _validar_fecha_iso,
+)
+# Cotización canónica: modelos + endpoint consumidos por tests vía este paquete.
+# (El módulo se llama `cotizacion` y no `cotizar` a propósito: si se llamara
+# igual que la función `cotizar`, el re-export de abajo rebindearía el atributo
+# del paquete `routes.alquileres.cotizar` del módulo a la función.)
+from routes.alquileres.cotizacion import (
+    cotizar,
+    CotizarItem,
+    CotizarRequest,
 )
 # Disponibilidad + validación de horarios: endpoint y helper consumidos por
 # estudio / cliente_portal / tests vía este paquete.
