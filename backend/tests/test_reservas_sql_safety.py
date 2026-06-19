@@ -79,8 +79,10 @@ def _funciones_motor():
         parientes_de,
         rango_con_buffer,
         reservado_directo,
+        reservado_directo_batch,
         reservado_total,
         unidades_en_mantenimiento,
+        unidades_en_mantenimiento_batch,
         validar_stock,
         validar_stock_hipotetico,
     )
@@ -99,8 +101,10 @@ def _funciones_motor():
         parientes_de,
         rango_con_buffer,
         reservado_directo,
+        reservado_directo_batch,
         reservado_total,
         unidades_en_mantenimiento,
+        unidades_en_mantenimiento_batch,
         _centinela_libre,
     ]
 

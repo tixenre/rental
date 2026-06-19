@@ -96,22 +96,41 @@ def rango_con_buffer(fecha_desde, fecha_hasta, buffer_horas: int):
         return fecha_desde, fecha_hasta
 
 
-def unidades_en_mantenimiento(conn, equipo_id: int, fecha_desde: str, fecha_hasta: str) -> int:
-    """Unidades del equipo fuera de servicio por mantenimiento en el rango.
+def unidades_en_mantenimiento_batch(
+    conn, equipo_ids, fecha_desde: str, fecha_hasta: str,
+) -> dict[int, int]:
+    """Unidades fuera de servicio por mantenimiento de VARIOS equipos en UNA query
+    (#626): `{equipo_id: unidades}`. Una entrada con bloquea_stock=TRUE saca
+    `cantidad` unidades durante [fecha, fecha_hasta]; el overlap usa la misma
+    convención half-open que los alquileres y el buffer NO aplica (ventana exacta).
 
-    Una entrada con bloquea_stock=TRUE saca `cantidad` unidades durante
-    [fecha, fecha_hasta]. El overlap usa la misma convención half-open que
-    los alquileres. El buffer NO aplica acá (la ventana de mantenimiento es
-    exacta)."""
-    row = conn.execute("""
-        SELECT COALESCE(SUM(cantidad), 0)
+    FUENTE ÚNICA de la subquery de mantenimiento: el escalar
+    `unidades_en_mantenimiento` delega acá con un solo id; el gate la usa para
+    contar todos los equipos del chequeo de una. El único token interpolado es el
+    placeholder `ph` del IN; los valores van como bound params. Equipos sin
+    mantenimiento que bloquee NO aparecen en el dict (el caller default-ea a 0)."""
+    ids = list(equipo_ids)
+    if not ids:
+        return {}
+    ph = ",".join("?" for _ in ids)
+    rows = conn.execute(f"""
+        SELECT equipo_id, COALESCE(SUM(cantidad), 0)
         FROM equipo_mantenimiento
-        WHERE equipo_id = ?
+        WHERE equipo_id IN ({ph})
           AND bloquea_stock = TRUE
           AND fecha < ?
           AND COALESCE(fecha_hasta, fecha) > ?
-    """, (equipo_id, fecha_hasta, fecha_desde)).fetchone()
-    return int((row[0] if row else 0) or 0)
+        GROUP BY equipo_id
+    """, (*ids, fecha_hasta, fecha_desde)).fetchall()
+    return {r[0]: int(r[1] or 0) for r in rows}
+
+
+def unidades_en_mantenimiento(conn, equipo_id: int, fecha_desde: str, fecha_hasta: str) -> int:
+    """Unidades del equipo fuera de servicio por mantenimiento en el rango (escalar;
+    delega en `unidades_en_mantenimiento_batch`, la fuente única de la subquery)."""
+    return unidades_en_mantenimiento_batch(
+        conn, [equipo_id], fecha_desde, fecha_hasta
+    ).get(equipo_id, 0)
 
 
 def consolidar_items_por_equipo(items) -> dict:
@@ -272,26 +291,59 @@ def expandir_demanda(conn, items: dict, solo_esenciales: bool = True) -> dict:
     return _expandir_mult(items, componentes_de(conn), solo_esenciales)
 
 
-def reservado_directo(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf) -> int:
-    """Unidades de `equipo_id` reservadas DIRECTAMENTE (items que lo apuntan) por
-    otros pedidos activos que se pisan con el rango ya bufferizado [fd_buf, fh_buf].
+def reservado_directo_batch(
+    conn, equipo_ids, excl_pedido_id: int, fh_buf, fd_buf,
+) -> dict[int, int]:
+    """Reserva DIRECTA de VARIOS equipos en UNA query (#626): `{equipo_id: unidades}`
+    de los items que apuntan a cada equipo en otros pedidos activos que se pisan con
+    el rango ya bufferizado [fd_buf, fh_buf].
 
-    Fuente única de la subquery de reserva directa: el gate autoritativo
-    (`validar_stock`) y el dry-run del portal (`validar_stock_hipotetico`) la
-    consumen vía el MISMO núcleo `gate._validar_demanda` → `reservado_total` → acá,
-    sin re-copiar SQL. Todos los valores van como bound params; el único token
-    interpolado es la constante interna ESTADOS_RESERVADO.
+    FUENTE ÚNICA de la subquery de reserva directa: el escalar `reservado_directo`
+    delega acá con un solo id, y el gate la usa para PRELLENAR el cache de consumo
+    de `reservado_total` con todos los nodos de un chequeo en una sola lectura, en
+    vez de O(N) queries (el `cache`/memo era el medio-paso; esto lo completa). El
+    gate autoritativo (`validar_stock`) y el dry-run del portal
+    (`validar_stock_hipotetico`) comparten esta subquery vía el núcleo único
+    `gate._validar_demanda`, sin re-copiar SQL. Todos los valores van como bound
+    params; los únicos tokens interpolados son la constante interna ESTADOS_RESERVADO
+    y el placeholder `ph` del IN. Equipos sin reserva NO aparecen (caller → 0).
     """
-    return conn.execute(f"""
-        SELECT COALESCE(SUM(pi2.cantidad), 0)
+    ids = list(equipo_ids)
+    if not ids:
+        return {}
+    ph = ",".join("?" for _ in ids)
+    rows = conn.execute(f"""
+        SELECT pi2.equipo_id, COALESCE(SUM(pi2.cantidad), 0)
         FROM alquiler_items pi2
         JOIN alquileres p ON p.id = pi2.pedido_id
-        WHERE pi2.equipo_id = ?
+        WHERE pi2.equipo_id IN ({ph})
           AND p.id != ?
           AND p.estado IN {ESTADOS_RESERVADO}
           AND p.fecha_desde < ?
           AND p.fecha_hasta > ?
-    """, (equipo_id, excl_pedido_id, fh_buf, fd_buf)).fetchone()[0]
+        GROUP BY pi2.equipo_id
+    """, (*ids, excl_pedido_id, fh_buf, fd_buf)).fetchall()
+    return {r[0]: int(r[1] or 0) for r in rows}
+
+
+def reservado_directo(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf) -> int:
+    """Unidades de `equipo_id` reservadas DIRECTAMENTE por otros pedidos activos que
+    se pisan con el rango bufferizado [fd_buf, fh_buf] (escalar; delega en
+    `reservado_directo_batch`, la fuente única de la subquery)."""
+    return reservado_directo_batch(
+        conn, [equipo_id], excl_pedido_id, fh_buf, fd_buf
+    ).get(equipo_id, 0)
+
+
+def consumo_nodos(rev_graph: dict, equipo_ids) -> set:
+    """Conjunto de nodos cuya reserva DIRECTA entra en el consumo recursivo de
+    `equipo_ids`: cada equipo más TODOS sus antecesores en el grafo inverso de
+    composición (`parientes_de`), a cualquier profundidad. Permite batchear
+    `reservado_directo` para todos de una (#626) y prellenar el cache de
+    `reservado_total` → mismo resultado que llamarla por equipo, sin O(N) lecturas.
+    Usa el MISMO núcleo de expansión (`_expandir_mult`, `solo_esenciales=False`) que
+    `reservado_total`, así el set cubre exactamente los nodos que esa función visita."""
+    return set(_expandir_mult({e: 1 for e in equipo_ids}, rev_graph, solo_esenciales=False))
 
 
 def reservado_total(conn, equipo_id: int, excl_pedido_id: int, fh_buf, fd_buf,

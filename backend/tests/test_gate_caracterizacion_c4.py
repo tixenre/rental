@@ -50,8 +50,9 @@ class _World:
         s = " ".join(sql.split()).upper()
         if "FROM APP_SETTINGS WHERE KEY = ?" in s:
             return _Cur([_Row(value="0")])
-        if "FROM EQUIPO_MANTENIMIENTO" in s:
-            return _Cur([_Row({0: self.mantenimiento.get(params[0], 0)})])
+        if "FROM EQUIPO_MANTENIMIENTO" in s:  # batcheado: (*equipo_ids, f_hasta, f_desde)
+            eq_ids = params[:-2]
+            return _Cur([_Row({0: e, 1: self.mantenimiento.get(e, 0)}) for e in eq_ids])
         if s.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
             return _Cur([_Row(r) for r in self.pedido_items])
         if s.startswith("SELECT EQUIPO_ID, COMPONENTE_ID, CANTIDAD") and "FROM KIT_COMPONENTES" in s:
@@ -64,8 +65,9 @@ class _World:
         if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
             eq = self.equipos.get(params[0])
             return _Cur([_Row(cantidad=eq["cantidad"])] if eq else [])
-        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s:
-            return _Cur([_Row({0: self.reservas_directas.get(params[0], 0)})])
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID IN" in s:
+            eq_ids = params[:-3]  # (*equipo_ids, excl, fh_buf, fd_buf)
+            return _Cur([_Row({0: e, 1: self.reservas_directas.get(e, 0)}) for e in eq_ids])
         return _Cur([])
 
 

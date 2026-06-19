@@ -19,14 +19,17 @@ from reservas.gate import validar_stock, validar_stock_hipotetico
 from reservas.semantics import (
     componentes_de,
     consolidar_items_por_equipo,
+    consumo_nodos,
     expandir_demanda,
     get_buffer_horas,
     invalidate_buffer_cache,
     parientes_de,
     rango_con_buffer,
     reservado_directo,
+    reservado_directo_batch,
     reservado_total,
     unidades_en_mantenimiento,
+    unidades_en_mantenimiento_batch,
 )
 
 __all__ = [
@@ -34,6 +37,7 @@ __all__ = [
     "calcular_disponibilidad",
     "componentes_de",
     "consolidar_items_por_equipo",
+    "consumo_nodos",
     "dias_no_disponibles",
     "expandir_demanda",
     "get_buffer_horas",
@@ -41,8 +45,10 @@ __all__ = [
     "parientes_de",
     "rango_con_buffer",
     "reservado_directo",
+    "reservado_directo_batch",
     "reservado_total",
     "unidades_en_mantenimiento",
+    "unidades_en_mantenimiento_batch",
     "validar_stock",
     "validar_stock_hipotetico",
 ]
