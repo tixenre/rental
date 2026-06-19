@@ -10,5 +10,6 @@ __all__ = ["router"]
 # Submódulos extraídos de `core` (registran sus rutas sobre el `router` al
 # importarse; el tuple los mantiene "usados" para ruff).
 from routes.specs import equipo_specs as _equipo_specs
+from routes.specs import compatibilidad as _compatibilidad
 
-_SUBMODULOS = (_equipo_specs,)
+_SUBMODULOS = (_equipo_specs, _compatibilidad)
