@@ -9,7 +9,8 @@ import logging
 import psycopg2
 
 from busqueda.motor import CAMPO_PLANTILLA
-from database.core import get_connection_params, PGConnection, regenerate_auto_tags_all
+from database.core import get_connection_params, PGConnection
+from database.auto_tags import regenerate_auto_tags_all
 
 logger = logging.getLogger(__name__)
 
