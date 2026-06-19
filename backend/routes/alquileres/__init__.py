@@ -80,7 +80,9 @@ __all__ = [
 
 # Submódulos sin símbolos re-exportados: el import registra sus rutas sobre el
 # `router` compartido; el tuple los mantiene "usados" para ruff. (`documentos`
-# sí re-exporta helpers, arriba — su import ya registra sus rutas.)
+# sí re-exporta helpers, arriba — su import ya registra sus rutas.) `pedidos`
+# son los endpoints HTTP del CRUD del pedido (la lógica reusable queda en `core`).
 from routes.alquileres import descuentos as _descuentos
+from routes.alquileres import pedidos as _pedidos
 
-_SUBMODULOS = (_descuentos,)
+_SUBMODULOS = (_descuentos, _pedidos)
