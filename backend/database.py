@@ -433,6 +433,10 @@ def init_db():
     # Todos los campos son NULL hasta completar la verificación.
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nombre_renaper TEXT")
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apellido_renaper TEXT")
+    # nombre_completo_renaper: nombre legal autoritativo tal cual lo devuelve
+    # RENAPER (full_name), sin reconstruirlo de nombre+apellido — importa para
+    # los contratos, donde el string legal exacto cuenta.
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nombre_completo_renaper TEXT")
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_nacimiento_renaper TEXT")
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion_renaper TEXT")
     # apodo: alias opcional para saludos informales en mails (siempre editable).

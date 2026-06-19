@@ -331,10 +331,11 @@ function ClienteHistorialSheet({
                   Identidad verificada
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-ink">
-                  {cliente.nombre_renaper && (
+                  {(cliente.nombre_completo_renaper || cliente.nombre_renaper) && (
                     <div className="col-span-2">
                       <span className="text-muted-foreground">Nombre legal: </span>
-                      {cliente.nombre_renaper} {cliente.apellido_renaper}
+                      {cliente.nombre_completo_renaper ||
+                        `${cliente.nombre_renaper ?? ""} ${cliente.apellido_renaper ?? ""}`.trim()}
                     </div>
                   )}
                   {cliente.dni && (

@@ -2046,6 +2046,7 @@ export type Cliente = {
   cuil: string | null;
   nombre_renaper: string | null;
   apellido_renaper: string | null;
+  nombre_completo_renaper: string | null;
   fecha_nacimiento_renaper: string | null;
   direccion_renaper: string | null;
   apodo: string | null;
