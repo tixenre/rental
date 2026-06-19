@@ -395,7 +395,7 @@ export function CartDrawer({
                                     loading="lazy"
                                     decoding="async"
                                     src={it.fotoUrl}
-                                    alt=""
+                                    alt={it.name}
                                     className="h-full w-full object-cover"
                                   />
                                 ) : (
