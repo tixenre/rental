@@ -76,9 +76,11 @@ class LockingFakeConn:
             self.log.append("buffer")
             return FakeCursor([FakeRow(value=str(self.world.buffer_horas))])
 
+        # Mantenimiento batcheado (#626): IN + GROUP BY; sin mantenimiento en
+        # estos tests → sin filas (el gate default-ea a 0).
         if "FROM EQUIPO_MANTENIMIENTO" in s_up:
-            self.log.append(("mant", params[0]))
-            return FakeCursor([FakeRow({0: 0})])
+            self.log.append(("mant", tuple(params[:-2])))
+            return FakeCursor([])
 
         if s_up.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
             self.log.append("items")
@@ -108,16 +110,21 @@ class LockingFakeConn:
                 return FakeCursor([])
             return FakeCursor([FakeRow(cantidad=eq["cantidad"])])
 
-        # Reservas directas — se leen del estado COMMITEADO (bajo el lock ya tomado).
-        # `reservado_total` (sin kits) se reduce a `reservado_directo` del propio equipo.
-        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s_up:
-            eq_id, excl = params[0], params[1]
-            self.log.append(("reservado_directo", eq_id))
-            total = sum(
-                c for (e, p), c in self.world.reservas.items()
-                if e == eq_id and p != excl
-            )
-            return FakeCursor([FakeRow({0: total})])
+        # Reservas directas — se leen del estado COMMITEADO (con los locks ya
+        # tomados en el Paso 1 del gate). Batcheado (#626): IN + GROUP BY,
+        # params = (*equipo_ids, excl, fh_buf, fd_buf). Se loguea por equipo para
+        # que el test de "lee reservas DESPUÉS del lock" siga verificando el orden.
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID IN" in s_up:
+            eq_ids, excl = params[:-3], params[-3]
+            rows = []
+            for eq_id in eq_ids:
+                self.log.append(("reservado_directo", eq_id))
+                total = sum(
+                    c for (e, p), c in self.world.reservas.items()
+                    if e == eq_id and p != excl
+                )
+                rows.append(FakeRow({0: eq_id, 1: total}))
+            return FakeCursor(rows)
 
         return FakeCursor([])
 
