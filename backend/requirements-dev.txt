@@ -7,3 +7,10 @@
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
 pytest-mock>=3.12.0
+
+# Linter (gate de CI, config en ruff.toml) + auditoría de CVEs de dependencias.
+# Versión PINEADA: el gate tiene que ser reproducible — una versión nueva de ruff
+# podría endurecer una regla F/E9 y poner un PR en rojo sin que nadie tocara
+# código. Subir a propósito, no por sorpresa.
+ruff==0.15.18
+pip-audit>=2.7.0

@@ -4,7 +4,6 @@ El cruce real con `alquiler_pagos` y el saldado se ejercen en
 `test_contabilidad_db.py`. Acá se prueba la matemática de quién le debe a quién.
 """
 
-import pytest
 
 from contabilidad.rendicion import PARTES, _netting
 
