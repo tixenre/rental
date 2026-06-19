@@ -22,6 +22,7 @@ from routes.cliente_portal.core import (
     _precios_actuales,
 )
 from routes.cliente_portal.documentos import _doc_response, _DOC_PREVIEW_HEADERS
+from routes.cliente_portal import favoritos as _favoritos  # registra sus rutas
 
 __all__ = [
     "router",
@@ -40,3 +41,7 @@ __all__ = [
     "_doc_response",
     "_DOC_PREVIEW_HEADERS",
 ]
+
+# Submódulos sin símbolos re-exportados: el import (arriba) registra sus rutas
+# sobre el `router` compartido; el tuple los mantiene "usados" para ruff.
+_SUBMODULOS = (_favoritos,)
