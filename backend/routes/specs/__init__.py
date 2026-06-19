@@ -12,5 +12,6 @@ __all__ = ["router"]
 from routes.specs import equipo_specs as _equipo_specs
 from routes.specs import compatibilidad as _compatibilidad
 from routes.specs import nombres as _nombres
+from routes.specs import templates as _templates
 
-_SUBMODULOS = (_equipo_specs, _compatibilidad, _nombres)
+_SUBMODULOS = (_equipo_specs, _compatibilidad, _nombres, _templates)
