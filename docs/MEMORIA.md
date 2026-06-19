@@ -176,6 +176,16 @@ La memoria se parte en **`MEMORIA.md` (digest enforceable, auto-cargado)** + **`
 completo, on-demand)**, misma `### fecha — título` en ambos. Refina —no reemplaza— _Memoria en capas
 (2026-05-25)_. Toda decisión nueva se escribe en los dos; `scripts/check-docs.mjs` verifica la paridad.
 
+### 2026-06-19 — Staging-login: la sesión auto-prueba el back-office logueado
+
+`POST /auth/staging-login` (doble llave **solo-dev**: `is_production` que falla-a-prod + secreto
+`STAGING_LOGIN_SECRET`) mintea la cookie firmada para una cuenta de servicio en `ADMIN_EMAILS` de dev → la
+sesión **smoke-testea flujos autenticados del back-office en staging vía `curl`**, no solo el camino 401/403.
+**Refina —no reemplaza—** _El dueño testea, no revisa código (2026-05-25)_: el dueño sigue siendo el gate que
+prueba en staging; la sesión verifica lo logueado antes de pasárselo. La admin-ness la sigue resolviendo
+`is_admin_email` (el login no la saltea); en prod responde **404**. Setup solo-dev en `DEPLOY_RAILWAY.md`;
+escrituras de prueba con IDs inexistentes para no mutar staging.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
