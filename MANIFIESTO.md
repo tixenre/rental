@@ -101,7 +101,7 @@ Body explica el **por qué**, no el **qué**. Bullets si hay varios efectos.
 - **Quién mergea y cuándo** (la sesión a `dev`, los gates del dueño, auto-merge, opt-out): definido en la decisión _Workflow de cambios_ del digest. No se repite acá.
 - Conflicts con main: rebase / merge desde el branch (no force-push a main).
 
-El método de mantenimiento (auditar/fixear/commits/PR) vive en el skill [`limpieza`](.claude/skills/limpieza/SKILL.md); el **mobile gate** + el prompt del auditor, en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
+El método de mantenimiento (auditar/fixear/commits/PR) vive en el skill [`limpieza`](.claude/skills/limpieza/SKILL.md); el **mobile gate** + la rúbrica de auditoría, en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
 ### Issues — labels
 
@@ -270,7 +270,7 @@ Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`
 |---|---|
 | [`docs/MEMORIA.md`](docs/MEMORIA.md) | Digest enforceable de decisiones + preferencias (memoria viva, curada; auto-cargado) |
 | [`docs/DECISIONES.md`](docs/DECISIONES.md) | Log ADR completo: el *por qué* de cada decisión (on-demand) |
-| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Prompt del auditor + mobile gate (método de mantenimiento → skill `limpieza`) |
+| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Rúbrica de auditoría + mobile gate (método de mantenimiento → skill `limpieza`) |
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/SISTEMA_SPECS.md`](docs/SISTEMA_SPECS.md) | **Manual técnico del sistema de specs / catálogo / datasets / autocompletar / compat** |
 | [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido` |
