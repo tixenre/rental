@@ -6,6 +6,8 @@ mínimo. Acceso = cualquier admin (`require_admin`); el actor de auditoría sale
 `admin.get("email")`.
 """
 
+import logging
+
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
@@ -35,6 +37,7 @@ from contabilidad.rendicion import rendicion as _rendicion, saldar as _saldar
 from contabilidad.cierres import cerrar_mes as _cerrar_mes, reabrir_mes as _reabrir_mes
 from contabilidad.reconciliacion import reconciliar as _reconciliar
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -354,9 +357,10 @@ async def subir_comprobante(request: Request, mov_id: int, file: UploadFile = Fi
         except HTTPException:
             conn.rollback()
             raise
-        except Exception as e:
+        except Exception:
             conn.rollback()
-            raise HTTPException(502, f"No se pudo subir el comprobante: {e}")
+            logger.exception("No se pudo subir el comprobante")
+            raise HTTPException(502, "No se pudo subir el comprobante")
 
 
 @router.get("/admin/contabilidad/gastos")

@@ -84,9 +84,9 @@ async def admin_upload_html_source(
     try:
         from services.equipo_html_extractor import extract_from_html
         result = extract_from_html(html_content, categoria_hint=categoria_hint)
-    except Exception as e:
+    except Exception:
         logger.exception("Error extrayendo specs del HTML (equipo %d)", id)
-        raise HTTPException(500, f"Error parseando HTML: {e}")
+        raise HTTPException(500, "No se pudo procesar el HTML")
 
     return {"html_source_url": html_source_url, **result}
 

@@ -6,6 +6,7 @@ categoría, huérfanas, asignar/actualizar/borrar/reordenar) con sus flags de
 visibilidad/prioridad/destacado. Registra sus rutas en el router compartido del
 paquete `routes.specs`. `_require_admin` (guard) vive en `core`.
 """
+import logging
 from typing import Optional
 
 from fastapi import HTTPException, Request
@@ -13,6 +14,8 @@ from pydantic import BaseModel
 
 from database import get_db, row_to_dict
 from routes.specs.core import router, _require_admin
+
+logger = logging.getLogger(__name__)
 
 
 # Asignación de una spec_def a una categoría con flags propios.
@@ -309,6 +312,7 @@ def reordenar_templates(payload: dict, request: Request):
         except HTTPException:
             conn.rollback()
             raise
-        except Exception as e:
+        except Exception:
             conn.rollback()
-            raise HTTPException(500, f"Error reordenando: {e}")
+            logger.exception("Error reordenando spec-templates")
+            raise HTTPException(500, "No se pudo reordenar")
