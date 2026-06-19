@@ -1,0 +1,143 @@
+"""Kit / componentes de un equipo (#501 fase a — extraído de `core`).
+
+Registra sus rutas en el router compartido del paquete `routes.equipos`. Tabla
+`kit_componentes`. `KitItem` y `_crea_ciclo_kit` los importan tests vía el
+`__init__` del paquete (re-export).
+"""
+from fastapi import HTTPException, Request
+from pydantic import BaseModel, Field
+
+from admin_guard import require_admin
+from database import MARCA_SUBQUERY, get_db, row_to_dict
+from routes.equipos.core import router
+
+
+class KitItem(BaseModel):
+    componente_id: int
+    cantidad:      int   = Field(default=1, ge=1, le=9999)
+    # default 0.0 (NO None): la columna kit_componentes.descuento_pct es NOT NULL,
+    # un NULL explícito la viola. Rango 0..100 (% de descuento por línea de combo).
+    descuento_pct: float = Field(default=0.0, ge=0, le=100)
+    esencial:      bool  = True
+
+
+class KitReorder(BaseModel):
+    orden: list[int]  # lista de componente_id en el orden deseado
+
+
+@router.get("/equipos/{id}/kit")
+def get_kit(id: int):
+    with get_db() as conn:
+        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+        rows = conn.execute(f"""
+            SELECT kc.id, kc.componente_id, kc.cantidad, kc.orden,
+                   kc.descuento_pct, kc.esencial,
+                   e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url, e.visible_catalogo
+            FROM kit_componentes kc
+            JOIN equipos e ON e.id = kc.componente_id
+            WHERE kc.equipo_id = ?
+            ORDER BY kc.orden ASC, e.nombre ASC
+        """, (id,)).fetchall()
+        return [row_to_dict(r) for r in rows]
+
+
+def _crea_ciclo_kit(conn, equipo_id: int, componente_id: int) -> bool:
+    """¿Agregar `componente_id` como componente de `equipo_id` crearía un ciclo?
+
+    Hay ciclo si `equipo_id` ya es alcanzable desde `componente_id` siguiendo
+    la cadena de sus propios componentes (BFS hacia abajo desde el componente
+    candidato). Auto-referencia directa (equipo_id == componente_id) la maneja
+    el caller, pero también la detectamos acá por las dudas.
+
+    Sin este check, dos endpoints concurrentes podrían crear A→B y B→A y
+    dejar el grafo con un ciclo, que aunque las queries actuales no recursen,
+    rompe la semántica de "un kit contiene componentes" y puede causar bugs
+    si alguna vez se hace un traversal recursivo.
+    """
+    if equipo_id == componente_id:
+        return True
+    visitados: set[int] = set()
+    pila: list[int] = [componente_id]
+    while pila:
+        actual = pila.pop()
+        if actual == equipo_id:
+            return True
+        if actual in visitados:
+            continue
+        visitados.add(actual)
+        hijos = conn.execute(
+            "SELECT componente_id FROM kit_componentes WHERE equipo_id = ?", (actual,)
+        ).fetchall()
+        pila.extend(h["componente_id"] for h in hijos)
+    return False
+
+
+@router.post("/equipos/{id}/kit", status_code=201)
+def add_kit_item(id: int, data: KitItem, request: Request):
+    require_admin(request)
+    if id == data.componente_id:
+        raise HTTPException(400, "Un equipo no puede ser componente de sí mismo")
+    with get_db() as conn:
+        try:
+            if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+                raise HTTPException(404, "Equipo no encontrado")
+            if not conn.execute(
+                "SELECT id FROM equipos WHERE id=? AND eliminado_at IS NULL", (data.componente_id,)
+            ).fetchone():
+                raise HTTPException(404, "Componente no encontrado")
+            if _crea_ciclo_kit(conn, id, data.componente_id):
+                raise HTTPException(
+                    400,
+                    "Agregar este componente crearía un ciclo en los kits "
+                    "(el componente ya contiene a este equipo en su cadena).",
+                )
+            try:
+                conn.execute("""
+                    INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, descuento_pct, esencial)
+                    VALUES (?,?,?,?,?)
+                    ON CONFLICT(equipo_id, componente_id) DO UPDATE SET
+                        cantidad=excluded.cantidad,
+                        descuento_pct=excluded.descuento_pct,
+                        esencial=excluded.esencial
+                """, (id, data.componente_id, data.cantidad, data.descuento_pct, data.esencial))
+                conn.commit()
+            except Exception as e:
+                raise HTTPException(400, str(e))
+            return get_kit(id)
+        except Exception:
+            conn.rollback()
+            raise
+
+
+@router.delete("/equipos/{id}/kit/{componente_id}", status_code=204)
+def remove_kit_item(id: int, componente_id: int, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            conn.execute(
+                "DELETE FROM kit_componentes WHERE equipo_id=? AND componente_id=?",
+                (id, componente_id)
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+@router.post("/admin/equipos/{id}/kit/reorder")
+def reorder_kit(id: int, data: KitReorder, request: Request):
+    """Reordena los componentes del kit según el array de componente_id."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            for i, componente_id in enumerate(data.orden):
+                conn.execute(
+                    "UPDATE kit_componentes SET orden=? WHERE equipo_id=? AND componente_id=?",
+                    (i, id, componente_id)
+                )
+            conn.commit()
+            return {"ok": True}
+        except Exception:
+            conn.rollback()
+            raise

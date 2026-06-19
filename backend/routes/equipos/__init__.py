@@ -14,10 +14,8 @@ from routes.equipos.core import (
     EquipoCreate,
     EquipoUpdate,
     FichaUpdate,
-    KitItem,
     UploadFotoFromUrlInput,
     _attach_disponibilidad,
-    _crea_ciclo_kit,
     _normalize_fecha_compra,
     admin_clasificar,
     admin_dashboard_uso,
@@ -42,8 +40,11 @@ __all__ = [
     "admin_equipos_sin_serie",
 ]
 
-# Submódulos extraídos de `core`: importarlos registra sus rutas sobre el `router`
-# compartido (paths idénticos). El tuple los mantiene "usados" para ruff.
+# Submódulos extraídos de `core`. Cada uno registra sus rutas sobre el `router`
+# compartido al importarse (paths idénticos). Los que re-exportan símbolos que
+# tests/main consumen se importan por su símbolo; los que no, vía el tuple
+# `_SUBMODULOS` (que también los mantiene "usados" para ruff).
+from routes.equipos.kit import KitItem, _crea_ciclo_kit
 from routes.equipos import mantenimiento as _mantenimiento
 
 _SUBMODULOS = (_mantenimiento,)
