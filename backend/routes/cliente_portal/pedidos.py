@@ -2,8 +2,9 @@
 
 Crear / cancelar pedido + listar / ver detalle de los pedidos del cliente logueado.
 Registra sus rutas en el router compartido del paquete `routes.cliente_portal`. Los
-helpers compartidos (`require_cliente`, `_proyectar`, `_documentos_disponibles`) y
-`_cancelar_solicitudes_pendientes` (del flujo de modificación) viven en `core`.
+helpers compartidos (`require_cliente`, `_proyectar`, `_documentos_disponibles`) viven
+en `core`; `_cancelar_solicitudes_pendientes` (cancelar solicitudes pendientes al
+cancelar el pedido) vive en `solicitudes`.
 """
 from typing import Optional
 
@@ -16,9 +17,9 @@ from routes.cliente_portal.core import (
     require_cliente,
     _proyectar,
     _documentos_disponibles,
-    _cancelar_solicitudes_pendientes,
     _ITEM_CAMPOS_PORTAL,
 )
+from routes.cliente_portal.solicitudes import _cancelar_solicitudes_pendientes
 
 
 # ── Crear / cancelar pedido ───────────────────────────────────────────────────

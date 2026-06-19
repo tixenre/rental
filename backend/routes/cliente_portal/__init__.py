@@ -11,6 +11,8 @@ from routes.cliente_portal.core import (
     require_cliente,
     get_session,
     ESTADOS_MODIFICABLES,
+)
+from routes.cliente_portal.solicitudes import (
     _cancelar_solicitudes_pendientes,
     _check_stock_hipotetico,
     ModificacionItemIn,
