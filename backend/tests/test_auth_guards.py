@@ -111,7 +111,7 @@ class TestRequireAdmin:
 
 class TestRequireCliente:
     def test_sin_sesion_401(self, monkeypatch):
-        monkeypatch.setattr("routes.cliente_portal.get_session", lambda req: None)
+        monkeypatch.setattr("routes.cliente_portal.core.get_session", lambda req: None)
 
         with pytest.raises(HTTPException) as exc:
             require_cliente(FakeRequest())
@@ -121,7 +121,7 @@ class TestRequireCliente:
         # Regresión del bug #31/#55: sesiones de admin NO deben ser tratadas
         # como cliente. role debe ser exactamente "cliente".
         monkeypatch.setattr(
-            "routes.cliente_portal.get_session",
+            "routes.cliente_portal.core.get_session",
             lambda req: {"email": "admin@rambla.com", "role": "admin"},
         )
 
@@ -132,7 +132,7 @@ class TestRequireCliente:
     def test_sesion_sin_role_rechaza(self, monkeypatch):
         # Sesión vieja sin role definido → tratar como no-cliente
         monkeypatch.setattr(
-            "routes.cliente_portal.get_session",
+            "routes.cliente_portal.core.get_session",
             lambda req: {"email": "x@y.com"},
         )
 
@@ -142,7 +142,7 @@ class TestRequireCliente:
 
     def test_sesion_cliente_valida_pasa(self, monkeypatch):
         monkeypatch.setattr(
-            "routes.cliente_portal.get_session",
+            "routes.cliente_portal.core.get_session",
             lambda req: {"email": "cliente@gmail.com", "role": "cliente", "cliente_id": 42},
         )
 

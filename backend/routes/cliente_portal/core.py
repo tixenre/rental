@@ -5,7 +5,7 @@ routes/cliente_portal.py — Portal de clientes (solo Google OAuth).
 import json
 import logging
 from fastapi import APIRouter, BackgroundTasks, Request, HTTPException
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
@@ -13,7 +13,6 @@ from database import get_db, row_to_dict, to_datetime, now_ar
 from routes.auth import get_session, signer, COOKIE_SECURE, SESSION_MAX_AGE
 from admin_guard import require_admin
 from itsdangerous import BadSignature, SignatureExpired
-from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from services.precios import es_responsable_inscripto
 from rate_limit import limiter
 
@@ -1236,152 +1235,6 @@ def admin_responder_solicitud(
             logger.error("Error resolviendo solicitud %s", id, exc_info=True)
             conn.rollback()
             raise
-
-
-# ── Documentos PDF (cliente) ──────────────────────────────────────────────────
-
-def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
-    """Carga el pedido validando ownership y rellena items + componentes."""
-    row = conn.execute(
-        "SELECT * FROM alquileres WHERE id = ? AND cliente_id = ?",
-        (pedido_id, cliente_id),
-    ).fetchone()
-    if not row:
-        raise HTTPException(404, "Pedido no encontrado")
-    pedido = row_to_dict(row)
-
-    from routes.alquileres import _get_alquiler_items
-    pedido["items"] = [
-        {
-            **_proyectar(it, _ITEM_CAMPOS_DOC),
-            "componentes": [_proyectar(c, _COMP_CAMPOS_DOC) for c in it["componentes"]],
-        }
-        for it in _get_alquiler_items(conn, pedido_id)
-    ]
-
-    # Datos del cliente para el contrato + Factura A si aplica.
-    # Nombre y dirección: preferir datos RENAPER si la identidad fue verificada.
-    cli = conn.execute(
-        """SELECT nombre, apellido, email, telefono, direccion, cuit,
-                  perfil_impuestos, razon_social, domicilio_fiscal,
-                  email_facturacion,
-                  dni, nombre_renaper, apellido_renaper, direccion_renaper
-           FROM clientes WHERE id = ?""",
-        (cliente_id,),
-    ).fetchone()
-    if cli:
-        c = row_to_dict(cli)
-        if c.get("nombre_renaper"):
-            pedido["cliente_nombre"] = f"{c['nombre_renaper']} {c.get('apellido_renaper', '')}".strip()
-        else:
-            pedido["cliente_nombre"] = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip()
-        pedido["cliente_email"] = c.get("email")
-        pedido["cliente_telefono"] = c.get("telefono")
-        pedido["cliente_direccion"] = c.get("direccion_renaper") or c.get("direccion")
-        pedido["cliente_cuit"] = c.get("cuit")
-        pedido["cliente_dni"] = c.get("dni")
-        pedido["cliente_perfil_impuestos"] = c.get("perfil_impuestos")
-        pedido["cliente_razon_social"] = c.get("razon_social")
-        pedido["cliente_domicilio_fiscal"] = c.get("domicilio_fiscal")
-        pedido["cliente_email_facturacion"] = c.get("email_facturacion")
-
-    # Desglose canónico (bruto/descuento/neto/IVA) — misma fuente de verdad
-    # que el admin: el PDF sólo pinta lo que devuelve `calcular_total`.
-    from routes.alquileres import _enriquecer_pedido_con_total
-    _enriquecer_pedido_con_total(conn, pedido)
-
-    return pedido
-
-
-# Los documentos se generan al vuelo y deben reflejar siempre el estado actual
-# del pedido. Sin esto el navegador cachea la URL estática y sirve un PDF viejo
-# tras editar el pedido (mismo criterio que `_DOC_NO_CACHE` en alquileres.py).
-_DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
-
-# El preview HTML se muestra dentro de un <iframe> del portal (mismo origen). El
-# middleware global pone X-Frame-Options: DENY, que bloquea TODO embedding —
-# incluido el propio — y deja el preview en blanco. SAMEORIGIN permite que el
-# portal embeba su propio documento sin abrir framing a terceros.
-_DOC_PREVIEW_HEADERS = {**_DOC_NO_CACHE, "X-Frame-Options": "SAMEORIGIN"}
-
-
-def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{filename}"', **_DOC_NO_CACHE},
-    )
-
-
-def _doc_response(
-    html_str: str,
-    pdf_filename: str,
-    format: str,
-):
-    """Devuelve HTML inline (preview) o PDF (download) según `format`.
-
-    Issue #106: el cliente puede previsualizar el documento antes de
-    descargar el PDF. HTML es más liviano y mejor UX mobile.
-    """
-    if format == "html":
-        from fastapi.responses import HTMLResponse
-        return HTMLResponse(content=html_str, headers=_DOC_PREVIEW_HEADERS)
-    return None  # caller sigue con PDF
-
-
-async def _doc_response_or_pdf(html_str: str, pdf_filename: str, format: str):
-    preview = _doc_response(html_str, pdf_filename, format)
-    if preview is not None:
-        return preview
-    pdf_bytes = await _render_pdf(html_str)
-    from fastapi.responses import Response
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{pdf_filename}"', **_DOC_NO_CACHE},
-    )
-
-
-@router.get("/api/cliente/pedidos/{id}/remito.pdf")
-@router.get("/api/cliente/pedidos/{id}/remito")
-async def cliente_pedido_remito(id: int, request: Request, format: str = "pdf"):
-    """Remito del pedido. format=pdf (default, download) o html (preview)."""
-    session = require_cliente(request)
-    with get_db() as conn:
-        pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
-    if not _documentos_disponibles(pedido.get("estado", ""))["remito"]:
-        raise HTTPException(403, "El remito estará disponible cuando confirmemos el pedido.")
-    return await _doc_response_or_pdf(
-        _pedido_html(pedido), _pedido_filename(pedido), format
-    )
-
-
-@router.get("/api/cliente/pedidos/{id}/contrato.pdf")
-@router.get("/api/cliente/pedidos/{id}/contrato")
-async def cliente_pedido_contrato(id: int, request: Request, format: str = "pdf"):
-    """Contrato del pedido. format=pdf (default) o html (preview)."""
-    session = require_cliente(request)
-    with get_db() as conn:
-        pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
-    if not _documentos_disponibles(pedido.get("estado", ""))["contrato"]:
-        raise HTTPException(403, "El contrato estará disponible cuando confirmemos el pedido.")
-    return await _doc_response_or_pdf(
-        _contrato_html(pedido), _pedido_filename(pedido, doc="contrato"), format
-    )
-
-
-@router.get("/api/cliente/pedidos/{id}/albaran.pdf")
-@router.get("/api/cliente/pedidos/{id}/albaran")
-async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf"):
-    """Albarán del pedido. format=pdf (default) o html (preview)."""
-    session = require_cliente(request)
-    with get_db() as conn:
-        pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
-    if not _documentos_disponibles(pedido.get("estado", ""))["albaran"]:
-        raise HTTPException(403, "El albarán estará disponible al momento de la entrega.")
-    return await _doc_response_or_pdf(
-        _albaran_html(pedido), _pedido_filename(pedido, doc="albaran"), format
-    )
 
 
 # ── Favoritos del cliente ──────────────────────────────────────────────────────
