@@ -13,14 +13,12 @@ from routes.cliente_portal.core import (
     ESTADOS_MODIFICABLES,
     _cancelar_solicitudes_pendientes,
     _check_stock_hipotetico,
-    cliente_crear_pedido,
-    CartItemIn,
-    PedidoClienteCreate,
     ModificacionItemIn,
     _items_payload_to_pedido_items,
     _lineas_libres_actuales,
     _precios_actuales,
 )
+from routes.cliente_portal.pedidos import cliente_crear_pedido, CartItemIn, PedidoClienteCreate
 from routes.cliente_portal.documentos import _doc_response, _DOC_PREVIEW_HEADERS
 from routes.cliente_portal import favoritos as _favoritos  # registra sus rutas
 
