@@ -18,8 +18,6 @@ from routes.equipos.core import (
     _attach_disponibilidad,
     _normalize_fecha_compra,
     admin_clasificar,
-    admin_dashboard_uso,
-    admin_equipos_sin_serie,
 )
 
 # `__all__` declara la superficie pública re-exportada (y le dice a ruff que
@@ -44,6 +42,7 @@ __all__ = [
 # compartido al importarse (paths idénticos). Los que re-exportan símbolos que
 # tests/main consumen se importan por su símbolo; los que no, vía el tuple
 # `_SUBMODULOS` (que también los mantiene "usados" para ruff).
+from routes.equipos.dashboard import admin_dashboard_uso, admin_equipos_sin_serie
 from routes.equipos.kit import KitItem, _crea_ciclo_kit
 from routes.equipos import mantenimiento as _mantenimiento
 
