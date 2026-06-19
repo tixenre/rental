@@ -12,8 +12,6 @@ from routes.alquileres.core import (
     PedidoCreate,
     PedidoDatos,
     PedidoItem,
-    DESTINATARIOS_PAGO,
-    METODOS_PAGO,
     ESTADOS_RESERVADO,
     # ── Endpoints consumidos como función ──
     create_pedido,
@@ -34,8 +32,14 @@ from routes.alquileres.core import (
     _parse_precio,
     _pedido_email_context,
     _recalcular_total_pedido,
-    _resolver_destino_metodo,
     _validar_fecha_iso,
+)
+# Registro de pagos: constantes + validador consumidos por contabilidad y tests
+# vía este paquete.
+from routes.alquileres.pagos import (
+    DESTINATARIOS_PAGO,
+    METODOS_PAGO,
+    _resolver_destino_metodo,
 )
 # Cotización canónica: modelos + endpoint consumidos por tests vía este paquete.
 # (El módulo se llama `cotizacion` y no `cotizar` a propósito: si se llamara
