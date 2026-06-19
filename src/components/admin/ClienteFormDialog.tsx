@@ -3,6 +3,8 @@ import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { Lock } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
@@ -154,6 +156,64 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
               </SelectContent>
             </Select>
           </div>
+
+          {/* Bloque de datos RENAPER — solo lectura cuando el cliente está verificado */}
+          {editing && cliente?.dni_validado_at && (
+            <div className="col-span-2 rounded-lg border border-verde/30 bg-verde/5 px-3 py-2.5 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs text-verde font-semibold">
+                <Lock className="h-3.5 w-3.5 shrink-0" />
+                Datos verificados por RENAPER — solo lectura
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {[
+                  {
+                    label: "Nombre legal",
+                    value:
+                      cliente.nombre_completo_renaper ||
+                      [cliente.nombre_renaper, cliente.apellido_renaper]
+                        .filter(Boolean)
+                        .join(" ") ||
+                      null,
+                  },
+                  { label: "DNI", value: cliente.dni },
+                  { label: "CUIL", value: cliente.cuil },
+                  { label: "Fecha de nacimiento", value: cliente.fecha_nacimiento_renaper },
+                  {
+                    label: "Género",
+                    value:
+                      cliente.genero_renaper === "M"
+                        ? "Masculino"
+                        : cliente.genero_renaper === "F"
+                          ? "Femenino"
+                          : cliente.genero_renaper,
+                  },
+                  { label: "Nacionalidad", value: cliente.nacionalidad_renaper },
+                  { label: "Lugar de nacimiento", value: cliente.lugar_nacimiento_renaper },
+                  { label: "Estado civil", value: cliente.estado_civil_renaper },
+                  { label: "Tipo de documento", value: cliente.tipo_documento_renaper },
+                  { label: "Emisión", value: cliente.emision_documento_renaper },
+                  { label: "Vencimiento", value: cliente.vencimiento_documento_renaper },
+                  { label: "Domicilio RENAPER", value: cliente.direccion_renaper, wide: true },
+                ]
+                  .filter((f) => f.value)
+                  .map((f) => (
+                    <div
+                      key={f.label}
+                      className={
+                        (f as { wide?: boolean }).wide ? "col-span-2 space-y-1" : "space-y-1"
+                      }
+                    >
+                      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                        {f.label}
+                      </div>
+                      <div className="rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5 text-xs text-ink font-mono select-all">
+                        {f.value}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="col-span-2 mt-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

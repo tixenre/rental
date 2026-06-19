@@ -456,6 +456,14 @@ def init_db():
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nombre_completo_renaper TEXT")
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS fecha_nacimiento_renaper TEXT")
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion_renaper TEXT")
+    # Datos adicionales del documento (todos solo texto — Ley 25.326).
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS genero_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS nacionalidad_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS lugar_nacimiento_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS vencimiento_documento_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS emision_documento_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS tipo_documento_renaper TEXT")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS estado_civil_renaper TEXT")
     # apodo: alias opcional para saludos informales en mails (siempre editable).
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apodo TEXT")
 

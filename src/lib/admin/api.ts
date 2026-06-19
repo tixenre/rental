@@ -2049,6 +2049,13 @@ export type Cliente = {
   nombre_completo_renaper: string | null;
   fecha_nacimiento_renaper: string | null;
   direccion_renaper: string | null;
+  genero_renaper: string | null;
+  nacionalidad_renaper: string | null;
+  lugar_nacimiento_renaper: string | null;
+  vencimiento_documento_renaper: string | null;
+  emision_documento_renaper: string | null;
+  tipo_documento_renaper: string | null;
+  estado_civil_renaper: string | null;
   apodo: string | null;
 };
 export type ClientesListResp = {
