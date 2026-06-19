@@ -15,6 +15,7 @@ PUBLIC_PREFIXES = (
     "/auth/me",
     "/auth/config",
     "/auth/dev-login",
+    "/auth/staging-login",  # login programático de staging (gateado en el handler: no-prod + secreto)
     "/static/",
     "/assets/",
     "/equipo/",

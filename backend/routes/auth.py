@@ -12,6 +12,7 @@ from authlib.integrations.httpx_client import OAuth2Client
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from pydantic import BaseModel
 
 from net_utils import get_client_ip
 from config import settings
@@ -73,6 +74,38 @@ def dev_bypass_enabled() -> bool:
     if os.getenv("RAILWAY_ENVIRONMENT"):
         return False
     return os.getenv("ADMIN_BYPASS_AUTH", "").strip().lower() in ("1", "true", "yes")
+
+
+# Cuenta de servicio para login programático en STAGING (no en prod). Email
+# dedicado y auditable: para que sea admin debe estar en `ADMIN_EMAILS` del
+# entorno dev (la admin-ness la sigue resolviendo `is_admin_email`, fuente
+# única; este login no la saltea). Override por env si hace falta otro.
+STAGING_LOGIN_EMAIL = os.getenv("STAGING_LOGIN_EMAIL", "staging-bot@rambla.local").strip().lower()
+
+
+def _staging_login_secret() -> str:
+    """Secreto compartido para `/auth/staging-login` (env var, solo dev)."""
+    return os.getenv("STAGING_LOGIN_SECRET", "").strip()
+
+
+def staging_login_enabled() -> bool:
+    """¿Está disponible el login programático de staging?
+
+    Doble llave, ambas necesarias (defensa en profundidad):
+      1. NO es producción — usa `settings.is_production`, que falla hacia "sí es
+         prod" ante un nombre de entorno desconocido, así que un ambiente nuevo
+         mal nombrado queda con el login APAGADO, no abierto.
+      2. Hay un secreto configurado — sin `STAGING_LOGIN_SECRET` el endpoint no
+         existe ni siquiera en dev.
+
+    Por qué el secreto es obligatorio: la BD de staging es copia de prod (ver
+    MEMORIA / `Settings.is_production`), o sea tiene PII real de clientes. Un
+    login abierto en una URL pública de dev sería una fuga. El secreto vive solo
+    en el entorno dev de Railway, nunca en el repo, y es rotable.
+    """
+    if settings.is_production:
+        return False
+    return bool(_staging_login_secret())
 
 
 GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -297,6 +330,38 @@ def auth_dev_login():
         name="Dev Admin",
         redirect="/admin",
     )
+
+
+class StagingLoginInput(BaseModel):
+    secret: str
+
+
+@router.post("/auth/staging-login")
+def auth_staging_login(body: StagingLoginInput, request: Request):
+    """Login programático para STAGING (dev de Railway), sin el flujo OAuth de Google.
+
+    A diferencia de `/auth/dev-login` (que se apaga en CUALQUIER entorno Railway),
+    este SÍ corre en el `dev` de Railway — pero solo si `staging_login_enabled()`
+    (no-prod + secreto configurado). Mintea la misma cookie de sesión firmada que
+    el OAuth real, para la cuenta de servicio `STAGING_LOGIN_EMAIL`. Devuelve JSON
+    + `Set-Cookie` (sin redirect HTML), para que un cliente automatizado capture
+    la cookie y pruebe flujos autenticados del back-office en staging.
+
+    Seguridad: 404 si no está habilitado (que parezca inexistente en prod);
+    secreto en body comparado en tiempo constante; rate-limit por IP compartido
+    con OAuth; cada intento queda logueado.
+    """
+    if not staging_login_enabled():
+        raise HTTPException(404, "No encontrado.")
+    ip = get_client_ip(request)
+    _check_rate(ip)
+    expected = _staging_login_secret()
+    if not (body.secret and secrets.compare_digest(body.secret, expected)):
+        _record_fail(ip)
+        logger.warning("staging-login: secreto inválido ip=%s", ip)
+        raise HTTPException(401, "Secreto inválido.")
+    logger.info("staging-login OK ip=%s email=%s", ip, STAGING_LOGIN_EMAIL)
+    return _make_session_response(email=STAGING_LOGIN_EMAIL, name="Staging Bot")
 
 
 @router.get("/api/public/maps-key")
