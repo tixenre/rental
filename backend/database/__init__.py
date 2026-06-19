@@ -4,12 +4,13 @@ Conexión PostgreSQL con pool, esquema y helpers. La superficie pública es ampl
 y la importa casi todo el backend (`from database import get_db, MARCA_SUBQUERY,
 …`). El split es interno:
 
-- `core`   → spine: paths, fragmentos SQL canónicos (marca), config + pool de
-             conexiones, wrappers sqlite-compat (`PGConnection`/`PGCursor`/`PGRow`),
-             helpers de conexión/fecha (`get_db`, `row_to_dict`, `to_datetime`,
-             `now_ar`, `to_iso`), enriquecimiento de equipos (`attach_*`) y
-             auto-tags (`regenerate_auto_tags*`).
-- `schema` → bootstrap idempotente del esquema (`init_db`).
+- `core`      → spine: paths, fragmentos SQL canónicos (marca), config + pool de
+                conexiones, wrappers sqlite-compat (`PGConnection`/`PGCursor`/`PGRow`),
+                helpers de conexión/fecha (`get_db`, `row_to_dict`, `to_datetime`,
+                `now_ar`, `to_iso`).
+- `equipos`   → enriquecimiento de equipos (`attach_*`).
+- `auto_tags` → etiquetas derivadas origen='auto' (`regenerate_auto_tags*`).
+- `schema`    → bootstrap idempotente del esquema (`init_db`).
 
 Este `__init__` re-exporta la superficie pública estable para que
 `from database import X` (y el acceso por atributo `database.X`) sigan funcionando
@@ -39,14 +40,16 @@ from database.core import (
     to_datetime,
     to_iso,
     now_ar,
-    # ── Enriquecimiento de equipos ──
+)
+from database.equipos import (
     attach_tags,
     attach_kit,
     attach_categorias,
     attach_ficha,
     attach_specs_destacados,
     attach_specs_estructuradas,
-    # ── Auto-tags ──
+)
+from database.auto_tags import (
     regenerate_auto_tags,
     regenerate_auto_tags_batch,
     regenerate_auto_tags_all,
