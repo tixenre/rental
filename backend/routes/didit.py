@@ -148,18 +148,20 @@ async def webhook_didit(request: Request):
 
     Flujo:
       1. Lee el body raw (antes de parsear JSON).
-      2. Verifica firma HMAC-SHA256 (X-Signature-V2) + freshness (X-Timestamp).
+      2. Verifica firma HMAC-SHA256 (X-Signature sobre el body crudo, con
+         X-Signature-V2 canónico como respaldo) + freshness (X-Timestamp).
       3. Si status == "Approved": actualiza clientes con dni, cuil, dni_validado_at.
       4. Siempre devuelve 200 (Didit reintenta en 4xx/5xx — idempotente).
 
     No loguea el body completo (puede contener datos RENAPER / Ley 25.326).
     """
     body = await request.body()
-    signature = request.headers.get("X-Signature-V2", "")
+    signature = request.headers.get("X-Signature", "")
+    signature_v2 = request.headers.get("X-Signature-V2", "")
     timestamp = request.headers.get("X-Timestamp", "")
 
     try:
-        verify_webhook(body=body, signature=signature, timestamp=timestamp)
+        verify_webhook(body=body, signature=signature, timestamp=timestamp, signature_v2=signature_v2)
     except DiditSignatureError as exc:
         logger.warning("didit webhook: firma rechazada — %s", exc)
         raise HTTPException(401, "Firma inválida")
