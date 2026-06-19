@@ -69,6 +69,17 @@ def create_session(*, return_url: str, vendor_data: str) -> DiditSession:
         json=payload,
         timeout=30.0,
     )
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        # El body de Didit contiene el mensaje real (ej. {"workflow_id": "Invalid workflow_id."}).
+        # raise_for_status() lo descartaría — lo logueamos antes de re-lanzar.
+        logger.error(
+            "didit: HTTP %s al crear sesión — body=%s workflow_id=%s",
+            exc.response.status_code,
+            exc.response.text,
+            settings.DIDIT_WORKFLOW_ID,
+        )
+        raise
     data = resp.json()
     return DiditSession(session_id=data["session_id"], url=data["url"])
