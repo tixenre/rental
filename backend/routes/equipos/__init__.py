@@ -45,5 +45,6 @@ from routes.equipos.ficha import FichaUpdate
 from routes.equipos.fotos import UploadFotoFromUrlInput
 from routes.equipos.kit import KitItem, _crea_ciclo_kit
 from routes.equipos import mantenimiento as _mantenimiento
+from routes.equipos import taxonomia as _taxonomia
 
-_SUBMODULOS = (_mantenimiento,)
+_SUBMODULOS = (_mantenimiento, _taxonomia)
