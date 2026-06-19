@@ -63,6 +63,8 @@ type IndexSearch = {
   /** Pre-filtra el catálogo por una categoría (root o sub-cat). Se usa para
    *  deep-linking desde la página de detalle u otros entry points. */
   cat?: string;
+  /** Reabrir drawer del carrito tras login. Usado cuando vuelve de /cliente/login o /cliente/registro. */
+  openCarrito?: boolean;
 };
 
 async function fetchOgImage(): Promise<string> {
@@ -179,8 +181,25 @@ type Mode = "grid" | "list";
 
 function Index() {
   // Datos de la API
-  const { startDate, endDate, items, setQty } = useCart();
+  const { startDate, endDate, items, setQty, setDrawerOpen } = useCart();
   const { data: allEquipos = [], isLoading, isError } = useEquipos(startDate, endDate);
+
+  // Reabre el drawer tras login exitoso si el parámetro ?openCarrito=1 está presente
+  // y hay items en el carrito + usuario logueado
+  useEffect(() => {
+    if (search.openCarrito && isLogged && Object.keys(items).length > 0) {
+      setDrawerOpen(true);
+      // Limpiar el param de la URL para no reopir en cada render
+      navigate({
+        search: (prev) => {
+          const next = { ...prev };
+          delete (next as any).openCarrito;
+          return next;
+        },
+        replace: true,
+      });
+    }
+  }, [search.openCarrito, isLogged, items, setDrawerOpen, navigate]);
 
   // Reconciliación: elimina del carrito items cuyo ID ya no existe en el catálogo
   // (equipo borrado, ocultado o archivado después de que el cliente lo agregó).

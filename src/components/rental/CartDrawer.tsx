@@ -25,6 +25,7 @@ import { es } from "date-fns/locale";
 import { RentalDateModal } from "./RentalDateModal";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
+import { cn } from "@/lib/utils";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -75,6 +76,13 @@ export function CartDrawer({
       return it ? { it, qty } : null;
     })
     .filter(Boolean) as { it: Equipment; qty: number }[];
+
+  // Auto-cerrar panel de login si el usuario logueó (sesión cambió)
+  useEffect(() => {
+    if (clienteSession && needsLogin) {
+      setNeedsLogin(false);
+    }
+  }, [clienteSession, needsLogin]);
 
   const d = days();
   // Sin fechas: estimado por jornada (el backend devuelve 1 jornada sin
@@ -244,13 +252,13 @@ export function CartDrawer({
   }
 
   function goToLogin() {
-    setDrawerOpen(false);
-    navigate({ to: "/cliente/login" });
+    // Vamos a login pero con parámetro para que al volver se reabra el drawer
+    navigate({ to: "/cliente/login", search: { from: "carrito" } });
   }
 
   function goToRegister() {
-    setDrawerOpen(false);
-    navigate({ to: "/cliente/registro" });
+    // Vamos a registro pero con parámetro para que al volver se reabra el drawer
+    navigate({ to: "/cliente/registro", search: { from: "carrito" } });
   }
 
   return (
