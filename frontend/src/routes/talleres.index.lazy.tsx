@@ -66,7 +66,9 @@ function WorkshopCard({ taller }: { taller: Taller }) {
         </div>
         <p className="text-sm text-muted-foreground line-clamp-2">{taller.descripcion}</p>
         <div className="flex items-center justify-between pt-1">
-          <p className="text-lg font-bold text-ink tabular-nums">{formatARS(taller.precio_total)}</p>
+          <p className="text-lg font-bold text-ink tabular-nums">
+            {formatARS(taller.precio_total)}
+          </p>
           <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink group-hover:gap-2.5 transition-[gap]">
             Ver taller <ArrowRight className="h-4 w-4" />
           </span>
@@ -77,7 +79,11 @@ function WorkshopCard({ taller }: { taller: Taller }) {
 }
 
 function TalleresPage() {
-  const { data: talleres = [], isLoading, isError } = useQuery({
+  const {
+    data: talleres = [],
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["talleres"],
     queryFn: apiGetTalleres,
     staleTime: 1000 * 60 * 5,
@@ -100,8 +106,8 @@ function TalleresPage() {
             &amp; talleres
           </h1>
           <p className="mt-4 text-base text-background/65 max-w-lg">
-            Espacios de aprendizaje en Rambla Estudio. Clases prácticas con profesionales
-            de la industria audiovisual y fotográfica.
+            Espacios de aprendizaje en Rambla Estudio. Clases prácticas con profesionales de la
+            industria audiovisual y fotográfica.
           </p>
         </div>
       </section>
@@ -109,9 +115,7 @@ function TalleresPage() {
       {/* Cards */}
       <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 sm:py-14">
         {isLoading && (
-          <div className="py-16 text-center text-muted-foreground text-sm">
-            Cargando talleres…
-          </div>
+          <div className="py-16 text-center text-muted-foreground text-sm">Cargando talleres…</div>
         )}
 
         {isError && (
@@ -122,7 +126,8 @@ function TalleresPage() {
 
         {!isLoading && !isError && talleres.length === 0 && (
           <div className="py-16 text-center text-muted-foreground text-sm">
-            No hay talleres activos por el momento. Seguinos en Instagram para enterarte de los próximos.
+            No hay talleres activos por el momento. Seguinos en Instagram para enterarte de los
+            próximos.
           </div>
         )}
 

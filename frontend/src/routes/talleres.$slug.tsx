@@ -29,8 +29,7 @@ export const Route = createFileRoute("/talleres/$slug")({
     }
     const url = `${SITE_URL}/talleres/${taller.slug}`;
     const title = `${taller.nombre} con ${taller.instructor_nombre} — Rambla Rental`;
-    const desc =
-      `${taller.descripcion}`.slice(0, 155).replace(/\s+/g, " ").trim();
+    const desc = `${taller.descripcion}`.slice(0, 155).replace(/\s+/g, " ").trim();
 
     const eventJsonLd = {
       "@context": "https://schema.org",

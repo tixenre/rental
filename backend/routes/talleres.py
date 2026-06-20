@@ -6,7 +6,6 @@ inscripción + notificaciones por email. Vista admin (read-only) de inscripcione
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
