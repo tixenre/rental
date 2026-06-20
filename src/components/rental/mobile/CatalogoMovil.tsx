@@ -72,8 +72,6 @@ function fmtDate(d: Date | null): string {
   return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
 }
 
-const POPULAR_CHIPS = ["Sony FX3", "Aputure 600d", "RØDE", "Pack boda", "Pack entrevista"];
-
 /* ── Category icon ───────────────────────────────────────────────── */
 type IconComp = React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
 
