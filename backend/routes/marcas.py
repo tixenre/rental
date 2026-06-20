@@ -2,6 +2,7 @@
 routes/marcas.py — CRUD de marcas (brands).
 """
 
+import logging
 import re
 import time
 import unicodedata
@@ -11,6 +12,7 @@ from pydantic import BaseModel
 from database import get_db, row_to_dict
 from admin_guard import require_admin
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -199,9 +201,10 @@ def admin_merge_marcas(req: MarcaMergeRequest, request: Request):
         except HTTPException:
             conn.rollback()
             raise
-        except Exception as e:
+        except Exception:
             conn.rollback()
-            raise HTTPException(500, f"Error al fusionar marcas: {e}")
+            logger.exception("Error al fusionar marcas")
+            raise HTTPException(500, "No se pudieron fusionar las marcas")
 
 
 @router.post("/admin/marcas/reorder")

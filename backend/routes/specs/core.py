@@ -8,22 +8,18 @@ superficies de specs viven en submódulos (ver `__init__`): `definitions`
 """
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter
 from pydantic import BaseModel
 
-from routes.auth import get_session
+# Guard CANÓNICO reexportado bajo el nombre del paquete (`_require_admin`): valida
+# que el email de la sesión esté en ADMIN_EMAILS (is_admin_email → 403), no solo
+# que exista una sesión. Una copia local que solo chequeara `if not session`
+# dejaba pasar a cualquier logueado —incluido un CLIENTE del portal, que mintea la
+# misma cookie `session`— → escalada de privilegios. Regresión: test_admin_guard_canonico.
+from admin_guard import require_admin as _require_admin  # noqa: F401  (re-export: lo consumen los submódulos del paquete specs)
 
 
 router = APIRouter()
-
-
-# ── Auth helper (guard compartido por los submódulos) ────────────────────
-
-def _require_admin(request: Request) -> dict:
-    session = get_session(request)
-    if not session:
-        raise HTTPException(401, "No autenticado")
-    return session
 
 
 # ── Modelos del flujo de "propuestas de specs" (skill gear-compatibility) ─

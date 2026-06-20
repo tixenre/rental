@@ -9,12 +9,15 @@ JSON bidireccional. Para migrar datos legacy ahora se usa el CLI:
 """
 
 import json
+import logging
 import re
 
 from fastapi import APIRouter, Request, HTTPException
 from database import get_db, MARCA_SUBQUERY
-from routes.auth import get_session
+from admin_guard import require_admin
+from services.media.processing import _optimize_og_image
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 DIAS_VALIDOS = {"lun", "mar", "mie", "jue", "vie", "sab", "dom"}
@@ -22,12 +25,9 @@ _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
-
-def require_admin(request: Request) -> dict:
-    session = get_session(request)
-    if not session:
-        raise HTTPException(401, "No autenticado")
-    return session
+# `require_admin` es el guard CANÓNICO (`admin_guard`): valida email ∈ ADMIN_EMAILS
+# (→ 403), no solo que exista sesión. Antes era una copia local débil que dejaba
+# pasar a cualquier logueado, incluido un cliente del portal.
 
 
 def _validar_horarios(value: str) -> str:
@@ -262,7 +262,7 @@ def list_settings():
 @router.put("/admin/settings/{key}")
 def update_setting(key: str, payload: dict, request: Request):
     """Actualiza una setting (solo admin)."""
-    session = require_admin(request)
+    guard = require_admin(request)
     if key not in ALLOWED_SETTINGS_KEYS:
         raise HTTPException(400, f"Setting '{key}' no es editable")
     value = payload.get("value")
@@ -336,7 +336,7 @@ def update_setting(key: str, payload: dict, request: Request):
         value = _validar_hero_taglines(value)
     if key == "comisiones_modelo":
         value = _validar_comisiones(value)
-    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+    actor = (guard.get("email") or "admin")[:255]
     with get_db() as conn:
         try:
             conn.execute("""
@@ -508,58 +508,10 @@ def listar_precios_manuales(request: Request):
         return {"usd_rate": usd_rate, "items": items}
 
 
-
 # ── Upload de imágenes a R2 (OG image) ────────────────────────────────────────
 # El logo del sitio ya NO se sube como imagen: se unificó en el SVG master del
 # wordmark (sección "Marca (SVG)" → setting `wordmark_svg`), que la web inyecta
 # inline. Ver `services/branding` + `upload-wordmark`.
-
-def _optimize_og_image(raw_content: bytes) -> tuple[bytes, str, str]:
-    """Optimiza imagen para preview Open Graph (WhatsApp / IG / Facebook).
-
-    Target: 1200x630 (recomendación de Facebook). Si la imagen no tiene
-    ese aspect ratio (1.91:1), la centramos sobre fondo blanco y cubrimos.
-    Se sirve como JPEG (mejor compresión que PNG para fotos).
-
-    Retorna (bytes, content_type, ext).
-    """
-    from io import BytesIO
-    from PIL import Image
-
-    TARGET_W, TARGET_H = 1200, 630
-
-    img = Image.open(BytesIO(raw_content))
-    if img.mode in ("RGBA", "LA", "P"):
-        # Aplanamos sobre fondo blanco (los OG images suelen rendererarse en
-        # plataformas que no manejan transparencia bien).
-        bg = Image.new("RGB", img.size, (255, 255, 255))
-        img_rgba = img.convert("RGBA") if img.mode != "RGBA" else img
-        bg.paste(img_rgba, mask=img_rgba.split()[-1])
-        img = bg
-    else:
-        img = img.convert("RGB")
-
-    # Cover: escalar y centrar para llenar 1200x630.
-    src_ratio = img.width / img.height
-    tgt_ratio = TARGET_W / TARGET_H
-    if src_ratio > tgt_ratio:
-        # Imagen más ancha que el target — recortar lados.
-        new_h = TARGET_H
-        new_w = int(img.width * (TARGET_H / img.height))
-        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-        left = (new_w - TARGET_W) // 2
-        img = img.crop((left, 0, left + TARGET_W, TARGET_H))
-    else:
-        # Imagen más alta — recortar top/bottom.
-        new_w = TARGET_W
-        new_h = int(img.height * (TARGET_W / img.width))
-        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-        top = (new_h - TARGET_H) // 2
-        img = img.crop((0, top, TARGET_W, top + TARGET_H))
-
-    out = BytesIO()
-    img.save(out, format="JPEG", quality=85, optimize=True)
-    return out.getvalue(), "image/jpeg", "jpg"
 
 
 @router.post("/admin/settings/upload-og-image")
@@ -570,8 +522,8 @@ async def upload_og_image(request: Request):
     Es la imagen que ven WhatsApp / IG / Facebook al compartir el link de
     la home. Path fijo en R2 + cache-buster (?v=<ts>).
     """
-    session = require_admin(request)
-    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+    guard = require_admin(request)
+    actor = (guard.get("email") or "admin")[:255]
 
     form = await request.form()
     file = form.get("file")
@@ -643,8 +595,8 @@ async def _upload_brand_svg(request: Request, kind: str):
     from services.media.storage import put as _r2_put
     from services.media_fastapi import media_http
 
-    session = require_admin(request)
-    actor = (session.get("email") or session.get("user_id") or "admin")[:255]
+    guard = require_admin(request)
+    actor = (guard.get("email") or "admin")[:255]
 
     form = await request.form()
     file = form.get("file")
@@ -685,8 +637,9 @@ async def _upload_brand_svg(request: Request, kind: str):
             settings_out["wordmark_svg"] = sanitize_svg(svg_text)
         else:
             settings_out.update(await derive_from_isologo(svg_text))
-    except Exception as e:
-        raise HTTPException(500, f"No se pudieron derivar los assets: {e}")
+    except Exception:
+        logger.exception("No se pudieron derivar los assets de marca")
+        raise HTTPException(500, "No se pudieron derivar los assets de marca")
 
     with get_db() as conn:
         _save_settings(conn, settings_out, actor)
@@ -721,5 +674,6 @@ def trigger_backup_manual(request: Request):
     try:
         result = run_backup()
         return result
-    except Exception as e:
-        raise HTTPException(500, f"Backup falló: {e}")
+    except Exception:
+        logger.exception("Backup manual falló")
+        raise HTTPException(500, "El backup falló")

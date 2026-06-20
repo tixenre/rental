@@ -24,7 +24,7 @@ from config import SITE_URL
 from database import get_db, now_ar, MARCA_NOMBRE_EXPR
 from rate_limit import limiter
 from services.ical import build_vcalendar, reserva_to_vevent
-from routes.settings import require_admin
+from admin_guard import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -169,8 +169,8 @@ def _actor(session) -> str:
 @router.get("/api/admin/calendar/feed")
 def get_calendar_feed(request: Request):
     """Devuelve la URL del feed (genera el token la primera vez)."""
-    session = require_admin(request)
-    actor = _actor(session)
+    guard = require_admin(request)
+    actor = _actor(guard)
     with get_db() as conn:
         token = _ensure_token(conn, actor)
     return {"url": _feed_url(token), "token": token, "enabled": bool(token)}
@@ -179,8 +179,8 @@ def get_calendar_feed(request: Request):
 @router.post("/api/admin/calendar/feed/regenerate")
 def regenerate_calendar_feed(request: Request):
     """Rota el token → la URL anterior deja de funcionar."""
-    session = require_admin(request)
-    actor = _actor(session)
+    guard = require_admin(request)
+    actor = _actor(guard)
     with get_db() as conn:
         token = secrets.token_urlsafe(32)
         _set_token(conn, token, actor)

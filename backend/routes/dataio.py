@@ -128,9 +128,9 @@ def export_dataio(
 
         try:
             rows = orchestrator.export_entity(conn, entity)
-        except Exception as e:
+        except Exception:
             logger.exception("export_entity falló para %r", entity)
-            raise HTTPException(500, f"Export {entity} falló: {type(e).__name__}: {e}")
+            raise HTTPException(500, f"Export {entity} falló")
 
         ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         return JSONResponse(
@@ -360,9 +360,10 @@ def reset_operacional(
                 },
                 "sequences_reset": list(_OPERACIONAL_SEQUENCES),
             }
-        except Exception as e:
+        except Exception:
             try:
                 conn.rollback()
             except Exception:
                 pass
-            raise HTTPException(500, f"Reset falló: {e}")
+            logger.exception("Reset de la base operacional falló")
+            raise HTTPException(500, "Reset falló")
