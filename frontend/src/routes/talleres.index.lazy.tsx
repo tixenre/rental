@@ -22,7 +22,7 @@ type PastWorkshop = {
 const TALLERES_PASADOS: PastWorkshop[] = [
   {
     nombre: "Taller de Rodaje",
-    subtitulo: "2ª edición · Filmar Escuela",
+    subtitulo: "rambla × filmar escuela",
     descripcion:
       "Espacio práctico de análisis y grabación. Los alumnos debaten y crean escenas de películas, video clips, publicidades y fashion films con equipos profesionales de Rambla Rental.",
     fechaLabel: "Abril – junio 2026 · Miércoles",
@@ -30,7 +30,7 @@ const TALLERES_PASADOS: PastWorkshop[] = [
   },
   {
     nombre: "Taller de Rodaje",
-    subtitulo: "1ª edición · Filmar Escuela",
+    subtitulo: "rambla × filmar escuela",
     descripcion:
       "Espacio práctico de análisis y grabación. Los alumnos debaten y crean escenas de películas, video clips, publicidades y fashion films con equipos profesionales de Rambla Rental.",
     fechaLabel: "Octubre – diciembre 2025 · Miércoles",
