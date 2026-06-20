@@ -194,8 +194,8 @@ ningún deploy pasa) → un deploy que no sirve el SPA **no se promueve**. Cazó
 (servía `"Frontend not built"`). Regla durable: las paths a assets de la **raíz** del repo
 (`FRONT`/`FRONT_NEW` → `frontend/public`/`dist`) se anclan a la raíz, **no** con `Path(__file__).parent`
 relativo al paquete — un **split** (`database.py` → paquete `database/`) las corre un nivel y quedan en
-`backend/…`. Staging no cubre "el backend Railway sirviendo el SPA" (el front de dev va por Vercel) → el
-gate es la red. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
+`backend/…`. Staging sirve el SPA por Railway igual que prod → el gate `/health/frontend` cubre **staging y
+prod**. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
 
 ---
 

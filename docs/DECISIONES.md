@@ -642,8 +642,8 @@
   (#501) bajó `core.py` un nivel y `FRONT_NEW = BASE.parent / "dist"` (con `BASE = Path(__file__).parent`)
   pasó a apuntar a `backend/dist` en vez de la raíz `/app/dist` (donde el Dockerfile copia el build) →
   `_serve_frontend` no encontraba el index → 503.
-- **Por qué no se cazó antes.** En staging el frontend lo sirve **Vercel**; el backend Railway de dev nunca
-  sirve el SPA → la regresión quedó **dormida** y solo fue fatal en prod. Y el healthcheck de Railway apuntaba
+- **Por qué no se cazó antes.** En ese momento el backend Railway de dev no servía el SPA (lo hacía un front
+  aparte) → la regresión quedó **dormida** y solo fue fatal en prod. Y el healthcheck de Railway apuntaba
   a `/health` (siempre 200, a propósito, para tolerar fallos de migración) → el deploy roto pasó como sano.
 - **Decisión / gate.** (1) `GET /health/frontend` → 503 si `FRONT_NEW/index.html` no existe; `railway.json`
   apunta el healthcheck ahí → un deploy que no puede servir el SPA **falla el healthcheck y no se promueve**
@@ -652,8 +652,9 @@
   repo (`FRONT`/`FRONT_NEW`) se anclan a la raíz, no con `__file__` relativo al paquete.
 - **Consecuencia / gotcha durable.** Un **split de paquete** (`x.py` → `x/`) **corre un nivel** todo
   `Path(__file__).parent…` → en un move-verbatim hay que revisar las **paths relativas** (a assets, .env,
-  templates), no solo el código. Dos asimetrías de entorno a recordar: el front de dev va por Vercel (el
-  backend Railway de staging no sirve el SPA) y `/health` es liveness-siempre-200 (no readiness). Regresión:
+  templates), no solo el código. Staging ahora sirve el SPA por Railway igual que prod → el gate
+  `/health/frontend` cubre **staging y prod** (la vieja asimetría del front de dev por un servicio aparte ya
+  no existe). Recordar la otra asimetría: `/health` es liveness-siempre-200 (no readiness). Regresión:
   `test_front_paths.py` (FRONT_NEW hermano de `backend/`) + `test_health_frontend_gate.py` (503/200 del gate).
 
 ---

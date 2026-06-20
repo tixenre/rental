@@ -2,7 +2,7 @@
 // build-changelog.ts — genera CHANGELOG.md desde src/data/changelog.ts
 // Uso: bun run changelog:build
 
-import { changelog, type ChangelogEntry } from "../src/data/changelog";
+import { changelog, type ChangelogEntry } from "../frontend/src/data/changelog";
 import { writeFileSync } from "fs";
 import { join } from "path";
 
