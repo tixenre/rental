@@ -5,6 +5,7 @@ esquema en dos capas; Alembic es la capa 2 — decisión 2026-06-03). Move-verba
 desde `database.py`; usa la conexión cruda + los wrappers del spine (`core`).
 """
 import logging
+import time
 
 import psycopg2
 
@@ -13,6 +14,23 @@ from database.core import get_connection_params, PGConnection
 from database.auto_tags import regenerate_auto_tags_all
 
 logger = logging.getLogger(__name__)
+
+
+def _ddl_retry(conn, sql: str, retries: int = 3) -> None:
+    """Ejecuta `sql` reintentando si Postgres devuelve 'tuple concurrently updated'.
+
+    Esa condición ocurre cuando autovacuum toca pg_catalog.pg_proc justo mientras
+    CREATE OR REPLACE FUNCTION escribe ahí. Es transitorio y reintentar resuelve.
+    """
+    for attempt in range(retries):
+        try:
+            conn.execute(sql)
+            return
+        except psycopg2.Error as exc:
+            if "tuple concurrently updated" in str(exc) and attempt < retries - 1:
+                time.sleep(0.2 * (2 ** attempt))
+            else:
+                raise
 
 
 def init_db():
@@ -40,10 +58,14 @@ def _init_db_schema(conn):
     # GIN trigram de abajo. Idempotente. Ver decisión 2026-06-06 (motor de búsqueda).
     conn.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
     conn.execute("CREATE EXTENSION IF NOT EXISTS unaccent")
-    conn.execute(
+    # CREATE OR REPLACE FUNCTION toca pg_proc y puede colisionar con autovacuum
+    # corriendo sobre el catálogo en CI. Reintentamos hasta 3 veces con backoff
+    # exponencial corto — en prod este DDL nunca corre en caliente.
+    _ddl_retry(
+        conn,
         "CREATE OR REPLACE FUNCTION f_unaccent(text) RETURNS text AS "
         "$$ SELECT public.unaccent('public.unaccent', $1) $$ "
-        "LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT"
+        "LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT",
     )
 
     # Crear tablas
