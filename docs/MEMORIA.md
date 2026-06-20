@@ -186,6 +186,17 @@ prueba en staging; la sesión verifica lo logueado antes de pasárselo. La admin
 `is_admin_email` (el login no la saltea); en prod responde **404**. Setup solo-dev en `DEPLOY_RAILWAY.md`;
 escrituras de prueba con IDs inexistentes para no mutar staging.
 
+### 2026-06-20 — Gate de "frontend servible" + paths de assets a la raíz (no __file__ del paquete)
+
+El healthcheck de Railway (`railway.json`) apunta a **`/health/frontend`** (503 si falta
+`FRONT_NEW/index.html`; va en `middleware.PUBLIC_EXACT` porque el healthcheck es **sin auth**, si no 401 y
+ningún deploy pasa) → un deploy que no sirve el SPA **no se promueve**. Cazó la caída de prod **#930**
+(servía `"Frontend not built"`). Regla durable: las paths a assets de la **raíz** del repo
+(`FRONT`/`FRONT_NEW` → `frontend/public`/`dist`) se anclan a la raíz, **no** con `Path(__file__).parent`
+relativo al paquete — un **split** (`database.py` → paquete `database/`) las corre un nivel y quedan en
+`backend/…`. Staging no cubre "el backend Railway sirviendo el SPA" (el front de dev va por Vercel) → el
+gate es la red. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
