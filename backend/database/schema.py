@@ -1537,6 +1537,109 @@ def _init_db_schema(conn):
     """)
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
 
+    # ── Talleres (workshops públicos con formulario de inscripción) ──────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS talleres (
+            id                   SERIAL PRIMARY KEY,
+            slug                 VARCHAR(120) NOT NULL UNIQUE,
+            nombre               TEXT NOT NULL,
+            subtitulo            TEXT NOT NULL DEFAULT '',
+            instructor_nombre    TEXT NOT NULL,
+            instructor_bio       TEXT NOT NULL DEFAULT '',
+            instructor_proyectos TEXT NOT NULL DEFAULT '',
+            descripcion          TEXT NOT NULL DEFAULT '',
+            publico_objetivo     TEXT NOT NULL DEFAULT '',
+            programa_teorica     JSONB NOT NULL DEFAULT '[]',
+            programa_practica    JSONB NOT NULL DEFAULT '[]',
+            fecha_inicio         DATE NOT NULL,
+            fecha_fin            DATE NOT NULL,
+            horario              TEXT NOT NULL DEFAULT '',
+            cupos_total          INTEGER NOT NULL DEFAULT 12,
+            cupos_confirmados    INTEGER NOT NULL DEFAULT 0,
+            precio_total         INTEGER NOT NULL DEFAULT 0,
+            precio_sena          INTEGER NOT NULL DEFAULT 0,
+            pago_alias           TEXT NOT NULL DEFAULT '',
+            pago_cbu             TEXT NOT NULL DEFAULT '',
+            pago_banco           TEXT NOT NULL DEFAULT '',
+            direccion            TEXT NOT NULL DEFAULT '',
+            activo               BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS taller_inscripciones (
+            id              SERIAL PRIMARY KEY,
+            taller_id       INTEGER NOT NULL REFERENCES talleres(id) ON DELETE CASCADE,
+            nombre          TEXT NOT NULL,
+            email           TEXT NOT NULL,
+            telefono        TEXT NOT NULL,
+            experiencia     TEXT,
+            comprobante_url TEXT,
+            en_lista_espera BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_taller_inscripciones_taller "
+        "ON taller_inscripciones(taller_id)"
+    )
+    # Seed idempotente del workshop de Jime Troncoso (julio 2026)
+    import json as _json_t
+    _programa_teorica = _json_t.dumps([
+        "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
+        "Cómo se compone y se coordina un equipo",
+        "Análisis de proyectos reales: videoclip, publicidad, ambientación en evento y foto producto",
+        "Armado de presupuesto (sí, vamos a hablar de números)",
+        "Cómo mostrar tus proyectos y crecer dentro de la industria",
+    ])
+    _programa_practica = _json_t.dumps([
+        "Crear el set: la clase práctica se construye sobre el proyecto elegido en la clase teórica",
+        "Nos dividimos en equipos con 1 semana de preproducción previa",
+        "Se suman el director de fotografía Pablo Isa y el gaffer Tincho Santini",
+        "Rambla Rental provee el equipo técnico para que la práctica sea lo más real posible",
+        "Vemos el resultado final juntos",
+    ])
+    conn.execute(
+        """
+        INSERT INTO talleres (
+            slug, nombre, subtitulo,
+            instructor_nombre, instructor_bio, instructor_proyectos,
+            descripcion, publico_objetivo,
+            programa_teorica, programa_practica,
+            fecha_inicio, fecha_fin, horario,
+            cupos_total, precio_total, precio_sena,
+            pago_alias, pago_cbu, pago_banco,
+            direccion, activo
+        )
+        VALUES (
+            'direccion-de-arte-jime-troncoso',
+            'Workshop Dirección de Arte', 'x Jime Troncoso',
+            'Jime Troncoso',
+            '26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos '
+            'creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos '
+            'digitales y físicos.',
+            'Universal LATAM, CheNetflix, Shorta, Spotify, Gancia, Skyy, Lucciano''s, Atomik, Luigi Bosca, '
+            'Shell, Las Pastillas del Abuelo, Los Pericos & El Plan de la Mariposa, Kevin Johansen, Bruto, '
+            'Hops, entre otros.',
+            'Si llegaste hasta acá: gracias, estoy muy emocionada por hacer realidad este proyecto. '
+            'El workshop incluye 2 clases en Rambla Estudio y son 12 cupos, porque quiero que sea '
+            'un espacio donde podamos tener un intercambio de aprendizajes y conocimientos.',
+            'Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafxs, filmmakers · '
+            'Estudiantes de comunicación audiovisual, cine o fotografía · '
+            'Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos',
+            %s::jsonb, %s::jsonb,
+            '2026-07-11', '2026-07-18', '9 a 13 hs',
+            12, 200000, 100000,
+            'rambla.estudio', '0170239440000032889112', 'BBVA',
+            'Chaco 1392 — Rambla Estudio',
+            TRUE
+        )
+        ON CONFLICT (slug) DO NOTHING
+        """,
+        (_programa_teorica, _programa_practica),
+    )
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.

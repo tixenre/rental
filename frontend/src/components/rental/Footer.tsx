@@ -56,6 +56,10 @@ function FooterMobile() {
             Estudio
           </Link>
           <span className="text-muted-foreground/40">·</span>
+          <Link to="/talleres" className="text-ink hover:text-amber transition">
+            Talleres
+          </Link>
+          <span className="text-muted-foreground/40">·</span>
           <Link to="/preguntas-frecuentes" className="text-ink hover:text-amber transition">
             FAQ
           </Link>
@@ -202,6 +206,11 @@ function FooterDesktop() {
               <li>
                 <Link to="/estudio" className="text-ink hover:text-amber transition">
                   El Estudio
+                </Link>
+              </li>
+              <li>
+                <Link to="/talleres" className="text-ink hover:text-amber transition">
+                  Workshops & Talleres
                 </Link>
               </li>
               <li>
