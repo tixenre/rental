@@ -207,9 +207,15 @@ function TallerLandingPage() {
 
             {/* About */}
             <section className="rounded-2xl border border-border/60 bg-muted/20 px-6 py-7">
-              <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-muted-foreground mb-5">
-                Sobre {taller.instructor_nombre}
+              <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-muted-foreground mb-4">
+                Sobre
               </p>
+              <h2
+                className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink mb-5"
+                style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
+              >
+                {taller.instructor_nombre}
+              </h2>
               <p className="text-base text-ink/80 leading-relaxed">
                 {taller.instructor_bio}
               </p>

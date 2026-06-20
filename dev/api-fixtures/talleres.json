@@ -31,9 +31,9 @@
     "cupos_disponibles": 12,
     "precio_total": 200000,
     "precio_sena": 100000,
-    "pago_alias": "rambla.rental",
-    "pago_cbu": "0720051288000030876540",
-    "pago_banco": "Galicia",
+    "pago_alias": "rambla.estudio",
+    "pago_cbu": "0170239440000032889112",
+    "pago_banco": "BBVA",
     "direccion": "Chaco 1392"
   }
 ]
