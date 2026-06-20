@@ -1,10 +1,11 @@
 /**
  * ClienteAvatar — círculo con iniciales y color determinístico por nombre.
  *
- * Da reconocimiento visual rápido del cliente en listas/headers (idea tomada de
- * Booqable). El color sale de un hash del nombre sobre una paleta acotada del DS
- * (tokens de marca/secundarios, todos con buen contraste), así un mismo cliente
- * siempre cae en el mismo color. Tamaño/typo se controlan por `className`.
+ * Da reconocimiento visual rápido de una persona/cliente en listas y headers
+ * (idea tomada de Booqable). El color sale de un hash del nombre sobre una
+ * paleta acotada del DS (tokens de marca/secundarios, todos con buen
+ * contraste), así un mismo nombre siempre cae en el mismo color. Tamaño y typo
+ * se controlan por `className`. Reusable en cualquier superficie (admin/portal).
  */
 
 import { cn } from "@/lib/utils";

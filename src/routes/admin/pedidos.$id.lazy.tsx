@@ -74,7 +74,7 @@ import {
   type DraftItem,
 } from "@/components/admin/pedido/usePedidoDraft";
 import { ClienteAutocomplete } from "@/components/admin/pedido/ClienteAutocomplete";
-import { ClienteAvatar } from "@/components/admin/ClienteAvatar";
+import { ClienteAvatar } from "@/components/kit/ClienteAvatar";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
 import { computeJornadas, parseDateTimeParts, toLocalISO } from "@/lib/rental-dates";

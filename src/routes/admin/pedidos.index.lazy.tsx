@@ -33,8 +33,9 @@ import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
 import { nextStep, type EstadoPedido } from "@/lib/pedido-estados";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
+import { PagoBadge } from "@/components/kit/PagoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
-import { ClienteAvatar } from "@/components/admin/ClienteAvatar";
+import { ClienteAvatar } from "@/components/kit/ClienteAvatar";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
 import { EnviarDocsDialog } from "@/components/admin/pedido/EnviarDocsDialog";
 import { AdminCard, FAB } from "@/components/mobile";
@@ -72,33 +73,6 @@ function creadoHace(iso?: string): string | null {
 
 const saldoDe = (p: Pedido) => Math.max(0, (p.monto_total ?? 0) - (p.monto_pagado ?? 0));
 const tieneSaldo = (p: Pedido) => !["borrador", "cancelado"].includes(p.estado) && saldoDe(p) > 0;
-
-/**
- * Pill de estado de pago para la fila (estilo Booqable: visible, con el monto
- * adeudado). Devuelve null cuando no aplica (presupuesto sin seña, sin monto).
- */
-function pagoTag(p: Pedido): { label: string; cls: string } | null {
-  const pagado = p.monto_pagado ?? 0;
-  const total = p.monto_total ?? 0;
-  const saldo = Math.max(0, total - pagado);
-  if (total <= 0) return null;
-  if (pagado >= total) return { label: "Pagado", cls: "bg-verde/10 text-verde border-verde/30" };
-  // Pre-confirmación = todavía es cotización, no deuda real.
-  const preConfirm = ["borrador", "presupuesto", "solicitado", "cancelado"].includes(p.estado);
-  if (preConfirm) {
-    if (pagado > 0)
-      return { label: `Seña ${fmtArs(pagado)}`, cls: "bg-amber/15 text-ink border-amber/40" };
-    return null;
-  }
-  // Confirmado en adelante con saldo → mostrar lo que falta cobrar.
-  const urgente = p.estado === "retirado" || p.estado === "entregado";
-  return {
-    label: `Debe ${fmtArs(saldo)}`,
-    cls: urgente
-      ? "bg-destructive/10 text-destructive border-destructive/30"
-      : "bg-amber/15 text-ink border-amber/40",
-  };
-}
 
 /** Origen del pedido → etiqueta legible (en vez del slug crudo "sistema"/"booqable-historico"/etc.). */
 function fuenteLabel(fuente: string | null): string | null {
@@ -481,7 +455,6 @@ function MasterList({
   return (
     <ul className="divide-y hairline">
       {items.map((p) => {
-        const pago = pagoTag(p);
         const sel = p.id === selId;
         return (
           <li key={p.id}>
@@ -515,20 +488,13 @@ function MasterList({
                     </span>
                   )}
                 </div>
-                <div className="mt-1.5 flex items-center justify-between gap-2">
-                  {pago ? (
-                    <span
-                      className={cn(
-                        "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
-                        pago.cls,
-                      )}
-                    >
-                      {pago.label}
-                    </span>
-                  ) : (
-                    <span />
-                  )}
-                  <span className="font-mono text-sm font-semibold tabular-nums text-ink">
+                <div className="mt-1.5 flex items-center gap-2">
+                  <PagoBadge
+                    pagado={p.monto_pagado ?? 0}
+                    total={p.monto_total ?? 0}
+                    estado={p.estado}
+                  />
+                  <span className="ml-auto font-mono text-sm font-semibold tabular-nums text-ink">
                     {fmtArs(p.monto_total)}
                   </span>
                 </div>

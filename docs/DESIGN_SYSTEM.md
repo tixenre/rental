@@ -273,6 +273,27 @@ Pendiente (follow-up, issue #575): el helper compartido `pedidoEstadoVariant`
 (rows de historial / leyenda de calendario, contextos distintos a los chips
 de pedido).
 
+### PagoBadge
+
+**Fuente única**: `src/components/kit/PagoBadge.tsx`. Hermano de `EstadoBadge`:
+mientras ese muestra el **estado del pedido**, este muestra la **cobranza con el
+monto** — `Pagado` (verde) · `Debe $X` (rojo si urgente = retirado/entregado,
+ámbar si no) · `Seña $X` (cotización con seña). Idea tomada de cómo Booqable hace
+visible el "Estado del pago". Props: `pagado`, `total`, `estado`. Devuelve `null`
+cuando no aplica (cotización sin seña, o pedido sin monto) — el caller no necesita
+placeholder. Pensado para **cualquier superficie que liste pedidos** (admin list,
+portal cliente, dashboards): no reimplementar el cálculo "sin seña/debe/pagado"
+inline, usar este chip.
+
+### ClienteAvatar
+
+**Fuente única**: `src/components/kit/ClienteAvatar.tsx`. Círculo con iniciales y
+color **determinístico por nombre** (hash sobre paleta acotada de tokens, todos
+con buen contraste) → el mismo nombre siempre cae en el mismo color, para
+reconocimiento visual rápido en listas/headers (idea de Booqable). Tamaño/typo por
+`className`. Reusable en admin y portal. No crear avatares ad-hoc con `bg-ink`
+inline.
+
 ### Otros componentes del kit (`src/components/kit/`)
 
 Versiones presentacionales del kit ya disponibles para adopción
@@ -284,6 +305,11 @@ piecewise (PR #577 las trajo a producción):
 - `ViewToggle` — segmented control con pill deslizante.
 - `StatCard` — número grande para dashboards.
 - `Input` + `SearchInput` + `FieldLabel` — variantes branded de inputs.
+
+> **Patrón de lista de pedidos (Booqable-inspired, 2026-06):** una fila se lee de
+> un vistazo con **avatar (`ClienteAvatar`) + nombre + `EstadoBadge` + `PagoBadge`
+> + monto**, alto contraste y jerarquía clara. Es el patrón a reproducir en el
+> resto de la web cuando se listan entidades con estado + plata.
 
 La ruta pública `/kit-preview` (sin login, `noindex`) los muestra todos
 para QA visual antes de adoptarlos en una pantalla concreta.
