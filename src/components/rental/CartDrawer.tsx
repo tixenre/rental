@@ -77,13 +77,6 @@ export function CartDrawer({
     })
     .filter(Boolean) as { it: Equipment; qty: number }[];
 
-  // Auto-cerrar panel de login si el usuario logueó (sesión cambió)
-  useEffect(() => {
-    if (clienteSession && needsLogin) {
-      setNeedsLogin(false);
-    }
-  }, [clienteSession, needsLogin]);
-
   const d = days();
   // Sin fechas: estimado por jornada (el backend devuelve 1 jornada sin
   // descuento ni IVA — es solo referencia; el submit exige fechas válidas).
@@ -106,6 +99,15 @@ export function CartDrawer({
     : [];
 
   const { data: clienteSession } = useClienteSession();
+
+  // Auto-cerrar panel de login si el usuario logueó (sesión cambió). Declarado
+  // acá, después de `clienteSession` — antes vivía arriba y rompía el typecheck
+  // por usar la var antes de declararla.
+  useEffect(() => {
+    if (clienteSession && needsLogin) {
+      setNeedsLogin(false);
+    }
+  }, [clienteSession, needsLogin]);
 
   // Total calculado por el BACKEND (fuente única, /api/cotizar). El front no
   // reimplementa la fórmula: manda ítems + fechas y muestra el desglose. #617.
@@ -564,7 +566,8 @@ export function CartDrawer({
                       Confirmar solicitud
                       {list.length > 0 && totalNeto > 0 && (
                         <span className="font-mono text-[11px] font-normal opacity-70 tracking-normal normal-case tabular-nums">
-                          · {formatARS(totalNeto)}{conIva ? " + IVA" : ""}
+                          · {formatARS(totalNeto)}
+                          {conIva ? " + IVA" : ""}
                         </span>
                       )}
                     </span>

@@ -184,23 +184,6 @@ function Index() {
   const { startDate, endDate, items, setQty, setDrawerOpen } = useCart();
   const { data: allEquipos = [], isLoading, isError } = useEquipos(startDate, endDate);
 
-  // Reabre el drawer tras login exitoso si el parámetro ?openCarrito=1 está presente
-  // y hay items en el carrito + usuario logueado
-  useEffect(() => {
-    if (search.openCarrito && isLogged && Object.keys(items).length > 0) {
-      setDrawerOpen(true);
-      // Limpiar el param de la URL para no reopir en cada render
-      navigate({
-        search: (prev) => {
-          const next = { ...prev };
-          delete (next as any).openCarrito;
-          return next;
-        },
-        replace: true,
-      });
-    }
-  }, [search.openCarrito, isLogged, items, setDrawerOpen, navigate]);
-
   // Reconciliación: elimina del carrito items cuyo ID ya no existe en el catálogo
   // (equipo borrado, ocultado o archivado después de que el cliente lo agregó).
   // Se corre solo cuando el catálogo cargó exitosamente y tiene datos.
@@ -345,6 +328,25 @@ function Index() {
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const { data: clienteSession } = useClienteSession();
   const isLogged = !!clienteSession;
+
+  // Reabre el drawer tras login exitoso si el parámetro ?openCarrito=1 está
+  // presente y hay items en el carrito + usuario logueado. (Declarado acá,
+  // después de search/navigate/isLogged — antes vivía arriba del componente y
+  // rompía el typecheck por usar las vars antes de declararlas.)
+  useEffect(() => {
+    if (search.openCarrito && isLogged && Object.keys(items).length > 0) {
+      setDrawerOpen(true);
+      // Limpiar el param de la URL para no reabrir en cada render
+      navigate({
+        search: (prev) => {
+          const next = { ...prev };
+          delete (next as Record<string, unknown>).openCarrito;
+          return next;
+        },
+        replace: true,
+      });
+    }
+  }, [search.openCarrito, isLogged, items, setDrawerOpen, navigate]);
   // Scroll-feel: `scrolled` se activa cuando el hero se tiñó >65% (mismo
   // umbral que el snap del topbar) → retinta el cat-bar para que combine con
   // el topbar amber. `spyCat` resalta el tab de la categoría en viewport
