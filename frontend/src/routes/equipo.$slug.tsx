@@ -364,7 +364,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
 
       {/* Header con marca, nombre, badges */}
       <header className="space-y-2">
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground flex-wrap">
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground flex-wrap">
           <span>{item.brand}</span>
           <span>·</span>
           {/* Categorías como chips: clickeables, deep-link al catálogo
@@ -533,7 +533,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           {/* Descripción */}
           {desc && (
             <section className="space-y-2">
-              <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Descripción
               </h2>
               <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
@@ -573,7 +573,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                 aria-expanded={specsOpen}
                 className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:text-ink"
               >
-                <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                   Ficha técnica
                   <span className="ml-2 text-ink/40">({item.specs.length})</span>
                 </h2>
@@ -701,7 +701,7 @@ function CartButtons({
 function FichaPillSection({ title, items }: { title: string; items: string[] }) {
   return (
     <section className="space-y-2">
-      <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         {title}
       </h2>
       <div className="flex flex-wrap gap-1.5">
@@ -737,7 +737,7 @@ function YouTubeEmbed({ url }: { url: string }) {
   if (!id) return null;
   return (
     <section className="space-y-2">
-      <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         Video demo
       </h2>
       <div

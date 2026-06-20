@@ -140,7 +140,7 @@ function FooterDesktop() {
 
           {/* Contacto */}
           <div>
-            <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-4">
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
               Contacto
             </h3>
             <ul className="space-y-3 text-sm">
@@ -190,7 +190,7 @@ function FooterDesktop() {
 
           {/* Navegación */}
           <div>
-            <h3 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-4">
+            <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
               Navegación
             </h3>
             <ul className="space-y-2.5 text-sm">
@@ -224,7 +224,7 @@ function FooterDesktop() {
         </div>
 
         <div className="mt-10 pt-6 border-t hairline flex flex-col-reverse gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             <span>© {new Date().getFullYear()} Rambla Rental</span>
             <Link to="/privacidad" className="hover:text-ink transition">
               Privacidad
@@ -234,7 +234,7 @@ function FooterDesktop() {
             </Link>
           </div>
 
-          <div className="flex flex-wrap gap-x-4 gap-y-2 items-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          <div className="flex flex-wrap gap-x-4 gap-y-2 items-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             <span>Aceptamos:</span>
             {CONTACT.paymentMethods.map((m) => (
               <span key={m} className="text-ink">

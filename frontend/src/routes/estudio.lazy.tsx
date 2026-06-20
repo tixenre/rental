@@ -169,7 +169,7 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
     >
       <div className="flex items-center gap-3 border-t hairline bg-background/95 backdrop-blur-xl px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
+          <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
             Reservar el estudio
           </div>
           <div className="truncate text-sm font-medium">{priceLabel}</div>
@@ -254,7 +254,7 @@ function EstudioPage() {
         <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b hairline bg-background/95 backdrop-blur-xl px-4 lg:px-12">
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground hover:text-ink transition"
+            className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
           >
             <ArrowLeft className="h-3 w-3" /> Catálogo
           </Link>
@@ -293,7 +293,7 @@ function EstudioPage() {
       <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b hairline bg-background/95 backdrop-blur-xl px-4 lg:px-12">
         <Link
           to="/"
-          className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground hover:text-ink transition"
+          className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
         >
           <ArrowLeft className="h-3 w-3" /> Catálogo
         </Link>
@@ -370,7 +370,7 @@ function EstudioPage() {
                 Deslizá para ver el estudio completo.
               </p>
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular-nums shrink-0">
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular-nums shrink-0">
               {photos.length} fotos
             </span>
           </div>
@@ -448,7 +448,7 @@ function EstudioPage() {
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {visibles.map((f) => (
                   <div key={f.label} className="rounded-xl border hairline bg-background p-3.5">
-                    <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground mb-1">
+                    <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
                       {f.label}
                     </div>
                     <div className="font-semibold text-[0.9375rem]">{f.value}</div>
@@ -478,7 +478,7 @@ function EstudioPage() {
                   Mínimo {minHours} horas. Elegí día y horario — te contactamos para confirmar.
                 </p>
               </div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/50 tabular-nums whitespace-nowrap shrink-0">
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink/50 tabular-nums whitespace-nowrap shrink-0">
                 {priceLabel}
               </span>
             </div>
@@ -490,7 +490,7 @@ function EstudioPage() {
               />
               {packActivo && (
                 <aside className="rounded-2xl border border-ink/20 bg-ink/8 p-5 lg:sticky lg:top-20 lg:self-start">
-                  <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink/55 mb-3.5">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink/55 mb-3.5">
                     Estudio + equipos · qué incluye
                   </div>
                   {withPack ? (

@@ -488,15 +488,15 @@ function PedidoEditorPage() {
             title="Fechas del alquiler"
             aside={
               !datos.fecha_desde || !datos.fecha_hasta ? (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-destructive">
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-destructive">
                   <AlertTriangle className="h-3 w-3" /> sin fechas
                 </span>
               ) : hasOverstock ? (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-destructive">
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-destructive">
                   <AlertTriangle className="h-3 w-3" /> revisar stock
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-verde">
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-verde">
                   <Check className="h-3 w-3" /> stock OK
                 </span>
               )
@@ -964,6 +964,7 @@ function FlowStrip({ estado }: { estado: PedidoEstado }) {
               i === idx && "text-ink font-semibold",
               i > idx && "text-muted-foreground/60",
             )}
+            title={ESTADO_LABEL[e]}
           >
             {ESTADO_LABEL[e].slice(0, 5)}
           </span>
@@ -999,7 +1000,7 @@ function EstadoDropdown({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 rounded-md border hairline bg-surface-elevated px-3 py-2 text-sm hover:border-ink disabled:opacity-60"
+        className="w-full flex items-center gap-2 rounded-md border hairline bg-surface-elevated px-3 py-2 text-sm hover:border-ink disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="text-ink">{ESTADO_LABEL[p.estado]}</span>
         <ChevronDown className="h-3.5 w-3.5 ml-auto text-muted-foreground" />

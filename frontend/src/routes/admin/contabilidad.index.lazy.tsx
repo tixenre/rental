@@ -31,7 +31,7 @@ function ContabilidadTablero() {
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Back-office · Finanzas
           </div>
           <h1 className="font-display text-3xl text-ink">Tablero</h1>
@@ -60,7 +60,7 @@ function ContabilidadTablero() {
           {/* KPIs: disponible · ganancia del mes (la rendición vive en la cuenta corriente) */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border hairline bg-surface-elevated p-5">
-              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Plata disponible
               </div>
               <div className="font-mono text-3xl font-semibold tabular-nums text-ink mt-1">
@@ -77,7 +77,7 @@ function ContabilidadTablero() {
             </div>
 
             <div className="rounded-xl border hairline bg-surface-elevated p-5">
-              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Ganancia neta · {data.ganancia_mes.mes}
               </div>
               <div
@@ -97,7 +97,7 @@ function ContabilidadTablero() {
           {/* Socios · Cuenta corriente */}
           {(data.disponible.socios?.length ?? 0) > 0 && (
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
                 Socios · Cuenta corriente
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -110,7 +110,7 @@ function ContabilidadTablero() {
 
           {/* Por caja */}
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
               Por caja
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -169,7 +169,7 @@ function ReconciliacionPanel() {
         r.ok ? "hairline bg-muted/10" : "border-destructive/40 bg-destructive/5"
       }`}
     >
-      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1">
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
         Reconciliación
       </div>
       {r.ok ? (

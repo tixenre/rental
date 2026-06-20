@@ -34,7 +34,7 @@ function TerminosPage() {
           <ArrowLeft className="h-3.5 w-3.5" /> Volver al catálogo
         </Link>
 
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Legal
         </div>
         <h1 className="font-display text-3xl md:text-4xl text-ink mt-1">Términos y condiciones</h1>

@@ -17,6 +17,13 @@ export type PerfilImpuestos =
   | "monotributo"
   | "exento";
 
+export const PERFIL_IMPUESTOS_LABEL: Record<PerfilImpuestos, string> = {
+  consumidor_final: "Consumidor final",
+  monotributo: "Monotributo",
+  responsable_inscripto: "Resp. inscripto",
+  exento: "Exento",
+};
+
 export function aplicaIva(perfil: PerfilImpuestos | null | undefined): boolean {
   return perfil === "responsable_inscripto";
 }

@@ -21,7 +21,7 @@ export function StudioPackKit({
 
   return (
     <div className="mt-3 space-y-2">
-      <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
+      <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink">
         <Package className="h-3 w-3" /> {title}
         <span className="ml-1 text-muted-foreground">({equipos.length})</span>
       </div>

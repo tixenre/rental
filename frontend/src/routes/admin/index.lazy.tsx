@@ -30,7 +30,7 @@ function AdminDashboard() {
   return (
     <div className="px-4 md:px-8 py-6 md:py-10 max-w-6xl mx-auto">
       <div className="mb-8">
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Back-office
         </div>
         <h1 className="font-display text-3xl md:text-4xl text-ink">Dashboard</h1>
@@ -49,7 +49,7 @@ function AdminDashboard() {
 
       {isError && (
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-6 text-sm text-destructive">
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] mb-2">Error</div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] mb-2">Error</div>
           <div>{(error as Error)?.message ?? "No se pudo cargar el dashboard"}</div>
           <div className="mt-2 text-xs opacity-80">Verificá que el backend esté corriendo.</div>
         </div>
@@ -80,7 +80,7 @@ function AdminDashboard() {
           {/* Movimientos del día */}
           <div className="mt-10">
             <div className="mb-4">
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Movimiento de equipos
               </div>
               <h2 className="font-display text-xl text-ink mt-0.5">Hoy y mañana</h2>
@@ -112,7 +112,7 @@ function AdminDashboard() {
           {/* Calendario full — antes vivía en /admin/calendario */}
           <div className="mt-10">
             <div className="mb-4">
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Vista mensual
               </div>
               <h2 className="font-display text-xl text-ink mt-0.5">Calendario</h2>
@@ -144,7 +144,7 @@ function Stat({
       }`}
     >
       <div className="flex items-center justify-between">
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           {label}
         </div>
         <div className="text-muted-foreground">{icon}</div>
@@ -175,7 +175,7 @@ function PedidosCard({
       <div className="px-4 py-3 border-b hairline flex items-center gap-2">
         <span className="text-muted-foreground">{icon}</span>
         <h2 className="font-display text-base text-ink">{title}</h2>
-        <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           {pedidos.length}
         </span>
       </div>
@@ -224,7 +224,7 @@ function EquiposAfueraCard({
           <AlertCircle className="h-4 w-4" />
         </span>
         <h2 className="font-display text-base text-ink">Equipos afuera</h2>
-        <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           {items.length}
         </span>
       </div>

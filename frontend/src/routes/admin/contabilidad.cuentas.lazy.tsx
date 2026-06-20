@@ -44,7 +44,7 @@ function CuentasPage() {
     <div className="px-4 md:px-6 py-6 space-y-8 max-w-4xl mx-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Back-office · Finanzas
           </div>
           <h1 className="font-display text-3xl text-ink">Cuentas</h1>
@@ -526,12 +526,12 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
       }}
       className="rounded-lg border hairline p-4 space-y-3"
     >
-      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         Nueva caja
       </div>
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Nombre
           </span>
           <input
@@ -542,7 +542,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           />
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Tipo
           </span>
           <select
@@ -558,7 +558,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Moneda
           </span>
           <select
@@ -571,7 +571,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Saldo inicial
           </span>
           <input

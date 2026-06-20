@@ -9,7 +9,6 @@ import {
   Pencil,
   Coins,
   Mail,
-  Box,
   ArrowRight,
   Trash2,
 } from "lucide-react";
@@ -31,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
 import { PEDIDO_NEXT_LABEL } from "@/lib/pedido-estados";
+import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import { AdminCard, FAB } from "@/components/mobile";
@@ -74,8 +74,13 @@ function cobranzaTag(p: Pedido): { label: string; cls: string } {
   const pagado = p.monto_pagado ?? 0;
   const total = p.monto_total ?? 0;
   if (total > 0 && pagado >= total) return { label: "pagado", cls: "text-verde" };
-  if (pagado > 0) return { label: `seña ${fmtArs(pagado)}`, cls: "text-muted-foreground" };
-  return { label: "sin seña", cls: "text-destructive" };
+  if (pagado > 0) return { label: `seña ${fmtArs(pagado)}`, cls: "text-amber" };
+  // sin seña: urgencia proporcional al estado — presupuesto/borrador es normal,
+  // confirmado merece atención, retirado sin cobrar es urgente.
+  if (p.estado === "retirado" || p.estado === "entregado")
+    return { label: "sin seña", cls: "text-destructive" };
+  if (p.estado === "confirmado") return { label: "sin seña", cls: "text-amber" };
+  return { label: "sin seña", cls: "text-muted-foreground" };
 }
 
 type EstadoFilter = "activos" | "presupuesto" | "confirmado" | "cerrados" | "todos";
@@ -178,7 +183,7 @@ function PedidosPage() {
       <div className="px-4 md:px-6 pt-3 md:pt-5 pb-2 md:pb-3 shrink-0">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Operaciones · Pedidos
             </div>
             <h1 className="font-display text-2xl md:text-3xl text-ink">Pedidos</h1>
@@ -295,7 +300,7 @@ function PedidosPage() {
                 type="button"
                 onClick={() => setPanelOpen(true)}
                 aria-label="Mostrar detalle"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
               >
                 <PanelLeft className="h-3.5 w-3.5" />
               </button>
@@ -415,13 +420,13 @@ function TabBtn({
 function hoyTag(p: Pedido): ReactNode | null {
   if (esHoy(p.fecha_desde) && p.estado === "confirmado")
     return (
-      <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-amber">
+      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-amber">
         retira hoy
       </span>
     );
   if (esHoy(p.fecha_hasta) && p.estado === "retirado")
     return (
-      <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-rosa">
+      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-rosa">
         devuelve hoy
       </span>
     );
@@ -584,7 +589,7 @@ function PreviewPane({
             type="button"
             onClick={() => setAskDelete(true)}
             aria-label="Eliminar pedido"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-destructive/40 hover:text-destructive"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -592,7 +597,7 @@ function PreviewPane({
             type="button"
             onClick={onTogglePanel}
             aria-label="Ocultar panel"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
           >
             <PanelLeft className="h-4 w-4" />
           </button>
@@ -675,9 +680,11 @@ function PreviewPane({
         <ul className="divide-y hairline">
           {(p.items ?? []).map((it) => (
             <li key={it.id} className="flex items-center gap-3 px-4 py-2.5">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground shrink-0">
-                <Box className="h-4 w-4" />
-              </span>
+              <EquipoThumb
+                src={it.foto_url}
+                alt={it.nombre_publico || it.nombre}
+                className="h-9 w-9 shrink-0"
+              />
               <div className="min-w-0 flex-1">
                 <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
                 {it.marca && (

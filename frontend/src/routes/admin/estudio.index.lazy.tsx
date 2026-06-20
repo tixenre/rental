@@ -131,7 +131,7 @@ function EstudioAdminPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 py-6 space-y-8">
       <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Back-office
         </div>
         <h1 className="font-display text-3xl text-ink">Estudio</h1>
@@ -918,7 +918,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <label className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+      <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </label>
       {children}

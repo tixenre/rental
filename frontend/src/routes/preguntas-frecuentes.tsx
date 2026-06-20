@@ -74,7 +74,7 @@ function FaqPage() {
   return (
     <PublicLayout>
       <div className="px-6 lg:px-12 py-12 max-w-3xl mx-auto w-full">
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Ayuda
         </div>
         <h1 className="mt-2 wordmark text-5xl text-ink">Preguntas frecuentes</h1>
@@ -86,7 +86,7 @@ function FaqPage() {
         <div className="mt-10 space-y-10">
           {groups.map((group) => (
             <section key={group.title}>
-              <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-3">
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">
                 {group.title}
               </h2>
               <Accordion type="multiple" className="rounded-lg border hairline divide-y hairline">

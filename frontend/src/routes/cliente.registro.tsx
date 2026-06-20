@@ -189,7 +189,7 @@ export default function ClienteRegistroPage() {
       <div className="min-h-screen bg-background grid place-items-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 rounded-full border-2 border-amber border-t-transparent animate-spin" />
-          <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Verificando…
           </p>
         </div>
@@ -217,7 +217,7 @@ export default function ClienteRegistroPage() {
 
           {/* Heading */}
           <div className="mb-7">
-            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1.5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
               Un paso más
             </div>
             <h1 className="font-display text-[2.25rem] leading-[0.95] text-ink lowercase">

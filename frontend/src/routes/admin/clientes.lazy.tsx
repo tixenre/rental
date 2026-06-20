@@ -43,6 +43,7 @@ import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
+import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
 
 export const Route = createLazyFileRoute("/admin/clientes")({
   component: ClientesPage,
@@ -91,7 +92,7 @@ function ClientesPage() {
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-7xl mx-auto">
       <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Back-office
           </div>
           <h1 className="font-display text-3xl text-ink">Clientes</h1>
@@ -156,7 +157,10 @@ function ClientesPage() {
                     ) : null}
                   </div>
                   {c.perfil_impuestos && (
-                    <div className="text-xs text-muted-foreground">{c.perfil_impuestos}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {PERFIL_IMPUESTOS_LABEL[c.perfil_impuestos as PerfilImpuestos] ??
+                        c.perfil_impuestos}
+                    </div>
                   )}
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
@@ -175,19 +179,35 @@ function ClientesPage() {
                     size="icon"
                     variant="ghost"
                     className="md:hidden"
+                    aria-label="Más acciones"
                     onClick={() => setMenuCliente(c)}
                   >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                   {/* Desktop: botones individuales */}
                   <div className="hidden md:inline-flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => setViewing(c)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Ver historial"
+                      onClick={() => setViewing(c)}
+                    >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => setEditing(c)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Editar datos"
+                      onClick={() => setEditing(c)}
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => setDeleting(c)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Eliminar cliente"
+                      onClick={() => setDeleting(c)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>

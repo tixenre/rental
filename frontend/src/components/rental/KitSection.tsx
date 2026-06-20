@@ -20,7 +20,7 @@ export function BoxItemsSection({ title, items }: { title: string; items: BoxIte
   if (items.length === 0) return null;
   return (
     <section className="space-y-2">
-      <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink">
+      <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink">
         <Package className="h-3 w-3" /> {title}
         <span className="ml-1 text-muted-foreground">({items.length})</span>
       </div>

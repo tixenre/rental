@@ -103,7 +103,7 @@ function SpecsConsolidadasPage() {
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-6xl mx-auto">
       <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Back-office · Inventario
         </div>
         <h1 className="font-display text-3xl text-ink">Specs</h1>
