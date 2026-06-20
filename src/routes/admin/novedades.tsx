@@ -14,7 +14,7 @@ function NovedadesPage() {
   return (
     <div className="px-4 md:px-8 py-6 md:py-10 max-w-3xl mx-auto">
       <div className="mb-8">
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Back-office
         </div>
         <h1 className="font-display text-3xl md:text-4xl text-ink flex items-center gap-2">

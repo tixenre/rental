@@ -420,13 +420,13 @@ function TabBtn({
 function hoyTag(p: Pedido): ReactNode | null {
   if (esHoy(p.fecha_desde) && p.estado === "confirmado")
     return (
-      <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-amber">
+      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-amber">
         retira hoy
       </span>
     );
   if (esHoy(p.fecha_hasta) && p.estado === "retirado")
     return (
-      <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-rosa">
+      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-rosa">
         devuelve hoy
       </span>
     );

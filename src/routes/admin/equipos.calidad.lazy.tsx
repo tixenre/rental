@@ -41,7 +41,7 @@ function CalidadPage() {
   return (
     <div className="px-4 md:px-8 py-6 md:py-10 max-w-3xl mx-auto">
       <header className="mb-8">
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Back-office › Equipos
         </div>
         <h1 className="font-display text-3xl md:text-4xl text-ink flex items-center gap-2">
@@ -58,7 +58,7 @@ function CalidadPage() {
 
       {isError && (
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-6 text-sm text-destructive">
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] mb-2">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] mb-2">
             <AlertCircle className="h-3.5 w-3.5" /> Error
           </div>
           <div>{(error as Error)?.message ?? "No se pudo cargar la calidad del inventario."}</div>
@@ -119,7 +119,7 @@ function SugerenciasSection() {
     <section className="mt-8 rounded-2xl border hairline bg-surface">
       <header className="flex items-center gap-2 px-5 pt-4 pb-3 border-b hairline">
         <Lightbulb className="h-4 w-4 text-amber" />
-        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Sugerencias del sistema · {data.total}
         </span>
       </header>
@@ -225,7 +225,7 @@ function CalidadView({ data }: { data: CalidadInventario }) {
   return (
     <>
       <section className="rounded-2xl border hairline bg-surface p-6 mb-6">
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
           Inventario
         </div>
         <div className="flex items-baseline gap-3 mb-4">
@@ -240,7 +240,7 @@ function CalidadView({ data }: { data: CalidadInventario }) {
       </section>
 
       <section className="rounded-2xl border hairline bg-surface">
-        <header className="px-5 pt-4 pb-3 border-b hairline font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <header className="px-5 pt-4 pb-3 border-b hairline font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Faltantes por campo
         </header>
         <ul>

@@ -478,15 +478,15 @@ function PedidoEditorPage() {
             title="Fechas del alquiler"
             aside={
               !datos.fecha_desde || !datos.fecha_hasta ? (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-destructive">
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-destructive">
                   <AlertTriangle className="h-3 w-3" /> sin fechas
                 </span>
               ) : hasOverstock ? (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-destructive">
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-destructive">
                   <AlertTriangle className="h-3 w-3" /> revisar stock
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-verde">
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-verde">
                   <Check className="h-3 w-3" /> stock OK
                 </span>
               )
