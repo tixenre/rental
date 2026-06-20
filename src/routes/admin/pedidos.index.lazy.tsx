@@ -205,13 +205,19 @@ function PedidosPage() {
           <TabBtn active={tab === "cobranzas"} onClick={() => setTab("cobranzas")}>
             <Coins className="h-3.5 w-3.5" /> Cobranzas
           </TabBtn>
-          <TabBtn
-            active={false}
+          <button
+            type="button"
             onClick={() => navigate({ to: "/admin/solicitudes" })}
-            badge={pendientes}
+            className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-ink transition-colors"
           >
-            <Pencil className="h-3.5 w-3.5" /> Solicitudes
-          </TabBtn>
+            <Pencil className="h-3.5 w-3.5" />
+            Solicitudes
+            {pendientes > 0 && (
+              <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-[10px] font-bold text-ink">
+                {pendientes}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Smart-chips */}
