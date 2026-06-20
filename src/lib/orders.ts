@@ -6,9 +6,13 @@
  * Antes esto vivía duplicado en una tabla `orders` de Supabase; ya no.
  */
 
-import { authedJson, authedPostJson, authedFetch } from "./authedFetch";
+import { authedJson, authedPostJson, authedFetch, AuthedHttpError } from "./authedFetch";
 import { toLocalISO } from "./rental-dates";
 import { trackSolicitarPedido } from "./analytics";
+
+/** El backend rechazó el pedido por falta de verificación de identidad (403).
+ *  Las bocas la cazan para mostrar el panel de verificación en vez de un toast genérico. */
+export class OrderVerificationError extends Error {}
 
 export type OrderStatus =
   | "borrador"
@@ -167,7 +171,15 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     })),
   };
 
-  const created = await authedPostJson<Record<string, unknown>>("/api/cliente/pedidos", body);
+  let created: Record<string, unknown>;
+  try {
+    created = await authedPostJson<Record<string, unknown>>("/api/cliente/pedidos", body);
+  } catch (e) {
+    if (e instanceof AuthedHttpError && e.status === 403) {
+      throw new OrderVerificationError(e.message);
+    }
+    throw e;
+  }
 
   // Analytics: pedido solicitado (no-op si GA no está activo). El valor es el
   // total del alquiler = Σ(precio_jornada × cantidad) × jornadas.

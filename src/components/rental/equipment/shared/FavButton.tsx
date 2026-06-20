@@ -38,7 +38,11 @@ export function FavButton({ itemId, size = "sm", className }: FavButtonProps) {
       aria-label={isFav ? "Quitar de favoritos" : "Guardar en favoritos"}
       aria-pressed={isFav}
       className={cn(
-        "grid place-items-center rounded-full border bg-background/80 backdrop-blur-sm transition-colors",
+        // `before:` amplía el área táctil a ~44px sin agrandar el visual del
+        // botón (queda chico e intencional sobre el thumb). Mejora la
+        // accesibilidad mobile sin romper el layout denso de las cards.
+        "relative grid place-items-center rounded-full border bg-background/80 backdrop-blur-sm transition-colors",
+        "before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']",
         isFav
           ? "border-destructive/30 text-destructive"
           : "hairline text-muted-foreground hover:text-destructive",

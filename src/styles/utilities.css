@@ -22,6 +22,20 @@
     color: var(--color-ink);
   }
 
+  /* Focus visible ring global — teclado + screen readers */
+  :focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  /* Para inputs y campos de forma, outline más ajustado */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 1px;
+  }
+
   /* iOS: evita el zoom al enfocar inputs < 16px */
   @media (max-width: 767px) {
     input,
@@ -33,6 +47,18 @@
 }
 
 @layer utilities {
+  /* ── Reduced motion: clase que desactiva transforms y transitions ── */
+  .no-motion,
+  .no-motion * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .no-motion:active,
+  .no-motion:hover,
+  .no-motion:focus {
+    transform: none !important;
+  }
+
   /* ── Brand ─────────────────────────────────────────────── */
   .hairline {
     border-color: var(--color-hairline);
@@ -167,12 +193,22 @@
      progreso (.topbar-snap) los colores se invierten. */
   .topbar-seal .seal-badge {
     fill: var(--color-amber);
-    transition: fill 0.12s;
   }
+  @media (prefers-reduced-motion: no-preference) {
+    .topbar-seal .seal-badge {
+      transition: fill 0.12s;
+    }
+  }
+
   .topbar-seal .seal-r {
     fill: var(--color-background);
-    transition: fill 0.12s;
   }
+  @media (prefers-reduced-motion: no-preference) {
+    .topbar-seal .seal-r {
+      transition: fill 0.12s;
+    }
+  }
+
   .topbar-snap .topbar-seal .seal-badge {
     fill: var(--color-background);
   }
@@ -216,29 +252,32 @@
 }
 
 /* ── Keyframes ─────────────────────────────────────────────── */
-@keyframes expand-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
+/* Animaciones solo si el usuario NO pidió reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes expand-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  @keyframes slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
   }
-}
-@keyframes slide-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-@keyframes slide-in-right {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
   }
 }

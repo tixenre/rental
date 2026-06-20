@@ -21,9 +21,13 @@ from database import (
     MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
 )
 from busqueda import construir
-from reservas import ESTADOS_RESERVADO, calcular_disponibilidad
+from reservas import (
+    calcular_disponibilidad,
+    reservado_total,
+    ESTADOS_RESERVADO,  # noqa: F401 — re-export canónico (guard: test_reservas_sql_safety)
+)
 from reservas.disponibilidad import _derivar_compuestos
-from reservas.semantics import componentes_de
+from reservas.semantics import componentes_de, parientes_de
 from routes.auth import get_session
 from admin_guard import require_admin
 from services.nombre_service import actualizar_nombres_de
@@ -648,6 +652,11 @@ def create_equipo(data: EquipoCreate, request: Request):
                 actualizar_nombres_de(conn, new_id, commit=False)
             except Exception:
                 pass
+            # Slug en la creación: el equipo nuevo nace con slug (clave natural
+            # del export dataio) por el camino correcto, no por el self-heal del
+            # export (#922). Idempotente; reusa la fuente única del backfill.
+            from dataio.slug import backfill_equipos_slug
+            backfill_equipos_slug(conn)
             conn.commit()
             row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (new_id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]
@@ -1174,7 +1183,18 @@ def _expand_to_ancestors(conn, ids) -> list[int]:
 
 @router.get("/equipos/{id}/calendario")
 def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(...)):
-    """Per-day available unit count for a given equipment and month."""
+    """Unidades libres por día de un equipo en un mes.
+
+    Delega el conteo de "reservado" en el motor único `reservas.reservado_total`,
+    que sube por TODO el grafo de composición (combos/kits anidados, a cualquier
+    profundidad). Antes este endpoint reimplementaba el overlap a 1 solo nivel de
+    kit (`directas` + `via_kit`) → mostraba un equipo como libre aunque estuviera
+    reservado vía un compuesto anidado (#923; violaba la fuente única, MEMORIA
+    2026-05-30 / 2026-05-31). El grafo inverso se calcula una vez y se reusa por día.
+    Comportamiento por día = overlap a nivel timestamp (igual que el gate): un día
+    en el que el alquiler sigue ocupado, aunque devuelva más tarde, cuenta como
+    ocupado (la versión vieja, a fecha exclusiva, lo mostraba libre — optimista).
+    """
     if not (1 <= month <= 12):
         raise HTTPException(400, "Mes inválido")
 
@@ -1185,48 +1205,20 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
         if not equipo:
             raise HTTPException(404, "Equipo no encontrado")
 
-        stock_total     = equipo["cantidad"]
+        stock_total = equipo["cantidad"]
         _, days_in_month = _cal.monthrange(year, month)
-        first_day       = _date(year, month, 1).isoformat()
-        last_day        = _date(year, month, days_in_month).isoformat()
-
-        # Direct reservations that overlap this month
-        directas = conn.execute(f"""
-            SELECT to_char(p.fecha_desde, 'YYYY-MM-DD') AS desde,
-                   to_char(p.fecha_hasta, 'YYYY-MM-DD') AS hasta,
-                   pi.cantidad
-            FROM alquiler_items pi
-            JOIN alquileres p ON p.id = pi.pedido_id
-            WHERE pi.equipo_id = ?
-              AND p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde::date <= ?
-              AND p.fecha_hasta::date > ?
-        """, (id, last_day, first_day)).fetchall()
-
-        # Via-kit reservations: this equipment is a component of a rented kit
-        via_kit = conn.execute(f"""
-            SELECT to_char(p.fecha_desde, 'YYYY-MM-DD') AS desde,
-                   to_char(p.fecha_hasta, 'YYYY-MM-DD') AS hasta,
-                   pi.cantidad * kc.cantidad AS cantidad
-            FROM kit_componentes kc
-            JOIN alquiler_items pi ON pi.equipo_id = kc.equipo_id
-            JOIN alquileres p ON p.id = pi.pedido_id
-            WHERE kc.componente_id = ?
-              AND p.estado IN {ESTADOS_RESERVADO}
-              AND p.fecha_desde::date <= ?
-              AND p.fecha_hasta::date > ?
-        """, (id, last_day, first_day)).fetchall()
-
-        reservations = [dict(r) for r in directas] + [dict(r) for r in via_kit]
+        rev = parientes_de(conn)  # grafo inverso de composición — una vez (motor)
 
         result: dict[str, int] = {}
         for day_num in range(1, days_in_month + 1):
-            d_str    = _date(year, month, day_num).isoformat()
-            reservado = sum(
-                r["cantidad"]
-                for r in reservations
-                if r["desde"] <= d_str < r["hasta"]
+            d0 = _date(year, month, day_num)
+            d1 = d0 + timedelta(days=1)
+            # Reservado recursivo (directo + vía cualquier compuesto que lo
+            # contenga) que se pisa con [d0, d1). excl=-1 → no excluir ningún
+            # pedido (contar todos). Sin buffer (vista de día, no chequeo de gate).
+            reservado = reservado_total(
+                conn, id, -1, d1.isoformat(), d0.isoformat(), rev_graph=rev,
             )
-            result[d_str] = max(0, stock_total - reservado)
+            result[d0.isoformat()] = max(0, stock_total - reservado)
 
         return result

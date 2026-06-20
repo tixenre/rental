@@ -26,6 +26,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";
+import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
+import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudioDisponibilidad, apiCrearReservaEstudio } from "@/lib/api";
 
@@ -160,11 +162,19 @@ export function StudioBookingForm({
   }, [initial, onPackChange]);
 
   const [auth, setAuth] = useState<"checking" | "in" | "out">("checking");
+  const [verificado, setVerificado] = useState(false);
   useEffect(() => {
     let cancelado = false;
     authedFetch("/api/cliente/me")
-      .then((r) => {
-        if (!cancelado) setAuth(r.ok ? "in" : "out");
+      .then(async (r) => {
+        if (cancelado) return;
+        if (!r.ok) {
+          setAuth("out");
+          return;
+        }
+        setAuth("in");
+        const me = await r.json().catch(() => null);
+        setVerificado(!!me?.dni_validado_at);
       })
       .catch(() => {
         if (!cancelado) setAuth("out");
@@ -180,6 +190,8 @@ export function StudioBookingForm({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [needsVerif, setNeedsVerif] = useState(false);
+  const [iniciandoVerif, setIniciandoVerif] = useState(false);
 
   const slots = useMemo(
     () => buildTimeSlots(openHour, closeHour, minHours),
@@ -256,10 +268,33 @@ export function StudioBookingForm({
 
   const canSubmit = !!fechaISO && disponibilidad === "libre" && !submitting;
 
+  const buildEstudioReturnParams = () =>
+    new URLSearchParams({
+      [QUERY_KEYS.d]: fechaISO ?? "",
+      [QUERY_KEYS.h]: startSlot,
+      [QUERY_KEYS.dur]: String(hours),
+      [QUERY_KEYS.pack]: withPack ? "1" : "0",
+    }).toString();
+
+  const handleVerificar = async () => {
+    setIniciandoVerif(true);
+    try {
+      await iniciarVerificacionIdentidad(`/estudio?${buildEstudioReturnParams()}`);
+    } catch {
+      /* el helper ya hizo toast */
+    } finally {
+      setIniciandoVerif(false);
+    }
+  };
+
   const handleReservarClick = () => {
     if (!canSubmit) return;
     if (auth !== "in") {
       setLoginModalOpen(true);
+      return;
+    }
+    if (!verificado) {
+      setNeedsVerif(true);
       return;
     }
     void handleReservar();
@@ -297,13 +332,7 @@ export function StudioBookingForm({
 
   const handleContinuarConGoogle = () => {
     if (!fechaISO) return;
-    const inner = new URLSearchParams({
-      [QUERY_KEYS.d]: fechaISO,
-      [QUERY_KEYS.h]: startSlot,
-      [QUERY_KEYS.dur]: String(hours),
-      [QUERY_KEYS.pack]: withPack ? "1" : "0",
-    });
-    window.location.href = `/cliente/auth/google?${new URLSearchParams({ next: `/estudio?${inner.toString()}` }).toString()}`;
+    window.location.href = `/cliente/auth/google?${new URLSearchParams({ next: `/estudio?${buildEstudioReturnParams()}` }).toString()}`;
   };
 
   const handleWhatsapp = () => {
@@ -327,8 +356,8 @@ export function StudioBookingForm({
     <div className="space-y-4">
       {returnedFromLogin && auth === "in" && (
         <div className="rounded-xl border border-verde/30 bg-verde/10 px-4 py-3 text-sm text-verde">
-          <span className="font-medium">Sesión iniciada.</span> Revisá los datos y apretá Reservar
-          para confirmar.
+          <span className="font-medium">Todo listo.</span> Revisá los datos y apretá Reservar para
+          confirmar.
         </div>
       )}
 
@@ -537,20 +566,27 @@ export function StudioBookingForm({
           </p>
         )}
 
-        <Button
-          onClick={handleReservarClick}
-          disabled={!canSubmit}
-          className="w-full bg-ink text-amber hover:bg-[color-mix(in_oklch,var(--ink)_82%,var(--amber))]"
-          size="lg"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reservando…
-            </>
-          ) : (
-            ctaLabel
-          )}
-        </Button>
+        {needsVerif ? (
+          <VerificacionRequeridaPanel
+            onVerificar={() => void handleVerificar()}
+            iniciando={iniciandoVerif}
+          />
+        ) : (
+          <Button
+            onClick={handleReservarClick}
+            disabled={!canSubmit}
+            className="w-full bg-ink text-amber hover:bg-[color-mix(in_oklch,var(--ink)_82%,var(--amber))]"
+            size="lg"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reservando…
+              </>
+            ) : (
+              ctaLabel
+            )}
+          </Button>
+        )}
 
         <button
           type="button"

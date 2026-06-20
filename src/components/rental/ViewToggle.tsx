@@ -44,7 +44,7 @@ export function ViewToggle<T extends string>({
           type="button"
           onClick={() => onChange(opt.value)}
           className={cn(
-            "relative z-10 flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold transition-colors",
+            "relative z-10 flex min-h-[44px] items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold transition-colors",
             value === opt.value ? "text-amber" : "text-muted-foreground hover:text-ink",
           )}
         >

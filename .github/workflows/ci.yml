@@ -175,6 +175,40 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_reservas_concurrency_db.py tests/test_reservas_nested_db.py -v --tb=short -m integration
+      - name: Calendario recursivo vía compuestos contra Postgres real (#934)
+        run: |
+          cd backend
+          # Verifica que reservar un combo cuenta como consumo en todas las hojas
+          # anidadas (combo → kit → hoja). Sin Postgres, el FOR UPDATE de psycopg2
+          # y la semántica de reservado_total() no se puede ejercer.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_equipo_calendario_db.py -v --tb=short -m integration
+      - name: dataio read-only + round-trip contra Postgres real (#922/#862)
+        run: |
+          cd backend
+          # #922: export no muta slugs (read-only). #862 round-trip: export→import→export
+          # es byte-idéntico (export/import son inversos; el slug sobrevive el viaje).
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_dataio_export_readonly_db.py tests/test_dataio_roundtrip_db.py -v --tb=short -m integration
+      - name: ranking_service + guard admin contra Postgres real (#862)
+        run: |
+          cd backend
+          # ranking_service: recalcular_ranking_todos asigna score 100 al equipo con
+          # pedidos, 0 al equipo sin pedidos; dry_run no muta.
+          # guard anti-#55: los 53 endpoints admin de _ADMIN_EXIST devuelven 4xx
+          # (auth/validación) para un no-admin — nunca 2xx (guard ausente) ni 5xx
+          # (DB antes del guard, indistinguible de 403 sin Postgres).
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_ranking_service_db.py tests/test_routes_admin_guard_db.py -v --tb=short -m integration
 
   build:
     name: Build frontend

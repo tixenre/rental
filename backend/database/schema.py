@@ -5,6 +5,7 @@ esquema en dos capas; Alembic es la capa 2 — decisión 2026-06-03). Move-verba
 desde `database.py`; usa la conexión cruda + los wrappers del spine (`core`).
 """
 import logging
+import time
 
 import psycopg2
 
@@ -13,6 +14,23 @@ from database.core import get_connection_params, PGConnection
 from database.auto_tags import regenerate_auto_tags_all
 
 logger = logging.getLogger(__name__)
+
+
+def _ddl_retry(conn, sql: str, retries: int = 3) -> None:
+    """Ejecuta `sql` reintentando si Postgres devuelve 'tuple concurrently updated'.
+
+    Esa condición ocurre cuando autovacuum toca pg_catalog.pg_proc justo mientras
+    CREATE OR REPLACE FUNCTION escribe ahí. Es transitorio y reintentar resuelve.
+    """
+    for attempt in range(retries):
+        try:
+            conn.execute(sql)
+            return
+        except psycopg2.Error as exc:
+            if "tuple concurrently updated" in str(exc) and attempt < retries - 1:
+                time.sleep(0.2 * (2 ** attempt))
+            else:
+                raise
 
 
 def init_db():
@@ -40,10 +58,14 @@ def _init_db_schema(conn):
     # GIN trigram de abajo. Idempotente. Ver decisión 2026-06-06 (motor de búsqueda).
     conn.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
     conn.execute("CREATE EXTENSION IF NOT EXISTS unaccent")
-    conn.execute(
+    # CREATE OR REPLACE FUNCTION toca pg_proc y puede colisionar con autovacuum
+    # corriendo sobre el catálogo en CI. Reintentamos hasta 3 veces con backoff
+    # exponencial corto — en prod este DDL nunca corre en caliente.
+    _ddl_retry(
+        conn,
         "CREATE OR REPLACE FUNCTION f_unaccent(text) RETURNS text AS "
         "$$ SELECT public.unaccent('public.unaccent', $1) $$ "
-        "LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT"
+        "LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT",
     )
 
     # Crear tablas
@@ -208,6 +230,15 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS estado_civil_renaper TEXT")
     # apodo: alias opcional para saludos informales en mails (siempre editable).
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apodo TEXT")
+    # Estado del flujo de verificación Didit (PR2). El gate de pedidos sigue usando
+    # `dni_validado_at IS NOT NULL` como criterio — este campo añade visibilidad de
+    # estados intermedios para el portal (rechazado, en_revision).
+    # Espejo de la migración i9j0k1l2m3n4 (esquema en dos capas, MEMORIA 2026-06-03).
+    conn.execute(
+        "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS "
+        "dni_verificacion_estado TEXT NOT NULL DEFAULT 'no_verificado'"
+    )
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_verificacion_motivo TEXT")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
@@ -1186,6 +1217,10 @@ def _init_db_schema(conn):
             END IF;
         END $$;
     """)
+    # Backfill de slugs faltantes (fuente única; idempotente). Acá, en el
+    # bootstrap, en vez del viejo self-heal que vivía dentro del export (#922).
+    from dataio.slug import backfill_equipos_slug
+    backfill_equipos_slug(conn)
 
     # JSONB agregadas por migraciones (b6f8d3e5a2c1, d7c9e1f3a8b2)
     conn.execute("ALTER TABLE solicitudes_modificacion ADD COLUMN IF NOT EXISTS cambios_json JSONB")

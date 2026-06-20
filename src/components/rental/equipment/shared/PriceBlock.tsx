@@ -18,6 +18,12 @@ interface PriceBlockProps {
    * lg = 19px (grid card) · md = 17px (lista desktop) · sm = 14px (mobile)
    */
   size?: "lg" | "md" | "sm";
+  /**
+   * Compacto: oculta la 3ª línea ("$X / jornada") cuando se muestra el total
+   * del período. Para filas densas (lista mobile colapsada) donde el ancho es
+   * escaso; el desglose completo queda en el panel expandido / ficha.
+   */
+  compact?: boolean;
   className?: string;
 }
 
@@ -41,6 +47,7 @@ export function PriceBlock({
   conIva = false,
   align = "left",
   size = "md",
+  compact = false,
   className,
 }: PriceBlockProps) {
   const showPeriodTotal = jornadas > 1;
@@ -68,13 +75,13 @@ export function PriceBlock({
       </span>
 
       {/* Label secundario */}
-      <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground leading-none">
+      <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground leading-none">
         {showPeriodTotal ? `${jornadas} jornadas` : `/ jornada${ivaSuffix}`}
       </span>
 
-      {/* Por-jornada cuando mostramos total del período */}
-      {showPeriodTotal && (
-        <span className="font-mono text-[9px] tabular-nums text-muted-foreground leading-none whitespace-nowrap">
+      {/* Por-jornada cuando mostramos total del período (oculto en compact) */}
+      {showPeriodTotal && !compact && (
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground leading-none whitespace-nowrap">
           {formatARS(perDay)} / jornada{ivaSuffix}
         </span>
       )}

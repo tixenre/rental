@@ -9,6 +9,9 @@ sus rutas sobre ese mismo router al importarse.
 from routes.cliente_portal.core import (
     router,
     require_cliente,
+    require_cliente_verificado,
+    cliente_verificado,
+    IDENTIDAD_NO_VERIFICADA_MSG,
     get_session,
     ESTADOS_MODIFICABLES,
 )
@@ -27,6 +30,9 @@ from routes.cliente_portal import favoritos as _favoritos  # registra sus rutas
 __all__ = [
     "router",
     "require_cliente",
+    "require_cliente_verificado",
+    "cliente_verificado",
+    "IDENTIDAD_NO_VERIFICADA_MSG",
     "get_session",
     "ESTADOS_MODIFICABLES",
     "_cancelar_solicitudes_pendientes",

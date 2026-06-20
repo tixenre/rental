@@ -2130,6 +2130,7 @@ export type Pedido = {
   cliente_email: string | null;
   cliente_telefono: string | null;
   cliente_perfil_impuestos: string | null;
+  cliente_dni_validado_at?: string | null;
   fecha_desde: string | null;
   fecha_hasta: string | null;
   estado: PedidoEstado;

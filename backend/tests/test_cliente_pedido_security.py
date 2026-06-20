@@ -71,9 +71,11 @@ def test_cliente_no_decide_precio_jornada(monkeypatch):
     """Caso atacante: el body manda precio_jornada=1 pero el server
     debe usar el del catálogo (50000) al construir el PedidoCreate."""
 
-    # 1. Sesión cliente válida (saltea require_cliente).
+    # 1. Sesión cliente válida y verificada (saltea require_cliente_verificado,
+    #    que el handler usa como gate: existencia + identidad). Este test aísla la
+    #    lógica de precio, no el gate.
     monkeypatch.setattr(
-        "routes.cliente_portal.pedidos.require_cliente",
+        "routes.cliente_portal.pedidos.require_cliente_verificado",
         lambda req: {"cliente_id": 42, "email": "cliente@test.com"},
     )
 
@@ -129,7 +131,7 @@ def test_equipo_inexistente_devuelve_404(monkeypatch):
     from fastapi import HTTPException
 
     monkeypatch.setattr(
-        "routes.cliente_portal.pedidos.require_cliente",
+        "routes.cliente_portal.pedidos.require_cliente_verificado",
         lambda req: {"cliente_id": 42, "email": "cliente@test.com"},
     )
     monkeypatch.setattr(

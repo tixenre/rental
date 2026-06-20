@@ -6,6 +6,15 @@
 // usamos ruta relativa (API_BASE vacío). En prod VITE_API_URL apunta al dominio.
 const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
+export class AuthedHttpError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AuthedHttpError";
+    this.status = status;
+  }
+}
+
 export type AuthedFetchInit = Omit<RequestInit, "headers"> & {
   headers?: Record<string, string>;
 };
@@ -63,7 +72,7 @@ export async function authedJson<T>(path: string, init: AuthedFetchInit = {}): P
         .slice(0, 200);
     }
     const prefix = `${method} ${path} → ${res.status}`;
-    throw new Error(message ? `${prefix}: ${message}` : prefix);
+    throw new AuthedHttpError(message ? `${prefix}: ${message}` : prefix, res.status);
   }
   // 204 No Content y respuestas sin body: devolver undefined cast a T para
   // no romper con `Unexpected end of JSON input`.

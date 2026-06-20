@@ -18,7 +18,7 @@ from database import get_db, row_to_dict
 from routes.auth import signer, COOKIE_SECURE, SESSION_MAX_AGE
 from services.precios import es_responsable_inscripto
 from rate_limit import limiter
-from routes.cliente_portal.core import router, require_cliente
+from routes.cliente_portal.core import router, require_cliente, cliente_verificado
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,8 @@ def cliente_me(request: Request):
                       created_at,
                       dni, cuil, dni_validado_at,
                       nombre_renaper, apellido_renaper, fecha_nacimiento_renaper,
-                      direccion_renaper, apodo
+                      direccion_renaper, apodo,
+                      dni_verificacion_estado, dni_verificacion_motivo
                FROM clientes WHERE id = ?""",
             (cliente_id,)
         ).fetchone()
@@ -169,10 +170,7 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
     cliente_id = session["cliente_id"]
 
     with get_db() as conn:
-        row_actual = conn.execute(
-            "SELECT dni_validado_at FROM clientes WHERE id = ?", (cliente_id,)
-        ).fetchone()
-    verificado = bool(row_actual and row_actual["dni_validado_at"])
+        verificado = cliente_verificado(conn, cliente_id)
 
     # Campos bloqueados post-verificación (datos que certifica RENAPER).
     _BLOQUEADOS = ("nombre", "apellido", "direccion", "cuit",
@@ -229,7 +227,8 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
                           razon_social, domicilio_fiscal, email_facturacion,
                           dni, cuil, dni_validado_at,
                           nombre_renaper, apellido_renaper, fecha_nacimiento_renaper,
-                          direccion_renaper, apodo
+                          direccion_renaper, apodo,
+                          dni_verificacion_estado, dni_verificacion_motivo
                    FROM clientes WHERE id = ?""",
                 (cliente_id,),
             ).fetchone()
