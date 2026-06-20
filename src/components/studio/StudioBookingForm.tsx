@@ -26,6 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";
+import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudioDisponibilidad, apiCrearReservaEstudio } from "@/lib/api";
 
@@ -160,11 +161,19 @@ export function StudioBookingForm({
   }, [initial, onPackChange]);
 
   const [auth, setAuth] = useState<"checking" | "in" | "out">("checking");
+  const [verificado, setVerificado] = useState(false);
   useEffect(() => {
     let cancelado = false;
     authedFetch("/api/cliente/me")
-      .then((r) => {
-        if (!cancelado) setAuth(r.ok ? "in" : "out");
+      .then(async (r) => {
+        if (cancelado) return;
+        if (!r.ok) {
+          setAuth("out");
+          return;
+        }
+        setAuth("in");
+        const me = await r.json().catch(() => null);
+        setVerificado(!!me?.dni_validado_at);
       })
       .catch(() => {
         if (!cancelado) setAuth("out");
@@ -256,10 +265,22 @@ export function StudioBookingForm({
 
   const canSubmit = !!fechaISO && disponibilidad === "libre" && !submitting;
 
+  const buildEstudioReturnParams = () =>
+    new URLSearchParams({
+      [QUERY_KEYS.d]: fechaISO ?? "",
+      [QUERY_KEYS.h]: startSlot,
+      [QUERY_KEYS.dur]: String(hours),
+      [QUERY_KEYS.pack]: withPack ? "1" : "0",
+    }).toString();
+
   const handleReservarClick = () => {
     if (!canSubmit) return;
     if (auth !== "in") {
       setLoginModalOpen(true);
+      return;
+    }
+    if (!verificado) {
+      void iniciarVerificacionIdentidad(`/estudio?${buildEstudioReturnParams()}`);
       return;
     }
     void handleReservar();
@@ -297,13 +318,7 @@ export function StudioBookingForm({
 
   const handleContinuarConGoogle = () => {
     if (!fechaISO) return;
-    const inner = new URLSearchParams({
-      [QUERY_KEYS.d]: fechaISO,
-      [QUERY_KEYS.h]: startSlot,
-      [QUERY_KEYS.dur]: String(hours),
-      [QUERY_KEYS.pack]: withPack ? "1" : "0",
-    });
-    window.location.href = `/cliente/auth/google?${new URLSearchParams({ next: `/estudio?${inner.toString()}` }).toString()}`;
+    window.location.href = `/cliente/auth/google?${new URLSearchParams({ next: `/estudio?${buildEstudioReturnParams()}` }).toString()}`;
   };
 
   const handleWhatsapp = () => {
@@ -327,8 +342,8 @@ export function StudioBookingForm({
     <div className="space-y-4">
       {returnedFromLogin && auth === "in" && (
         <div className="rounded-xl border border-verde/30 bg-verde/10 px-4 py-3 text-sm text-verde">
-          <span className="font-medium">Sesión iniciada.</span> Revisá los datos y apretá Reservar
-          para confirmar.
+          <span className="font-medium">Todo listo.</span> Revisá los datos y apretá Reservar para
+          confirmar.
         </div>
       )}
 

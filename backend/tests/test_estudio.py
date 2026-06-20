@@ -705,11 +705,17 @@ class _RecordingConn(_ConnCM):
 
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
-        if su.startswith("SELECT NOMBRE, APELLIDO, EMAIL, TELEFONO FROM CLIENTES"):
+        if su.startswith("SELECT NOMBRE, APELLIDO, EMAIL, TELEFONO") and "FROM CLIENTES" in su:
+            # Datos de contacto del cliente (sin dni: el gate de identidad ahora
+            # lo resuelve la fuente única `cliente_verificado`, query aparte).
             return _Cur([{
                 "nombre": "Tester", "apellido": "Estudio",
                 "email": "tester@example.com", "telefono": "1122334455",
             }])
+        if su.startswith("SELECT DNI_VALIDADO_AT FROM CLIENTES"):
+            # Gate de identidad vía `cliente_verificado`: verificado (dni seteado)
+            # → pasa el gate; estos tests aíslan la ORQUESTACIÓN, no el gate.
+            return _Cur([{"dni_validado_at": "2026-06-01T10:00:00"}])
         if su.startswith("INSERT INTO ALQUILERES"):
             self.alquiler_params = params
             return _CurLastrowid([], lastrowid=self.pedido_id)

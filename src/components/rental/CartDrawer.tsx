@@ -18,8 +18,9 @@ import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { useClienteSession } from "@/lib/iva";
 import { EmptyImage } from "./EmptyImage";
-import { createOrder } from "@/lib/orders";
-import { authedFetch } from "@/lib/authedFetch";
+import { createOrder, OrderVerificationError } from "@/lib/orders";
+import { chequearEstadoCuenta, iniciarVerificacionIdentidad } from "@/lib/verificacion";
+import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { RentalDateModal } from "./RentalDateModal";
@@ -58,6 +59,8 @@ export function CartDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
+  const [needsVerif, setNeedsVerif] = useState(false);
+  const [iniciandoVerif, setIniciandoVerif] = useState(false);
   const [notas, setNotas] = useState("");
   const [showNotas, setShowNotas] = useState(false);
   const [dateModalOpen, setDateModalOpen] = useState(false);
@@ -190,21 +193,28 @@ export function CartDrawer({
     setSubmitting(true);
     setSubmitError(null);
     setNeedsLogin(false);
+    setNeedsVerif(false);
 
-    // #27 — Pre-check de login antes de submitear. Si no hay sesión, mostramos
-    // panel con login/registro en vez del 401 críptico.
-    try {
-      const me = await authedFetch("/api/cliente/me");
-      if (!me.ok) {
-        setNeedsLogin(true);
-        setSubmitting(false);
-        return;
-      }
-    } catch {
+    // #27 — Pre-check de cuenta antes de submitear (fuente única en
+    // verificacion.ts). Sin sesión → panel login/registro; logueado pero sin
+    // DNI validado → panel de verificación de identidad; en vez del 401/403 críptico.
+    const estado = await chequearEstadoCuenta();
+    if (estado === "no-logueado") {
       setNeedsLogin(true);
       setSubmitting(false);
       return;
     }
+    if (estado === "error") {
+      toast.error("No pudimos verificar tu cuenta, reintentá.");
+      setSubmitting(false);
+      return;
+    }
+    if (estado === "no-verificado") {
+      setNeedsVerif(true);
+      setSubmitting(false);
+      return;
+    }
+    // "logueado-verificado" → sigue al createOrder
 
     try {
       const order = await createOrder({
@@ -235,6 +245,13 @@ export function CartDrawer({
       });
       navigate({ to: "/cliente/portal", search: { nuevo: Number(order.id) } });
     } catch (err: unknown) {
+      // Backstop: si el backend rechaza por identidad (403), mostramos el panel
+      // de verificación en vez del toast genérico.
+      if (err instanceof OrderVerificationError) {
+        setNeedsVerif(true);
+        setSubmitting(false);
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Error al enviar el pedido";
       setSubmitError(msg);
       toast.error(msg, { duration: 6000 });
@@ -597,6 +614,23 @@ export function CartDrawer({
                       </button>
                     </div>
                   </div>
+                )}
+
+                {/* Verificación de identidad requerida (logueado sin DNI validado) */}
+                {needsVerif && (
+                  <VerificacionRequeridaPanel
+                    iniciando={iniciandoVerif}
+                    onVerificar={async () => {
+                      setIniciandoVerif(true);
+                      try {
+                        await iniciarVerificacionIdentidad("/?pedido=retomar");
+                      } catch {
+                        /* el helper ya hizo toast */
+                      } finally {
+                        setIniciandoVerif(false);
+                      }
+                    }}
+                  />
                 )}
 
                 {list.length > 0 && (

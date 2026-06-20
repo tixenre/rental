@@ -42,6 +42,7 @@ import { useFavoritos } from "@/hooks/useFavoritos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useCart } from "@/lib/cart-store";
+import { useRetomarPedido } from "@/lib/verificacion";
 import { toast } from "sonner";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,8 @@ type IndexSearch = {
   /** Pre-filtra el catálogo por una categoría (root o sub-cat). Se usa para
    *  deep-linking desde la página de detalle u otros entry points. */
   cat?: string;
+  /** Al volver verificado desde Didit (?pedido=retomar) se reabre el carrito. */
+  pedido?: "retomar";
 };
 
 async function fetchOgImage(): Promise<string> {
@@ -85,6 +88,7 @@ export const Route = createFileRoute("/")({
     return {
       view: v === "grid" || v === "list" ? v : undefined,
       cat: typeof c === "string" && c.trim() ? c.trim() : undefined,
+      pedido: search.pedido === "retomar" ? "retomar" : undefined,
     };
   },
   loader: async ({ context }) => {
@@ -179,8 +183,12 @@ type Mode = "grid" | "list";
 
 function Index() {
   // Datos de la API
-  const { startDate, endDate, items, setQty } = useCart();
+  const { startDate, endDate, items, setQty, setDrawerOpen } = useCart();
   const { data: allEquipos = [], isLoading, isError } = useEquipos(startDate, endDate);
+
+  // Al volver verificado desde Didit (?pedido=retomar) reabrimos el carrito,
+  // que sigue persistido en localStorage por el cart-store.
+  useRetomarPedido(() => setDrawerOpen(true));
 
   // Reconciliación: elimina del carrito items cuyo ID ya no existe en el catálogo
   // (equipo borrado, ocultado o archivado después de que el cliente lo agregó).

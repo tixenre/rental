@@ -34,8 +34,13 @@ import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
 import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { ShareButton } from "@/components/rental/equipment/shared/ShareButton";
-import { createOrder } from "@/lib/orders";
-import { authedFetch } from "@/lib/authedFetch";
+import { createOrder, OrderVerificationError } from "@/lib/orders";
+import {
+  chequearEstadoCuenta,
+  iniciarVerificacionIdentidad,
+  useRetomarPedido,
+} from "@/lib/verificacion";
+import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
 import { logSearch } from "@/lib/search-log";
 import { filtrarOrdenar } from "@/lib/search/normalize";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
@@ -362,6 +367,8 @@ function CartSheet({
   const navigate = useNavigate();
   const [solicitado, setSolicitado] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [needsVerif, setNeedsVerif] = useState(false);
+  const [iniciandoVerif, setIniciandoVerif] = useState(false);
 
   const entries = Object.entries(cartItems)
     .map(([id, qty]) => ({ eq: equipos.find((e) => e.id === id)!, qty }))
@@ -389,21 +396,32 @@ function CartSheet({
       return;
     }
     setSubmitting(true);
-    try {
-      const me = await authedFetch("/api/cliente/me");
-      if (!me.ok) {
-        toast.error("Debés iniciar sesión para solicitar un rental.", {
-          duration: 5000,
-          action: { label: "Iniciar sesión", onClick: () => navigate({ to: "/cliente/login" }) },
-        });
-        return;
-      }
-    } catch {
-      toast.error("Sin conexión. Verificá tu internet.", { duration: 4000 });
+    setNeedsVerif(false);
+
+    // Pre-check de cuenta (fuente única en verificacion.ts). Sin sesión →
+    // toast con link a login; logueado pero sin DNI validado → panel de
+    // verificación; en vez del 401/403 críptico.
+    const estado = await chequearEstadoCuenta();
+    if (estado === "no-logueado") {
+      toast.error("Debés iniciar sesión para solicitar un rental.", {
+        duration: 5000,
+        action: { label: "Iniciar sesión", onClick: () => navigate({ to: "/cliente/login" }) },
+      });
+      setSubmitting(false);
       return;
-    } finally {
-      // only clear submitting if we returned early above
     }
+    if (estado === "error") {
+      toast.error("Sin conexión. Verificá tu internet.", { duration: 4000 });
+      setSubmitting(false);
+      return;
+    }
+    if (estado === "no-verificado") {
+      setNeedsVerif(true);
+      setSubmitting(false);
+      return;
+    }
+    // "logueado-verificado" → sigue al createOrder
+
     try {
       await createOrder({
         status: "solicitado",
@@ -424,6 +442,12 @@ function CartSheet({
       });
       setSolicitado(true);
     } catch (err: unknown) {
+      // Backstop: si el backend rechaza por identidad (403), mostramos el panel
+      // de verificación en vez del toast genérico.
+      if (err instanceof OrderVerificationError) {
+        setNeedsVerif(true);
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Error al enviar el pedido";
       toast.error(msg, { duration: 6000 });
     } finally {
@@ -661,6 +685,20 @@ function CartSheet({
                 Consultanos por WhatsApp
               </a>
             </div>
+          ) : needsVerif ? (
+            <VerificacionRequeridaPanel
+              iniciando={iniciandoVerif}
+              onVerificar={async () => {
+                setIniciandoVerif(true);
+                try {
+                  await iniciarVerificacionIdentidad("/?pedido=retomar");
+                } catch {
+                  /* el helper ya hizo toast */
+                } finally {
+                  setIniciandoVerif(false);
+                }
+              }}
+            />
           ) : (
             <button
               className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-[15px] font-bold hover:bg-amber hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1133,6 +1171,10 @@ export function CatalogoMovil() {
   const [showBrandSheet, setShowBrandSheet] = useState(false);
   const [showFiltrosSheet, setShowFiltrosSheet] = useState(false);
   const [fichaEq, setFichaEq] = useState<Equipment | null>(null);
+
+  // Al volver verificado desde Didit (?pedido=retomar) reabrimos el carrito,
+  // que sigue persistido en localStorage por el cart-store.
+  useRetomarPedido(() => setShowCartSheet(true));
 
   const navigate = useNavigate();
 

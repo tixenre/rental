@@ -80,17 +80,22 @@ import { cn } from "@/lib/utils";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { GoogleIcon } from "@/components/ui/GoogleIcon";
 import { formatARS } from "@/lib/format";
+import { iniciarVerificacionIdentidad, esPathInternoSeguro } from "@/lib/verificacion";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mis pedidos — Rambla Rental" }] }),
   validateSearch: (
     search: Record<string, unknown>,
-  ): { nuevo?: number; verificacion?: "pendiente" } => {
-    const out: { nuevo?: number; verificacion?: "pendiente" } = {};
+  ): { nuevo?: number; verificacion?: "pendiente"; return_to?: string } => {
+    const out: { nuevo?: number; verificacion?: "pendiente"; return_to?: string } = {};
     const n = Number(search.nuevo);
     if (Number.isFinite(n) && n > 0) out.nuevo = n;
     // Retorno del flujo Didit: el usuario vuelve con ?verificacion=pendiente.
     if (search.verificacion === "pendiente") out.verificacion = "pendiente";
+    // Path interno a donde volver tras verificar (carrito/estudio). Validado
+    // contra la allowlist anti open-redirect (espejo del backend).
+    if (typeof search.return_to === "string" && esPathInternoSeguro(search.return_to))
+      out.return_to = search.return_to;
     return out;
   },
   component: ClientePortal,
@@ -242,7 +247,7 @@ function fmtTime(s?: string) {
 
 export default function ClientePortal() {
   const navigate = useNavigate();
-  const { nuevo, verificacion } = Route.useSearch();
+  const { nuevo, verificacion, return_to } = Route.useSearch();
   const fav = useFavoritos();
   const { data: allEquipos = [] } = useEquipos();
   const favEquipos = useMemo(
@@ -321,6 +326,12 @@ export default function ClientePortal() {
     const limpiar = (verificado: boolean) => {
       if (!alive) return;
       setConfirmandoVerif(false);
+      // Si verificó y vino con un return_to (carrito/estudio), lo devolvemos
+      // ahí (full-nav). El timeout (limpiar(false)) no lo usa: queda en el portal.
+      if (verificado && return_to) {
+        window.location.assign(return_to);
+        return;
+      }
       if (verificado) toast.success("¡Identidad verificada!");
       navigate({ to: "/cliente/portal", search: {}, replace: true });
     };
@@ -353,7 +364,7 @@ export default function ClientePortal() {
       alive = false;
       window.clearTimeout(timer);
     };
-  }, [verificacion, navigate]);
+  }, [verificacion, navigate, return_to]);
 
   useEffect(() => {
     const nuevos: Array<{ pedidoId: number; numero: string; tipo: DocTipo }> = [];
@@ -931,16 +942,9 @@ function IdentidadSection({
   async function iniciarVerificacion() {
     setIniciando(true);
     try {
-      const r = await authedFetch("/api/cliente/verificacion/sesion", { method: "POST" });
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        toast.error(err.detail ?? "No se pudo iniciar la verificación");
-        return;
-      }
-      const { url } = await r.json();
-      window.location.href = url;
+      await iniciarVerificacionIdentidad();
     } catch {
-      toast.error("Error de red al iniciar la verificación");
+      /* el helper ya hizo toast */
     } finally {
       setIniciando(false);
     }
