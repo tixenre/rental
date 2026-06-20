@@ -1257,6 +1257,7 @@ function FlowStrip({ estado }: { estado: PedidoEstado }) {
               i === idx && "text-ink font-semibold",
               i > idx && "text-muted-foreground/60",
             )}
+            title={ESTADO_LABEL[e]}
           >
             {ESTADO_LABEL[e].slice(0, 5)}
           </span>
@@ -1292,7 +1293,7 @@ function EstadoDropdown({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 rounded-md border hairline bg-surface-elevated px-3 py-2 text-sm hover:border-ink disabled:opacity-60"
+        className="w-full flex items-center gap-2 rounded-md border hairline bg-surface-elevated px-3 py-2 text-sm hover:border-ink disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="text-ink">{ESTADO_LABEL[p.estado]}</span>
         <ChevronDown className="h-3.5 w-3.5 ml-auto text-muted-foreground" />
