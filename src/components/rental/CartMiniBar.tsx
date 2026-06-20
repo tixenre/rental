@@ -70,7 +70,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
           aria-hidden="true"
         >
           <div className="mx-auto max-w-7xl px-4 py-2 lg:px-12">
-            <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground mb-1">
+            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
               En tu rental ({count} {count === 1 ? "ítem" : "ítems"})
             </div>
             <div className="max-h-[240px] overflow-y-auto">

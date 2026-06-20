@@ -33,7 +33,7 @@ export function ComoFunciona({ onDateOpen }: ComoFuncionaProps) {
     <section className="py-[clamp(1.25rem,2.5vw,1.75rem)] bg-background">
       <div className="max-w-[1180px] mx-auto px-[clamp(16px,4vw,28px)]">
         <div className="mb-[clamp(0.7rem,1.8vw,1rem)]">
-          <p className="font-mono text-[0.6875rem] tracking-[0.25em] uppercase text-muted-foreground">
+          <p className="font-mono text-[0.6875rem] tracking-[0.2em] uppercase text-muted-foreground">
             Cómo funciona
           </p>
           <h2 className="font-sans font-bold text-[clamp(1.7rem,4.2vw,2.6rem)] tracking-[-0.02em] leading-[1.05] mt-2 text-balance">

@@ -225,7 +225,7 @@ export function DateRangePickerModal({
           style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
         >
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Fechas del alquiler
             </div>
             <h2 className="font-display text-xl sm:text-2xl text-ink leading-tight">
@@ -253,7 +253,7 @@ export function DateRangePickerModal({
                   : "border-dashed hairline", // vacío: borde dashed
               )}
             >
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1.5">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
                 Retiro
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -282,7 +282,7 @@ export function DateRangePickerModal({
 
             {/* ── Jornadas stepper ───────────────────────────────── */}
             <div className="rounded-xl border border-ink/15 bg-amber-soft/40 px-3.5 py-3">
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1.5">
+              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
                 Jornadas
               </div>
               <div className="flex items-center justify-between gap-2">
@@ -334,7 +334,7 @@ export function DateRangePickerModal({
               )}
             >
               <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1">
+                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
                   Devolución
                 </div>
                 <div className="flex items-center gap-1.5 leading-none">

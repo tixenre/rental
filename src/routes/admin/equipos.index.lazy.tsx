@@ -707,7 +707,7 @@ function EquiposPage() {
                 </TableCell>
                 <TableCell>
                   {eq.marca && (
-                    <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-semibold leading-none mb-0.5">
+                    <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-semibold leading-none mb-0.5">
                       {eq.marca}
                     </div>
                   )}
@@ -788,6 +788,7 @@ function EquiposPage() {
                     size="icon"
                     variant="ghost"
                     className="sm:hidden"
+                    aria-label="Más acciones"
                     onClick={() => setMenuEquipo(eq)}
                   >
                     <MoreHorizontal className="h-4 w-4" />
@@ -856,7 +857,12 @@ function EquiposPage() {
                         <RotateCcw className="h-4 w-4 text-amber" />
                       </Button>
                     ) : (
-                      <Button size="icon" variant="ghost" onClick={() => setDeleting(eq)}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Eliminar equipo"
+                        onClick={() => setDeleting(eq)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}

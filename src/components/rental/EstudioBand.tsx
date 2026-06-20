@@ -26,7 +26,7 @@ export function EstudioBand() {
       </Link>
       <div className="flex flex-col justify-center gap-5 p-[clamp(2.25rem,5vw,4rem)_clamp(1.5rem,4vw,3.5rem)]">
         <p
-          className="font-mono text-[0.6875rem] tracking-[0.25em] uppercase"
+          className="font-mono text-[0.6875rem] tracking-[0.2em] uppercase"
           style={{ color: "color-mix(in oklch, var(--amber) 80%, white)" }}
         >
           El Estudio

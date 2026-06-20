@@ -870,7 +870,7 @@ function GridMode({
       {isFiltered && (
         <div className="px-4 lg:px-12">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Filtrando por
             </span>
             {selectedBrand && (
@@ -934,7 +934,7 @@ function GridMode({
           <section className="px-4 lg:px-12">
             <div className="mb-4 flex items-end justify-between gap-3">
               <h2 className="font-display text-2xl sm:text-3xl">Resultados</h2>
-              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular">
                 {filtered.length} {filtered.length === 1 ? "equipo" : "equipos"}
               </span>
             </div>
@@ -964,7 +964,7 @@ function GridMode({
               >
                 <div className="mb-4 flex items-end justify-between gap-3">
                   <h2 className="font-display text-2xl sm:text-3xl">{c}</h2>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular">
                     {items.length} {items.length === 1 ? "equipo" : "equipos"}
                   </span>
                 </div>
@@ -1203,14 +1203,14 @@ function ListMode({
               {hasMore && (
                 <div
                   ref={sentinelRef}
-                  className="flex items-center justify-center py-6 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground"
+                  className="flex items-center justify-center py-6 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
                 >
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Cargando más equipos…
                 </div>
               )}
               {!hasMore && filtered.length > PAGE_SIZE && (
-                <div className="py-6 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                <div className="py-6 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                   Fin del catálogo · {filtered.length} equipos
                 </div>
               )}

@@ -29,7 +29,7 @@ export function SpecsGrid({ item, max = 6 }: SpecsGridProps) {
 
   return (
     <section className="space-y-2">
-      <h2 className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         Specs clave
       </h2>
       <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2">

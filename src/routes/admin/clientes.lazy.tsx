@@ -179,19 +179,35 @@ function ClientesPage() {
                     size="icon"
                     variant="ghost"
                     className="md:hidden"
+                    aria-label="Más acciones"
                     onClick={() => setMenuCliente(c)}
                   >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                   {/* Desktop: botones individuales */}
                   <div className="hidden md:inline-flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => setViewing(c)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Ver historial"
+                      onClick={() => setViewing(c)}
+                    >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => setEditing(c)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Editar datos"
+                      onClick={() => setEditing(c)}
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => setDeleting(c)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Eliminar cliente"
+                      onClick={() => setDeleting(c)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>

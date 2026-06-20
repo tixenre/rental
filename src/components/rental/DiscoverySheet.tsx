@@ -124,7 +124,7 @@ export function DiscoverySheet({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="flex-1 font-display text-lg">Descubrir</div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular pr-2">
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular pr-2">
                 {resultCount} {resultCount === 1 ? "equipo" : "equipos"}
               </span>
             </div>

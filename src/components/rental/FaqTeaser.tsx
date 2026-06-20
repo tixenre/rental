@@ -13,7 +13,7 @@ export function FaqTeaser() {
     <section id="faq" className="py-[clamp(2.75rem,6vw,4.5rem)] bg-surface">
       <div className="max-w-[760px] mx-auto px-[clamp(16px,4vw,28px)]">
         <div className="mb-[clamp(1.5rem,4vw,2.5rem)]">
-          <p className="font-mono text-[0.6875rem] tracking-[0.25em] uppercase text-muted-foreground">
+          <p className="font-mono text-[0.6875rem] tracking-[0.2em] uppercase text-muted-foreground">
             Preguntas frecuentes
           </p>
           <h2 className="font-sans font-bold text-[clamp(1.7rem,4.2vw,2.6rem)] tracking-[-0.02em] leading-[1.05] mt-2 text-balance">

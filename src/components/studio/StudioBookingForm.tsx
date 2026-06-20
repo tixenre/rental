@@ -77,7 +77,7 @@ function Section({
   return (
     <section className={cn("rounded-2xl border hairline bg-surface p-5 sm:p-6", className)}>
       <header className="flex items-baseline gap-2 mb-4">
-        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground tabular">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular">
           {pad(step)}
         </span>
         <h3 className="font-display text-lg sm:text-xl">{title}</h3>
@@ -89,7 +89,7 @@ function Section({
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+    <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
       {children}
     </label>
   );
@@ -449,7 +449,7 @@ export function StudioBookingForm({
             role="radiogroup"
             aria-label="¿Qué reservás?"
           >
-            <legend className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2 sm:col-span-2">
+            <legend className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2 sm:col-span-2">
               ¿Qué reservás?
             </legend>
 
@@ -642,7 +642,7 @@ export function StudioBookingForm({
               </div>
             )}
             <div className="mt-2 flex items-baseline justify-between border-t hairline pt-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Total estimado
               </span>
               <span className="font-semibold tabular">
