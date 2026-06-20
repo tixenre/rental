@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
-import { PublicLayout } from "@/components/rental/PublicLayout";
 import { Logo } from "@/components/rental/Logo";
 import { Footer } from "@/components/rental/Footer";
 import { SITE_URL } from "@/lib/site";
@@ -116,6 +115,7 @@ function LandingHub() {
                 src={studioPic}
                 alt="Rambla Estudio"
                 className="absolute inset-0 w-full h-full object-cover opacity-[0.18] transition-transform duration-700 group-hover:scale-[1.04]"
+                loading="lazy"
               />
             )}
             <div className="relative">

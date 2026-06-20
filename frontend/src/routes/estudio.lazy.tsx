@@ -253,7 +253,7 @@ function EstudioPage() {
       <div className="min-h-dvh bg-background text-ink flex flex-col">
         <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b hairline bg-background/95 backdrop-blur-xl px-4 lg:px-12">
           <Link
-            to="/"
+            to="/catalogo"
             className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
           >
             <ArrowLeft className="h-3 w-3" /> Catálogo
@@ -292,7 +292,7 @@ function EstudioPage() {
       {/* ── TopBar ───────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b hairline bg-background/95 backdrop-blur-xl px-4 lg:px-12">
         <Link
-          to="/"
+          to="/catalogo"
           className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
         >
           <ArrowLeft className="h-3 w-3" /> Catálogo
