@@ -1,22 +1,19 @@
 import { createLazyFileRoute, useNavigate, useParams, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft,
-  ChevronDown,
   User,
   Calendar,
   Box,
   FileText,
   Check,
   AlertTriangle,
-  Lock,
   Coins,
   ArrowRight,
   Plus,
   Minus,
   X,
-  Search,
   Mail,
   Eye,
   Download,
@@ -86,59 +83,17 @@ import { useCotizacion } from "@/lib/cotizacion";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
-import { EquipoSearchSheet } from "@/components/admin/pedido/EquipoSearchSheet";
+import { EquipoComboSearch } from "@/components/admin/pedido/EquipoComboSearch";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "@/components/admin/pedido/EnviarDocsDialog";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
-import { PEDIDO_NEXT_LABEL } from "@/lib/pedido-estados";
+import { FLOW, transiciones, nextStep } from "@/lib/pedido-estados";
 
 export const Route = createLazyFileRoute("/admin/pedidos/$id")({
   component: PedidoEditorPage,
 });
 
-// ── Máquina de estados (espeja ESTADOS_VALIDOS del backend, alquileres.py) ────
-// El back-office NO ofrece transiciones que el backend rechazaría.
-const FLOW: PedidoEstado[] = ["presupuesto", "confirmado", "retirado", "devuelto", "finalizado"];
-const TRANSICIONES: Partial<Record<PedidoEstado, PedidoEstado[]>> = {
-  borrador: ["presupuesto", "cancelado"],
-  presupuesto: ["confirmado", "cancelado"],
-  solicitado: ["confirmado", "cancelado"], // estado del portal → se confirma igual
-  confirmado: ["retirado", "cancelado"],
-  retirado: ["devuelto", "cancelado"],
-  entregado: ["devuelto", "cancelado"], // estado del portal
-  devuelto: ["finalizado"],
-  finalizado: [],
-  cancelado: [],
-};
-const ALL_TARGETS: PedidoEstado[] = [
-  "presupuesto",
-  "confirmado",
-  "retirado",
-  "devuelto",
-  "finalizado",
-  "cancelado",
-];
-const NEXT_LABEL = PEDIDO_NEXT_LABEL;
-
-const transiciones = (e: PedidoEstado): PedidoEstado[] => TRANSICIONES[e] ?? [];
-
-/** Motivo por el que un destino está bloqueado (faltan fechas / sin equipos) — espeja la validación del backend. */
-function blockReason(p: Pedido, target: PedidoEstado): string | null {
-  const needs: PedidoEstado[] = ["confirmado", "retirado", "devuelto", "finalizado"];
-  if (needs.includes(target)) {
-    if (!p.fecha_desde || !p.fecha_hasta) return "faltan fechas";
-    if (!p.items?.length) return "sin equipos";
-  }
-  return null;
-}
-
-function nextStep(
-  p: Pedido,
-): { target: PedidoEstado; label: string; blocked: string | null } | null {
-  const t = transiciones(p.estado).filter((x) => x !== "cancelado");
-  if (!t.length) return null;
-  const target = t[0];
-  return { target, label: NEXT_LABEL[p.estado] ?? "Avanzar", blocked: blockReason(p, target) };
-}
+// La máquina de estados (FLOW / transiciones / blockReason / nextStep) vive en
+// @/lib/pedido-estados — fuente única compartida con el panel de detalle de la lista.
 
 // ── Página ───────────────────────────────────────────────────────────────────
 
@@ -197,8 +152,8 @@ function PedidoEditorPage() {
   // Modales
   const [openPagoModal, setOpenPagoModal] = useState(false);
   const [openMailDialog, setOpenMailDialog] = useState(false);
-  const [openSearchSheet, setOpenSearchSheet] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
+  const [askCancel, setAskCancel] = useState(false);
   const [askVerif, setAskVerif] = useState(false);
   const [pendingEstado, setPendingEstado] = useState<PedidoEstado | null>(null);
   const [linkVerif, setLinkVerif] = useState<string | null>(null);
@@ -324,6 +279,34 @@ function PedidoEditorPage() {
     setItems((its) => (its ?? []).map((it) => (it.uid === uid ? { ...it, ...patch } : it)));
 
   const removeItem = (uid: string) => setItems((its) => (its ?? []).filter((it) => it.uid !== uid));
+
+  // Agregar equipo del catálogo (desde el buscador inline). Si ya está en el
+  // pedido, suma +1; si no, lo agrega como línea nueva. No cierra el buscador
+  // → se pueden cargar varios seguidos.
+  const handleAddEquipo = (eq: Equipo) => {
+    const display = eq.nombre_publico || eq.nombre;
+    const existing = items.find((i) => i.equipo_id === eq.id);
+    if (existing) {
+      updateItem(existing.uid, { cantidad: existing.cantidad + 1 });
+      toast.success(`+1 ${display}`);
+    } else {
+      setItems((its) => [
+        ...(its ?? []),
+        {
+          uid: `e${eq.id}`,
+          equipo_id: eq.id,
+          cantidad: 1,
+          precio_jornada: eq.precio_jornada ?? 0,
+          nombre: eq.nombre,
+          marca: eq.marca,
+          nombre_publico: eq.nombre_publico ?? null,
+          foto_url: eq.foto_url ?? null,
+          cobro_modo: "jornada",
+        },
+      ]);
+      toast.success(`Agregado: ${display}`);
+    }
+  };
 
   // Agregar línea personalizada (#805): ítem de texto libre, fuera del catálogo.
   const addLineaLibre = () =>
@@ -532,15 +515,13 @@ function PedidoEditorPage() {
 
           {/* Equipos */}
           <Section icon={Box} title={`Equipos · ${items.length}`}>
-            {/* Trigger buscador */}
-            <button
-              type="button"
-              onClick={() => setOpenSearchSheet(true)}
-              className="flex w-full items-center gap-2.5 px-3 py-2.5 mb-2 rounded-md border hairline text-sm text-muted-foreground hover:bg-muted/30 transition"
-            >
-              <Search className="h-4 w-4 shrink-0" />
-              <span>Buscar para añadir equipos…</span>
-            </button>
+            {/* Buscador inline: resultados en dropdown debajo (no tapa el form) */}
+            <EquipoComboSearch
+              existing={items}
+              stockMap={stockMap}
+              onAdd={handleAddEquipo}
+              className="mb-2"
+            />
 
             {items.length === 0 ? (
               <ul className="divide-y hairline">
@@ -583,38 +564,6 @@ function PedidoEditorPage() {
               <Plus className="h-4 w-4 shrink-0" />
               <span>Agregar línea personalizada (flete, servicio, etc.)</span>
             </button>
-
-            <EquipoSearchSheet
-              open={openSearchSheet}
-              onOpenChange={setOpenSearchSheet}
-              existing={items}
-              stockMap={stockMap}
-              onAdd={(eq: Equipo) => {
-                const display = eq.nombre_publico || eq.nombre;
-                const existing = items.find((i) => i.equipo_id === eq.id);
-                if (existing) {
-                  updateItem(existing.uid, { cantidad: existing.cantidad + 1 });
-                  toast.success(`+1 ${display}`);
-                } else {
-                  setItems((its) => [
-                    ...(its ?? []),
-                    {
-                      uid: `e${eq.id}`,
-                      equipo_id: eq.id,
-                      cantidad: 1,
-                      precio_jornada: eq.precio_jornada ?? 0,
-                      nombre: eq.nombre,
-                      marca: eq.marca,
-                      nombre_publico: eq.nombre_publico ?? null,
-                      foto_url: eq.foto_url ?? null,
-                      cobro_modo: "jornada",
-                    },
-                  ]);
-                  toast.success(`Agregado: ${display}`);
-                }
-                setOpenSearchSheet(false);
-              }}
-            />
           </Section>
 
           {/* Notas */}
@@ -632,11 +581,6 @@ function PedidoEditorPage() {
         <aside className="px-4 md:px-5 py-5 space-y-4 bg-surface/40 lg:border-t-0 border-t hairline pb-28 lg:pb-5">
           {/* Estado */}
           <RailSection label="Estado del pedido">
-            <EstadoDropdown
-              p={p}
-              onSet={(e) => estadoMut.mutate(e)}
-              disabled={estadoMut.isPending}
-            />
             <FlowStrip estado={p.estado} />
             {ns && (
               <Button
@@ -718,7 +662,7 @@ function PedidoEditorPage() {
               <BdRow l="Neto" v={fmtArs(totales.totalNeto)} />
               <BdRow
                 l={`IVA ${totales.conIva ? "21%" : ""}`}
-                v={totales.conIva ? fmtArs(totales.iva) : "— cons. final"}
+                v={totales.conIva ? fmtArs(totales.iva) : "— sin IVA"}
               />
               <div className="border-t hairline my-1" />
               <BdRow l="Total" v={fmtArs(total)} strong />
@@ -745,10 +689,13 @@ function PedidoEditorPage() {
           {/* Cobranza */}
           <RailSection label="Cobranza">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] text-muted-foreground">cobranza</span>
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {fmtArs(pagadoMonto)} de {fmtArs(total)}
+                {pagadoMonto === 0 ? " · sin seña" : ""}
+              </span>
               <span
                 className={cn(
-                  "font-mono text-[11px]",
+                  "font-mono text-[11px] font-semibold",
                   pagadoMonto >= total && total > 0 ? "text-verde" : "text-destructive",
                 )}
               >
@@ -764,22 +711,20 @@ function PedidoEditorPage() {
                 style={{ width: `${total ? Math.min(100, (pagadoMonto / total) * 100) : 0}%` }}
               />
             </div>
-            <div className="mt-1 font-mono text-[11px] text-muted-foreground">
-              {fmtArs(pagadoMonto)} de {fmtArs(total)}
-              {pagadoMonto === 0 ? " · sin seña" : ""}
-            </div>
             {(p.pagos ?? []).map((pago) => (
               <PagoRow key={pago.id} pago={pago} pedidoId={p.id} />
             ))}
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full mt-2"
-              disabled={p.estado === "cancelado"}
-              onClick={() => setOpenPagoModal(true)}
-            >
-              <Coins className="h-4 w-4 mr-1" /> Registrar pago
-            </Button>
+            {!(pagadoMonto >= total && total > 0) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-2"
+                disabled={p.estado === "cancelado"}
+                onClick={() => setOpenPagoModal(true)}
+              >
+                <Coins className="h-4 w-4 mr-1" /> Registrar pago
+              </Button>
+            )}
           </RailSection>
 
           {/* Documentos */}
@@ -819,6 +764,17 @@ function PedidoEditorPage() {
 
           {/* Eliminar pedido */}
           <RailSection label="Zona peligrosa">
+            {transiciones(p.estado).includes("cancelado") && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={estadoMut.isPending}
+                onClick={() => setAskCancel(true)}
+              >
+                <X className="h-4 w-4 mr-1" /> Cancelar pedido
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -905,6 +861,30 @@ function PedidoEditorPage() {
               {pendingEstado === "confirmado"
                 ? "Confirmar de todas formas"
                 : "Continuar de todas formas"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={askCancel} onOpenChange={setAskCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar pedido #{p.numero_pedido ?? p.id}</AlertDialogTitle>
+            <AlertDialogDescription>
+              El pedido pasa a estado <strong>Cancelado</strong> y libera el stock reservado. Queda
+              en el historial (no se borra). Podés volver a eliminarlo definitivamente si hace
+              falta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                estadoMut.mutate("cancelado");
+                setAskCancel(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Cancelar pedido
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1264,77 +1244,6 @@ function FlowStrip({ estado }: { estado: PedidoEstado }) {
           {i < FLOW.length - 1 && <span className="text-muted-foreground/40 text-[10px]">›</span>}
         </span>
       ))}
-    </div>
-  );
-}
-
-function EstadoDropdown({
-  p,
-  onSet,
-  disabled,
-}: {
-  p: Pedido;
-  onSet: (e: PedidoEstado) => void;
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const h = (ev: MouseEvent) => {
-      if (ref.current && !ref.current.contains(ev.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-  const valid = transiciones(p.estado);
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 rounded-md border hairline bg-surface-elevated px-3 py-2 text-sm hover:border-ink disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <span className="text-ink">{ESTADO_LABEL[p.estado]}</span>
-        <ChevronDown className="h-3.5 w-3.5 ml-auto text-muted-foreground" />
-      </button>
-      {open && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border hairline bg-surface-elevated shadow-lg py-1">
-          {ALL_TARGETS.map((e) => {
-            const isCur = e === p.estado;
-            const allowed = isCur || valid.includes(e);
-            const reason = allowed && !isCur ? blockReason(p, e) : null;
-            const dis = !allowed || !!reason;
-            return (
-              <button
-                key={e}
-                type="button"
-                disabled={dis}
-                onClick={() => {
-                  if (!dis && !isCur) {
-                    onSet(e);
-                    setOpen(false);
-                  }
-                }}
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left",
-                  isCur && "bg-amber-soft",
-                  dis ? "text-muted-foreground/60 cursor-not-allowed" : "hover:bg-surface",
-                )}
-              >
-                <span>{ESTADO_LABEL[e]}</span>
-                {isCur && <Check className="h-3.5 w-3.5 ml-auto text-verde" />}
-                {reason && (
-                  <span className="ml-auto font-mono text-[10px] text-muted-foreground">
-                    {reason}
-                  </span>
-                )}
-                {!allowed && !isCur && <Lock className="h-3 w-3 ml-auto text-muted-foreground" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
