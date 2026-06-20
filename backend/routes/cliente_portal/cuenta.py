@@ -6,6 +6,7 @@ Alta del cliente (registro vía token de invitación, mintea la sesión) y perfi
 compartido del paquete `routes.cliente_portal`. `require_cliente` (guard) vive en
 `core`.
 """
+import logging
 from typing import Optional
 
 from fastapi import Request, HTTPException
@@ -18,6 +19,8 @@ from routes.auth import signer, COOKIE_SECURE, SESSION_MAX_AGE
 from services.precios import es_responsable_inscripto
 from rate_limit import limiter
 from routes.cliente_portal.core import router, require_cliente
+
+logger = logging.getLogger(__name__)
 
 
 # ── Registro ─────────────────────────────────────────────────────────────────
@@ -234,6 +237,7 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
         except HTTPException:
             conn.rollback()
             raise
-        except Exception as e:
+        except Exception:
             conn.rollback()
-            raise HTTPException(500, f"Error al actualizar perfil: {e}")
+            logger.exception("Error al actualizar el perfil del cliente")
+            raise HTTPException(500, "No se pudo actualizar el perfil")

@@ -9,6 +9,7 @@ JSON bidireccional. Para migrar datos legacy ahora se usa el CLI:
 """
 
 import json
+import logging
 import re
 
 from fastapi import APIRouter, Request, HTTPException
@@ -16,6 +17,7 @@ from database import get_db, MARCA_SUBQUERY
 from admin_guard import require_admin
 from services.media.processing import _optimize_og_image
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 DIAS_VALIDOS = {"lun", "mar", "mie", "jue", "vie", "sab", "dom"}
@@ -635,8 +637,9 @@ async def _upload_brand_svg(request: Request, kind: str):
             settings_out["wordmark_svg"] = sanitize_svg(svg_text)
         else:
             settings_out.update(await derive_from_isologo(svg_text))
-    except Exception as e:
-        raise HTTPException(500, f"No se pudieron derivar los assets: {e}")
+    except Exception:
+        logger.exception("No se pudieron derivar los assets de marca")
+        raise HTTPException(500, "No se pudieron derivar los assets de marca")
 
     with get_db() as conn:
         _save_settings(conn, settings_out, actor)
@@ -671,5 +674,6 @@ def trigger_backup_manual(request: Request):
     try:
         result = run_backup()
         return result
-    except Exception as e:
-        raise HTTPException(500, f"Backup falló: {e}")
+    except Exception:
+        logger.exception("Backup manual falló")
+        raise HTTPException(500, "El backup falló")
