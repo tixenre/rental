@@ -635,6 +635,27 @@
   handler corre, sin crear datos). Probado en vivo: login 200, `/auth/me` `is_admin: true`, lecturas admin 200,
   escrituras a id falso 404. Setup detallado en `docs/DEPLOY_RAILWAY.md`.
 
+### 2026-06-20 — Gate de "frontend servible" + paths de assets a la raíz (no __file__ del paquete)
+
+- **Contexto.** `ramblarental.com.ar` sirvió `{"error":"Frontend not built"}` (503) en vez del catálogo. El
+  backend (Railway) sirve el SPA desde `FRONT_NEW/index.html`; el split `database.py` → paquete `database/`
+  (#501) bajó `core.py` un nivel y `FRONT_NEW = BASE.parent / "dist"` (con `BASE = Path(__file__).parent`)
+  pasó a apuntar a `backend/dist` en vez de la raíz `/app/dist` (donde el Dockerfile copia el build) →
+  `_serve_frontend` no encontraba el index → 503.
+- **Por qué no se cazó antes.** En staging el frontend lo sirve **Vercel**; el backend Railway de dev nunca
+  sirve el SPA → la regresión quedó **dormida** y solo fue fatal en prod. Y el healthcheck de Railway apuntaba
+  a `/health` (siempre 200, a propósito, para tolerar fallos de migración) → el deploy roto pasó como sano.
+- **Decisión / gate.** (1) `GET /health/frontend` → 503 si `FRONT_NEW/index.html` no existe; `railway.json`
+  apunta el healthcheck ahí → un deploy que no puede servir el SPA **falla el healthcheck y no se promueve**
+  (staging Y prod). **Debe** estar en `middleware.PUBLIC_EXACT`: el healthcheck va **sin auth** → si no fuera
+  público daría 401 y **ningún** deploy pasaría (lo cazó un test). (2) Las paths a assets de la **raíz** del
+  repo (`FRONT`/`FRONT_NEW`) se anclan a la raíz, no con `__file__` relativo al paquete.
+- **Consecuencia / gotcha durable.** Un **split de paquete** (`x.py` → `x/`) **corre un nivel** todo
+  `Path(__file__).parent…` → en un move-verbatim hay que revisar las **paths relativas** (a assets, .env,
+  templates), no solo el código. Dos asimetrías de entorno a recordar: el front de dev va por Vercel (el
+  backend Railway de staging no sirve el SPA) y `/health` es liveness-siempre-200 (no readiness). Regresión:
+  `test_front_paths.py` (FRONT_NEW hermano de `backend/`) + `test_health_frontend_gate.py` (503/200 del gate).
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

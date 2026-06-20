@@ -1013,8 +1013,14 @@ def _init_db_schema(conn):
             ('Banco',       'banco', NULL,      'ARS', 4),
             ('Fondo Rambla','fondo', 'Rambla',  'ARS', 5),
             ('Dólares',     'caja',  NULL,      'USD', 6)
-        ON CONFLICT (nombre) WHERE activa DO NOTHING
+        ON CONFLICT DO NOTHING
     """)
+    # `ON CONFLICT DO NOTHING` SIN target (no `(nombre) WHERE activa`): la tabla
+    # tiene DOS unique (nombre-activo + idx_cuentas_socio sobre socio). Si una
+    # cuenta de socio se renombró/desactivó, su nombre sale del índice parcial
+    # pero su socio sigue en idx_cuentas_socio → el ON CONFLICT (nombre) no lo
+    # atrapaba y el seed reventaba con UniqueViolation en cada boot (#932). Sin
+    # target, salta ante CUALQUIER choque → idempotente de verdad.
     # Rambla también cobra (default): la caja Fondo Rambla representa al cobrador
     # 'Rambla'. Backfill para BDs que ya tenían la caja con socio NULL (migración
     # c3d4e5f6a7b8). Idempotente.

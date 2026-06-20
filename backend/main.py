@@ -206,6 +206,24 @@ def health():
     }
 
 
+@app.get("/health/frontend", include_in_schema=False)
+def health_frontend():
+    """Readiness del SPA para el healthcheck de Railway.
+
+    503 si el `dist` del frontend NO está donde el backend lo sirve (`FRONT_NEW`).
+    Así un deploy que no puede servir el SPA (ej. la regresión de paths #930, o un
+    `COPY` de dist roto) **falla el healthcheck y NO se promueve** — ni en staging
+    ni en prod. A diferencia de `/health` (siempre 200, para tolerar fallos de
+    migración a propósito), esto SÍ tumba el deploy si el SPA no se sirve.
+    """
+    if (FRONT_NEW / "index.html").is_file():
+        return {"status": "ok", "frontend": "served"}
+    return JSONResponse(
+        {"status": "error", "frontend": "not_built", "expected": str(FRONT_NEW)},
+        status_code=503,
+    )
+
+
 @app.get("/health/migrations", include_in_schema=False)
 def health_migrations():
     """Estado detallado de las migraciones Alembic: revisión aplicada vs head
