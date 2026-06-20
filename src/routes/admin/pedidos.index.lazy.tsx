@@ -3,7 +3,6 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Search,
-  FileText,
   Plus,
   PanelLeft,
   Pencil,
@@ -209,9 +208,6 @@ function PedidosPage() {
                   {pendientes}
                 </span>
               )}
-            </Button>
-            <Button variant="outline" onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
-              <FileText className="h-4 w-4 mr-1" /> Presupuesto
             </Button>
             <Button onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
               <Plus className="h-4 w-4 mr-1" /> Nuevo pedido

@@ -987,13 +987,17 @@ function ItemRow({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn("py-2.5 space-y-1.5 bg-surface", isDragging && "opacity-60")}
+      className={cn(
+        "flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 bg-surface",
+        isDragging && "opacity-60",
+      )}
     >
-      <div className="flex items-center gap-2">
+      {/* Identidad: grip + foto + nombre/meta (crece y ocupa el ancho sobrante) */}
+      <div className="flex min-w-[200px] flex-1 items-center gap-2">
         <button
           type="button"
           aria-label="Reordenar línea"
-          className="inline-flex h-11 w-11 -ml-3 items-center justify-center text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
+          className="inline-flex h-11 w-9 -ml-2 shrink-0 items-center justify-center text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
@@ -1007,7 +1011,7 @@ function ItemRow({
           <EquipoThumb
             src={it.foto_url}
             alt={it.nombre_publico || it.nombre}
-            className="h-10 w-10"
+            className="h-10 w-10 shrink-0"
           />
         )}
         <div className="min-w-0 flex-1">
@@ -1021,12 +1025,12 @@ function ItemRow({
           ) : (
             <>
               <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
-              <div className="font-mono text-[11px] text-muted-foreground flex items-center gap-1.5">
-                <span>{fmtArs(it.precio_jornada)} / jornada</span>
+              <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                {it.marca && <span className="truncate">{it.marca}</span>}
                 {stock && (
                   <span
                     className={cn(
-                      "inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
+                      "inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px]",
                       disponible <= 0
                         ? "bg-destructive/10 text-destructive"
                         : "bg-muted text-muted-foreground",
@@ -1039,25 +1043,17 @@ function ItemRow({
             </>
           )}
         </div>
-        <div className="font-mono text-sm font-semibold tabular-nums w-24 text-right shrink-0">
-          {fmtArs(subtotal)}
-        </div>
-        <button
-          type="button"
-          onClick={() => removeItem(it.uid)}
-          aria-label="Quitar línea"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
-        >
-          <X className="h-4 w-4" />
-        </button>
       </div>
-      {/* Stepper + precio editable */}
-      <div className="flex items-center gap-2 pl-13">
+
+      {/* Controles: cantidad · precio · subtotal · quitar (alineados en columna) */}
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5">
+        {/* Stepper de cantidad */}
         <div className="flex items-center gap-1">
           <Button
             size="icon"
             variant="outline"
             className="h-9 w-9"
+            aria-label="Restar uno"
             onClick={() => updateItem(it.uid, { cantidad: Math.max(1, it.cantidad - 1) })}
           >
             <Minus className="h-3 w-3" />
@@ -1066,9 +1062,10 @@ function ItemRow({
             type="number"
             min={1}
             value={it.cantidad}
+            aria-label="Cantidad"
             onChange={(e) => updateItem(it.uid, { cantidad: parseInt(e.target.value) || 1 })}
             className={cn(
-              "h-9 w-10 text-center text-sm p-0",
+              "h-9 w-11 text-center text-sm p-0",
               overstock && "border-destructive text-destructive",
             )}
           />
@@ -1076,16 +1073,20 @@ function ItemRow({
             size="icon"
             variant="outline"
             className="h-9 w-9"
+            aria-label="Sumar uno"
             onClick={() => updateItem(it.uid, { cantidad: it.cantidad + 1 })}
           >
             <Plus className="h-3 w-3" />
           </Button>
         </div>
-        <div className="flex items-center gap-1 ml-2">
+
+        {/* Precio editable por jornada */}
+        <div className="flex items-center gap-1">
           <Input
             type="number"
             min={0}
             value={it.precio_jornada}
+            aria-label="Precio por jornada"
             onChange={(e) => updateItem(it.uid, { precio_jornada: parseInt(e.target.value) || 0 })}
             className="h-9 w-24 text-sm"
           />
@@ -1098,18 +1099,28 @@ function ItemRow({
               className="h-9 rounded-md border hairline bg-surface-elevated px-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
               aria-label="Modo de cobro"
             >
-              <option value="jornada">/jornada</option>
+              <option value="jornada">/día</option>
               <option value="fijo">fijo</option>
             </select>
           ) : (
             <span className="text-xs text-muted-foreground whitespace-nowrap">/día</span>
           )}
         </div>
-        {overstock && (
-          <div className="ml-auto text-[11px] text-destructive flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" /> Excede stock ({max})
-          </div>
-        )}
+
+        {/* Subtotal de la línea */}
+        <div className="w-24 text-right font-mono text-sm font-semibold tabular-nums text-ink">
+          {fmtArs(subtotal)}
+        </div>
+
+        {/* Quitar */}
+        <button
+          type="button"
+          onClick={() => removeItem(it.uid)}
+          aria-label="Quitar línea"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
     </li>
   );
