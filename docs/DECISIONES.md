@@ -779,3 +779,27 @@ cancel-in-progress` ya cancela corridas viejas.
   valor concreto se documenta en el design system (acá vive el **criterio**, no la tabla de números). El
   **supervisor lo hace cumplir**: marca como hallazgo un tap target nuevo < 44px, o una decisión táctil
   que contradiga HIG sin justificación.
+
+### 2026-06-20 — Filosofía de diseño del DS: enforceable, la esencia del front
+
+- **Contexto.** El rediseño de Pedidos (jun 2026) no fue una lista de fixes sino la aplicación de un
+  criterio repetible. El dueño pidió capturar **la esencia** —el _por qué_— para reproducirla en toda la
+  web, no solo los componentes sueltos (avatar, badges).
+- **Decisión.** La **Filosofía de diseño** vive como **primera sección** de `DESIGN_SYSTEM.md` (11
+  principios) y es **enforceable**: el supervisor mide toda UI nueva o rediseñada contra ella antes que
+  contra cualquier detalle. Los principios: (1) la info se tiene que ver (contraste/peso reales, WCAG de
+  piso); (2) mostrá el estado y la plata, no los escondas (`Debe $X`, no "sin seña" gris; el estado se
+  **deriva** del backend); (3) un foco por pantalla; (4) **una sola forma de hacer cada cosa** (sin tres
+  controles para una acción ni botones duplicados); (5) lo más usado, a mano; (6) reconocimiento >
+  lectura (avatares, pills, selección obvia); (7) densidad útil sin aire muerto; (8) decí lo que hace
+  (copy/labels/empty states, voz "vos"); (9) **reusar no recrear** (la forma del pill vive en `kit/Pill`;
+  `EstadoBadge`/`PagoBadge` derivan; cero clases copiadas a mano); (10) mobile/a11y no son extra (HIG,
+  ≥44px, foco visible); (11) el core es sagrado, el diseño es presentación.
+- **Why.** Sin el _por qué_ escrito, cada pantalla re-discute el mismo criterio y el front deriva. La
+  esencia documentada + enforceable es lo que hace que el rollout a toda la web sea consistente y no una
+  colección de one-offs.
+- **Consecuencias.** Materializado en código: `kit/Pill` (forma + tonos semánticos única), `kit/PagoBadge`
+  (estado de pago con monto), `kit/ClienteAvatar` (avatar determinístico). El **contraste de los tints de
+  `EstadoBadge`** queda como decisión visual aparte (pendiente, afecta también el portal del cliente).
+  Refina —no reemplaza— _Apple HIG (2026-06-05)_ y es la contraparte visual de la _Barra de calidad de
+  ingeniería (2026-05-25)_: les da el marco de diseño unificado.

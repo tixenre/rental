@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Pill } from "./Pill";
 import type { EstadoPedido } from "./types";
 
 export type { EstadoPedido };
@@ -72,15 +73,8 @@ export function EstadoBadge({
     cls: "bg-muted text-muted-foreground border-transparent",
   };
   const label = labelOverride ?? mappedLabel;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 font-sans text-[10px] font-medium",
-        cls,
-        className,
-      )}
-    >
-      {label}
-    </span>
-  );
+  // La forma del pill sale del primitivo `Pill`; el color sigue saliendo del map
+  // por `estado` (paleta de marca documentada). El contraste de estos tints es
+  // una decisión visual aparte (ver Filosofía de diseño en DESIGN_SYSTEM.md).
+  return <Pill className={cn(cls, className)}>{label}</Pill>;
 }
