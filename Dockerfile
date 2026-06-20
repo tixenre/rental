@@ -25,6 +25,11 @@ RUN bun install --frozen-lockfile
 COPY vite.config.ts tsconfig.json index.html ./
 COPY public/ ./public/
 COPY src/ ./src/
+# dev/ solo existe en esta etapa de build (se descarta con la imagen frontend).
+# Vite carga su config con esbuild, que resuelve estáticamente todos los
+# imports — incluso los dinámicos — antes de ejecutar. Sin este COPY, el
+# import condicional de ./dev/api-fixtures-plugin falla aunque no se ejecute.
+COPY dev/ ./dev/
 RUN bun run build
 
 # ── Stage 2: runtime (Python + Chromium) ─────────────────────────────────
