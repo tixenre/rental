@@ -6,14 +6,14 @@ inscripción + notificaciones por email. Vista admin (read-only) de inscripcione
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
 from admin_guard import require_admin
 from database import get_db, now_ar
-from services.email import send_email, get_admin_to
+from services.email import send_email
+from services.email.service import get_admin_to
 from services.media.storage import put as _r2_put
 
 logger = logging.getLogger(__name__)
