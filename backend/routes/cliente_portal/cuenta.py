@@ -133,7 +133,8 @@ def cliente_me(request: Request):
                       created_at,
                       dni, cuil, dni_validado_at,
                       nombre_renaper, apellido_renaper, fecha_nacimiento_renaper,
-                      direccion_renaper, apodo
+                      direccion_renaper, apodo,
+                      dni_verificacion_estado, dni_verificacion_motivo
                FROM clientes WHERE id = ?""",
             (cliente_id,)
         ).fetchone()
@@ -226,7 +227,8 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
                           razon_social, domicilio_fiscal, email_facturacion,
                           dni, cuil, dni_validado_at,
                           nombre_renaper, apellido_renaper, fecha_nacimiento_renaper,
-                          direccion_renaper, apodo
+                          direccion_renaper, apodo,
+                          dni_verificacion_estado, dni_verificacion_motivo
                    FROM clientes WHERE id = ?""",
                 (cliente_id,),
             ).fetchone()

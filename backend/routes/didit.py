@@ -219,8 +219,9 @@ async def webhook_didit(request: Request):
     status = payload.get("status", "")
     logger.info("didit webhook: session_id=%s status=%s", session_id, status)
 
-    if status != "Approved":
-        # Otros estados (Processing, Declined, etc.) se ignoran por ahora.
+    # Solo procesamos estados conocidos que requieren acción.
+    ESTADOS_ACCION = {"Approved", "Declined", "Processing", "In_review", "Under_review"}
+    if status not in ESTADOS_ACCION:
         return {"ok": True}
 
     # vendor_data es el cliente_id que pasamos al crear la sesión.
@@ -231,22 +232,47 @@ async def webhook_didit(request: Request):
         logger.error("didit webhook: vendor_data inválido %r session_id=%s", vendor_data, session_id)
         return {"ok": True}  # Devolvemos 200 para que Didit no reintente.
 
-    # Datos validados por RENAPER. Viven en `decision.id_verifications[]` (API v3).
-    # Normalmente el webhook ya los trae embebidos; si llegara 'liviano' (sin
-    # `decision` o sin DNI), los pedimos por API a la fuente canónica. No se
-    # loguea el body completo (Ley 25.326).
-    datos = extraer_datos_renaper(payload.get("decision"))
-    if not datos.tiene_datos:
-        try:
-            # `retrieve_decision` hace un GET httpx SÍNCRONO (hasta el timeout):
-            # en este handler async bloquearía el event loop. Lo mandamos al
-            # threadpool para no congelar el servidor ante un webhook 'liviano'.
-            decision = await run_in_threadpool(retrieve_decision, session_id)
-            datos = extraer_datos_renaper(decision)
-        except Exception as exc:
-            logger.error("didit webhook: no se pudo recuperar la decisión session_id=%s — %s", session_id, exc)
+    if status == "Approved":
+        # Datos validados por RENAPER. Viven en `decision.id_verifications[]` (API v3).
+        # Normalmente el webhook ya los trae embebidos; si llegara 'liviano' (sin
+        # `decision` o sin DNI), los pedimos por API a la fuente canónica. No se
+        # loguea el body completo (Ley 25.326).
+        datos = extraer_datos_renaper(payload.get("decision"))
+        if not datos.tiene_datos:
+            try:
+                # `retrieve_decision` hace un GET httpx SÍNCRONO (hasta el timeout):
+                # en este handler async bloquearía el event loop. Lo mandamos al
+                # threadpool para no congelar el servidor ante un webhook 'liviano'.
+                decision = await run_in_threadpool(retrieve_decision, session_id)
+                datos = extraer_datos_renaper(decision)
+            except Exception as exc:
+                logger.error("didit webhook: no se pudo recuperar la decisión session_id=%s — %s", session_id, exc)
+        _guardar_verificacion(cliente_id=cliente_id, session_id=session_id, datos=datos)
 
-    _guardar_verificacion(cliente_id=cliente_id, session_id=session_id, datos=datos)
+    elif status == "Declined":
+        # Intentamos extraer un motivo legible del payload (no siempre presente).
+        motivo: Optional[str] = None
+        try:
+            decision = payload.get("decision") or {}
+            motivo = (
+                decision.get("decline_reason")
+                or decision.get("comment")
+                or None
+            )
+            if motivo:
+                motivo = str(motivo)[:500]  # cap defensivo
+        except Exception:
+            pass
+        _actualizar_estado_verificacion(
+            cliente_id=cliente_id, session_id=session_id, estado="rechazado", motivo=motivo
+        )
+
+    else:
+        # Processing, In_review, Under_review → en revisión.
+        _actualizar_estado_verificacion(
+            cliente_id=cliente_id, session_id=session_id, estado="en_revision"
+        )
+
     return {"ok": True}
 
 
@@ -274,6 +300,8 @@ def _guardar_verificacion(
                    cuil=COALESCE(?, cuil),
                    dni_validado_at=?,
                    didit_session_id=?,
+                   dni_verificacion_estado='verificado',
+                   dni_verificacion_motivo=NULL,
                    nombre_renaper=COALESCE(?, nombre_renaper),
                    apellido_renaper=COALESCE(?, apellido_renaper),
                    nombre_completo_renaper=COALESCE(?, nombre_completo_renaper),
@@ -307,4 +335,33 @@ def _guardar_verificacion(
         bool(datos.nombre_completo or datos.nombre),
         bool(datos.direccion),
         session_id,
+    )
+
+
+def _actualizar_estado_verificacion(
+    *,
+    cliente_id: int,
+    session_id: str,
+    estado: str,
+    motivo: Optional[str] = None,
+) -> None:
+    """Persiste el estado intermedio de verificación (rechazado / en_revision).
+
+    Solo actualiza si el didit_session_id coincide — misma defensa en profundidad
+    que _guardar_verificacion. `motivo` es directo (no COALESCE): un evento
+    posterior puede limpiar el motivo de un rechazo previo al pasar a en_revision.
+    """
+    with get_db() as conn:
+        conn.execute(
+            """UPDATE clientes
+               SET dni_verificacion_estado=?,
+                   dni_verificacion_motivo=?,
+                   updated_at=?
+               WHERE id=? AND didit_session_id=?""",
+            (estado, motivo, now_ar(), cliente_id, session_id),
+        )
+        conn.commit()
+    logger.info(
+        "didit: cliente_id=%s estado=%s session_id=%s",
+        cliente_id, estado, session_id,
     )

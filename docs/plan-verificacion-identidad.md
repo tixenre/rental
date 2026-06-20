@@ -1,9 +1,9 @@
 # Plan — Integración robusta de la verificación de identidad (Didit)
 
-> **Estado:** propuesta, esperando OK del dueño para arrancar PR1.
-> **Contexto:** la plomería de Didit (webhook firmado HMAC + freshness, extracción RENAPER,
-> fail-closed por config, Ley 25.326 — no guarda foto ni selfie) ya está sólida. Lo que falta es
-> **integrarla al flujo** y hacerla robusta. Doc hermano: `docs/design-brief-verificacion-identidad.md`.
+> **Estado:** PR1 mergeado a `dev` (gate 403 + flujo Didit + retorno al carrito/estudio). PR2 en PR
+> (estados webhook rechazado/en_revision + tab Identidad fusionada en Perfil + panel inline en Estudio).
+> PR3 pendiente: vista admin + estados en la ficha + re-verificación. Issue de tracking: #939.
+> Doc hermano: `docs/design-brief-verificacion-identidad.md`.
 
 ## Diagnóstico (lo que se encontró)
 

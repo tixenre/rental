@@ -1,14 +1,15 @@
-"""Gate de verificación de identidad (PR1).
+"""Gate de verificación de identidad (PR1 + PR2).
 
-"Verificado" = `clientes.dni_validado_at IS NOT NULL`. El gate rechaza con 403
-los flujos de creación de pedido (`POST /api/cliente/pedidos`) y de reserva del
-estudio (`POST /api/estudio/reservas`) cuando el cliente no completó la
-verificación Didit. Además, la creación de sesión Didit acepta un `return_to`
-interno opcional (allowlist anti open-redirect) que se cuela urlencodeado en el
-return_url; un `return_to` inválido/ausente cae al fallback (nunca 400).
+PR1: "Verificado" = `clientes.dni_validado_at IS NOT NULL`. El gate rechaza con
+403 los flujos de creación de pedido (`POST /api/cliente/pedidos`) y de reserva
+del estudio (`POST /api/estudio/reservas`). Sesión Didit acepta `return_to`
+interno (allowlist anti open-redirect); inválido/ausente → fallback (nunca 400).
 
-Tests puros: TestClient (routing + middleware + guards) + monkeypatch de la capa
-de DB (`get_db`) y del cliente Didit (`create_session`). Sin DB ni red.
+PR2: Webhook Didit maneja "Declined" → estado='rechazado' y "Processing" /
+"In_review" / "Under_review" → estado='en_revision'. "Approved" sigue
+escribiendo estado='verificado' (cubierto en integración; aquí solo los nuevos).
+
+Tests puros: TestClient + monkeypatch de DB y clientes Didit. Sin DB ni red.
 """
 
 import pytest
@@ -228,3 +229,88 @@ def test_sesion_sin_body_sigue_creando(monkeypatch):
     )
     assert res.status_code == 201, res.text
     assert "return_to=" not in captured["return_url"]
+
+
+# ── Webhook PR2: estados intermedios ─────────────────────────────────────────
+
+class _FakeConnRecorder(_FakeConn):
+    """FakeConn que graba todas las llamadas a execute() para inspección."""
+
+    def __init__(self):
+        super().__init__(None)
+        self.calls: list[tuple[str, tuple]] = []
+
+    def execute(self, sql, params=()):
+        self.calls.append((sql, tuple(params)))
+        return _FakeCursor(None)
+
+
+def _mock_webhook(monkeypatch):
+    """Parcha verify_webhook (no-op HMAC) y get_db (recorder) para tests del webhook."""
+    recorder = _FakeConnRecorder()
+    monkeypatch.setattr("routes.didit.verify_webhook", lambda **kw: None)
+    monkeypatch.setattr("routes.didit.get_db", lambda: recorder)
+    return recorder
+
+
+_WH_HEADERS = {"X-Signature": "x", "X-Timestamp": "0"}
+
+
+def test_webhook_declined_actualiza_estado_rechazado(monkeypatch):
+    """Webhook Declined → UPDATE dni_verificacion_estado='rechazado' con motivo."""
+    recorder = _mock_webhook(monkeypatch)
+    res = client.post(
+        "/api/webhooks/didit",
+        json={
+            "session_id": "sess-decline",
+            "status": "Declined",
+            "vendor_data": "123",
+            "decision": {"decline_reason": "foto borrosa"},
+        },
+        headers=_WH_HEADERS,
+    )
+    assert res.status_code == 200, res.text
+    updates = [c for c in recorder.calls if "dni_verificacion_estado" in c[0]]
+    assert updates, "No se llamó UPDATE con dni_verificacion_estado"
+    _, params = updates[0]
+    assert params[0] == "rechazado"
+    assert params[1] == "foto borrosa"
+
+
+def test_webhook_processing_actualiza_estado_en_revision(monkeypatch):
+    """Webhook Processing → UPDATE dni_verificacion_estado='en_revision', motivo=None."""
+    recorder = _mock_webhook(monkeypatch)
+    res = client.post(
+        "/api/webhooks/didit",
+        json={
+            "session_id": "sess-proc",
+            "status": "Processing",
+            "vendor_data": "123",
+        },
+        headers=_WH_HEADERS,
+    )
+    assert res.status_code == 200, res.text
+    updates = [c for c in recorder.calls if "dni_verificacion_estado" in c[0]]
+    assert updates, "No se llamó UPDATE con dni_verificacion_estado"
+    _, params = updates[0]
+    assert params[0] == "en_revision"
+    assert params[1] is None
+
+
+def test_webhook_in_review_actualiza_estado_en_revision(monkeypatch):
+    """Webhook In_review → mismo camino que Processing."""
+    recorder = _mock_webhook(monkeypatch)
+    res = client.post(
+        "/api/webhooks/didit",
+        json={
+            "session_id": "sess-review",
+            "status": "In_review",
+            "vendor_data": "123",
+        },
+        headers=_WH_HEADERS,
+    )
+    assert res.status_code == 200, res.text
+    updates = [c for c in recorder.calls if "dni_verificacion_estado" in c[0]]
+    assert updates
+    _, params = updates[0]
+    assert params[0] == "en_revision"

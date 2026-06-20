@@ -119,6 +119,8 @@ type Perfil = {
   dni?: string | null;
   cuil?: string | null;
   dni_validado_at?: string | null;
+  dni_verificacion_estado?: string | null;
+  dni_verificacion_motivo?: string | null;
   nombre_renaper?: string | null;
   apellido_renaper?: string | null;
   fecha_nacimiento_renaper?: string | null;
@@ -172,8 +174,7 @@ type Pedido = {
   cantidad_jornadas?: number;
 };
 
-// ── Nuevo: tipo de tab del portal ─────────────────────────────────────────────
-type PortalTab = "pedidos" | "notificaciones" | "perfil" | "identidad";
+type PortalTab = "pedidos" | "notificaciones" | "perfil";
 
 const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "retirado"]);
 const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
@@ -316,7 +317,7 @@ export default function ClientePortal() {
   useEffect(() => {
     if (verificacion !== "pendiente" || verifHandledRef.current) return;
     verifHandledRef.current = true;
-    setActiveTab("identidad");
+    setActiveTab("perfil");
     setConfirmandoVerif(true);
 
     let alive = true;
@@ -554,12 +555,6 @@ export default function ClientePortal() {
               active={activeTab === "perfil"}
               onClick={() => setActiveTab("perfil")}
             />
-            <SidebarNavItem
-              icon={<ShieldCheck className="h-4 w-4" />}
-              label="Identidad"
-              active={activeTab === "identidad"}
-              onClick={() => setActiveTab("identidad")}
-            />
           </div>
 
           {/* Logout al fondo */}
@@ -584,7 +579,7 @@ export default function ClientePortal() {
               {perfil && !perfil.dni_validado_at && (
                 <button
                   type="button"
-                  onClick={() => setActiveTab("identidad")}
+                  onClick={() => setActiveTab("perfil")}
                   className="w-full mb-5 flex items-center gap-3 rounded-xl border border-amber bg-amber-soft px-4 py-3 text-left transition hover:bg-amber/20"
                 >
                   <ShieldAlert className="h-5 w-5 text-amber shrink-0" />
@@ -758,22 +753,15 @@ export default function ClientePortal() {
           {/* TAB: NOTIFICACIONES */}
           {activeTab === "notificaciones" && <NotificacionesSection />}
 
-          {/* TAB: PERFIL */}
+          {/* TAB: PERFIL (incluye sección de identidad) */}
           {activeTab === "perfil" && perfil && (
             <PerfilSection
               perfil={perfil}
               pedidosCount={pedidos.length}
               totalAlquilado={pedidos.reduce((s, p) => s + (p.monto_total ?? 0), 0)}
               onLogout={handleLogout}
-            />
-          )}
-
-          {/* TAB: IDENTIDAD */}
-          {activeTab === "identidad" && perfil && (
-            <IdentidadSection
-              perfil={perfil}
+              confirmandoVerif={confirmandoVerif}
               onPerfilChange={setPerfil}
-              confirmando={confirmandoVerif}
             />
           )}
         </main>
@@ -785,7 +773,7 @@ export default function ClientePortal() {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="Navegación del portal"
       >
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-3">
           <BottomNavItem
             icon={<Package className="h-5 w-5" />}
             label="Pedidos"
@@ -803,12 +791,6 @@ export default function ClientePortal() {
             label="Perfil"
             active={activeTab === "perfil"}
             onClick={() => setActiveTab("perfil")}
-          />
-          <BottomNavItem
-            icon={<ShieldCheck className="h-5 w-5" />}
-            label="Identidad"
-            active={activeTab === "identidad"}
-            onClick={() => setActiveTab("identidad")}
           />
         </div>
       </nav>
@@ -928,13 +910,18 @@ function IdentidadSection({
   perfil,
   onPerfilChange,
   confirmando = false,
+  compact = false,
 }: {
   perfil: Perfil;
   onPerfilChange: (p: Perfil) => void;
   /** True mientras esperamos el webhook tras volver del flujo Didit. */
   confirmando?: boolean;
+  /** True cuando está embebido en PerfilSection (omite el heading y el padding exterior). */
+  compact?: boolean;
 }) {
   const verificado = Boolean(perfil.dni_validado_at);
+  const estado = perfil.dni_verificacion_estado ?? "no_verificado";
+  const motivo = perfil.dni_verificacion_motivo;
   const [iniciando, setIniciando] = useState(false);
   const [apodo, setApodo] = useState(perfil.apodo ?? "");
   const [guardandoApodo, setGuardandoApodo] = useState(false);
@@ -972,16 +959,15 @@ function IdentidadSection({
     }
   }
 
-  return (
-    <div className="px-5 lg:px-10 pt-8 max-w-xl">
-      <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-6">
-        identidad.
-      </h2>
+  const inner = (
+    <>
+      {!compact && (
+        <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-6">
+          identidad.
+        </h2>
+      )}
 
-      {/* Estado de verificación. NOTA: el estado "confirmando" (vuelta de Didit,
-          esperando webhook) es un interino honesto con tokens del DS — el diseño
-          pulido de proceso/éxito/rechazo viene por handoff de Claude Design
-          (ver docs/design-brief-verificacion-identidad.md). */}
+      {/* Badge de estado */}
       {confirmando && !verificado ? (
         <div className="flex items-center gap-3 rounded-xl border hairline bg-surface px-4 py-4 mb-6">
           <ShieldCheck className="h-7 w-7 text-muted-foreground shrink-0 animate-pulse" />
@@ -991,6 +977,28 @@ function IdentidadSection({
             </div>
             <div className="font-sans text-xs text-muted-foreground mt-0.5">
               Estamos esperando la respuesta de RENAPER. Puede tardar unos segundos.
+            </div>
+          </div>
+        </div>
+      ) : estado === "rechazado" ? (
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 mb-6">
+          <XCircle className="h-7 w-7 text-destructive shrink-0 mt-0.5" />
+          <div>
+            <div className="font-sans font-semibold text-[15px] text-ink">
+              Verificación rechazada
+            </div>
+            <div className="font-sans text-xs text-muted-foreground mt-0.5">
+              {motivo ? motivo : "Tu verificación no pudo completarse. Podés intentarlo de nuevo."}
+            </div>
+          </div>
+        </div>
+      ) : estado === "en_revision" ? (
+        <div className="flex items-center gap-3 rounded-xl border border-amber bg-amber-soft px-4 py-4 mb-6">
+          <Clock className="h-7 w-7 text-amber shrink-0" />
+          <div>
+            <div className="font-sans font-semibold text-[15px] text-ink">En revisión</div>
+            <div className="font-sans text-xs text-muted-foreground mt-0.5">
+              Tu verificación está siendo revisada. Vas a recibir novedades pronto.
             </div>
           </div>
         </div>
@@ -1083,8 +1091,8 @@ function IdentidadSection({
         </div>
       )}
 
-      {/* Botón de verificación (solo si no verificado y no estamos confirmando) */}
-      {!verificado && !confirmando && (
+      {/* Botón de verificación (no verificado y no estamos confirmando ni en revisión) */}
+      {!verificado && !confirmando && estado !== "en_revision" && (
         <div className="mb-6">
           <p className="font-sans text-[13px] text-muted-foreground mb-4 leading-[1.5]">
             La verificación usa tu DNI y una selfie. Tarda menos de 2 minutos y la hace Didit, que
@@ -1131,8 +1139,11 @@ function IdentidadSection({
           el del DNI.
         </p>
       </div>
-    </div>
+    </>
   );
+
+  if (compact) return <div>{inner}</div>;
+  return <div className="px-5 lg:px-10 pt-8 max-w-xl">{inner}</div>;
 }
 
 // ── Tab: Perfil ───────────────────────────────────────────────────────────────
@@ -1142,20 +1153,15 @@ function PerfilSection({
   pedidosCount,
   totalAlquilado,
   onLogout,
+  confirmandoVerif = false,
+  onPerfilChange,
 }: {
-  perfil: {
-    nombre: string;
-    apellido: string;
-    email: string;
-    telefono: string;
-    direccion: string;
-    cuit?: string | null;
-    perfil_impuestos?: string | null;
-    created_at?: string | null;
-  };
+  perfil: Perfil;
   pedidosCount: number;
   totalAlquilado: number;
   onLogout: () => void;
+  confirmandoVerif?: boolean;
+  onPerfilChange: (p: Perfil) => void;
 }) {
   const initial = perfil.nombre?.[0]?.toUpperCase() ?? "?";
   const fullName = nombreCliente(perfil);
@@ -1267,6 +1273,19 @@ function PerfilSection({
             Total alquilado
           </div>
         </div>
+      </div>
+
+      {/* Identidad — embebida en perfil */}
+      <div className="border-t hairline pt-6 mb-6">
+        <h3 className="font-display text-[18px] font-black text-ink tracking-[-0.01em] mb-4">
+          identidad.
+        </h3>
+        <IdentidadSection
+          perfil={perfil}
+          onPerfilChange={onPerfilChange}
+          confirmando={confirmandoVerif}
+          compact
+        />
       </div>
 
       {/* Logout */}

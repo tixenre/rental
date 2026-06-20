@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";
 import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
+import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudioDisponibilidad, apiCrearReservaEstudio } from "@/lib/api";
 
@@ -189,6 +190,8 @@ export function StudioBookingForm({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [needsVerif, setNeedsVerif] = useState(false);
+  const [iniciandoVerif, setIniciandoVerif] = useState(false);
 
   const slots = useMemo(
     () => buildTimeSlots(openHour, closeHour, minHours),
@@ -273,6 +276,17 @@ export function StudioBookingForm({
       [QUERY_KEYS.pack]: withPack ? "1" : "0",
     }).toString();
 
+  const handleVerificar = async () => {
+    setIniciandoVerif(true);
+    try {
+      await iniciarVerificacionIdentidad(`/estudio?${buildEstudioReturnParams()}`);
+    } catch {
+      /* el helper ya hizo toast */
+    } finally {
+      setIniciandoVerif(false);
+    }
+  };
+
   const handleReservarClick = () => {
     if (!canSubmit) return;
     if (auth !== "in") {
@@ -280,7 +294,7 @@ export function StudioBookingForm({
       return;
     }
     if (!verificado) {
-      void iniciarVerificacionIdentidad(`/estudio?${buildEstudioReturnParams()}`);
+      setNeedsVerif(true);
       return;
     }
     void handleReservar();
@@ -552,20 +566,27 @@ export function StudioBookingForm({
           </p>
         )}
 
-        <Button
-          onClick={handleReservarClick}
-          disabled={!canSubmit}
-          className="w-full bg-ink text-amber hover:bg-[color-mix(in_oklch,var(--ink)_82%,var(--amber))]"
-          size="lg"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reservando…
-            </>
-          ) : (
-            ctaLabel
-          )}
-        </Button>
+        {needsVerif ? (
+          <VerificacionRequeridaPanel
+            onVerificar={() => void handleVerificar()}
+            iniciando={iniciandoVerif}
+          />
+        ) : (
+          <Button
+            onClick={handleReservarClick}
+            disabled={!canSubmit}
+            className="w-full bg-ink text-amber hover:bg-[color-mix(in_oklch,var(--ink)_82%,var(--amber))]"
+            size="lg"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reservando…
+              </>
+            ) : (
+              ctaLabel
+            )}
+          </Button>
+        )}
 
         <button
           type="button"

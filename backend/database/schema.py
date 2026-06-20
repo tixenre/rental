@@ -208,6 +208,15 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS estado_civil_renaper TEXT")
     # apodo: alias opcional para saludos informales en mails (siempre editable).
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS apodo TEXT")
+    # Estado del flujo de verificación Didit (PR2). El gate de pedidos sigue usando
+    # `dni_validado_at IS NOT NULL` como criterio — este campo añade visibilidad de
+    # estados intermedios para el portal (rechazado, en_revision).
+    # Espejo de la migración i9j0k1l2m3n4 (esquema en dos capas, MEMORIA 2026-06-03).
+    conn.execute(
+        "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS "
+        "dni_verificacion_estado TEXT NOT NULL DEFAULT 'no_verificado'"
+    )
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_verificacion_motivo TEXT")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
