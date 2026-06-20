@@ -252,7 +252,7 @@ export function HeroBanner({
 }
 
 /* ── SheetClose button ───────────────────────────────────────────── */
-export function SheetClose({ onClose }: { onClose: () => void }) {
+function SheetClose({ onClose }: { onClose: () => void }) {
   return (
     <button
       onClick={onClose}
@@ -264,7 +264,7 @@ export function SheetClose({ onClose }: { onClose: () => void }) {
 }
 
 /* ── CartItem (subcomponent with per-item imgFailed state) ───────── */
-export function CartItem({
+function CartItem({
   eq,
   qty,
   fechaDesde,
@@ -1213,7 +1213,7 @@ export function BrandSheet({
   );
 }
 
-export function BrandLogo({ nombre, logo_url }: { nombre: string; logo_url: string | null }) {
+function BrandLogo({ nombre, logo_url }: { nombre: string; logo_url: string | null }) {
   const [failed, setFailed] = useState(false);
   if (logo_url && !failed) {
     return (

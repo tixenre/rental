@@ -281,7 +281,7 @@ export function SortableRootItem({
   );
 }
 
-export function SortableChildItem({
+function SortableChildItem({
   child,
   parents,
   grandchildren = [],
@@ -475,7 +475,7 @@ export function SortableChildItem({
   );
 }
 
-export function ChildZone({ childId, children }: { childId: number; children: React.ReactNode }) {
+function ChildZone({ childId, children }: { childId: number; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `child-zone-${childId}`,
     data: { type: "child-zone", childId } satisfies DragData,
@@ -487,7 +487,7 @@ export function ChildZone({ childId, children }: { childId: number; children: Re
   );
 }
 
-export function SortableGrandchildItem({
+function SortableGrandchildItem({
   grand,
   parentChildId,
   onRename,
@@ -605,7 +605,7 @@ export function SortableGrandchildItem({
 // - Guarda al click del check o Enter; cancela con Escape o click en ✗.
 // - Re-sincroniza con `value` si cambia desde afuera (re-fetch post-save).
 
-export function EditableNameInput({
+function EditableNameInput({
   value,
   onSave,
   className,

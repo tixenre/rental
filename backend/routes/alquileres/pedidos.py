@@ -227,7 +227,6 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                         {"errores": [f"Sin stock suficiente: {s}" for s in sin_stock]},
                     )
 
-            es_historico    = _es_historico(p_row["fuente"])
             estado_anterior = p_row["estado"]
             updates         = {"estado": data.estado}
 
