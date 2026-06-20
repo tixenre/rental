@@ -1,7 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
-import { Logo } from "@/components/rental/Logo";
-import { Footer } from "@/components/rental/Footer";
 import { SITE_URL } from "@/lib/site";
 import { useHeroPhotos } from "@/lib/studio/hero-photos";
 
@@ -35,30 +33,6 @@ function LandingHub() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* TopBar mínima — logo + nav */}
-      <header className="sticky top-0 z-40 border-b hairline bg-background/95 backdrop-blur-xl">
-        <div className="flex items-center justify-between px-4 sm:px-6 lg:px-12 h-16">
-          <Logo size="sm" linkTo={null} />
-          <nav className="flex items-center gap-4 text-sm font-medium">
-            <Link to="/catalogo" className="text-muted-foreground hover:text-ink transition hidden sm:block">
-              Catálogo
-            </Link>
-            <Link to="/estudio" className="text-muted-foreground hover:text-ink transition hidden sm:block">
-              Estudio
-            </Link>
-            <Link to="/talleres" className="text-muted-foreground hover:text-ink transition hidden sm:block">
-              Talleres
-            </Link>
-            <Link
-              to="/catalogo"
-              className="inline-flex items-center gap-1.5 rounded-full bg-ink text-amber px-4 py-2 text-xs font-semibold transition hover:brightness-110"
-            >
-              Ver catálogo
-            </Link>
-          </nav>
-        </div>
-      </header>
-
       <main className="flex-1 flex flex-col">
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <section className="flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24 bg-background">
@@ -158,9 +132,6 @@ function LandingHub() {
           </Link>
         </div>
       </main>
-
-      {/* Footer */}
-      <Footer />
     </div>
   );
 }
