@@ -12,6 +12,7 @@ import {
 
 import { adminApi, type PedidoResumen } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { CalendarioWidget } from "@/components/admin/CalendarioWidget";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
@@ -26,6 +27,13 @@ function AdminDashboard() {
     queryFn: () => adminApi.dashboard(),
     staleTime: 60_000,
   });
+  // Conteo de pedidos con saldo pendiente (atajo a cobranzas).
+  const saldoQ = useQuery({
+    queryKey: ["admin", "pedidos", "con_saldo_count"],
+    queryFn: () => adminApi.listPedidos({ con_saldo: true, per_page: 1 }),
+    staleTime: 60_000,
+  });
+  const conSaldo = saldoQ.data?.total ?? 0;
 
   return (
     <div className="px-4 md:px-8 py-6 md:py-10 max-w-6xl mx-auto">
@@ -77,6 +85,30 @@ function AdminDashboard() {
             />
           </div>
 
+          {/* Atajos a Pedidos — entran a la lista ya filtrada (?f=). Reemplazan los
+              chips que antes vivían en /admin/pedidos. */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <AtajoPedidos
+              f="retiraHoy"
+              label="Retiran hoy"
+              n={data.salen_hoy.length}
+              dot="bg-amber"
+            />
+            <AtajoPedidos
+              f="devuelveHoy"
+              label="Devuelven hoy"
+              n={data.devuelven_hoy.length}
+              dot="bg-rosa"
+            />
+            <AtajoPedidos
+              f="nuevos"
+              label="Presupuestos nuevos"
+              n={data.pendientes}
+              dot="bg-azul"
+            />
+            <AtajoPedidos f="saldo" label="Con saldo" n={conSaldo} dot="bg-verde" />
+          </div>
+
           {/* Movimientos del día */}
           <div className="mt-10">
             <div className="mb-4">
@@ -123,6 +155,31 @@ function AdminDashboard() {
         </>
       )}
     </div>
+  );
+}
+
+/** Chip-atajo que entra a /admin/pedidos con un filtro del día pre-aplicado (?f=). */
+function AtajoPedidos({
+  f,
+  label,
+  n,
+  dot,
+}: {
+  f: "retiraHoy" | "devuelveHoy" | "nuevos" | "saldo";
+  label: string;
+  n: number;
+  dot: string;
+}) {
+  return (
+    <Link
+      to="/admin/pedidos"
+      search={{ f }}
+      className="inline-flex items-center gap-1.5 rounded-full border hairline bg-surface px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-ink"
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
+      {label}
+      <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{n}</span>
+    </Link>
   );
 }
 

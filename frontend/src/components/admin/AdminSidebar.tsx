@@ -20,7 +20,6 @@ import {
   Ruler,
   ShieldCheck,
   Database,
-  Inbox,
   HardDriveDownload,
   Clapperboard,
   Wallet,
@@ -77,7 +76,7 @@ const items: NavItem[] = [
     ],
   },
   { title: "Estudio", url: "/admin/estudio", icon: Clapperboard },
-  { title: "Solicitudes", url: "/admin/solicitudes", icon: Inbox },
+  // Solicitudes se accede desde la página de Pedidos (no se duplica en el sidebar).
   { title: "Clientes", url: "/admin/clientes", icon: Users },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
   {
