@@ -757,7 +757,10 @@ function PedidoEditorPage() {
             </div>
             <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full bg-amber"
+                className={cn(
+                  "h-full transition-colors",
+                  pagadoMonto >= total && total > 0 ? "bg-verde" : "bg-amber",
+                )}
                 style={{ width: `${total ? Math.min(100, (pagadoMonto / total) * 100) : 0}%` }}
               />
             </div>
@@ -846,7 +849,7 @@ function PedidoEditorPage() {
               disabled={!!ns.blocked || estadoMut.isPending}
               onClick={() => !ns.blocked && handleNextStep(ns.target)}
             >
-              {ns.blocked ?? ns.label.split(" ")[0]}
+              {ns.blocked ?? ns.label}
             </Button>
           )}
         </div>
