@@ -52,7 +52,6 @@ function LandingHub() {
 
         {/* ── Tres propuestas ──────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-3 flex-1 min-h-[55vh]">
-
           {/* Rental */}
           <Link
             to="/catalogo"
@@ -65,7 +64,13 @@ function LandingHub() {
               className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink mb-4"
               style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
             >
-              rental.<br /><span className="opacity-60">alquilá lo<br />que necesitás.</span>
+              rental.
+              <br />
+              <span className="opacity-60">
+                alquilá lo
+                <br />
+                que necesitás.
+              </span>
             </h2>
             <p className="text-ink/65 text-sm mb-7 leading-relaxed max-w-xs">
               Cámaras, lentes, iluminación, audio y soportes. Retiro en el estudio.
@@ -97,7 +102,13 @@ function LandingHub() {
                 className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-white mb-4"
                 style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
               >
-                estudio.<br /><span className="opacity-70">un lugar donde<br />pasan cosas.</span>
+                estudio.
+                <br />
+                <span className="opacity-70">
+                  un lugar donde
+                  <br />
+                  pasan cosas.
+                </span>
               </h2>
               <p className="text-white/70 text-sm mb-7 leading-relaxed max-w-xs">
                 Set con fondo infinito, ciclorama y luz natural. Por hora.
@@ -121,7 +132,13 @@ function LandingHub() {
               className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink mb-4"
               style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
             >
-              workshops.<br /><span className="opacity-60">aprender<br />haciendo.</span>
+              workshops.
+              <br />
+              <span className="opacity-60">
+                aprender
+                <br />
+                haciendo.
+              </span>
             </h2>
             <p className="text-ink/65 text-sm mb-7 leading-relaxed max-w-xs">
               Clases prácticas de dirección de arte, foto y video. Cupos limitados.

@@ -81,9 +81,7 @@ function TalleresAdminPage() {
         <h1 className="text-xl font-semibold text-ink">Talleres</h1>
       </div>
 
-      {loadingTalleres && (
-        <p className="text-sm text-muted-foreground">Cargando talleres…</p>
-      )}
+      {loadingTalleres && <p className="text-sm text-muted-foreground">Cargando talleres…</p>}
 
       {talleres.length > 1 && (
         <div className="flex flex-wrap gap-2">
@@ -107,26 +105,31 @@ function TalleresAdminPage() {
         <AdminSection storageKey="talleres:info" title={`${taller.nombre} ${taller.subtitulo}`}>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <span>
-              <span className="text-ink font-medium">{taller.cupos_confirmados}</span>/{taller.cupos_total} cupos confirmados
+              <span className="text-ink font-medium">{taller.cupos_confirmados}</span>/
+              {taller.cupos_total} cupos confirmados
             </span>
             {taller.cupos_disponibles > 0 ? (
-              <span className="text-green-600">{taller.cupos_disponibles} disponibles</span>
+              <span className="text-verde">{taller.cupos_disponibles} disponibles</span>
             ) : (
-              <span className="text-amber-600">Sin cupos — lista de espera activa</span>
+              <span className="text-amber">Sin cupos — lista de espera activa</span>
             )}
             <span>Precio: {formatARS(taller.precio_total)}</span>
             <span>
-              {new Date(taller.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" })}
+              {new Date(taller.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", {
+                day: "numeric",
+                month: "long",
+              })}
               {" y "}
-              {new Date(taller.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" })}
+              {new Date(taller.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", {
+                day: "numeric",
+                month: "long",
+              })}
             </span>
           </div>
         </AdminSection>
       )}
 
-      {loadingIns && (
-        <p className="text-sm text-muted-foreground">Cargando inscripciones…</p>
-      )}
+      {loadingIns && <p className="text-sm text-muted-foreground">Cargando inscripciones…</p>}
 
       {!loadingIns && inscripciones.length === 0 && tallerActivo && (
         <div className="rounded-xl border border-dashed border-border/60 py-12 text-center text-sm text-muted-foreground">
@@ -135,7 +138,10 @@ function TalleresAdminPage() {
       )}
 
       {confirmadas.length > 0 && (
-        <AdminSection storageKey="talleres:confirmadas" title={`Inscripciones confirmadas (${confirmadas.length})`}>
+        <AdminSection
+          storageKey="talleres:confirmadas"
+          title={`Inscripciones confirmadas (${confirmadas.length})`}
+        >
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -150,7 +156,10 @@ function TalleresAdminPage() {
               </thead>
               <tbody>
                 {confirmadas.map((ins) => (
-                  <tr key={ins.id} className="border-b border-border/40 hover:bg-muted/20 transition">
+                  <tr
+                    key={ins.id}
+                    className="border-b border-border/40 hover:bg-muted/20 transition"
+                  >
                     <td className="py-2.5 pr-4 font-medium text-ink">{ins.nombre}</td>
                     <td className="py-2.5 pr-4 text-muted-foreground">
                       <a href={`mailto:${ins.email}`} className="hover:text-ink transition">
@@ -169,7 +178,7 @@ function TalleresAdminPage() {
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-ink hover:text-amber transition"
                         >
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" strokeWidth={1.5} />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-verde" strokeWidth={1.5} />
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       ) : (
@@ -204,7 +213,10 @@ function TalleresAdminPage() {
               </thead>
               <tbody>
                 {espera.map((ins) => (
-                  <tr key={ins.id} className="border-b border-border/40 hover:bg-muted/20 transition">
+                  <tr
+                    key={ins.id}
+                    className="border-b border-border/40 hover:bg-muted/20 transition"
+                  >
                     <td className="py-2.5 pr-4 font-medium text-ink">{ins.nombre}</td>
                     <td className="py-2.5 pr-4 text-muted-foreground">
                       <a href={`mailto:${ins.email}`} className="hover:text-ink transition">
