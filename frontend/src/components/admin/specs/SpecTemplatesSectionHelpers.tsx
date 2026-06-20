@@ -106,7 +106,7 @@ export function DestacadasCounter({ items }: { items: SpecTemplate[] }) {
   );
 }
 
-export function Badge({
+function Badge({
   children,
   tone = "default",
 }: {
@@ -562,7 +562,7 @@ export function SpecTemplateFormModal({
   );
 }
 
-export function Toggle({
+function Toggle({
   label,
   checked,
   onChange,
