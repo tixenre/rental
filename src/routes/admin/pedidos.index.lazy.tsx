@@ -134,9 +134,11 @@ function PedidosPage() {
     search.f && search.f in DAY_FILTER_LABEL ? (search.f as DayFilter) : null;
 
   const [q, setQ] = useState("");
-  const [estadoF, setEstadoF] = useState<EstadoFilter>("activos");
+  const [estadoF, setEstadoF] = useState<EstadoFilter>("todos");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [askDelete, setAskDelete] = useState(false);
+  const qc = useQueryClient();
 
   // Lista de pedidos (per_page alto cubre el volumen real).
   const pedidosQ = useQuery({
@@ -181,6 +183,19 @@ function PedidosPage() {
 
   const openEditor = (id: number) =>
     navigate({ to: "/admin/pedidos/$id", params: { id: String(id) } });
+
+  // Borrar el pedido seleccionado (la acción vive arriba de la lista, no en el panel).
+  const selPedido = items.find((p) => p.id === selId) ?? null;
+  const deleteMut = useMutation({
+    mutationFn: () => adminApi.deletePedido(selId as number),
+    onSuccess: () => {
+      toast.success("Pedido eliminado");
+      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
+      setSelectedId(null);
+      setAskDelete(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="flex flex-col h-[calc(100dvh-var(--admin-topbar-h,56px))] min-h-0">
@@ -270,22 +285,32 @@ function PedidosPage() {
             panelOpen ? "w-[360px]" : "flex-1",
           )}
         >
-          {!panelOpen && (
-            <div className="flex items-center gap-2 px-4 py-2 border-b hairline bg-surface-elevated shrink-0">
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                {items.length} pedido{items.length !== 1 ? "s" : ""}
-              </span>
-              <div className="flex-1" />
-              <button
-                type="button"
-                onClick={() => setPanelOpen(true)}
-                aria-label="Mostrar detalle"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
-              >
-                <PanelLeft className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
+          {/* Barra del listado: contador + acciones (eliminar el seleccionado · ancho del panel) */}
+          <div className="flex items-center gap-1 px-3 py-2 border-b hairline bg-surface-elevated shrink-0">
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              {items.length} pedido{items.length !== 1 ? "s" : ""}
+            </span>
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={() => setAskDelete(true)}
+              disabled={selId == null}
+              aria-label="Eliminar pedido seleccionado"
+              title="Eliminar pedido seleccionado"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-destructive/40 hover:text-destructive disabled:opacity-40 disabled:hover:border-hairline disabled:hover:text-muted-foreground"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPanelOpen((o) => !o)}
+              aria-label={panelOpen ? "Ensanchar lista" : "Mostrar detalle"}
+              title={panelOpen ? "Ensanchar la lista" : "Mostrar el detalle"}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+          </div>
           <div className="flex-1 overflow-y-auto">
             <MasterList
               items={items}
@@ -298,15 +323,34 @@ function PedidosPage() {
         </div>
         {panelOpen && (
           <div className="flex-1 min-w-0 overflow-y-auto bg-surface/40">
-            <PreviewPane
-              id={selId}
-              onOpen={openEditor}
-              onTogglePanel={() => setPanelOpen(false)}
-              onDeleted={() => setSelectedId(null)}
-            />
+            <PreviewPane id={selId} onOpen={openEditor} />
           </div>
         )}
       </div>
+
+      {/* Eliminar el pedido seleccionado (acción de la barra del listado) */}
+      <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Eliminar pedido #{selPedido?.numero_pedido ?? selId}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {selPedido?.cliente_nombre ? `${selPedido.cliente_nombre} · ` : ""}Se borran también
+              sus ítems y pagos. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMut.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Mobile: cards */}
       <div className="md:hidden flex-1 overflow-y-auto px-4 pb-24 space-y-2 border-t hairline pt-3">
@@ -465,17 +509,7 @@ function MasterList({
   );
 }
 
-function PreviewPane({
-  id,
-  onOpen,
-  onTogglePanel,
-  onDeleted,
-}: {
-  id: number | null;
-  onOpen: (id: number) => void;
-  onTogglePanel: () => void;
-  onDeleted: () => void;
-}) {
+function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) => void }) {
   const detalleQ = useQuery({
     queryKey: ["admin", "pedido", id],
     queryFn: () => adminApi.getPedido(id as number),
@@ -483,21 +517,10 @@ function PreviewPane({
   });
   const p = detalleQ.data;
   const qc = useQueryClient();
-  const [askDelete, setAskDelete] = useState(false);
   const [openPago, setOpenPago] = useState(false);
   const [openMail, setOpenMail] = useState(false);
   const [askVerif, setAskVerif] = useState(false);
   const [pendingEstado, setPendingEstado] = useState<EstadoPedido | null>(null);
-
-  const deleteMut = useMutation({
-    mutationFn: () => adminApi.deletePedido(id as number),
-    onSuccess: () => {
-      toast.success("Pedido eliminado");
-      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
-      onDeleted();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   // Avanzar estado inline (quick-action). Misma máquina que el editor
   // (@/lib/pedido-estados); el backend rechaza transiciones inválidas igual.
@@ -575,26 +598,6 @@ function PreviewPane({
                 </>
               )}
             </div>
-          </div>
-          {/* Acciones secundarias (de-enfatizadas, lejos de las quick-actions) */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setAskDelete(true)}
-              aria-label="Eliminar pedido"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-destructive/40 hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={onTogglePanel}
-              aria-label="Ensanchar lista"
-              title="Ensanchar la lista"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
-            >
-              <PanelLeft className="h-4 w-4" />
-            </button>
           </div>
         </div>
 
@@ -746,26 +749,6 @@ function PreviewPane({
               }}
             >
               Avanzar de todas formas
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar pedido #{p.numero_pedido ?? p.id}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se borran también sus ítems y pagos. No se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteMut.mutate()}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

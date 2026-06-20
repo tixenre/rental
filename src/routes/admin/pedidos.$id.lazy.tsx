@@ -383,55 +383,73 @@ function PedidoEditorPage() {
             {/* Buscar ficha existente: al elegirla, el contacto y el descuento
                 se completan solos. También se puede tipear a mano abajo (pedido
                 sin ficha vinculada). */}
-            <div className="mb-3">
-              <ClienteAutocomplete
-                placeholder="Buscar cliente por nombre, email o teléfono…"
-                onPick={(c) =>
-                  setDatos((d) =>
-                    d
-                      ? {
-                          ...d,
-                          cliente_id: c.id,
-                          cliente_nombre: nombreCliente(c),
-                          cliente_email: c.email ?? "",
-                          cliente_telefono: c.telefono ?? "",
-                          // El descuento sigue al cliente: si el nuevo no tiene
-                          // uno propio, se resetea a 0.
-                          descuento_pct: c.descuento ?? 0,
-                        }
-                      : d,
-                  )
-                }
-              />
-              {datos.cliente_id && (
-                <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                  <Check className="h-3 w-3 text-verde" />
-                  <span>Ficha vinculada · el contacto se sincroniza con el cliente</span>
-                  <button
-                    type="button"
-                    onClick={() => setDatos((d) => d && { ...d, cliente_id: null })}
-                    className="ml-1 underline hover:text-ink"
-                  >
-                    Desvincular
-                  </button>
+            {datos.cliente_id ? (
+              // Cliente vinculado: tarjeta clara de QUIÉN está seleccionado.
+              <div className="mb-3 flex items-center gap-3 rounded-lg border border-verde/30 bg-verde/[0.06] px-3 py-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink font-display text-sm text-amber">
+                  {(datos.cliente_nombre || "?").trim().charAt(0).toUpperCase() || "?"}
                 </div>
-              )}
-              {datos.cliente_id && (
-                <div
-                  className={cn(
-                    "mt-1 flex items-center gap-1.5 font-mono text-[11px]",
-                    p.cliente_dni_validado_at ? "text-verde" : "text-amber",
-                  )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate font-medium text-ink">
+                      {datos.cliente_nombre || "Cliente sin nombre"}
+                    </span>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-[10px]",
+                        p.cliente_dni_validado_at
+                          ? "bg-verde/10 text-verde"
+                          : "bg-amber/15 text-ink",
+                      )}
+                    >
+                      {p.cliente_dni_validado_at ? (
+                        <ShieldCheck className="h-3 w-3" />
+                      ) : (
+                        <ShieldAlert className="h-3 w-3" />
+                      )}
+                      {p.cliente_dni_validado_at ? "Verificado" : "Sin verificar"}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+                    {[datos.cliente_email, datos.cliente_telefono].filter(Boolean).join(" · ") ||
+                      "sin contacto"}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDatos((d) => d && { ...d, cliente_id: null })}
+                  className="shrink-0 rounded-md border hairline px-2.5 py-1 text-xs text-muted-foreground hover:border-ink hover:text-ink"
                 >
-                  {p.cliente_dni_validado_at ? (
-                    <ShieldCheck className="h-3 w-3 shrink-0" />
-                  ) : (
-                    <ShieldAlert className="h-3 w-3 shrink-0" />
-                  )}
-                  {p.cliente_dni_validado_at ? "Identidad verificada" : "Identidad sin verificar"}
-                </div>
-              )}
-            </div>
+                  Desvincular
+                </button>
+              </div>
+            ) : (
+              // Sin ficha: buscar una, o cargar el contacto a mano abajo.
+              <div className="mb-3">
+                <ClienteAutocomplete
+                  placeholder="Buscar cliente por nombre, email o teléfono…"
+                  onPick={(c) =>
+                    setDatos((d) =>
+                      d
+                        ? {
+                            ...d,
+                            cliente_id: c.id,
+                            cliente_nombre: nombreCliente(c),
+                            cliente_email: c.email ?? "",
+                            cliente_telefono: c.telefono ?? "",
+                            // El descuento sigue al cliente: si el nuevo no tiene
+                            // uno propio, se resetea a 0.
+                            descuento_pct: c.descuento ?? 0,
+                          }
+                        : d,
+                    )
+                  }
+                />
+                <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+                  O cargá el contacto a mano abajo (pedido sin ficha vinculada).
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FieldLabel label="Nombre">
                 <Input
