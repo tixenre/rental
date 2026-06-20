@@ -562,7 +562,7 @@ function Index() {
                       else setSelectedCats(new Set([cat]));
                     }}
                     className={cn(
-                      "inline-flex items-baseline gap-1.5 rounded-full border px-3.5 py-1.5 whitespace-nowrap shrink-0 text-sm transition",
+                      "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 py-2.5 whitespace-nowrap shrink-0 text-sm transition",
                       isActive
                         ? "border-transparent bg-amber font-bold text-ink"
                         : "border-hairline font-medium text-muted-foreground hover:border-ink hover:text-ink",
@@ -589,7 +589,7 @@ function Index() {
                   type="button"
                   onClick={() => setFavoritosOnly((v) => !v)}
                   className={cn(
-                    "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                    "shrink-0 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition whitespace-nowrap",
                     favoritosOnly
                       ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
                       : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
@@ -607,7 +607,7 @@ function Index() {
                 type="button"
                 onClick={() => setDisponiblesOnly((v) => !v)}
                 className={cn(
-                  "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                  "shrink-0 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition whitespace-nowrap",
                   disponiblesOnly
                     ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
                     : "border-hairline text-ink hover:border-ink hover:bg-muted/50",

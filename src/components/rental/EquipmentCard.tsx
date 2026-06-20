@@ -172,22 +172,24 @@ export function EquipmentCard({
         />
 
         {qty === 0 ? (
+          /* Área de tap 44×44px con before: — el botón visual queda en 34px */
           <button
             type="button"
             onClick={handleAdd}
             disabled={sinStock}
             aria-label={`Agregar ${nombrePublico} al carrito`}
-            className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full border hairline bg-background text-ink transition-colors hover:border-amber hover:bg-amber active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="relative grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full border hairline bg-background text-ink transition-colors hover:border-amber hover:bg-amber active:scale-90 disabled:cursor-not-allowed disabled:opacity-40 before:absolute before:inset-[-5px] before:content-['']"
           >
             <Plus className="h-4 w-4" />
           </button>
         ) : (
+          /* size="md" = 30px por botón → pill completa ~86px, tap target OK (MEMORIA 2026-05-29) */
           <StepperPill
             qty={qty}
             onIncrement={handleAdd}
             onDecrement={() => remove(item.id)}
             maxReached={reachedMax}
-            size="sm"
+            size="md"
           />
         )}
       </div>
