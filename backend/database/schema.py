@@ -20,7 +20,17 @@ def init_db():
     raw_conn = psycopg2.connect(**get_connection_params())
     raw_conn.set_isolation_level(0)  # Autocommit
     conn = PGConnection(raw_conn)
+    try:
+        _init_db_schema(conn)
+    finally:
+        conn.close()
+    logger.info("Base de datos PostgreSQL inicializada")
 
+
+def _init_db_schema(conn):
+    """Aplica todo el DDL idempotente sobre `conn`. La conexión y su cierre los
+    maneja `init_db` con try/finally — separar el cuerpo evita re-indentar ~1500
+    líneas y garantiza que `conn.close()` corra aunque un DDL falle (sin leak)."""
     # ── Búsqueda fuzzy: extensiones + helper inmutable ────────────────────────
     # `pg_trgm` (similitud por trigramas → typos + ranking) y `unaccent` (folding
     # de acentos: "bateria" = "Batería"). El motor único vive en backend/busqueda;
@@ -593,8 +603,10 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_spec_def_unidad_id "
         "ON spec_definitions(unidad_id) WHERE unidad_id IS NOT NULL"
     )
+    # Nombre distinto del de arriba (`idx_spec_def_compat`, sobre spec_key): antes
+    # ambos se llamaban igual → con IF NOT EXISTS este nunca se creaba (#921).
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_spec_def_compat "
+        "CREATE INDEX IF NOT EXISTS idx_spec_def_es_compat "
         "ON spec_definitions(es_compatibilidad) WHERE es_compatibilidad"
     )
     # aliases: lista de strings usados para match de columnas B&H/CSV.
@@ -1507,5 +1519,3 @@ def init_db():
         logger.warning("No se pudieron regenerar etiquetas auto: %s", ex)
 
     conn.commit()
-    conn.close()
-    logger.info("Base de datos PostgreSQL inicializada")
