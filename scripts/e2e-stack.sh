@@ -13,7 +13,7 @@
 #   sudo scripts/e2e-stack.sh            # backend en :8000
 #   sudo scripts/e2e-stack.sh --seed     # + 1 equipo y 1 reserva de ejemplo
 #
-# Después, en otra terminal: `npm run dev` + `npx playwright test`.
+# Después, en otra terminal: `cd frontend && npm run dev` + `npx playwright test`.
 # Requiere root (arranca Postgres) y postgresql-16 instalado.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

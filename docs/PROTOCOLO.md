@@ -5,6 +5,12 @@
 > código muerto/DRY · seguridad+bugs · ramas · issues · modularización/split). Este doc agrega lo que
 > el skill **referencia** pero no contiene — la **rúbrica de auditoría** (su fase de diagnóstico) y el
 > **mobile gate**.
+>
+> **Dos pasadas, una rúbrica.** El **backend** se diagnostica con los ejes **A-O** (abajo) y se ejecuta
+> vía `mantenimiento`. El **front-end / experiencia** se diagnostica con los ejes **P-U** (abajo) y se
+> ejecuta vía el skill [`pulido-frontend`](../.claude/skills/pulido-frontend/SKILL.md) — el loop de
+> auditar→pulir una pantalla viva (UX · UI/estética · modularización · performance), DS-first. El
+> **mobile gate** es obligatorio para las dos.
 
 ---
 
@@ -63,6 +69,29 @@ Diagnóstico profundo y **repetible**: no toca código (los hallazgos se **ejecu
   prod con PII real**).
 - **O · Higiene de deps** _(periódico, no por-PR)_ — `pip-audit` / `npm audit`, pinning (`==`),
   supply-chain.
+
+**Front-end / experiencia (la pasada visual — la maneja [`pulido-frontend`](../.claude/skills/pulido-frontend/SKILL.md)):**
+
+Se diagnostican **viendo la pantalla viva** (render-compare con `render.mjs --both`; rutas
+autenticadas vía `staging-login`), no leyendo clases. Mobile 375×667 obligatorio.
+
+- **P · UX / flujo** — la tarea se completa sin fricción; sin pasos de más ni callejones; **una sola
+  forma de hacer cada cosa** (no 3 controles para 1 acción); labels que **prometen lo que hacen** (un
+  botón "Gestionar" que no gestiona = 🔴). El "siguiente paso" único y **derivado** del estado real.
+- **Q · Jerarquía visual** — un solo foco primario por pantalla; el dato clave anclado; lectura clara;
+  aire. Dos CTAs del mismo peso (o tres ámbares compitiendo) = el ojo no sabe dónde ir.
+- **R · Consistencia con el DS** — tokens (cero hex / escala genérica; lo cuida el guardrail de ESLint);
+  componentes reusados, no one-offs; spacing/eyebrows/tipografía por recipe; estados canónicos
+  (`EstadoBadge`/`EmptyState`/skeleton). Drift contra `docs/DESIGN_SYSTEM.md` = hallazgo.
+- **S · Accesibilidad** — contraste WCAG (**amber sobre blanco es borderline** — `ink` sobre lo que sea
+  si no se lee); tap targets ≥44px; inputs ≥16px; `:focus-visible`; `aria-label` en icon-buttons;
+  focus-trap + autofocus en modales; orden de foco.
+- **T · Performance percibida** — LCP mobile; `loading="lazy"`; lazy de rutas pesadas; skeleton que
+  espeja el layout (cero CLS); `memo`/`useMemo` **solo con lag medido** (memo sin problema = deuda);
+  payloads chicos; nada bloqueante en el render path.
+- **U · Estética / acabado** — alineación, ritmo, densidad; micro-interacciones canónicas (press scale,
+  hover lift, `--ease-*`); copy (voz "vos", precios por `formatARS()`, empty states accionables); pulido
+  de detalle.
 
 ### Método (read-only)
 

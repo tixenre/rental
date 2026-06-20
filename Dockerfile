@@ -18,18 +18,18 @@ ENV VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID
 ENV VITE_API_URL=$VITE_API_URL
 
 # Deps primero — capa cacheada mientras no cambien package.json/bun.lock.
-COPY package.json bun.lock ./
+COPY frontend/package.json frontend/bun.lock ./
 RUN bun install --frozen-lockfile
 
 # Después código y config — capa que se invalida en cada cambio de UI.
-COPY vite.config.ts tsconfig.json index.html ./
-COPY public/ ./public/
-COPY src/ ./src/
+COPY frontend/vite.config.ts frontend/tsconfig.json frontend/index.html ./
+COPY frontend/public/ ./public/
+COPY frontend/src/ ./src/
 # dev/ solo existe en esta etapa de build (se descarta con la imagen frontend).
 # Vite carga su config con esbuild, que resuelve estáticamente todos los
 # imports — incluso los dinámicos — antes de ejecutar. Sin este COPY, el
 # import condicional de ./dev/api-fixtures-plugin falla aunque no se ejecute.
-COPY dev/ ./dev/
+COPY frontend/dev/ ./dev/
 RUN bun run build
 
 # ── Stage 2: runtime (Python + Chromium) ─────────────────────────────────
@@ -62,12 +62,13 @@ COPY backend/ ./backend/
 # con "No module named 'lentes_parser'" en producción.
 COPY tools/ ./tools/
 # Fuentes de marca para los PDFs: `pdf_templates._fonts_css()` las embebe en
-# runtime desde `src/assets/fonts` (FONTS_DIR = backend/../src/assets/fonts). El
-# runtime NO trae todo `src/` (solo el `dist` buildeado), así que copiamos
-# explícitamente las fuentes — sin esto los documentos PDF saldrían con la
-# tipografía del sistema en vez de la de Rambla (degrada silencioso, no rompe).
-COPY src/assets/fonts/ ./src/assets/fonts/
-COPY --from=frontend /app/dist ./dist
+# runtime desde `frontend/src/assets/fonts` (FONTS_DIR = backend/../frontend/src/
+# assets/fonts). El runtime NO trae todo `frontend/src/` (solo el `dist`
+# buildeado), así que copiamos explícitamente las fuentes — sin esto los
+# documentos PDF saldrían con la tipografía del sistema en vez de la de Rambla
+# (degrada silencioso, no rompe).
+COPY frontend/src/assets/fonts/ ./frontend/src/assets/fonts/
+COPY --from=frontend /app/dist ./frontend/dist
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
