@@ -25,6 +25,7 @@ import {
   Wallet,
   BookOpen,
   Calculator,
+  GraduationCap,
 } from "lucide-react";
 
 import {
@@ -76,6 +77,7 @@ const items: NavItem[] = [
     ],
   },
   { title: "Estudio", url: "/admin/estudio", icon: Clapperboard },
+  { title: "Talleres", url: "/admin/talleres", icon: GraduationCap },
   // Solicitudes se accede desde la página de Pedidos (no se duplica en el sidebar).
   { title: "Clientes", url: "/admin/clientes", icon: Users },
   { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
