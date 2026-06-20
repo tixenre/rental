@@ -1,0 +1,39 @@
+[
+  {
+    "id": 1,
+    "slug": "direccion-de-arte-jime-troncoso",
+    "nombre": "Workshop Dirección de Arte",
+    "subtitulo": "x Jime Troncoso",
+    "instructor_nombre": "Jime Troncoso",
+    "instructor_bio": "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos creativos en proyectos artísticos, audiovisuales y fotográficos.",
+    "instructor_proyectos": ["Universal LATAM", "CheNetflix", "Shorta", "Spotify", "Gancia", "Skyy", "Lucciano's", "Atomik", "Luigi Bosca", "Shell", "Las Pastillas del Abuelo", "Los Pericos & El Plan de la Mariposa", "Kevin Johansen", "Bruto", "Hops"],
+    "descripcion": "Un workshop intensivo de dos sábados para aprender a pensar y ejecutar la dirección de arte en producciones reales: desde la moodboard hasta el set.",
+    "publico_objetivo": "Para fotógrafas, directoras de arte, productoras audiovisuales y cualquier persona con curiosidad por el detrás de escena visual de una producción.",
+    "programa_teorica": [
+      "¿Qué es la dirección de arte y por qué importa?",
+      "Referentes y construcción de moodboard",
+      "Paleta de color, texturas y objetos",
+      "Comunicación con el fotógrafo y el director",
+      "Cómo cotizar y presentar tu trabajo"
+    ],
+    "programa_practica": [
+      "Producción de una sesión real en Rambla Estudio",
+      "Selección y construcción del set",
+      "Trabajo con modelos y vestuario",
+      "Coordinación con el equipo de foto (Pablo Isa + Tincho + Rambla Rental)",
+      "Feedback en vivo y cierre"
+    ],
+    "fecha_inicio": "2026-07-11",
+    "fecha_fin": "2026-07-18",
+    "horario": "9 a 13 hs",
+    "cupos_total": 12,
+    "cupos_confirmados": 0,
+    "cupos_disponibles": 12,
+    "precio_total": 200000,
+    "precio_sena": 100000,
+    "pago_alias": "rambla.rental",
+    "pago_cbu": "0720051288000030876540",
+    "pago_banco": "Galicia",
+    "direccion": "Chaco 1392"
+  }
+]

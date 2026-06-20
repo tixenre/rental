@@ -28,6 +28,13 @@ const GET_ROUTES: Record<string, string> = {
   "/api/equipos": "equipos.json",
   "/api/categorias": "categorias.json",
   "/api/marcas": "marcas.json",
+  "/api/talleres": "talleres.json",
+};
+
+// Rutas de prefijo: cualquier GET que empiece con la key sirve el fixture.
+// Usado para rutas dinámicas como /api/talleres/{slug}.
+const GET_PREFIX_ROUTES: Record<string, string> = {
+  "/api/talleres/": "talleres-slug.json",
 };
 
 function loadFixture(file: string): string | null {
@@ -143,6 +150,7 @@ export function apiFixturesPlugin(): Plugin {
 
         // GET de lectura del catálogo.
         if (req.method === "GET") {
+          // Exact match primero
           const file = GET_ROUTES[pathname];
           if (file) {
             const fixtureBody = loadFixture(file);
@@ -152,6 +160,19 @@ export function apiFixturesPlugin(): Plugin {
               res.statusCode = 200;
               res.end(fixtureBody);
               return;
+            }
+          }
+          // Prefix match para rutas dinámicas (ej. /api/talleres/{slug})
+          for (const [prefix, prefixFile] of Object.entries(GET_PREFIX_ROUTES)) {
+            if (pathname.startsWith(prefix)) {
+              const prefixBody = loadFixture(prefixFile);
+              if (prefixBody != null) {
+                res.setHeader("Content-Type", "application/json");
+                res.setHeader("X-Rambla-Fixture", "1");
+                res.statusCode = 200;
+                res.end(prefixBody);
+                return;
+              }
             }
           }
         }

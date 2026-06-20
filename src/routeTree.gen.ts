@@ -35,6 +35,7 @@ import { Route as AdminEstudioRouteImport } from './routes/admin/estudio'
 import { Route as AdminEquiposRouteImport } from './routes/admin/equipos'
 import { Route as ClientePedidosIdEditarRouteImport } from './routes/cliente.pedidos.$id.editar'
 
+const TalleresIndexLazyRouteImport = createFileRoute('/talleres/')()
 const AdminIndexLazyRouteImport = createFileRoute('/admin/')()
 const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
@@ -143,6 +144,13 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TalleresIndexLazyRoute = TalleresIndexLazyRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TalleresRoute,
+} as any).lazy(() =>
+  import('./routes/talleres.index.lazy').then((d) => d.Route),
+)
 const AdminIndexLazyRoute = AdminIndexLazyRouteImport.update({
   id: '/',
   path: '/',
@@ -460,6 +468,7 @@ export interface FileRoutesByFullPath {
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
+  '/talleres/': typeof TalleresIndexLazyRoute
   '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
   '/admin/contabilidad/glosario': typeof AdminContabilidadGlosarioLazyRoute
   '/admin/contabilidad/liquidacion': typeof AdminContabilidadLiquidacionLazyRoute
@@ -488,7 +497,6 @@ export interface FileRoutesByTo {
   '/estudio': typeof EstudioRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
-  '/talleres': typeof TalleresRouteWithChildren
   '/terminos': typeof TerminosRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
@@ -510,6 +518,7 @@ export interface FileRoutesByTo {
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente': typeof ClienteIndexRoute
   '/admin': typeof AdminIndexLazyRoute
+  '/talleres': typeof TalleresIndexLazyRoute
   '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
   '/admin/contabilidad/glosario': typeof AdminContabilidadGlosarioLazyRoute
   '/admin/contabilidad/liquidacion': typeof AdminContabilidadLiquidacionLazyRoute
@@ -566,6 +575,7 @@ export interface FileRoutesById {
   '/admin/unidades': typeof AdminUnidadesLazyRoute
   '/cliente/': typeof ClienteIndexRoute
   '/admin/': typeof AdminIndexLazyRoute
+  '/talleres/': typeof TalleresIndexLazyRoute
   '/admin/contabilidad/cuentas': typeof AdminContabilidadCuentasLazyRoute
   '/admin/contabilidad/glosario': typeof AdminContabilidadGlosarioLazyRoute
   '/admin/contabilidad/liquidacion': typeof AdminContabilidadLiquidacionLazyRoute
@@ -623,6 +633,7 @@ export interface FileRouteTypes {
     | '/admin/unidades'
     | '/cliente/'
     | '/admin/'
+    | '/talleres/'
     | '/admin/contabilidad/cuentas'
     | '/admin/contabilidad/glosario'
     | '/admin/contabilidad/liquidacion'
@@ -651,7 +662,6 @@ export interface FileRouteTypes {
     | '/estudio'
     | '/preguntas-frecuentes'
     | '/privacidad'
-    | '/talleres'
     | '/terminos'
     | '/admin/login'
     | '/admin/novedades'
@@ -673,6 +683,7 @@ export interface FileRouteTypes {
     | '/admin/unidades'
     | '/cliente'
     | '/admin'
+    | '/talleres'
     | '/admin/contabilidad/cuentas'
     | '/admin/contabilidad/glosario'
     | '/admin/contabilidad/liquidacion'
@@ -728,6 +739,7 @@ export interface FileRouteTypes {
     | '/admin/unidades'
     | '/cliente/'
     | '/admin/'
+    | '/talleres/'
     | '/admin/contabilidad/cuentas'
     | '/admin/contabilidad/glosario'
     | '/admin/contabilidad/liquidacion'
@@ -829,6 +841,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/talleres/': {
+      id: '/talleres/'
+      path: '/'
+      fullPath: '/talleres/'
+      preLoaderRoute: typeof TalleresIndexLazyRouteImport
+      parentRoute: typeof TalleresRoute
     }
     '/admin/': {
       id: '/admin/'
@@ -1272,10 +1291,12 @@ const ClienteRouteWithChildren =
 
 interface TalleresRouteChildren {
   TalleresSlugRoute: typeof TalleresSlugRoute
+  TalleresIndexLazyRoute: typeof TalleresIndexLazyRoute
 }
 
 const TalleresRouteChildren: TalleresRouteChildren = {
   TalleresSlugRoute: TalleresSlugRoute,
+  TalleresIndexLazyRoute: TalleresIndexLazyRoute,
 }
 
 const TalleresRouteWithChildren = TalleresRoute._addFileChildren(

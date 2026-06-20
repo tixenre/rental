@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { SITE_URL } from "@/lib/site";
 
 export const Route = createFileRoute("/talleres")({
+  component: () => <Outlet />,
   head: () => ({
     meta: [
       { title: "Workshops & Talleres — Rambla Rental" },
