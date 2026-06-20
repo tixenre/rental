@@ -1,0 +1,148 @@
+/**
+ * ClientePortalTypes.ts — Tipos y utilidades compartidas del portal del cliente.
+ *
+ * Extraído de cliente.portal.tsx para evitar exportar no-componentes desde .tsx
+ * (regla react-refresh/only-export-components).
+ */
+
+import { formatARS } from "@/lib/format";
+
+// ── Tipos ────────────────────────────────────────────────────────────────────
+
+export type Perfil = {
+  id: number;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  direccion: string;
+  cuit?: string | null;
+  perfil_impuestos?: string | null;
+  descuento?: number;
+  direccion_maps_url?: string | null;
+  created_at?: string | null;
+  // Identidad / RENAPER
+  dni?: string | null;
+  cuil?: string | null;
+  dni_validado_at?: string | null;
+  dni_verificacion_estado?: string | null;
+  dni_verificacion_motivo?: string | null;
+  nombre_renaper?: string | null;
+  apellido_renaper?: string | null;
+  fecha_nacimiento_renaper?: string | null;
+  direccion_renaper?: string | null;
+  apodo?: string | null;
+};
+
+export type Item = {
+  id?: number;
+  nombre: string;
+  marca: string;
+  modelo?: string | null;
+  cantidad: number;
+  precio_jornada: number;
+  subtotal: number;
+  foto_url?: string;
+  nombre_publico?: string | null;
+  nombre_publico_largo?: string | null;
+};
+export type Pago = { id?: number; monto: number; concepto?: string | null; fecha: string };
+export type SolicitudPortal = {
+  id: number;
+  estado: "pendiente" | "aprobada" | "rechazada" | "cancelada";
+  respuesta?: string | null;
+  resolved_by?: string | null;
+  resolved_at?: string | null;
+  created_at: string;
+};
+export type Pedido = {
+  id: number;
+  numero_pedido: string;
+  estado: string;
+  fecha_desde?: string;
+  fecha_hasta?: string;
+  monto_total?: number;
+  monto_pagado?: number;
+  descuento_pct?: number | null;
+  notas?: string | null;
+  created_at?: string | null;
+  items: Item[];
+  pagos?: Pago[];
+  solicitudes?: SolicitudPortal[];
+  documentos_disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
+  bruto?: number;
+  descuento_monto?: number;
+  monto_neto?: number;
+  iva_pct?: number;
+  iva_monto?: number;
+  total_con_iva?: number;
+  con_iva?: boolean;
+  cantidad_jornadas?: number;
+};
+
+export type PortalTab = "pedidos" | "notificaciones" | "perfil";
+export type DocTipo = "remito" | "contrato" | "albaran";
+export type Filtro = "todos" | "activos" | "historial";
+
+// ── Constantes compartidas con el componente principal ───────────────────────
+
+export const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "retirado"]);
+export const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
+export const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
+
+export const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran"];
+
+export const TAB_OPTIONS: { value: Filtro; label: string }[] = [
+  { value: "todos", label: "Todos" },
+  { value: "activos", label: "Activos" },
+  { value: "historial", label: "Historial" },
+];
+
+// ── Utilidades compartidas ────────────────────────────────────────────────────
+
+// Reemplazar fmt() con formatARS() del sistema
+export function fmt(n?: number) {
+  if (n == null) return "—";
+  return formatARS(n);
+}
+export function fmtDate(s?: string) {
+  if (!s) return "—";
+  const d = new Date(s.slice(0, 10) + "T12:00:00");
+  const dias = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  const meses = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
+  return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
+}
+export function fmtTime(s?: string) {
+  if (!s || s.length < 16) return null;
+  return s.slice(11, 16);
+}
+
+export const docSeenKey = (pedidoId: number, tipo: DocTipo) =>
+  `rambla.doc_seen.${pedidoId}.${tipo}`;
+export function wasDocSeen(pedidoId: number, tipo: DocTipo): boolean {
+  try {
+    return localStorage.getItem(docSeenKey(pedidoId, tipo)) === "1";
+  } catch {
+    return false;
+  }
+}
+export function markDocSeen(pedidoId: number, tipo: DocTipo): void {
+  try {
+    localStorage.setItem(docSeenKey(pedidoId, tipo), "1");
+  } catch {
+    /* ignore */
+  }
+}
