@@ -4,6 +4,7 @@ import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
 import { visualizer } from "rollup-plugin-visualizer";
+import { apiFixturesPlugin } from "./dev/api-fixtures-plugin";
 
 // ANALYZE=1 npm run build → genera dist/bundle-stats.html con el desglose
 // del bundle (qué deps pesan qué). Útil para auditar performance.
@@ -18,6 +19,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     tsconfigPaths({ projects: ["tsconfig.json"] }),
+    // Solo dev: puebla el catálogo cuando el backend Python no está levantado
+    // (p. ej. en el preview de v0). No afecta el build de producción.
+    apiFixturesPlugin(),
     ...(analyze
       ? [
           visualizer({

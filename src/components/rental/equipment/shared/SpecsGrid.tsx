@@ -38,7 +38,7 @@ export function SpecsGrid({ item, max = 6 }: SpecsGridProps) {
             key={`${s.label}-${i}`}
             className="rounded-lg border hairline bg-surface px-3 py-2.5"
           >
-            <dt className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+            <dt className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
               {s.label}
             </dt>
             <dd className="mt-1 font-mono text-lg font-semibold tabular-nums text-ink leading-tight">

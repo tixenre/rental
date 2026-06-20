@@ -34,7 +34,7 @@ export function IncludesLine({
   return (
     <p
       className={cn(
-        "truncate font-mono text-[9px] tracking-[0.1em] text-muted-foreground",
+        "truncate font-mono text-[11px] tracking-[0.1em] text-muted-foreground",
         className,
       )}
     >

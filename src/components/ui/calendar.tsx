@@ -93,7 +93,10 @@ function Calendar({
         range_middle: cn("rounded-none", defaultClassNames.range_middle),
         range_end: cn("bg-accent rounded-r-md", defaultClassNames.range_end),
         today: cn(
-          "bg-accent text-accent-foreground rounded-md data-[selected=true]:rounded-none",
+          // "Hoy" es un punto de referencia, no un estado seleccionado:
+          // ring sutil en vez de relleno sólido, para que la selección real
+          // (retiro/rango) siga siendo el elemento más prominente del calendario.
+          "rounded-md font-semibold text-ink ring-1 ring-inset ring-amber/55 data-[selected=true]:ring-0",
           defaultClassNames.today,
         ),
         outside: cn(

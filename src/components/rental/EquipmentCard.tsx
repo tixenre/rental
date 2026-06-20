@@ -116,11 +116,11 @@ export function EquipmentCard({
 
         {/* Overlays top-left apilados: categoría + (destacado) */}
         <div className="pointer-events-none absolute left-2 top-2 flex flex-col gap-1">
-          <span className="rounded-full bg-surface-elevated/88 px-[7px] py-[3px] font-mono text-[8px] uppercase tracking-[0.18em] text-muted-foreground backdrop-blur-sm">
+          <span className="rounded-full bg-surface-elevated/88 px-[7px] py-[3px] font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground backdrop-blur-sm">
             {item.category}
           </span>
           {item.destacado && (
-            <span className="self-start rounded-full bg-amber px-2 py-[3px] font-mono text-[8px] font-bold uppercase tracking-[0.18em] text-ink">
+            <span className="self-start rounded-full bg-amber px-2 py-[3px] font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-ink">
               ★ destacado
             </span>
           )}
@@ -135,7 +135,7 @@ export function EquipmentCard({
         {/* No disponible overlay — rojo suave */}
         {sinStock && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-            <span className="rounded-full border border-destructive/30 bg-destructive/10 px-[10px] py-[5px] text-center font-mono text-[8px] uppercase leading-snug tracking-[0.15em] text-destructive">
+            <span className="rounded-full border border-destructive/30 bg-destructive/10 px-[10px] py-[5px] text-center font-mono text-[10px] uppercase leading-snug tracking-[0.15em] text-destructive">
               {disponible !== undefined
                 ? "Sin disponibilidad en estas fechas"
                 : "Sin stock disponible"}
@@ -147,7 +147,7 @@ export function EquipmentCard({
         <button
           type="button"
           onClick={openDetail}
-          className="absolute inset-x-0 bottom-0 flex h-[34px] items-center justify-center gap-1.5 bg-ink/72 font-mono text-[9px] uppercase tracking-[0.16em] text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
+          className="absolute inset-x-0 bottom-0 flex h-[34px] items-center justify-center gap-1.5 bg-ink/72 font-mono text-[11px] uppercase tracking-[0.16em] text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100"
         >
           <span>—</span> ver ficha técnica
         </button>

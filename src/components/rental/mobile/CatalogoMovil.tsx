@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import {
   Camera,
   Sun,
@@ -216,7 +216,7 @@ function HeroBanner({
         <button
           type="button"
           onClick={() => navigate({ to: "/estudio" })}
-          className="absolute left-4 bottom-4 inline-flex items-center gap-1.5 bg-ink text-amber font-bold text-[13px] tracking-[-0.01em] px-4 py-2.5 rounded-full"
+          className="absolute left-4 bottom-4 inline-flex min-h-[44px] items-center gap-1.5 bg-ink text-amber font-bold text-[13px] tracking-[-0.01em] px-4 py-2.5 rounded-full"
           style={{ zIndex: 1 }}
         >
           Conocé el estudio
@@ -239,7 +239,7 @@ function HeroBanner({
 
       {/* Copy section — amber. */}
       <div className="bg-amber" style={{ padding: "24px 20px 32px" }}>
-        <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-ink/55 mb-3">
+        <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-ink/55 mb-3">
           Catálogo · {equipCount} equipos · Mar del Plata
         </div>
 
@@ -273,7 +273,7 @@ function SheetClose({ onClose }: { onClose: () => void }) {
   return (
     <button
       onClick={onClose}
-      className="w-[30px] h-[30px] rounded-full bg-muted grid place-items-center text-muted-foreground hover:bg-ink/10 hover:text-ink transition-colors"
+      className="relative w-[30px] h-[30px] rounded-full bg-muted grid place-items-center text-muted-foreground hover:bg-ink/10 hover:text-ink transition-colors before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
     >
       <X size={14} strokeWidth={2.5} />
     </button>
@@ -311,7 +311,7 @@ function CartItem({
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted-foreground">
+        <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
           {eq.brand}
         </div>
         <div className="font-sans text-sm font-bold text-ink leading-tight mt-0.5 truncate">
@@ -330,7 +330,7 @@ function CartItem({
         >
           {formatARS(eq.pricePerDay * qty * jornadasEfectivas)}
         </div>
-        <div className="font-mono text-[9px] tracking-[0.1em] text-muted-foreground mt-0.5">
+        <div className="font-mono text-[11px] tracking-[0.1em] text-muted-foreground mt-0.5">
           {fechaDesde ? `${jornadas} jorn.` : "/ jorn."}
         </div>
       </div>
@@ -497,7 +497,7 @@ function CartSheet({
           >
             <div className="flex-1 flex items-center gap-2.5">
               <div>
-                <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
+                <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
                   Salida
                 </div>
                 <div className="font-sans text-sm font-bold leading-tight text-ink">
@@ -509,7 +509,7 @@ function CartSheet({
               </div>
               <ChevronRight size={14} className="text-muted-foreground/50 shrink-0" />
               <div>
-                <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
+                <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
                   Devolución
                 </div>
                 <div className="font-sans text-sm font-bold leading-tight text-ink">
@@ -524,7 +524,7 @@ function CartSheet({
               className="text-center shrink-0 pl-3 border-l"
               style={{ borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)" }}
             >
-              <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
+              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
                 Jorn.
               </div>
               <div
@@ -552,7 +552,7 @@ function CartSheet({
               <div className="font-sans text-[13px] font-bold text-ink leading-tight">
                 Elegí las fechas para ver el precio total
               </div>
-              <div className="font-mono text-[9px] tracking-[0.15em] uppercase text-muted-foreground mt-0.5">
+              <div className="font-mono text-[11px] tracking-[0.15em] uppercase text-muted-foreground mt-0.5">
                 Precios mostrados por jornada
               </div>
             </div>
@@ -602,7 +602,7 @@ function CartSheet({
                     {descuentoLabel(descuentoOrigen, jornadas, clienteSession?.nombre)}
                     <span
                       className={cn(
-                        "inline-flex items-center px-1.5 py-px rounded-full font-mono text-[9px] font-bold",
+                        "inline-flex items-center px-1.5 py-px rounded-full font-mono text-[11px] font-bold",
                         descuentoOrigen === "cliente"
                           ? "bg-verde/10 text-verde"
                           : "bg-azul/10 text-azul",
@@ -751,7 +751,7 @@ function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: 
         <div className="w-9 h-1 rounded-full bg-hairline mx-auto mt-2.5 shrink-0" />
         <div className="flex items-start justify-between px-5 py-3 border-b border-hairline shrink-0">
           <div>
-            <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground">
+            <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
               {eq.brand} · {eq.category}
             </div>
             <div className="font-sans text-base font-bold text-ink mt-0.5">{eq.name}</div>
@@ -790,20 +790,20 @@ function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: 
               >
                 {fechaDesde ? formatARS(eq.pricePerDay * jornadas) : formatARS(eq.pricePerDay)}
               </div>
-              <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted-foreground mt-0.5">
-                {fechaDesde ? `${jornadas} jornadas` : "/ jornada"}
+              <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground mt-0.5">
+                {fechaDesde ? `${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}` : "/ jornada"}
               </div>
             </div>
             {eq.cantidad != null && (
               <div className="font-mono text-xs text-muted-foreground">
-                {eq.cantidad} disponibles
+                {eq.cantidad} {eq.cantidad === 1 ? "disponible" : "disponibles"}
               </div>
             )}
           </div>
 
           {/* Specs */}
           <div className="px-5 py-3 border-b border-hairline">
-            <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-1">
+            <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-1">
               Especificaciones
             </div>
             <div className="font-sans text-[13px] text-muted-foreground leading-relaxed">
@@ -823,7 +823,7 @@ function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: 
           {/* Includes */}
           {eq.includes && eq.includes.length > 0 && (
             <div className="px-5 py-3 border-b border-hairline">
-              <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mb-1.5">
+              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-1.5">
                 Incluye
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -911,7 +911,11 @@ function EquipmentRow({
   const pocoStock = eq.cantidad != null && eq.cantidad > 0 && eq.cantidad <= 2;
   const reachedMax = eq.cantidad != null && inCart >= eq.cantidad;
 
-  const nombrePublico = `${eq.brand} ${eq.name}`;
+  // Evita el "— Nombre" cuando el equipo no tiene marca (brand vacío o "—").
+  const nombrePublico = [eq.brand, eq.name]
+    .filter((p) => p && p.trim() && p.trim() !== "—")
+    .join(" ")
+    .trim();
 
   const quickFacts = (
     eq.specsDestacados && eq.specsDestacados.length > 0
@@ -964,28 +968,29 @@ function EquipmentRow({
 
         {/* Info */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 font-mono text-[8px] uppercase leading-none tracking-[0.18em] text-muted-foreground">
-            <span className="truncate">{eq.category}</span>
-            {(sinStock || pocoStock) && (
-              <span className={cn("shrink-0", sinStock ? "text-destructive" : "text-amber")}>
-                · {sinStock ? "no disponible" : `${eq.cantidad} disp.`}
-              </span>
+          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase leading-none tracking-[0.1em] text-muted-foreground">
+            <span className="min-w-0 truncate">{eq.category}</span>
+            {/* Solo el estado accionable (agotado) en el listado; el stock bajo
+                queda para el panel expandido y la ficha, evitando ruido. */}
+            {sinStock && (
+              <span className="shrink-0 whitespace-nowrap text-destructive">· agotado</span>
             )}
           </div>
-          <div className="mt-0.5 flex items-center gap-1.5">
-            <span className="truncate font-sans text-[15px] font-bold leading-tight text-ink">
+          <div className="mt-0.5 flex items-start gap-1.5">
+            <span className="line-clamp-2 font-sans text-[15px] font-bold leading-[1.2] text-ink">
               {nombrePublico}
             </span>
             <ChevronDown
               className={cn(
-                "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+                "mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
                 isExpanded && "rotate-180",
               )}
             />
           </div>
         </div>
 
-        {/* Price */}
+        {/* Price — compacto en la fila densa: total + jornadas, sin la 3ª línea
+            (el desglose por jornada queda en el panel expandido). */}
         <PriceBlock
           perDay={eq.pricePerDay}
           jornadas={fechaDesde ? jornadas : 0}
@@ -993,6 +998,7 @@ function EquipmentRow({
           conIva={conIva}
           size="sm"
           align="right"
+          compact
           className="shrink-0"
         />
 
@@ -1011,7 +1017,7 @@ function EquipmentRow({
               type="button"
               aria-label={`Agregar ${nombrePublico}`}
               disabled={sinStock}
-              className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full border hairline bg-background text-ink transition-colors hover:border-amber hover:bg-amber active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border hairline bg-background text-ink transition-colors hover:border-amber hover:bg-amber active:scale-90 disabled:cursor-not-allowed disabled:opacity-40"
               onClick={(e) => {
                 e.stopPropagation();
                 if (sinStock) return;
@@ -1019,7 +1025,7 @@ function EquipmentRow({
                 onTap(); // also expand
               }}
             >
-              <Plus size={14} />
+              <Plus size={16} />
             </button>
           )}
         </div>
@@ -1044,17 +1050,21 @@ function EquipmentRow({
               conIva={conIva}
               size="lg"
             />
-            {inCart > 1 && (
-              <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground">
+            {inCart > 1 ? (
+              <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
                 {inCart} unidades
               </span>
-            )}
+            ) : pocoStock ? (
+              <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-amber">
+                {eq.cantidad === 1 ? "última unidad" : `${eq.cantidad} disponibles`}
+              </span>
+            ) : null}
           </div>
 
           {/* Includes — 2 columnas */}
           {eq.includes && eq.includes.length > 0 && (
             <div className="mb-2">
-              <div className="mb-1.5 font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Incluye
               </div>
               <div className="grid grid-cols-2 gap-1">
@@ -1092,7 +1102,7 @@ function EquipmentRow({
                     key={f.label}
                     className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-card px-2 py-0.5 font-sans text-[11px]"
                   >
-                    <span className="font-mono uppercase tracking-wider text-[9px] text-muted-foreground">
+                    <span className="font-mono uppercase tracking-wider text-[11px] text-muted-foreground">
                       {f.label}
                     </span>
                     {hasValue && <span className="font-medium text-ink">{f.value}</span>}
@@ -1183,6 +1193,24 @@ export function CatalogoMovil() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const topbarRef = useRef<HTMLElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
+  const searchBarRef = useRef<HTMLDivElement>(null);
+
+  // Alturas sticky calculadas dinámicamente (no hardcodeadas).
+  const [stickyTops, setStickyTops] = useState({ searchBar: 53, catTabs: 118 });
+
+  // Medir las alturas reales de topbar y search bar para calcular los tops
+  // sticky correctos (no hardcodeados, que se desalinean con safe-area reales).
+  useLayoutEffect(() => {
+    const topbar = topbarRef.current;
+    const searchBar = searchBarRef.current;
+    if (!topbar || !searchBar) return;
+    const topbarHeight = topbar.offsetHeight;
+    const searchBarHeight = searchBar.offsetHeight;
+    setStickyTops({
+      searchBar: topbarHeight,
+      catTabs: topbarHeight + searchBarHeight,
+    });
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -1335,10 +1363,10 @@ export function CatalogoMovil() {
   }, []);
 
   // Height of compact search (used for category tabs top offset)
-  // Cat-tabs sticky bajo el topbar (54px) + barra de búsqueda sticky (~65px).
-  const TOPBAR_HEIGHT = 53;
-  const SEARCH_BAR_HEIGHT = 65;
-  const CAT_TABS_STICKY_TOP = TOPBAR_HEIGHT + SEARCH_BAR_HEIGHT;
+  // Cat-tabs sticky: calculadas dinámicamente para usar alturas reales
+  // (no hardcodeadas, que varían con safe-area y padding real del topbar).
+  // Nota: el topbar tiene padding-top dinámico (safe-area-inset-top),
+  // así que 53px es una aproximación que falla en algunos devices.
 
   // h-dvh (dynamic viewport) respeta la URL bar de safari iOS — antes
   // h-screen dejaba el cart-bar tapado cuando safari mostraba su UI.
@@ -1366,7 +1394,7 @@ export function CatalogoMovil() {
           <RamblaSeal />
 
           <button
-            className="date-pill-snap flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3.5 rounded-full font-sans text-xs font-semibold text-ink transition-all whitespace-nowrap"
+            className="date-pill-snap flex-1 flex min-h-[44px] items-center justify-center gap-1.5 py-1.5 px-3.5 rounded-full font-sans text-xs font-semibold text-ink transition-all whitespace-nowrap"
             style={{
               border: "1.5px solid color-mix(in oklch, var(--amber) 55%, transparent)",
               background: "var(--amber-soft)",
@@ -1379,7 +1407,7 @@ export function CatalogoMovil() {
             />
             <span>{datePillLabel}</span>
             {fechaDesde && (
-              <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-muted-foreground">
+              <span className="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">
                 · {jornadas} jorn.
               </span>
             )}
@@ -1388,7 +1416,7 @@ export function CatalogoMovil() {
           <button
             type="button"
             onClick={() => navigate({ to: "/cliente" })}
-            className="user-btn-snap p-1.5 rounded-full border border-hairline text-ink hover:border-ink transition-colors"
+            className="user-btn-snap grid h-11 w-11 shrink-0 place-items-center rounded-full border border-hairline text-ink hover:border-ink transition-colors"
             aria-label="Acceso clientes"
           >
             <User size={15} />
@@ -1404,10 +1432,11 @@ export function CatalogoMovil() {
         />
 
         {/* Search bar — sticky bajo el topbar. Los chips de "Populares"
-            scrollean fuera (no son sticky). */}
+            son sticky debajo de esto. */}
         <div
-          className="sticky z-[39] px-4 pt-3 pb-2 backdrop-blur"
-          style={{ top: TOPBAR_HEIGHT, background: TABS_BG }}
+          ref={searchBarRef}
+          className="sticky z-[39] px-4 py-2 backdrop-blur"
+          style={{ top: stickyTops.searchBar, background: TABS_BG }}
         >
           <div className="relative">
             <Search
@@ -1435,33 +1464,15 @@ export function CatalogoMovil() {
           </div>
         </div>
 
-        {/* Popular chips — scrollean fuera con el contenido */}
-        <div className="px-4 pt-1 pb-2">
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-            <span className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground whitespace-nowrap self-center shrink-0">
-              Populares:
-            </span>
-            {POPULAR_CHIPS.map((chip) => (
-              <button
-                key={chip}
-                className="px-[11px] py-1 rounded-full border border-hairline bg-surface font-sans text-[11px] font-medium text-ink whitespace-nowrap shrink-0 hover:border-ink hover:bg-muted transition-all"
-                onClick={() => setQuery(chip)}
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Category tabs */}
+        {/* Category tabs — calculado dinámicamente, directo bajo search bar */}
         <div
           className="sticky z-[39] border-b border-hairline backdrop-blur transition-[top] duration-150"
           style={{
-            top: CAT_TABS_STICKY_TOP,
+            top: stickyTops.catTabs,
             background: TABS_BG,
           }}
         >
-          <div className="flex overflow-x-auto px-4" style={{ scrollbarWidth: "none", gap: 0 }}>
+          <div className="flex overflow-x-auto px-4 py-1" style={{ scrollbarWidth: "none", gap: 0 }}>
             {categories.map((cat) => {
               const count =
                 cat === "Todo"
@@ -1474,7 +1485,7 @@ export function CatalogoMovil() {
                 <button
                   key={cat}
                   className={cn(
-                    "flex items-baseline gap-1 py-[10px] pb-[9px] px-3 whitespace-nowrap shrink-0 border-b-[2.5px] transition-all",
+                    "flex min-h-[44px] items-center gap-1 py-[10px] pb-[9px] px-3 whitespace-nowrap shrink-0 border-b-[2.5px] transition-all",
                     activeTab === cat ? "border-amber" : "border-transparent",
                   )}
                   onClick={() => handleTabChange(cat)}
@@ -1489,7 +1500,7 @@ export function CatalogoMovil() {
                   >
                     {cat}
                   </span>
-                  <span className="font-mono text-[8px] tracking-[0.15em] text-muted-foreground leading-none">
+                  <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground leading-none">
                     {count}
                   </span>
                 </button>
@@ -1502,7 +1513,7 @@ export function CatalogoMovil() {
         <div className="flex items-center gap-1.5 px-4 py-2">
           <button
             className={cn(
-              "flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
+              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
               stockOnly
                 ? "bg-amber-soft border-amber/60 font-semibold"
                 : "border-hairline bg-transparent hover:border-ink hover:bg-muted",
@@ -1528,7 +1539,7 @@ export function CatalogoMovil() {
             type="button"
             onClick={() => setShowBrandSheet(true)}
             className={cn(
-              "flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
+              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
               selectedBrand
                 ? "bg-amber-soft border-amber/60 font-semibold"
                 : "border-hairline bg-transparent hover:border-ink hover:bg-muted",
@@ -1541,7 +1552,7 @@ export function CatalogoMovil() {
             type="button"
             onClick={() => setShowFiltrosSheet(true)}
             className={cn(
-              "relative flex items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium transition-all",
+              "relative flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium transition-all",
               activeFiltersCount > 0
                 ? "border-ink text-ink"
                 : "border-hairline text-muted-foreground hover:border-ink hover:text-ink",
@@ -1550,7 +1561,7 @@ export function CatalogoMovil() {
             <SlidersHorizontal size={11} />
             Filtros
             {activeFiltersCount > 0 && (
-              <span className="inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[8px] font-bold text-amber">
+              <span className="inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[10px] font-bold text-amber">
                 {activeFiltersCount}
               </span>
             )}
@@ -1593,7 +1604,10 @@ export function CatalogoMovil() {
             para que el home indicator de iPhone no tape el contenido. */}
         {totalItems > 0 && (
           <div
-            className="sticky bottom-0 z-40 flex items-center gap-2.5 px-4 cursor-pointer border-t-[1.5px] border-amber backdrop-blur-lg transition-colors hover:bg-amber/5"
+            role="button"
+            tabIndex={0}
+            aria-label={`Ver tu rental: ${totalItems} ${totalItems === 1 ? "ítem" : "ítems"}, total ${formatARS(totalARS)}`}
+            className="sticky bottom-0 z-40 flex items-center gap-2.5 px-4 cursor-pointer border-t-[1.5px] border-amber backdrop-blur-lg transition-colors hover:bg-amber/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber focus-visible:ring-inset"
             style={{
               background: CARTBAR_BG,
               boxShadow: "0 -8px 24px -8px rgba(0,0,0,0.12)",
@@ -1603,18 +1617,24 @@ export function CatalogoMovil() {
               WebkitTapHighlightColor: "transparent",
             }}
             onClick={() => setShowCartSheet(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setShowCartSheet(true);
+              }
+            }}
           >
             <div className="flex-1">
               <div className="font-sans text-[13px] font-bold text-ink leading-tight">
                 {totalItems} {totalItems === 1 ? "ítem" : "ítems"}
               </div>
-              <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground mt-0.5">
+              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mt-0.5">
                 {fechaDesde ? `${jornadas} jornadas` : "elegí fechas"}
               </div>
             </div>
             <div className="flex-1" />
             <div className="text-right">
-              <div className="font-mono text-[8px] tracking-[0.2em] uppercase text-muted-foreground">
+              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
                 Total
               </div>
               <div
@@ -1686,7 +1706,7 @@ export function CatalogoMovil() {
   );
 }
 
-/* ── BrandSheet ──────────────────────────────────────────────────── */
+/* ��─ BrandSheet ──────────────────────────────────────────────────── */
 type BrandSheetItem = {
   nombre: string;
   logo_url: string | null;
@@ -1750,7 +1770,7 @@ function BrandSheet({
                     {b.nombre}
                   </div>
                   {b.destacada && (
-                    <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-amber/80 mt-0.5">
+                    <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber/80 mt-0.5">
                       Destacada
                     </div>
                   )}

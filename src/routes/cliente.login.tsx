@@ -38,6 +38,15 @@ function ClienteLoginPage() {
     if (errCode) setError(ERROR_MESSAGES[errCode] ?? `Error: ${errCode}`);
   }, []);
 
+  function handleGoogleLogin() {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get("from");
+    const next = from === "carrito" ? "/?openCarrito=1" : null;
+    window.location.href = next
+      ? `/cliente/auth/google?next=${encodeURIComponent(next)}`
+      : "/cliente/auth/google";
+  }
+
   return (
     <div className="min-h-dvh bg-background flex flex-col">
       <header className="border-b hairline px-6 py-[18px]">
@@ -66,9 +75,7 @@ function ClienteLoginPage() {
           )}
 
           <button
-            onClick={() => {
-              window.location.href = "/cliente/auth/google";
-            }}
+            onClick={handleGoogleLogin}
             className="flex items-center justify-center gap-2.5 rounded-md border-[1.5px] hairline bg-card py-[13px] font-sans text-sm font-semibold text-ink transition hover:border-ink hover:bg-background"
           >
             <GoogleIcon />
