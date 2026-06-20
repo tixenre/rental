@@ -18,7 +18,7 @@ if [[ "${1:-}" == "--limit" && -n "${2:-}" ]]; then
 fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CHANGELOG="$ROOT/src/data/changelog.ts"
+CHANGELOG="$ROOT/frontend/src/data/changelog.ts"
 
 if [[ ! -f "$CHANGELOG" ]]; then
   echo "❌ No encontré $CHANGELOG" >&2
