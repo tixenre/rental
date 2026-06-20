@@ -652,6 +652,11 @@ def create_equipo(data: EquipoCreate, request: Request):
                 actualizar_nombres_de(conn, new_id, commit=False)
             except Exception:
                 pass
+            # Slug en la creación: el equipo nuevo nace con slug (clave natural
+            # del export dataio) por el camino correcto, no por el self-heal del
+            # export (#922). Idempotente; reusa la fuente única del backfill.
+            from dataio.slug import backfill_equipos_slug
+            backfill_equipos_slug(conn)
             conn.commit()
             row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (new_id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]

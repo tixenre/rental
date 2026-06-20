@@ -2,7 +2,7 @@
 
 import pytest
 
-from dataio.slug import equipo_slug, slugify
+from dataio.slug import equipo_slug, slug_unico, slugify
 
 
 pytestmark = pytest.mark.unit
@@ -57,3 +57,22 @@ class TestEquipoSlug:
     def test_todo_vacio(self):
         assert equipo_slug(None, None, None) == ""
         assert equipo_slug("", "", "") == ""
+
+
+class TestSlugUnico:
+    """Regla canónica de desambiguación (fuente única: backfill + alta + CLI)."""
+
+    def test_libre_pasa_directo(self):
+        assert slug_unico("sony-fx3", set()) == "sony-fx3"
+
+    def test_colision_sufijo_desde_2(self):
+        assert slug_unico("sony-fx3", {"sony-fx3"}) == "sony-fx3-2"
+
+    def test_colisiones_consecutivas(self):
+        ocupados = {"sony-fx3", "sony-fx3-2", "sony-fx3-3"}
+        assert slug_unico("sony-fx3", ocupados) == "sony-fx3-4"
+
+    def test_no_muta_el_set(self):
+        ocupados = {"sony-fx3"}
+        slug_unico("sony-fx3", ocupados)
+        assert ocupados == {"sony-fx3"}  # el caller reserva, no la función
