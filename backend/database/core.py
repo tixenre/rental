@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from dotenv import load_dotenv
-    _BASE = pathlib.Path(__file__).parent
+    _BASE = pathlib.Path(__file__).parent.parent  # backend/ (database/ es paquete, #501)
     for _name in (".env.local", ".env"):
         _f = _BASE / _name
         if _f.exists():
@@ -25,10 +25,15 @@ except ImportError:
 # ── Paths ────────────────────────────────────────────────────────────────────
 
 BASE = pathlib.Path(__file__).parent
-# Frontend clásico (admin, login, etc.)
-FRONT = BASE.parent / "frontend" / "public"
+# El frontend clásico y el SPA Vite viven en la RAÍZ del repo (/app en Docker:
+# el Dockerfile hace `COPY --from=frontend /app/dist ./dist`). `database/` es un
+# paquete (#501) → desde `database/core.py` hay que subir DOS niveles
+# (database/ → backend/ → raíz). Antes era `backend/database.py` y alcanzaba un
+# nivel; el split lo bajó uno → prod servía "Frontend not built" porque apuntaba
+# a `backend/dist`. (Regresión del split, hotfix.)
+FRONT = BASE.parent.parent / "frontend" / "public"
 # Nuevo frontend (rental-refine, Vite SPA) — compilado en la raíz
-FRONT_NEW = BASE.parent / "dist"
+FRONT_NEW = BASE.parent.parent / "dist"
 
 # ── Fragmentos SQL canónicos ─────────────────────────────────────────────────
 #
