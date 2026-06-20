@@ -94,7 +94,7 @@ function LandingHub() {
               className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-background mb-4"
               style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
             >
-              alquilá lo<br />que necesitás.
+              rental.<br /><span className="opacity-70">alquilá lo<br />que necesitás.</span>
             </h2>
             <p className="text-background/65 text-sm mb-7 leading-relaxed max-w-xs">
               Cámaras, lentes, iluminación, audio y soportes. Retiro en el estudio.
@@ -126,7 +126,7 @@ function LandingHub() {
                 className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink mb-4"
                 style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
               >
-                un lugar donde<br />pasan cosas.
+                estudio.<br /><span className="opacity-60">un lugar donde<br />pasan cosas.</span>
               </h2>
               <p className="text-ink/65 text-sm mb-7 leading-relaxed max-w-xs">
                 Set con fondo infinito, ciclorama y luz natural. Por hora.
@@ -149,7 +149,7 @@ function LandingHub() {
               className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink mb-4"
               style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
             >
-              aprender<br />haciendo.
+              workshops.<br /><span className="opacity-60">aprender<br />haciendo.</span>
             </h2>
             <p className="text-muted-foreground text-sm mb-7 leading-relaxed max-w-xs">
               Clases prácticas de dirección de arte, foto y video. Cupos limitados.
