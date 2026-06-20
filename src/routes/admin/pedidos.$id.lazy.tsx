@@ -74,6 +74,7 @@ import {
   type DraftItem,
 } from "@/components/admin/pedido/usePedidoDraft";
 import { ClienteAutocomplete } from "@/components/admin/pedido/ClienteAutocomplete";
+import { ClienteAvatar } from "@/components/admin/ClienteAvatar";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
 import { computeJornadas, parseDateTimeParts, toLocalISO } from "@/lib/rental-dates";
@@ -386,9 +387,7 @@ function PedidoEditorPage() {
             {datos.cliente_id ? (
               // Cliente vinculado: tarjeta clara de QUIÉN está seleccionado.
               <div className="mb-3 flex items-center gap-3 rounded-lg border border-verde/30 bg-verde/[0.06] px-3 py-2.5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink font-display text-sm text-amber">
-                  {(datos.cliente_nombre || "?").trim().charAt(0).toUpperCase() || "?"}
-                </div>
+                <ClienteAvatar nombre={datos.cliente_nombre} className="h-9 w-9 text-sm" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate font-medium text-ink">

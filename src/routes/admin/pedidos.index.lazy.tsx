@@ -34,6 +34,7 @@ import { nextStep, type EstadoPedido } from "@/lib/pedido-estados";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
+import { ClienteAvatar } from "@/components/admin/ClienteAvatar";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
 import { EnviarDocsDialog } from "@/components/admin/pedido/EnviarDocsDialog";
 import { AdminCard, FAB } from "@/components/mobile";
@@ -72,18 +73,31 @@ function creadoHace(iso?: string): string | null {
 const saldoDe = (p: Pedido) => Math.max(0, (p.monto_total ?? 0) - (p.monto_pagado ?? 0));
 const tieneSaldo = (p: Pedido) => !["borrador", "cancelado"].includes(p.estado) && saldoDe(p) > 0;
 
-/** Tag de cobranza para la fila (pagado / seña / sin seña). */
-function cobranzaTag(p: Pedido): { label: string; cls: string } {
+/**
+ * Pill de estado de pago para la fila (estilo Booqable: visible, con el monto
+ * adeudado). Devuelve null cuando no aplica (presupuesto sin seña, sin monto).
+ */
+function pagoTag(p: Pedido): { label: string; cls: string } | null {
   const pagado = p.monto_pagado ?? 0;
   const total = p.monto_total ?? 0;
-  if (total > 0 && pagado >= total) return { label: "pagado", cls: "text-verde" };
-  if (pagado > 0) return { label: `seña ${fmtArs(pagado)}`, cls: "text-amber" };
-  // sin seña: urgencia proporcional al estado — presupuesto/borrador es normal,
-  // confirmado merece atención, retirado sin cobrar es urgente.
-  if (p.estado === "retirado" || p.estado === "entregado")
-    return { label: "sin seña", cls: "text-destructive" };
-  if (p.estado === "confirmado") return { label: "sin seña", cls: "text-amber" };
-  return { label: "sin seña", cls: "text-muted-foreground" };
+  const saldo = Math.max(0, total - pagado);
+  if (total <= 0) return null;
+  if (pagado >= total) return { label: "Pagado", cls: "bg-verde/10 text-verde border-verde/30" };
+  // Pre-confirmación = todavía es cotización, no deuda real.
+  const preConfirm = ["borrador", "presupuesto", "solicitado", "cancelado"].includes(p.estado);
+  if (preConfirm) {
+    if (pagado > 0)
+      return { label: `Seña ${fmtArs(pagado)}`, cls: "bg-amber/15 text-ink border-amber/40" };
+    return null;
+  }
+  // Confirmado en adelante con saldo → mostrar lo que falta cobrar.
+  const urgente = p.estado === "retirado" || p.estado === "entregado";
+  return {
+    label: `Debe ${fmtArs(saldo)}`,
+    cls: urgente
+      ? "bg-destructive/10 text-destructive border-destructive/30"
+      : "bg-amber/15 text-ink border-amber/40",
+  };
 }
 
 /** Origen del pedido → etiqueta legible (en vez del slug crudo "sistema"/"booqable-historico"/etc.). */
@@ -467,7 +481,7 @@ function MasterList({
   return (
     <ul className="divide-y hairline">
       {items.map((p) => {
-        const tag = cobranzaTag(p);
+        const pago = pagoTag(p);
         const sel = p.id === selId;
         return (
           <li key={p.id}>
@@ -476,30 +490,48 @@ function MasterList({
               onClick={() => onSelect(p.id)}
               onDoubleClick={() => onOpen(p.id)}
               className={cn(
-                "w-full text-left px-3.5 py-2.5 transition-colors border-l-2",
+                "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors border-l-2",
                 sel ? "border-amber bg-amber-soft" : "border-transparent hover:bg-surface",
               )}
             >
-              <div className="flex items-start justify-between gap-2">
-                <span className="font-medium text-ink truncate">
-                  {p.cliente_nombre || "Sin cliente"}
-                </span>
-                <EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />
-              </div>
-              <div className="mt-0.5 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                <span>#{p.numero_pedido ?? p.id}</span>
-                <span>·</span>
-                {hoyTag(p) ?? (
-                  <span className="tabular-nums">
-                    {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
+              <ClienteAvatar nombre={p.cliente_nombre} className="mt-0.5 h-9 w-9 text-[11px]" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium text-ink">
+                    {p.cliente_nombre || "Sin cliente"}
                   </span>
-                )}
-              </div>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <span className={cn("font-mono text-[11px]", tag.cls)}>{tag.label}</span>
-                <span className="font-mono text-sm tabular-nums text-ink">
-                  {fmtArs(p.monto_total)}
-                </span>
+                  <EstadoBadge
+                    estado={p.estado}
+                    label={ESTADO_LABEL[p.estado]}
+                    className="shrink-0"
+                  />
+                </div>
+                <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                  <span>#{p.numero_pedido ?? p.id}</span>
+                  <span>·</span>
+                  {hoyTag(p) ?? (
+                    <span className="truncate tabular-nums">
+                      {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  {pago ? (
+                    <span
+                      className={cn(
+                        "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+                        pago.cls,
+                      )}
+                    >
+                      {pago.label}
+                    </span>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="font-mono text-sm font-semibold tabular-nums text-ink">
+                    {fmtArs(p.monto_total)}
+                  </span>
+                </div>
               </div>
             </button>
           </li>
@@ -575,8 +607,9 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
     <div className="min-h-full pb-6">
       {/* Toolbar sticky — datos read-only + quick-actions siempre visibles */}
       <div className="sticky top-0 z-10 border-b hairline bg-surface/85 px-5 md:px-6 py-3 backdrop-blur-md">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="flex items-start gap-3">
+          <ClienteAvatar nombre={p.cliente_nombre} className="h-10 w-10 shrink-0 text-sm" />
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="font-display text-2xl text-ink truncate">
                 {p.cliente_nombre || "Sin cliente"}
@@ -617,20 +650,21 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
           <Button variant="outline" size="sm" onClick={() => setOpenMail(true)}>
             <Mail className="h-3.5 w-3.5 mr-1" /> Mandar mail
           </Button>
-          <WhatsAppButton pedido={p} phone={p.cliente_telefono} />
+          <WhatsAppButton pedido={p} phone={p.cliente_telefono} variant="compact" />
         </div>
       </div>
 
       {/* Cuerpo */}
       <div className="px-5 md:px-6 py-5 space-y-4">
-        {/* Siguiente paso — ejecuta la transición acá mismo */}
+        {/* Siguiente paso — ejecuta la transición acá mismo (compacto, sin aire muerto) */}
         {ns && (
-          <div className="rounded-lg border border-amber bg-amber-soft px-4 py-3 flex items-center justify-between gap-3">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="flex w-fit items-center gap-3 rounded-lg border border-amber bg-amber-soft py-2 pl-3.5 pr-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               Siguiente paso
-            </div>
+            </span>
             <Button
               variant={ns.blocked ? "outline" : "amber"}
+              size="sm"
               className="shrink-0"
               disabled={!!ns.blocked || estadoMut.isPending}
               title={ns.blocked ?? ""}
