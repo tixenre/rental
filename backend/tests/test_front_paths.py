@@ -7,8 +7,8 @@ busca `FRONT_NEW / index.html`; si FRONT_NEW apunta mal, el backend devuelve
 El split de `database.py` → paquete `database/` (#501) bajó `core.py` un nivel, y
 las paths relativas a `__file__` quedaron apuntando a `backend/dist` en vez de
 la raíz. Más tarde el frontend se mudó de la raíz a `frontend/` (simétrico a
-`backend/`), así que el `dist` ahora vive en `frontend/dist`. Dormido en staging
-(el frontend de dev lo sirve Vercel), fatal en prod (Railway sirve el SPA). Este
+`backend/`), así que el `dist` ahora vive en `frontend/dist`. Railway sirve el SPA
+tanto en staging como en prod, así que la regresión sería fatal en ambos. Este
 test es hermético y falla con la regresión.
 """
 import pytest
