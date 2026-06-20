@@ -14,8 +14,8 @@ portal del cliente (ej. "Tu verificación fue rechazada — podés reintentarla"
 
 Espeja init_db() (esquema en dos capas, MEMORIA 2026-06-03).
 
-Revision ID: i9j0k1l2m3n4
-Revises: h8i9j0k1l2m3
+Revision ID: d1e2f3a4b5c6
+Revises: c2d4e6f8a0b1
 Create Date: 2026-06-20
 """
 
@@ -23,8 +23,8 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "i9j0k1l2m3n4"
-down_revision: Union[str, Sequence[str], None] = "h8i9j0k1l2m3"
+revision: str = "d1e2f3a4b5c6"
+down_revision: Union[str, Sequence[str], None] = "c2d4e6f8a0b1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
