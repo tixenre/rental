@@ -667,22 +667,28 @@ function PedidoEditorPage() {
               <div className="border-t hairline my-1" />
               <BdRow l="Total" v={fmtArs(total)} strong />
             </div>
-            <FieldLabel label="Descuento manual %" className="mt-3 max-w-[140px]">
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                value={datos.descuento_pct}
-                onChange={(e) =>
-                  setDatos(
-                    (d) =>
-                      d && {
-                        ...d,
-                        descuento_pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
-                      },
-                  )
-                }
-              />
+            <FieldLabel label="Descuento manual" className="mt-3 max-w-[140px]">
+              <div className="relative">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={datos.descuento_pct}
+                  className="pr-7"
+                  onChange={(e) =>
+                    setDatos(
+                      (d) =>
+                        d && {
+                          ...d,
+                          descuento_pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                        },
+                    )
+                  }
+                />
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                  %
+                </span>
+              </div>
             </FieldLabel>
           </RailSection>
 

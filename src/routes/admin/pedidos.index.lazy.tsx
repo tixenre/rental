@@ -86,14 +86,15 @@ function cobranzaTag(p: Pedido): { label: string; cls: string } {
   return { label: "sin seña", cls: "text-muted-foreground" };
 }
 
-/** Origen del pedido → etiqueta legible (en vez del slug crudo "sistema"/etc.). */
+/** Origen del pedido → etiqueta legible (en vez del slug crudo "sistema"/"booqable-historico"/etc.). */
 function fuenteLabel(fuente: string | null): string | null {
   if (!fuente) return null;
+  // Cualquier importado histórico (ej. "booqable-historico") → "histórico".
+  if (fuente.includes("historico") || fuente.includes("booqable")) return "histórico";
   const map: Record<string, string> = {
     sistema: "back-office",
     estudio: "Estudio",
     portal: "portal del cliente",
-    historico: "histórico",
   };
   return map[fuente] ?? fuente;
 }
