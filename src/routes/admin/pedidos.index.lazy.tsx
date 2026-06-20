@@ -1,4 +1,4 @@
-import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
+import { createLazyFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -11,6 +11,8 @@ import {
   Mail,
   ArrowRight,
   Trash2,
+  ShieldAlert,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -29,10 +31,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
-import { PEDIDO_NEXT_LABEL } from "@/lib/pedido-estados";
+import { nextStep, type EstadoPedido } from "@/lib/pedido-estados";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
+import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
+import { EnviarDocsDialog } from "@/components/admin/pedido/EnviarDocsDialog";
 import { AdminCard, FAB } from "@/components/mobile";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
@@ -83,6 +87,18 @@ function cobranzaTag(p: Pedido): { label: string; cls: string } {
   return { label: "sin seña", cls: "text-muted-foreground" };
 }
 
+/** Origen del pedido → etiqueta legible (en vez del slug crudo "sistema"/etc.). */
+function fuenteLabel(fuente: string | null): string | null {
+  if (!fuente) return null;
+  const map: Record<string, string> = {
+    sistema: "back-office",
+    estudio: "Estudio",
+    portal: "portal del cliente",
+    historico: "histórico",
+  };
+  return map[fuente] ?? fuente;
+}
+
 type EstadoFilter = "activos" | "presupuesto" | "confirmado" | "cerrados" | "todos";
 const ESTADO_FILTERS: { id: EstadoFilter; label: string }[] = [
   { id: "activos", label: "Activos" },
@@ -92,29 +108,40 @@ const ESTADO_FILTERS: { id: EstadoFilter; label: string }[] = [
   { id: "todos", label: "Todos" },
 ];
 
-type SmartChip = "retiraHoy" | "devuelveHoy" | "nuevos" | "saldo";
+/** Filtro de "atajo" del día — llega por deep-link (?f=) desde el Dashboard, no como chip visible. */
+type DayFilter = "retiraHoy" | "devuelveHoy" | "nuevos" | "saldo";
+const DAY_FILTER_LABEL: Record<DayFilter, string> = {
+  retiraHoy: "Retiran hoy",
+  devuelveHoy: "Devuelven hoy",
+  nuevos: "Presupuestos nuevos",
+  saldo: "Con saldo",
+};
+const matchesDayFilter = (p: Pedido, f: DayFilter): boolean => {
+  if (f === "retiraHoy") return esHoy(p.fecha_desde) && p.estado === "confirmado";
+  if (f === "devuelveHoy") return esHoy(p.fecha_hasta) && p.estado === "retirado";
+  if (f === "nuevos") return p.estado === "presupuesto" || p.estado === "solicitado";
+  return tieneSaldo(p);
+};
 
 // ── Página ───────────────────────────────────────────────────────────────────
 
 function PedidosPage() {
   useDocumentTitle("Pedidos · Back Office");
   const navigate = useNavigate();
+  // Deep-link ?f= (atajos del día desde el Dashboard). strict:false → search laxo.
+  const search = useSearch({ strict: false }) as { f?: string };
+  const dayFilter: DayFilter | null =
+    search.f && search.f in DAY_FILTER_LABEL ? (search.f as DayFilter) : null;
+
   const [q, setQ] = useState("");
-  const [tab, setTab] = useState<"todos" | "cobranzas">("todos");
   const [estadoF, setEstadoF] = useState<EstadoFilter>("activos");
-  const [smart, setSmart] = useState<SmartChip | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [panelOpen, setPanelOpen] = useState(true);
 
   // Lista de pedidos (per_page alto cubre el volumen real).
   const pedidosQ = useQuery({
-    queryKey: ["admin", "pedidos", { q, tab }],
-    queryFn: () =>
-      adminApi.listPedidos({
-        q: q || undefined,
-        con_saldo: tab === "cobranzas" || undefined,
-        per_page: 200,
-      }),
+    queryKey: ["admin", "pedidos", { q }],
+    queryFn: () => adminApi.listPedidos({ q: q || undefined, per_page: 200 }),
     refetchInterval: 5000,
   });
 
@@ -126,39 +153,24 @@ function PedidosPage() {
 
   const raw = useMemo(() => pedidosQ.data?.items ?? [], [pedidosQ.data]);
 
-  // Conteos para smart-chips + estado chips.
-  const counts = useMemo(
-    () => ({
-      retiraHoy: raw.filter((p) => esHoy(p.fecha_desde) && p.estado === "confirmado").length,
-      devuelveHoy: raw.filter((p) => esHoy(p.fecha_hasta) && p.estado === "retirado").length,
-      nuevos: raw.filter((p) => p.estado === "presupuesto" || p.estado === "solicitado").length,
-      saldo: raw.filter(tieneSaldo).length,
-      activos: raw.filter((p) => p.estado !== "finalizado" && p.estado !== "cancelado").length,
-    }),
+  // Conteo de activos para el chip de estado.
+  const activosCount = useMemo(
+    () => raw.filter((p) => p.estado !== "finalizado" && p.estado !== "cancelado").length,
     [raw],
   );
 
-  // Pipeline de filtros: tab (lo aplica el backend con con_saldo) → smart-chip → estado.
+  // Filtros: si llega un atajo del día (?f=) define la lista; si no, manda el chip de estado.
   const items = useMemo(() => {
-    let list = raw;
-    if (smart === "retiraHoy")
-      list = list.filter((p) => esHoy(p.fecha_desde) && p.estado === "confirmado");
-    else if (smart === "devuelveHoy")
-      list = list.filter((p) => esHoy(p.fecha_hasta) && p.estado === "retirado");
-    else if (smart === "nuevos")
-      list = list.filter((p) => p.estado === "presupuesto" || p.estado === "solicitado");
-    else if (smart === "saldo") list = list.filter(tieneSaldo);
-
-    if (tab === "cobranzas") return list; // ya filtrado por con_saldo en el backend
+    if (dayFilter) return raw.filter((p) => matchesDayFilter(p, dayFilter));
     if (estadoF === "activos")
-      return list.filter((p) => p.estado !== "finalizado" && p.estado !== "cancelado");
+      return raw.filter((p) => p.estado !== "finalizado" && p.estado !== "cancelado");
     if (estadoF === "cerrados")
-      return list.filter((p) => p.estado === "finalizado" || p.estado === "cancelado");
+      return raw.filter((p) => p.estado === "finalizado" || p.estado === "cancelado");
     if (estadoF === "presupuesto")
-      return list.filter((p) => p.estado === "presupuesto" || p.estado === "solicitado");
-    if (estadoF === "confirmado") return list.filter((p) => p.estado === "confirmado");
-    return list;
-  }, [raw, smart, tab, estadoF]);
+      return raw.filter((p) => p.estado === "presupuesto" || p.estado === "solicitado");
+    if (estadoF === "confirmado") return raw.filter((p) => p.estado === "confirmado");
+    return raw;
+  }, [raw, dayFilter, estadoF]);
 
   // Selección: la primera de la lista si no hay ninguna válida.
   const selId =
@@ -169,13 +181,6 @@ function PedidosPage() {
 
   const openEditor = (id: number) =>
     navigate({ to: "/admin/pedidos/$id", params: { id: String(id) } });
-
-  const smartChips: { id: SmartChip; label: string; n: number; dot: string }[] = [
-    { id: "retiraHoy", label: "Retiran hoy", n: counts.retiraHoy, dot: "bg-amber" },
-    { id: "devuelveHoy", label: "Devuelven hoy", n: counts.devuelveHoy, dot: "bg-rosa" },
-    { id: "nuevos", label: "Presupuestos nuevos", n: counts.nuevos, dot: "bg-azul" },
-    { id: "saldo", label: "Con saldo", n: counts.saldo, dot: "bg-verde" },
-  ];
 
   return (
     <div className="flex flex-col h-[calc(100dvh-var(--admin-topbar-h,56px))] min-h-0">
@@ -193,6 +198,18 @@ function PedidosPage() {
             </p>
           </div>
           <div className="hidden md:flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate({ to: "/admin/solicitudes" })}
+              className="relative"
+            >
+              <Pencil className="h-4 w-4 mr-1" /> Solicitudes
+              {pendientes > 0 && (
+                <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-[10px] font-bold text-ink">
+                  {pendientes}
+                </span>
+              )}
+            </Button>
             <Button variant="outline" onClick={() => navigate({ to: "/admin/pedidos/nuevo" })}>
               <FileText className="h-4 w-4 mr-1" /> Presupuesto
             </Button>
@@ -202,52 +219,8 @@ function PedidosPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 border-b hairline mt-3 md:mt-4 -mb-px">
-          <TabBtn active={tab === "todos"} onClick={() => setTab("todos")}>
-            Todos
-          </TabBtn>
-          <TabBtn active={tab === "cobranzas"} onClick={() => setTab("cobranzas")}>
-            <Coins className="h-3.5 w-3.5" /> Cobranzas
-          </TabBtn>
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/admin/solicitudes" })}
-            className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-sm text-muted-foreground hover:text-ink transition-colors"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Solicitudes
-            {pendientes > 0 && (
-              <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-[10px] font-bold text-ink">
-                {pendientes}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Smart-chips */}
-        <div className="flex items-center gap-1 mt-2 overflow-x-auto pb-0.5 md:flex-wrap md:gap-1.5 md:mt-3">
-          {smartChips.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setSmart(smart === c.id ? null : c.id)}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                smart === c.id
-                  ? "border-ink bg-surface text-ink"
-                  : "border-hairline text-muted-foreground hover:text-ink hover:border-ink",
-              )}
-            >
-              <span className={cn("h-1.5 w-1.5 rounded-full", c.dot)} />
-              {c.label}
-              <span className="font-mono text-[10px] tabular-nums text-ink/70">{c.n}</span>
-            </button>
-          ))}
-        </div>
-
         {/* Búsqueda + chips de estado */}
-        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-2 md:mt-3">
+        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-3 md:mt-4">
           <div className="relative md:max-w-sm flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -257,7 +230,17 @@ function PedidosPage() {
               className="pl-9"
             />
           </div>
-          {tab === "todos" && (
+          {dayFilter ? (
+            // Atajo del día activo (vino del Dashboard) — mostrar y permitir limpiar.
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/admin/pedidos" })}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-ink bg-ink px-3 py-1 text-xs font-semibold text-amber md:ml-auto"
+            >
+              {DAY_FILTER_LABEL[dayFilter]}
+              <X className="h-3 w-3" />
+            </button>
+          ) : (
             <div className="flex items-center gap-1 overflow-x-auto pb-0.5 md:flex-wrap md:gap-1.5 md:ml-auto">
               {ESTADO_FILTERS.map((f) => (
                 <button
@@ -273,7 +256,7 @@ function PedidosPage() {
                 >
                   {f.label}
                   {f.id === "activos" && (
-                    <span className="font-mono text-[10px] tabular-nums">{counts.activos}</span>
+                    <span className="font-mono text-[10px] tabular-nums">{activosCount}</span>
                   )}
                 </button>
               ))}
@@ -330,6 +313,20 @@ function PedidosPage() {
 
       {/* Mobile: cards */}
       <div className="md:hidden flex-1 overflow-y-auto px-4 pb-24 space-y-2 border-t hairline pt-3">
+        {/* Acceso a Solicitudes (en mobile no está el sidebar para llegar) */}
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/admin/solicitudes" })}
+          className="flex w-full items-center gap-2 rounded-xl border hairline bg-surface-elevated px-4 py-2.5 text-sm text-ink"
+        >
+          <Pencil className="h-4 w-4 text-muted-foreground" />
+          Solicitudes de cambio
+          {pendientes > 0 && (
+            <span className="ml-auto inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-[10px] font-bold text-ink">
+              {pendientes}
+            </span>
+          )}
+        </button>
         {pedidosQ.isLoading &&
           Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-28 w-full rounded-xl" />
@@ -383,38 +380,6 @@ function PedidosPage() {
 }
 
 // ── Subcomponentes ───────────────────────────────────────────────────────────
-
-function TabBtn({
-  active,
-  onClick,
-  children,
-  badge,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-  badge?: number;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition",
-        active
-          ? "border-amber text-ink"
-          : "border-transparent text-muted-foreground hover:text-ink",
-      )}
-    >
-      {children}
-      {!!badge && badge > 0 && (
-        <span className="inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-[10px] font-bold text-ink">
-          {badge}
-        </span>
-      )}
-    </button>
-  );
-}
 
 /** Tag "RETIRA HOY" / "DEVUELVE HOY" si aplica (para meta de fila/card). */
 function hoyTag(p: Pedido): ReactNode | null {
@@ -522,12 +487,29 @@ function PreviewPane({
   const p = detalleQ.data;
   const qc = useQueryClient();
   const [askDelete, setAskDelete] = useState(false);
+  const [openPago, setOpenPago] = useState(false);
+  const [openMail, setOpenMail] = useState(false);
+  const [askVerif, setAskVerif] = useState(false);
+  const [pendingEstado, setPendingEstado] = useState<EstadoPedido | null>(null);
+
   const deleteMut = useMutation({
     mutationFn: () => adminApi.deletePedido(id as number),
     onSuccess: () => {
       toast.success("Pedido eliminado");
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
       onDeleted();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Avanzar estado inline (quick-action). Misma máquina que el editor
+  // (@/lib/pedido-estados); el backend rechaza transiciones inválidas igual.
+  const estadoMut = useMutation({
+    mutationFn: (estado: EstadoPedido) => adminApi.setPedidoEstado(id as number, estado),
+    onSuccess: (_d, estado) => {
+      toast.success(`Pedido → ${ESTADO_LABEL[estado]}`);
+      qc.invalidateQueries({ queryKey: ["admin", "pedido", id] });
+      qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -553,56 +535,224 @@ function PreviewPane({
   const total = p.monto_total ?? 0;
   const saldo = Math.max(0, total - pagado);
   const jornadas = p.cantidad_jornadas ?? 1;
+  const nItems = p.items?.length ?? 0;
+  const fuente = fuenteLabel(p.fuente);
+
+  // Próximo paso del flujo (compartido con el editor).
+  const ns = nextStep(p);
+  const clienteSinVerificar = !!p.cliente_id && !p.cliente_dni_validado_at;
+  const ESTADOS_CON_AVISO: EstadoPedido[] = ["confirmado", "retirado"];
+  const advanceEstado = (target: EstadoPedido) => {
+    if (clienteSinVerificar && ESTADOS_CON_AVISO.includes(target)) {
+      setPendingEstado(target);
+      setAskVerif(true);
+    } else {
+      estadoMut.mutate(target);
+    }
+  };
 
   return (
-    <div className="p-5 md:p-6 max-w-3xl">
-      {/* Header del preview */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-2xl font-bold text-ink truncate">
-              {p.cliente_nombre || "Sin cliente"}
-            </h2>
-            <EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />
+    <div className="min-h-full pb-6">
+      {/* Toolbar sticky — datos read-only + quick-actions siempre visibles */}
+      <div className="sticky top-0 z-10 border-b hairline bg-surface/85 px-5 md:px-6 py-3 backdrop-blur-md">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="font-display text-2xl text-ink truncate">
+                {p.cliente_nombre || "Sin cliente"}
+              </h2>
+              <EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />
+            </div>
+            <div className="mt-1 font-mono text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
+              <span>Pedido #{p.numero_pedido ?? p.id}</span>
+              {creadoHace(p.created_at) && (
+                <>
+                  <span>·</span>
+                  <span>creado {creadoHace(p.created_at)}</span>
+                </>
+              )}
+              {fuente && (
+                <>
+                  <span>·</span>
+                  <span>{fuente}</span>
+                </>
+              )}
+            </div>
           </div>
-          <div className="mt-1 font-mono text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
-            <span>Pedido #{p.numero_pedido ?? p.id}</span>
-            {creadoHace(p.created_at) && (
-              <>
-                <span>·</span>
-                <span>creado {creadoHace(p.created_at)}</span>
-              </>
-            )}
-            {p.fuente && (
-              <>
-                <span>·</span>
-                <span>{p.fuente}</span>
-              </>
-            )}
+          {/* Acciones secundarias (de-enfatizadas, lejos de las quick-actions) */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setAskDelete(true)}
+              aria-label="Eliminar pedido"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onTogglePanel}
+              aria-label="Ensanchar lista"
+              title="Ensanchar la lista"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+
+        {/* Quick-actions: lo que más se usa, sin scrollear ni entrar al editor */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => onOpen(p.id)}>
             <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
           </Button>
-          <button
-            type="button"
-            onClick={() => setAskDelete(true)}
-            aria-label="Eliminar pedido"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={p.estado === "cancelado"}
+            onClick={() => setOpenPago(true)}
           >
-            <Trash2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onTogglePanel}
-            aria-label="Ocultar panel"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border hairline text-muted-foreground hover:text-ink"
-          >
-            <PanelLeft className="h-4 w-4" />
-          </button>
+            <Coins className="h-3.5 w-3.5 mr-1" /> Registrar pago
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setOpenMail(true)}>
+            <Mail className="h-3.5 w-3.5 mr-1" /> Mandar mail
+          </Button>
+          <WhatsAppButton pedido={p} phone={p.cliente_telefono} />
         </div>
       </div>
+
+      {/* Cuerpo */}
+      <div className="px-5 md:px-6 py-5 space-y-4">
+        {/* Siguiente paso — ejecuta la transición acá mismo */}
+        {ns && (
+          <div className="rounded-lg border border-amber bg-amber-soft px-4 py-3 flex items-center justify-between gap-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Siguiente paso
+            </div>
+            <Button
+              variant={ns.blocked ? "outline" : "amber"}
+              className="shrink-0"
+              disabled={!!ns.blocked || estadoMut.isPending}
+              title={ns.blocked ?? ""}
+              onClick={() => !ns.blocked && advanceEstado(ns.target)}
+            >
+              <ArrowRight className="h-4 w-4 mr-1" />
+              {ns.blocked ? `Falta: ${ns.blocked}` : ns.label}
+            </Button>
+          </div>
+        )}
+
+        {/* Fechas + total */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Fechas
+            </div>
+            <div className="mt-1 text-ink font-medium tabular-nums">
+              {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
+            </div>
+            <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+              {jornadas} jornada{jornadas !== 1 ? "s" : ""}
+            </div>
+          </div>
+          <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Total neto
+            </div>
+            <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
+              {fmtArs(total)}
+            </div>
+            <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+              {pagado >= total && total > 0
+                ? "pagado"
+                : pagado > 0
+                  ? `seña ${fmtArs(pagado)} · resta ${fmtArs(saldo)}`
+                  : "sin seña registrada"}
+            </div>
+          </div>
+        </div>
+
+        {/* Equipos */}
+        <div className="rounded-xl border hairline bg-surface-elevated">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b hairline">
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Equipos · {nItems}
+            </span>
+            {nItems > 0 && (
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                precio / jornada
+              </span>
+            )}
+          </div>
+          <ul className="divide-y hairline">
+            {(p.items ?? []).map((it) => (
+              <li key={it.id} className="flex items-center gap-3 px-4 py-2.5">
+                <EquipoThumb
+                  src={it.foto_url}
+                  alt={it.nombre_publico || it.nombre}
+                  className="h-9 w-9 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
+                  {it.marca && (
+                    <div className="font-mono text-[11px] text-muted-foreground">{it.marca}</div>
+                  )}
+                </div>
+                <div className="font-mono text-sm tabular-nums text-ink shrink-0">
+                  {it.cantidad}× {fmtArs(it.precio_jornada)}
+                </div>
+              </li>
+            ))}
+            {nItems === 0 && (
+              <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                Sin equipos cargados.
+              </li>
+            )}
+          </ul>
+        </div>
+      </div>
+
+      {/* Modales (quick-actions inline) */}
+      <RegistrarPagoModal
+        pedidoId={p.id}
+        total={total}
+        pagado={pagado}
+        open={openPago}
+        onOpenChange={setOpenPago}
+      />
+      <EnviarDocsDialog
+        pedidoId={p.id}
+        clienteEmail={p.cliente_email ?? ""}
+        open={openMail}
+        onOpenChange={setOpenMail}
+      />
+
+      <AlertDialog open={askVerif} onOpenChange={setAskVerif}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-amber shrink-0" />
+              Cliente sin identidad verificada
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {p.cliente_nombre} no verificó su identidad (DNI + selfie). Podés avanzar igual, o
+              gestionarlo desde el editor.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingEstado) estadoMut.mutate(pendingEstado);
+                setAskVerif(false);
+                setPendingEstado(null);
+              }}
+            >
+              Avanzar de todas formas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
         <AlertDialogContent>
@@ -623,100 +773,6 @@ function PreviewPane({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Siguiente paso — abre el editor (la máquina de estados real vive ahí). */}
-      {!["finalizado", "cancelado"].includes(p.estado) && (
-        <div className="mt-4 rounded-lg border border-amber bg-amber-soft px-4 py-3 flex items-center justify-between gap-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Siguiente paso
-          </div>
-          <Button variant="amber" onClick={() => onOpen(p.id)} className="shrink-0">
-            <ArrowRight className="h-4 w-4 mr-1" />
-            {PEDIDO_NEXT_LABEL[p.estado] ?? "Gestionar"}
-          </Button>
-        </div>
-      )}
-
-      {/* Fechas + total */}
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Fechas
-          </div>
-          <div className="mt-1 text-ink font-medium tabular-nums">
-            {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
-          </div>
-          <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-            {jornadas} jornada{jornadas !== 1 ? "s" : ""}
-          </div>
-        </div>
-        <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Total neto
-          </div>
-          <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
-            {fmtArs(total)}
-          </div>
-          <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-            {pagado >= total && total > 0
-              ? "pagado"
-              : pagado > 0
-                ? `seña ${fmtArs(pagado)} · resta ${fmtArs(saldo)}`
-                : "sin seña registrada"}
-          </div>
-        </div>
-      </div>
-
-      {/* Equipos */}
-      <div className="mt-4 rounded-xl border hairline bg-surface-elevated">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b hairline">
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            Equipos · {p.items?.length ?? 0}
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-            precio / jornada
-          </span>
-        </div>
-        <ul className="divide-y hairline">
-          {(p.items ?? []).map((it) => (
-            <li key={it.id} className="flex items-center gap-3 px-4 py-2.5">
-              <EquipoThumb
-                src={it.foto_url}
-                alt={it.nombre_publico || it.nombre}
-                className="h-9 w-9 shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
-                {it.marca && (
-                  <div className="font-mono text-[11px] text-muted-foreground">{it.marca}</div>
-                )}
-              </div>
-              <div className="font-mono text-sm tabular-nums text-ink shrink-0">
-                {it.cantidad}× {fmtArs(it.precio_jornada)}
-              </div>
-            </li>
-          ))}
-          {(p.items?.length ?? 0) === 0 && (
-            <li className="px-4 py-6 text-center text-sm text-muted-foreground">
-              Sin equipos cargados.
-            </li>
-          )}
-        </ul>
-      </div>
-
-      {/* Acciones */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <WhatsAppButton pedido={p} phone={p.cliente_telefono} />
-        <Button variant="outline" onClick={() => onOpen(p.id)}>
-          <Mail className="h-4 w-4 mr-1" /> Email
-        </Button>
-        <Button variant="outline" onClick={() => onOpen(p.id)}>
-          <Coins className="h-4 w-4 mr-1" /> Registrar pago
-        </Button>
-        <Button variant="outline" onClick={() => onOpen(p.id)}>
-          <FileText className="h-4 w-4 mr-1" /> Documentos
-        </Button>
-      </div>
     </div>
   );
 }
