@@ -403,7 +403,7 @@ function CartSheet({
     if (estado === "no-logueado") {
       toast.error("Debés iniciar sesión para solicitar un rental.", {
         duration: 5000,
-        action: { label: "Iniciar sesión", onClick: () => navigate({ to: "/cliente/login" }) },
+        action: { label: "Iniciar sesión", onClick: () => navigate({ to: "/cliente/login", search: { from: "carrito" } }) },
       });
       setSubmitting(false);
       return;
