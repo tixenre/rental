@@ -1,20 +1,28 @@
 import { Link } from "@tanstack/react-router";
 import { Check, ArrowRight } from "lucide-react";
+import { useHeroPhotos } from "@/lib/studio/hero-photos";
 
 export function EstudioBand() {
+  // Misma fuente que el hero: fotos del estudio desde R2 (admin).
+  // Usamos la 2da foto para no repetir la del hero; si no hay, la 1ra.
+  const photos = useHeroPhotos();
+  const bandPhoto = photos[1] ?? photos[0];
+
   return (
     <section className="bg-ink grid grid-cols-1 md:grid-cols-[46%_54%]">
       <Link
         to="/estudio"
-        className="relative overflow-hidden min-h-[280px] block group"
+        className="relative overflow-hidden min-h-[280px] block group bg-ink"
         aria-label="Conocé el estudio"
       >
-        <img
-          src="/estudio/Rambla_Estudio_S7V9491.jpg"
-          alt="El Estudio — Rambla Rental"
-          className="w-full h-full object-cover block transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
-          loading="lazy"
-        />
+        {bandPhoto && (
+          <img
+            src={bandPhoto}
+            alt="El Estudio — Rambla Rental"
+            className="w-full h-full object-cover block transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
+            loading="lazy"
+          />
+        )}
       </Link>
       <div className="flex flex-col justify-center gap-5 p-[clamp(2.25rem,5vw,4rem)_clamp(1.5rem,4vw,3.5rem)]">
         <p
