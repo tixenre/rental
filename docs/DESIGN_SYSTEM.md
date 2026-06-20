@@ -10,6 +10,68 @@
 
 ---
 
+## Filosofía de diseño (la esencia)
+
+> **Esto es el norte.** Los tokens, componentes y reglas de abajo son el _cómo_;
+> esta sección es el _por qué_. Toda pantalla nueva — y todo rediseño de una
+> existente — se mide contra estos principios antes que contra cualquier detalle.
+> Si un principio y una regla puntual chocan, gana el principio (y arreglamos la
+> regla). Nacieron del rediseño de **Pedidos** (jun 2026) y se reproducen en
+> **toda la web**.
+
+1. **La información se tiene que ver.** El dato que importa va con peso visual
+   real: tamaño, contraste y color suficientes. Nada de gris-mono-chiquito para
+   lo central. Si el usuario tiene que forzar la vista o entrar a un detalle para
+   leer lo básico, está mal. (Contraste WCAG como piso, no como aspiración.)
+
+2. **Mostrá el estado, no lo escondas.** Lo que define una entidad —su estado y
+   su plata— va **visible y con el dato concreto**: no "sin seña" en gris, sino
+   `Debe $X`; no un tono sutil, sino un pill de color que se lee de un vistazo.
+   El estado se **deriva** de la realidad (backend), nunca se inventa un grafo nuevo.
+
+3. **Un foco por pantalla.** Una acción primaria clara y el resto secundario. Dos
+   CTAs del mismo peso = el ojo no sabe dónde ir. El "siguiente paso" es único y
+   sale del estado real.
+
+4. **Una sola forma de hacer cada cosa.** No tres controles para una acción, no
+   dos botones que van al mismo lado. Si hay dos caminos idénticos, sobra uno
+   (sacamos el dropdown de estado redundante y el botón "Presupuesto" duplicado).
+
+5. **Lo que más se usa, a mano.** Las acciones frecuentes van arriba y siempre
+   visibles, no enterradas al final de un scroll largo (toolbar fija del panel).
+
+6. **Reconocimiento antes que lectura.** Avatares con color determinístico, pills
+   de estado, iconos consistentes → se escanea sin leer todo. Quién/qué está
+   seleccionado, siempre obvio (tarjeta del cliente, fila resaltada).
+
+7. **Densidad útil, sin ruido ni aire muerto.** Filas que respiran pero compactas,
+   columnas alineadas entre sí, nada de huecos enormes en el medio. Un renglón
+   denso bien alineado le gana a dos renglones con espacio muerto.
+
+8. **Decí lo que hace.** Labels y copy que prometen exactamente la acción; estados
+   vacíos accionables; voz "vos"; precios por `formatARS()`. El nombre del botón
+   es lo que pasa al tocarlo.
+
+9. **DS-first: reusar, no recrear.** Los patrones viven en la librería (`kit/`,
+   `ui/`, `rental/`, `admin/`) y se **reproducen**, no se recrean inline. Si una
+   pieza existe, se usa; si es nueva y reutilizable, se **extrae** (así nacieron
+   `PagoBadge` y `ClienteAvatar`). Cero one-offs, cero clases de pill copiadas a mano.
+
+10. **Mobile y accesibilidad no son un extra.** Se diseña para el pulgar y para
+    todos: tap targets ≥44px (Apple HIG), inputs ≥16px, `:focus-visible`,
+    `aria-label` en icon-buttons, foco atrapado en modales.
+
+11. **El core es sagrado; el diseño es presentación.** Pulir la UI nunca toca el
+    cálculo (motor de reservas / plata). La capa visual cambia; la lógica de
+    negocio no se altera para que algo "se vea mejor".
+
+**Patrón de referencia (encarna lo de arriba):** una fila que lista una entidad con
+estado + plata se lee de un vistazo con **avatar (`ClienteAvatar`) + nombre +
+`EstadoBadge` + `PagoBadge` + monto**, alto contraste y jerarquía clara. Es el molde
+a reproducir (pedidos, clientes, cobranzas, lo que venga).
+
+---
+
 ## Stack real
 
 - **Frontend:** Vite + React 19 + TanStack Router + Tailwind v4 +
