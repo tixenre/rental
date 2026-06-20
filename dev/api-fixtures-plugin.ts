@@ -1,4 +1,5 @@
 import { readFileSync, existsSync } from "node:fs";
+import type { IncomingMessage } from "node:http";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
 // Fuente ÚNICA del conteo de jornadas (espejo del backend: ceil(Δ/24h), mín 1).
@@ -47,9 +48,11 @@ function loadPrecios(): Map<number, number> {
   if (!raw) return map;
   try {
     const data = JSON.parse(raw);
-    const arr: any[] = Array.isArray(data) ? data : (data.items ?? data.equipos ?? []);
+    const parsed = data as { items?: unknown[]; equipos?: unknown[] };
+    const arr: unknown[] = Array.isArray(data) ? data : (parsed.items ?? parsed.equipos ?? []);
     for (const e of arr) {
-      if (typeof e.id === "number") map.set(e.id, Number(e.precio_jornada) || 0);
+      const item = e as { id?: unknown; precio_jornada?: unknown };
+      if (typeof item.id === "number") map.set(item.id, Number(item.precio_jornada) || 0);
     }
   } catch {
     /* ignore */
@@ -65,8 +68,19 @@ function descuentoPorJornadas(jornadas: number): number {
   return 0;
 }
 
-function cotizar(body: any, precios: Map<number, number>) {
-  const items: any[] = Array.isArray(body?.items) ? body.items : [];
+interface CotizarItem {
+  equipo_id?: number | null;
+  cantidad?: number;
+  precio_jornada?: number;
+}
+interface CotizarBody {
+  items?: CotizarItem[];
+  fecha_desde?: string;
+  fecha_hasta?: string;
+}
+
+function cotizar(body: CotizarBody, precios: Map<number, number>) {
+  const items: CotizarItem[] = Array.isArray(body?.items) ? body.items : [];
   const hayFechas = !!(body?.fecha_desde && body?.fecha_hasta);
 
   const subtotalPorJornada = items.reduce((acc, it) => {
@@ -101,10 +115,10 @@ function cotizar(body: any, precios: Map<number, number>) {
   };
 }
 
-function readBody(req: any): Promise<any> {
+function readBody(req: IncomingMessage): Promise<CotizarBody> {
   return new Promise((resolve) => {
     let data = "";
-    req.on("data", (c: any) => (data += c));
+    req.on("data", (c: Buffer | string) => (data += c));
     req.on("end", () => {
       try {
         resolve(data ? JSON.parse(data) : {});

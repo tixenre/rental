@@ -68,7 +68,10 @@ for (const r of ecRows) {
 }
 
 const specRows = (
-  await client.query(`SELECT equipo_id, spec_def_id, value FROM equipo_specs WHERE equipo_id = ANY($1)`, [equipoIds])
+  await client.query(
+    `SELECT equipo_id, spec_def_id, value FROM equipo_specs WHERE equipo_id = ANY($1)`,
+    [equipoIds],
+  )
 ).rows;
 const specsByEquipo = new Map();
 for (const r of specRows) {
@@ -201,7 +204,10 @@ const categoriasTree = cats
   .filter((n) => n.total > 0);
 
 /* ─── Escribir fixtures ──────────────────────────────── */
-writeFileSync(resolve(OUT, "equipos.json"), JSON.stringify({ total: items.length, items }, null, 0));
+writeFileSync(
+  resolve(OUT, "equipos.json"),
+  JSON.stringify({ total: items.length, items }, null, 0),
+);
 writeFileSync(resolve(OUT, "categorias.json"), JSON.stringify(categoriasTree, null, 0));
 writeFileSync(
   resolve(OUT, "marcas.json"),

@@ -403,7 +403,10 @@ function CartSheet({
     if (estado === "no-logueado") {
       toast.error("Debés iniciar sesión para solicitar un rental.", {
         duration: 5000,
-        action: { label: "Iniciar sesión", onClick: () => navigate({ to: "/cliente/login", search: { from: "carrito" } }) },
+        action: {
+          label: "Iniciar sesión",
+          onClick: () => navigate({ to: "/cliente/login", search: { from: "carrito" } }),
+        },
       });
       setSubmitting(false);
       return;
@@ -789,7 +792,9 @@ function FichaSheet({ eq, onClose, onAddToCart, inCart, jornadas, fechaDesde }: 
                 {fechaDesde ? formatARS(eq.pricePerDay * jornadas) : formatARS(eq.pricePerDay)}
               </div>
               <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground mt-0.5">
-                {fechaDesde ? `${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}` : "/ jornada"}
+                {fechaDesde
+                  ? `${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`
+                  : "/ jornada"}
               </div>
             </div>
             {eq.cantidad != null && (
@@ -1470,7 +1475,10 @@ export function CatalogoMovil() {
             background: TABS_BG,
           }}
         >
-          <div className="flex overflow-x-auto px-4 py-1" style={{ scrollbarWidth: "none", gap: 0 }}>
+          <div
+            className="flex overflow-x-auto px-4 py-1"
+            style={{ scrollbarWidth: "none", gap: 0 }}
+          >
             {categories.map((cat) => {
               const count =
                 cat === "Todo"

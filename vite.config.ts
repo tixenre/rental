@@ -13,9 +13,7 @@ export default defineConfig(async ({ mode }) => {
   // Solo dev: puebla el catálogo cuando el backend Python no está levantado.
   // Import dinámico para que Railway (que no copia ./dev/) no falle en build.
   const devPlugins =
-    mode === "development"
-      ? [(await import("./dev/api-fixtures-plugin")).apiFixturesPlugin()]
-      : [];
+    mode === "development" ? [(await import("./dev/api-fixtures-plugin")).apiFixturesPlugin()] : [];
 
   return {
     plugins: [
@@ -64,8 +62,8 @@ export default defineConfig(async ({ mode }) => {
       // a /admin. Vite los seguirá cargando dinámicamente cuando hagan falta.
       modulePreload: {
         polyfill: false,
-        resolveDependencies(_filename, deps) {
-          return deps.filter((d) => !/(\/|^)(admin|vendor-dnd)-/.test(d));
+        resolveDependencies(_filename: string, deps: string[]) {
+          return deps.filter((d: string) => !/(\/|^)(admin|vendor-dnd)-/.test(d));
         },
       },
       rollupOptions: {
