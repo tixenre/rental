@@ -206,18 +206,32 @@ function TallerLandingPage() {
             )}
 
             {/* About */}
-            <section>
-              <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-muted-foreground mb-4">
+            <section className="rounded-2xl border border-border/60 bg-muted/20 px-6 py-7">
+              <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-muted-foreground mb-5">
                 Sobre {taller.instructor_nombre}
               </p>
-              <p className="text-base text-muted-foreground leading-relaxed mb-4">
+              <p className="text-base text-ink/80 leading-relaxed">
                 {taller.instructor_bio}
               </p>
-              {taller.instructor_proyectos && (
-                <p className="text-sm text-muted-foreground/80">
-                  <span className="font-medium text-muted-foreground">Proyectos:</span>{" "}
-                  {taller.instructor_proyectos}
-                </p>
+              {taller.instructor_proyectos?.length > 0 && (
+                <div className="mt-6">
+                  <p className="font-mono text-[0.625rem] tracking-[0.2em] uppercase text-muted-foreground mb-3">
+                    Trabajó con
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(Array.isArray(taller.instructor_proyectos)
+                      ? taller.instructor_proyectos
+                      : String(taller.instructor_proyectos).split(",").map((s: string) => s.trim())
+                    ).map((p: string) => (
+                      <span
+                        key={p}
+                        className="inline-block rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium text-ink/70"
+                      >
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
             </section>
 
