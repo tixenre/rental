@@ -277,7 +277,7 @@ function TallerLandingPage() {
         <div className="max-w-[1100px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <Logo className="h-5 w-auto opacity-50" />
           <span>{taller.direccion}</span>
-          <Link to="/" className="hover:text-ink transition">
+          <Link to="/catalogo" className="hover:text-ink transition">
             Volver al catálogo
           </Link>
         </div>

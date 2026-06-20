@@ -48,7 +48,7 @@ function FooterMobile() {
 
         {/* Links de navegación en chips */}
         <nav className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
-          <Link to="/" className="text-ink hover:text-amber transition">
+          <Link to="/catalogo" className="text-ink hover:text-amber transition">
             Catálogo
           </Link>
           <span className="text-muted-foreground/40">·</span>
@@ -199,7 +199,7 @@ function FooterDesktop() {
             </h3>
             <ul className="space-y-2.5 text-sm">
               <li>
-                <Link to="/" className="text-ink hover:text-amber transition">
+                <Link to="/catalogo" className="text-ink hover:text-amber transition">
                   Catálogo
                 </Link>
               </li>
