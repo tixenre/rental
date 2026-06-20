@@ -642,8 +642,8 @@
   (#501) bajó `core.py` un nivel y `FRONT_NEW = BASE.parent / "dist"` (con `BASE = Path(__file__).parent`)
   pasó a apuntar a `backend/dist` en vez de la raíz `/app/dist` (donde el Dockerfile copia el build) →
   `_serve_frontend` no encontraba el index → 503.
-- **Por qué no se cazó antes.** En staging el frontend lo sirve **Vercel**; el backend Railway de dev nunca
-  sirve el SPA → la regresión quedó **dormida** y solo fue fatal en prod. Y el healthcheck de Railway apuntaba
+- **Por qué no se cazó antes.** En ese momento el backend Railway de dev no servía el SPA (lo hacía un front
+  aparte) → la regresión quedó **dormida** y solo fue fatal en prod. Y el healthcheck de Railway apuntaba
   a `/health` (siempre 200, a propósito, para tolerar fallos de migración) → el deploy roto pasó como sano.
 - **Decisión / gate.** (1) `GET /health/frontend` → 503 si `FRONT_NEW/index.html` no existe; `railway.json`
   apunta el healthcheck ahí → un deploy que no puede servir el SPA **falla el healthcheck y no se promueve**
@@ -652,8 +652,9 @@
   repo (`FRONT`/`FRONT_NEW`) se anclan a la raíz, no con `__file__` relativo al paquete.
 - **Consecuencia / gotcha durable.** Un **split de paquete** (`x.py` → `x/`) **corre un nivel** todo
   `Path(__file__).parent…` → en un move-verbatim hay que revisar las **paths relativas** (a assets, .env,
-  templates), no solo el código. Dos asimetrías de entorno a recordar: el front de dev va por Vercel (el
-  backend Railway de staging no sirve el SPA) y `/health` es liveness-siempre-200 (no readiness). Regresión:
+  templates), no solo el código. Staging ahora sirve el SPA por Railway igual que prod → el gate
+  `/health/frontend` cubre **staging y prod** (la vieja asimetría del front de dev por un servicio aparte ya
+  no existe). Recordar la otra asimetría: `/health` es liveness-siempre-200 (no readiness). Regresión:
   `test_front_paths.py` (FRONT_NEW hermano de `backend/`) + `test_health_frontend_gate.py` (503/200 del gate).
 
 ---
@@ -778,3 +779,27 @@ cancel-in-progress` ya cancela corridas viejas.
   valor concreto se documenta en el design system (acá vive el **criterio**, no la tabla de números). El
   **supervisor lo hace cumplir**: marca como hallazgo un tap target nuevo < 44px, o una decisión táctil
   que contradiga HIG sin justificación.
+
+### 2026-06-20 — Filosofía de diseño del DS: enforceable, la esencia del front
+
+- **Contexto.** El rediseño de Pedidos (jun 2026) no fue una lista de fixes sino la aplicación de un
+  criterio repetible. El dueño pidió capturar **la esencia** —el _por qué_— para reproducirla en toda la
+  web, no solo los componentes sueltos (avatar, badges).
+- **Decisión.** La **Filosofía de diseño** vive como **primera sección** de `DESIGN_SYSTEM.md` (11
+  principios) y es **enforceable**: el supervisor mide toda UI nueva o rediseñada contra ella antes que
+  contra cualquier detalle. Los principios: (1) la info se tiene que ver (contraste/peso reales, WCAG de
+  piso); (2) mostrá el estado y la plata, no los escondas (`Debe $X`, no "sin seña" gris; el estado se
+  **deriva** del backend); (3) un foco por pantalla; (4) **una sola forma de hacer cada cosa** (sin tres
+  controles para una acción ni botones duplicados); (5) lo más usado, a mano; (6) reconocimiento >
+  lectura (avatares, pills, selección obvia); (7) densidad útil sin aire muerto; (8) decí lo que hace
+  (copy/labels/empty states, voz "vos"); (9) **reusar no recrear** (la forma del pill vive en `kit/Pill`;
+  `EstadoBadge`/`PagoBadge` derivan; cero clases copiadas a mano); (10) mobile/a11y no son extra (HIG,
+  ≥44px, foco visible); (11) el core es sagrado, el diseño es presentación.
+- **Why.** Sin el _por qué_ escrito, cada pantalla re-discute el mismo criterio y el front deriva. La
+  esencia documentada + enforceable es lo que hace que el rollout a toda la web sea consistente y no una
+  colección de one-offs.
+- **Consecuencias.** Materializado en código: `kit/Pill` (forma + tonos semánticos única), `kit/PagoBadge`
+  (estado de pago con monto), `kit/ClienteAvatar` (avatar determinístico). El **contraste de los tints de
+  `EstadoBadge`** queda como decisión visual aparte (pendiente, afecta también el portal del cliente).
+  Refina —no reemplaza— _Apple HIG (2026-06-05)_ y es la contraparte visual de la _Barra de calidad de
+  ingeniería (2026-05-25)_: les da el marco de diseño unificado.

@@ -51,3 +51,6 @@ test-results
 playwright-report
 blob-report
 .playwright
+
+# Claude Code SDK internal artifacts
+.claude/worktrees/

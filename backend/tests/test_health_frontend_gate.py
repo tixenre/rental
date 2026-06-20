@@ -1,10 +1,10 @@
 """El healthcheck `/health/frontend` (gate de deploy de Railway) debe responder
 503 si el SPA no se sirve y 200 si sí.
 
-Es la red que faltó en la caída de prod (#930): staging no cubría "el backend
-Railway sirviendo el SPA" porque el front de dev va por Vercel. Con este gate
-apuntado desde `railway.json`, un deploy que no puede servir el frontend falla el
-healthcheck y NO se promueve (ni staging ni prod). Hermético (fakea el dist).
+Es la red que faltó en la caída de prod (#930). Railway sirve el SPA tanto en
+staging como en prod; con este gate apuntado desde `railway.json`, un deploy que
+no puede servir el frontend falla el healthcheck y NO se promueve (ni staging ni
+prod). Hermético (fakea el dist).
 """
 import pytest
 from fastapi.testclient import TestClient

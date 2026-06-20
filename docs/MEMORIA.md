@@ -194,8 +194,8 @@ ningún deploy pasa) → un deploy que no sirve el SPA **no se promueve**. Cazó
 (servía `"Frontend not built"`). Regla durable: las paths a assets de la **raíz** del repo
 (`FRONT`/`FRONT_NEW` → `frontend/public`/`dist`) se anclan a la raíz, **no** con `Path(__file__).parent`
 relativo al paquete — un **split** (`database.py` → paquete `database/`) las corre un nivel y quedan en
-`backend/…`. Staging no cubre "el backend Railway sirviendo el SPA" (el front de dev va por Vercel) → el
-gate es la red. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
+`backend/…`. Staging sirve el SPA por Railway igual que prod → el gate `/health/frontend` cubre **staging y
+prod**. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
 
 ---
 
@@ -251,3 +251,13 @@ hacer en la misma pasada una **lectura comprensiva del sistema completo** para c
 La referencia default para UX mobile/táctil es **Apple HIG**. Materialización: **tap target mínimo 44×44px**
 (`h-11 w-11`); inputs ≥ 16px; `.safe-*` cerca de notch/home-bar. El valor vive en los specs del DS (no acá).
 El supervisor marca un tap target nuevo < 44px o una decisión táctil que contradiga HIG sin justificación.
+
+### 2026-06-20 — Filosofía de diseño del DS: enforceable, la esencia del front
+
+Toda UI nueva o rediseñada sigue la **Filosofía de diseño** del DS (`DESIGN_SYSTEM.md`, primera sección,
+11 principios): la info se tiene que ver (contraste/peso reales), **estado + plata visibles** (`Debe $X`,
+no "sin seña" gris), un foco por pantalla, **una sola forma de hacer cada cosa** (sin controles/botones
+duplicados), lo más usado a mano, reconocimiento > lectura (avatares/pills), densidad sin aire muerto,
+**reusar no recrear** (la forma del pill vive en `kit/Pill`; `EstadoBadge`/`PagoBadge` derivan, cero clases
+copiadas), mobile/a11y no son extra, el core es presentación. El supervisor la hace cumplir; el detalle
+vive en el doc. Es la contraparte visual de la _Barra de calidad de ingeniería (2026-05-25)_.

@@ -19,7 +19,7 @@ uvicorn main:app --reload --port 8000 &
 BACKEND_PID=$!
 
 # ── Frontend ─────────────────────────────────────────────────────────────────
-cd "$ROOT"
+cd "$ROOT/frontend"
 echo "→ Frontend arrancando en http://localhost:3000 ..."
 npm run dev &
 FRONTEND_PID=$!

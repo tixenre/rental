@@ -24,12 +24,17 @@ jobs:
   typecheck:
     name: TypeScript typecheck
     runs-on: ubuntu-latest
+    # El frontend vive en frontend/ (simétrico a backend/) → los npm corren ahí.
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
       # Guardrail de ruteo: una ruta "parent" (con sub-rutas) DEBE proveer <Outlet/>,
@@ -39,12 +44,16 @@ jobs:
   lint:
     name: Lint + formato (eslint/prettier)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       # eslint corre prettier embebido (formato = error, reglas de React = aviso)
       - run: npm run lint
@@ -213,11 +222,15 @@ jobs:
   build:
     name: Build frontend
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build

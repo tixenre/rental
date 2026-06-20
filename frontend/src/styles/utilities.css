@@ -1,0 +1,283 @@
+/* ============================================================
+   Rambla Rental — Utilities, type recipes & motion  (CANONICAL)
+   Todo lo que no es token ni @font-face. @theme vive en tokens/.
+   ============================================================ */
+
+@layer base {
+  .font-display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background-color: var(--color-amber);
+    color: var(--color-ink);
+  }
+
+  /* Focus visible ring global — teclado + screen readers */
+  :focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  /* Para inputs y campos de forma, outline más ajustado */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 1px;
+  }
+
+  /* iOS: evita el zoom al enfocar inputs < 16px */
+  @media (max-width: 767px) {
+    input,
+    textarea,
+    select {
+      font-size: max(16px, 1em);
+    }
+  }
+}
+
+@layer utilities {
+  /* ── Reduced motion: clase que desactiva transforms y transitions ── */
+  .no-motion,
+  .no-motion * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .no-motion:active,
+  .no-motion:hover,
+  .no-motion:focus {
+    transform: none !important;
+  }
+
+  /* ── Brand ─────────────────────────────────────────────── */
+  .hairline {
+    border-color: var(--color-hairline);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-amber-tape {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--color-amber) 0 24px,
+      var(--color-amber-hot) 24px 48px
+    );
+  }
+
+  .wordmark {
+    font-family: var(--font-display);
+    font-weight: 900;
+    letter-spacing: 0.01em;
+    font-feature-settings: "ss01";
+    text-transform: lowercase;
+    line-height: 0.9;
+  }
+
+  /* Logo wordmark INLINE (SVG themable) — lo usa components/rental/Logo.tsx.
+     El span lleva la altura (h-7/h-9/…) y el color (text-amber); el svg los
+     hereda. Cualquier fill sólido toma currentColor (marca monocromática),
+     preservando los huecos → robusto ante el SVG que sube el admin. */
+  .logo-wordmark svg {
+    height: 100%;
+    width: auto;
+    display: block;
+  }
+  .logo-wordmark svg [fill]:not([fill="none"]):not([fill="transparent"]) {
+    fill: currentColor;
+  }
+  .logo-wordmark svg path:not([fill]) {
+    fill: currentColor;
+  }
+
+  .grain {
+    position: relative;
+  }
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: radial-gradient(oklch(0.18 0.01 60 / 0.05) 1px, transparent 1px);
+    background-size: 4px 4px;
+  }
+
+  /* ── Type recipes ──────────────────────────────────────── */
+  .t-display-1 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(3.5rem, 9vw, 8.5rem);
+    line-height: 0.9;
+    letter-spacing: -0.01em;
+    text-transform: lowercase;
+    text-wrap: balance;
+  }
+  .t-display-2 {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(2.25rem, 5vw, 4rem);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    text-transform: lowercase;
+  }
+  .t-h1 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 1.875rem;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+  }
+  .t-h2 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+  .t-h3 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 1.125rem;
+    line-height: 1.3;
+  }
+  .t-body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+  .t-small {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--color-muted-foreground);
+  }
+  .t-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .t-eyebrow {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 0.625rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+
+  /* ── Safe area (iOS sticky bars) ───────────────────────── */
+  .safe-t {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-b {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* ── TopBar amber-on-scroll (snap ≥65% invierte logo/pills) ──
+     Rambla seal: badge amber + R bone por default. Al pasar 65% del
+     progreso (.topbar-snap) los colores se invierten. */
+  .topbar-seal .seal-badge {
+    fill: var(--color-amber);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .topbar-seal .seal-badge {
+      transition: fill 0.12s;
+    }
+  }
+
+  .topbar-seal .seal-r {
+    fill: var(--color-background);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .topbar-seal .seal-r {
+      transition: fill 0.12s;
+    }
+  }
+
+  .topbar-snap .topbar-seal .seal-badge {
+    fill: var(--color-background);
+  }
+  .topbar-snap .topbar-seal .seal-r {
+    fill: var(--color-amber);
+  }
+  /* date-pill y botón de sesión: se invierten a bone con ink al hacer snap. */
+  .topbar-snap .date-pill-snap,
+  .topbar-snap .user-btn-snap {
+    background: var(--color-background) !important;
+    border-color: var(--color-background) !important;
+    color: var(--color-ink);
+  }
+
+  /* ── Calendar modifiers (react-day-picker) ───────────────
+     rdp-nostock: día sin stock → fondo rojo suave + punto destructive.
+     rdp-closed:  día cerrado (horarios/feriados) → rojo más tenue + tachado. */
+  .rdp-nostock {
+    position: relative;
+    background-color: color-mix(in oklch, var(--color-destructive) 12%, transparent) !important;
+    color: var(--color-destructive) !important;
+  }
+  .rdp-nostock::after {
+    content: "";
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--color-destructive);
+    pointer-events: none;
+  }
+  .rdp-closed {
+    background-color: color-mix(in oklch, var(--color-destructive) 8%, transparent) !important;
+    color: var(--color-destructive) !important;
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
+}
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+/* Animaciones solo si el usuario NO pidió reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes expand-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes slide-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+}
