@@ -33,7 +33,7 @@ const Grain = ({ opacity = 8 }: { opacity?: number }) => (
 function ProgramaItem({ text, index }: { text: string; index: number }) {
   return (
     <li className="flex items-start gap-3">
-      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-amber/20 text-amber-700 text-xs font-bold grid place-items-center">
+      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-rosa text-white text-xs font-bold grid place-items-center">
         {index + 1}
       </span>
       <span className="text-sm leading-relaxed text-muted-foreground">{text}</span>
@@ -79,7 +79,7 @@ function TallerLandingPage() {
           <Logo className="h-6 w-auto" />
           <a
             href="#inscripcion"
-            className="inline-flex items-center gap-1.5 rounded-full bg-ink text-amber px-4 py-2 text-sm font-bold hover:brightness-110 transition"
+            className="inline-flex items-center gap-1.5 rounded-full bg-rosa text-ink px-4 py-2 text-sm font-bold hover:brightness-110 transition"
           >
             Inscribirme <ChevronRight className="h-3.5 w-3.5" />
           </a>
@@ -90,7 +90,7 @@ function TallerLandingPage() {
       <section className="relative bg-ink overflow-hidden">
         <Grain opacity={10} />
         <div className="relative max-w-[1100px] mx-auto px-4 sm:px-6 py-16 sm:py-24">
-          <p className="font-mono text-[0.625rem] tracking-[0.3em] uppercase text-amber mb-4">
+          <p className="font-mono text-[0.625rem] tracking-[0.3em] uppercase text-rosa mb-4">
             Workshop
           </p>
           <h1
@@ -103,7 +103,7 @@ function TallerLandingPage() {
             className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] mt-1"
             style={{
               fontSize: "clamp(2.75rem, 8vw, 5.5rem)",
-              color: "color-mix(in oklch, var(--amber) 70%, white)",
+              color: "color-mix(in oklch, var(--color-rosa) 80%, white)",
             }}
           >
             {taller.subtitulo}
@@ -131,7 +131,7 @@ function TallerLandingPage() {
           <div className="mt-8">
             <a
               href="#inscripcion"
-              className="inline-flex items-center gap-2 rounded-full bg-amber text-ink px-7 py-3.5 text-base font-bold hover:brightness-110 active:scale-[0.97] transition-all"
+              className="inline-flex items-center gap-2 rounded-full bg-rosa text-ink px-7 py-3.5 text-base font-bold hover:brightness-110 active:scale-[0.97] transition-all"
             >
               Quiero inscribirme
             </a>
@@ -167,7 +167,7 @@ function TallerLandingPage() {
             {taller.programa_teorica.length > 0 && (
               <section>
                 <div className="mb-4">
-                  <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-amber mb-1">
+                  <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-rosa mb-1">
                     Clase 1 — Teórica
                   </p>
                   <h2 className="font-display text-2xl font-bold text-ink lowercase tracking-tight">
@@ -190,7 +190,7 @@ function TallerLandingPage() {
             {taller.programa_practica.length > 0 && (
               <section>
                 <div className="mb-4">
-                  <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-amber mb-1">
+                  <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-rosa mb-1">
                     Clase 2 — Práctica
                   </p>
                   <h2 className="font-display text-2xl font-bold text-ink lowercase tracking-tight">

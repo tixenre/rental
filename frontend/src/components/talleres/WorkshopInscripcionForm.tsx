@@ -87,7 +87,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
     return (
       <div className="rounded-2xl border border-border/60 bg-background p-6 sm:p-8 text-center">
         <CheckCircle2
-          className={`mx-auto mb-4 h-10 w-10 ${isEspera ? "text-amber" : "text-green-500"}`}
+          className={`mx-auto mb-4 h-10 w-10 ${isEspera ? "text-rosa" : "text-green-500"}`}
           strokeWidth={1.5}
         />
         <h3 className="font-display text-xl font-bold text-ink mb-2">
@@ -123,9 +123,9 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
       <div
         className={`rounded-xl px-4 py-2.5 text-sm font-medium ${
           enListaActual
-            ? "bg-amber/15 text-amber-700"
+            ? "bg-rosa/15 text-rosa"
             : cuposDisponibles <= 3
-              ? "bg-amber/10 text-amber-700"
+              ? "bg-rosa/10 text-rosa"
               : "bg-green-50 text-green-700"
         }`}
       >
@@ -265,7 +265,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
       <Button
         type="submit"
         disabled={submitState === "submitting" || upload.status === "uploading"}
-        className="bg-ink text-amber hover:brightness-110 active:scale-[0.98] font-bold rounded-full py-6 text-base transition-all"
+        className="bg-rosa text-ink hover:brightness-110 active:scale-[0.98] font-bold rounded-full py-6 text-base transition-all"
       >
         {submitState === "submitting" ? (
           <span className="flex items-center gap-2">
