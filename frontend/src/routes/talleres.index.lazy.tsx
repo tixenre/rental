@@ -85,25 +85,29 @@ function TalleresPage() {
 
   return (
     <PublicLayout>
-      <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 sm:py-16">
-        <header className="mb-10">
-          <p className="font-mono text-[0.6875rem] tracking-[0.2em] uppercase text-muted-foreground mb-3">
-            Rambla Rental
+      {/* Header full-bleed oscuro */}
+      <section className="bg-ink text-background px-4 sm:px-6 pt-12 pb-14">
+        <div className="max-w-[900px] mx-auto">
+          <p className="font-mono text-[0.6875rem] tracking-[0.2em] uppercase text-amber mb-3">
+            Rambla
           </p>
           <h1
-            className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-ink"
+            className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-background"
             style={{ fontSize: "clamp(2.5rem, 6vw, 4rem)" }}
           >
-            Workshops
+            workshops
             <br />
-            &amp; Talleres
+            &amp; talleres
           </h1>
-          <p className="mt-4 text-base text-muted-foreground max-w-lg">
+          <p className="mt-4 text-base text-background/65 max-w-lg">
             Espacios de aprendizaje en Rambla Estudio. Clases prácticas con profesionales
             de la industria audiovisual y fotográfica.
           </p>
-        </header>
+        </div>
+      </section>
 
+      {/* Cards */}
+      <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 sm:py-14">
         {isLoading && (
           <div className="py-16 text-center text-muted-foreground text-sm">
             Cargando talleres…
