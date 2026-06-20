@@ -24,6 +24,9 @@ import {
   Trash2,
   GripVertical,
   Tag,
+  ShieldAlert,
+  ShieldCheck,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -203,6 +206,11 @@ function PedidoEditorPage() {
   const [openMailDialog, setOpenMailDialog] = useState(false);
   const [openSearchSheet, setOpenSearchSheet] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
+  const [askVerif, setAskVerif] = useState(false);
+  const [pendingEstado, setPendingEstado] = useState<PedidoEstado | null>(null);
+  const [linkVerif, setLinkVerif] = useState<string | null>(null);
+  const [generandoLink, setGenerandoLink] = useState(false);
+  const [copiadoLink, setCopiadoLink] = useState(false);
 
   const qc = useQueryClient();
   const deleteMut = useMutation({
@@ -239,6 +247,31 @@ function PedidoEditorPage() {
 
   const { datos, setDatos, items, setItems, saveStatus, estadoMut } = draft;
   const ns = nextStep(p);
+
+  const clienteSinVerificar = !!p.cliente_id && !p.cliente_dni_validado_at;
+  const ESTADOS_CON_AVISO: PedidoEstado[] = ["confirmado", "retirado"];
+
+  const handleNextStep = (target: PedidoEstado) => {
+    if (clienteSinVerificar && ESTADOS_CON_AVISO.includes(target)) {
+      setPendingEstado(target);
+      setAskVerif(true);
+    } else {
+      estadoMut.mutate(target);
+    }
+  };
+
+  const handleGenerarLink = async () => {
+    if (!p.cliente_id) return;
+    setGenerandoLink(true);
+    try {
+      const r = await adminApi.generarLinkVerificacion(p.cliente_id);
+      setLinkVerif(r.url);
+    } catch {
+      toast.error("No se pudo generar el link de verificación");
+    } finally {
+      setGenerandoLink(false);
+    }
+  };
 
   // Fechas+horas derivadas del draft (vivo). datos.fecha_desde/_hasta vienen
   // como datetime ISO (keepDateTime) o, en pedidos viejos sin hora, date-only
@@ -405,6 +438,21 @@ function PedidoEditorPage() {
                   >
                     Desvincular
                   </button>
+                </div>
+              )}
+              {datos.cliente_id && (
+                <div
+                  className={cn(
+                    "mt-1 flex items-center gap-1.5 font-mono text-[11px]",
+                    p.cliente_dni_validado_at ? "text-verde" : "text-amber",
+                  )}
+                >
+                  {p.cliente_dni_validado_at ? (
+                    <ShieldCheck className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <ShieldAlert className="h-3 w-3 shrink-0" />
+                  )}
+                  {p.cliente_dni_validado_at ? "Identidad verificada" : "Identidad sin verificar"}
                 </div>
               )}
             </div>
@@ -603,13 +651,62 @@ function PedidoEditorPage() {
                 className="w-full"
                 disabled={!!ns.blocked || estadoMut.isPending}
                 title={ns.blocked ?? ""}
-                onClick={() => estadoMut.mutate(ns.target)}
+                onClick={() => !ns.blocked && handleNextStep(ns.target)}
               >
                 <ArrowRight className="h-4 w-4 mr-1" />
                 {ns.blocked ? `Falta: ${ns.blocked}` : ns.label}
               </Button>
             )}
           </RailSection>
+
+          {/* Identidad del cliente (solo cuando tiene ficha vinculada sin verificar) */}
+          {clienteSinVerificar && (
+            <RailSection label="Identidad del cliente">
+              <div className="flex items-center gap-1.5 text-amber text-sm mb-2">
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                <span>Sin verificar</span>
+              </div>
+              {linkVerif ? (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground">Mandá este link al cliente:</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={linkVerif}
+                      className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-[11px] text-ink outline-none truncate"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(linkVerif);
+                        setCopiadoLink(true);
+                        setTimeout(() => setCopiadoLink(false), 2000);
+                      }}
+                      className="flex items-center gap-1 rounded-md border hairline bg-surface px-2.5 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors shrink-0 h-[30px]"
+                    >
+                      {copiadoLink ? (
+                        <Check className="h-3.5 w-3.5 text-verde" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      {copiadoLink ? "Copiado" : "Copiar"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  disabled={generandoLink}
+                  onClick={() => void handleGenerarLink()}
+                >
+                  <ShieldCheck className="h-4 w-4 mr-1" />
+                  {generandoLink ? "Generando…" : "Generar link de verificación"}
+                </Button>
+              )}
+            </RailSection>
+          )}
 
           {/* Desglose — vivo via useCotizacion */}
           <RailSection label="Desglose">
@@ -754,7 +851,7 @@ function PedidoEditorPage() {
               variant={ns.blocked ? "outline" : "amber"}
               size="sm"
               disabled={!!ns.blocked || estadoMut.isPending}
-              onClick={() => estadoMut.mutate(ns.target)}
+              onClick={() => !ns.blocked && handleNextStep(ns.target)}
             >
               {ns.blocked ?? ns.label.split(" ")[0]}
             </Button>
@@ -788,6 +885,34 @@ function PedidoEditorPage() {
         open={openMailDialog}
         onOpenChange={setOpenMailDialog}
       />
+      <AlertDialog open={askVerif} onOpenChange={setAskVerif}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-amber shrink-0" />
+              Cliente sin identidad verificada
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {p.cliente_nombre} no verificó su identidad (DNI + selfie). Podés generar un link de
+              verificación para mandárselo, o continuar de todas formas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingEstado) estadoMut.mutate(pendingEstado);
+                setAskVerif(false);
+                setPendingEstado(null);
+              }}
+            >
+              {pendingEstado === "confirmado"
+                ? "Confirmar de todas formas"
+                : "Continuar de todas formas"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={askDelete} onOpenChange={setAskDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -306,7 +306,8 @@ def _aplicar_contacto_cliente(pedido: dict, c: dict) -> None:
     El nombre: si hay datos RENAPER (identidad verificada), se usa el nombre
     legal confirmado; si no, el nombre ingresado por el cliente. El email/teléfono
     se sobrescriben solo si el cliente tiene un valor. También pone `cliente_dni`
-    si el DNI fue verificado por RENAPER.
+    si el DNI fue verificado por RENAPER, y `cliente_dni_validado_at` para que el
+    back-office pueda mostrar el aviso de identidad sin verificar.
     """
     if c.get("nombre_renaper"):
         pedido["cliente_nombre"] = f"{c['nombre_renaper']} {c.get('apellido_renaper', '')}".strip()
@@ -318,6 +319,7 @@ def _aplicar_contacto_cliente(pedido: dict, c: dict) -> None:
         pedido["cliente_telefono"] = c["telefono"]
     if c.get("dni"):
         pedido["cliente_dni"] = c["dni"]
+    pedido["cliente_dni_validado_at"] = c.get("dni_validado_at")
 
 
 def _enriquecer_pedido_con_cliente(conn, pedido: dict) -> dict:
@@ -336,7 +338,7 @@ def _enriquecer_pedido_con_cliente(conn, pedido: dict) -> dict:
         return pedido
     row = conn.execute(
         """SELECT nombre, apellido, email, telefono,
-                  dni, nombre_renaper, apellido_renaper
+                  dni, nombre_renaper, apellido_renaper, dni_validado_at
            FROM clientes WHERE id = ?""",
         (cid,),
     ).fetchone()
@@ -353,7 +355,7 @@ def _enriquecer_pedidos_con_cliente(conn, pedidos: list[dict]) -> None:
     ph = ",".join(["?"] * len(ids))
     rows = conn.execute(
         f"""SELECT id, nombre, apellido, email, telefono,
-                   dni, nombre_renaper, apellido_renaper
+                   dni, nombre_renaper, apellido_renaper, dni_validado_at
             FROM clientes WHERE id IN ({ph})""",
         ids,
     ).fetchall()
