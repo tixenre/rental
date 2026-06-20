@@ -127,9 +127,12 @@ function SolicitudesPage() {
   return (
     <div className="space-y-6 p-4 md:p-6 max-w-4xl mx-auto">
       <header>
-        <h1 className="text-2xl font-semibold text-ink">Solicitudes de modificación</h1>
+        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Operaciones · Solicitudes
+        </div>
+        <h1 className="font-display text-3xl text-ink">Solicitudes</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Cambios pedidos por clientes en pedidos confirmados. Aprobá o rechazá cada uno.
+          Cambios pedidos por clientes en pedidos confirmados.
         </p>
       </header>
 
