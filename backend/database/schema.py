@@ -1186,6 +1186,10 @@ def _init_db_schema(conn):
             END IF;
         END $$;
     """)
+    # Backfill de slugs faltantes (fuente única; idempotente). Acá, en el
+    # bootstrap, en vez del viejo self-heal que vivía dentro del export (#922).
+    from dataio.slug import backfill_equipos_slug
+    backfill_equipos_slug(conn)
 
     # JSONB agregadas por migraciones (b6f8d3e5a2c1, d7c9e1f3a8b2)
     conn.execute("ALTER TABLE solicitudes_modificacion ADD COLUMN IF NOT EXISTS cambios_json JSONB")
