@@ -1199,7 +1199,7 @@ function FieldLabel({
 }) {
   return (
     <label className={cn("block", className)}>
-      <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-1">
+      <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
         {label}
       </span>
       {children}

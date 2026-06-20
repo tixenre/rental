@@ -104,7 +104,7 @@ function PagosLogPage() {
 
       {/* Total del subconjunto */}
       <div className="flex items-baseline gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Total {q.data ? `(${q.data.count})` : ""}
         </span>
         <span className="font-mono text-xl font-semibold tabular-nums text-ink">
@@ -183,7 +183,7 @@ function PagosLogPage() {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+    <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
       {children}
     </label>
   );

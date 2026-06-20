@@ -430,7 +430,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
       }}
       className="rounded-lg border hairline p-4 space-y-3"
     >
-      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         Nuevo movimiento
       </div>
 
@@ -581,7 +581,7 @@ function CuentaSelect({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="space-y-1">
-      <span className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+      <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </span>
       {children}

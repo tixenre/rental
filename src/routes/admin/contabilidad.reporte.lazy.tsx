@@ -187,7 +187,7 @@ function Kpi({
 }) {
   return (
     <div className="rounded-xl border hairline bg-surface-elevated p-5">
-      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </div>
       <div
