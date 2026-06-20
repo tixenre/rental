@@ -63,7 +63,8 @@ type IndexSearch = {
   /** Pre-filtra el catálogo por una categoría (root o sub-cat). Se usa para
    *  deep-linking desde la página de detalle u otros entry points. */
   cat?: string;
-  /** Reabrir drawer del carrito tras login. Usado cuando vuelve de /cliente/login o /cliente/registro. */
+  /** Reabrir el drawer del carrito al volver de un desvío de auth (login,
+   *  registro o verificación de identidad). Usado con `?openCarrito=1`. */
   openCarrito?: boolean;
 };
 
@@ -87,6 +88,7 @@ export const Route = createFileRoute("/")({
     return {
       view: v === "grid" || v === "list" ? v : undefined,
       cat: typeof c === "string" && c.trim() ? c.trim() : undefined,
+      openCarrito: search.openCarrito === "1" || search.openCarrito === true ? true : undefined,
     };
   },
   loader: async ({ context }) => {

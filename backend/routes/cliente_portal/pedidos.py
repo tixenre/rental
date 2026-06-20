@@ -15,6 +15,7 @@ from database import get_db, row_to_dict
 from routes.cliente_portal.core import (
     router,
     require_cliente,
+    require_cliente_verificado,
     _proyectar,
     _documentos_disponibles,
     _ITEM_CAMPOS_PORTAL,
@@ -52,15 +53,8 @@ def cliente_crear_pedido(
     data: PedidoClienteCreate, request: Request, background: BackgroundTasks,
 ):
     """Crea un pedido (estado 'presupuesto') ligado al cliente autenticado."""
-    session = require_cliente(request)
+    session = require_cliente_verificado(request)
     cliente_id = session["cliente_id"]
-
-    with get_db() as conn:
-        row_cli = conn.execute(
-            "SELECT id FROM clientes WHERE id = ?", (cliente_id,)
-        ).fetchone()
-    if not row_cli:
-        raise HTTPException(404, "Cliente no encontrado.")
 
     if not data.items:
         raise HTTPException(400, "El pedido debe tener al menos un ítem")

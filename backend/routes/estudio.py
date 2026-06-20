@@ -823,6 +823,10 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
     FOR UPDATE (su buffer propio), no con el motor. Los EQUIPOS del pack son
     equipos reales: se validan con el motor sagrado (_check_stock, buffer global).
     Criterio ante race del pack: best-effort — todo lo disponible al confirmar."""
+    # Import diferido (mismo motivo que `_require_cliente`): evita acoplar el
+    # módulo a toda la cadena del portal en import-time y romper ciclos.
+    from routes.cliente_portal import cliente_verificado, IDENTIDAD_NO_VERIFICADA_MSG
+
     session = _require_cliente(request)
     cliente_id = session["cliente_id"]
 
@@ -839,6 +843,10 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
             ).fetchone()
             if not cli:
                 raise HTTPException(401, "Sesión de cliente inválida")
+            # Gate de identidad: mismo criterio que /api/cliente/pedidos, vía la
+            # fuente única `cliente_verificado` (no se duplica el chequeo de dni).
+            if not cliente_verificado(conn, cliente_id):
+                raise HTTPException(403, IDENTIDAD_NO_VERIFICADA_MSG)
             cliente_nombre = nombre_completo_cliente(cli["nombre"], cli["apellido"])
             cliente_email = cli["email"]
             cliente_telefono = cli["telefono"]

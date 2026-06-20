@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, Request, HTTPException
 from typing import Optional
 
-from database import to_datetime, now_ar
+from database import to_datetime, now_ar, get_db
 from routes.auth import get_session
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,37 @@ def require_cliente(request: Request) -> dict:
     session = get_session(request)
     if not session or session.get("role") != "cliente":
         raise HTTPException(401, "Sesión de cliente requerida")
+    return session
+
+
+# Mensaje único del gate de identidad — la UI lo muestra tal cual si llegara a disparar.
+IDENTIDAD_NO_VERIFICADA_MSG = (
+    "Necesitás verificar tu identidad antes de hacer un pedido. "
+    "Verificá tu DNI desde tu portal — tarda menos de 2 minutos."
+)
+
+
+def cliente_verificado(conn, cliente_id: int) -> bool:
+    """True si el cliente completó la verificación de identidad (dni_validado_at).
+    Fuente única del criterio "está verificado"; usa una conexión ya abierta."""
+    row = conn.execute(
+        "SELECT dni_validado_at FROM clientes WHERE id = ?", (cliente_id,)
+    ).fetchone()
+    return bool(row and row["dni_validado_at"])
+
+
+def require_cliente_verificado(request: Request) -> dict:
+    """Como require_cliente pero además exige identidad verificada (el gate del
+    flujo de pedidos). 401 sin sesión; 404 si el cliente no existe; 403 si no
+    completó la verificación Didit. El criterio "está verificado" lo decide la
+    fuente única `cliente_verificado` (no se duplica el chequeo de `dni_validado_at`)."""
+    session = require_cliente(request)
+    cliente_id = session["cliente_id"]
+    with get_db() as conn:
+        if conn.execute("SELECT 1 FROM clientes WHERE id = ?", (cliente_id,)).fetchone() is None:
+            raise HTTPException(404, "Cliente no encontrado.")
+        if not cliente_verificado(conn, cliente_id):
+            raise HTTPException(403, IDENTIDAD_NO_VERIFICADA_MSG)
     return session
 
 

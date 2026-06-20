@@ -199,7 +199,7 @@
       transition: fill 0.12s;
     }
   }
-  
+
   .topbar-seal .seal-r {
     fill: var(--color-background);
   }
@@ -208,7 +208,7 @@
       transition: fill 0.12s;
     }
   }
-  
+
   .topbar-snap .topbar-seal .seal-badge {
     fill: var(--color-background);
   }
