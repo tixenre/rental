@@ -89,6 +89,7 @@ import { nombreCliente } from "@/lib/cliente-nombre";
 import { EquipoSearchSheet } from "@/components/admin/pedido/EquipoSearchSheet";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "@/components/admin/pedido/EnviarDocsDialog";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
+import { PEDIDO_NEXT_LABEL } from "@/lib/pedido-estados";
 
 export const Route = createLazyFileRoute("/admin/pedidos/$id")({
   component: PedidoEditorPage,
@@ -116,15 +117,7 @@ const ALL_TARGETS: PedidoEstado[] = [
   "finalizado",
   "cancelado",
 ];
-const NEXT_LABEL: Partial<Record<PedidoEstado, string>> = {
-  borrador: "Presupuestar",
-  presupuesto: "Confirmar pedido",
-  solicitado: "Confirmar pedido",
-  confirmado: "Marcar retirado",
-  retirado: "Registrar devolución",
-  entregado: "Registrar devolución",
-  devuelto: "Cobrar saldo y finalizar",
-};
+const NEXT_LABEL = PEDIDO_NEXT_LABEL;
 
 const transiciones = (e: PedidoEstado): PedidoEstado[] => TRANSICIONES[e] ?? [];
 

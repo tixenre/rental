@@ -30,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
+import { PEDIDO_NEXT_LABEL } from "@/lib/pedido-estados";
 import { EstadoBadge } from "@/components/kit/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import { AdminCard, FAB } from "@/components/mobile";
@@ -615,14 +616,12 @@ function PreviewPane({
       {/* Siguiente paso — abre el editor (la máquina de estados real vive ahí). */}
       {!["finalizado", "cancelado"].includes(p.estado) && (
         <div className="mt-4 rounded-lg border border-amber bg-amber-soft px-4 py-3 flex items-center justify-between gap-3">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              Siguiente paso
-            </div>
-            <div className="font-medium text-ink">{siguientePasoLabel(p.estado)}</div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Siguiente paso
           </div>
           <Button variant="amber" onClick={() => onOpen(p.id)} className="shrink-0">
-            <ArrowRight className="h-4 w-4 mr-1" /> Gestionar
+            <ArrowRight className="h-4 w-4 mr-1" />
+            {PEDIDO_NEXT_LABEL[p.estado] ?? "Gestionar"}
           </Button>
         </div>
       )}
@@ -707,18 +706,4 @@ function PreviewPane({
       </div>
     </div>
   );
-}
-
-/** Etiqueta informativa del próximo paso típico (la transición real la maneja el editor). */
-function siguientePasoLabel(estado: Pedido["estado"]): string {
-  const map: Partial<Record<Pedido["estado"], string>> = {
-    borrador: "Cargar y presupuestar",
-    presupuesto: "Confirmar pedido",
-    solicitado: "Confirmar pedido",
-    confirmado: "Marcar retirado",
-    retirado: "Registrar devolución",
-    entregado: "Registrar devolución",
-    devuelto: "Cobrar saldo y finalizar",
-  };
-  return map[estado] ?? "Gestionar pedido";
 }

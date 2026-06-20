@@ -14,3 +14,14 @@ export type EstadoPedido =
   | "devuelto"
   | "finalizado"
   | "cancelado";
+
+/** Label del CTA del "siguiente paso feliz" — compartido entre lista y editor de pedidos. */
+export const PEDIDO_NEXT_LABEL: Partial<Record<EstadoPedido, string>> = {
+  borrador: "Presupuestar",
+  presupuesto: "Confirmar pedido",
+  solicitado: "Confirmar pedido",
+  confirmado: "Marcar retirado",
+  retirado: "Registrar devolución",
+  entregado: "Registrar devolución",
+  devuelto: "Cobrar saldo y finalizar",
+};
