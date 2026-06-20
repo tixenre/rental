@@ -52,12 +52,17 @@ export async function iniciarVerificacionIdentidad(returnTo?: string): Promise<v
   window.location.assign(url);
 }
 
-const RESUME_FLAG = "pedido";
-const RESUME_VALUE = "retomar";
+// Reusa el mismo flag que el retorno de login (`?openCarrito=1`, introducido en
+// dev): un único param "reabrí el carrito al volver de un desvío de auth"
+// (login O verificación). El desktop lo maneja con su handler propio en
+// index.tsx; este hook cubre el mobile (CartSheet en CatalogoMovil), que no
+// tiene ese handler.
+const RESUME_FLAG = "openCarrito";
+const RESUME_VALUE = "1";
 
-/** Al volver verificado a una ruta del catálogo (?pedido=retomar), reabre el carrito.
- *  El flag vive en la URL (NO en el cart-store, que excluye drawerOpen a propósito).
- *  Corre una sola vez en mount; limpia el flag de la URL. */
+/** Al volver a una ruta del catálogo con `?openCarrito=1` (tras login o
+ *  verificación), reabre el carrito. El flag vive en la URL (NO en el cart-store,
+ *  que excluye drawerOpen a propósito). Corre una sola vez en mount; limpia el flag. */
 export function useRetomarPedido(onRetomar: () => void): void {
   useEffect(() => {
     if (typeof window === "undefined") return;

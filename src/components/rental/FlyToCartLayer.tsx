@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useFlyToCart } from "@/lib/fly-to-cart-store";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /**
  * Capa global que anima un "+1" desde donde se tocó "Agregar"
@@ -14,6 +15,7 @@ export function FlyToCartLayer() {
   const flyKey = useFlyToCart((s) => s.flyKey);
   const popCart = useFlyToCart((s) => s.popCart);
   const clearFly = useFlyToCart((s) => s.clearFly);
+  const reducedMotion = useReducedMotion();
 
   const [target, setTarget] = useState<{ x: number; y: number } | null>(null);
 
@@ -32,6 +34,27 @@ export function FlyToCartLayer() {
   }, [flyKey, origin, clearFly]);
 
   if (typeof document === "undefined") return null;
+
+  // Si el usuario pidió reduced motion, no animar — saltar directo al destino
+  if (reducedMotion) {
+    if (origin && target) {
+      return createPortal(
+        <div
+          className="pointer-events-none fixed left-0 top-0 z-[60] grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-amber font-mono text-xs font-bold text-ink shadow-lg ring-2 ring-amber/40"
+          style={{ left: `${target.x}px`, top: `${target.y}px` }}
+          aria-hidden
+          onAnimationEnd={() => {
+            popCart();
+            clearFly();
+          }}
+        >
+          +1
+        </div>,
+        document.body,
+      );
+    }
+    return null;
+  }
 
   return createPortal(
     <AnimatePresence

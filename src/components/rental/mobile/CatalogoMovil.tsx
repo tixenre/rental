@@ -691,7 +691,7 @@ function CartSheet({
               onVerificar={async () => {
                 setIniciandoVerif(true);
                 try {
-                  await iniciarVerificacionIdentidad("/?pedido=retomar");
+                  await iniciarVerificacionIdentidad("/?openCarrito=1");
                 } catch {
                   /* el helper ya hizo toast */
                 } finally {
@@ -1172,8 +1172,9 @@ export function CatalogoMovil() {
   const [showFiltrosSheet, setShowFiltrosSheet] = useState(false);
   const [fichaEq, setFichaEq] = useState<Equipment | null>(null);
 
-  // Al volver verificado desde Didit (?pedido=retomar) reabrimos el carrito,
-  // que sigue persistido en localStorage por el cart-store.
+  // Al volver con ?openCarrito=1 (tras login o verificación) reabrimos el carrito
+  // mobile; sigue persistido en localStorage por el cart-store. El desktop tiene
+  // su propio handler en index.tsx; este hook cubre el mobile (CartSheet).
   useRetomarPedido(() => setShowCartSheet(true));
 
   const navigate = useNavigate();

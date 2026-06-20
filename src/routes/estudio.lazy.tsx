@@ -187,10 +187,11 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
 
 // ── Página principal ───────────────────────────────────────────────────────
 function EstudioPage() {
-  const { data } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["estudio"],
     queryFn: apiGetEstudio,
     staleTime: 1000 * 60 * 5,
+    retry: 2,
   });
 
   const precioHora = data?.precio_hora ?? STUDIO.pricePerHour;
@@ -246,8 +247,48 @@ function EstudioPage() {
 
   const [withPack, setWithPack] = useState(false);
 
+  // Skeleton de carga inicial (solo cuando no hay data de cache)
+  if (isLoading && !data) {
+    return (
+      <div className="min-h-dvh bg-background text-ink flex flex-col">
+        <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b hairline bg-background/95 backdrop-blur-xl px-4 lg:px-12">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground hover:text-ink transition"
+          >
+            <ArrowLeft className="h-3 w-3" /> Catálogo
+          </Link>
+        </header>
+        <div className="flex flex-1 flex-col gap-6 px-4 lg:px-12 py-16 animate-pulse">
+          <div className="h-8 w-48 rounded-md bg-surface" />
+          <div className="h-[clamp(8rem,20vw,14rem)] w-full max-w-md rounded-xl bg-surface" />
+          <div className="h-4 w-64 rounded-md bg-surface" />
+          <div className="h-4 w-40 rounded-md bg-surface" />
+        </div>
+      </div>
+    );
+  }
+
+  // Error de red — mostramos un estado claro con opción de reintentar.
+  // El contenido de la página igual se renderiza con los datos estáticos de fallback.
+  const networkError = isError;
+
   return (
     <div className="min-h-dvh bg-background text-ink">
+      {networkError && (
+        <div
+          role="alert"
+          className="sticky top-0 z-50 flex items-center justify-between gap-3 bg-destructive/10 border-b border-destructive/30 px-4 py-3 text-sm text-destructive"
+        >
+          <span>No se pudo cargar la info actualizada del estudio. Mostrando datos guardados.</span>
+          <button
+            onClick={() => refetch()}
+            className="shrink-0 rounded-full border border-destructive/40 px-3 py-1 text-xs font-medium hover:bg-destructive/10 transition"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
       {/* ── TopBar ───────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b hairline bg-background/95 backdrop-blur-xl px-4 lg:px-12">
         <Link

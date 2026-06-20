@@ -42,7 +42,6 @@ import { useFavoritos } from "@/hooks/useFavoritos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useCart } from "@/lib/cart-store";
-import { useRetomarPedido } from "@/lib/verificacion";
 import { toast } from "sonner";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
@@ -64,8 +63,9 @@ type IndexSearch = {
   /** Pre-filtra el catálogo por una categoría (root o sub-cat). Se usa para
    *  deep-linking desde la página de detalle u otros entry points. */
   cat?: string;
-  /** Al volver verificado desde Didit (?pedido=retomar) se reabre el carrito. */
-  pedido?: "retomar";
+  /** Reabrir el drawer del carrito al volver de un desvío de auth (login,
+   *  registro o verificación de identidad). Usado con `?openCarrito=1`. */
+  openCarrito?: boolean;
 };
 
 async function fetchOgImage(): Promise<string> {
@@ -88,7 +88,7 @@ export const Route = createFileRoute("/")({
     return {
       view: v === "grid" || v === "list" ? v : undefined,
       cat: typeof c === "string" && c.trim() ? c.trim() : undefined,
-      pedido: search.pedido === "retomar" ? "retomar" : undefined,
+      openCarrito: search.openCarrito === "1" || search.openCarrito === true ? true : undefined,
     };
   },
   loader: async ({ context }) => {
@@ -185,10 +185,6 @@ function Index() {
   // Datos de la API
   const { startDate, endDate, items, setQty, setDrawerOpen } = useCart();
   const { data: allEquipos = [], isLoading, isError } = useEquipos(startDate, endDate);
-
-  // Al volver verificado desde Didit (?pedido=retomar) reabrimos el carrito,
-  // que sigue persistido en localStorage por el cart-store.
-  useRetomarPedido(() => setDrawerOpen(true));
 
   // Reconciliación: elimina del carrito items cuyo ID ya no existe en el catálogo
   // (equipo borrado, ocultado o archivado después de que el cliente lo agregó).
@@ -334,6 +330,25 @@ function Index() {
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const { data: clienteSession } = useClienteSession();
   const isLogged = !!clienteSession;
+
+  // Reabre el drawer tras login exitoso si el parámetro ?openCarrito=1 está
+  // presente y hay items en el carrito + usuario logueado. (Declarado acá,
+  // después de search/navigate/isLogged — antes vivía arriba del componente y
+  // rompía el typecheck por usar las vars antes de declararlas.)
+  useEffect(() => {
+    if (search.openCarrito && isLogged && Object.keys(items).length > 0) {
+      setDrawerOpen(true);
+      // Limpiar el param de la URL para no reabrir en cada render
+      navigate({
+        search: (prev) => {
+          const next = { ...prev };
+          delete (next as Record<string, unknown>).openCarrito;
+          return next;
+        },
+        replace: true,
+      });
+    }
+  }, [search.openCarrito, isLogged, items, setDrawerOpen, navigate]);
   // Scroll-feel: `scrolled` se activa cuando el hero se tiñó >65% (mismo
   // umbral que el snap del topbar) → retinta el cat-bar para que combine con
   // el topbar amber. `spyCat` resalta el tab de la categoría en viewport
@@ -551,7 +566,7 @@ function Index() {
                       else setSelectedCats(new Set([cat]));
                     }}
                     className={cn(
-                      "inline-flex items-baseline gap-1.5 rounded-full border px-3.5 py-1.5 whitespace-nowrap shrink-0 text-sm transition",
+                      "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 py-2.5 whitespace-nowrap shrink-0 text-sm transition",
                       isActive
                         ? "border-transparent bg-amber font-bold text-ink"
                         : "border-hairline font-medium text-muted-foreground hover:border-ink hover:text-ink",
@@ -578,7 +593,7 @@ function Index() {
                   type="button"
                   onClick={() => setFavoritosOnly((v) => !v)}
                   className={cn(
-                    "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                    "shrink-0 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition whitespace-nowrap",
                     favoritosOnly
                       ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
                       : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
@@ -596,7 +611,7 @@ function Index() {
                 type="button"
                 onClick={() => setDisponiblesOnly((v) => !v)}
                 className={cn(
-                  "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition whitespace-nowrap",
+                  "shrink-0 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition whitespace-nowrap",
                   disponiblesOnly
                     ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
                     : "border-hairline text-ink hover:border-ink hover:bg-muted/50",

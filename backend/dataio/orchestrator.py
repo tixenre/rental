@@ -241,7 +241,7 @@ def init_slugs(conn, dry_run: bool = False) -> dict[str, int]:
 
     Returns: {"updated": N, "disambiguated": M, "already_had": K}
     """
-    from .slug import equipo_slug
+    from .slug import equipo_slug, slug_unico
 
     stats = {"updated": 0, "disambiguated": 0, "already_had": 0}
 
@@ -277,26 +277,11 @@ def init_slugs(conn, dry_run: bool = False) -> dict[str, int]:
     stats["already_had"] = len(used_slugs)
 
     for r in rows:
-        base = equipo_slug(r["marca"], r["modelo"], r["nombre"])
-        if not base:
-            base = f"equipo-{r['id']}"
-        slug = base
-        i = 2
-        disamb = False
-        while slug in used_slugs:
-            slug = f"{base}-{i}"
-            i += 1
-            disamb = True
-            if i > 100:
-                # Último recurso: sufijo con ID. También puede colisionar
-                # si una corrida previa ya lo asignó, así que iteramos.
-                fallback_base = f"{base}-id{r['id']}"
-                slug = fallback_base
-                j = 2
-                while slug in used_slugs:
-                    slug = f"{fallback_base}-{j}"
-                    j += 1
-                break
+        base = equipo_slug(r["marca"], r["modelo"], r["nombre"]) or f"equipo-{r['id']}"
+        # Desambiguación vía la regla canónica (fuente única, compartida con el
+        # backfill de init_db / alta de equipo).
+        slug = slug_unico(base, used_slugs)
+        disamb = slug != base
         if not dry_run:
             conn.execute(
                 "UPDATE equipos SET slug = ? WHERE id = ?", (slug, r["id"])

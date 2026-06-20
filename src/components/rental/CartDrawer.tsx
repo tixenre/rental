@@ -26,6 +26,7 @@ import { es } from "date-fns/locale";
 import { RentalDateModal } from "./RentalDateModal";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
+import { cn } from "@/lib/utils";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -101,6 +102,15 @@ export function CartDrawer({
     : [];
 
   const { data: clienteSession } = useClienteSession();
+
+  // Auto-cerrar panel de login si el usuario logueó (sesión cambió). Declarado
+  // acá, después de `clienteSession` — antes vivía arriba y rompía el typecheck
+  // por usar la var antes de declararla.
+  useEffect(() => {
+    if (clienteSession && needsLogin) {
+      setNeedsLogin(false);
+    }
+  }, [clienteSession, needsLogin]);
 
   // Total calculado por el BACKEND (fuente única, /api/cotizar). El front no
   // reimplementa la fórmula: manda ítems + fechas y muestra el desglose. #617.
@@ -261,13 +271,13 @@ export function CartDrawer({
   }
 
   function goToLogin() {
-    setDrawerOpen(false);
-    navigate({ to: "/cliente/login" });
+    // Vamos a login pero con parámetro para que al volver se reabra el drawer
+    navigate({ to: "/cliente/login", search: { from: "carrito" } });
   }
 
   function goToRegister() {
-    setDrawerOpen(false);
-    navigate({ to: "/cliente/registro" });
+    // Vamos a registro pero con parámetro para que al volver se reabra el drawer
+    navigate({ to: "/cliente/registro", search: { from: "carrito" } });
   }
 
   return (
@@ -404,7 +414,7 @@ export function CartDrawer({
                                     loading="lazy"
                                     decoding="async"
                                     src={it.fotoUrl}
-                                    alt=""
+                                    alt={it.name}
                                     className="h-full w-full object-cover"
                                   />
                                 ) : (
@@ -569,7 +579,15 @@ export function CartDrawer({
                       <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
                     </>
                   ) : (
-                    "Confirmar solicitud"
+                    <span className="flex items-center gap-2">
+                      Confirmar solicitud
+                      {list.length > 0 && totalNeto > 0 && (
+                        <span className="font-mono text-[11px] font-normal opacity-70 tracking-normal normal-case tabular-nums">
+                          · {formatARS(totalNeto)}
+                          {conIva ? " + IVA" : ""}
+                        </span>
+                      )}
+                    </span>
                   )}
                 </button>
 
@@ -623,7 +641,7 @@ export function CartDrawer({
                     onVerificar={async () => {
                       setIniciandoVerif(true);
                       try {
-                        await iniciarVerificacionIdentidad("/?pedido=retomar");
+                        await iniciarVerificacionIdentidad("/?openCarrito=1");
                       } catch {
                         /* el helper ya hizo toast */
                       } finally {
