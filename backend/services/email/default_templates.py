@@ -210,4 +210,61 @@ Podés ver el detalle del pedido actualizado en tu portal: {{ portal_url }}
 
 Ver pedido: {{ admin_url }}""",
     },
+
+    # ── Talleres ──────────────────────────────────────────────────────────────
+    "taller_inscripcion_admin": {
+        "subject": "Nueva inscripción{% if en_lista_espera %} (lista de espera){% endif %} — {{ taller_nombre }} ({{ nombre }})",
+        "body_html": f"""<p {b.H}>{{% if en_lista_espera %}}Nueva inscripción — lista de espera{{% else %}}Nueva inscripción{{% endif %}}</p>
+<p style="margin:0 0 8px;"><strong>{{{{ nombre }}}}</strong> se inscribió al taller <strong>{{{{ taller_nombre }}}}</strong>.</p>
+{{% if en_lista_espera %}}<p style="margin:0 0 8px;color:#b45309;"><strong>Lista de espera</strong> — los cupos del taller están completos.</p>{{% endif %}}
+<p {b.LBL}>Contacto</p>
+<p style="margin:0 0 4px;"><strong>Email:</strong> {{{{ email }}}}<br><strong>Teléfono:</strong> {{{{ telefono }}}}</p>
+{{% if experiencia %}}<p {b.LBL}>Experiencia</p><p style="margin:0 0 4px;">{{{{ experiencia }}}}</p>{{% endif %}}
+{{% if comprobante_url %}}<p {b.LBL}>Comprobante de pago</p><p style="margin:0 0 4px;"><a href="{{{{ comprobante_url }}}}" style="color:{b.INK};">Ver comprobante</a></p>{{% endif %}}
+<p {b.MUTED_P}>Inscripción recibida el {{{{ fecha }}}}.</p>""",
+        "body_text": """{%- if en_lista_espera %}[LISTA DE ESPERA] {% endif -%}
+Nueva inscripción — {{ taller_nombre }}
+
+Nombre: {{ nombre }}
+Email: {{ email }}
+Teléfono: {{ telefono }}
+{% if experiencia %}Experiencia: {{ experiencia }}{% endif %}
+{% if comprobante_url %}Comprobante: {{ comprobante_url }}{% endif %}
+
+Fecha: {{ fecha }}""",
+    },
+    "taller_inscripcion_cliente": {
+        "subject": "{% if en_lista_espera %}Quedaste en lista de espera{% else %}¡Tu lugar está reservado!{% endif %} — {{ taller_nombre }}",
+        "body_html": f"""<p {b.H}>{{% if en_lista_espera %}}Quedaste en lista de espera{{% else %}}¡Tu lugar está reservado!{{% endif %}}</p>
+<p style="margin:0 0 8px;">Hola <strong>{{{{ nombre_pila }}}}</strong>, {{% if en_lista_espera %}}te anotamos en la lista de espera de <strong>{{{{ taller_nombre }}}}</strong>. Te avisamos si se libera un cupo.{{% else %}}recibimos tu inscripción a <strong>{{{{ taller_nombre }}}}</strong>. Tu seña queda confirmada cuando verifiquemos el pago.{{% endif %}}</p>
+{{% if not en_lista_espera %}}
+<p {b.LBL}>Fechas</p>
+<p style="margin:0 0 4px;"><strong>Clase teórica:</strong> sábado 11 de julio, 9 a 13 hs<br><strong>Clase práctica:</strong> sábado 18 de julio, 9 a 13 hs<br><strong>Lugar:</strong> Chaco 1392 — Rambla Estudio</p>
+<p {b.LBL}>Datos de pago (seña 50%)</p>
+<p style="margin:0 0 4px;"><strong>Alias:</strong> rambla.estudio<br><strong>CBU:</strong> 0170239440000032889112<br><strong>Banco:</strong> BBVA<br><strong>Monto:</strong> $100.000</p>
+{{% endif %}}
+<p {b.MUTED_P}>¿Preguntas? Respondé este mail o escribínos por WhatsApp.</p>
+<p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
+        "body_text": """{%- if en_lista_espera -%}
+Hola {{ nombre_pila }}, te anotamos en la lista de espera de {{ taller_nombre }}.
+
+Te avisamos si se libera un cupo. ¿Preguntas? Respondé este mail.
+{%- else -%}
+Hola {{ nombre_pila }}, recibimos tu inscripción a {{ taller_nombre }}.
+
+Clase teórica: sábado 11 de julio, 9 a 13 hs
+Clase práctica: sábado 18 de julio, 9 a 13 hs
+Lugar: Chaco 1392 — Rambla Estudio
+
+Datos de pago (seña 50%):
+  Alias: rambla.estudio
+  CBU: 0170239440000032889112
+  Banco: BBVA
+  Monto: $100.000
+
+¿Preguntas? Respondé este mail.
+{%- endif %}
+
+— El equipo de Rambla""",
+    },
 }

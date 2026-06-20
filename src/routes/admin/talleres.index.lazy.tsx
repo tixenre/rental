@@ -1,0 +1,230 @@
+import { useState } from "react";
+import { createLazyFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Users, ExternalLink, Clock, CheckCircle2 } from "lucide-react";
+
+import { authedJson } from "@/lib/authedFetch";
+import { useDocumentTitle } from "@/lib/use-document-title";
+import { AdminSection } from "@/components/admin/AdminSection";
+import { formatARS } from "@/lib/format";
+
+export const Route = createLazyFileRoute("/admin/talleres/")({
+  component: TalleresAdminPage,
+});
+
+type TallerAdmin = {
+  id: number;
+  slug: string;
+  nombre: string;
+  subtitulo: string;
+  instructor_nombre: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  cupos_total: number;
+  cupos_confirmados: number;
+  cupos_disponibles: number;
+  precio_total: number;
+  activo: boolean;
+};
+
+type Inscripcion = {
+  id: number;
+  nombre: string;
+  email: string;
+  telefono: string;
+  experiencia: string | null;
+  comprobante_url: string | null;
+  en_lista_espera: boolean;
+  created_at: string | null;
+};
+
+function TalleresAdminPage() {
+  useDocumentTitle("Talleres — Admin");
+  const [tallerSeleccionado, setTallerSeleccionado] = useState<number | null>(null);
+
+  const { data: talleres = [], isLoading: loadingTalleres } = useQuery({
+    queryKey: ["admin", "talleres"],
+    queryFn: () => authedJson<TallerAdmin[]>("/api/admin/talleres"),
+    staleTime: 1000 * 60,
+  });
+
+  const tallerActivo = tallerSeleccionado ?? talleres[0]?.id ?? null;
+
+  const { data: inscripciones = [], isLoading: loadingIns } = useQuery({
+    queryKey: ["admin", "talleres", tallerActivo, "inscripciones"],
+    queryFn: () =>
+      tallerActivo
+        ? authedJson<Inscripcion[]>(`/api/admin/talleres/${tallerActivo}/inscripciones`)
+        : Promise.resolve([] as Inscripcion[]),
+    enabled: !!tallerActivo,
+    staleTime: 1000 * 30,
+  });
+
+  const taller = talleres.find((t) => t.id === tallerActivo);
+  const confirmadas = inscripciones.filter((i) => !i.en_lista_espera);
+  const espera = inscripciones.filter((i) => i.en_lista_espera);
+
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString("es-AR", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-3">
+        <Users className="h-5 w-5 text-muted-foreground" />
+        <h1 className="text-xl font-semibold text-ink">Talleres</h1>
+      </div>
+
+      {loadingTalleres && (
+        <p className="text-sm text-muted-foreground">Cargando talleres…</p>
+      )}
+
+      {talleres.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {talleres.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTallerSeleccionado(t.id)}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                t.id === tallerActivo
+                  ? "bg-ink text-amber"
+                  : "bg-muted/40 text-muted-foreground hover:text-ink"
+              }`}
+            >
+              {t.nombre}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {taller && (
+        <AdminSection storageKey="talleres:info" title={`${taller.nombre} ${taller.subtitulo}`}>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+            <span>
+              <span className="text-ink font-medium">{taller.cupos_confirmados}</span>/{taller.cupos_total} cupos confirmados
+            </span>
+            {taller.cupos_disponibles > 0 ? (
+              <span className="text-green-600">{taller.cupos_disponibles} disponibles</span>
+            ) : (
+              <span className="text-amber-600">Sin cupos — lista de espera activa</span>
+            )}
+            <span>Precio: {formatARS(taller.precio_total)}</span>
+            <span>
+              {new Date(taller.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" })}
+              {" y "}
+              {new Date(taller.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" })}
+            </span>
+          </div>
+        </AdminSection>
+      )}
+
+      {loadingIns && (
+        <p className="text-sm text-muted-foreground">Cargando inscripciones…</p>
+      )}
+
+      {!loadingIns && inscripciones.length === 0 && tallerActivo && (
+        <div className="rounded-xl border border-dashed border-border/60 py-12 text-center text-sm text-muted-foreground">
+          No hay inscripciones todavía.
+        </div>
+      )}
+
+      {confirmadas.length > 0 && (
+        <AdminSection storageKey="talleres:confirmadas" title={`Inscripciones confirmadas (${confirmadas.length})`}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border/60">
+                  <th className="pb-2 pr-4 font-medium">Nombre</th>
+                  <th className="pb-2 pr-4 font-medium">Email</th>
+                  <th className="pb-2 pr-4 font-medium">Teléfono</th>
+                  <th className="pb-2 pr-4 font-medium hidden lg:table-cell">Experiencia</th>
+                  <th className="pb-2 pr-4 font-medium">Comprobante</th>
+                  <th className="pb-2 font-medium">Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {confirmadas.map((ins) => (
+                  <tr key={ins.id} className="border-b border-border/40 hover:bg-muted/20 transition">
+                    <td className="py-2.5 pr-4 font-medium text-ink">{ins.nombre}</td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">
+                      <a href={`mailto:${ins.email}`} className="hover:text-ink transition">
+                        {ins.email}
+                      </a>
+                    </td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">{ins.telefono}</td>
+                    <td className="py-2.5 pr-4 text-muted-foreground hidden lg:table-cell max-w-[180px] truncate">
+                      {ins.experiencia || "—"}
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      {ins.comprobante_url ? (
+                        <a
+                          href={ins.comprobante_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-ink hover:text-amber transition"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" strokeWidth={1.5} />
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground/50 text-xs">Sin adjunto</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 text-muted-foreground text-xs">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {fmtDate(ins.created_at)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </AdminSection>
+      )}
+
+      {espera.length > 0 && (
+        <AdminSection storageKey="talleres:espera" title={`Lista de espera (${espera.length})`}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border/60">
+                  <th className="pb-2 pr-4 font-medium">Nombre</th>
+                  <th className="pb-2 pr-4 font-medium">Email</th>
+                  <th className="pb-2 pr-4 font-medium">Teléfono</th>
+                  <th className="pb-2 font-medium">Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {espera.map((ins) => (
+                  <tr key={ins.id} className="border-b border-border/40 hover:bg-muted/20 transition">
+                    <td className="py-2.5 pr-4 font-medium text-ink">{ins.nombre}</td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">
+                      <a href={`mailto:${ins.email}`} className="hover:text-ink transition">
+                        {ins.email}
+                      </a>
+                    </td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">{ins.telefono}</td>
+                    <td className="py-2.5 text-muted-foreground text-xs">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {fmtDate(ins.created_at)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </AdminSection>
+      )}
+    </div>
+  );
+}

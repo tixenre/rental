@@ -304,3 +304,72 @@ export async function apiCrearReservaEstudio(body: EstudioReservaBody) {
 
 // NOTA: la creación de pedidos se movió a `src/lib/orders.ts → createOrder()`
 // usando el endpoint autenticado /api/cliente/pedidos del backend FastAPI.
+
+// ── Talleres ─────────────────────────────────────────────────────────────────
+
+export type Taller = {
+  id: number;
+  slug: string;
+  nombre: string;
+  subtitulo: string;
+  instructor_nombre: string;
+  instructor_bio: string;
+  instructor_proyectos: string;
+  descripcion: string;
+  publico_objetivo: string;
+  programa_teorica: string[];
+  programa_practica: string[];
+  fecha_inicio: string;
+  fecha_fin: string;
+  horario: string;
+  cupos_total: number;
+  cupos_confirmados: number;
+  cupos_disponibles: number;
+  precio_total: number;
+  precio_sena: number;
+  pago_alias: string;
+  pago_cbu: string;
+  pago_banco: string;
+  direccion: string;
+};
+
+export type InscripcionBody = {
+  nombre: string;
+  email: string;
+  telefono: string;
+  experiencia?: string;
+  comprobante_url?: string;
+};
+
+export type InscripcionResult = {
+  id: number;
+  en_lista_espera: boolean;
+  cupos_disponibles: number;
+};
+
+export function apiGetTalleres() {
+  return get<Taller[]>("/api/talleres");
+}
+
+export function apiGetTaller(slug: string) {
+  return get<Taller>(`/api/talleres/${slug}`);
+}
+
+export async function apiUploadComprobante(slug: string, file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_BASE}/api/talleres/${slug}/upload-comprobante`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? `No se pudo subir el comprobante (${res.status})`);
+  }
+  const data = (await res.json()) as { url: string };
+  return data.url;
+}
+
+export function apiCrearInscripcion(slug: string, body: InscripcionBody) {
+  return post<InscripcionResult>(`/api/talleres/${slug}/inscripcion`, body);
+}

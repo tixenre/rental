@@ -1,0 +1,27 @@
+import { createFileRoute } from "@tanstack/react-router";
+
+import { SITE_URL } from "@/lib/site";
+
+export const Route = createFileRoute("/talleres")({
+  head: () => ({
+    meta: [
+      { title: "Workshops & Talleres — Rambla Rental" },
+      {
+        name: "description",
+        content:
+          "Talleres y workshops de fotografía, video y dirección de arte en Rambla Estudio, Mar del Plata.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: `${SITE_URL}/talleres` },
+      { property: "og:title", content: "Workshops & Talleres — Rambla Rental" },
+      {
+        property: "og:description",
+        content:
+          "Talleres y workshops de fotografía, video y dirección de arte en Rambla Estudio, Mar del Plata.",
+      },
+      { property: "og:locale", content: "es_AR" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+    links: [{ rel: "canonical", href: `${SITE_URL}/talleres` }],
+  }),
+});

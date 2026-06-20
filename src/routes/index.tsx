@@ -22,6 +22,7 @@ import { SITE_URL } from "@/lib/site";
 import { HeroSection } from "@/components/rental/HeroSection";
 import { ComoFunciona } from "@/components/rental/ComoFunciona";
 import { EstudioBand } from "@/components/rental/EstudioBand";
+import { TalleresBand } from "@/components/rental/TalleresBand";
 import { FaqTeaser } from "@/components/rental/FaqTeaser";
 import { RentalDateModal } from "@/components/rental/RentalDateModal";
 import { useClienteSession } from "@/lib/iva";
@@ -781,6 +782,7 @@ function Index() {
       )}
 
       <EstudioBand />
+      <TalleresBand />
       <FaqTeaser />
 
       <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
