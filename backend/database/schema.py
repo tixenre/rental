@@ -1562,6 +1562,7 @@ def _init_db_schema(conn):
             pago_cbu             TEXT NOT NULL DEFAULT '',
             pago_banco           TEXT NOT NULL DEFAULT '',
             direccion            TEXT NOT NULL DEFAULT '',
+            notif_email          TEXT NOT NULL DEFAULT '',
             activo               BOOLEAN NOT NULL DEFAULT TRUE,
             created_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at           TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -1610,7 +1611,7 @@ def _init_db_schema(conn):
             fecha_inicio, fecha_fin, horario,
             cupos_total, precio_total, precio_sena,
             pago_alias, pago_cbu, pago_banco,
-            direccion, activo
+            direccion, notif_email, activo
         )
         VALUES (
             'direccion-de-arte-jime-troncoso',
@@ -1633,11 +1634,17 @@ def _init_db_schema(conn):
             12, 200000, 100000,
             'rambla.estudio', '0170239440000032889112', 'BBVA',
             'Chaco 1392 — Rambla Estudio',
+            'jimetroncoso44@gmail.com',
             TRUE
         )
         ON CONFLICT (slug) DO NOTHING
         """,
         (_programa_teorica, _programa_practica),
+    )
+    # Fix idempotente: si la fila ya existía (ON CONFLICT DO NOTHING), actualiza notif_email.
+    conn.execute(
+        "UPDATE talleres SET notif_email = %s WHERE slug = %s AND notif_email = ''",
+        ("jimetroncoso44@gmail.com", "direccion-de-arte-jime-troncoso"),
     )
 
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
