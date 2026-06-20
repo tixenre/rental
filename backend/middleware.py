@@ -46,6 +46,11 @@ PUBLIC_API_ANY = (
     # vive bajo /api/estudio/reservas y tiene su propio `_require_cliente` en el
     # handler, así que el guard de cliente se sigue aplicando ahí.
     "/api/estudio",
+    # /api/talleres: lista, detalle, upload de comprobante e inscripción son todos
+    # públicos (cualquier visitante puede inscribirse sin sesión). Los endpoints
+    # admin de talleres viven bajo /api/admin/talleres y tienen su propio
+    # require_admin, por lo que quedan protegidos igual que el resto del admin.
+    "/api/talleres",
     # Webhooks server-to-server (Didit): los llama un tercero SIN cookie de
     # sesión, así que el guard de sesión los cortaría con 401 antes del handler
     # (y la verificación de identidad nunca se persistiría). Se autentican por
