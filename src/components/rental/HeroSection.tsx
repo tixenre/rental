@@ -70,7 +70,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
                 onClick={onDateOpen}
                 className={cn(
                   "inline-flex items-center gap-2.5 bg-ink text-amber rounded-full px-[26px] py-[14px] text-[0.9375rem] font-bold tracking-[-0.01em] whitespace-nowrap shadow-[0_4px_20px_oklch(0.14_0.01_60/24%)] transition-colors duration-150 hover:bg-black active:scale-[0.97]",
-                  reducedMotion && "no-motion"
+                  reducedMotion && "no-motion",
                 )}
               >
                 <Calendar size={16} /> Elegí fechas y reservá
@@ -118,14 +118,22 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
               {photos.length > 1 && (
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); setPaused((p) => !p); }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPaused((p) => !p);
+                  }}
                   aria-label={paused ? "Reanudar presentación" : "Pausar presentación"}
                   className="mr-1 grid h-5 w-5 place-items-center rounded-full bg-black/30 text-white/70 hover:bg-black/50 hover:text-white transition"
                 >
                   {paused ? (
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden><polygon points="1,0 7,4 1,8" /></svg>
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden>
+                      <polygon points="1,0 7,4 1,8" />
+                    </svg>
                   ) : (
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden><rect x="1" y="0" width="2.5" height="8"/><rect x="4.5" y="0" width="2.5" height="8"/></svg>
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden>
+                      <rect x="1" y="0" width="2.5" height="8" />
+                      <rect x="4.5" y="0" width="2.5" height="8" />
+                    </svg>
                   )}
                 </button>
               )}
@@ -133,7 +141,10 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
                 <button
                   key={i}
                   type="button"
-                  onClick={(e) => { e.preventDefault(); setPhotoIdx(i); }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setPhotoIdx(i);
+                  }}
                   aria-label={`Foto ${i + 1} de ${photos.length}`}
                   aria-current={i === photoIdx ? "true" : undefined}
                   className={cn(
