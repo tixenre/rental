@@ -94,9 +94,34 @@ saltea). ⚠️ **Nunca** setear estas vars en prod: el handler responde 404 ah�
 pero el secreto no tiene por qué existir fuera de `dev`. La BD de staging es
 copia de prod (PII real) → el secreto es obligatorio, no opcional.
 
-Uso: `curl -X POST -c jar.txt -H 'Content-Type: application/json' \
-  -d '{"secret":"..."}' https://rambla-rental-dev.up.railway.app/auth/staging-login`
-y reusar la cookie de `jar.txt` (`-b jar.txt`) en las llamadas autenticadas.
+#### Para una sesión automatizada: el secreto vive en el ENTORNO, nunca en el repo
+
+🔐 **El repo es público y staging tiene PII real** → `STAGING_LOGIN_SECRET`
+**jamás** se commitea (lo volvería world-readable: cualquiera mintearía una
+cookie admin y leería los datos de clientes). El secreto se inyecta como
+**variable de entorno** y la sesión lo lee de ahí — el código/docs referencian
+**el nombre de la var, nunca el valor**:
+
+- **Sesiones de Claude Code on the web** → setear `STAGING_LOGIN_SECRET` en la
+  **config del environment** (env vars del entorno, igual que cualquier secreto;
+  ver `code.claude.com/docs/en/claude-code-on-the-web`). Así toda sesión nueva lo
+  recibe en `os.getenv("STAGING_LOGIN_SECRET")` sin pegarlo a mano ni tocar git.
+- **El entorno `dev` de Railway** ya lo tiene (es donde lo valida el handler).
+
+Receta (lee el secreto del entorno — falla ruidoso si no está, en vez de mandar
+un placeholder):
+
+```bash
+B=https://rambla-rental-dev.up.railway.app
+: "${STAGING_LOGIN_SECRET:?seteá STAGING_LOGIN_SECRET en el entorno (no en el repo)}"
+# 1) login → guarda la cookie firmada
+curl -s -c jar.txt -H 'Content-Type: application/json' \
+  -d "{\"secret\":\"$STAGING_LOGIN_SECRET\"}" "$B/auth/staging-login"
+# 2) reusar la cookie en cualquier endpoint admin
+curl -s -b jar.txt "$B/api/alquileres?per_page=1"
+```
+
+Escrituras de prueba con IDs inexistentes para no mutar staging (MEMORIA 2026-06-19).
 
 ---
 
