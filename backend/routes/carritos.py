@@ -1,7 +1,12 @@
-"""Carritos activos — persistencia server-side (#280 Fases 1 + 2).
+"""Carritos activos — persistencia server-side (#280 Fases 1 + 2 + 2.5).
 
 POST /api/cart/heartbeat → upsert del carrito (anónimo o logueado).
-GET  /api/admin/carritos → lista de carritos activos para el back-office.
+GET  /api/admin/carritos → lista + métricas de funnel + demanda + conflicto de
+                           stock para el back-office.
+
+El conflicto de stock se calcula READ-ONLY reusando el motor de reservas
+(`reservas.calcular_disponibilidad`) — nunca con lógica de overlap propia
+(MEMORIA 2026-05-30: `backend/reservas/` = fuente única).
 """
 
 import json
@@ -15,6 +20,10 @@ from database import get_db, row_to_dict
 from routes.auth import get_session
 
 router = APIRouter(tags=["carritos"])
+
+# Un carrito sin actividad por más de esto se considera abandonado (se le estampa
+# `abandonado_en` la primera vez que lo detectamos; un heartbeat nuevo lo limpia).
+ABANDONO_HORAS = 24
 
 
 class CartItem(BaseModel):
@@ -77,6 +86,7 @@ def cart_heartbeat(data: CartHeartbeat, request: Request):
                 hora_hasta     = EXCLUDED.hora_hasta,
                 total_items    = EXCLUDED.total_items,
                 monto_estimado = EXCLUDED.monto_estimado,
+                abandonado_en  = NULL,
                 updated_at     = NOW()
             """,
             (
@@ -156,16 +166,37 @@ def marcar_confirmado(session_id: str, conn) -> None:
 
 @router.get("/admin/carritos")
 def admin_listar_carritos(request: Request, horas: int = 72):
-    """Lista carritos activos para el back-office.
+    """Lista carritos activos + métricas de funnel para el back-office.
 
-    Por defecto muestra los actualizados en las últimas 72h y no confirmados.
-    El parámetro `horas` permite ampliar la ventana (ej. ?horas=168 = 7 días).
+    Devuelve, en una sola respuesta para que el dashboard refresque en un solo
+    loop: la lista de carritos no confirmados (con flag de abandono y conflicto
+    de stock por carrito), KPIs del funnel, ranking de demanda latente y la
+    serie de carritos creados/confirmados por día.
+
+    El parámetro `horas` amplía la ventana de la lista (ej. ?horas=168 = 7 días).
     """
     from admin_guard import require_admin
+    from reservas.disponibilidad import calcular_disponibilidad
 
     require_admin(request)
 
     with get_db() as conn:
+        # Estampar abandono: la primera vez que un carrito cruza el umbral sin
+        # actividad le ponemos `abandonado_en`. Idempotente; un heartbeat nuevo
+        # lo limpia (ver upsert). Es bookkeeping barato sobre el índice de updated_at.
+        conn.execute(
+            """
+            UPDATE carritos_activos
+            SET abandonado_en = NOW()
+            WHERE NOT confirmado
+              AND abandonado_en IS NULL
+              AND total_items > 0
+              AND updated_at < NOW() - (? * INTERVAL '1 hour')
+            """,
+            (ABANDONO_HORAS,),
+        )
+        conn.commit()
+
         rows = conn.execute(
             """
             SELECT
@@ -183,11 +214,13 @@ def admin_listar_carritos(request: Request, horas: int = 72):
                 ca.total_items,
                 ca.monto_estimado,
                 ca.confirmado,
+                ca.abandonado_en,
                 ca.created_at,
                 ca.updated_at
             FROM carritos_activos ca
             LEFT JOIN clientes cl ON cl.id = ca.cliente_id
             WHERE NOT ca.confirmado
+              AND ca.total_items > 0
               AND ca.updated_at > NOW() - (? * INTERVAL '1 hour')
             ORDER BY ca.updated_at DESC
             LIMIT 200
@@ -195,10 +228,124 @@ def admin_listar_carritos(request: Request, horas: int = 72):
             (int(horas),),
         ).fetchall()
 
-        result = []
+        carritos = []
         for r in rows:
             d = row_to_dict(r)
             d["items"] = json.loads(d.pop("items_json") or "[]")
-            result.append(d)
+            d["abandonado"] = d.pop("abandonado_en", None) is not None
+            carritos.append(d)
 
-    return {"carritos": result, "total": len(result)}
+        # Conflicto de stock por carrito (READ-ONLY, motor de reservas). Cacheamos
+        # la disponibilidad por par de fechas para no recalcular el motor por carrito.
+        disp_cache: dict[tuple[str, str], dict] = {}
+        for c in carritos:
+            fd, fh = c.get("fecha_desde"), c.get("fecha_hasta")
+            if not fd or not fh:
+                c["sin_stock"] = False
+                continue
+            fd, fh = str(fd), str(fh)
+            key = (fd, fh)
+            if key not in disp_cache:
+                disp_cache[key] = calcular_disponibilidad(conn, fd, fh)
+            disp = disp_cache[key]
+            sin_stock = False
+            for it in c["items"]:
+                libres = disp.get(str(it["equipo_id"]))
+                it["disponible"] = libres
+                if libres is not None and it.get("cantidad", 0) > libres:
+                    sin_stock = True
+            c["sin_stock"] = sin_stock
+
+        stats = _calcular_stats(conn, carritos)
+        demanda = _calcular_demanda(carritos)
+        por_dia = _carritos_por_dia(conn)
+
+    return {
+        "carritos": carritos,
+        "total": len(carritos),
+        "stats": stats,
+        "demanda": demanda,
+        "por_dia": por_dia,
+    }
+
+
+def _calcular_stats(conn, carritos: list[dict]) -> dict:
+    """KPIs del funnel: pipeline, identificación, abandono y conversión 7d."""
+    activos = len(carritos)
+    pipeline_ars = sum(int(c.get("monto_estimado") or 0) for c in carritos)
+    identificados = sum(1 for c in carritos if c.get("cliente_id"))
+    abandonados = sum(1 for c in carritos if c.get("abandonado"))
+
+    # Conversión de los últimos 7 días: confirmados / creados (con items).
+    row = conn.execute(
+        """
+        SELECT
+            COUNT(*)                              AS creados,
+            COUNT(*) FILTER (WHERE confirmado)    AS confirmados
+        FROM carritos_activos
+        WHERE total_items > 0
+          AND created_at > NOW() - INTERVAL '7 days'
+        """
+    ).fetchone()
+    creados_7d = int(row["creados"] or 0)
+    confirmados_7d = int(row["confirmados"] or 0)
+    conversion_pct = round(100.0 * confirmados_7d / creados_7d, 1) if creados_7d else 0.0
+
+    # Equipos pretendidos por 2+ carritos activos a la vez (señal de disputa).
+    en_disputa = sum(
+        1 for d in _calcular_demanda(carritos) if d["carritos"] >= 2
+    )
+
+    return {
+        "activos": activos,
+        "pipeline_ars": pipeline_ars,
+        "identificados": identificados,
+        "anonimos": activos - identificados,
+        "abandonados": abandonados,
+        "creados_7d": creados_7d,
+        "confirmados_7d": confirmados_7d,
+        "conversion_pct": conversion_pct,
+        "equipos_en_disputa": en_disputa,
+    }
+
+
+def _calcular_demanda(carritos: list[dict]) -> list[dict]:
+    """Ranking de demanda latente: equipos más presentes en carritos activos.
+
+    Por equipo: en cuántos carritos aparece (`carritos`) y cuántas unidades se
+    piden en total (`unidades`). Ordenado por presencia y luego por unidades.
+    """
+    agg: dict[int, dict] = {}
+    for c in carritos:
+        for it in c.get("items", []):
+            eid = it.get("equipo_id")
+            if eid is None:
+                continue
+            a = agg.setdefault(
+                eid, {"equipo_id": eid, "nombre": it.get("nombre") or str(eid), "carritos": 0, "unidades": 0}
+            )
+            a["carritos"] += 1
+            a["unidades"] += int(it.get("cantidad") or 0)
+    ranking = sorted(agg.values(), key=lambda a: (a["carritos"], a["unidades"]), reverse=True)
+    return ranking[:10]
+
+
+def _carritos_por_dia(conn) -> list[dict]:
+    """Serie de los últimos 14 días: carritos creados y confirmados por día."""
+    rows = conn.execute(
+        """
+        SELECT
+            to_char(created_at, 'YYYY-MM-DD')   AS dia,
+            COUNT(*)                            AS creados,
+            COUNT(*) FILTER (WHERE confirmado)  AS confirmados
+        FROM carritos_activos
+        WHERE total_items > 0
+          AND created_at > NOW() - INTERVAL '14 days'
+        GROUP BY to_char(created_at, 'YYYY-MM-DD')
+        ORDER BY to_char(created_at, 'YYYY-MM-DD')
+        """
+    ).fetchall()
+    return [
+        {"dia": r["dia"], "creados": int(r["creados"] or 0), "confirmados": int(r["confirmados"] or 0)}
+        for r in rows
+    ]
