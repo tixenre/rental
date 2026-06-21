@@ -350,11 +350,8 @@ function Index() {
       });
     }
   }, [search.openCarrito, isLogged, items, setDrawerOpen, navigate]);
-  // Scroll-feel: `scrolled` se activa cuando el hero se tiñó >65% (mismo
-  // umbral que el snap del topbar) → retinta el cat-bar para que combine con
-  // el topbar amber. `spyCat` resalta el tab de la categoría en viewport
-  // (scroll-spy) en modo browse, sin filtrar.
-  const [scrolled, setScrolled] = useState(false);
+  // `spyCat` resalta el tab de la categoría en viewport (scroll-spy) en modo
+  // browse, sin filtrar.
   const [spyCat, setSpyCat] = useState<string | null>(null);
 
   const toggleCat = (c: string) => {
@@ -453,25 +450,6 @@ function Index() {
 
   const getDisponible = (item: Equipment) => item.disponible;
 
-  // Hero scroll-amber: calcula --amber-pct para que el TopBar se tiña
-  const heroRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const hero = heroRef.current;
-    if (!hero) return;
-    const onScroll = () => {
-      const heroH = hero.offsetHeight;
-      const pct = heroH > 0 ? Math.min(100, Math.round((window.scrollY / heroH) * 100)) : 0;
-      document.documentElement.style.setProperty("--amber-pct", pct + "%");
-      setScrolled((prev) => (prev === pct >= 65 ? prev : pct >= 65));
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      document.documentElement.style.setProperty("--amber-pct", "0%");
-    };
-  }, []);
-
   // Scroll-spy: en modo browse (grid, sin filtro ni búsqueda) resalta el tab
   // de la categoría que está en viewport. No filtra — solo actualiza `spyCat`.
   const browseMode = mode === "grid" && selectedCats.size === 0 && !query.trim();
@@ -497,10 +475,10 @@ function Index() {
   }, [browseMode, allEquipos.length]);
 
   return (
-    <PublicLayout topBar={{ amberOnScroll: true }}>
+    <PublicLayout topBar={{ variant: "rental" }}>
       <ViewIntroDialog onPick={(m) => setMode(m)} />
       {/* Hero amber hifi */}
-      <div ref={heroRef}>
+      <div>
         <HeroSection
           tagline={tagline}
           equipmentCount={isLoading ? undefined : allEquipos.length}
@@ -510,17 +488,8 @@ function Index() {
 
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
 
-      {/* Toggle Modo + búsqueda sticky. Al scrollear >65% (mismo umbral que
-            el snap del topbar) se retinta de amber soft para combinar con el
-            topbar teñido en vez de quedar como una barra blanca "rota". */}
-      <div
-        className="sticky top-16 z-30 border-b hairline backdrop-blur-xl transition-colors"
-        style={{
-          background: scrolled
-            ? "color-mix(in oklch, var(--amber) 20%, var(--background))"
-            : "var(--background)",
-        }}
-      >
+      {/* Toggle Modo + búsqueda sticky, justo bajo el topbar (top-16). */}
+      <div className="sticky top-16 z-30 border-b hairline bg-background/95 backdrop-blur-xl">
         {/* Mobile */}
         <div className="sm:hidden px-3 py-3">
           <MobileStickyBar

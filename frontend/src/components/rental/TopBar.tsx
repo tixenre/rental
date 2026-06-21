@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, ShoppingBag, User, LogOut } from "lucide-react";
@@ -16,33 +16,35 @@ const TOPBAR_H = "h-16";
 const TOPBAR_PX = "px-4 md:px-8";
 
 // ── Config por sección ──────────────────────────────────────────────────────────
-// `bg` vacío = fondo claro (logo amber); `bg` de color = fondo de marca (logo blanco).
+// Cada área tiene su color de marca de fondo y el logo en blanco. Una sola lógica.
 const SECTION_CONFIG = {
-  rental: { label: "rental.", labelColor: "text-amber", href: "/catalogo", bg: "", ctaColor: "" },
+  rental: {
+    label: "rental.",
+    href: "/catalogo",
+    bg: "bg-amber",
+    ctaColor: "bg-ink text-amber hover:opacity-90",
+  },
   estudio: {
     label: "estudio.",
-    labelColor: "text-white",
     href: "/estudio",
     bg: "bg-naranja",
     ctaColor: "bg-white text-ink hover:bg-white/90",
   },
   workshops: {
     label: "workshops.",
-    labelColor: "text-white",
     href: "/talleres",
     bg: "bg-rosa",
     ctaColor: "bg-white text-ink hover:bg-white/90",
   },
   cliente: {
     label: "portal.",
-    labelColor: "text-amber",
     href: "/cliente/portal",
-    bg: "",
-    ctaColor: "",
+    bg: "bg-verde",
+    ctaColor: "bg-white text-ink hover:bg-white/90",
   },
 } as const;
 
-type Section = keyof typeof SECTION_CONFIG;
+export type Section = keyof typeof SECTION_CONFIG;
 
 const SECTION_DEFAULT_CTA: Record<Section, { label: string; href: string } | null> = {
   rental: null,
@@ -53,8 +55,8 @@ const SECTION_DEFAULT_CTA: Record<Section, { label: string; href: string } | nul
 
 export type TopBarProps = {
   /**
-   * - "default" / "rental": catálogo público (dates pill + carrito + Ingresar).
-   * - "estudio" / "workshops": topbar de sección con fondo de color + CTA.
+   * - "default" / "rental": catálogo (dates pill + carrito + Ingresar).
+   * - "estudio" / "workshops": topbar de sección + CTA.
    * - "cliente": post-login del portal (perfil + salir).
    */
   variant?: "default" | "rental" | "estudio" | "workshops" | "cliente";
@@ -65,11 +67,6 @@ export type TopBarProps = {
   /** Solo aplica cuando variant === "cliente". */
   onLogout?: () => void;
   onProfileClick?: () => void;
-  /**
-   * Cuando true, el TopBar se tiñe de amber gradualmente conforme el hero scrollea.
-   * Solo aplica en variant "rental" / "default".
-   */
-  amberOnScroll?: boolean;
 };
 
 export function TopBar({
@@ -78,7 +75,6 @@ export function TopBar({
   userName,
   onLogout,
   onProfileClick,
-  amberOnScroll,
 }: TopBarProps = {}) {
   if (variant === "cliente") {
     return (
@@ -88,45 +84,38 @@ export function TopBar({
   if (variant === "estudio") return <SectionTopBar section="estudio" ctaOverride={cta} />;
   if (variant === "workshops") return <SectionTopBar section="workshops" ctaOverride={cta} />;
   // "default" | "rental"
-  return <RentalTopBar amberOnScroll={amberOnScroll} />;
+  return <RentalTopBar />;
 }
 
 // ── Shell único del topbar ───────────────────────────────────────────────────────
-// Estructura compartida: <header> sticky con alto/padding fijos, logo a la izquierda,
-// slot central opcional (desktop) y slot derecho. De acá salen TODAS las variantes.
-function TopBarShell({
+// Estructura compartida: <header> sticky con alto/padding/bg de marca fijos, logo a
+// la izquierda, slot central opcional y slot derecho. De acá salen TODAS las barras
+// (incluido el catálogo mobile, que lo importa directo con sus propios slots).
+export function TopBarShell({
   section,
-  snapped = false,
-  dynamicBg = false,
-  headerRef,
   center,
+  centerClassName = "flex",
   right,
+  headerRef,
 }: {
   section: Section;
-  snapped?: boolean;
-  /** El rental tiñe el fondo por scroll vía style inline → el shell no fija bg. */
-  dynamicBg?: boolean;
-  headerRef?: React.Ref<HTMLElement>;
   center?: ReactNode;
+  /** Clases del contenedor central — el caller decide su visibilidad (ej. "hidden md:flex"). */
+  centerClassName?: string;
   right?: ReactNode;
+  /** Para medir la altura real del topbar (ej. sticky tops del catálogo mobile). */
+  headerRef?: React.Ref<HTMLElement>;
 }) {
   const { bg } = SECTION_CONFIG[section];
-  const colored = !!bg;
   return (
     <header
       ref={headerRef}
-      className={cn(
-        "sticky top-0 z-[var(--z-topbar)] transition-[background,border-color]",
-        TOPBAR_H,
-        colored && bg,
-        !colored && "border-b hairline backdrop-blur-xl",
-        !colored && !dynamicBg && "bg-background/95",
-      )}
+      className={cn("sticky top-0 z-[var(--z-topbar)] pt-[env(safe-area-inset-top)]", bg)}
     >
-      <div className={cn("h-full flex items-center justify-between gap-4", TOPBAR_PX)}>
-        <SectionLogo section={section} snapped={snapped} />
+      <div className={cn("flex items-center justify-between gap-3", TOPBAR_H, TOPBAR_PX)}>
+        <SectionLogo section={section} />
         {center && (
-          <div className="hidden md:flex flex-1 justify-center px-4 min-w-0">{center}</div>
+          <div className={cn("flex-1 justify-center px-2 min-w-0", centerClassName)}>{center}</div>
         )}
         {right}
       </div>
@@ -135,26 +124,17 @@ function TopBarShell({
 }
 
 // ── Logo compuesto: isologo (mobile) / wordmark (desktop) + label de área ─────────
-// El logo ES la navegación de vuelta al root del área.
-function SectionLogo({ section, snapped = false }: { section: Section; snapped?: boolean }) {
-  const { label, labelColor, href, bg } = SECTION_CONFIG[section];
-  const logoColor = bg ? "text-white" : "text-amber";
+// El logo ES la navegación de vuelta al root del área. Siempre blanco sobre el color.
+export function SectionLogo({ section }: { section: Section }) {
+  const { label, href } = SECTION_CONFIG[section];
   return (
     <Link to={href} className="inline-flex items-end gap-2.5 group shrink-0">
-      {/* Mobile: isologo (R) */}
-      <LogoMark className="sm:hidden" />
+      {/* Mobile: isologo (R) — mono blanco, la R muestra el color del área */}
+      <LogoMark mono className="sm:hidden text-white" />
       {/* Desktop: wordmark completo */}
-      <Logo
-        linkTo={null}
-        size="sm"
-        color={logoColor}
-        className={cn("max-sm:hidden", snapped && "[filter:brightness(0)_invert(1)]")}
-      />
+      <Logo linkTo={null} size="sm" color="text-white" className="max-sm:hidden" />
       <span
-        className={cn(
-          "font-display font-black lowercase leading-none transition-colors",
-          snapped ? "text-background" : labelColor,
-        )}
+        className="font-display font-black lowercase leading-none text-white"
         style={{ fontSize: "1rem" }}
       >
         {label}
@@ -194,11 +174,10 @@ function SectionTopBar({
 }
 
 // ── TopBar del rental (catálogo): dates pill central + carrito + sesión ───────────
-function RentalTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
+// Fondo amber sólido (color del área) → controles en blanco/ink para contrastar.
+function RentalTopBar() {
   const { startDate, endDate, startTime, endTime, setDrawerOpen, totalItems, days } = useCart();
   const [dateModalOpen, setDateModalOpen] = useState(false);
-  const headerRef = useRef<HTMLElement>(null);
-  const [snapped, setSnapped] = useState(false);
   const count = totalItems();
   const hasDates = !!(startDate && endDate);
   const jornadas = days();
@@ -210,33 +189,10 @@ function RentalTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
   const userLinkTo = isLogged ? "/cliente/portal" : "/cliente";
   const userLinkLabel = isLogged ? `Mi cuenta · ${firstName ?? ""}`.trim() : "Ingresar";
 
-  useEffect(() => {
-    if (!amberOnScroll) return;
-    const header = headerRef.current;
-    if (!header) return;
-
-    const onScroll = () => {
-      const pct = parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--amber-pct") || "0",
-      );
-      header.style.background = `color-mix(in oklch, var(--amber) ${pct}%, color-mix(in oklch, var(--background) 92%, transparent))`;
-      setSnapped(pct >= 65);
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [amberOnScroll]);
-
   const datesPill = (
     <button
       onClick={() => setDateModalOpen(true)}
-      className={cn(
-        "w-full max-w-xl flex items-center justify-center gap-3 rounded-full border-2 px-6 py-2 transition shadow-sm",
-        snapped
-          ? "border-background/80 bg-background text-ink hover:bg-background/90"
-          : "border-amber/50 bg-amber/10 hover:border-amber hover:bg-amber/20",
-      )}
+      className="w-full max-w-xl flex items-center justify-center gap-3 rounded-full border-2 border-background/80 bg-background px-6 py-2 text-ink shadow-sm transition hover:bg-background/90"
       aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
     >
       <CalendarIcon className="h-5 w-5 shrink-0 text-amber" />
@@ -245,12 +201,7 @@ function RentalTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
           {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
           <span className="mx-2 opacity-50">→</span>
           {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
-          <span
-            className={cn(
-              "ml-2 font-mono text-[11px] uppercase tracking-wider",
-              snapped ? "text-ink/60" : "text-muted-foreground",
-            )}
-          >
+          <span className="ml-2 font-mono text-[11px] uppercase tracking-wider text-ink/60">
             · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
           </span>
         </span>
@@ -265,12 +216,7 @@ function RentalTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
       {/* Carrito: solo desktop (en mobile vive en MobileStickyBar / CartMiniBar) */}
       <button
         onClick={() => setDrawerOpen(true, "bottom")}
-        className={cn(
-          "hidden md:flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition relative",
-          snapped
-            ? "bg-ink text-amber hover:opacity-90"
-            : "bg-foreground text-background hover:bg-amber hover:text-ink",
-        )}
+        className="hidden md:flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-amber transition relative hover:opacity-90"
         aria-label={`Carrito (${count})`}
       >
         <ShoppingBag className="h-4 w-4" />
@@ -281,13 +227,8 @@ function RentalTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
       <Link
         to={userLinkTo}
         className={cn(
-          "flex items-center gap-2 rounded-full border transition",
+          "flex items-center gap-2 rounded-full bg-background text-ink transition hover:bg-background/90",
           isLogged ? "px-2 py-1.5 pr-3" : "px-0 py-0 w-9 h-9 justify-center",
-          snapped
-            ? "border-background/80 bg-background text-ink hover:bg-background/90"
-            : isLogged
-              ? "border-amber/50 bg-amber/10 hover:bg-amber/20"
-              : "hairline hover:border-foreground/40",
         )}
         aria-label={userLinkLabel}
         title={userLinkLabel}
@@ -315,10 +256,8 @@ function RentalTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
       <TopBarShell
         section="rental"
-        headerRef={headerRef}
-        snapped={snapped}
-        dynamicBg={!!amberOnScroll}
         center={datesPill}
+        centerClassName="hidden md:flex"
         right={actions}
       />
     </>
@@ -340,7 +279,7 @@ function ClienteTopBar({
 
   const pillContent = (
     <>
-      <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-amber text-ink font-display text-xs font-black shrink-0">
+      <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-verde text-white font-display text-xs font-black shrink-0">
         {initial ?? <User className="h-3.5 w-3.5" />}
       </div>
       {firstName && (
@@ -355,7 +294,7 @@ function ClienteTopBar({
         <button
           type="button"
           onClick={onProfileClick}
-          className="inline-flex items-center gap-2 rounded-full border hairline px-2 py-1 hover:border-ink/30 transition"
+          className="inline-flex items-center gap-2 rounded-full bg-background px-2 py-1 hover:bg-background/90 transition"
           title="Ver mi cuenta"
         >
           {pillContent}
@@ -363,7 +302,7 @@ function ClienteTopBar({
       ) : (
         <Link
           to="/cliente/perfil"
-          className="inline-flex items-center gap-2 rounded-full border hairline px-2 py-1 hover:border-ink/30 transition"
+          className="inline-flex items-center gap-2 rounded-full bg-background px-2 py-1 hover:bg-background/90 transition"
           title="Editar mi perfil"
         >
           {pillContent}
@@ -374,7 +313,7 @@ function ClienteTopBar({
         <button
           type="button"
           onClick={onLogout}
-          className="inline-flex items-center gap-1.5 rounded-full border hairline px-3 py-2 text-sm hover:border-foreground/40"
+          className="inline-flex items-center gap-1.5 rounded-full bg-white/15 text-white px-3 py-2 text-sm hover:bg-white/25 transition"
           aria-label="Salir"
         >
           <LogOut className="h-4 w-4" />

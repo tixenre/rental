@@ -11,8 +11,8 @@ import { useRetomarPedido } from "@/lib/verificacion";
 import { logSearch } from "@/lib/search-log";
 import { filtrarOrdenar } from "@/lib/search/normalize";
 import { RentalDateModal } from "@/components/rental/RentalDateModal";
+import { TopBarShell } from "@/components/rental/TopBar";
 import {
-  RamblaSeal,
   HeroBanner,
   EquipmentRow,
   CartSheet,
@@ -106,31 +106,6 @@ export function CatalogoMovil() {
       searchBar: topbarHeight,
       catTabs: topbarHeight + searchBarHeight,
     });
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    const topbar = topbarRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      // Amber-on-scroll: el topbar se tiñe amber gradualmente conforme el
-      // hero amber scrollea hacia arriba. Mientras el bottom del hero está
-      // bien debajo de la topbar (~53px) el progreso es 0; cuando llega
-      // al topbar, progreso 1. Misma lógica que el mock hifi.
-      // En 65% del progreso, el seal y el date-pill invierten colores.
-      const hero = heroRef.current;
-      if (topbar && hero) {
-        const heroRect = hero.getBoundingClientRect();
-        const containerRect = el.getBoundingClientRect();
-        const relBottom = heroRect.bottom - containerRect.top;
-        const progress = Math.min(1, Math.max(0, 1 - (relBottom - 53) / (heroRect.height * 0.5)));
-        topbar.style.setProperty("--amber-pct", `${Math.round(progress * 100)}%`);
-        topbar.classList.toggle("topbar-snap", progress > 0.65);
-      }
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
   const datePillLabel = useMemo(() => {
@@ -274,53 +249,38 @@ export function CatalogoMovil() {
         className="flex-1 overflow-y-auto overflow-x-hidden"
         style={{ WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}
       >
-        {/* TopBar — amber-on-scroll: el background mezcla amber según
-            el progreso de scroll (--amber-pct, seteado en el onScroll).
-            En el snap (>65%), el seal invierte sus colores via la clase
-            topbar-snap. */}
-        <header
-          ref={topbarRef}
-          className="topbar-mobile sticky top-0 z-40 flex items-center gap-2.5 px-4 py-[10px] border-b border-hairline backdrop-blur-xl transition-colors"
-          style={{
-            background:
-              "color-mix(in oklch, var(--amber) var(--amber-pct, 0%), color-mix(in oklch, var(--background) 90%, transparent))",
-            paddingTop: "max(10px, calc(env(safe-area-inset-top) + 4px))",
-          }}
-        >
-          <RamblaSeal />
+        {/* TopBar unificado (mismo shell que desktop / estudio / talleres):
+            bg-amber, isologo + "rental.", date pill central + acceso clientes. */}
+        <TopBarShell
+          section="rental"
+          headerRef={topbarRef}
+          center={
+            <button
+              className="w-full flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border-2 border-background/80 bg-background py-1.5 px-3.5 font-sans text-xs font-semibold text-ink transition whitespace-nowrap hover:bg-background/90"
+              onClick={() => setShowDateSheet(true)}
+            >
+              <Calendar size={14} className="shrink-0 text-amber" />
+              <span>{datePillLabel}</span>
+              {fechaDesde && (
+                <span className="font-mono text-[11px] tracking-[0.2em] uppercase text-ink/60">
+                  · {jornadas} jorn.
+                </span>
+              )}
+            </button>
+          }
+          right={
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/cliente" })}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-background text-ink transition hover:bg-background/90"
+              aria-label="Acceso clientes"
+            >
+              <User size={15} />
+            </button>
+          }
+        />
 
-          <button
-            className="date-pill-snap flex-1 flex min-h-[44px] items-center justify-center gap-1.5 py-1.5 px-3.5 rounded-full font-sans text-xs font-semibold text-ink transition-all whitespace-nowrap"
-            style={{
-              border: "1.5px solid color-mix(in oklch, var(--amber) 55%, transparent)",
-              background: "var(--amber-soft)",
-            }}
-            onClick={() => setShowDateSheet(true)}
-          >
-            <Calendar
-              size={14}
-              style={{ color: "color-mix(in oklch, var(--amber) 80%, var(--ink))", flexShrink: 0 }}
-            />
-            <span>{datePillLabel}</span>
-            {fechaDesde && (
-              <span className="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">
-                · {jornadas} jorn.
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/cliente" })}
-            className="user-btn-snap grid h-11 w-11 shrink-0 place-items-center rounded-full border border-hairline text-ink hover:border-ink transition-colors"
-            aria-label="Acceso clientes"
-          >
-            <User size={15} />
-          </button>
-        </header>
-
-        {/* Hero banner amber — eyebrow + headline brand + CTA.
-            Anclado al heroRef del amber-on-scroll del topbar. */}
+        {/* Hero banner amber — eyebrow + headline brand + CTA. */}
         <HeroBanner
           heroRef={heroRef}
           equipCount={allEquipos?.length ?? 0}
