@@ -20,7 +20,7 @@ export function TalleresBand() {
             limitados.
           </p>
           <Link
-            to="/talleres"
+            to="/workshops"
             className="inline-flex items-center gap-[9px] w-fit rounded-full border border-ink text-ink px-6 py-3 text-[0.9375rem] font-bold tracking-[-0.01em] transition-[gap,background] duration-[180ms] hover:gap-[13px] hover:bg-ink hover:text-background active:scale-[0.97]"
           >
             Ver talleres <ArrowRight size={15} strokeWidth={2.4} />

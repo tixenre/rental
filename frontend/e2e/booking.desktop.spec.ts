@@ -30,7 +30,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function abrirModal(page: import("@playwright/test").Page) {
-  await page.goto("/catalogo");
+  await page.goto("/rental");
   await page.getByRole("button", { name: "Elegir fechas" }).first().click();
   await expect(page.getByRole("heading", { name: "Elegí tus fechas" })).toBeVisible();
 }

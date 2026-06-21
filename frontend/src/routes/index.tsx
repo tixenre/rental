@@ -50,7 +50,7 @@ function LandingHub() {
         <div className="grid grid-cols-1 md:grid-cols-3 flex-1 min-h-[55vh]">
           {/* Rental */}
           <Link
-            to="/catalogo"
+            to="/rental"
             className="group relative flex flex-col justify-end p-8 sm:p-10 bg-amber text-ink min-h-[320px] md:min-h-0 transition-[filter] hover:brightness-105 active:brightness-95"
           >
             <p className="font-mono text-[0.625rem] tracking-[0.28em] uppercase text-ink/55 mb-5">
@@ -117,7 +117,7 @@ function LandingHub() {
 
           {/* Talleres */}
           <Link
-            to="/talleres"
+            to="/workshops"
             className="group relative flex flex-col justify-end p-8 sm:p-10 text-ink min-h-[320px] md:min-h-0 transition-[filter] hover:brightness-105 active:brightness-95"
             style={{ backgroundColor: "var(--color-rosa)" }}
           >

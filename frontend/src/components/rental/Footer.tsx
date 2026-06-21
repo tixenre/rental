@@ -48,7 +48,7 @@ function FooterMobile() {
 
         {/* Links de navegación en chips */}
         <nav className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
-          <Link to="/catalogo" className="text-ink hover:text-amber transition">
+          <Link to="/rental" className="text-ink hover:text-amber transition">
             Catálogo
           </Link>
           <span className="text-muted-foreground/40">·</span>
@@ -56,7 +56,7 @@ function FooterMobile() {
             Estudio
           </Link>
           <span className="text-muted-foreground/40">·</span>
-          <Link to="/talleres" className="text-ink hover:text-amber transition">
+          <Link to="/workshops" className="text-ink hover:text-amber transition">
             Talleres
           </Link>
           <span className="text-muted-foreground/40">·</span>
@@ -199,7 +199,7 @@ function FooterDesktop() {
             </h3>
             <ul className="space-y-2.5 text-sm">
               <li>
-                <Link to="/catalogo" className="text-ink hover:text-amber transition">
+                <Link to="/rental" className="text-ink hover:text-amber transition">
                   Catálogo
                 </Link>
               </li>
@@ -209,7 +209,7 @@ function FooterDesktop() {
                 </Link>
               </li>
               <li>
-                <Link to="/talleres" className="text-ink hover:text-amber transition">
+                <Link to="/workshops" className="text-ink hover:text-amber transition">
                   Workshops & Talleres
                 </Link>
               </li>

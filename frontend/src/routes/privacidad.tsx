@@ -28,7 +28,7 @@ function PrivacidadPage() {
     <PublicLayout>
       <div className="max-w-3xl mx-auto w-full px-4 md:px-6 py-8 md:py-12">
         <Link
-          to="/catalogo"
+          to="/rental"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-ink transition mb-6"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Volver al catálogo

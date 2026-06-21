@@ -13,7 +13,7 @@ export const AREAS = {
   rental: {
     label: "rental.",
     desc: "Alquiler de equipos",
-    href: "/catalogo",
+    href: "/rental",
     bg: "bg-amber",
     fg: "text-ink",
   },
@@ -27,7 +27,7 @@ export const AREAS = {
   workshops: {
     label: "workshops.",
     desc: "Talleres y formación",
-    href: "/talleres",
+    href: "/workshops",
     bg: "bg-rosa",
     fg: "text-ink",
   },
