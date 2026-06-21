@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { SITE_URL } from "@/lib/site";
 import { useHeroPhotos } from "@/lib/studio/hero-photos";
+import { Logo } from "@/components/rental/Logo";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -33,6 +34,12 @@ function LandingHub() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Hub topbar: solo logo, sin color, es el portal de entrada */}
+      <header className="sticky top-0 z-[var(--z-topbar)] h-16 bg-background/95 backdrop-blur-xl border-b hairline">
+        <div className="h-full px-6 md:px-10 flex items-center">
+          <Logo linkTo="/" size="sm" />
+        </div>
+      </header>
       <main className="flex-1 flex flex-col">
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <section className="flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24 bg-background">

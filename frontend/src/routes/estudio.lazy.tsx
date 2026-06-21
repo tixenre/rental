@@ -8,6 +8,7 @@ import { STUDIO, STUDIO_PHONE } from "@/data/studio";
 import { apiGetEstudio } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { PublicLayout } from "@/components/rental/PublicLayout";
 
 export const Route = createLazyFileRoute("/estudio")({
   component: EstudioPage,
@@ -250,22 +251,14 @@ function EstudioPage() {
   // Skeleton de carga inicial (solo cuando no hay data de cache)
   if (isLoading && !data) {
     return (
-      <div className="min-h-dvh bg-background text-ink flex flex-col">
-        <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b hairline bg-background/95 backdrop-blur-xl px-4 lg:px-12">
-          <Link
-            to="/catalogo"
-            className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
-          >
-            <ArrowLeft className="h-3 w-3" /> Catálogo
-          </Link>
-        </header>
+      <PublicLayout topBar={{ variant: "estudio", cta: { label: "Reservar el estudio", href: "#reservar" } }}>
         <div className="flex flex-1 flex-col gap-6 px-4 lg:px-12 py-16 animate-pulse">
           <div className="h-8 w-48 rounded-md bg-surface" />
           <div className="h-[clamp(8rem,20vw,14rem)] w-full max-w-md rounded-xl bg-surface" />
           <div className="h-4 w-64 rounded-md bg-surface" />
           <div className="h-4 w-40 rounded-md bg-surface" />
         </div>
-      </div>
+      </PublicLayout>
     );
   }
 
@@ -274,11 +267,11 @@ function EstudioPage() {
   const networkError = isError;
 
   return (
-    <div className="min-h-dvh bg-background text-ink">
+    <PublicLayout topBar={{ variant: "estudio", cta: { label: "Reservar el estudio", href: "#reservar" } }}>
       {networkError && (
         <div
           role="alert"
-          className="sticky top-0 z-50 flex items-center justify-between gap-3 bg-destructive/10 border-b border-destructive/30 px-4 py-3 text-sm text-destructive"
+          className="flex items-center justify-between gap-3 bg-destructive/10 border-b border-destructive/30 px-4 py-3 text-sm text-destructive"
         >
           <span>No se pudo cargar la info actualizada del estudio. Mostrando datos guardados.</span>
           <button
@@ -289,34 +282,6 @@ function EstudioPage() {
           </button>
         </div>
       )}
-      {/* ── TopBar ───────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b hairline bg-background/95 backdrop-blur-xl px-4 lg:px-12">
-        <Link
-          to="/catalogo"
-          className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
-        >
-          <ArrowLeft className="h-3 w-3" /> Catálogo
-        </Link>
-        <div className="absolute left-1/2 -translate-x-1/2">
-          <Link to="/" aria-label="Rambla Rental">
-            <img
-              src="/wordmark.svg"
-              alt="Rambla Rental"
-              className="h-[17px] block"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-            <span className="wordmark text-xl leading-none font-black sr-only">rambla</span>
-          </Link>
-        </div>
-        <a
-          href="#reservar"
-          className="inline-flex items-center justify-center rounded-full bg-amber px-4 py-2 text-sm font-bold text-ink hover:brightness-105 transition"
-        >
-          Reservar
-        </a>
-      </header>
 
       <main>
         {/* ── Hero — ink editorial ──────────────────────────────────── */}
@@ -652,6 +617,6 @@ function EstudioPage() {
       {/* Spacer mobile (detrás de la barra fija) */}
       <div className="h-20 lg:hidden" aria-hidden />
       <MobileBookBar priceLabel={priceLabel} />
-    </div>
+    </PublicLayout>
   );
 }

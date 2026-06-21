@@ -6,36 +6,43 @@ import { es } from "date-fns/locale";
 import { Calendar as CalendarIcon, ShoppingBag, User, LogOut } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
 import { Logo } from "./Logo";
+import { LogoMark } from "./LogoMark";
 import { cn } from "@/lib/utils";
 import { useClienteSession } from "@/lib/iva";
 
+// ── Config por sección ────────────────────────────────────────────────────────
+const SECTION_CONFIG = {
+  rental:    { label: "rental.",    labelColor: "text-amber", href: "/catalogo", bg: "",             ctaColor: "" },
+  estudio:   { label: "estudio.",   labelColor: "text-white", href: "/estudio",  bg: "bg-naranja",   ctaColor: "bg-white text-ink hover:bg-white/90" },
+  workshops: { label: "workshops.", labelColor: "text-white", href: "/talleres", bg: "bg-rosa",      ctaColor: "bg-white text-ink hover:bg-white/90" },
+} as const;
+
+type Section = keyof typeof SECTION_CONFIG;
+
 export type TopBarProps = {
   /**
-   * - "default": catálogo público (dates pill + carrito + Ingresar).
-   * - "cliente": post-login del portal (sin dates pill ni carrito; muestra
-   *   nombre del usuario y botón Salir).
+   * - "default" / "rental": catálogo público (dates pill + carrito + Ingresar).
+   * - "estudio" / "workshops": topbar de sección con fondo de color.
+   * - "cliente": post-login del portal (sin dates pill ni carrito).
    */
-  variant?: "default" | "cliente";
+  variant?: "default" | "rental" | "estudio" | "workshops" | "cliente";
+  /** CTA override para section bars. Si no se pasa se usa el default de la sección. */
+  cta?: { label: string; href: string };
   /** Solo aplica cuando variant === "cliente". */
   userName?: string;
   /** Solo aplica cuando variant === "cliente". */
   onLogout?: () => void;
-  /**
-   * Si se provee, el pill del usuario abre un drawer en lugar de navegar
-   * a `/cliente/perfil`. Lo usa el portal para mostrar el perfil sin
-   * abandonar la lista de pedidos.
-   */
   onProfileClick?: () => void;
   /**
-   * Cuando true, el TopBar se tiñe de amber gradualmente conforme el hero
-   * (primera sección de la página) scrollea hacia arriba.
-   * El progreso se lee de `--amber-pct` en `document.documentElement`.
+   * Cuando true, el TopBar se tiñe de amber gradualmente conforme el hero scrollea.
+   * Solo aplica en variant "rental" / "default".
    */
   amberOnScroll?: boolean;
 };
 
 export function TopBar({
   variant = "default",
+  cta,
   userName,
   onLogout,
   onProfileClick,
@@ -46,10 +53,70 @@ export function TopBar({
       <ClienteTopBar userName={userName} onLogout={onLogout} onProfileClick={onProfileClick} />
     );
   }
-  return <DefaultTopBar amberOnScroll={amberOnScroll} />;
+  if (variant === "estudio") return <SectionTopBar section="estudio" ctaOverride={cta} />;
+  if (variant === "workshops") return <SectionTopBar section="workshops" ctaOverride={cta} />;
+  // "default" | "rental"
+  return <RentalTopBar amberOnScroll={amberOnScroll} />;
 }
 
-function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
+// ── Logo compuesto: RAMBLA + área ─────────────────────────────────────────────
+function SectionLogo({ section }: { section: Section }) {
+  const { label, labelColor, href, bg } = SECTION_CONFIG[section];
+  const logoColor = bg ? "text-white" : "text-amber";
+  return (
+    <Link to={href} className="inline-flex items-end gap-3 group">
+      {/* Mobile: isologo (R) */}
+      <LogoMark className="sm:hidden" />
+      {/* Desktop: wordmark completo */}
+      <Logo linkTo={null} size="sm" color={logoColor} className="max-sm:hidden" />
+      <span
+        className={`font-display font-black lowercase leading-none ${labelColor}`}
+        style={{ fontSize: "1rem" }}
+      >
+        {label}
+      </span>
+    </Link>
+  );
+}
+
+// ── TopBar de secciones (estudio / workshops) ─────────────────────────────────
+const SECTION_DEFAULT_CTA: Record<Section, { label: string; href: string } | null> = {
+  rental:    null,
+  estudio:   { label: "Reservar el estudio", href: "/estudio#reserva" },
+  workshops: null,
+};
+
+// ── TopBar de sección: logo izquierda · CTA derecha ──────────────────────────
+// El logo ES la navegación de vuelta al root del área (workshops → /talleres).
+function SectionTopBar({
+  section,
+  ctaOverride,
+}: {
+  section: Section;
+  ctaOverride?: { label: string; href: string };
+}) {
+  const { bg, ctaColor } = SECTION_CONFIG[section];
+  const cta = ctaOverride ?? SECTION_DEFAULT_CTA[section];
+
+  return (
+    <header className={`sticky top-0 z-[var(--z-topbar)] h-20 ${bg}`}>
+      <div className="h-full px-8 md:px-12 flex items-center justify-between gap-4">
+        <SectionLogo section={section} />
+        {cta && (
+          <a
+            href={cta.href}
+            className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold transition ${ctaColor}`}
+          >
+            {cta.label}
+          </a>
+        )}
+      </div>
+    </header>
+  );
+}
+
+// ── TopBar del rental (variante original) ─────────────────────────────────────
+function RentalTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
   const { startDate, endDate, startTime, endTime, setDrawerOpen, totalItems, days } = useCart();
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
@@ -58,8 +125,6 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
   const hasDates = !!(startDate && endDate);
   const jornadas = days();
 
-  // Cuando hay sesión, el botón "Ingresar" se convierte en avatar y va
-  // al portal directo (#513). El nombre lo expone `useClienteSession`.
   const { data: clienteSession } = useClienteSession();
   const isLogged = !!clienteSession;
   const initial = clienteSession?.nombre?.trim()[0]?.toUpperCase() ?? null;
@@ -67,8 +132,6 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
   const userLinkTo = isLogged ? "/cliente/portal" : "/cliente";
   const userLinkLabel = isLogged ? `Mi cuenta · ${firstName ?? ""}`.trim() : "Ingresar";
 
-  // Amber-on-scroll: lee --amber-pct del <html> (puesto por la página)
-  // y aplica el gradiente al header + calcula el snap a 65%.
   useEffect(() => {
     if (!amberOnScroll) return;
     const header = headerRef.current;
@@ -83,7 +146,7 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll(); // sync inicial
+    onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, [amberOnScroll]);
 
@@ -132,9 +195,8 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
             </Link>
           </div>
 
-          {/* Desktop col izquierda: logo. Al snapear (topbar amber) el logo
-              se invierte a blanco para leerse sobre el fondo amarillo. */}
-          <div className="hidden md:flex items-center shrink-0">
+          {/* Desktop col izquierda: logo + rental. */}
+          <div className="hidden md:flex items-end gap-3 shrink-0">
             <Logo
               size="md"
               linkTo="/"
@@ -143,6 +205,15 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
                 snapped && "[filter:brightness(0)_invert(1)]",
               )}
             />
+            <span
+              className={cn(
+                "font-display font-black lowercase leading-none transition-colors",
+                snapped ? "text-background" : "text-amber",
+              )}
+              style={{ fontSize: "1rem" }}
+            >
+              rental.
+            </span>
           </div>
 
           {/* Desktop col central: pill de fechas */}
@@ -157,9 +228,7 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
               )}
               aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
             >
-              <CalendarIcon
-                className={cn("h-5 w-5 shrink-0", snapped ? "text-amber" : "text-amber")}
-              />
+              <CalendarIcon className="h-5 w-5 shrink-0 text-amber" />
               {hasDates ? (
                 <span className="text-base font-semibold tabular-nums">
                   {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
@@ -230,6 +299,7 @@ function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
   );
 }
 
+// ── TopBar del portal cliente ─────────────────────────────────────────────────
 function ClienteTopBar({
   userName,
   onLogout,
@@ -261,7 +331,6 @@ function ClienteTopBar({
         </div>
         <div className="flex-1" />
 
-        {/* Avatar pill: si hay onProfileClick → abre drawer; sino → /cliente/perfil */}
         {onProfileClick ? (
           <button
             type="button"
