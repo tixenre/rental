@@ -197,6 +197,28 @@ relativo al paquete — un **split** (`database.py` → paquete `database/`) las
 `backend/…`. Staging sirve el SPA por Railway igual que prod → el gate `/health/frontend` cubre **staging y
 prod**. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
 
+### 2026-06-20 — Iteración local con datos reales (clon de staging) + verificar sin mocks
+
+Para iterar flujos autenticados / con datos reales: **backend local + BD de staging clonada a Postgres
+local** (`pg_dump` read-only de la remota → restore local) + **staging-login** para impersonar
+(`POST /auth/staging-login {target:"cliente"|"admin"}`; cliente por `STAGING_CLIENTE_EMAIL` o `cliente_id`).
+**Nunca** apuntar el backend local a la BD remota: `init_db()` corre al startup y le escribiría el esquema +
+expone PII (clon = solo lectura sobre la remota). `.env` local gitignored. El loop render-compare se valida
+con **datos/assets reales, no solo mocks** (así apareció el wordmark custom no themeable). Extiende
+_Staging-login (2026-06-19)_ al portal cliente y al loop local; setup en `DEPLOY_RAILWAY.md`.
+
+### 2026-06-20 — TopBar modular por área: shell único, color de marca, logo themeable
+
+Un **shell único** (`TopBarShell`, `components/rental/TopBar.tsx`) → TODAS las variantes
+(rental/estudio/workshops/cliente): mismo alto/padding/logo, **color de marca por área** y **logo blanco
+themeable** (el wordmark normaliza sus fills a `currentColor`; isologo mono vía `LogoMark`). **Fuente única**
+de las áreas en `src/data/areas.ts` (label/desc/href/color), consumida por el topbar Y el menú. La
+navegación entre áreas vive en un **menú hamburguesa** (sheet con identidad del hub). **Mobile simplifica**:
+label del área solo si hay lugar (no con date pill central), acciones redundantes (CTA de sección,
+perfil/salir del portal) al menú, logo a la izquierda; la landing (`/`) no lleva topbar. Materializa la
+_Filosofía de diseño del DS (2026-06-20)_ en la navegación; detalle en `DESIGN_SYSTEM.md`. El supervisor
+marca un topbar fuera del shell o una lista de áreas duplicada.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
@@ -261,3 +283,10 @@ duplicados), lo más usado a mano, reconocimiento > lectura (avatares/pills), de
 **reusar no recrear** (la forma del pill vive en `kit/Pill`; `EstadoBadge`/`PagoBadge` derivan, cero clases
 copiadas), mobile/a11y no son extra, el core es presentación. El supervisor la hace cumplir; el detalle
 vive en el doc. Es la contraparte visual de la _Barra de calidad de ingeniería (2026-05-25)_.
+
+### 2026-06-20 — Fijarse en el repo antes de implementar (sobre todo tras mergear dev)
+
+Antes de codear algo, **verificar si ya existe** en el repo —con prioridad tras mergear `dev`, porque lo que
+avanzó allá puede ya cubrir el pedido (caso: el staging-login de cliente ya estaba hecho, #961). Vale para
+features, helpers, endpoints y patrones. Refuerza la _Barra de calidad de ingeniería (2026-05-25)_ (no
+duplicar, fuente única); el supervisor marca reimplementaciones de algo ya presente.

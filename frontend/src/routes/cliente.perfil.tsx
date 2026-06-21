@@ -107,10 +107,8 @@ function PerfilPage() {
   }
   if (!perfil) return null;
 
-  const userName = nombreCliente(perfil);
-
   return (
-    <PublicLayout topBar={{ variant: "cliente", userName, onLogout: handleLogout }}>
+    <PublicLayout topBar={{ variant: "cliente" }}>
       {/* Sub-header amarillo */}
       <div className="bg-amber border-b hairline">
         <div className="max-w-xl mx-auto px-4 py-5">

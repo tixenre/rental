@@ -43,7 +43,7 @@ function NotFoundComponent() {
           <h2 className="mt-4 font-display text-xl text-ink">Página no encontrada</h2>
           <div className="mt-6">
             <Link
-              to="/catalogo"
+              to="/rental"
               className="inline-flex items-center justify-center rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition hover:bg-amber hover:text-ink"
             >
               Volver al catálogo

@@ -181,7 +181,7 @@ function CategoriaPage() {
             La categoría que buscás no existe o fue renombrada.
           </p>
           <Link
-            to="/catalogo"
+            to="/rental"
             className="inline-flex items-center gap-1.5 rounded-full bg-ink text-amber px-4 py-2 text-sm font-medium hover:brightness-110 transition"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Volver al catálogo
@@ -200,7 +200,7 @@ function CategoriaPage() {
         <nav aria-label="Breadcrumb" className="mb-4">
           <ol className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <li>
-              <Link to="/catalogo" className="hover:text-ink transition">
+              <Link to="/rental" className="hover:text-ink transition">
                 Catálogo
               </Link>
             </li>

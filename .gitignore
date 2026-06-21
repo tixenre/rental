@@ -54,3 +54,4 @@ blob-report
 
 # Claude Code SDK internal artifacts
 .claude/worktrees/
+.vite/

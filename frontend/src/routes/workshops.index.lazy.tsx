@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Calendar, MapPin, Users } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { SectionBanner } from "@/components/rental/SectionBanner";
 import { apiGetTalleres, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 
-export const Route = createLazyFileRoute("/talleres/")({
+export const Route = createLazyFileRoute("/workshops/")({
   component: TalleresPage,
 });
 
@@ -68,7 +69,7 @@ function WorkshopCard({ taller }: { taller: Taller }) {
 
   return (
     <Link
-      to="/talleres/$slug"
+      to="/workshops/$slug"
       params={{ slug: taller.slug }}
       className="group flex flex-col sm:flex-row rounded-2xl border border-border/60 bg-background overflow-hidden hover:border-rosa/40 hover:shadow-md transition-all duration-200"
     >
@@ -174,27 +175,8 @@ function TalleresPage() {
   });
 
   return (
-    <PublicLayout>
-      {/* Header full-bleed rosa */}
-      <section className="bg-rosa text-ink px-4 sm:px-6 pt-12 pb-14">
-        <div className="max-w-[900px] mx-auto">
-          <p className="font-mono text-[0.6875rem] tracking-[0.2em] uppercase text-ink/55 mb-3">
-            Rambla
-          </p>
-          <h1
-            className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-ink"
-            style={{ fontSize: "clamp(2.5rem, 6vw, 4rem)" }}
-          >
-            workshops
-            <br />
-            &amp; talleres
-          </h1>
-          <p className="mt-4 text-base text-ink/70 max-w-lg">
-            Espacios de aprendizaje en Rambla Estudio. Clases prácticas con profesionales de la
-            industria audiovisual y fotográfica.
-          </p>
-        </div>
-      </section>
+    <PublicLayout topBar={{ variant: "workshops" }}>
+      <SectionBanner section="workshops" />
 
       <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-col gap-4">
         {isLoading && (
