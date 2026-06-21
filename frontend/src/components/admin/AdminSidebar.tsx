@@ -26,6 +26,7 @@ import {
   BookOpen,
   Calculator,
   GraduationCap,
+  ShoppingCart,
 } from "lucide-react";
 
 import {
@@ -63,6 +64,7 @@ const items: NavItem[] = [
     exact: true,
   },
   { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
+  { title: "Carritos activos", url: "/admin/carritos", icon: ShoppingCart },
   {
     title: "Inventario",
     url: "/admin/equipos",

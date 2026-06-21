@@ -57,6 +57,12 @@ PUBLIC_API_ANY = (
     # firma HMAC-SHA256 dentro del handler (`verify_webhook`, fail-closed si el
     # secret no está) — NO por sesión. Por eso van exentos del middleware.
     "/api/webhooks/",
+    # Heartbeat de carrito (#280 Fase 1): visitantes anónimos también persisten
+    # su carrito. El handler valida el session_id internamente (UUID válido) y
+    # solo asocia cliente_id si hay sesión activa — auth opcional, no ausente.
+    # El endpoint admin de carritos (/api/admin/carritos) no tiene este prefijo
+    # y sigue protegido por require_admin dentro del handler.
+    "/api/cart/heartbeat",
 )
 
 # Archivos estáticos que viven en la raíz del build de Vite (`public/` se copia

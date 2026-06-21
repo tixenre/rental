@@ -167,7 +167,7 @@ def admin_listar_carritos(request: Request, horas: int = 72):
 
     with get_db() as conn:
         rows = conn.execute(
-            f"""
+            """
             SELECT
                 ca.id,
                 ca.session_id,
@@ -188,10 +188,11 @@ def admin_listar_carritos(request: Request, horas: int = 72):
             FROM carritos_activos ca
             LEFT JOIN clientes cl ON cl.id = ca.cliente_id
             WHERE NOT ca.confirmado
-              AND ca.updated_at > NOW() - INTERVAL '{int(horas)} hours'
+              AND ca.updated_at > NOW() - (? * INTERVAL '1 hour')
             ORDER BY ca.updated_at DESC
             LIMIT 200
             """,
+            (int(horas),),
         ).fetchall()
 
         result = []
