@@ -66,6 +66,7 @@ from routes.dataio           import router as dataio_router
 from routes.estudio          import router as estudio_router
 from routes.didit            import router as didit_router
 from routes.talleres         import router as talleres_router
+from routes.carritos         import router as carritos_router
 from middleware          import auth_middleware
 
 logger = logging.getLogger(__name__)
@@ -185,6 +186,7 @@ app.include_router(dataio_router,         prefix="/api")
 app.include_router(estudio_router,        prefix="/api")
 app.include_router(didit_router,          prefix="/api")
 app.include_router(talleres_router,       prefix="/api")
+app.include_router(carritos_router,       prefix="/api")
 app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
 app.include_router(calendar_router)  # /calendar/feed.ics (root) + /api/admin/calendar/*
 app.include_router(cliente_portal_router)

@@ -1647,6 +1647,42 @@ def _init_db_schema(conn):
         ("jimetroncoso44@gmail.com", "direccion-de-arte-jime-troncoso"),
     )
 
+    # ── Carritos activos (#280 Fase 1): persistencia server-side ──────────────
+    # Cada heartbeat del frontend hace upsert por session_id (UUID v4 generado
+    # en el cliente). cliente_id se asocia automáticamente si hay sesión activa.
+    # items_json incluye nombre del equipo para el dashboard sin joins adicionales.
+    # confirmado=TRUE cuando el cliente confirma el pedido (cierre del funnel).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS carritos_activos (
+            id              SERIAL PRIMARY KEY,
+            session_id      TEXT NOT NULL UNIQUE,
+            cliente_id      INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
+            items_json      JSONB NOT NULL DEFAULT '[]',
+            fecha_desde     DATE,
+            fecha_hasta     DATE,
+            hora_desde      TEXT,
+            hora_hasta      TEXT,
+            total_items     INTEGER NOT NULL DEFAULT 0,
+            monto_estimado  INTEGER NOT NULL DEFAULT 0,
+            confirmado      BOOLEAN NOT NULL DEFAULT FALSE,
+            abandonado_en   TIMESTAMPTZ,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_carritos_updated "
+        "ON carritos_activos(updated_at DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_carritos_cliente "
+        "ON carritos_activos(cliente_id) WHERE cliente_id IS NOT NULL"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_carritos_activos_no_conf "
+        "ON carritos_activos(updated_at DESC) WHERE NOT confirmado"
+    )
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.
