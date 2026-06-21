@@ -9,6 +9,7 @@ import { Logo } from "./Logo";
 import { LogoMark } from "./LogoMark";
 import { AreaMenu } from "./AreaMenu";
 import { AREAS } from "@/data/areas";
+import { useClienteSession } from "@/lib/iva";
 import { cn } from "@/lib/utils";
 
 // ── Dimensiones compartidas del topbar (fuente única) ──────────────────────────
@@ -70,6 +71,7 @@ export function TopBarShell({
   centerClassName = "flex",
   right,
   headerRef,
+  labelOverride,
 }: {
   section: Section;
   center?: ReactNode;
@@ -78,6 +80,8 @@ export function TopBarShell({
   right?: ReactNode;
   /** Para medir la altura real del topbar (ej. sticky tops del catálogo mobile). */
   headerRef?: React.Ref<HTMLElement>;
+  /** Reemplaza el label del área (ej. el nombre del cliente en el portal). */
+  labelOverride?: string;
 }) {
   const { bg } = SECTION_CONFIG[section];
   return (
@@ -87,7 +91,7 @@ export function TopBarShell({
     >
       <div className={cn("flex items-center gap-3", TOPBAR_H, TOPBAR_PX)}>
         {/* Sin label en mobile cuando hay date pill central (no hay espacio). */}
-        <SectionLogo section={section} labelMobile={!center} />
+        <SectionLogo section={section} labelMobile={!center} labelOverride={labelOverride} />
         {center && (
           <div className={cn("flex-1 justify-center px-2 min-w-0", centerClassName)}>{center}</div>
         )}
@@ -105,13 +109,17 @@ export function TopBarShell({
 export function SectionLogo({
   section,
   labelMobile = true,
+  labelOverride,
 }: {
   section: Section;
   /** Mostrar el label del área en mobile. False cuando el topbar ya tiene un
    *  control central (date pill) que no deja espacio. */
   labelMobile?: boolean;
+  /** Reemplaza el label por defecto del área (ej. nombre del cliente). */
+  labelOverride?: string;
 }) {
-  const { label, href } = SECTION_CONFIG[section];
+  const { label: defaultLabel, href } = SECTION_CONFIG[section];
+  const label = labelOverride ?? defaultLabel;
   return (
     <Link
       to={href}
@@ -224,6 +232,11 @@ function RentalTopBar() {
 
 // ── TopBar del portal cliente: logo + menú ────────────────────────────────────────
 // Mi perfil y Salir viven en el menú (AreaMenu), igual que el acceso cliente.
+// El label se personaliza con el nombre del cliente logueado ("rambla tincho.");
+// sin sesión (ej. /cliente/login) cae al "portal." por defecto.
 function ClienteTopBar() {
-  return <TopBarShell section="cliente" />;
+  const { data: clienteSession } = useClienteSession();
+  const firstName = clienteSession?.nombre?.trim().split(" ")[0];
+  const label = firstName ? `${firstName.toLowerCase()}.` : undefined;
+  return <TopBarShell section="cliente" labelOverride={label} />;
 }

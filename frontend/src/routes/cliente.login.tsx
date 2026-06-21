@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { GoogleIcon } from "@/components/ui/GoogleIcon";
 import { useEffect, useState } from "react";
-import { Logo } from "@/components/rental/Logo";
+import { TopBar } from "@/components/rental/TopBar";
 import { useBusinessPhone } from "@/lib/business";
 import { whatsappLink } from "@/lib/whatsapp";
 
@@ -49,9 +49,7 @@ function ClienteLoginPage() {
 
   return (
     <div className="min-h-dvh bg-background flex flex-col">
-      <header className="border-b hairline px-6 py-[18px]">
-        <Logo size="md" linkTo="/" />
-      </header>
+      <TopBar variant="cliente" />
 
       <div className="flex-1 grid place-items-center px-6 py-8">
         <div className="w-full max-w-[400px] rounded-[20px] border hairline bg-surface p-8 sm:px-8 sm:py-9 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.08)] flex flex-col gap-[22px]">
