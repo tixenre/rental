@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Users,
   AlertTriangle,
-  Flame,
 } from "lucide-react";
 
 import { adminApi } from "@/lib/admin/api";
@@ -133,25 +132,16 @@ function CarritosPage() {
           recuperarlos por WhatsApp.
         </div>
       )}
-      {stats && stats.equipos_en_disputa > 0 && (
-        <div className="flex items-center gap-2 rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          <Flame className="h-4 w-4 shrink-0" />
-          {stats.equipos_en_disputa} equipo{stats.equipos_en_disputa !== 1 ? "s" : ""} pretendido
-          {stats.equipos_en_disputa !== 1 ? "s" : ""} por 2 o más carritos a la vez — ojo con el
-          stock.
-        </div>
-      )}
-
       {/* Insights: demanda + serie por día */}
       {(demanda.length > 0 || porDia.length > 0) && (
         <div className="grid lg:grid-cols-2 gap-6">
           {demanda.length > 0 && (
-            <Section title="Demanda latente" subtitle="Equipos más presentes en carritos activos">
+            <Section title="Interés latente" subtitle="Equipos más presentes en carritos activos">
               <RankList
                 items={demanda.map((d) => ({
                   primary: d.nombre,
-                  secondary: `${d.unidades} unidad${d.unidades !== 1 ? "es" : ""} pedida${d.unidades !== 1 ? "s" : ""}`,
-                  value: `${d.carritos}×`,
+                  secondary: `en ${d.carritos} carrito${d.carritos !== 1 ? "s" : ""}`,
+                  value: `${d.unidades}u`,
                 }))}
                 icon={Package}
               />
@@ -162,6 +152,7 @@ function CarritosPage() {
               <BarChart
                 data={porDia.map((d) => ({ label: d.dia, value: d.creados }))}
                 labelFn={(l) => l.slice(8)}
+                valueFormat={(n) => String(n)}
               />
             </Section>
           )}

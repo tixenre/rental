@@ -291,11 +291,6 @@ def _calcular_stats(conn, carritos: list[dict]) -> dict:
     confirmados_7d = int(row["confirmados"] or 0)
     conversion_pct = round(100.0 * confirmados_7d / creados_7d, 1) if creados_7d else 0.0
 
-    # Equipos pretendidos por 2+ carritos activos a la vez (señal de disputa).
-    en_disputa = sum(
-        1 for d in _calcular_demanda(carritos) if d["carritos"] >= 2
-    )
-
     return {
         "activos": activos,
         "pipeline_ars": pipeline_ars,
@@ -305,7 +300,6 @@ def _calcular_stats(conn, carritos: list[dict]) -> dict:
         "creados_7d": creados_7d,
         "confirmados_7d": confirmados_7d,
         "conversion_pct": conversion_pct,
-        "equipos_en_disputa": en_disputa,
     }
 
 

@@ -40,7 +40,6 @@ export type CarritosStats = {
   creados_7d: number;
   confirmados_7d: number;
   conversion_pct: number;
-  equipos_en_disputa: number;
 };
 
 export type CarritoDemanda = {

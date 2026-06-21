@@ -441,9 +441,12 @@ export function Section({
 export function BarChart({
   data,
   labelFn = (l) => l.slice(5),
+  valueFormat = fmtArs,
 }: {
   data: { label: string; value: number }[];
   labelFn?: (label: string) => string;
+  /** Formato del valor en el tooltip. Default pesos; pasar otro para conteos. */
+  valueFormat?: (value: number) => string;
 }) {
   if (!data.length) return <div className="text-sm text-muted-foreground">Sin datos</div>;
   const max = Math.max(...data.map((d) => d.value), 1);
@@ -452,7 +455,7 @@ export function BarChart({
       {data.map((d) => (
         <div key={d.label} className="flex-1 flex flex-col items-center gap-1 group">
           <div className="text-[9px] font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
-            {fmtArs(d.value)}
+            {valueFormat(d.value)}
           </div>
           <div
             className="w-full bg-ink/80 hover:bg-ink rounded-sm transition-colors min-h-[2px]"
