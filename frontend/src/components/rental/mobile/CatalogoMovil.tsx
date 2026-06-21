@@ -250,7 +250,8 @@ export function CatalogoMovil() {
         style={{ WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}
       >
         {/* TopBar unificado (mismo shell que desktop / estudio / talleres):
-            bg-amber, isologo + date pill central + acceso clientes. */}
+            bg-amber, isologo + date pill central. El acceso cliente y la
+            navegación entre áreas viven en el menú (AreaMenu, lo agrega el shell). */}
         <TopBarShell
           section="rental"
           headerRef={topbarRef}
@@ -266,16 +267,6 @@ export function CatalogoMovil() {
                   · {jornadas} jorn.
                 </span>
               )}
-            </button>
-          }
-          right={
-            <button
-              type="button"
-              onClick={() => navigate({ to: "/cliente" })}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-background text-ink transition hover:bg-background/90"
-              aria-label="Acceso clientes"
-            >
-              <User size={15} />
             </button>
           }
         />

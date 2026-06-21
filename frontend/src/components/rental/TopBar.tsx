@@ -7,8 +7,8 @@ import { Calendar as CalendarIcon, ShoppingBag, User, LogOut } from "lucide-reac
 import { RentalDateModal } from "./RentalDateModal";
 import { Logo } from "./Logo";
 import { LogoMark } from "./LogoMark";
+import { AreaMenu } from "./AreaMenu";
 import { cn } from "@/lib/utils";
-import { useClienteSession } from "@/lib/iva";
 
 // ── Dimensiones compartidas del topbar (fuente única) ──────────────────────────
 // Todas las variantes salen del mismo shell → mismo alto y padding en toda la web.
@@ -118,7 +118,10 @@ export function TopBarShell({
         {center && (
           <div className={cn("flex-1 justify-center px-2 min-w-0", centerClassName)}>{center}</div>
         )}
-        <div className="ml-auto shrink-0">{right}</div>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          {right}
+          <AreaMenu current={section} />
+        </div>
       </div>
     </header>
   );
@@ -196,13 +199,6 @@ function RentalTopBar() {
   const hasDates = !!(startDate && endDate);
   const jornadas = days();
 
-  const { data: clienteSession } = useClienteSession();
-  const isLogged = !!clienteSession;
-  const initial = clienteSession?.nombre?.trim()[0]?.toUpperCase() ?? null;
-  const firstName = clienteSession?.nombre?.trim().split(" ")[0] ?? null;
-  const userLinkTo = isLogged ? "/cliente/portal" : "/cliente";
-  const userLinkLabel = isLogged ? `Mi cuenta · ${firstName ?? ""}`.trim() : "Ingresar";
-
   const datesPill = (
     <button
       onClick={() => setDateModalOpen(true)}
@@ -226,43 +222,17 @@ function RentalTopBar() {
   );
 
   const actions = (
-    <div className="flex items-center gap-2 shrink-0">
-      {/* Carrito: solo desktop (en mobile vive en MobileStickyBar / CartMiniBar) */}
-      <button
-        onClick={() => setDrawerOpen(true, "bottom")}
-        className="hidden md:flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-amber transition relative hover:opacity-90"
-        aria-label={`Carrito (${count})`}
-      >
-        <ShoppingBag className="h-4 w-4" />
-        {count > 0 && <span className="tabular-nums">{count}</span>}
-        <span>{count > 0 ? (count === 1 ? "ítem" : "ítems") : "Tu rental"}</span>
-      </button>
-      {/* Sesión: siempre */}
-      <Link
-        to={userLinkTo}
-        className={cn(
-          "flex items-center gap-2 rounded-full bg-background text-ink transition hover:bg-background/90",
-          isLogged ? "px-2 py-1.5 pr-3" : "px-0 py-0 w-9 h-9 justify-center",
-        )}
-        aria-label={userLinkLabel}
-        title={userLinkLabel}
-      >
-        {isLogged && initial ? (
-          <>
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber text-ink font-display text-[11px] font-black">
-              {initial}
-            </span>
-            {firstName && (
-              <span className="hidden sm:block text-sm font-semibold leading-none">
-                {firstName}
-              </span>
-            )}
-          </>
-        ) : (
-          <User className="h-4 w-4" />
-        )}
-      </Link>
-    </div>
+    // Carrito solo desktop (en mobile vive en MobileStickyBar / CartMiniBar).
+    // El acceso cliente se movió al menú (AreaMenu).
+    <button
+      onClick={() => setDrawerOpen(true, "bottom")}
+      className="hidden md:flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-amber transition relative hover:opacity-90"
+      aria-label={`Carrito (${count})`}
+    >
+      <ShoppingBag className="h-4 w-4" />
+      {count > 0 && <span className="tabular-nums">{count}</span>}
+      <span>{count > 0 ? (count === 1 ? "ítem" : "ítems") : "Tu rental"}</span>
+    </button>
   );
 
   return (
