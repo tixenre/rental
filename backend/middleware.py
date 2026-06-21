@@ -93,6 +93,16 @@ async def auth_middleware(request: Request, call_next):
     if not path.startswith("/api/") and path.endswith(STATIC_EXTENSIONS):
         return await call_next(request)
 
+    # Páginas del SPA por URL directa (deep link / refresh): toda ruta limpia que
+    # NO sea /api/ ni /admin la sirve el catch-all (index.html), y el SPA hace su
+    # routing + auth client-side (el portal cliente redirige a /cliente/login solo;
+    # los datos siguen detrás de /api/ con sesión → 401). Sin esto, un deep link o
+    # refresh a una página pública (/rental, /estudio, /workshops, /preguntas-*) caía
+    # a /login —regresión al mover el catálogo de `/` a `/rental`—. /admin y /api se
+    # siguen protegiendo server-side abajo.
+    if not path.startswith("/api/") and not path.startswith("/admin"):
+        return await call_next(request)
+
     session = get_session(request)
     if not session:
         if path.startswith("/api/"):
