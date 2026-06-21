@@ -34,24 +34,13 @@ function LandingHub() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Hub topbar: solo logo, sin color, es el portal de entrada */}
-      <header className="sticky top-0 z-[var(--z-topbar)] h-16 bg-background/95 backdrop-blur-xl border-b hairline">
-        <div className="h-full px-6 md:px-10 flex items-center">
-          <Logo linkTo="/" size="sm" />
-        </div>
-      </header>
       <main className="flex-1 flex flex-col">
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <section className="flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24 bg-background">
           <p className="font-mono text-[0.625rem] tracking-[0.35em] uppercase text-muted-foreground mb-6">
             Chaco 1392 — Mar del Plata
           </p>
-          <h1
-            className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-ink"
-            style={{ fontSize: "clamp(3.5rem, 14vw, 9rem)" }}
-          >
-            rambla.
-          </h1>
+          <Logo linkTo={null} color="text-ink" className="!h-[clamp(3rem,12vw,8rem)]" />
           <p className="mt-5 text-base sm:text-lg text-muted-foreground max-w-md leading-relaxed">
             Equipos audiovisuales, estudio de foto y video, y workshops — todo en un lugar.
           </p>
