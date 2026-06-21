@@ -50,9 +50,6 @@ export function AreaMenu({ current }: { current?: AreaKey | "cliente" }) {
         <div className="flex flex-col gap-6 p-5 pt-12">
           {/* Áreas */}
           <div className="flex flex-col gap-2">
-            <p className="px-1 font-mono text-[0.625rem] uppercase tracking-[0.25em] text-muted-foreground">
-              Áreas
-            </p>
             {AREA_LIST.map((a) => {
               const active = current === a.key;
               return (
