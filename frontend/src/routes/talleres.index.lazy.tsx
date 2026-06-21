@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Calendar, MapPin, Users } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { SectionBanner } from "@/components/rental/SectionBanner";
 import { apiGetTalleres, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 
@@ -107,7 +108,9 @@ function WorkshopCard({ taller }: { taller: Taller }) {
         </div>
         <p className="text-sm text-muted-foreground line-clamp-2">{taller.descripcion}</p>
         <div className="flex items-center justify-between pt-1">
-          <p className="text-xl font-bold text-ink tabular-nums">{formatARS(taller.precio_total)}</p>
+          <p className="text-xl font-bold text-ink tabular-nums">
+            {formatARS(taller.precio_total)}
+          </p>
           <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink group-hover:gap-3 transition-[gap]">
             Ver taller <ArrowRight className="h-4 w-4" />
           </span>
@@ -161,34 +164,19 @@ function PastWorkshopCard({ pw }: { pw: PastWorkshop }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 function TalleresPage() {
-  const { data: talleres = [], isLoading, isError } = useQuery({
+  const {
+    data: talleres = [],
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: ["talleres"],
     queryFn: apiGetTalleres,
     staleTime: 1000 * 60 * 5,
   });
 
   return (
-    <PublicLayout>
-      {/* Header full-bleed rosa */}
-      <section className="bg-rosa text-ink px-4 sm:px-6 pt-12 pb-14">
-        <div className="max-w-[900px] mx-auto">
-          <p className="font-mono text-[0.6875rem] tracking-[0.2em] uppercase text-ink/55 mb-3">
-            Rambla
-          </p>
-          <h1
-            className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-ink"
-            style={{ fontSize: "clamp(2.5rem, 6vw, 4rem)" }}
-          >
-            workshops
-            <br />
-            &amp; talleres
-          </h1>
-          <p className="mt-4 text-base text-ink/70 max-w-lg">
-            Espacios de aprendizaje en Rambla Estudio. Clases prácticas con profesionales
-            de la industria audiovisual y fotográfica.
-          </p>
-        </div>
-      </section>
+    <PublicLayout topBar={{ variant: "workshops" }}>
+      <SectionBanner section="workshops" />
 
       <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 sm:py-14 flex flex-col gap-4">
         {isLoading && (
@@ -202,7 +190,8 @@ function TalleresPage() {
 
         {!isLoading && !isError && talleres.length === 0 && (
           <div className="py-8 text-center text-muted-foreground text-sm">
-            No hay talleres activos por el momento. Seguinos en Instagram para enterarte de los próximos.
+            No hay talleres activos por el momento. Seguinos en Instagram para enterarte de los
+            próximos.
           </div>
         )}
 
