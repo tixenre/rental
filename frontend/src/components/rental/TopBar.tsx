@@ -178,7 +178,8 @@ function SectionTopBar({
           <a
             href={cta.href}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold transition shrink-0",
+              // Oculto en mobile: el CTA ya vive en el hero + barra sticky inferior.
+              "hidden sm:inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold transition shrink-0",
               ctaColor,
             )}
           >
