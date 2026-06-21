@@ -6,14 +6,14 @@ inscripción + notificaciones por email. Vista admin (read-only) de inscripcione
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
 from admin_guard import require_admin
 from database import get_db, now_ar
-from services.email import send_email, get_admin_to
+from services.email import send_email
+from services.email.service import get_admin_to
 from services.media.storage import put as _r2_put
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 COMPROBANTE_MAX_MB = 10
+
+_DIAS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+_MESES_ES = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+]
+
+
+def _fmt_fecha_es(d) -> str:
+    """datetime.date → 'sábado 11 de julio'"""
+    from datetime import date
+    if isinstance(d, str):
+        d = date.fromisoformat(d)
+    return f"{_DIAS_ES[d.weekday()]} {d.day} de {_MESES_ES[d.month - 1]}"
+
+
+def _fmt_pesos(n: int) -> str:
+    return "$" + f"{n:,}".replace(",", ".")
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -176,7 +194,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
 
     nombre_pila = nombre.split()[0]
     fecha_str = now_ar().strftime("%-d de %B de %Y, %H:%M hs")
-    admin_to = get_admin_to()
+    admin_to = taller["notif_email"] or get_admin_to()
 
     ctx_admin = {
         "taller_nombre": taller["nombre"],
@@ -192,7 +210,14 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
         "taller_nombre": taller["nombre"],
         "nombre_pila": nombre_pila,
         "en_lista_espera": en_lista,
-        "admin_email": admin_to or "contacto@ramblarental.com",
+        "fecha_inicio_str": _fmt_fecha_es(taller["fecha_inicio"]),
+        "fecha_fin_str": _fmt_fecha_es(taller["fecha_fin"]),
+        "horario": taller["horario"],
+        "direccion": taller["direccion"],
+        "precio_sena_str": _fmt_pesos(taller["precio_sena"]),
+        "pago_alias": taller["pago_alias"],
+        "pago_cbu": taller["pago_cbu"],
+        "pago_banco": taller["pago_banco"],
     }
 
     if admin_to:

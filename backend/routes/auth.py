@@ -82,6 +82,12 @@ def dev_bypass_enabled() -> bool:
 # única; este login no la saltea). Override por env si hace falta otro.
 STAGING_LOGIN_EMAIL = os.getenv("STAGING_LOGIN_EMAIL", "staging-bot@rambla.local").strip().lower()
 
+# Cliente de servicio para impersonar el PORTAL DEL CLIENTE en staging (target
+# "cliente" de `/auth/staging-login`). Se busca por este email salvo que el body
+# pase un `cliente_id` puntual. Como staging es copia de prod, también sirve
+# impersonar cualquier cliente real existente por id.
+STAGING_CLIENTE_EMAIL = os.getenv("STAGING_CLIENTE_EMAIL", "staging-cliente@rambla.local").strip().lower()
+
 
 def _staging_login_secret() -> str:
     """Secreto compartido para `/auth/staging-login` (env var, solo dev)."""
@@ -152,8 +158,16 @@ def require_session(request: Request) -> dict:
     return session
 
 
-def _make_session_response(email: str, name: str, redirect: str | None = None):
-    token = signer.dumps({"email": email, "name": name})
+def _make_session_response(
+    email: str, name: str, redirect: str | None = None, extra: dict | None = None
+):
+    """Mintea la cookie de sesión firmada. `extra` agrega campos a la sesión
+    (ej. `role`/`cliente_id` para una sesión de cliente); sin él, sesión de admin
+    como siempre."""
+    payload = {"email": email, "name": name}
+    if extra:
+        payload.update(extra)
+    token = signer.dumps(payload)
     if redirect:
         # Use 200 + JS redirect so the browser processes Set-Cookie before navigating.
         # A 303 redirect through the Vite proxy drops Set-Cookie headers.
@@ -164,7 +178,7 @@ def _make_session_response(email: str, name: str, redirect: str | None = None):
             f'</head><body>Redirigiendo...</body></html>'
         )
     else:
-        res = JSONResponse({"ok": True, "email": email, "name": name})
+        res = JSONResponse({"ok": True, **payload})
     res.set_cookie(
         "session", token,
         httponly=True,
@@ -332,8 +346,37 @@ def auth_dev_login():
     )
 
 
+def _resolve_staging_cliente(cliente_id: int | None) -> dict | None:
+    """Resuelve el cliente a impersonar en staging (target="cliente"). READ-ONLY:
+    solo lee `clientes`, nunca muta staging. Por `cliente_id` si se pasa; si no,
+    por `STAGING_CLIENTE_EMAIL`. Devuelve `{id, email, name}` o None si no existe."""
+    from database import get_db
+
+    with get_db() as conn:
+        if cliente_id is not None:
+            row = conn.execute(
+                "SELECT id, nombre, apellido, email FROM clientes WHERE id = ?",
+                (cliente_id,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT id, nombre, apellido, email FROM clientes WHERE LOWER(email) = LOWER(?)",
+                (STAGING_CLIENTE_EMAIL,),
+            ).fetchone()
+    if not row:
+        return None
+    nombre = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip()
+    return {"id": row["id"], "email": row["email"], "name": nombre or row["email"]}
+
+
 class StagingLoginInput(BaseModel):
     secret: str
+    # "admin" (default, sesión de back-office) o "cliente" (sesión del portal del
+    # cliente). Backward-compatible: sin `target` se comporta como antes.
+    target: str = "admin"
+    # Solo para target="cliente": impersonar un cliente puntual por id. Si se
+    # omite, se usa el cliente de servicio `STAGING_CLIENTE_EMAIL`.
+    cliente_id: int | None = None
 
 
 @router.post("/auth/staging-login")
@@ -343,9 +386,14 @@ def auth_staging_login(body: StagingLoginInput, request: Request):
     A diferencia de `/auth/dev-login` (que se apaga en CUALQUIER entorno Railway),
     este SÍ corre en el `dev` de Railway — pero solo si `staging_login_enabled()`
     (no-prod + secreto configurado). Mintea la misma cookie de sesión firmada que
-    el OAuth real, para la cuenta de servicio `STAGING_LOGIN_EMAIL`. Devuelve JSON
-    + `Set-Cookie` (sin redirect HTML), para que un cliente automatizado capture
-    la cookie y pruebe flujos autenticados del back-office en staging.
+    el OAuth real. Devuelve JSON + `Set-Cookie` (sin redirect HTML), para que un
+    cliente automatizado capture la cookie y pruebe flujos autenticados en staging.
+
+    Dos targets (la admin-ness y la cliente-ness las siguen resolviendo
+    `is_admin_email` / `require_cliente`, fuentes únicas — este login no las saltea):
+      - "admin" (default): sesión de back-office para `STAGING_LOGIN_EMAIL`.
+      - "cliente": sesión del PORTAL para un cliente real existente (`role` +
+        `cliente_id`), resuelto por `_resolve_staging_cliente`. No crea clientes.
 
     Seguridad: 404 si no está habilitado (que parezca inexistente en prod);
     secreto en body comparado en tiempo constante; rate-limit por IP compartido
@@ -360,7 +408,25 @@ def auth_staging_login(body: StagingLoginInput, request: Request):
         _record_fail(ip)
         logger.warning("staging-login: secreto inválido ip=%s", ip)
         raise HTTPException(401, "Secreto inválido.")
-    logger.info("staging-login OK ip=%s email=%s", ip, STAGING_LOGIN_EMAIL)
+
+    target = (body.target or "admin").strip().lower()
+    if target == "cliente":
+        cli = _resolve_staging_cliente(body.cliente_id)
+        if not cli:
+            raise HTTPException(
+                404,
+                "Cliente de staging no encontrado. Pasá un `cliente_id` existente "
+                f"o creá el cliente `{STAGING_CLIENTE_EMAIL}` en staging.",
+            )
+        logger.info("staging-login OK (cliente) ip=%s cliente_id=%s", ip, cli["id"])
+        return _make_session_response(
+            email=cli["email"], name=cli["name"],
+            extra={"role": "cliente", "cliente_id": cli["id"]},
+        )
+    if target != "admin":
+        raise HTTPException(400, "target inválido (usá 'admin' o 'cliente').")
+
+    logger.info("staging-login OK (admin) ip=%s email=%s", ip, STAGING_LOGIN_EMAIL)
     return _make_session_response(email=STAGING_LOGIN_EMAIL, name="Staging Bot")
 
 

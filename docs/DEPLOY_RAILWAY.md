@@ -85,14 +85,26 @@ hacia "sí prod") **y** secreto configurado. **Solo en el entorno `dev`:**
 
 ```
 STAGING_LOGIN_SECRET=...   # secreto rotable; sin esto el endpoint no existe ni en dev
-STAGING_LOGIN_EMAIL=...    # opcional; default staging-bot@rambla.local
+STAGING_LOGIN_EMAIL=...    # opcional; default staging-bot@rambla.local (sesión admin)
+STAGING_CLIENTE_EMAIL=...  # opcional; default staging-cliente@rambla.local (sesión cliente)
 ```
 
-La cuenta debe estar en `ADMIN_EMAILS` del entorno `dev` para tener rol admin
+La cuenta admin debe estar en `ADMIN_EMAILS` del entorno `dev` para tener rol admin
 (la admin-ness la resuelve `is_admin_email`, fuente única — este login no la
 saltea). ⚠️ **Nunca** setear estas vars en prod: el handler responde 404 ahí,
 pero el secreto no tiene por qué existir fuera de `dev`. La BD de staging es
 copia de prod (PII real) → el secreto es obligatorio, no opcional.
+
+**Dos targets** (mismo gate + mismo secreto):
+
+- `target` ausente o `"admin"` (default) → sesión de **back-office**.
+- `target: "cliente"` → sesión del **portal del cliente** (`/cliente/*`), sin
+  cuenta de Google. Resuelve el cliente por `STAGING_CLIENTE_EMAIL`, o por
+  `cliente_id` si lo pasás en el body (impersonar un cliente real existente —
+  staging es copia de prod). **READ-ONLY: no crea clientes.** Si no existe ni el
+  cliente de servicio ni el `cliente_id`, responde 404 (creá el cliente en
+  staging o pasá un id válido). La cliente-ness la sigue resolviendo
+  `require_cliente` (`role="cliente"` + `cliente_id`) — este login no la saltea.
 
 #### Para una sesión automatizada: el secreto vive en el ENTORNO, nunca en el repo
 
@@ -114,14 +126,50 @@ un placeholder):
 ```bash
 B=https://rambla-rental-dev.up.railway.app
 : "${STAGING_LOGIN_SECRET:?seteá STAGING_LOGIN_SECRET en el entorno (no en el repo)}"
-# 1) login → guarda la cookie firmada
+# 1) login admin → guarda la cookie firmada
 curl -s -c jar.txt -H 'Content-Type: application/json' \
   -d "{\"secret\":\"$STAGING_LOGIN_SECRET\"}" "$B/auth/staging-login"
 # 2) reusar la cookie en cualquier endpoint admin
 curl -s -b jar.txt "$B/api/alquileres?per_page=1"
+
+# — o — login como CLIENTE (portal /cliente/*), sin cuenta de Google:
+curl -s -c jar_cli.txt -H 'Content-Type: application/json' \
+  -d "{\"secret\":\"$STAGING_LOGIN_SECRET\",\"target\":\"cliente\"}" "$B/auth/staging-login"
+# impersonar un cliente real puntual: agregá  ,"cliente_id":123
+curl -s -b jar_cli.txt "$B/api/cliente/me"
 ```
 
 Escrituras de prueba con IDs inexistentes para no mutar staging (MEMORIA 2026-06-19).
+
+### Iterar local con datos reales (clon de staging)
+
+Para iterar UI/flujos que necesitan **sesión o datos/assets reales** (portal cliente,
+back-office, cualquier cosa con SVG/settings del admin) sin depender de la nube: clonás
+la BD de staging a tu **Postgres local** y corrés el backend local con `staging-login`.
+Los bugs de theming/datos **no se ven con fixtures** (MEMORIA 2026-06-20 — *Iteración
+local con datos reales*).
+
+```bash
+# 1. Clonar la BD de staging a local — pg_dump READ-ONLY de la remota (cuidá versiones de pg;
+#    si el server remoto es más nuevo, usá el pg_dump de esa versión, ej. postgresql@18).
+pg_dump "$STAGING_DATABASE_URL" -Fc --no-owner --no-acl -f /tmp/staging.dump   # solo lectura
+psql -d postgres -c "DROP DATABASE IF EXISTS rambla_rental WITH (FORCE)"
+psql -d postgres -c "CREATE DATABASE rambla_rental"
+pg_restore -d rambla_rental --no-owner --no-acl /tmp/staging.dump
+
+# 2. Backend local — .env (gitignored): SECRET_KEY, STAGING_LOGIN_SECRET, y
+#    DATABASE_URL apuntando a TU Postgres local (NUNCA a la remota — init_db le escribe el esquema).
+cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -q -r requirements.txt
+uvicorn main:app --port 8000
+
+# 3. Login local — desde la consola del navegador en localhost:3000 (guarda la cookie HttpOnly):
+#    fetch("/auth/staging-login", { method:"POST", headers:{"Content-Type":"application/json"},
+#      body: JSON.stringify({ secret:"<STAGING_LOGIN_SECRET>", target:"cliente" }), credentials:"include" })
+```
+
+⚠️ El clon es **read-only sobre la remota** (cero escritura a staging/prod). **Nunca** pongas
+la `DATABASE_URL` remota en el `.env` local: `init_db()` corre al arranque y le haría
+`ALTER/CREATE` al esquema, además de ser PII real.
 
 ---
 

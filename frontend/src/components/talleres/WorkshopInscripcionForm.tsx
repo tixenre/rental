@@ -87,7 +87,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
     return (
       <div className="rounded-2xl border border-border/60 bg-background p-6 sm:p-8 text-center">
         <CheckCircle2
-          className={`mx-auto mb-4 h-10 w-10 ${isEspera ? "text-amber" : "text-green-500"}`}
+          className={`mx-auto mb-4 h-10 w-10 ${isEspera ? "text-rosa" : "text-verde"}`}
           strokeWidth={1.5}
         />
         <h3 className="font-display text-xl font-bold text-ink mb-2">
@@ -100,7 +100,9 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
         </p>
         {!isEspera && (
           <div className="mt-6 rounded-xl bg-muted/40 p-4 text-left text-sm">
-            <p className="font-medium text-ink mb-2">Datos para la seña ({formatARS(taller.precio_sena)})</p>
+            <p className="font-medium text-ink mb-2">
+              Datos para la seña ({formatARS(taller.precio_sena)})
+            </p>
             <p className="text-muted-foreground leading-relaxed">
               Alias: <span className="text-ink font-mono">{taller.pago_alias}</span>
               <br />
@@ -123,10 +125,10 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
       <div
         className={`rounded-xl px-4 py-2.5 text-sm font-medium ${
           enListaActual
-            ? "bg-amber/15 text-amber-700"
+            ? "bg-rosa/15 text-rosa"
             : cuposDisponibles <= 3
-              ? "bg-amber/10 text-amber-700"
-              : "bg-green-50 text-green-700"
+              ? "bg-rosa/10 text-rosa"
+              : "bg-verde/10 text-verde"
         }`}
       >
         {enListaActual
@@ -223,7 +225,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
                 />
               </label>
               {upload.status === "error" && (
-                <p className="mt-2 text-xs text-red-600 text-center">{upload.message}</p>
+                <p className="mt-2 text-xs text-destructive text-center">{upload.message}</p>
               )}
             </>
           ) : upload.status === "uploading" ? (
@@ -233,7 +235,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm text-green-700">
+              <div className="flex items-center gap-2 text-sm text-verde">
                 <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                 <span className="truncate">{upload.fileName}</span>
               </div>
@@ -249,14 +251,14 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
         </div>
         <p className="text-xs text-muted-foreground">
           Alias: <span className="font-mono font-medium text-ink">{taller.pago_alias}</span>
-          {" · "}CBU:{" "}
-          <span className="font-mono text-ink">{taller.pago_cbu}</span>
-          {" · "}{taller.pago_banco}
+          {" · "}CBU: <span className="font-mono text-ink">{taller.pago_cbu}</span>
+          {" · "}
+          {taller.pago_banco}
         </p>
       </div>
 
       {submitState === "error" && (
-        <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 shrink-0" />
           Algo salió mal. Revisá los datos e intentá de nuevo.
         </div>
@@ -265,7 +267,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
       <Button
         type="submit"
         disabled={submitState === "submitting" || upload.status === "uploading"}
-        className="bg-ink text-amber hover:brightness-110 active:scale-[0.98] font-bold rounded-full py-6 text-base transition-all"
+        className="bg-rosa text-ink hover:brightness-110 active:scale-[0.98] font-bold rounded-full py-6 text-base transition-all"
       >
         {submitState === "submitting" ? (
           <span className="flex items-center gap-2">
@@ -277,9 +279,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
         )}
       </Button>
 
-      <p className="text-xs text-muted-foreground text-center">
-        * Campos obligatorios
-      </p>
+      <p className="text-xs text-muted-foreground text-center">* Campos obligatorios</p>
     </form>
   );
 }

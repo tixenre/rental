@@ -307,7 +307,7 @@ export default function ClientePortal() {
   if (loading) {
     return (
       <div className="min-h-dvh bg-background flex flex-col">
-        <TopBar variant="cliente" userName={undefined} />
+        <TopBar variant="cliente" />
         <div className="flex flex-1">
           <aside className="hidden md:block w-[220px] shrink-0 border-r hairline" />
           <main className="flex-1 px-5 lg:px-12 pt-8">
@@ -334,13 +334,8 @@ export default function ClientePortal() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-dvh bg-background flex flex-col">
-      {/* TopBar — logo + nombre + avatar que abre tab Perfil */}
-      <TopBar
-        variant="cliente"
-        userName={userName}
-        onLogout={handleLogout}
-        onProfileClick={() => setActiveTab("perfil")}
-      />
+      {/* TopBar — logo + menú (perfil/salir viven en el menú) */}
+      <TopBar variant="cliente" />
 
       <div className="flex flex-1 overflow-hidden">
         {/* ── Sidebar desktop ─────────────────────────────────────────── */}

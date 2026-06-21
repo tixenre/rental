@@ -1,298 +1,242 @@
 import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
-import { useEffect, useRef, useState } from "react";
+import { useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, ShoppingBag, User, LogOut } from "lucide-react";
+import { Calendar as CalendarIcon, ShoppingBag } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
 import { Logo } from "./Logo";
-import { cn } from "@/lib/utils";
+import { LogoMark } from "./LogoMark";
+import { AreaMenu } from "./AreaMenu";
+import { AREAS } from "@/data/areas";
 import { useClienteSession } from "@/lib/iva";
+import { cn } from "@/lib/utils";
+
+// ── Dimensiones compartidas del topbar (fuente única) ──────────────────────────
+// Todas las variantes salen del mismo shell → mismo alto y padding en toda la web.
+const TOPBAR_H = "h-16";
+const TOPBAR_PX = "px-4 md:px-8";
+
+// ── Config por sección ──────────────────────────────────────────────────────────
+// Las 3 áreas derivan de la fuente única `AREAS` (label/href/bg); acá solo se suma
+// el color del CTA. `cliente` (portal post-login) es propio del topbar, no es un
+// área navegable del menú.
+const SECTION_CONFIG = {
+  rental: { ...AREAS.rental, ctaColor: "bg-ink text-amber hover:opacity-90" },
+  estudio: { ...AREAS.estudio, ctaColor: "bg-white text-ink hover:bg-white/90" },
+  workshops: { ...AREAS.workshops, ctaColor: "bg-white text-ink hover:bg-white/90" },
+  cliente: {
+    label: "portal.",
+    href: "/cliente/portal",
+    bg: "bg-verde",
+    ctaColor: "bg-white text-ink hover:bg-white/90",
+  },
+} as const;
+
+export type Section = keyof typeof SECTION_CONFIG;
+
+const SECTION_DEFAULT_CTA: Record<Section, { label: string; href: string } | null> = {
+  rental: null,
+  estudio: { label: "Reservar el estudio", href: "/estudio#reserva" },
+  workshops: null,
+  cliente: null,
+};
 
 export type TopBarProps = {
   /**
-   * - "default": catálogo público (dates pill + carrito + Ingresar).
-   * - "cliente": post-login del portal (sin dates pill ni carrito; muestra
-   *   nombre del usuario y botón Salir).
+   * - "default" / "rental": catálogo (dates pill + carrito).
+   * - "estudio" / "workshops": topbar de sección + CTA.
+   * - "cliente": portal post-login (logo + menú; perfil/salir van en el menú).
    */
-  variant?: "default" | "cliente";
-  /** Solo aplica cuando variant === "cliente". */
-  userName?: string;
-  /** Solo aplica cuando variant === "cliente". */
-  onLogout?: () => void;
-  /**
-   * Si se provee, el pill del usuario abre un drawer en lugar de navegar
-   * a `/cliente/perfil`. Lo usa el portal para mostrar el perfil sin
-   * abandonar la lista de pedidos.
-   */
-  onProfileClick?: () => void;
-  /**
-   * Cuando true, el TopBar se tiñe de amber gradualmente conforme el hero
-   * (primera sección de la página) scrollea hacia arriba.
-   * El progreso se lee de `--amber-pct` en `document.documentElement`.
-   */
-  amberOnScroll?: boolean;
+  variant?: "default" | "rental" | "estudio" | "workshops" | "cliente";
+  /** CTA override para section bars. Si no se pasa se usa el default de la sección. */
+  cta?: { label: string; href: string };
 };
 
-export function TopBar({
-  variant = "default",
-  userName,
-  onLogout,
-  onProfileClick,
-  amberOnScroll,
-}: TopBarProps = {}) {
-  if (variant === "cliente") {
-    return (
-      <ClienteTopBar userName={userName} onLogout={onLogout} onProfileClick={onProfileClick} />
-    );
-  }
-  return <DefaultTopBar amberOnScroll={amberOnScroll} />;
+export function TopBar({ variant = "default", cta }: TopBarProps = {}) {
+  if (variant === "cliente") return <ClienteTopBar />;
+  if (variant === "estudio") return <SectionTopBar section="estudio" ctaOverride={cta} />;
+  if (variant === "workshops") return <SectionTopBar section="workshops" ctaOverride={cta} />;
+  // "default" | "rental"
+  return <RentalTopBar />;
 }
 
-function DefaultTopBar({ amberOnScroll }: { amberOnScroll?: boolean }) {
+// ── Shell único del topbar ───────────────────────────────────────────────────────
+// Estructura compartida: <header> sticky con alto/padding/bg de marca fijos, logo a
+// la izquierda, slot central opcional y slot derecho. De acá salen TODAS las barras
+// (incluido el catálogo mobile, que lo importa directo con sus propios slots).
+export function TopBarShell({
+  section,
+  center,
+  centerClassName = "flex",
+  right,
+  headerRef,
+  labelOverride,
+}: {
+  section: Section;
+  center?: ReactNode;
+  /** Clases del contenedor central — el caller decide su visibilidad (ej. "hidden md:flex"). */
+  centerClassName?: string;
+  right?: ReactNode;
+  /** Para medir la altura real del topbar (ej. sticky tops del catálogo mobile). */
+  headerRef?: React.Ref<HTMLElement>;
+  /** Reemplaza el label del área (ej. el nombre del cliente en el portal). */
+  labelOverride?: string;
+}) {
+  const { bg } = SECTION_CONFIG[section];
+  return (
+    <header
+      ref={headerRef}
+      className={cn("sticky top-0 z-[var(--z-topbar)] pt-[env(safe-area-inset-top)]", bg)}
+    >
+      <div className={cn("flex items-center gap-3", TOPBAR_H, TOPBAR_PX)}>
+        {/* Sin label en mobile cuando hay date pill central (no hay espacio). */}
+        <SectionLogo section={section} labelMobile={!center} labelOverride={labelOverride} />
+        {center && (
+          <div className={cn("flex-1 justify-center px-2 min-w-0", centerClassName)}>{center}</div>
+        )}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          {right}
+          <AreaMenu current={section} />
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// ── Logo compuesto: isologo (mobile) / wordmark (desktop) + label de área ─────────
+// El logo ES la navegación de vuelta al root del área. Siempre blanco sobre el color.
+export function SectionLogo({
+  section,
+  labelMobile = true,
+  labelOverride,
+}: {
+  section: Section;
+  /** Mostrar el label del área en mobile. False cuando el topbar ya tiene un
+   *  control central (date pill) que no deja espacio. */
+  labelMobile?: boolean;
+  /** Reemplaza el label por defecto del área (ej. nombre del cliente). */
+  labelOverride?: string;
+}) {
+  const { label: defaultLabel, href } = SECTION_CONFIG[section];
+  const label = labelOverride ?? defaultLabel;
+  return (
+    <Link
+      to={href}
+      className="inline-flex items-center sm:items-end gap-2 sm:gap-2.5 group shrink-0"
+    >
+      {/* Mobile: isologo (R) mono — la silueta blanca, la R muestra el color del área */}
+      <LogoMark className="sm:hidden text-white h-10 w-10" />
+      {/* Desktop: wordmark completo */}
+      <Logo linkTo={null} size="sm" color="text-white" className="max-sm:hidden" />
+      <span
+        className={cn(
+          "font-display font-black lowercase leading-none text-white text-base",
+          !labelMobile && "max-sm:hidden",
+        )}
+      >
+        {label}
+      </span>
+    </Link>
+  );
+}
+
+// ── TopBar de secciones (estudio / workshops): logo + CTA ─────────────────────────
+function SectionTopBar({
+  section,
+  ctaOverride,
+}: {
+  section: Section;
+  ctaOverride?: { label: string; href: string };
+}) {
+  const { ctaColor } = SECTION_CONFIG[section];
+  const cta = ctaOverride ?? SECTION_DEFAULT_CTA[section];
+  return (
+    <TopBarShell
+      section={section}
+      right={
+        cta && (
+          <a
+            href={cta.href}
+            className={cn(
+              // Oculto en mobile: el CTA ya vive en el hero + barra sticky inferior.
+              "hidden sm:inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold transition shrink-0",
+              ctaColor,
+            )}
+          >
+            {cta.label}
+          </a>
+        )
+      }
+    />
+  );
+}
+
+// ── TopBar del rental (catálogo): dates pill central + carrito + sesión ───────────
+// Fondo amber sólido (color del área) → controles en blanco/ink para contrastar.
+function RentalTopBar() {
   const { startDate, endDate, startTime, endTime, setDrawerOpen, totalItems, days } = useCart();
   const [dateModalOpen, setDateModalOpen] = useState(false);
-  const headerRef = useRef<HTMLElement>(null);
-  const [snapped, setSnapped] = useState(false);
   const count = totalItems();
   const hasDates = !!(startDate && endDate);
   const jornadas = days();
 
-  // Cuando hay sesión, el botón "Ingresar" se convierte en avatar y va
-  // al portal directo (#513). El nombre lo expone `useClienteSession`.
-  const { data: clienteSession } = useClienteSession();
-  const isLogged = !!clienteSession;
-  const initial = clienteSession?.nombre?.trim()[0]?.toUpperCase() ?? null;
-  const firstName = clienteSession?.nombre?.trim().split(" ")[0] ?? null;
-  const userLinkTo = isLogged ? "/cliente/portal" : "/cliente";
-  const userLinkLabel = isLogged ? `Mi cuenta · ${firstName ?? ""}`.trim() : "Ingresar";
+  const datesPill = (
+    <button
+      onClick={() => setDateModalOpen(true)}
+      className="inline-flex items-center justify-center gap-2 rounded-full border border-background/70 bg-background px-5 py-2 text-ink shadow-sm transition hover:bg-background/90"
+      aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
+    >
+      <CalendarIcon className="h-4 w-4 shrink-0 text-amber" />
+      {hasDates ? (
+        <span className="text-sm font-semibold tabular-nums truncate">
+          {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
+          <span className="mx-1.5 opacity-50">→</span>
+          {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
+          <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ink/60">
+            · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
+          </span>
+        </span>
+      ) : (
+        <span className="text-sm font-semibold">Elegir fechas</span>
+      )}
+    </button>
+  );
 
-  // Amber-on-scroll: lee --amber-pct del <html> (puesto por la página)
-  // y aplica el gradiente al header + calcula el snap a 65%.
-  useEffect(() => {
-    if (!amberOnScroll) return;
-    const header = headerRef.current;
-    if (!header) return;
-
-    const onScroll = () => {
-      const pct = parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue("--amber-pct") || "0",
-      );
-      header.style.background = `color-mix(in oklch, var(--amber) ${pct}%, color-mix(in oklch, var(--background) 92%, transparent))`;
-      setSnapped(pct >= 65);
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll(); // sync inicial
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [amberOnScroll]);
+  const actions = (
+    // Carrito solo desktop (en mobile vive en MobileStickyBar / CartMiniBar).
+    // El acceso cliente se movió al menú (AreaMenu).
+    <button
+      onClick={() => setDrawerOpen(true, "bottom")}
+      className="hidden md:flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-amber transition relative hover:opacity-90"
+      aria-label={`Carrito (${count})`}
+    >
+      <ShoppingBag className="h-4 w-4" />
+      {count > 0 && <span className="tabular-nums">{count}</span>}
+      <span>{count > 0 ? (count === 1 ? "ítem" : "ítems") : "Tu rental"}</span>
+    </button>
+  );
 
   return (
     <>
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
-      <header
-        ref={headerRef}
-        className="sticky top-0 z-[var(--z-topbar)] h-16 border-b hairline backdrop-blur-xl transition-[background,border-color]"
-      >
-        <div
-          className={cn(
-            "h-full px-4 md:px-6 md:grid md:grid-cols-[auto_1fr_auto] md:gap-4 md:items-center",
-            !amberOnScroll && "bg-background/95 md:bg-background/85",
-          )}
-        >
-          {/* Mobile: logo centrado + botón sesión derecha */}
-          <div className="flex h-full w-full items-center md:hidden">
-            <div className="w-10" />
-            <div className="flex-1 flex justify-center">
-              <Logo
-                size="md"
-                linkTo="/"
-                className={cn(
-                  "transition-[filter] duration-150",
-                  snapped && "[filter:brightness(0)_invert(1)]",
-                )}
-              />
-            </div>
-            <Link
-              to={userLinkTo}
-              className={cn(
-                "flex items-center justify-center w-11 h-11 rounded-full border hairline transition",
-                isLogged
-                  ? "bg-amber text-ink border-amber hover:opacity-90"
-                  : "hover:border-foreground/40",
-              )}
-              aria-label={userLinkLabel}
-              title={userLinkLabel}
-            >
-              {isLogged && initial ? (
-                <span className="font-display text-sm font-black">{initial}</span>
-              ) : (
-                <User className="h-5 w-5" />
-              )}
-            </Link>
-          </div>
-
-          {/* Desktop col izquierda: logo. Al snapear (topbar amber) el logo
-              se invierte a blanco para leerse sobre el fondo amarillo. */}
-          <div className="hidden md:flex items-center shrink-0">
-            <Logo
-              size="md"
-              linkTo="/"
-              className={cn(
-                "transition-[filter] duration-150",
-                snapped && "[filter:brightness(0)_invert(1)]",
-              )}
-            />
-          </div>
-
-          {/* Desktop col central: pill de fechas */}
-          <div className="hidden md:flex px-4">
-            <button
-              onClick={() => setDateModalOpen(true)}
-              className={cn(
-                "w-full flex items-center justify-center gap-3 rounded-full border-2 px-6 py-2 transition shadow-sm",
-                snapped
-                  ? "border-background/80 bg-background text-ink hover:bg-background/90"
-                  : "border-amber/50 bg-amber/10 hover:border-amber hover:bg-amber/20",
-              )}
-              aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
-            >
-              <CalendarIcon
-                className={cn("h-5 w-5 shrink-0", snapped ? "text-amber" : "text-amber")}
-              />
-              {hasDates ? (
-                <span className="text-base font-semibold tabular-nums">
-                  {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
-                  <span className="mx-2 opacity-50">→</span>
-                  {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
-                  <span
-                    className={cn(
-                      "ml-2 font-mono text-[11px] uppercase tracking-wider",
-                      snapped ? "text-ink/60" : "text-muted-foreground",
-                    )}
-                  >
-                    · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
-                  </span>
-                </span>
-              ) : (
-                <span className="text-base font-semibold">Elegir fechas</span>
-              )}
-            </button>
-          </div>
-
-          {/* Desktop col derecha: carrito + sesión */}
-          <div className="hidden md:flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setDrawerOpen(true, "bottom")}
-              className={cn(
-                "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition relative",
-                snapped
-                  ? "bg-ink text-amber hover:opacity-90"
-                  : "bg-foreground text-background hover:bg-amber hover:text-ink",
-              )}
-              aria-label={`Carrito (${count})`}
-            >
-              <ShoppingBag className="h-4 w-4" />
-              {count > 0 && <span className="tabular-nums">{count}</span>}
-              <span>{count > 0 ? (count === 1 ? "ítem" : "ítems") : "Tu rental"}</span>
-            </button>
-            <Link
-              to={userLinkTo}
-              className={cn(
-                "flex items-center gap-2 rounded-full border transition",
-                isLogged ? "px-2 py-1.5 pr-3" : "px-0 py-0 w-9 h-9 justify-center",
-                snapped
-                  ? "border-background/80 bg-background text-ink hover:bg-background/90"
-                  : isLogged
-                    ? "border-amber/50 bg-amber/10 hover:bg-amber/20"
-                    : "hairline hover:border-foreground/40",
-              )}
-              aria-label={userLinkLabel}
-              title={userLinkLabel}
-            >
-              {isLogged && initial ? (
-                <>
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber text-ink font-display text-[11px] font-black">
-                    {initial}
-                  </span>
-                  {firstName && (
-                    <span className="text-sm font-semibold leading-none">{firstName}</span>
-                  )}
-                </>
-              ) : (
-                <User className="h-4 w-4" />
-              )}
-            </Link>
-          </div>
-        </div>
-      </header>
+      <TopBarShell
+        section="rental"
+        center={datesPill}
+        centerClassName="hidden md:flex"
+        right={actions}
+      />
     </>
   );
 }
 
-function ClienteTopBar({
-  userName,
-  onLogout,
-  onProfileClick,
-}: {
-  userName?: string;
-  onLogout?: () => void;
-  onProfileClick?: () => void;
-}) {
-  const initial = userName ? userName[0].toUpperCase() : null;
-  const firstName = userName ? userName.split(" ")[0] : null;
-
-  const pillContent = (
-    <>
-      <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-amber text-ink font-display text-xs font-black shrink-0">
-        {initial ?? <User className="h-3.5 w-3.5" />}
-      </div>
-      {firstName && (
-        <span className="hidden sm:block pr-1 text-sm font-semibold text-ink">{firstName}</span>
-      )}
-    </>
-  );
-
-  return (
-    <header className="sticky top-0 z-[var(--z-topbar)] border-b hairline bg-background/95 backdrop-blur-md md:bg-background/85 md:backdrop-blur-xl">
-      <div className="px-4 py-3 md:px-6 flex items-center gap-3">
-        <div className="shrink-0">
-          <Logo size="md" linkTo="/" />
-        </div>
-        <div className="flex-1" />
-
-        {/* Avatar pill: si hay onProfileClick → abre drawer; sino → /cliente/perfil */}
-        {onProfileClick ? (
-          <button
-            type="button"
-            onClick={onProfileClick}
-            className="inline-flex items-center gap-2 rounded-full border hairline px-2 py-1 hover:border-ink/30 transition"
-            title="Ver mi cuenta"
-          >
-            {pillContent}
-          </button>
-        ) : (
-          <Link
-            to="/cliente/perfil"
-            className="inline-flex items-center gap-2 rounded-full border hairline px-2 py-1 hover:border-ink/30 transition"
-            title="Editar mi perfil"
-          >
-            {pillContent}
-          </Link>
-        )}
-
-        {onLogout && (
-          <button
-            type="button"
-            onClick={onLogout}
-            className="inline-flex items-center gap-1.5 rounded-full border hairline px-3 py-2 text-sm hover:border-foreground/40"
-            aria-label="Salir"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Salir</span>
-          </button>
-        )}
-      </div>
-    </header>
-  );
+// ── TopBar del portal cliente: logo + menú ────────────────────────────────────────
+// Mi perfil y Salir viven en el menú (AreaMenu), igual que el acceso cliente.
+// El label se personaliza con el nombre del cliente logueado ("rambla tincho.");
+// sin sesión (ej. /cliente/login) cae al "portal." por defecto.
+function ClienteTopBar() {
+  const { data: clienteSession } = useClienteSession();
+  const firstName = clienteSession?.nombre?.trim().split(" ")[0];
+  const label = firstName ? `${firstName.toLowerCase()}.` : undefined;
+  return <TopBarShell section="cliente" labelOverride={label} />;
 }

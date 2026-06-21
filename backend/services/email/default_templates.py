@@ -239,9 +239,9 @@ Fecha: {{ fecha }}""",
 <p style="margin:0 0 8px;">Hola <strong>{{{{ nombre_pila }}}}</strong>, {{% if en_lista_espera %}}te anotamos en la lista de espera de <strong>{{{{ taller_nombre }}}}</strong>. Te avisamos si se libera un cupo.{{% else %}}recibimos tu inscripción a <strong>{{{{ taller_nombre }}}}</strong>. Tu seña queda confirmada cuando verifiquemos el pago.{{% endif %}}</p>
 {{% if not en_lista_espera %}}
 <p {b.LBL}>Fechas</p>
-<p style="margin:0 0 4px;"><strong>Clase teórica:</strong> sábado 11 de julio, 9 a 13 hs<br><strong>Clase práctica:</strong> sábado 18 de julio, 9 a 13 hs<br><strong>Lugar:</strong> Chaco 1392 — Rambla Estudio</p>
-<p {b.LBL}>Datos de pago (seña 50%)</p>
-<p style="margin:0 0 4px;"><strong>Alias:</strong> rambla.estudio<br><strong>CBU:</strong> 0170239440000032889112<br><strong>Banco:</strong> BBVA<br><strong>Monto:</strong> $100.000</p>
+<p style="margin:0 0 4px;"><strong>Clase teórica:</strong> {{{{ fecha_inicio_str }}}}, {{{{ horario }}}}<br><strong>Clase práctica:</strong> {{{{ fecha_fin_str }}}}, {{{{ horario }}}}<br><strong>Lugar:</strong> {{{{ direccion }}}}</p>
+<p {b.LBL}>Datos de pago (seña)</p>
+<p style="margin:0 0 4px;"><strong>Alias:</strong> {{{{ pago_alias }}}}<br><strong>CBU:</strong> {{{{ pago_cbu }}}}<br><strong>Banco:</strong> {{{{ pago_banco }}}}<br><strong>Monto:</strong> {{{{ precio_sena_str }}}}</p>
 {{% endif %}}
 <p {b.MUTED_P}>¿Preguntas? Respondé este mail o escribínos por WhatsApp.</p>
 <p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
@@ -252,15 +252,15 @@ Te avisamos si se libera un cupo. ¿Preguntas? Respondé este mail.
 {%- else -%}
 Hola {{ nombre_pila }}, recibimos tu inscripción a {{ taller_nombre }}.
 
-Clase teórica: sábado 11 de julio, 9 a 13 hs
-Clase práctica: sábado 18 de julio, 9 a 13 hs
-Lugar: Chaco 1392 — Rambla Estudio
+Clase teórica: {{ fecha_inicio_str }}, {{ horario }}
+Clase práctica: {{ fecha_fin_str }}, {{ horario }}
+Lugar: {{ direccion }}
 
-Datos de pago (seña 50%):
-  Alias: rambla.estudio
-  CBU: 0170239440000032889112
-  Banco: BBVA
-  Monto: $100.000
+Datos de pago (seña):
+  Alias: {{ pago_alias }}
+  CBU: {{ pago_cbu }}
+  Banco: {{ pago_banco }}
+  Monto: {{ precio_sena_str }}
 
 ¿Preguntas? Respondé este mail.
 {%- endif %}

@@ -273,7 +273,7 @@ export function PedidoEmpty({
       ) : (
         cta && (
           <Link
-            to="/catalogo"
+            to="/rental"
             className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-bold text-amber transition hover:bg-amber hover:text-ink"
           >
             Explorar catálogo <ArrowRight className="h-3.5 w-3.5" />

@@ -2,7 +2,9 @@ import { test, expect } from "@playwright/test";
 
 const PUBLIC_ROUTES = [
   "/",
+  "/rental",
   "/estudio",
+  "/workshops",
   "/preguntas-frecuentes",
   "/cliente/login",
   "/cliente/registro",

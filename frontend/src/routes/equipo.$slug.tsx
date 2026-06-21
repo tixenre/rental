@@ -224,7 +224,7 @@ function EquipoPage() {
       <PublicLayout>
         <div className="max-w-4xl mx-auto w-full px-6 py-10">
           <button
-            onClick={() => navigate({ to: "/catalogo" })}
+            onClick={() => navigate({ to: "/rental" })}
             className="text-sm text-muted-foreground hover:text-ink transition flex items-center gap-1.5 mb-6"
           >
             <ArrowLeft className="h-4 w-4" /> Volver al catálogo
@@ -353,7 +353,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
       {/* Breadcrumb + back */}
       <nav className="flex items-center gap-3 text-xs">
         <button
-          onClick={() => navigate({ to: "/catalogo" })}
+          onClick={() => navigate({ to: "/rental" })}
           className="flex items-center gap-1.5 text-muted-foreground hover:text-ink transition"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Volver al catálogo
@@ -376,7 +376,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           ).map((c) => (
             <Link
               key={`${c.id}-${c.nombre}`}
-              to="/catalogo"
+              to="/rental"
               search={{ cat: c.nombre }}
               className="rounded-full border hairline px-2 py-0.5 normal-case tracking-normal text-muted-foreground hover:border-foreground/40 hover:text-ink transition"
             >

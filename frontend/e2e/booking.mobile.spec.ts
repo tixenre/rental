@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function abrirModalYElegirFecha(page: import("@playwright/test").Page) {
-  await page.goto("/");
+  await page.goto("/rental");
   await page.getByRole("button", { name: "Elegir fechas" }).first().click();
   await expect(page.getByRole("heading", { name: "Elegí tus fechas" })).toBeVisible();
   // Elegí el primer día disponible del calendario (independiente del reloj de CI).

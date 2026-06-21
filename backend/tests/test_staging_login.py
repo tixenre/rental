@@ -116,3 +116,87 @@ class TestEndpoint:
         session = auth.get_session(_FakeRequest(cookies={"session": token}))
         assert session["email"] == "no-admin@rambla.local"
         assert is_admin_email(session["email"]) is False
+
+    def test_admin_es_el_default_sin_target(self, monkeypatch):
+        """Backward-compat: sin `target` mintea sesión de admin (sin `role`)."""
+        _env(monkeypatch, "dev", "s3cr3t")
+        res = auth.auth_staging_login(auth.StagingLoginInput(secret="s3cr3t"), _FakeRequest())
+        token = res.headers.get("set-cookie", "").split("session=", 1)[1].split(";", 1)[0]
+        session = auth.get_session(_FakeRequest(cookies={"session": token}))
+        assert session["email"] == auth.STAGING_LOGIN_EMAIL
+        assert "role" not in session  # NO es sesión de cliente
+
+    def test_target_invalido_400(self, monkeypatch):
+        _env(monkeypatch, "dev", "s3cr3t")
+        with pytest.raises(HTTPException) as exc:
+            auth.auth_staging_login(
+                auth.StagingLoginInput(secret="s3cr3t", target="otro"), _FakeRequest()
+            )
+        assert exc.value.status_code == 400
+
+
+# ── target="cliente": sesión del portal del cliente ──────────────────────────
+
+class TestClienteTarget:
+    def test_cliente_target_mintea_sesion_de_cliente(self, monkeypatch):
+        """target="cliente" mintea una sesión que `require_cliente` acepta:
+        lleva `role="cliente"` + `cliente_id` del cliente resuelto."""
+        _env(monkeypatch, "dev", "s3cr3t")
+        monkeypatch.setattr(
+            auth, "_resolve_staging_cliente",
+            lambda cid: {"id": 77, "email": "cli@rambla.local", "name": "Cliente Test"},
+        )
+        res = auth.auth_staging_login(
+            auth.StagingLoginInput(secret="s3cr3t", target="cliente"), _FakeRequest()
+        )
+        token = res.headers.get("set-cookie", "").split("session=", 1)[1].split(";", 1)[0]
+        session = auth.get_session(_FakeRequest(cookies={"session": token}))
+        assert session["role"] == "cliente"
+        assert session["cliente_id"] == 77
+        assert session["email"] == "cli@rambla.local"
+
+        # Regresión real: la sesión minteada pasa el guard del portal.
+        from routes.cliente_portal.core import require_cliente
+        ok = require_cliente(_FakeRequest(cookies={"session": token}))
+        assert ok["cliente_id"] == 77
+
+        # Boundary admin≠cliente (bug #31/#55): la sesión de cliente NO es admin.
+        from admin_guard import require_admin
+        with pytest.raises(HTTPException) as exc:
+            require_admin(_FakeRequest(cookies={"session": token}))
+        assert exc.value.status_code == 403
+
+    def test_cliente_target_404_si_no_existe(self, monkeypatch):
+        """Sin cliente de servicio ni `cliente_id` válido → 404 (no se crea nada)."""
+        _env(monkeypatch, "dev", "s3cr3t")
+        monkeypatch.setattr(auth, "_resolve_staging_cliente", lambda cid: None)
+        with pytest.raises(HTTPException) as exc:
+            auth.auth_staging_login(
+                auth.StagingLoginInput(secret="s3cr3t", target="cliente"), _FakeRequest()
+            )
+        assert exc.value.status_code == 404
+
+    def test_cliente_target_404_en_prod(self, monkeypatch):
+        """El gate aplica igual al target cliente: 404 en prod aunque el secreto sea correcto."""
+        _env(monkeypatch, "production", "s3cr3t")
+        with pytest.raises(HTTPException) as exc:
+            auth.auth_staging_login(
+                auth.StagingLoginInput(secret="s3cr3t", target="cliente"), _FakeRequest()
+            )
+        assert exc.value.status_code == 404
+
+    def test_cliente_id_se_pasa_al_resolver(self, monkeypatch):
+        """Si el body trae `cliente_id`, el resolver lo recibe (impersonar un cliente puntual)."""
+        _env(monkeypatch, "dev", "s3cr3t")
+        recibido = {}
+
+        def _fake_resolver(cid):
+            recibido["cid"] = cid
+            return {"id": cid, "email": "c@x.local", "name": "C"}
+
+        monkeypatch.setattr(auth, "_resolve_staging_cliente", _fake_resolver)
+        auth.auth_staging_login(
+            auth.StagingLoginInput(secret="s3cr3t", target="cliente", cliente_id=42),
+            _FakeRequest(),
+        )
+        assert recibido["cid"] == 42

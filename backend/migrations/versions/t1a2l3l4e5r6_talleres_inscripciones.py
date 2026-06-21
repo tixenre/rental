@@ -124,7 +124,7 @@ def upgrade() -> None:
         VALUES (
             'direccion-de-arte-jime-troncoso',
             'Workshop Dirección de Arte',
-            'x Jime Troncoso',
+            'rambla × jime troncoso',
             'Jime Troncoso',
             {instructor_bio},
             {instructor_proyectos},

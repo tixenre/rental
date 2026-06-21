@@ -62,10 +62,15 @@ No se toca nada todavía. Se **ve** la pantalla viva y se mapea la deuda de expe
 - **Ruta pública** → `node .claude/skills/importar-diseno/render.mjs /la-ruta --both` (desktop+mobile).
 - **Estados internos** (editor, modal, dark) → `--click "<sel>"` / `--eval "<js>"` (rutean por estado
   de React, no por URL).
-- **Ruta autenticada (admin/portal)** → en la nube no hay sesión+datos; logueate vía **`staging-login`**
-  (MEMORIA *2026-06-19*; receta en `docs/DEPLOY_RAILWAY.md`, secreto en env, **nunca** en el repo) y
-  recorré staging con browser real (cookie de sesión inyectada). Caso testigo: la auditoría del flujo
-  de **Pedidos** se hizo así, pantalla por pantalla (lista, tabs, editor, alta, mobile).
+- **Ruta autenticada (admin/portal) o que use datos/assets reales** → los fixtures no alcanzan: los bugs
+  de theming/datos no se ven con mocks (caso testigo: el wordmark custom del admin se veía amber sobre los
+  topbars de color, invisible con el SVG bundleado local). Dos caminos, ambos vía **`staging-login`**
+  (`target:"cliente"|"admin"`; MEMORIA *2026-06-19*, secreto en env, **nunca** en el repo): (a) recorrer
+  **staging** con browser real; (b) **montar el entorno local con datos reales** —backend local + **BD de
+  staging clonada a Postgres local** (dump read-only) + staging-login— y correr el render-compare **en vivo
+  localmente** (MEMORIA *2026-06-20 — Iteración local con datos reales*; setup en `docs/DEPLOY_RAILWAY.md`).
+  **Nunca** apuntar el backend local a la base remota. Caso testigo: la auditoría de **Pedidos** (staging) y
+  el pulido del **portal cliente** (clon local, impersonando un cliente).
 - **Mobile es obligatorio** — viewport real 375×667 (no alcanza leer clases `hidden sm:*`).
 
 **Salida** = hallazgos en formato `pantalla:zona | eje | 🔴/🟡/🟢 | qué | propuesta`. Igual que el
