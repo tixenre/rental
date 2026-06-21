@@ -195,21 +195,21 @@ function RentalTopBar() {
   const datesPill = (
     <button
       onClick={() => setDateModalOpen(true)}
-      className="w-full max-w-xl flex items-center justify-center gap-3 rounded-full border-2 border-background/80 bg-background px-6 py-2 text-ink shadow-sm transition hover:bg-background/90"
+      className="inline-flex items-center justify-center gap-2 rounded-full border border-background/70 bg-background px-5 py-2 text-ink shadow-sm transition hover:bg-background/90"
       aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
     >
-      <CalendarIcon className="h-5 w-5 shrink-0 text-amber" />
+      <CalendarIcon className="h-4 w-4 shrink-0 text-amber" />
       {hasDates ? (
-        <span className="text-base font-semibold tabular-nums truncate">
+        <span className="text-sm font-semibold tabular-nums truncate">
           {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
-          <span className="mx-2 opacity-50">→</span>
+          <span className="mx-1.5 opacity-50">→</span>
           {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
-          <span className="ml-2 font-mono text-[11px] uppercase tracking-wider text-ink/60">
+          <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ink/60">
             · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
           </span>
         </span>
       ) : (
-        <span className="text-base font-semibold">Elegir fechas</span>
+        <span className="text-sm font-semibold">Elegir fechas</span>
       )}
     </button>
   );
