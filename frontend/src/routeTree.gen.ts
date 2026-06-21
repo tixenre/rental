@@ -54,6 +54,7 @@ const AdminEmailTemplatesLazyRouteImport = createFileRoute(
 const AdminDisenoLazyRouteImport = createFileRoute('/admin/diseno')()
 const AdminDataioLazyRouteImport = createFileRoute('/admin/dataio')()
 const AdminClientesLazyRouteImport = createFileRoute('/admin/clientes')()
+const AdminCarritosLazyRouteImport = createFileRoute('/admin/carritos')()
 const AdminTalleresIndexLazyRouteImport = createFileRoute('/admin/talleres/')()
 const AdminSpecsIndexLazyRouteImport = createFileRoute('/admin/specs/')()
 const AdminPedidosIndexLazyRouteImport = createFileRoute('/admin/pedidos/')()
@@ -236,6 +237,13 @@ const AdminClientesLazyRoute = AdminClientesLazyRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any).lazy(() =>
   import('./routes/admin/clientes.lazy').then((d) => d.Route),
+)
+const AdminCarritosLazyRoute = AdminCarritosLazyRouteImport.update({
+  id: '/carritos',
+  path: '/carritos',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/carritos.lazy').then((d) => d.Route),
 )
 const WorkshopsSlugRoute = WorkshopsSlugRouteImport.update({
   id: '/$slug',
@@ -484,6 +492,7 @@ export interface FileRoutesByFullPath {
   '/equipo/$slug': typeof EquipoSlugRoute
   '/talleres/$slug': typeof TalleresSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
+  '/admin/carritos': typeof AdminCarritosLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/dataio': typeof AdminDataioLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
@@ -537,6 +546,7 @@ export interface FileRoutesByTo {
   '/equipo/$slug': typeof EquipoSlugRoute
   '/talleres/$slug': typeof TalleresSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
+  '/admin/carritos': typeof AdminCarritosLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/dataio': typeof AdminDataioLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
@@ -598,6 +608,7 @@ export interface FileRoutesById {
   '/equipo/$slug': typeof EquipoSlugRoute
   '/talleres/$slug': typeof TalleresSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
+  '/admin/carritos': typeof AdminCarritosLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/dataio': typeof AdminDataioLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
@@ -660,6 +671,7 @@ export interface FileRouteTypes {
     | '/equipo/$slug'
     | '/talleres/$slug'
     | '/workshops/$slug'
+    | '/admin/carritos'
     | '/admin/clientes'
     | '/admin/dataio'
     | '/admin/diseno'
@@ -713,6 +725,7 @@ export interface FileRouteTypes {
     | '/equipo/$slug'
     | '/talleres/$slug'
     | '/workshops/$slug'
+    | '/admin/carritos'
     | '/admin/clientes'
     | '/admin/dataio'
     | '/admin/diseno'
@@ -773,6 +786,7 @@ export interface FileRouteTypes {
     | '/equipo/$slug'
     | '/talleres/$slug'
     | '/workshops/$slug'
+    | '/admin/carritos'
     | '/admin/clientes'
     | '/admin/dataio'
     | '/admin/diseno'
@@ -986,6 +1000,13 @@ declare module '@tanstack/react-router' {
       path: '/dataio'
       fullPath: '/admin/dataio'
       preLoaderRoute: typeof AdminDataioLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/carritos': {
+      id: '/admin/carritos'
+      path: '/carritos'
+      fullPath: '/admin/carritos'
+      preLoaderRoute: typeof AdminCarritosLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/clientes': {
@@ -1290,6 +1311,7 @@ interface AdminRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
   AdminNovedadesRoute: typeof AdminNovedadesRoute
   AdminTalleresRoute: typeof AdminTalleresRouteWithChildren
+  AdminCarritosLazyRoute: typeof AdminCarritosLazyRoute
   AdminClientesLazyRoute: typeof AdminClientesLazyRoute
   AdminDataioLazyRoute: typeof AdminDataioLazyRoute
   AdminDisenoLazyRoute: typeof AdminDisenoLazyRoute
@@ -1319,6 +1341,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
   AdminNovedadesRoute: AdminNovedadesRoute,
   AdminTalleresRoute: AdminTalleresRouteWithChildren,
+  AdminCarritosLazyRoute: AdminCarritosLazyRoute,
   AdminClientesLazyRoute: AdminClientesLazyRoute,
   AdminDataioLazyRoute: AdminDataioLazyRoute,
   AdminDisenoLazyRoute: AdminDisenoLazyRoute,

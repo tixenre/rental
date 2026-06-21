@@ -44,7 +44,7 @@ function CarritosPage() {
             <span
               className={cn(
                 "inline-block h-2 w-2 rounded-full",
-                isLoading ? "bg-amber-400 animate-pulse" : "bg-verde",
+                isLoading ? "bg-amber animate-pulse" : "bg-verde",
               )}
             />
             {dataUpdatedAt
