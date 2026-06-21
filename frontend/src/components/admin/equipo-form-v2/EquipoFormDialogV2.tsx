@@ -16,8 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
   Upload,
@@ -68,16 +67,8 @@ import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import type { ContenidoIncluidoItem } from "@/data/equipment";
 import { uploadFileToBucket, uploadExternalUrlToBucket, isHostedUrl } from "@/lib/equipment/photos";
-import {
-  getEquipoFotos,
-  uploadEquipoFoto,
-  uploadEquipoFotoFromUrl,
-  deleteEquipoFoto,
-  reorderEquipoFotos,
-  type EquipoFoto,
-  type EquipoFotoOrdenItem,
-} from "@/lib/equipment/equipoFotos";
-import { PhotoGallery, type GalleryFoto } from "@/components/common/PhotoGallery";
+import { uploadEquipoFotoFromUrl } from "@/lib/equipment/equipoFotos";
+import { PhotoGallery } from "@/components/common/PhotoGallery";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
 import { KitEditor } from "./KitEditor";
@@ -95,55 +86,14 @@ import {
   CategoriasPicker,
   TipoGlosario,
 } from "./form-helpers";
-
-// ════════════════════════════════════════════════════════════════════
-// Schema
-// ════════════════════════════════════════════════════════════════════
-
-// Schema dinámico: en creación validamos campos mínimos obligatorios
-// (#351). En edición todo queda opcional para no romper flujos de
-// completado parcial — el dashboard de calidad ya visibiliza los huecos.
-function buildSchema(isEdit: boolean) {
-  const requiredStr = (name: string) =>
-    isEdit ? z.string().optional().nullable() : z.string().min(1, `${name} requerido`);
-  const requiredNum = (name: string) =>
-    isEdit
-      ? z.coerce.number().min(0).optional().nullable()
-      : z.coerce.number().min(1, `${name} requerido`);
-
-  return z.object({
-    nombre: z.string().min(1, "Nombre requerido"),
-    marca: requiredStr("Marca"),
-    modelo: z.string().optional().nullable(),
-    cantidad: z.coerce.number().int().min(1, "Cantidad requerida").default(1),
-    precio_jornada: requiredNum("Precio/jornada"),
-    precio_usd: z.coerce.number().min(0).optional().nullable(),
-    roi_pct: z.coerce.number().min(0).optional().nullable(),
-    valor_reposicion: z.coerce.number().min(0).optional().nullable(),
-    fecha_compra: z.string().optional().nullable(),
-    serie: z.string().optional().nullable(),
-    bh_url: z.string().optional().nullable(),
-    foto_url: z.string().optional().nullable(),
-    dueno: requiredStr("Dueño"),
-    estado: z.enum(["operativo", "en_mantenimiento", "fuera_servicio"]).default("operativo"),
-    visible_catalogo: z.boolean().default(true),
-    ficha_completa: z.boolean().default(false),
-    tipo: z.enum(["simple", "kit", "combo"]).default("simple"),
-  });
-}
-
-type FormValues = z.infer<ReturnType<typeof buildSchema>>;
-
-/** Campos "recomendados" para un equipo (#351). Después del create, si
- *  alguno está vacío, mostramos un toast con CTA para completar. */
-const RECOMMENDED_FIELDS = ["foto", "descripcion", "serie", "valor_reposicion"] as const;
-type RecommendedField = (typeof RECOMMENDED_FIELDS)[number];
-const RECOMMENDED_LABELS: Record<RecommendedField, string> = {
-  foto: "foto",
-  descripcion: "descripción",
-  serie: "número de serie",
-  valor_reposicion: "valor de reposición",
-};
+import {
+  buildSchema,
+  type FormValues,
+  RECOMMENDED_FIELDS,
+  type RecommendedField,
+  RECOMMENDED_LABELS,
+} from "./equipo-form-schema";
+import { useEquipoFotos } from "./useEquipoFotos";
 
 // ════════════════════════════════════════════════════════════════════
 // Componente principal
@@ -249,64 +199,10 @@ export function EquipoFormDialogV2({
   const [pickingPhotoUrl, setPickingPhotoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadingToR2, setUploadingToR2] = useState(false);
-  const [galleryUploading, setGalleryUploading] = useState(false);
 
   // ── Galería multi-foto (edit mode) ────────────────────────────────
-  const fotosQ = useQuery({
-    queryKey: ["admin", "equipo-fotos", initial?.id],
-    queryFn: () => getEquipoFotos(initial!.id),
-    enabled: !!initial?.id && open,
-  });
-  const fotos: GalleryFoto[] = (fotosQ.data ?? []).map((f: EquipoFoto) => ({
-    id: f.id,
-    url: f.url,
-    orden: f.orden,
-    es_principal: f.es_principal,
-  }));
-
-  const deleteFotoMut = useMutation({
-    mutationFn: (fotoId: number) => deleteEquipoFoto(initial!.id, fotoId),
-    onSuccess: () => {
-      toast.success("Foto eliminada");
-      void qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial?.id] });
-      void qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
-    },
-    onError: (e) => toast.error("Error eliminando foto", { description: (e as Error).message }),
-  });
-
-  const reorderFotoMut = useMutation({
-    mutationFn: (items: EquipoFotoOrdenItem[]) => reorderEquipoFotos(initial!.id, items),
-    onSuccess: (data) => {
-      qc.setQueryData(["admin", "equipo-fotos", initial?.id], data.fotos);
-    },
-    onError: (e) => toast.error("Error reordenando fotos", { description: (e as Error).message }),
-  });
-
-  async function handleGalleryUpload(files: FileList) {
-    if (!initial?.id) return;
-    setGalleryUploading(true);
-    try {
-      await Promise.all(Array.from(files).map((f) => uploadEquipoFoto(initial.id, f)));
-      toast.success(files.length === 1 ? "Foto subida" : `${files.length} fotos subidas`);
-      await qc.invalidateQueries({ queryKey: ["admin", "equipo-fotos", initial.id] });
-      void qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
-    } catch (e) {
-      toast.error("Error subiendo foto", { description: (e as Error).message });
-    } finally {
-      setGalleryUploading(false);
-    }
-  }
-
-  function handleGalleryReorder(reordered: GalleryFoto[]) {
-    reorderFotoMut.mutate(
-      reordered.map((f) => ({ id: f.id, orden: f.orden, es_principal: f.es_principal })),
-    );
-  }
-
-  function handleGallerySetPrincipal(id: number) {
-    const updated = fotos.map((f) => ({ id: f.id, orden: f.orden, es_principal: f.id === id }));
-    reorderFotoMut.mutate(updated);
-  }
+  // Concern decoupled del form → useEquipoFotos (query + mutaciones + handlers).
+  const gallery = useEquipoFotos(initial, open);
 
   // CREATE mode: archivo local que se sube después de crear el equipo.
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -1368,13 +1264,13 @@ export function EquipoFormDialogV2({
             La foto marcada como principal aparece en la ficha pública y en el catálogo.
           </p>
           <PhotoGallery
-            fotos={fotos}
-            onUpload={handleGalleryUpload}
-            onDelete={(id) => deleteFotoMut.mutate(id)}
-            onReorder={handleGalleryReorder}
-            onSetPrincipal={handleGallerySetPrincipal}
-            uploading={galleryUploading}
-            disabled={deleteFotoMut.isPending || reorderFotoMut.isPending}
+            fotos={gallery.fotos}
+            onUpload={gallery.handleGalleryUpload}
+            onDelete={gallery.onDelete}
+            onReorder={gallery.handleGalleryReorder}
+            onSetPrincipal={gallery.handleGallerySetPrincipal}
+            uploading={gallery.galleryUploading}
+            disabled={gallery.mutating}
           />
         </section>
       )}

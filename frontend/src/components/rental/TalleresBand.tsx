@@ -16,8 +16,8 @@ export function TalleresBand() {
             aprender haciendo.
           </h2>
           <p className="text-[0.9375rem] leading-[1.5] text-muted-foreground">
-            Clases prácticas de dirección de arte, fotografía y video en Rambla Estudio.
-            Cupos limitados.
+            Clases prácticas de dirección de arte, fotografía y video en Rambla Estudio. Cupos
+            limitados.
           </p>
           <Link
             to="/talleres"
