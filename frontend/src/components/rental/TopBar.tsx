@@ -113,7 +113,8 @@ export function TopBarShell({
       className={cn("sticky top-0 z-[var(--z-topbar)] pt-[env(safe-area-inset-top)]", bg)}
     >
       <div className={cn("flex items-center gap-3", TOPBAR_H, TOPBAR_PX)}>
-        <SectionLogo section={section} />
+        {/* Sin label en mobile cuando hay date pill central (no hay espacio). */}
+        <SectionLogo section={section} labelMobile={!center} />
         {center && (
           <div className={cn("flex-1 justify-center px-2 min-w-0", centerClassName)}>{center}</div>
         )}
@@ -125,15 +126,31 @@ export function TopBarShell({
 
 // ── Logo compuesto: isologo (mobile) / wordmark (desktop) + label de área ─────────
 // El logo ES la navegación de vuelta al root del área. Siempre blanco sobre el color.
-export function SectionLogo({ section }: { section: Section }) {
+export function SectionLogo({
+  section,
+  labelMobile = true,
+}: {
+  section: Section;
+  /** Mostrar el label del área en mobile. False cuando el topbar ya tiene un
+   *  control central (date pill) que no deja espacio. */
+  labelMobile?: boolean;
+}) {
   const { label, href } = SECTION_CONFIG[section];
   return (
-    <Link to={href} className="inline-flex items-end gap-2.5 group shrink-0">
-      {/* Mobile: isologo (R) solo — mono blanco, la R muestra el color del área */}
+    <Link
+      to={href}
+      className="inline-flex items-center sm:items-end gap-2 sm:gap-2.5 group shrink-0"
+    >
+      {/* Mobile: isologo (R) — mono blanco, la R muestra el color del área */}
       <LogoMark mono className="sm:hidden text-white h-9 w-9" />
-      {/* Desktop: wordmark + label de área */}
+      {/* Desktop: wordmark completo */}
       <Logo linkTo={null} size="sm" color="text-white" className="max-sm:hidden" />
-      <span className="font-display font-black lowercase leading-none text-white text-base max-sm:hidden">
+      <span
+        className={cn(
+          "font-display font-black lowercase leading-none text-white text-base",
+          !labelMobile && "max-sm:hidden",
+        )}
+      >
         {label}
       </span>
     </Link>
