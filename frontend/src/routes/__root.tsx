@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { FaviconSync } from "@/components/rental/FaviconSync";
+import { useCartHeartbeat } from "@/hooks/useCartHeartbeat";
 import { Component, type ReactNode } from "react";
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -55,10 +56,16 @@ function NotFoundComponent() {
   );
 }
 
+function CartSync() {
+  useCartHeartbeat();
+  return null;
+}
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: () => (
     <RootErrorBoundary>
       <FaviconSync />
+      <CartSync />
       <Outlet />
       <Toaster richColors position="top-right" />
     </RootErrorBoundary>

@@ -40,6 +40,9 @@ class PedidoClienteCreate(BaseModel):
     fecha_hasta: Optional[str] = None
     notas:       Optional[str] = None
     items:       list[CartItemIn] = []
+    # session_id del carrito (#280 Fase 1): si viene, marcamos el carrito como
+    # confirmado en carritos_activos para cerrar el funnel de conversión.
+    session_id:  Optional[str] = None
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
@@ -103,7 +106,20 @@ def cliente_crear_pedido(
             for i in data.items
         ],
     )
-    return create_pedido(payload, background=background)
+    resultado = create_pedido(payload, background=background)
+
+    # Cerrar el funnel de conversión (#280 Fase 1): marcar el carrito como
+    # confirmado para que desaparezca del dashboard de carritos activos.
+    if data.session_id:
+        try:
+            from routes.carritos import marcar_confirmado
+            with get_db() as conn:
+                marcar_confirmado(data.session_id, conn)
+                conn.commit()
+        except Exception:
+            pass  # No crítico — el pedido ya se creó
+
+    return resultado
 
 
 @router.patch("/api/cliente/pedidos/{id}/cancelar")
