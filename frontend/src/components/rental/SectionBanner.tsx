@@ -1,23 +1,12 @@
 import { Logo } from "@/components/rental/Logo";
+import { AREAS, type AreaKey } from "@/data/areas";
 
-type Section = "rental" | "estudio" | "workshops";
-
-const CONFIG: Record<Section, { color: string; label: string; eyebrow: string }> = {
-  rental: {
-    color: "text-amber",
-    label: "rental.",
-    eyebrow: "Equipos audiovisuales",
-  },
-  estudio: {
-    color: "text-naranja",
-    label: "estudio.",
-    eyebrow: "Foto & video",
-  },
-  workshops: {
-    color: "text-rosa",
-    label: "workshops.",
-    eyebrow: "Talleres & formación",
-  },
+// Eyebrow editorial del banner (copy propio; el resto —label y color— sale de
+// la fuente única `areas.ts`, no se duplica la lista de áreas).
+const EYEBROW: Record<AreaKey, string> = {
+  rental: "Equipos audiovisuales",
+  estudio: "Foto & video",
+  workshops: "Talleres & formación",
 };
 
 /**
@@ -28,10 +17,11 @@ export function SectionBanner({
   section,
   className = "",
 }: {
-  section: Section;
+  section: AreaKey;
   className?: string;
 }) {
-  const { color, label, eyebrow } = CONFIG[section];
+  const { label, accent: color } = AREAS[section];
+  const eyebrow = EYEBROW[section];
 
   return (
     <div className={`relative bg-ink overflow-hidden flex flex-col justify-end ${className}`}>

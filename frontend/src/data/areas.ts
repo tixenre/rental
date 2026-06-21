@@ -5,9 +5,10 @@
 //
 // - `label`: nombre con punto, font-display lowercase ("rental.")
 // - `desc`:  bajada corta (menú de áreas)
-// - `href`:  root del área
-// - `bg`:    clase de fondo de marca
-// - `fg`:    color de texto legible sobre `bg` (para piezas con texto sobre el color)
+// - `href`:   root del área
+// - `bg`:     clase de fondo de marca (topbar)
+// - `fg`:     color de texto legible sobre `bg` (logo/contenido sobre el color)
+// - `accent`: color de marca como texto (wordmark/label en el SectionBanner)
 
 export const AREAS = {
   rental: {
@@ -16,6 +17,7 @@ export const AREAS = {
     href: "/rental",
     bg: "bg-amber",
     fg: "text-ink",
+    accent: "text-amber",
   },
   estudio: {
     label: "estudio.",
@@ -23,6 +25,7 @@ export const AREAS = {
     href: "/estudio",
     bg: "bg-naranja",
     fg: "text-white",
+    accent: "text-naranja",
   },
   workshops: {
     label: "workshops.",
@@ -30,6 +33,7 @@ export const AREAS = {
     href: "/workshops",
     bg: "bg-rosa",
     fg: "text-ink",
+    accent: "text-rosa",
   },
 } as const;
 

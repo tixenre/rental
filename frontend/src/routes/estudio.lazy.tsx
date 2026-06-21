@@ -251,7 +251,9 @@ function EstudioPage() {
   // Skeleton de carga inicial (solo cuando no hay data de cache)
   if (isLoading && !data) {
     return (
-      <PublicLayout topBar={{ variant: "estudio", cta: { label: "Reservar el estudio", href: "#reservar" } }}>
+      <PublicLayout
+        topBar={{ variant: "estudio", cta: { label: "Reservar el estudio", href: "#reservar" } }}
+      >
         <div className="flex flex-1 flex-col gap-6 px-4 lg:px-12 py-16 animate-pulse">
           <div className="h-8 w-48 rounded-md bg-surface" />
           <div className="h-[clamp(8rem,20vw,14rem)] w-full max-w-md rounded-xl bg-surface" />
@@ -267,7 +269,9 @@ function EstudioPage() {
   const networkError = isError;
 
   return (
-    <PublicLayout topBar={{ variant: "estudio", cta: { label: "Reservar el estudio", href: "#reservar" } }}>
+    <PublicLayout
+      topBar={{ variant: "estudio", cta: { label: "Reservar el estudio", href: "#reservar" } }}
+    >
       {networkError && (
         <div
           role="alert"
