@@ -1,17 +1,20 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Menu,
   ArrowRight,
   Check,
   Home,
   User,
+  Package,
+  LogOut,
   HelpCircle,
   MessageCircle,
   FileText,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetClose } from "@/components/ui/sheet";
-import { useClienteSession } from "@/lib/iva";
+import { useClienteSession, invalidateClienteSession } from "@/lib/iva";
+import { authedFetch } from "@/lib/authedFetch";
 import { whatsappUrl } from "@/data/contact";
 import { AREA_LIST, type AreaKey } from "@/data/areas";
 import { cn } from "@/lib/utils";
@@ -29,9 +32,16 @@ const SECONDARY = [
  */
 export function AreaMenu({ current }: { current?: AreaKey | "cliente" }) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const { data: clienteSession } = useClienteSession();
   const isLogged = !!clienteSession;
-  const firstName = clienteSession?.nombre?.trim().split(" ")[0] ?? null;
+
+  async function handleLogout() {
+    await authedFetch("/auth/logout", { method: "POST" }).catch(() => {});
+    invalidateClienteSession();
+    setOpen(false);
+    navigate({ to: "/cliente/login" });
+  }
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -82,7 +92,7 @@ export function AreaMenu({ current }: { current?: AreaKey | "cliente" }) {
             })}
           </div>
 
-          {/* Inicio + portal cliente */}
+          {/* Inicio + cuenta del cliente */}
           <div className="flex flex-col gap-1 border-t hairline pt-4">
             <SheetClose asChild>
               <Link
@@ -93,15 +103,46 @@ export function AreaMenu({ current }: { current?: AreaKey | "cliente" }) {
                 Inicio
               </Link>
             </SheetClose>
-            <SheetClose asChild>
-              <Link
-                to={isLogged ? "/cliente/portal" : "/cliente"}
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink transition hover:bg-muted"
-              >
-                <User className="h-4 w-4 shrink-0 text-muted-foreground" />
-                {isLogged ? `Mi cuenta${firstName ? ` · ${firstName}` : ""}` : "Ingresar"}
-              </Link>
-            </SheetClose>
+            {isLogged ? (
+              <>
+                <SheetClose asChild>
+                  <Link
+                    to="/cliente/portal"
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink transition hover:bg-muted"
+                  >
+                    <Package className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    Mis pedidos
+                  </Link>
+                </SheetClose>
+                <SheetClose asChild>
+                  <Link
+                    to="/cliente/perfil"
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink transition hover:bg-muted"
+                  >
+                    <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    Mi perfil
+                  </Link>
+                </SheetClose>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink transition hover:bg-muted text-left"
+                >
+                  <LogOut className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  Salir
+                </button>
+              </>
+            ) : (
+              <SheetClose asChild>
+                <Link
+                  to="/cliente"
+                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink transition hover:bg-muted"
+                >
+                  <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  Ingresar
+                </Link>
+              </SheetClose>
+            )}
           </div>
 
           {/* Links secundarios */}

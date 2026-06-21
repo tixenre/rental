@@ -3,7 +3,7 @@ import { useCart } from "@/lib/cart-store";
 import { useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, ShoppingBag, User, LogOut } from "lucide-react";
+import { Calendar as CalendarIcon, ShoppingBag } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
 import { Logo } from "./Logo";
 import { LogoMark } from "./LogoMark";
@@ -43,32 +43,17 @@ const SECTION_DEFAULT_CTA: Record<Section, { label: string; href: string } | nul
 
 export type TopBarProps = {
   /**
-   * - "default" / "rental": catálogo (dates pill + carrito + Ingresar).
+   * - "default" / "rental": catálogo (dates pill + carrito).
    * - "estudio" / "workshops": topbar de sección + CTA.
-   * - "cliente": post-login del portal (perfil + salir).
+   * - "cliente": portal post-login (logo + menú; perfil/salir van en el menú).
    */
   variant?: "default" | "rental" | "estudio" | "workshops" | "cliente";
   /** CTA override para section bars. Si no se pasa se usa el default de la sección. */
   cta?: { label: string; href: string };
-  /** Solo aplica cuando variant === "cliente". */
-  userName?: string;
-  /** Solo aplica cuando variant === "cliente". */
-  onLogout?: () => void;
-  onProfileClick?: () => void;
 };
 
-export function TopBar({
-  variant = "default",
-  cta,
-  userName,
-  onLogout,
-  onProfileClick,
-}: TopBarProps = {}) {
-  if (variant === "cliente") {
-    return (
-      <ClienteTopBar userName={userName} onLogout={onLogout} onProfileClick={onProfileClick} />
-    );
-  }
+export function TopBar({ variant = "default", cta }: TopBarProps = {}) {
+  if (variant === "cliente") return <ClienteTopBar />;
   if (variant === "estudio") return <SectionTopBar section="estudio" ctaOverride={cta} />;
   if (variant === "workshops") return <SectionTopBar section="workshops" ctaOverride={cta} />;
   // "default" | "rental"
@@ -237,64 +222,8 @@ function RentalTopBar() {
   );
 }
 
-// ── TopBar del portal cliente: logo + perfil + salir ──────────────────────────────
-function ClienteTopBar({
-  userName,
-  onLogout,
-  onProfileClick,
-}: {
-  userName?: string;
-  onLogout?: () => void;
-  onProfileClick?: () => void;
-}) {
-  const initial = userName ? userName[0].toUpperCase() : null;
-  const firstName = userName ? userName.split(" ")[0] : null;
-
-  const pillContent = (
-    <>
-      <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-verde text-white font-display text-xs font-black shrink-0">
-        {initial ?? <User className="h-3.5 w-3.5" />}
-      </div>
-      {firstName && (
-        <span className="hidden sm:block pr-1 text-sm font-semibold text-ink">{firstName}</span>
-      )}
-    </>
-  );
-
-  const actions = (
-    <div className="flex items-center gap-2 shrink-0">
-      {onProfileClick ? (
-        <button
-          type="button"
-          onClick={onProfileClick}
-          className="inline-flex items-center gap-2 rounded-full bg-background px-2 py-1 hover:bg-background/90 transition"
-          title="Ver mi cuenta"
-        >
-          {pillContent}
-        </button>
-      ) : (
-        <Link
-          to="/cliente/perfil"
-          className="inline-flex items-center gap-2 rounded-full bg-background px-2 py-1 hover:bg-background/90 transition"
-          title="Editar mi perfil"
-        >
-          {pillContent}
-        </Link>
-      )}
-
-      {onLogout && (
-        <button
-          type="button"
-          onClick={onLogout}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white/15 text-white px-3 py-2 text-sm hover:bg-white/25 transition"
-          aria-label="Salir"
-        >
-          <LogOut className="h-4 w-4" />
-          <span className="hidden sm:inline">Salir</span>
-        </button>
-      )}
-    </div>
-  );
-
-  return <TopBarShell section="cliente" right={actions} />;
+// ── TopBar del portal cliente: logo + menú ────────────────────────────────────────
+// Mi perfil y Salir viven en el menú (AreaMenu), igual que el acceso cliente.
+function ClienteTopBar() {
+  return <TopBarShell section="cliente" />;
 }
