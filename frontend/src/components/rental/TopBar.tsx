@@ -8,6 +8,7 @@ import { RentalDateModal } from "./RentalDateModal";
 import { Logo } from "./Logo";
 import { LogoMark } from "./LogoMark";
 import { AreaMenu } from "./AreaMenu";
+import { AREAS } from "@/data/areas";
 import { cn } from "@/lib/utils";
 
 // ── Dimensiones compartidas del topbar (fuente única) ──────────────────────────
@@ -16,26 +17,13 @@ const TOPBAR_H = "h-16";
 const TOPBAR_PX = "px-4 md:px-8";
 
 // ── Config por sección ──────────────────────────────────────────────────────────
-// Cada área tiene su color de marca de fondo y el logo en blanco. Una sola lógica.
+// Las 3 áreas derivan de la fuente única `AREAS` (label/href/bg); acá solo se suma
+// el color del CTA. `cliente` (portal post-login) es propio del topbar, no es un
+// área navegable del menú.
 const SECTION_CONFIG = {
-  rental: {
-    label: "rental.",
-    href: "/catalogo",
-    bg: "bg-amber",
-    ctaColor: "bg-ink text-amber hover:opacity-90",
-  },
-  estudio: {
-    label: "estudio.",
-    href: "/estudio",
-    bg: "bg-naranja",
-    ctaColor: "bg-white text-ink hover:bg-white/90",
-  },
-  workshops: {
-    label: "workshops.",
-    href: "/talleres",
-    bg: "bg-rosa",
-    ctaColor: "bg-white text-ink hover:bg-white/90",
-  },
+  rental: { ...AREAS.rental, ctaColor: "bg-ink text-amber hover:opacity-90" },
+  estudio: { ...AREAS.estudio, ctaColor: "bg-white text-ink hover:bg-white/90" },
+  workshops: { ...AREAS.workshops, ctaColor: "bg-white text-ink hover:bg-white/90" },
   cliente: {
     label: "portal.",
     href: "/cliente/portal",

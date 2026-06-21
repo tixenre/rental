@@ -13,38 +13,8 @@ import {
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { useClienteSession } from "@/lib/iva";
 import { whatsappUrl } from "@/data/contact";
+import { AREA_LIST, type AreaKey } from "@/data/areas";
 import { cn } from "@/lib/utils";
-
-type AreaKey = "rental" | "estudio" | "workshops";
-
-// Las 3 áreas con su color de marca — misma identidad que el hub (/).
-const AREAS: { key: AreaKey; label: string; desc: string; href: string; bg: string; fg: string }[] =
-  [
-    {
-      key: "rental",
-      label: "rental.",
-      desc: "Alquiler de equipos",
-      href: "/catalogo",
-      bg: "bg-amber",
-      fg: "text-ink",
-    },
-    {
-      key: "estudio",
-      label: "estudio.",
-      desc: "Set de foto y video",
-      href: "/estudio",
-      bg: "bg-naranja",
-      fg: "text-white",
-    },
-    {
-      key: "workshops",
-      label: "workshops.",
-      desc: "Talleres y formación",
-      href: "/talleres",
-      bg: "bg-rosa",
-      fg: "text-ink",
-    },
-  ];
 
 const SECONDARY = [
   { label: "Preguntas frecuentes", href: "/preguntas-frecuentes", icon: HelpCircle },
@@ -83,7 +53,7 @@ export function AreaMenu({ current }: { current?: AreaKey | "cliente" }) {
             <p className="px-1 font-mono text-[0.625rem] uppercase tracking-[0.25em] text-muted-foreground">
               Áreas
             </p>
-            {AREAS.map((a) => {
+            {AREA_LIST.map((a) => {
               const active = current === a.key;
               return (
                 <SheetClose asChild key={a.key}>
