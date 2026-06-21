@@ -85,14 +85,26 @@ hacia "sí prod") **y** secreto configurado. **Solo en el entorno `dev`:**
 
 ```
 STAGING_LOGIN_SECRET=...   # secreto rotable; sin esto el endpoint no existe ni en dev
-STAGING_LOGIN_EMAIL=...    # opcional; default staging-bot@rambla.local
+STAGING_LOGIN_EMAIL=...    # opcional; default staging-bot@rambla.local (sesión admin)
+STAGING_CLIENTE_EMAIL=...  # opcional; default staging-cliente@rambla.local (sesión cliente)
 ```
 
-La cuenta debe estar en `ADMIN_EMAILS` del entorno `dev` para tener rol admin
+La cuenta admin debe estar en `ADMIN_EMAILS` del entorno `dev` para tener rol admin
 (la admin-ness la resuelve `is_admin_email`, fuente única — este login no la
 saltea). ⚠️ **Nunca** setear estas vars en prod: el handler responde 404 ahí,
 pero el secreto no tiene por qué existir fuera de `dev`. La BD de staging es
 copia de prod (PII real) → el secreto es obligatorio, no opcional.
+
+**Dos targets** (mismo gate + mismo secreto):
+
+- `target` ausente o `"admin"` (default) → sesión de **back-office**.
+- `target: "cliente"` → sesión del **portal del cliente** (`/cliente/*`), sin
+  cuenta de Google. Resuelve el cliente por `STAGING_CLIENTE_EMAIL`, o por
+  `cliente_id` si lo pasás en el body (impersonar un cliente real existente —
+  staging es copia de prod). **READ-ONLY: no crea clientes.** Si no existe ni el
+  cliente de servicio ni el `cliente_id`, responde 404 (creá el cliente en
+  staging o pasá un id válido). La cliente-ness la sigue resolviendo
+  `require_cliente` (`role="cliente"` + `cliente_id`) — este login no la saltea.
 
 #### Para una sesión automatizada: el secreto vive en el ENTORNO, nunca en el repo
 
@@ -114,11 +126,17 @@ un placeholder):
 ```bash
 B=https://rambla-rental-dev.up.railway.app
 : "${STAGING_LOGIN_SECRET:?seteá STAGING_LOGIN_SECRET en el entorno (no en el repo)}"
-# 1) login → guarda la cookie firmada
+# 1) login admin → guarda la cookie firmada
 curl -s -c jar.txt -H 'Content-Type: application/json' \
   -d "{\"secret\":\"$STAGING_LOGIN_SECRET\"}" "$B/auth/staging-login"
 # 2) reusar la cookie en cualquier endpoint admin
 curl -s -b jar.txt "$B/api/alquileres?per_page=1"
+
+# — o — login como CLIENTE (portal /cliente/*), sin cuenta de Google:
+curl -s -c jar_cli.txt -H 'Content-Type: application/json' \
+  -d "{\"secret\":\"$STAGING_LOGIN_SECRET\",\"target\":\"cliente\"}" "$B/auth/staging-login"
+# impersonar un cliente real puntual: agregá  ,"cliente_id":123
+curl -s -b jar_cli.txt "$B/api/cliente/me"
 ```
 
 Escrituras de prueba con IDs inexistentes para no mutar staging (MEMORIA 2026-06-19).
