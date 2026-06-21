@@ -133,7 +133,7 @@ export function SectionLogo({
       className="inline-flex items-center sm:items-end gap-2 sm:gap-2.5 group shrink-0"
     >
       {/* Mobile: isologo (R) — mono blanco, la R muestra el color del área */}
-      <LogoMark mono className="sm:hidden text-white h-9 w-9" />
+      <LogoMark mono className="sm:hidden text-white h-10 w-10" />
       {/* Desktop: wordmark completo */}
       <Logo linkTo={null} size="sm" color="text-white" className="max-sm:hidden" />
       <span

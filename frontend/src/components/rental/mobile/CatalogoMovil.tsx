@@ -257,7 +257,7 @@ export function CatalogoMovil() {
           headerRef={topbarRef}
           center={
             <button
-              className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-full border-2 border-background/80 bg-background px-3.5 py-1.5 font-sans text-xs font-semibold text-ink transition whitespace-nowrap hover:bg-background/90"
+              className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-full bg-background px-3.5 py-1.5 font-sans text-sm font-semibold text-ink transition whitespace-nowrap hover:bg-background/90"
               onClick={() => setShowDateSheet(true)}
             >
               <Calendar size={14} className="shrink-0 text-amber" />
