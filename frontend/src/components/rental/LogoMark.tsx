@@ -27,7 +27,7 @@ export function LogoMark({ className = "", mono = false }: { className?: string;
 
   return (
     <span
-      className={`inline-block h-8 w-8 shrink-0 ${className}`}
+      className={`inline-block shrink-0 ${className || "h-8 w-8"}`}
       dangerouslySetInnerHTML={{ __html: svg }}
       role="img"
       aria-label="Rambla"

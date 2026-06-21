@@ -112,12 +112,15 @@ export function TopBarShell({
       ref={headerRef}
       className={cn("sticky top-0 z-[var(--z-topbar)] pt-[env(safe-area-inset-top)]", bg)}
     >
-      <div className={cn("flex items-center justify-between gap-3", TOPBAR_H, TOPBAR_PX)}>
-        <SectionLogo section={section} />
+      <div className={cn("relative flex items-center gap-3", TOPBAR_H, TOPBAR_PX)}>
+        {/* Logo: centrado en mobile (absolute), a la izquierda en desktop (flujo) */}
+        <div className="absolute left-1/2 -translate-x-1/2 md:relative md:left-auto md:translate-x-0">
+          <SectionLogo section={section} />
+        </div>
         {center && (
           <div className={cn("flex-1 justify-center px-2 min-w-0", centerClassName)}>{center}</div>
         )}
-        {right}
+        <div className="ml-auto shrink-0">{right}</div>
       </div>
     </header>
   );
@@ -128,15 +131,15 @@ export function TopBarShell({
 export function SectionLogo({ section }: { section: Section }) {
   const { label, href } = SECTION_CONFIG[section];
   return (
-    <Link to={href} className="inline-flex items-end gap-2.5 group shrink-0">
+    <Link
+      to={href}
+      className="inline-flex items-center sm:items-end gap-2 sm:gap-2.5 group shrink-0"
+    >
       {/* Mobile: isologo (R) — mono blanco, la R muestra el color del área */}
-      <LogoMark mono className="sm:hidden text-white" />
+      <LogoMark mono className="sm:hidden text-white h-10 w-10" />
       {/* Desktop: wordmark completo */}
       <Logo linkTo={null} size="sm" color="text-white" className="max-sm:hidden" />
-      <span
-        className="font-display font-black lowercase leading-none text-white"
-        style={{ fontSize: "1rem" }}
-      >
+      <span className="font-display font-black lowercase leading-none text-white text-base">
         {label}
       </span>
     </Link>

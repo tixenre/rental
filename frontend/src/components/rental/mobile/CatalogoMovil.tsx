@@ -250,24 +250,10 @@ export function CatalogoMovil() {
         style={{ WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}
       >
         {/* TopBar unificado (mismo shell que desktop / estudio / talleres):
-            bg-amber, isologo + "rental.", date pill central + acceso clientes. */}
+            bg-amber, isologo + "rental." centrado, acceso clientes a la derecha. */}
         <TopBarShell
           section="rental"
           headerRef={topbarRef}
-          center={
-            <button
-              className="w-full flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border-2 border-background/80 bg-background py-1.5 px-3.5 font-sans text-xs font-semibold text-ink transition whitespace-nowrap hover:bg-background/90"
-              onClick={() => setShowDateSheet(true)}
-            >
-              <Calendar size={14} className="shrink-0 text-amber" />
-              <span>{datePillLabel}</span>
-              {fechaDesde && (
-                <span className="font-mono text-[11px] tracking-[0.2em] uppercase text-ink/60">
-                  · {jornadas} jorn.
-                </span>
-              )}
-            </button>
-          }
           right={
             <button
               type="button"
@@ -287,13 +273,28 @@ export function CatalogoMovil() {
           onDateOpen={() => setShowDateSheet(true)}
         />
 
-        {/* Search bar — sticky bajo el topbar. Los chips de "Populares"
-            son sticky debajo de esto. */}
+        {/* Fechas + búsqueda — bloque sticky bajo el topbar. La barra de fechas
+            va arriba de la de búsqueda; juntas se pegan al scrollear. */}
         <div
           ref={searchBarRef}
-          className="sticky z-[39] px-4 py-2 backdrop-blur"
+          className="sticky z-[39] px-4 py-2 flex flex-col gap-2 backdrop-blur"
           style={{ top: stickyTops.searchBar, background: TABS_BG }}
         >
+          {/* Barra de fechas */}
+          <button
+            type="button"
+            onClick={() => setShowDateSheet(true)}
+            className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[var(--radius-lg)] border-[1.5px] border-amber/55 bg-amber-soft px-4 font-sans text-sm font-semibold text-ink transition hover:bg-amber/15"
+          >
+            <Calendar size={15} className="shrink-0 text-amber" />
+            <span>{datePillLabel}</span>
+            {fechaDesde && (
+              <span className="font-mono text-[11px] tracking-[0.2em] uppercase text-muted-foreground">
+                · {jornadas} jorn.
+              </span>
+            )}
+          </button>
+          {/* Búsqueda */}
           <div className="relative">
             <Search
               size={15}
