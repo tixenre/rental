@@ -6,7 +6,7 @@ real qué carritos están activos y analizar el funnel de conversión. El
 `session_id` es un UUID v4 generado por el frontend (no requiere login).
 
 Revision ID: cart0sact1vos
-Revises: z0a1b2c3d4e5
+Revises: n2o3p4q5r6s7
 Create Date: 2026-06-21
 """
 
@@ -15,7 +15,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "cart0sact1vos"
-down_revision: Union[str, Sequence[str], None] = "z0a1b2c3d4e5"
+down_revision: Union[str, Sequence[str], None] = "n2o3p4q5r6s7"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
