@@ -19,16 +19,21 @@ const SIZE_CLASS: Record<Size, string> = {
  * `text-amber` por default, y la inversión a blanco del top bar (filtro al
  * snapear) funciona sobre el mismo elemento.
  *
- * Usar en: TopBar, login pages, footer. `linkTo={null}` lo deja sin link.
+ * `color` acepta cualquier clase Tailwind de color de texto (ej. "text-rosa",
+ * "text-naranja", "text-white"). Por default: "text-amber" (color de marca).
+ *
+ * Usar en: TopBar, login pages, footer, SectionBanner. `linkTo={null}` lo deja sin link.
  */
 export function Logo({
   size = "md",
   linkTo = "/",
   className = "",
+  color = "text-amber",
 }: {
   size?: Size;
   linkTo?: string | null;
   className?: string;
+  color?: string;
 }) {
   const { data: customSvg } = useQuery({
     queryKey: ["settings", "wordmark_svg"],
@@ -39,11 +44,19 @@ export function Logo({
         .catch(() => null),
     staleTime: 60_000,
   });
-  const svg = customSvg ?? wordmarkSvgRaw;
+  // El wordmark es monocromático → normalizamos el color a `currentColor` para
+  // que tome el del contexto (amber sobre claro, blanco sobre los topbars de
+  // color). El SVG custom del admin trae el color hardcodeado (#ffb71b), sea como
+  // atributo `fill="..."` o en un `<style>` (`fill: #...`); cubrimos ambos. El
+  // bundleado ya usa currentColor (estos replace son no-op ahí).
+  const rawSvg = customSvg ?? wordmarkSvgRaw;
+  const svg = rawSvg
+    .replace(/fill="#[0-9a-fA-F]{3,8}"/gi, 'fill="currentColor"')
+    .replace(/fill:\s*#[0-9a-fA-F]{3,8}/gi, "fill: currentColor");
 
   const mark = (
     <span
-      className={`logo-wordmark inline-block w-auto text-amber ${SIZE_CLASS[size]} ${className}`}
+      className={`logo-wordmark inline-block w-auto ${color} ${SIZE_CLASS[size]} ${className}`}
       role="img"
       aria-label="Rambla Rental"
       dangerouslySetInnerHTML={{ __html: svg }}
