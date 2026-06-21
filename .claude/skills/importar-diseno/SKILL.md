@@ -118,13 +118,16 @@ son referencia, pero el repo manda.
    ```bash
    node .claude/skills/importar-diseno/render.mjs /cliente/portal --mobile
    ```
-   **Rutas autenticadas (admin / portal con login + datos):** el render-compare en vivo puede **no ser
-   posible** (necesita sesión + backend + datos reales — imposible en la nube efímera). Ahí: construí
-   **fiel al render del prototipo** (que sí podés rasterizar — usá `--click`/`--eval` para alcanzar los
-   estados internos, ver paso 3) y verificá con **screenshots del dueño en staging** (su captura vs el
-   render del prototipo). Funciona igual de bien. El agujero conocido —no poder auto-render-comparar el
-   **componente real** de una ruta autenticada— se cierra con un harness de preview con mocks: tracking
-   en **#743**.
+   **Rutas autenticadas (admin / portal con login + datos):** en la nube efímera no hay sesión+datos, pero
+   el render-compare en vivo **sí es posible localmente** montando el **entorno local con datos reales** —
+   backend local + **BD de staging clonada a Postgres local** (dump read-only) + **`staging-login`**
+   (`target:"cliente"|"admin"`) para impersonar— y corriendo el render-compare sobre el **componente real**
+   logueado (MEMORIA *2026-06-20 — Iteración local con datos reales*; setup en `docs/DEPLOY_RAILWAY.md`).
+   **Nunca** apuntar el backend local a la base remota (`init_db()` le escribe el esquema; es PII). Esto es
+   clave porque los **bugs de theming/datos no se ven con mocks** (caso: el wordmark custom del admin se veía
+   amber sobre los topbars de color, invisible con el SVG bundleado) — verificá **con datos/assets reales**.
+   Alternativa sin montar el entorno: construir fiel al render del prototipo y verificar con **screenshots
+   del dueño en staging**. El harness de preview con mocks queda como tracking en **#743**.
 
 ## Handoff de documentos (PDF) — el mismo loop, otro medio
 

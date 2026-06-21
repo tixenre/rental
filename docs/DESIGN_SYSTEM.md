@@ -376,6 +376,36 @@ piecewise (PR #577 las trajo a producción):
 La ruta pública `/kit-preview` (sin login, `noindex`) los muestra todos
 para QA visual antes de adoptarlos en una pantalla concreta.
 
+### TopBar — navegación modular por área (`src/components/rental/TopBar.tsx`)
+
+La web tiene áreas con identidad propia (rental · estudio · workshops · portal cliente)
++ el hub (`/`). **Todas las barras salen de un único shell**, no de topbars ad-hoc por
+pantalla. Es la aplicación de la Filosofía a la navegación: una sola forma de hacerlo,
+reusar no recrear.
+
+- **`TopBarShell`** — el shell único: `<header>` sticky con **mismo alto, padding y logo**
+  para todas las variantes. Recibe `section`, slots (`center`, `right`), y opcionales
+  (`headerRef`, `labelOverride`). De acá salen rental / estudio / workshops / cliente.
+- **Color de marca por área** — cada área tiene su `bg` (amber / naranja / rosa / verde),
+  fuente única en **`src/data/areas.ts`** (`label/desc/href/color`), consumida por el
+  topbar **y** el menú. No duplicar la lista de áreas en otro lado.
+- **Logo themeable** — sobre el color del área el logo va **blanco**: el wordmark
+  (`Logo`) **normaliza sus fills a `currentColor`** (atributo `fill=` y `<style>`), así el
+  SVG custom del admin también se tiñe; en mobile se usa el **isologo mono** (`LogoMark`,
+  silueta `currentColor` + R recortada) que funciona sobre cualquier color. **Nunca**
+  hardcodear el color de un asset de marca que deba adaptarse al contexto.
+- **Navegación entre áreas** — vive en un **menú hamburguesa** (`AreaMenu`, sheet con la
+  identidad del hub: áreas con su color + Inicio + acceso/portal + links). No tabs sueltas
+  ni un switcher escondido en el logo.
+- **Mobile simplifica** — el label del área aparece **solo si hay lugar** (se oculta cuando
+  hay un control central como el date pill); las acciones redundantes (CTA de sección,
+  perfil/salir del portal) **se mueven al menú**; el logo va a la izquierda. La landing (`/`)
+  no lleva topbar; el login del portal usa el **mismo** topbar que el portal.
+
+Regla viva: _TopBar modular por área (2026-06-20)_ en [`MEMORIA.md`](MEMORIA.md). El
+supervisor marca un topbar que no salga del shell, una lista de áreas duplicada, o un
+asset de marca con color hardcodeado donde deba ser themeable.
+
 ---
 
 ## Mobile — reglas críticas

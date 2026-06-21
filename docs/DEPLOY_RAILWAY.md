@@ -141,6 +141,36 @@ curl -s -b jar_cli.txt "$B/api/cliente/me"
 
 Escrituras de prueba con IDs inexistentes para no mutar staging (MEMORIA 2026-06-19).
 
+### Iterar local con datos reales (clon de staging)
+
+Para iterar UI/flujos que necesitan **sesión o datos/assets reales** (portal cliente,
+back-office, cualquier cosa con SVG/settings del admin) sin depender de la nube: clonás
+la BD de staging a tu **Postgres local** y corrés el backend local con `staging-login`.
+Los bugs de theming/datos **no se ven con fixtures** (MEMORIA 2026-06-20 — *Iteración
+local con datos reales*).
+
+```bash
+# 1. Clonar la BD de staging a local — pg_dump READ-ONLY de la remota (cuidá versiones de pg;
+#    si el server remoto es más nuevo, usá el pg_dump de esa versión, ej. postgresql@18).
+pg_dump "$STAGING_DATABASE_URL" -Fc --no-owner --no-acl -f /tmp/staging.dump   # solo lectura
+psql -d postgres -c "DROP DATABASE IF EXISTS rambla_rental WITH (FORCE)"
+psql -d postgres -c "CREATE DATABASE rambla_rental"
+pg_restore -d rambla_rental --no-owner --no-acl /tmp/staging.dump
+
+# 2. Backend local — .env (gitignored): SECRET_KEY, STAGING_LOGIN_SECRET, y
+#    DATABASE_URL apuntando a TU Postgres local (NUNCA a la remota — init_db le escribe el esquema).
+cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -q -r requirements.txt
+uvicorn main:app --port 8000
+
+# 3. Login local — desde la consola del navegador en localhost:3000 (guarda la cookie HttpOnly):
+#    fetch("/auth/staging-login", { method:"POST", headers:{"Content-Type":"application/json"},
+#      body: JSON.stringify({ secret:"<STAGING_LOGIN_SECRET>", target:"cliente" }), credentials:"include" })
+```
+
+⚠️ El clon es **read-only sobre la remota** (cero escritura a staging/prod). **Nunca** pongas
+la `DATABASE_URL` remota en el `.env` local: `init_db()` corre al arranque y le haría
+`ALTER/CREATE` al esquema, además de ser PII real.
+
 ---
 
 ## 🗄️ Base de datos: schema y migraciones
