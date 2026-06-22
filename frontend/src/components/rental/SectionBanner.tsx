@@ -37,7 +37,7 @@ export function SectionBanner({
       {/* Contenido */}
       <div className="relative px-8 sm:px-12 pb-8 sm:pb-12 pt-10 sm:pt-14 flex flex-col gap-3">
         {/* Eyebrow */}
-        <p className={`font-mono text-[0.625rem] tracking-[0.3em] uppercase ${color} opacity-70`}>
+        <p className={`font-mono text-2xs tracking-[0.3em] uppercase ${color} opacity-70`}>
           {eyebrow}
         </p>
 

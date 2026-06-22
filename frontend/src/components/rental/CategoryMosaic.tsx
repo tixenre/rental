@@ -106,7 +106,7 @@ function CategoryScrollRow({
               <CategoryIllustration category={c as Category} className="h-7 w-7" />
             </span>
             <div className="flex w-full items-baseline justify-between gap-1">
-              <span className="font-display text-[0.9rem] leading-tight text-ink">{c}</span>
+              <span className="font-display text-sm leading-tight text-ink">{c}</span>
               <span className="font-mono text-2xs tabular text-muted-foreground shrink-0">
                 {count}
               </span>

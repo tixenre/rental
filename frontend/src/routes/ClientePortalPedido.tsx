@@ -1197,7 +1197,7 @@ export function PedidoTimeline({ pedido }: { pedido: Pedido }) {
               >
                 {s.label}
               </div>
-              <div className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-muted-foreground tabular-nums mt-0.5">
+              <div className="font-mono text-2xs uppercase tracking-[0.06em] text-muted-foreground tabular-nums mt-0.5">
                 {s.fecha ? fmtTimelineDateTime(s.fecha) : "—"}
               </div>
             </div>

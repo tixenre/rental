@@ -220,7 +220,7 @@ export default function ClienteRegistroPage() {
             <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
               Un paso más
             </div>
-            <h1 className="font-display text-[2.25rem] leading-[0.95] text-ink lowercase">
+            <h1 className="font-display text-4xl leading-[0.95] text-ink lowercase">
               completá tu perfil.
             </h1>
           </div>
@@ -232,7 +232,7 @@ export default function ClienteRegistroPage() {
                 {info.email[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-mono text-[8.5px] uppercase tracking-[0.18em] text-muted-foreground mb-0.5">
+                <div className="font-mono text-2xs uppercase tracking-[0.18em] text-muted-foreground mb-0.5">
                   Cuenta verificada
                 </div>
                 <div className="font-sans text-sm font-semibold text-ink truncate">
@@ -285,7 +285,7 @@ export default function ClienteRegistroPage() {
 
                 {/* Dirección estructurada */}
                 <div className="space-y-2.5 rounded-xl border hairline bg-surface px-3.5 py-3.5">
-                  <div className="font-mono text-[8.5px] uppercase tracking-[0.2em] text-muted-foreground mb-0.5">
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-0.5">
                     Dirección
                   </div>
                   <Field
