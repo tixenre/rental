@@ -203,7 +203,7 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
                         (f as { wide?: boolean }).wide ? "col-span-2 space-y-1" : "space-y-1"
                       }
                     >
-                      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                         {f.label}
                       </div>
                       <div className="rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5 text-xs text-ink font-mono select-all">

@@ -296,7 +296,7 @@ function PackSection() {
               </div>
               <div className="min-w-0 flex-1">
                 {p.marca && (
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                     {p.marca}
                   </div>
                 )}

@@ -38,7 +38,7 @@ export function PreviewPane({
       <button
         type="button"
         onClick={onOpen}
-        className="sticky top-[140px] z-[var(--z-sub-toolbar)] hidden lg:flex items-center justify-center gap-1.5 h-32 w-7 self-start [writing-mode:vertical-rl] rotate-180 rounded-l-md border border-r-0 border-[var(--hairline)] bg-card font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink hover:border-ink transition"
+        className="sticky top-[140px] z-[var(--z-sub-toolbar)] hidden lg:flex items-center justify-center gap-1.5 h-32 w-7 self-start [writing-mode:vertical-rl] rotate-180 rounded-l-md border border-r-0 border-[var(--hairline)] bg-card font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink hover:border-ink transition"
         aria-label="Mostrar panel de detalle"
       >
         Detalle <ArrowRight className="h-3 w-3" />
@@ -52,7 +52,7 @@ export function PreviewPane({
       aria-label="Panel de detalle del equipo seleccionado"
     >
       <div className="flex items-center justify-between border-b border-[var(--hairline)] px-4 py-2 shrink-0">
-        <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
           Detalle
         </span>
         <button
@@ -120,7 +120,7 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
 
         <div className="p-5 flex flex-col gap-3.5">
           <div>
-            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               {item.brand} · {item.category}
             </div>
             <h3 className="font-sans text-[22px] font-bold text-ink leading-[1.1] tracking-[-0.015em] mt-1">
@@ -133,7 +133,7 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
               <div className="font-mono text-[22px] font-bold text-ink tabular-nums leading-none">
                 {formatARS(item.pricePerDay)}
               </div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground mt-1">
+              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mt-1">
                 / jornada
               </div>
             </div>
@@ -151,7 +151,7 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
 
           {specs.length > 0 && (
             <div>
-              <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
                 Detalles
               </div>
               <ul className="font-sans text-xs text-muted-foreground leading-[1.6]">
@@ -210,7 +210,7 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
             </button>
             <div className="text-center">
               <div className="font-display text-[22px] font-black text-ink leading-none">{qty}</div>
-              <div className="font-mono text-[8px] uppercase tracking-[0.15em] text-ink/70">
+              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink/70">
                 {qty === 1 ? "unidad" : "unidades"}
               </div>
             </div>

@@ -1830,7 +1830,7 @@ ${fotoTag}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                     $ / jornada
                   </div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
@@ -1838,7 +1838,7 @@ ${fotoTag}
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                     % día
                   </div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
@@ -1846,7 +1846,7 @@ ${fotoTag}
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5 col-span-2">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                     Valor reposición
                   </div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">

@@ -306,7 +306,7 @@ export function DateRangePickerModal({
                     >
                       {hasStart ? jornadas : "—"}
                     </span>
-                    <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                       {jornadas === 1 ? "jornada" : "jornadas"}
                     </span>
                   </div>
@@ -354,7 +354,7 @@ export function DateRangePickerModal({
                   </span>
                   {/* Badge "+1 J" — solo cuando suma jornada por hora */}
                   {sumaJornadaPorHora && !devolucionCerrada && (
-                    <span className="rounded-full bg-naranja/20 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-naranja">
+                    <span className="rounded-full bg-naranja/20 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-naranja">
                       +1 J
                     </span>
                   )}

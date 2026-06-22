@@ -124,7 +124,7 @@ export function EquipmentRow({
           className="flex min-w-0 flex-1 flex-col text-left"
         >
           {/* Categoría — solo la categoría (sin marca) */}
-          <div className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             <span className="truncate">{item.category}</span>
             {disponible !== undefined && (sinStock || stockBajo) && (
               <span className={cn("shrink-0", sinStock ? "text-destructive" : "text-amber")}>

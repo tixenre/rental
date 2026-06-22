@@ -346,7 +346,7 @@ export default function ClientePortal() {
           {/* Saludo */}
           {perfil && (
             <div className="px-4 mb-5">
-              <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                 Portal · cliente
               </div>
               <div className="font-sans text-sm font-semibold text-ink mt-0.5 truncate">

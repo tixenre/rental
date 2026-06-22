@@ -220,7 +220,7 @@ export function TablaValueInput({
                   {fixedUnit ? <span className="opacity-60"> · {fixedUnit}</span> : null}
                 </div>
                 {showSubHeaders && (
-                  <div className="grid grid-cols-2 gap-1 normal-case text-[9px] tracking-normal opacity-70">
+                  <div className="grid grid-cols-2 gap-1 normal-case text-[10px] tracking-normal opacity-70">
                     <span>número</span>
                     <span>unidad</span>
                   </div>

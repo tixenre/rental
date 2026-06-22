@@ -170,7 +170,7 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
     >
       <div className="flex items-center gap-3 border-t hairline bg-background/95 backdrop-blur-xl px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Reservar el estudio
           </div>
           <div className="truncate text-sm font-medium">{priceLabel}</div>
@@ -352,7 +352,7 @@ function EstudioPage() {
           <div className="relative overflow-hidden bg-ink px-[clamp(1.5rem,4vw,3.5rem)] py-[clamp(2.5rem,5vw,4.5rem)] flex flex-col justify-center">
             <Grain opacity={10} />
             <div className="relative">
-              <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-amber/55 mb-5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/55 mb-5">
                 La pieza central
               </p>
               <div className="flex items-baseline gap-1 leading-none">
@@ -417,7 +417,7 @@ function EstudioPage() {
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {visibles.map((f) => (
                   <div key={f.label} className="rounded-xl border hairline bg-background p-3.5">
-                    <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
                       {f.label}
                     </div>
                     <div className="font-semibold text-[0.9375rem]">{f.value}</div>
@@ -437,7 +437,7 @@ function EstudioPage() {
           <div className="relative">
             <div className="flex flex-wrap items-end justify-between gap-3 mb-7">
               <div>
-                <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-ink/55 mb-2.5">
+                <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/55 mb-2.5">
                   Reservas
                 </p>
                 <h2 className="font-display font-black lowercase leading-[0.95] text-ink text-[clamp(1.75rem,4vw,2.75rem)]">
@@ -491,7 +491,7 @@ function EstudioPage() {
         <section className="bg-ink px-4 lg:px-12 py-14">
           <div className="flex flex-wrap items-end justify-between gap-3 mb-8">
             <div>
-              <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-amber/50 mb-2.5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/50 mb-2.5">
                 Producciones
               </p>
               <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,3.5rem)]">

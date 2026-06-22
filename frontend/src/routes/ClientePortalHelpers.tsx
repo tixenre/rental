@@ -100,7 +100,7 @@ export function BottomNavItem({
       <span className={cn("transition", active && "text-ink")}>{icon}</span>
       <span
         className={cn(
-          "font-mono text-[9px] uppercase tracking-[0.12em] transition",
+          "font-mono text-[10px] uppercase tracking-[0.12em] transition",
           active ? "text-ink font-semibold" : "text-muted-foreground",
         )}
       >
@@ -270,7 +270,7 @@ export function IdentidadSection({
                 <div className="font-sans text-sm text-ink">
                   {[perfil.nombre_renaper, perfil.apellido_renaper].filter(Boolean).join(" ")}
                 </div>
-                <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                   Nombre legal (RENAPER)
                 </div>
               </div>
@@ -302,7 +302,7 @@ export function IdentidadSection({
                 <span className="font-sans text-sm text-ink">
                   {perfil.fecha_nacimiento_renaper}
                 </span>
-                <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                   Fecha de nacimiento
                 </div>
               </div>
@@ -314,7 +314,7 @@ export function IdentidadSection({
               <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
               <div className="flex-1">
                 <span className="font-sans text-sm text-ink">{perfil.direccion_renaper}</span>
-                <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                   Domicilio (RENAPER)
                 </div>
               </div>
@@ -346,7 +346,7 @@ export function IdentidadSection({
 
       {/* Apodo (siempre editable) */}
       <div className="mb-2">
-        <label className="block font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
+        <label className="block font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
           Apodo (opcional)
         </label>
         <div className="flex gap-2">
@@ -435,14 +435,14 @@ export function PerfilSection({
         <div>
           <div className="font-sans font-bold text-[17px] text-ink">{fullName}</div>
           {memberSince && (
-            <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
               {memberSince}
             </div>
           )}
           {/* Badge Google (siempre OAuth) */}
           <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border hairline px-2 py-0.5">
             <GoogleIcon size={12} />
-            <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
               Google
             </span>
           </div>
@@ -454,7 +454,7 @@ export function PerfilSection({
         <div className="flex items-center gap-3 px-4 py-3">
           <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="font-sans text-sm text-ink flex-1 min-w-0 truncate">{perfil.email}</span>
-          <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+          <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
             <Lock className="h-2.5 w-2.5" /> Verificado
           </span>
         </div>
@@ -462,7 +462,7 @@ export function PerfilSection({
           <div className="flex items-center gap-3 px-4 py-3">
             <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="font-sans text-sm text-ink flex-1">{perfil.telefono}</span>
-            <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
               <Lock className="h-2.5 w-2.5" /> Verificado
             </span>
           </div>
@@ -494,7 +494,7 @@ export function PerfilSection({
           <div className="font-sans font-extrabold text-[26px] text-ink leading-none tabular-nums">
             {pedidosCount}
           </div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
+          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
             Pedidos
           </div>
         </div>
@@ -502,7 +502,7 @@ export function PerfilSection({
           <div className="font-sans font-extrabold text-[22px] text-ink leading-none tabular-nums">
             {formatARS(totalAlquilado)}
           </div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
+          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
             Total alquilado
           </div>
         </div>

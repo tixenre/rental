@@ -714,14 +714,14 @@ function EquiposPage() {
                 </TableCell>
                 <TableCell>
                   {eq.marca && (
-                    <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-semibold leading-none mb-0.5">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-semibold leading-none mb-0.5">
                       {eq.marca}
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 font-medium text-ink leading-tight">
                     <span>{eq.nombre}</span>
                     {esNuevo(eq) && (
-                      <span className="text-[9px] font-bold uppercase tracking-wide bg-ink text-amber px-1.5 py-0.5 rounded shrink-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wide bg-ink text-amber px-1.5 py-0.5 rounded shrink-0">
                         Nuevo
                       </span>
                     )}
@@ -745,11 +745,11 @@ function EquiposPage() {
                 </TableCell>
                 <TableCell>
                   {eq.visible_catalogo ? (
-                    <span className="inline-flex items-center rounded-full bg-verde/15 text-verde px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em]">
+                    <span className="inline-flex items-center rounded-full bg-verde/15 text-verde px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.1em]">
                       Visible
                     </span>
                   ) : (
-                    <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em]">
+                    <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.1em]">
                       Oculto
                     </span>
                   )}

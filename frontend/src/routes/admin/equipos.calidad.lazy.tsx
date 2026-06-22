@@ -265,7 +265,7 @@ function CalidadView({ data }: { data: CalidadInventario }) {
                         <span className="font-display text-base tabular text-ink">{n}</span>{" "}
                         <span className="text-muted-foreground">{label}</span>
                       </div>
-                      <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                      <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                         {pct}% del inventario
                       </div>
                     </div>

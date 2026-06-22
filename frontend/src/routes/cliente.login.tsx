@@ -80,7 +80,7 @@ function ClienteLoginPage() {
             Entrar con Google
           </button>
 
-          <div className="flex items-center gap-3 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground before:content-[''] before:flex-1 before:h-px before:bg-[var(--hairline)] after:content-[''] after:flex-1 after:h-px after:bg-[var(--hairline)]">
+          <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground before:content-[''] before:flex-1 before:h-px before:bg-[var(--hairline)] after:content-[''] after:flex-1 after:h-px after:bg-[var(--hairline)]">
             o
           </div>
 

@@ -545,7 +545,7 @@ function Index() {
                     {cat}
                     <span
                       className={cn(
-                        "font-mono text-[9px] tracking-[0.1em] tabular",
+                        "font-mono text-[10px] tracking-[0.1em] tabular",
                         isActive ? "text-ink/70" : "text-muted-foreground",
                       )}
                     >
@@ -639,7 +639,7 @@ function Index() {
             scrollear). */}
       {mode === "list" && (
         <div className="hidden sm:flex items-center gap-2 px-6 py-2 border-b hairline bg-background overflow-x-auto scrollbar-none">
-          <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground shrink-0">
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground shrink-0">
             Populares:
           </span>
           {POPULAR_CHIPS.map((chip) => (

@@ -173,7 +173,7 @@ function EquipoRow({
       <div className="flex-1 min-w-0">
         <div className="truncate text-ink">{equipo.nombre}</div>
         {equipo.marca && (
-          <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground truncate">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground truncate">
             {equipo.marca}
           </div>
         )}
