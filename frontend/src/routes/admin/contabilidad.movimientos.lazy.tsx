@@ -266,7 +266,7 @@ function MovimientoRow({
             <button
               type="button"
               onClick={() => onBeneficiario(mov.beneficiario!)}
-              className="text-[11px] text-amber hover:underline"
+              className="text-[11px] text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
               title="Ver el historial de este beneficiario"
             >
               {mov.beneficiario}
@@ -282,7 +282,7 @@ function MovimientoRow({
             href={mov.comprobante_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] text-amber hover:underline"
+            className="text-[11px] text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
           >
             Ver comprobante
           </a>
@@ -324,7 +324,10 @@ function CobroRow({ cobro }: { cobro: CobroMensual }) {
         <span className="capitalize text-ink">Cobro alquileres · {mesLabel(cobro.mes)}</span>
         <div className="text-[11px] text-muted-foreground">
           {cobro.cantidad} pago(s) ·{" "}
-          <Link to="/admin/pagos" className="text-amber hover:underline">
+          <Link
+            to="/admin/pagos"
+            className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+          >
             ver detalle
           </Link>
         </div>
