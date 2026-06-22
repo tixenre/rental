@@ -11,16 +11,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, ClipboardPaste } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 import type { SpecTablaColumna } from "@/lib/admin/api";
 
 /** Para columnas tipo `valor_unidad`, cada celda guarda un objeto con
@@ -203,7 +203,7 @@ export function TablaValueInput({
       {/* Header. Si valor_unidad tiene UNA sola unidad fija (definida en la
           spec), la pegamos al label como sufijo y la celda solo pide número. */}
       <div
-        className="grid gap-1.5 px-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground"
+        className="grid gap-1.5 px-1 text-2xs font-mono uppercase tracking-wider text-muted-foreground"
         style={{ gridTemplateColumns: gridTemplate }}
       >
         {columnas.map((c, i) => {
@@ -220,7 +220,7 @@ export function TablaValueInput({
                   {fixedUnit ? <span className="opacity-60"> · {fixedUnit}</span> : null}
                 </div>
                 {showSubHeaders && (
-                  <div className="grid grid-cols-2 gap-1 normal-case text-[9px] tracking-normal opacity-70">
+                  <div className="grid grid-cols-2 gap-1 normal-case text-2xs tracking-normal opacity-70">
                     <span>número</span>
                     <span>unidad</span>
                   </div>
@@ -312,7 +312,7 @@ function PasteCsvSection({
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled}
-        className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-ink disabled:opacity-40"
+        className="inline-flex items-center gap-1 text-2xs font-mono uppercase tracking-wider text-muted-foreground hover:text-ink disabled:opacity-40"
       >
         <ClipboardPaste className="h-3 w-3" />
         Pegar CSV
@@ -322,13 +322,13 @@ function PasteCsvSection({
   return (
     <div className="rounded-md border hairline bg-muted/10 p-2 space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+        <span className="text-2xs font-mono uppercase tracking-wider text-muted-foreground">
           Pegar CSV ({colsExample})
         </span>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-[10px] text-muted-foreground hover:text-ink"
+          className="text-2xs text-muted-foreground hover:text-ink"
         >
           cerrar
         </button>
@@ -349,7 +349,7 @@ function PasteCsvSection({
           variant="outline"
           onClick={() => setText("")}
           disabled={!text || disabled}
-          className="h-6 px-2 text-[10px]"
+          className="h-6 px-2 text-2xs"
         >
           Limpiar
         </Button>
@@ -363,7 +363,7 @@ function PasteCsvSection({
             }
           }}
           disabled={!text.trim() || disabled}
-          className="h-6 px-2 text-[10px]"
+          className="h-6 px-2 text-2xs"
         >
           Agregar filas
         </Button>

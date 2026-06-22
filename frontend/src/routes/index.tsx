@@ -91,11 +91,11 @@ function LandingHub() {
               />
             )}
             <div className="relative">
-              <p className="font-mono text-[0.625rem] tracking-[0.28em] uppercase mb-5 text-white/65">
+              <p className="font-mono text-[0.625rem] tracking-[0.28em] uppercase mb-5 text-ink">
                 El Estudio
               </p>
               <h2
-                className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-white mb-4"
+                className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink mb-4"
                 style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
               >
                 estudio.
@@ -106,7 +106,7 @@ function LandingHub() {
                   pasan cosas.
                 </span>
               </h2>
-              <p className="text-white/70 text-sm mb-7 leading-relaxed max-w-xs">
+              <p className="text-ink text-sm mb-7 leading-relaxed max-w-xs">
                 Set con fondo infinito, ciclorama y luz natural. Por hora.
               </p>
               <span className="inline-flex items-center gap-2 w-fit rounded-full bg-white text-ink px-5 py-2.5 text-sm font-bold tracking-[-0.01em] transition-[gap] duration-150 group-hover:gap-3.5">

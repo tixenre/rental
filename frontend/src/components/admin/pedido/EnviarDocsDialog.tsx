@@ -9,11 +9,11 @@ import type { LucideIcon } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Textarea } from "@/design-system/ui/textarea";
+import { Checkbox } from "@/design-system/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -21,14 +21,14 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from "@/design-system/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 import { adminApi } from "@/lib/admin/api";
 
 // Plantillas de mail elegibles desde el modal. `simple` (sentinela; Radix no
@@ -212,9 +212,7 @@ export function EnviarDocsDialog({
 
             {preview && (
               <div className="space-y-1 rounded-md border hairline bg-muted/20 p-2">
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Asunto
-                </div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Asunto</div>
                 <div className="break-words text-sm font-medium text-ink">{preview.subject}</div>
                 <iframe
                   srcDoc={preview.html}

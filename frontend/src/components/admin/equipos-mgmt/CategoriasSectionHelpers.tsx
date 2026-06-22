@@ -23,8 +23,8 @@ import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 import { EquiposCountToggle, EquiposPanel } from "./EquiposEnCategoriaList";
 
 export type RowItem = {
@@ -243,7 +243,7 @@ export function SortableRootItem({
                 />
               ))}
               {children.length === 0 && (
-                <li className="px-3 py-3 text-[11px] text-muted-foreground/60 italic">
+                <li className="px-3 py-3 text-xs text-muted-foreground/60 italic">
                   Sin subcategorías. Arrastrá una de otra raíz acá, o creá nueva con el +.
                 </li>
               )}

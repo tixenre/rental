@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { XIcon, ChevronLeft, ChevronRight } from "lucide-react";
-import { ModalBackdrop } from "@/components/ui/modal-backdrop";
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 
 interface LightboxPhoto {
   url: string;

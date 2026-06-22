@@ -13,15 +13,15 @@ import { cn } from "@/lib/utils";
 export type PillTone = "success" | "warning" | "danger" | "info" | "neutral";
 
 const TONE: Record<PillTone, string> = {
-  success: "bg-verde/10 text-verde border-verde/30",
+  success: "bg-verde/10 text-verde-ink border-verde/30",
   warning: "bg-amber/15 text-ink border-amber/40",
   danger: "bg-destructive/10 text-destructive border-destructive/30",
-  info: "bg-azul/10 text-azul border-azul/30",
+  info: "bg-azul/10 text-azul-ink border-azul/30",
   neutral: "bg-muted text-muted-foreground border-transparent",
 };
 
 const BASE =
-  "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-medium";
+  "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-2xs font-medium";
 
 export function Pill({
   tone,

@@ -2,10 +2,10 @@ import { useRef, useState } from "react";
 import { Upload, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Textarea } from "@/design-system/ui/textarea";
 import { apiUploadComprobante, apiCrearInscripcion, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 
@@ -128,7 +128,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
             ? "bg-rosa/15 text-rosa"
             : cuposDisponibles <= 3
               ? "bg-rosa/10 text-rosa"
-              : "bg-verde/10 text-verde"
+              : "bg-verde/10 text-verde-ink"
         }`}
       >
         {enListaActual

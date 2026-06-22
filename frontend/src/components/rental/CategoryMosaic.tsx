@@ -20,7 +20,7 @@ export function CategoryMosaic({
     <section className="pt-4 pb-6 lg:pt-5 lg:pb-8">
       <div className="mb-4 flex items-end justify-between px-6 lg:px-12">
         <div className="flex flex-col leading-none">
-          <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+          <span className="font-mono text-2xs uppercase tracking-[0.3em] text-muted-foreground">
             buscá por
           </span>
           <span className="mt-1.5 font-display text-2xl leading-[0.9]">categorías</span>
@@ -107,7 +107,7 @@ function CategoryScrollRow({
             </span>
             <div className="flex w-full items-baseline justify-between gap-1">
               <span className="font-display text-[0.9rem] leading-tight text-ink">{c}</span>
-              <span className="font-mono text-[10px] tabular text-muted-foreground shrink-0">
+              <span className="font-mono text-2xs tabular text-muted-foreground shrink-0">
                 {count}
               </span>
             </div>

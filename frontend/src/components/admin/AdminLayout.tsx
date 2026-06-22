@@ -11,7 +11,7 @@ import { Menu } from "lucide-react";
 
 import { authedFetch } from "@/lib/authedFetch";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/design-system/ui/sidebar";
 
 type Session = { email?: string; name?: string; is_admin?: boolean };
 

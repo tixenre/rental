@@ -9,6 +9,7 @@
 import { authedJson, authedPostJson, authedFetch, AuthedHttpError } from "./authedFetch";
 import { toLocalISO } from "./rental-dates";
 import { trackSolicitarPedido } from "./analytics";
+import { useCart } from "./cart-store";
 
 /** El backend rechazó el pedido por falta de verificación de identidad (403).
  *  Las bocas la cazan para mostrar el panel de verificación en vez de un toast genérico. */
@@ -169,6 +170,8 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
       cantidad: it.qty,
       precio_jornada: Math.round(it.pricePerDay),
     })),
+    // session_id del carrito (#280 Fase 1): cierra el funnel de conversión
+    session_id: useCart.getState().sessionId,
   };
 
   let created: Record<string, unknown>;

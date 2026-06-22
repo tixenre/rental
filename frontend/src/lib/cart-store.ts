@@ -16,6 +16,9 @@ type CartState = {
   endTime: string;
   drawerOpen: boolean;
   drawerPlacement: DrawerPlacement;
+  /** UUID v4 generado una sola vez y persistido; identifica la sesión de carrito
+   *  en el backend para el tracking de carritos activos (#280 Fase 1). */
+  sessionId: string;
   add: (id: string) => void;
   remove: (id: string) => void;
   setQty: (id: string, qty: number) => void;
@@ -38,6 +41,7 @@ export const useCart = create<CartState>()(
       endTime: "09:00",
       drawerOpen: false,
       drawerPlacement: "right" as DrawerPlacement,
+      sessionId: crypto.randomUUID(),
       add: (id) => {
         trackAddToCart(id);
         // Click-through de búsqueda: si el usuario venía de buscar, este agregado
@@ -95,6 +99,7 @@ export const useCart = create<CartState>()(
         endDate: state.endDate,
         startTime: state.startTime,
         endTime: state.endTime,
+        sessionId: state.sessionId,
       }),
       // Descarta fechas vencidas al rehidratar: si startDate quedó guardada en
       // el pasado (visita anterior al lanzamiento, o carrito olvidado), el

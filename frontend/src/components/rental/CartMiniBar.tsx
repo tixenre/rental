@@ -70,7 +70,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
           aria-hidden="true"
         >
           <div className="mx-auto max-w-7xl px-4 py-2 lg:px-12">
-            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
               En tu rental ({count} {count === 1 ? "ítem" : "ítems"})
             </div>
             <div className="max-h-[240px] overflow-y-auto">
@@ -91,7 +91,7 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
           >
             <ShoppingBag className="h-4 w-4" />
             {!isEmpty && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber px-1 text-[10px] font-bold tabular text-ink">
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber px-1 text-2xs font-bold tabular text-ink">
                 {count}
               </span>
             )}
@@ -100,14 +100,14 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
             <div className="text-sm font-semibold">
               {isEmpty ? "Carrito vacío" : `${count} ${count === 1 ? "ítem" : "ítems"}`}
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               {isEmpty ? "Sumá equipos" : `${days} ${days === 1 ? "jornada" : "jornadas"}`}
             </div>
           </div>
         </div>
 
         <div className="ml-auto text-right leading-tight">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             {hayFechas ? "Total" : "/ jornada"}
           </div>
           <div className="text-base font-semibold tabular sm:text-lg">
@@ -145,22 +145,22 @@ function CartPreviewRow({ equipo, qty, days }: { equipo: Equipment; qty: number;
           <EmptyImage category={equipo.category} brand={equipo.brand} />
         )}
         {qty > 1 && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[9px] text-amber">
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-ink px-1 font-mono text-3xs text-amber">
             ×{qty}
           </span>
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.18em] text-muted-foreground">
           {equipo.brand}
         </div>
-        <div className="truncate text-[13px] leading-tight text-ink">{equipo.name}</div>
+        <div className="truncate text-sm leading-tight text-ink">{equipo.name}</div>
       </div>
       <div className="shrink-0 text-right">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
           {days > 1 ? `${days} j · total` : "/ jornada"}
         </div>
-        <div className="font-mono text-[12px] tabular text-ink">{formatARS(periodTotal)}</div>
+        <div className="font-mono text-xs tabular text-ink">{formatARS(periodTotal)}</div>
       </div>
     </div>
   );

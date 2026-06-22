@@ -46,15 +46,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Button } from "@/design-system/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/design-system/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,17 +64,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+} from "@/design-system/ui/dropdown-menu";
 import { adminApi, type MarcaAdmin } from "@/lib/admin/api";
-import { InlineSvg } from "@/components/ui/InlineSvg";
-import { isSvgUrl } from "@/components/ui/inline-svg-utils";
+import { InlineSvg } from "@/design-system/ui/InlineSvg";
+import { isSvgUrl } from "@/design-system/ui/inline-svg-utils";
 
 export function MarcasSection() {
   const qc = useQueryClient();
@@ -337,7 +337,7 @@ export function MarcasSection() {
                         }
                       }}
                       disabled={mergeMut.isPending}
-                      className="rounded-md border hairline bg-background px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-ink hover:bg-amber-soft transition disabled:opacity-50"
+                      className="rounded-md border hairline bg-background px-2 py-1 text-2xs font-mono uppercase tracking-wider text-ink hover:bg-amber-soft transition disabled:opacity-50"
                     >
                       Fusionar
                     </button>
@@ -353,7 +353,7 @@ export function MarcasSection() {
         <div className="space-y-4">
           {/* Destacadas con drag-drop */}
           <div className="space-y-1">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1">
+            <div className="text-2xs uppercase tracking-wider text-muted-foreground px-1">
               Destacadas — orden del carrusel
             </div>
             <DndContext
@@ -393,7 +393,7 @@ export function MarcasSection() {
           {/* Otras marcas (no destacadas) */}
           {otrasShown.length > 0 && (
             <div className="space-y-1">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1">
+              <div className="text-2xs uppercase tracking-wider text-muted-foreground px-1">
                 Otras marcas — no aparecen en el carrusel
               </div>
               <div className="border hairline rounded-md divide-y divide-muted/40">
@@ -536,7 +536,7 @@ function MarcaAvatar({ marca }: { marca: MarcaAdmin }) {
   }
   const initial = marca.nombre.trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className="h-8 w-8 rounded grid place-items-center bg-muted text-[11px] font-medium text-muted-foreground shrink-0">
+    <div className="h-8 w-8 rounded grid place-items-center bg-muted text-xs font-medium text-muted-foreground shrink-0">
       {initial}
     </div>
   );
@@ -585,7 +585,7 @@ function SortableMarcaRow(props: RowProps) {
 
       <div className="flex-1 min-w-0">
         <div className="truncate text-sm text-ink">{marca.nombre}</div>
-        <div className="text-[10px] text-muted-foreground tabular-nums">
+        <div className="text-2xs text-muted-foreground tabular-nums">
           {marca.total} {marca.total === 1 ? "equipo" : "equipos"}
         </div>
       </div>

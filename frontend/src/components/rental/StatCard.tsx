@@ -15,7 +15,7 @@ export function StatCard({
 }) {
   return (
     <div className={cn("rounded-lg border border-hairline bg-surface px-4 py-3", className)}>
-      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </div>
       <div
@@ -27,7 +27,7 @@ export function StatCard({
       >
         {value}
       </div>
-      {meta && <div className="mt-1 font-mono text-[10px] text-muted-foreground">{meta}</div>}
+      {meta && <div className="mt-1 font-mono text-2xs text-muted-foreground">{meta}</div>}
     </div>
   );
 }

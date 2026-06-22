@@ -5,8 +5,8 @@
 > tiene que decidir un color, un tamaño tipográfico, un radio, una
 > animación o un texto — empezás acá.
 >
-> La fuente canónica del design system es este doc + `src/styles/` (tokens/tipografía/utilities/
-> fuentes; entry `src/ds-styles.css`) + `src/components/` (primitivos y piezas).
+> La fuente canónica del design system es este doc + `src/design-system/` (tokens/tipografía/utilities/
+> fuentes en `styles/`; entry `ds-styles.css`; primitivos en `ui/` y `kit/`).
 
 ---
 
@@ -87,7 +87,7 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
 
 ---
 
-## Tokens en `src/styles.css`
+## Tokens en `src/design-system/styles/`
 
 ### Colores (lo que hay hoy)
 
@@ -105,9 +105,10 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
 | `--muted-foreground`  | `oklch(0.42 0.01 70)`   | Secondary text, eyebrows               |
 | `--rosa`              | `#ED7BAD`               | Status palette                         |
 | `--azul`              | `#1097DB`               | Status palette (Presupuesto)           |
-| `--verde`             | `#009971`               | Status palette (Confirmado)            |
+| `--verde`             | `#009971`               | Status palette (Confirmado) — charts/montos/bandas |
+| `--verde-ink`         | `oklch(0.48 0.125 166.4)` | Texto de estado verde sobre tints (AA); NO el verde de marca |
 | `--naranja`           | `#E9552F`               | Status palette (Warning)               |
-| `--destructive`       | `oklch(0.62 0.22 27)`   | Errors, delete, Cancelado              |
+| `--destructive`       | `oklch(0.55 0.22 27)`   | Errors/delete/Cancelado — AA texto-sobre-claro y blanco-sobre-rojo (era 0.62, #971) |
 
 **Regla del color (single-accent discipline):** la página es \*\*bone + ink
 
@@ -115,6 +116,14 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
   status de pedido y gráficos — nunca en superficies de marketing.
 
 **Orden de gráficos** (siempre): amber → azul → naranja → verde → rosa.
+
+**Texto sobre tints de marca (AA):** un color de marca usado como TEXTO sobre su propio tint
+(`text-verde` sobre `bg-verde/10` ≈ 3.2:1, o blanco sobre el naranja del hub ≈ 2.4:1) suele
+fallar AA. El fix **no** es tocar el color de marca (rompe charts/montos/fondos), sino: (a) un
+**token de texto más oscuro**, mismo hue/chroma, menor L — `--verde-ink` (0.48), `--destructive`
+ya a 0.55 — aplicado al TEXTO dejando el tint; o (b) sobre fondo de marca sólido, texto **ink
+opaco** (no blanco translúcido). El verde de WhatsApp (`#25D366` + blanco) es **excepción
+tier-4 a propósito** (identidad de marca) — no se "arregla". Decisión: 2026-06-22.
 
 Las utilities Tailwind correspondientes (`bg-amber`, `text-ink`,
 `border-hairline`, `bg-rosa/10`, etc.) las genera Tailwind v4 directo de
@@ -239,6 +248,7 @@ de un componente):
 `--duration-xslow` matchea exactamente la `duration: 0.55` del
 FlyToCartLayer. `--ease-default` es el del CartDrawer Framer Motion.
 `--ease-bounce` es la signature del badge pop al sumar al carrito.
+`--duration-xslow` también lo usa el `<Spinner>` para su velocidad de rotación.
 
 Uso opt-in:
 
@@ -285,21 +295,39 @@ Defined as utility classes en `src/styles.css`:
 .grain         /* dot-grain texture overlay ~40% opacity */
 ```
 
+## Hit-area / tap targets (≥44px, HIG)
+
+Utilidades canónicas en `src/design-system/styles/utilities.css` para llevar el área **tocable** a 44px
+**sin agrandar el visual** (generalizan el `::before` que vivía en StepperPill — fuente única):
+
+```
+.hit-area-44      /* ::before transparente 44×44 centrado — botones-ícono aislados */
+.hit-area-inline  /* ::before que extiende SÓLO el alto a 44px — links/chips de texto en fila */
+```
+
+- **Gotcha (importante):** el `::before` se **solapa entre vecinos** en `flex-wrap` o filas
+  apiladas (dos hit-areas de 44px con gap chico → zona de click ambigua). Ahí **NO** uses el
+  `::before`: usá **`min-h-11`** (agranda la caja, sin solape), gateado a mobile si en desktop
+  hay mouse — ej. `min-h-11 md:min-h-0` para el sidebar admin (Sheet táctil en mobile / fijo en
+  desktop) o las celdas del calendario.
+- El elemento debe ser `position:relative` (las clases lo setean). **OJO** con elementos ya
+  `absolute`: forzar `relative` los rompe → ahí poné el `before:` inline directo (no la clase).
+
 ---
 
 ## Componentes — ubicaciones canónicas
 
 | Categoría                                          | Dónde vive                | Notas                                                                                                                                  |
 | -------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/components/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
+| **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
 | **Componentes de aplicación (`rental/`)**          | `src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar integrados con queries + estado.                                                            |
 | **Componentes admin**                              | `src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
-| **Kit portátil ports**                             | `src/components/kit/*`    | Versiones presentacionales del kit, con paleta de marca. Adoptadas piecewise (issue #575). EstadoBadge ya es la única fuente del repo. |
+| **Kit portátil ports**                             | `src/design-system/kit/*`    | Versiones presentacionales del kit, con paleta de marca. Adoptadas piecewise (issue #575). EstadoBadge ya es la única fuente del repo. |
 
-### Button (`src/components/ui/button.tsx`)
+### Button (`src/design-system/ui/button.tsx`)
 
 ```tsx
-import { Button } from "@/components/ui/button";
+import { Button } from "@/design-system/ui/button";
 
 // variants: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "primary" | "amber"
 // sizes:    "default" (h-9) | "sm" (h-8) | "lg" (h-10) | "icon" (h-9 w-9)
@@ -319,7 +347,7 @@ import { Button } from "@/components/ui/button";
 
 ### EstadoBadge
 
-**Fuente única**: `src/components/kit/EstadoBadge.tsx`, con la paleta
+**Fuente única**: `src/design-system/kit/EstadoBadge.tsx`, con la paleta
 secundaria oficial de marca (`bg-azul/10`, `bg-verde/10`, …).
 
 Usado por `/cliente/portal` (PR E1) **y por el admin** (`/admin/pedidos`
@@ -337,7 +365,7 @@ de pedido).
 
 ### PagoBadge
 
-**Fuente única**: `src/components/kit/PagoBadge.tsx`. Hermano de `EstadoBadge`:
+**Fuente única**: `src/design-system/kit/PagoBadge.tsx`. Hermano de `EstadoBadge`:
 mientras ese muestra el **estado del pedido**, este muestra la **cobranza con el
 monto** — `Pagado` (verde) · `Debe $X` (rojo si urgente = retirado/entregado,
 ámbar si no) · `Seña $X` (cotización con seña). Idea tomada de cómo Booqable hace
@@ -349,14 +377,37 @@ inline, usar este chip.
 
 ### ClienteAvatar
 
-**Fuente única**: `src/components/kit/ClienteAvatar.tsx`. Círculo con iniciales y
+**Fuente única**: `src/design-system/kit/ClienteAvatar.tsx`. Círculo con iniciales y
 color **determinístico por nombre** (hash sobre paleta acotada de tokens, todos
 con buen contraste) → el mismo nombre siempre cae en el mismo color, para
 reconocimiento visual rápido en listas/headers (idea de Booqable). Tamaño/typo por
 `className`. Reusable en admin y portal. No crear avatares ad-hoc con `bg-ink`
 inline.
 
-### Otros componentes del kit (`src/components/kit/`)
+### Spinner / loading (`src/design-system/ui/spinner.tsx`)
+
+Primitivo canónico de carga. Consolida los 34 `<Loader2 className="animate-spin …" />` del repo.
+
+```tsx
+import { Spinner } from "@/design-system/ui/spinner";
+
+<Spinner />            // md (20px) por default
+<Spinner size="sm" /> // 16px — para usar dentro de Button
+<Spinner size="lg" /> // 24px — para estados de página completa
+```
+
+Velocidad: usa `--duration-xslow` (550ms/vuelta). El `Button` acepta `loading={true}` para
+mostrar el Spinner automáticamente y deshabilitar el botón hasta que la acción termine:
+
+```tsx
+import { Button } from "@/design-system/ui/button";
+
+<Button loading={isPending}>Guardar</Button>
+```
+
+No crear spinners con `Loader2` suelto — siempre `<Spinner>`.
+
+### Otros componentes del kit (`src/design-system/kit/`)
 
 Versiones presentacionales del kit ya disponibles para adopción
 piecewise (PR #577 las trajo a producción):
@@ -373,7 +424,7 @@ piecewise (PR #577 las trajo a producción):
 > + monto**, alto contraste y jerarquía clara. Es el patrón a reproducir en el
 > resto de la web cuando se listan entidades con estado + plata.
 
-La ruta pública `/kit-preview` (sin login, `noindex`) los muestra todos
+La ruta `/kit-preview` (admin-only, sin indexar) los muestra todos
 para QA visual antes de adoptarlos en una pantalla concreta.
 
 ### TopBar — navegación modular por área (`src/components/rental/TopBar.tsx`)

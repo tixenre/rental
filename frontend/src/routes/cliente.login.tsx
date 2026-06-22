@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GoogleIcon } from "@/components/ui/GoogleIcon";
+import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { useEffect, useState } from "react";
 import { TopBar } from "@/components/rental/TopBar";
 import { useBusinessPhone } from "@/lib/business";
@@ -54,13 +54,14 @@ function ClienteLoginPage() {
       <div className="flex-1 grid place-items-center px-6 py-8">
         <div className="w-full max-w-[400px] rounded-[20px] border hairline bg-surface p-8 sm:px-8 sm:py-9 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.08)] flex flex-col gap-[22px]">
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.26em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.26em] text-muted-foreground">
               Portal de clientes
             </div>
+            {/* eslint-disable-next-line no-restricted-syntax -- display heading: entre text-3xl (30px) y text-4xl (36px), óptico */}
             <h1 className="font-display text-[32px] font-black text-ink leading-none tracking-[-0.015em] mt-1.5">
               Acceso
             </h1>
-            <p className="font-sans text-[13px] text-muted-foreground leading-[1.55] mt-1.5">
+            <p className="font-sans text-sm text-muted-foreground leading-[1.55] mt-1.5">
               Ingresá con la cuenta de Google con la que hiciste tu reserva para ver tus pedidos,
               descargar remitos y consultar pagos.
             </p>
@@ -80,7 +81,7 @@ function ClienteLoginPage() {
             Entrar con Google
           </button>
 
-          <div className="flex items-center gap-3 font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground before:content-[''] before:flex-1 before:h-px before:bg-[var(--hairline)] after:content-[''] after:flex-1 after:h-px after:bg-[var(--hairline)]">
+          <div className="flex items-center gap-3 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground before:content-[''] before:flex-1 before:h-px before:bg-[var(--hairline)] after:content-[''] after:flex-1 after:h-px after:bg-[var(--hairline)]">
             o
           </div>
 

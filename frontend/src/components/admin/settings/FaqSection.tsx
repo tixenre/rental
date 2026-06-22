@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 
 import { adminApi } from "@/lib/admin/api";
 import { FAQ_GROUPS, parseFaq, type FaqGroup } from "@/data/faq";

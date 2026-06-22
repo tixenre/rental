@@ -10,6 +10,16 @@
   --font-sans: "TT Commons", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
+  /* Extensión de la escala de texto (debajo de text-xs = 12px).
+     text-2xs = 10px  → reemplaza text-[10px] (patrón más frecuente del codebase)
+     text-3xs = 9px   → reemplaza text-[9px]  (micro-labels: counts, badges)
+     Sin token para 11px → usa text-xs (12px, 1px imperceptible a toda DPI).
+     Sin token para 13px → usa text-sm (14px, 1px imperceptible a toda DPI). */
+  --text-2xs: 0.625rem;    /* 10px */
+  --text-3xs: 0.5625rem;   /* 9px  */
+  --text-15: 0.9375rem;    /* 15px — product names, CTAs (entre text-sm y text-base) */
+  --text-22: 1.375rem;     /* 22px — display headings (entre text-xl y text-2xl) */
+
   --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 12px;

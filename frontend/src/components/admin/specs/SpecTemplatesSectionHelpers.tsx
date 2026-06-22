@@ -6,21 +6,21 @@
 import React, { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GripVertical, Pencil, Trash2, X } from "lucide-react";
-import { ModalBackdrop } from "@/components/ui/modal-backdrop";
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { toast } from "sonner";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 
 import {
   adminApi,
@@ -63,7 +63,7 @@ export function OrphansPanel({
           <li key={o.spec_key} className="flex items-center gap-3 px-3 py-2 text-sm">
             <div className="flex-1 min-w-0">
               <div className="font-mono text-xs text-ink">{o.spec_key}</div>
-              <div className="text-[11px] text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 {o.count_equipos} {o.count_equipos === 1 ? "equipo" : "equipos"} · ejemplos:{" "}
                 {o.sample_values
                   .slice(0, 3)
@@ -77,7 +77,7 @@ export function OrphansPanel({
           </li>
         ))}
       </ul>
-      <p className="px-3 py-2 text-[10px] text-muted-foreground bg-amber-soft/50">
+      <p className="px-3 py-2 text-2xs text-muted-foreground bg-amber-soft/50">
         Estos specs vinieron del autocompletar o de cargas anteriores y quedaron como "custom" en
         cada equipo. Si querés que aparezcan formateados en todos los equipos de esta categoría,
         agregalos al template con el tipo y unidad correctos.
@@ -158,9 +158,7 @@ export function SortableSpecRow({
 
       <div className="min-w-0">
         <div className="truncate text-ink">{template.label}</div>
-        <div className="font-mono text-[10px] text-muted-foreground truncate">
-          {template.spec_key}
-        </div>
+        <div className="font-mono text-2xs text-muted-foreground truncate">{template.spec_key}</div>
       </div>
 
       <div className="text-xs min-w-0">
@@ -173,13 +171,13 @@ export function SortableSpecRow({
           ? ` · ${template.unidad}`
           : ""}
         {template.tipo === "enum" && template.enum_options ? (
-          <div className="text-[10px] text-muted-foreground truncate">
+          <div className="text-2xs text-muted-foreground truncate">
             {template.enum_options.join(", ")}
           </div>
         ) : null}
       </div>
 
-      <div className="hidden md:flex flex-wrap gap-1 text-[10px] min-w-0">
+      <div className="hidden md:flex flex-wrap gap-1 text-2xs min-w-0">
         {template.destacado && <Badge tone="amber">★ ficha destacada</Badge>}
       </div>
       <div className="md:hidden" aria-hidden />
@@ -377,7 +375,7 @@ export function SpecTemplateFormModal({
             <div className="font-display text-base text-ink">
               {isNew ? "Asignar spec a categoría" : "Editar asignación"}
             </div>
-            <div className="text-[11px] text-muted-foreground truncate">{categoriaPath}</div>
+            <div className="text-xs text-muted-foreground truncate">{categoriaPath}</div>
           </div>
           <button
             onClick={onClose}
@@ -390,14 +388,14 @@ export function SpecTemplateFormModal({
 
         <div className="p-4 space-y-3">
           {prefillKey && prefillSampleValues && prefillSampleValues.length > 0 && (
-            <div className="rounded-md border hairline border-amber/30 bg-amber-soft/30 px-3 py-2 text-[11px]">
+            <div className="rounded-md border hairline border-amber/30 bg-amber-soft/30 px-3 py-2 text-xs">
               <div className="font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
                 Sugerencia desde "{prefillKey}"
               </div>
               <div className="text-ink">
                 Valores en equipos: {prefillSampleValues.map((v) => `"${v}"`).join(", ")}
               </div>
-              <p className="text-muted-foreground mt-1 text-[10px]">
+              <p className="text-muted-foreground mt-1 text-2xs">
                 Buscá una spec del catálogo que matchee, o creala en Gear Compatibility si no
                 existe.
               </p>
@@ -416,7 +414,7 @@ export function SpecTemplateFormModal({
                   className="font-mono"
                   autoFocus
                 />
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-2xs text-muted-foreground mt-1">
                   Las specs validadas aparecen arriba. Si no encontrás la que buscás,{" "}
                   <a href="/admin/gear-compatibility" className="text-amber underline">
                     creala en Gear Compatibility →
@@ -425,10 +423,10 @@ export function SpecTemplateFormModal({
               </div>
               <div className="border hairline rounded-md max-h-64 overflow-y-auto divide-y hairline">
                 {defsQ.isLoading && (
-                  <div className="px-3 py-2 text-[11px] text-muted-foreground">Cargando…</div>
+                  <div className="px-3 py-2 text-xs text-muted-foreground">Cargando…</div>
                 )}
                 {!defsQ.isLoading && candidatas.length === 0 && (
-                  <div className="px-3 py-2 text-[11px] text-muted-foreground italic">
+                  <div className="px-3 py-2 text-xs text-muted-foreground italic">
                     {search
                       ? "Ninguna spec disponible matchea la búsqueda."
                       : "Todas las specs del catálogo ya están asignadas a esta categoría."}
@@ -447,10 +445,8 @@ export function SpecTemplateFormModal({
                     <div className="flex items-center gap-1.5">
                       {d.validado && <span className="text-verde">✓</span>}
                       <span className="text-ink font-medium">{d.label}</span>
-                      <span className="font-mono text-[9px] text-muted-foreground">
-                        {d.spec_key}
-                      </span>
-                      <span className="text-[9px] text-muted-foreground ml-auto">
+                      <span className="font-mono text-3xs text-muted-foreground">{d.spec_key}</span>
+                      <span className="text-3xs text-muted-foreground ml-auto">
                         {TIPO_LABEL[d.tipo]}
                         {d.unidad ? ` · ${d.unidad}` : ""}
                       </span>
@@ -466,30 +462,30 @@ export function SpecTemplateFormModal({
             <div className="rounded-md border hairline bg-muted/20 px-3 py-2 space-y-0.5">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-xs font-medium text-ink">{specInfo.label}</span>
-                <span className="font-mono text-[9px] text-muted-foreground">
+                <span className="font-mono text-3xs text-muted-foreground">
                   {specInfo.spec_key}
                 </span>
-                <span className="text-[9px] text-muted-foreground">
+                <span className="text-3xs text-muted-foreground">
                   · {TIPO_LABEL[specInfo.tipo]}
                   {specInfo.unidad ? ` · ${specInfo.unidad}` : ""}
                 </span>
                 {specInfo.es_compatibilidad && (
-                  <span className="text-[9px] bg-amber-soft/60 text-ink px-1 rounded">
+                  <span className="text-3xs bg-amber-soft/60 text-ink px-1 rounded">
                     compat {specInfo.compatibilidad_modo}
                   </span>
                 )}
               </div>
               {specInfo.tipo === "enum" || specInfo.tipo === "multi_enum" ? (
-                <div className="text-[10px] text-muted-foreground">
+                <div className="text-2xs text-muted-foreground">
                   Opciones: {(specInfo.enum_options ?? []).join(", ") || "—"}
                 </div>
               ) : null}
               {specInfo.ayuda && (
-                <div className="text-[10px] text-muted-foreground italic">{specInfo.ayuda}</div>
+                <div className="text-2xs text-muted-foreground italic">{specInfo.ayuda}</div>
               )}
               <a
                 href="/admin/gear-compatibility"
-                className="text-[10px] text-amber underline inline-block"
+                className="text-2xs text-amber underline inline-block"
               >
                 Editar la definición global →
               </a>
@@ -539,7 +535,7 @@ export function SpecTemplateFormModal({
                       <SelectItem value="contenido">Contenido (recibe — ej. sensor)</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-[10px] text-muted-foreground mt-1">
+                  <p className="text-2xs text-muted-foreground mt-1">
                     El modo jerárquico de la spec global decide; acá solo definís cómo participa
                     esta categoría.
                   </p>

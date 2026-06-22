@@ -12,8 +12,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -21,8 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
+} from "@/design-system/ui/dialog";
+import { Checkbox } from "@/design-system/ui/checkbox";
 import { adminApi } from "@/lib/admin/api";
 
 export function AddEquiposToCategoriaDialog({
@@ -149,7 +149,7 @@ export function AddEquiposToCategoriaDialog({
                     />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm text-ink">{e.nombre}</div>
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-2xs text-muted-foreground">
                         {[e.marca, e.modelo].filter(Boolean).join(" · ") || "—"}
                         {isIn && (
                           <span className="ml-2 text-ink/70">· ya está en esta categoría</span>

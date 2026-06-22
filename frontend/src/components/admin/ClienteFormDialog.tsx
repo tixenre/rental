@@ -12,17 +12,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@/design-system/ui/dialog";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 
 import { adminApi, type Cliente, type ClienteInput } from "@/lib/admin/api";
 
@@ -203,7 +203,7 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
                         (f as { wide?: boolean }).wide ? "col-span-2 space-y-1" : "space-y-1"
                       }
                     >
-                      <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                         {f.label}
                       </div>
                       <div className="rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5 text-xs text-ink font-mono select-all">

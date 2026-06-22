@@ -19,10 +19,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Badge } from "@/design-system/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +32,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 import { adminApi, pedidoPdfUrl, type PedidoHistorialItem } from "@/lib/admin/api";
@@ -89,7 +89,7 @@ export function ItemsCard({
 
       {/* Column headers */}
       {items.length > 0 && (
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2 border-b hairline bg-muted/20 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2 border-b hairline bg-muted/20 text-2xs uppercase tracking-wide text-muted-foreground">
           <span>Producto</span>
           <span className="text-right w-20">Disponible</span>
           <span className="text-right w-16">Cantidad</span>
@@ -127,7 +127,7 @@ export function ItemsCard({
                     {stock && (
                       <span
                         className={cn(
-                          "ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-[10px]",
+                          "ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-2xs",
                           disponible <= 0
                             ? "bg-destructive/10 text-destructive"
                             : "bg-muted text-muted-foreground",
@@ -142,7 +142,7 @@ export function ItemsCard({
                   <div className="text-sm tabular-nums font-medium text-ink">
                     {fmtArs(subtotal)}
                   </div>
-                  <div className="text-[11px] text-muted-foreground">{jornadas}j</div>
+                  <div className="text-xs text-muted-foreground">{jornadas}j</div>
                 </div>
                 <button
                   type="button"
@@ -204,7 +204,7 @@ export function ItemsCard({
                   <span className="text-xs text-muted-foreground whitespace-nowrap">/día</span>
                 </div>
                 {overstock && (
-                  <div className="ml-auto text-[11px] text-destructive flex items-center gap-1">
+                  <div className="ml-auto text-xs text-destructive flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" /> Excede stock ({max})
                   </div>
                 )}
@@ -398,7 +398,7 @@ export function PagosSidebar({
       <div
         className={cn(
           "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-          estadoPago === "pagado" ? "bg-verde/10 text-verde" : "bg-amber/15 text-ink",
+          estadoPago === "pagado" ? "bg-verde/10 text-verde-ink" : "bg-amber/15 text-ink",
         )}
       >
         {estadoPago === "pagado" ? "Pagado" : "Pago pendiente"}
@@ -599,18 +599,16 @@ export function HistorialModificaciones({ items }: { items: PedidoHistorialItem[
         return (
           <li key={h.id} className="rounded border hairline bg-card px-2.5 py-2">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge variant={HIST_ESTADO_VARIANT[h.estado]} className="text-[10px]">
+              <Badge variant={HIST_ESTADO_VARIANT[h.estado]} className="text-2xs">
                 {HIST_ESTADO_LABEL[h.estado]}
               </Badge>
               {isDirecto && (
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Auto
-                </span>
+                <span className="text-2xs uppercase tracking-wide text-muted-foreground">Auto</span>
               )}
               {overrideAplicado && (
-                <span className="text-[10px] text-amber">modificada al aprobar</span>
+                <span className="text-2xs text-amber">modificada al aprobar</span>
               )}
-              <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
+              <span className="ml-auto text-2xs text-muted-foreground tabular-nums">
                 {fmtFecha(h.created_at)}
               </span>
             </div>
@@ -641,7 +639,7 @@ export function HistorialModificaciones({ items }: { items: PedidoHistorialItem[
               </div>
             )}
             {h.resolved_by && h.resolved_at && (
-              <div className="text-[10px] text-muted-foreground mt-1">
+              <div className="text-2xs text-muted-foreground mt-1">
                 {h.resolved_by} · {fmtFecha(h.resolved_at)}
               </div>
             )}

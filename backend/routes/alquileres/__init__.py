@@ -15,6 +15,7 @@ from routes.alquileres.core import (
     ESTADOS_RESERVADO,
     # ── Endpoints consumidos como función ──
     create_pedido,
+    create_pedido_retry,
     propagar_descuento_a_presupuestos,
     # ── Helpers ──
     get_db,
@@ -67,7 +68,7 @@ __all__ = [
     "router",
     "CotizarItem", "CotizarRequest", "PedidoCreate", "PedidoDatos", "PedidoItem",
     "DESTINATARIOS_PAGO", "METODOS_PAGO", "ESTADOS_RESERVADO",
-    "cotizar", "create_pedido", "get_disponibilidad", "propagar_descuento_a_presupuestos",
+    "cotizar", "create_pedido", "create_pedido_retry", "get_disponibilidad", "propagar_descuento_a_presupuestos",
     "get_db",
     "_agrupar_items_por_categoria", "_apply_pedido_datos", "_apply_pedido_items",
     "_batch_get_alquiler_items", "_cuerpo_mail_simple", "_dispatch_pedido_creado_emails",

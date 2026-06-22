@@ -346,7 +346,7 @@ export default function ClientePortal() {
           {/* Saludo */}
           {perfil && (
             <div className="px-4 mb-5">
-              <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+              <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
                 Portal · cliente
               </div>
               <div className="font-sans text-sm font-semibold text-ink mt-0.5 truncate">
@@ -446,7 +446,7 @@ export default function ClientePortal() {
               {/* Favoritos */}
               {favEquipos.length > 0 && (
                 <section className="mb-8">
-                  <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-4">
+                  <h2 className="font-display text-22 font-black text-ink tracking-[-0.01em] mb-4">
                     Mis favoritos
                   </h2>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
@@ -459,11 +459,11 @@ export default function ClientePortal() {
 
               {/* Header pedidos */}
               <div className="flex items-baseline justify-between gap-3 mb-4">
-                <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em]">
+                <h2 className="font-display text-22 font-black text-ink tracking-[-0.01em]">
                   mis pedidos.
                 </h2>
                 {pedidos.length > 0 && (
-                  <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                  <span className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
                     {pedidos.length} {pedidos.length === 1 ? "pedido" : "pedidos"}
                   </span>
                 )}
@@ -478,13 +478,13 @@ export default function ClientePortal() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Buscar por número, equipo, marca…"
-                    className="w-full rounded-full border hairline bg-surface px-9 py-2.5 font-sans text-[13px] text-ink outline-none transition placeholder:text-muted-foreground hover:border-ink/30 focus:border-ink focus:bg-card"
+                    className="w-full rounded-full border hairline bg-surface px-9 py-2.5 font-sans text-sm text-ink outline-none transition placeholder:text-muted-foreground hover:border-ink/30 focus:border-ink focus:bg-card"
                   />
                   {query && (
                     <button
                       type="button"
                       onClick={() => setQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 grid h-[22px] w-[22px] place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 grid h-[22px] w-[22px] place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
                       aria-label="Limpiar búsqueda"
                     >
                       <XIcon className="h-3 w-3" />
@@ -504,7 +504,7 @@ export default function ClientePortal() {
                         type="button"
                         onClick={() => setTab(value)}
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 font-sans text-xs font-semibold transition",
+                          "hit-area-inline inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 font-sans text-xs font-semibold transition",
                           active
                             ? "bg-ink text-amber border-ink"
                             : "border-hairline text-muted-foreground hover:text-ink hover:border-ink",
@@ -513,7 +513,7 @@ export default function ClientePortal() {
                         {label}
                         <span
                           className={cn(
-                            "font-mono text-[9px] tabular-nums",
+                            "font-mono text-3xs tabular-nums",
                             active ? "opacity-85" : "opacity-60",
                           )}
                         >

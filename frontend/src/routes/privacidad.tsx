@@ -34,13 +34,13 @@ function PrivacidadPage() {
           <ArrowLeft className="h-3.5 w-3.5" /> Volver al catálogo
         </Link>
 
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Legal
         </div>
         <h1 className="font-display text-3xl md:text-4xl text-ink mt-1">Política de privacidad</h1>
         <p className="text-sm text-muted-foreground mt-2">Última actualización: {LAST_UPDATED}</p>
 
-        <article className="mt-8 space-y-6 text-[15px] leading-relaxed text-foreground/90">
+        <article className="mt-8 space-y-6 text-15 leading-relaxed text-foreground/90">
           {PRIVACY_SECTIONS.map((s) => (
             <section key={s.id} id={s.id}>
               <h2 className="font-display text-xl text-ink mb-2">{s.title}</h2>

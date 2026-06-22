@@ -7,8 +7,8 @@ import { useMemo, useState } from "react";
 import { Search, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 import { BottomSheet } from "@/components/mobile";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { fmtArs } from "@/lib/format";
@@ -100,7 +100,7 @@ export function EquipoSearchSheet({
           <section key={cat} className="mb-2">
             <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-2 flex items-center justify-between border-b hairline">
               <h4 className="font-display text-sm text-ink">{cat}</h4>
-              <span className="text-[11px] text-muted-foreground">{equipos.length}</span>
+              <span className="text-xs text-muted-foreground">{equipos.length}</span>
             </div>
             <ul className="divide-y hairline">
               {equipos.map((eq) => {

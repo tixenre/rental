@@ -31,9 +31,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/design-system/ui/dialog";
 
 import { adminApi } from "@/lib/admin/api";
 import { AddEquiposToCategoriaDialog } from "./AddEquiposToCategoriaDialog";

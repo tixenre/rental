@@ -26,6 +26,7 @@ import {
   BookOpen,
   Calculator,
   GraduationCap,
+  ShoppingCart,
 } from "lucide-react";
 
 import {
@@ -43,7 +44,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "@/design-system/ui/sidebar";
 import { authedFetch } from "@/lib/authedFetch";
 
 type SubItem = { title: string; url: string; icon?: typeof LayoutDashboard };
@@ -63,6 +64,7 @@ const items: NavItem[] = [
     exact: true,
   },
   { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
+  { title: "Carritos activos", url: "/admin/carritos", icon: ShoppingCart },
   {
     title: "Inventario",
     url: "/admin/equipos",
@@ -197,7 +199,7 @@ export function AdminSidebar({ email }: { email: string }) {
           {!collapsed && (
             <div className="min-w-0">
               <div className="font-display text-base leading-tight text-ink truncate">Rambla</div>
-              <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                 Back-office
               </div>
             </div>
@@ -208,7 +210,7 @@ export function AdminSidebar({ email }: { email: string }) {
       <SidebarContent>
         <SidebarGroup>
           {!collapsed && (
-            <SidebarGroupLabel className="font-mono text-[9px] uppercase tracking-[0.2em]">
+            <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.2em]">
               General
             </SidebarGroupLabel>
           )}
@@ -296,7 +298,7 @@ export function AdminSidebar({ email }: { email: string }) {
       <SidebarFooter className="border-t hairline">
         {!collapsed && email && (
           <div className="px-2 py-1.5 min-w-0">
-            <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Sesión
             </div>
             <div className="text-xs text-ink truncate" title={email}>

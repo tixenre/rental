@@ -18,9 +18,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Checkbox } from "@/design-system/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useUsdRate, calcularPrecioJornada } from "@/hooks/useSettings";
 import {
@@ -30,7 +30,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/design-system/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,14 +40,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 
 import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
 import { stashEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
@@ -313,7 +313,7 @@ function EquiposPage() {
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-7xl mx-auto">
       <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Back-office
           </div>
           <h1 className="font-display text-3xl text-ink">Equipos</h1>
@@ -321,7 +321,7 @@ function EquiposPage() {
             {equiposQ.isLoading ? "Cargando…" : `${total} equipos`}
           </p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5 md:justify-end">
           <Button
             variant="outline"
             onClick={() => setOpenDashboard(true)}
@@ -368,7 +368,7 @@ function EquiposPage() {
         />
       )}
 
-      <div className="flex flex-col md:flex-row gap-2">
+      <div className="flex flex-col md:flex-row md:flex-wrap gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -634,7 +634,7 @@ function EquiposPage() {
             )}
           >
             {label}
-            <span className="font-mono text-[10px] tabular-nums opacity-70">{tabCounts[id]}</span>
+            <span className="font-mono text-2xs tabular-nums opacity-70">{tabCounts[id]}</span>
           </button>
         ))}
       </div>
@@ -707,21 +707,21 @@ function EquiposPage() {
                       }}
                     />
                   ) : (
-                    <div className="h-10 w-10 rounded bg-muted/40 grid place-items-center text-[10px] text-muted-foreground">
+                    <div className="h-10 w-10 rounded bg-muted/40 grid place-items-center text-2xs text-muted-foreground">
                       —
                     </div>
                   )}
                 </TableCell>
                 <TableCell>
                   {eq.marca && (
-                    <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-semibold leading-none mb-0.5">
+                    <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground font-semibold leading-none mb-0.5">
                       {eq.marca}
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 font-medium text-ink leading-tight">
                     <span>{eq.nombre}</span>
                     {esNuevo(eq) && (
-                      <span className="text-[9px] font-bold uppercase tracking-wide bg-ink text-amber px-1.5 py-0.5 rounded shrink-0">
+                      <span className="text-2xs font-bold uppercase tracking-wide bg-ink text-amber px-1.5 py-0.5 rounded shrink-0">
                         Nuevo
                       </span>
                     )}
@@ -732,7 +732,7 @@ function EquiposPage() {
                     )}
                     {!eq.ficha_completa && (
                       <span
-                        className="text-[10px] text-amber bg-amber-soft/40 px-1 py-0.5 rounded shrink-0"
+                        className="text-2xs text-amber bg-amber-soft/40 px-1 py-0.5 rounded shrink-0"
                         title="Ficha pendiente — marcala como completa en el form cuando termines de cargarla"
                       >
                         pendiente
@@ -745,11 +745,11 @@ function EquiposPage() {
                 </TableCell>
                 <TableCell>
                   {eq.visible_catalogo ? (
-                    <span className="inline-flex items-center rounded-full bg-verde/15 text-verde px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em]">
+                    <span className="inline-flex items-center rounded-full bg-verde/15 text-verde px-2 py-0.5 font-mono text-2xs font-bold uppercase tracking-[0.1em]">
                       Visible
                     </span>
                   ) : (
-                    <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.1em]">
+                    <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 font-mono text-2xs font-bold uppercase tracking-[0.1em]">
                       Oculto
                     </span>
                   )}
@@ -777,13 +777,13 @@ function EquiposPage() {
                     {(eq.etiquetas ?? []).slice(0, 2).map((t) => (
                       <span
                         key={t}
-                        className="inline-flex items-center rounded-full border hairline bg-surface px-2 py-0.5 text-[10px] font-medium text-ink whitespace-nowrap"
+                        className="inline-flex items-center rounded-full border hairline bg-surface px-2 py-0.5 text-2xs font-medium text-ink whitespace-nowrap"
                       >
                         {t}
                       </span>
                     ))}
                     {(eq.etiquetas ?? []).length > 2 && (
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-2xs text-muted-foreground">
                         +{(eq.etiquetas ?? []).length - 2}
                       </span>
                     )}

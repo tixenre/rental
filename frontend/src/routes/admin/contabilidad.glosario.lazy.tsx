@@ -109,7 +109,7 @@ function GlosarioPage() {
     <div className="px-4 md:px-6 py-6 space-y-8 max-w-3xl mx-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Back-office · Finanzas
           </div>
           <h1 className="font-display text-3xl text-ink">Glosario</h1>
@@ -134,7 +134,7 @@ function GlosarioPage() {
 function Bloque({ titulo, items }: { titulo: string; items: Item[] }) {
   return (
     <section className="space-y-3">
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         {titulo}
       </div>
       <dl className="space-y-3">

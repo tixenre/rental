@@ -7,29 +7,29 @@
 ## 1. Catálogo de componentes canónicos (reusar antes que crear)
 
 > **Fuente canónica = la librería del DS, que vive en la app:** `src/components/*` (primitivos +
-> piezas) y `src/styles/` (tokens/tipografía/utilities/fuentes). No hay paquete aparte. La columna
+> piezas) y `src/design-system/styles/` (tokens/tipografía/utilities/fuentes). No hay paquete aparte. La columna
 > "Dónde" apunta al path real en `src/`.
 
 | Necesitás… | Usá | Dónde (hoy, en la app) |
 |---|---|---|
-| Botón (variants: default, amber, **primary**, outline, ghost…) | `Button` | `src/components/ui/button.tsx` |
-| Badge de estado de pedido | `EstadoBadge` | `src/components/kit/EstadoBadge.tsx` |
-| Bloque de precio | `PriceBlock` | `src/components/kit/PriceBlock.tsx` (catálogo) · `src/components/rental/equipment/shared/PriceBlock.tsx` (cards) |
-| Stat / métrica | `StatCard` | `src/components/kit/StatCard.tsx` |
+| Botón (variants: default, amber, **primary**, outline, ghost…) | `Button` | `src/design-system/ui/button.tsx` |
+| Badge de estado de pedido | `EstadoBadge` | `src/design-system/kit/EstadoBadge.tsx` |
+| Bloque de precio | `PriceBlock` | `src/design-system/kit/PriceBlock.tsx` (catálogo) · `src/components/rental/equipment/shared/PriceBlock.tsx` (cards) |
+| Stat / métrica | `StatCard` | `src/design-system/kit/StatCard.tsx` |
 | Stepper de cantidad (pill hairline) | `StepperPill` | `src/components/rental/equipment/shared/StepperPill.tsx` |
 | Favorito | `FavButton` | `src/components/rental/equipment/shared/FavButton.tsx` |
-| Pills de add-ons | `AddonPills` | `src/components/kit/AddonPills.tsx` |
-| Toggle grid/lista | `ViewToggle` | `src/components/kit/ViewToggle.tsx` |
-| Empty state | `EmptyState` | `src/components/kit/EmptyState.tsx` |
-| Input/Search/FieldLabel | `Input` | `src/components/kit/Input.tsx` |
+| Pills de add-ons | `AddonPills` | `src/design-system/kit/AddonPills.tsx` |
+| Toggle grid/lista | `ViewToggle` | `src/design-system/kit/ViewToggle.tsx` |
+| Empty state | `EmptyState` | `src/design-system/kit/EmptyState.tsx` |
+| Input/Search/FieldLabel | `Input` | `src/design-system/kit/Input.tsx` |
 | Modal de fechas de reserva | `RentalDateModal` | `src/components/rental/RentalDateModal.tsx` (base única) |
-| shadcn primitives (dialog, card, accordion, calendar, dropdown…) | varios | `src/components/ui/*` |
+| shadcn primitives (dialog, card, accordion, calendar, dropdown…) | varios | `src/design-system/ui/*` |
 | `cn()` classnames | `cn` | `src/lib/utils.ts` |
 
-**Librería canónica del DS — vive EN LA APP, en `src/`:** primitivos shadcn en `src/components/ui/*`,
+**Librería canónica del DS — vive EN LA APP, en `src/`:** primitivos shadcn en `src/design-system/ui/*`,
 piezas de marca en `src/components/{kit,rental}` (PriceBlock, StepperPill, EstadoBadge, StatCard…), y
-tokens/tipografía/utilities/fuentes en `src/styles/` (entry `src/ds-styles.css`, cableado desde
-`src/styles.css`). Es la **fuente única**: un token/utility se edita en `src/styles/`, una pieza en
+tokens/tipografía/utilities/fuentes en `src/design-system/styles/` (entry `src/design-system/ds-styles.css`, cableado desde
+`src/styles.css`). Es la **fuente única**: un token/utility se edita en `src/design-system/styles/`, una pieza en
 `src/components/`, **no se duplica**. **Reuse-first:** antes de crear un botón/badge/precio/stepper/estado,
 chequeá si ya existe. Un primitivo nuevo reutilizable va a `src/components/{ui,kit}`, no inline. Las
 pantallas cableadas (carrito, topbar…) consumen esos primitivos. (Hubo un paquete workspace
@@ -51,7 +51,7 @@ pantallas cableadas (carrito, topbar…) consumen esos primitivos. (Hubo un paqu
 - **HTTP + auth:** `authedFetch` / `authedJson` de `src/lib/authedFetch.ts` (cookie de sesión,
   `credentials:"include"`, base URL `VITE_API_URL`). No armar fetch a mano.
 - **Tipos:** backend en `src/lib/api.ts` (`BackendEquipo`, `EstudioConfig`…); frontend en
-  `src/data/equipment.ts` (`Equipment`) y `src/components/kit/types.ts` (`EstadoPedido` — 9 estados:
+  `src/data/equipment.ts` (`Equipment`) y `src/design-system/kit/types.ts` (`EstadoPedido` — 9 estados:
   borrador, presupuesto, solicitado, confirmado, retirado, entregado, devuelto, finalizado, cancelado).
 - **Formato:** `formatARS()`, `formatRentalRange()` de `src/lib/format.ts`.
 - **Estado global:** `useCart` (`src/lib/cart-store.ts`, zustand+persist), `useClienteSession`

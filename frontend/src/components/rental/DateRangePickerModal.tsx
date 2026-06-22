@@ -9,8 +9,8 @@ import {
   Plus,
   AlertTriangle,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/design-system/ui/dialog";
+import { Calendar } from "@/design-system/ui/calendar";
 import {
   computeJornadas,
   deriveEndDate,
@@ -225,7 +225,7 @@ export function DateRangePickerModal({
           style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
         >
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Fechas del alquiler
             </div>
             <h2 className="font-display text-xl sm:text-2xl text-ink leading-tight">
@@ -234,7 +234,7 @@ export function DateRangePickerModal({
           </div>
           <button
             onClick={() => onOpenChange(false)}
-            className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+            className="hit-area-44 grid h-9 w-9 place-items-center rounded-full hover:bg-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
             aria-label="Cerrar"
           >
             <X className="h-4 w-4" />
@@ -242,18 +242,20 @@ export function DateRangePickerModal({
         </div>
 
         {/* ── Retiro + Jornadas + Devolución ──────────────────────── */}
-        <div className="px-5 sm:px-6 pt-5 pb-4 shrink-0 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Mobile: compacto (pt/pb/space chicos) para dejarle alto al calendario,
+            que es la interacción principal. Desktop (sm:) mantiene el aire. */}
+        <div className="px-5 sm:px-6 pt-3 sm:pt-5 pb-3 sm:pb-4 shrink-0 space-y-2.5 sm:space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
             {/* ── Retiro ─────────────────────────────────────────── */}
             <div
               className={cn(
-                "rounded-xl px-3.5 py-3 border bg-surface/40",
+                "rounded-xl px-3.5 py-2.5 sm:py-3 border bg-surface/40",
                 hasStart
                   ? "border-ink/15" // fecha elegida: borde sutil
                   : "border-dashed hairline", // vacío: borde dashed
               )}
             >
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
+              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
                 Retiro
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -280,39 +282,43 @@ export function DateRangePickerModal({
               </div>
             </div>
 
-            {/* ── Jornadas stepper ───────────────────────────────── */}
-            <div className="rounded-xl border border-ink/15 bg-amber-soft/40 px-3.5 py-3">
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
-                Jornadas
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={decJornada}
-                  disabled={!hasStart || jornadas <= 1}
-                  aria-label="Quitar una jornada"
-                  className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
-                <div className="flex items-baseline gap-1.5 leading-none">
-                  <span
-                    data-testid="jornadas-count"
-                    className="font-display text-2xl font-black text-ink tabular-nums"
-                  >
-                    {hasStart ? jornadas : "—"}
-                  </span>
-                  <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                    {jornadas === 1 ? "jornada" : "jornadas"}
-                  </span>
+            {/* ── Jornadas stepper ──── Mobile: una sola fila compacta
+                 (eyebrow + stepper inline). Desktop (sm:): 2 líneas como las
+                 demás cards del grid, para igualar alto con Retiro. */}
+            <div className="rounded-xl border border-ink/15 bg-amber-soft/40 px-3.5 py-2 sm:py-3">
+              <div className="flex items-center justify-between gap-2 sm:block">
+                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground sm:mb-1.5">
+                  Jornadas
                 </div>
-                <button
-                  onClick={incJornada}
-                  disabled={!hasStart}
-                  aria-label="Agregar una jornada"
-                  className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink hover:bg-amber disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2 sm:justify-between">
+                  <button
+                    onClick={decJornada}
+                    disabled={!hasStart || jornadas <= 1}
+                    aria-label="Quitar una jornada"
+                    className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <div className="flex items-baseline gap-1.5 leading-none">
+                    <span
+                      data-testid="jornadas-count"
+                      className="font-display text-xl sm:text-2xl font-black text-ink tabular-nums"
+                    >
+                      {hasStart ? jornadas : "—"}
+                    </span>
+                    <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                      {jornadas === 1 ? "jornada" : "jornadas"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={incJornada}
+                    disabled={!hasStart}
+                    aria-label="Agregar una jornada"
+                    className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink hover:bg-amber disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -321,7 +327,7 @@ export function DateRangePickerModal({
           {hasRange && (
             <div
               className={cn(
-                "rounded-xl border px-3.5 py-3 flex items-center justify-between gap-3",
+                "rounded-xl border px-3.5 py-2.5 sm:py-3 flex items-center justify-between gap-3",
                 // Jerarquía de estados visuales (de mayor a menor prioridad):
                 // 1. devolucionCerrada → destructive (bloquea)
                 // 2. sumaJornadaPorHora → naranja (advierte)
@@ -334,7 +340,7 @@ export function DateRangePickerModal({
               )}
             >
               <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
+                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
                   Devolución
                 </div>
                 <div className="flex items-center gap-1.5 leading-none">
@@ -348,7 +354,7 @@ export function DateRangePickerModal({
                   </span>
                   {/* Badge "+1 J" — solo cuando suma jornada por hora */}
                   {sumaJornadaPorHora && !devolucionCerrada && (
-                    <span className="rounded-full bg-naranja/20 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-naranja">
+                    <span className="rounded-full bg-naranja/20 px-1.5 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-naranja">
                       +1 J
                     </span>
                   )}
@@ -373,7 +379,7 @@ export function DateRangePickerModal({
           {/* ── Feedback (jerarquía: error > warn > hint) ──────────── */}
           {devolucionCerrada ? (
             /* ERROR: día cerrado → bloquea Aplicar */
-            <p className="flex items-start gap-1.5 text-[11px] text-destructive">
+            <p className="flex items-start gap-1.5 text-xs text-destructive">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               La devolución cae el{" "}
               <strong>{format(endDate!, "EEEE dd MMM", { locale: es })}</strong>, que está cerrado.
@@ -381,7 +387,7 @@ export function DateRangePickerModal({
             </p>
           ) : rangoCruzaBloqueado ? (
             /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito */
-            <p className="flex items-start gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-[11px] text-ink">
+            <p className="flex items-start gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber" />
               <span>
                 Algunos equipos del carrito no tienen stock en estas fechas —{" "}
@@ -390,7 +396,7 @@ export function DateRangePickerModal({
             </p>
           ) : sumaJornadaPorHora ? (
             /* WARN: jornada extra por hora → Aplicar habilitado (avisa, no bloquea) */
-            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-[11px] text-ink">
+            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
               <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
               <span>
                 Devolvés a las <strong>{endTime}</strong>, más tarde que tu retiro ({startTime}) →{" "}
@@ -400,7 +406,7 @@ export function DateRangePickerModal({
             </p>
           ) : (
             /* HINT: info contextual — cambia según si hay fecha o no */
-            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
               {hasStart
                 ? "Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de retiro suma una jornada."
@@ -435,7 +441,7 @@ export function DateRangePickerModal({
           <button
             onClick={clear}
             disabled={!hasStart}
-            className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition px-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="hit-area-44 flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition px-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Eraser className="h-3.5 w-3.5" />
             Limpiar
@@ -455,7 +461,7 @@ export function DateRangePickerModal({
           <button
             onClick={apply}
             disabled={!hasStart || blocked}
-            className="rounded-full bg-amber px-6 py-2.5 sm:py-2 text-sm font-semibold text-ink hover:brightness-110 transition shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center min-h-11 rounded-full bg-amber px-6 py-2.5 sm:py-2 text-sm font-semibold text-ink hover:brightness-110 transition shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Aplicar
           </button>

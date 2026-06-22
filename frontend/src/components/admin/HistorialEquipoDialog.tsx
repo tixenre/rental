@@ -16,9 +16,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+} from "@/design-system/ui/dialog";
+import { Button } from "@/design-system/ui/button";
+import { Badge } from "@/design-system/ui/badge";
 import {
   Table,
   TableBody,
@@ -26,7 +26,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/design-system/ui/table";
 
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
@@ -131,7 +131,7 @@ export function HistorialEquipoDialog({
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <span className="font-mono text-xs">{h.numero_pedido}</span>
-                            <Badge variant="outline" className="text-[10px]">
+                            <Badge variant="outline" className="text-2xs">
                               {h.estado}
                             </Badge>
                           </div>
@@ -176,7 +176,7 @@ export function HistorialEquipoDialog({
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-md border hairline bg-muted/20 p-2">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="text-base font-medium tabular-nums">{value}</div>
     </div>
   );

@@ -38,15 +38,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Button } from "@/design-system/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 import type { SpecTemplate } from "@/lib/admin/api";
 
 import { type Spec, sameLabel, extractNumericPart } from "./spec-helpers";
@@ -178,7 +178,7 @@ export function SpecsDiffEditor({
       {/* Sección template-bound */}
       {templateBound.length > 0 && (
         <div className="rounded-md border hairline bg-muted/20 p-2 space-y-1">
-          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground px-0.5">
+          <div className="flex items-center gap-1.5 text-2xs uppercase tracking-wider text-muted-foreground px-0.5">
             <BookmarkCheck className="h-3 w-3" />
             Del template ({templateBound.length})
           </div>
@@ -199,7 +199,7 @@ export function SpecsDiffEditor({
       {custom.length > 0 && (
         <div className="space-y-1">
           {templateBound.length > 0 && (
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-0.5">
+            <div className="text-2xs uppercase tracking-wider text-muted-foreground px-0.5">
               Custom ({custom.length}) · arrastrá para reordenar
             </div>
           )}
@@ -258,7 +258,7 @@ function TemplateBoundRow({
         <span className="text-ink">{tmpl.label}</span>
         {tmpl.obligatorio && <span className="text-destructive ml-0.5">*</span>}
         {tmpl.ayuda && (
-          <div className="text-[10px] text-muted-foreground truncate" title={tmpl.ayuda}>
+          <div className="text-2xs text-muted-foreground truncate" title={tmpl.ayuda}>
             {tmpl.ayuda}
           </div>
         )}
@@ -268,7 +268,7 @@ function TemplateBoundRow({
         {validation.message && (
           <div
             className={
-              "text-[10px] " + (validation.severity === "error" ? "text-destructive" : "text-amber")
+              "text-2xs " + (validation.severity === "error" ? "text-destructive" : "text-amber")
             }
           >
             {validation.severity === "error" ? "✗ " : "⚠ "}
@@ -490,7 +490,7 @@ function CustomSortableRow({
         </Button>
       </div>
       {tmplCollision && (
-        <div className="ml-6 text-[10px] text-amber italic">
+        <div className="ml-6 text-2xs text-amber italic">
           ⚠ Existe la spec oficial <strong>"{tmplCollision.label}"</strong> en el template —
           eliminala y usá la del template para que entre al sistema estructurado.
         </div>
@@ -550,7 +550,7 @@ function RangoValueInput({
   };
 
   const unitSpan = (
-    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{unidad}</span>
+    <span className="text-2xs uppercase tracking-wider text-muted-foreground">{unidad}</span>
   );
 
   return (
@@ -565,14 +565,14 @@ function RangoValueInput({
         className="text-xs w-16"
         aria-label="Valor (o mínimo si es rango)"
       />
-      <span className="text-[11px] text-muted-foreground select-none">–</span>
+      <span className="text-xs text-muted-foreground select-none">–</span>
       <Input
         type="number"
         inputMode="decimal"
         step="any"
         value={max}
         onChange={(e) => commit(min, e.target.value)}
-        className="text-xs w-24 placeholder:text-muted-foreground/40 placeholder:italic placeholder:text-[10px]"
+        className="text-xs w-24 placeholder:text-muted-foreground/40 placeholder:italic placeholder:text-2xs"
         placeholder="vacío si es fijo"
         aria-label="Valor máximo (vacío si es fijo)"
       />
@@ -621,7 +621,7 @@ function MedidasValueInput({
   };
 
   const unitChip = (
-    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{unidad}</span>
+    <span className="text-2xs uppercase tracking-wider text-muted-foreground">{unidad}</span>
   );
 
   return (
@@ -638,7 +638,7 @@ function MedidasValueInput({
             className="text-xs w-16 text-center"
             aria-label={`Medida ${i + 1} de ${axes}`}
           />
-          {i < axes - 1 && <span className="text-[11px] text-muted-foreground select-none">×</span>}
+          {i < axes - 1 && <span className="text-xs text-muted-foreground select-none">×</span>}
         </div>
       ))}
       {!prefix && unitChip}
@@ -698,7 +698,7 @@ function MultiEnumValueInput({
             key={opt}
             type="button"
             onClick={() => toggle(opt)}
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] transition ${
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs transition ${
               isSelected
                 ? "border-amber bg-amber-soft text-ink"
                 : "border-ink/15 bg-background text-muted-foreground hover:border-ink/30"
@@ -750,7 +750,7 @@ function NumericValueInput({
       />
       {hasUnidad && (
         <span
-          className={`pointer-events-none absolute inset-y-0 flex items-center text-[10px] uppercase tracking-wider text-muted-foreground ${
+          className={`pointer-events-none absolute inset-y-0 flex items-center text-2xs uppercase tracking-wider text-muted-foreground ${
             prefix ? "left-2" : "right-2"
           }`}
           aria-hidden

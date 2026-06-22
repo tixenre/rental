@@ -1,12 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  X,
-  Trash2,
-  Loader2,
-  AlertCircle,
-  Calendar as CalendarIcon,
-  ShoppingBag,
-} from "lucide-react";
+import { X, Trash2, AlertCircle, Calendar as CalendarIcon, ShoppingBag } from "lucide-react";
+import { Button } from "@/design-system/ui/button";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { IncludesLine } from "./equipment/shared/IncludesLine";
 import { EmptyState } from "./EmptyState";
@@ -315,7 +309,7 @@ export function CartDrawer({
             {/* Header sticky */}
             <div className="flex items-center justify-between gap-3 border-b hairline px-5 py-4 sm:px-6">
               <div className="min-w-0">
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                   Tu pedido
                 </div>
                 <h2 id={titleId} className="font-display text-2xl leading-tight">
@@ -350,7 +344,7 @@ export function CartDrawer({
                     <span>
                       {format(endDate, "EEE dd MMM", { locale: es })} {endTime}
                     </span>
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
                       · {d} {d === 1 ? "jornada" : "jornadas"}
                     </span>
                   </span>
@@ -422,7 +416,7 @@ export function CartDrawer({
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                                <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
                                   {it.brand}
                                 </div>
                                 <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">
@@ -431,17 +425,17 @@ export function CartDrawer({
                                 <IncludesLine
                                   includes={it.includes}
                                   label="Incluye:"
-                                  className="mt-0.5 text-[10px]"
+                                  className="mt-0.5 text-2xs"
                                 />
                                 {noDisponible && (
                                   <div className="mt-1 flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1 text-[10px] font-semibold text-destructive uppercase tracking-wide">
+                                    <div className="flex items-center gap-1 text-2xs font-semibold text-destructive uppercase tracking-wide">
                                       <AlertCircle className="h-3 w-3 shrink-0" />
                                       Sin stock en estas fechas
                                     </div>
                                     <button
                                       onClick={() => remove(it.id)}
-                                      className="flex items-center gap-1 text-[10px] font-medium text-destructive/80 underline underline-offset-2 transition hover:text-destructive"
+                                      className="flex items-center gap-1 text-2xs font-medium text-destructive/80 underline underline-offset-2 transition hover:text-destructive"
                                     >
                                       Quitar
                                     </button>
@@ -463,7 +457,7 @@ export function CartDrawer({
                                       <span className="text-muted-foreground"> /día</span>
                                     </div>
                                     {d > 0 && (
-                                      <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-[11px] tabular">
+                                      <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-xs tabular">
                                         {lineaDto > 0 && (
                                           <span className="line-through text-muted-foreground/60">
                                             {formatARS(lineaBruta)}
@@ -498,7 +492,7 @@ export function CartDrawer({
                     {/* Notas opcionales */}
                     {showNotas && (
                       <div className="mt-4 space-y-2 rounded-lg border hairline bg-surface p-4">
-                        <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                        <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground mb-1">
                           Notas para nosotros (opcional)
                         </div>
                         <textarea
@@ -546,7 +540,7 @@ export function CartDrawer({
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                  <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
                     {hayFechas ? "Total" : "Estimado · por jornada"}
                   </span>
                   <span className="font-display text-3xl tabular text-ink">
@@ -568,28 +562,28 @@ export function CartDrawer({
                     Agregar una nota
                   </button>
                 )}
-                <button
-                  type="button"
-                  disabled={submitting || list.length === 0 || hayNoDisponible}
+                <Button
+                  variant="amber"
+                  size="lg"
+                  className="w-full uppercase tracking-widest"
+                  disabled={list.length === 0 || hayNoDisponible}
+                  loading={submitting}
                   onClick={handleSubmit}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-amber py-3 text-sm font-medium uppercase tracking-widest text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink"
                 >
                   {submitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Enviando…
-                    </>
+                    "Enviando…"
                   ) : (
                     <span className="flex items-center gap-2">
                       Confirmar solicitud
                       {list.length > 0 && totalNeto > 0 && (
-                        <span className="font-mono text-[11px] font-normal opacity-70 tracking-normal normal-case tabular-nums">
+                        <span className="font-mono text-xs font-normal opacity-70 tracking-normal normal-case tabular-nums">
                           · {formatARS(totalNeto)}
                           {conIva ? " + IVA" : ""}
                         </span>
                       )}
                     </span>
                   )}
-                </button>
+                </Button>
 
                 {hayNoDisponible ? (
                   <p className="flex items-center justify-center gap-1.5 text-center text-xs text-destructive">
@@ -616,20 +610,22 @@ export function CartDrawer({
                       Iniciá sesión o creá una cuenta para mandarnos tu solicitud.
                     </p>
                     <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-1 uppercase tracking-wider"
                         onClick={goToLogin}
-                        className="flex-1 rounded-md bg-ink px-3 py-2 text-xs font-medium uppercase tracking-wider text-amber transition hover:brightness-110"
                       >
                         Iniciar sesión
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 uppercase tracking-wider"
                         onClick={goToRegister}
-                        className="flex-1 rounded-md border hairline px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink transition hover:bg-background"
                       >
                         Crear cuenta
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}

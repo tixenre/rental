@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 
 import { adminApi } from "@/lib/admin/api";
 
@@ -45,7 +45,7 @@ export function BufferSection() {
       </div>
       <div className="flex items-end gap-2 border-t hairline pt-3">
         <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <div className="text-2xs uppercase tracking-wide text-muted-foreground">
             Horas de buffer
           </div>
           <Input

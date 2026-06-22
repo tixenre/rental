@@ -9,7 +9,7 @@
    Para editar un token/utility: hacelo en `src/styles/`, NO acá.
    ============================================================ */
 
-@import "./ds-styles.css";
+@import "./design-system/ds-styles.css";
 @import "tw-animate-css";
 
 /* Tailwind v4 no escanea node_modules. Apuntamos al src de la app. */

@@ -17,20 +17,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+} from "@/design-system/ui/dialog";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Textarea } from "@/design-system/ui/textarea";
+import { Badge } from "@/design-system/ui/badge";
+import { Switch } from "@/design-system/ui/switch";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 
 import { adminApi, type Equipo, type MantenimientoInput } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
@@ -179,15 +179,13 @@ export function MantenimientoEquipoDialog({
           <p className="text-xs font-medium text-ink/80">Nuevo evento</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="space-y-1">
-              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <Label className="text-2xs uppercase tracking-wide text-muted-foreground">
                 Fecha
               </Label>
               <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                Tipo
-              </Label>
+              <Label className="text-2xs uppercase tracking-wide text-muted-foreground">Tipo</Label>
               <Select value={tipo} onValueChange={setTipo}>
                 <SelectTrigger>
                   <SelectValue />
@@ -202,7 +200,7 @@ export function MantenimientoEquipoDialog({
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <Label className="text-2xs uppercase tracking-wide text-muted-foreground">
                 Costo (ARS)
               </Label>
               <Input
@@ -214,7 +212,7 @@ export function MantenimientoEquipoDialog({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <Label className="text-2xs uppercase tracking-wide text-muted-foreground">
                 Próxima revisión
               </Label>
               <Input
@@ -225,7 +223,7 @@ export function MantenimientoEquipoDialog({
             </div>
           </div>
           <div className="space-y-1">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <Label className="text-2xs uppercase tracking-wide text-muted-foreground">
               Descripción / Notas
             </Label>
             <Textarea
@@ -241,7 +239,7 @@ export function MantenimientoEquipoDialog({
             <div className="flex items-center justify-between gap-2">
               <div className="space-y-0.5">
                 <Label className="text-xs font-medium text-ink/80">Bloquear disponibilidad</Label>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-2xs text-muted-foreground">
                   El equipo no se podrá alquilar mientras esté en mantenimiento.
                 </p>
               </div>
@@ -250,7 +248,7 @@ export function MantenimientoEquipoDialog({
             {bloqueaStock && (
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div className="space-y-1">
-                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <Label className="text-2xs uppercase tracking-wide text-muted-foreground">
                     Fuera de servicio hasta
                   </Label>
                   <Input
@@ -261,7 +259,7 @@ export function MantenimientoEquipoDialog({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <Label className="text-2xs uppercase tracking-wide text-muted-foreground">
                     Unidades afectadas
                   </Label>
                   <Input
@@ -310,24 +308,24 @@ export function MantenimientoEquipoDialog({
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-sm font-medium">{fmtFecha(ev.fecha)}</span>
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-2xs">
                       {TIPOS.find((t) => t.value === ev.tipo)?.label ?? ev.tipo}
                     </Badge>
                     {ev.costo != null && (
-                      <Badge variant="secondary" className="text-[10px] tabular-nums">
+                      <Badge variant="secondary" className="text-2xs tabular-nums">
                         {fmtMoneda(ev.costo)}
                       </Badge>
                     )}
                     {ev.proxima_revision && (
                       <Badge
                         variant={ev.proxima_revision < hoyISO() ? "destructive" : "default"}
-                        className="text-[10px]"
+                        className="text-2xs"
                       >
                         próx. {fmtFecha(ev.proxima_revision)}
                       </Badge>
                     )}
                     {ev.bloquea_stock && (
-                      <Badge variant="destructive" className="text-[10px]">
+                      <Badge variant="destructive" className="text-2xs">
                         bloquea stock{ev.fecha_hasta ? ` → ${fmtFecha(ev.fecha_hasta)}` : ""}
                         {ev.cantidad > 1 ? ` (×${ev.cantidad})` : ""}
                       </Badge>
@@ -372,7 +370,7 @@ function Stat({ label, value, alert }: { label: string; value: string | number; 
     <div
       className={`rounded-md border hairline p-2 ${alert ? "bg-destructive/10 border-destructive/30" : "bg-muted/20"}`}
     >
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+      <div className="text-2xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
         {alert && <AlertCircle className="h-3 w-3 text-destructive" />}
         {label}
       </div>

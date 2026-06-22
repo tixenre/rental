@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ChevronRight, Search, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system/ui/tabs";
 import type { Equipment } from "@/data/equipment";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { normalizar, tokenizar } from "@/lib/search/normalize";
@@ -124,7 +124,7 @@ export function DiscoverySheet({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="flex-1 font-display text-lg">Descubrir</div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular pr-2">
+              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular pr-2">
                 {resultCount} {resultCount === 1 ? "equipo" : "equipos"}
               </span>
             </div>
@@ -143,7 +143,7 @@ export function DiscoverySheet({
                 >
                   Filtros
                   {activeFilters > 0 && (
-                    <span className="ml-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-ink px-1 text-[9px] font-bold text-amber">
+                    <span className="ml-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-ink px-1 text-3xs font-bold text-amber">
                       {activeFilters}
                     </span>
                   )}
@@ -261,7 +261,7 @@ function SearchBody({
 
       {!trimmed ? (
         <div className="px-4 pt-5">
-          <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <p className="mb-3 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Categorías
           </p>
           <div className="flex flex-wrap gap-2">

@@ -7,13 +7,13 @@
 
 import { MessageCircle, ChevronDown } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/design-system/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/design-system/ui/dropdown-menu";
 import { whatsappLink } from "@/lib/whatsapp";
 import { templatesForPedido, type PedidoMinimal } from "@/lib/admin/whatsapp-templates";
 import { cn } from "@/lib/utils";
@@ -122,9 +122,7 @@ export function WhatsAppButton({
             <div>
               <div className="text-sm font-medium">{t.label}</div>
               {t.message && (
-                <div className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">
-                  {t.message}
-                </div>
+                <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{t.message}</div>
               )}
             </div>
           </DropdownMenuItem>

@@ -10,11 +10,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/design-system/ui/collapsible";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Button } from "@/design-system/ui/button";
+import { Badge } from "@/design-system/ui/badge";
 import { isHostedUrl } from "@/lib/equipment/photos";
 import { normalizar } from "@/lib/search/normalize";
 import type { CategoriaAdmin } from "@/lib/admin/api";
@@ -198,17 +202,17 @@ export function PhotoCard({
             </button>
             <div className="absolute bottom-1 left-1">
               {pendingFile && (
-                <Badge variant="secondary" className="text-[9px]">
+                <Badge variant="secondary" className="text-3xs">
                   Local — al guardar
                 </Badge>
               )}
               {isHosted && (
-                <Badge variant="default" className="text-[9px]">
+                <Badge variant="default" className="text-3xs">
                   ✓ En R2
                 </Badge>
               )}
               {isExternal && (
-                <Badge variant="outline" className="text-[9px]">
+                <Badge variant="outline" className="text-3xs">
                   URL externa
                 </Badge>
               )}
@@ -345,7 +349,7 @@ export function CategoriasPicker({
                     <button key={c.id} type="button" onClick={() => toggle(c.id)}>
                       <Badge
                         variant={selected.has(c.id) ? "default" : "secondary"}
-                        className="cursor-pointer text-[10px]"
+                        className="cursor-pointer text-2xs"
                       >
                         {c.nombre}
                       </Badge>

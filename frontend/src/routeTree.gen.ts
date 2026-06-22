@@ -17,6 +17,7 @@ import { Route as TalleresRouteImport } from './routes/talleres'
 import { Route as RentalRouteImport } from './routes/rental'
 import { Route as PrivacidadRouteImport } from './routes/privacidad'
 import { Route as PreguntasFrecuentesRouteImport } from './routes/preguntas-frecuentes'
+import { Route as KitPreviewRouteImport } from './routes/kit-preview'
 import { Route as EstudioRouteImport } from './routes/estudio'
 import { Route as ClienteRouteImport } from './routes/cliente'
 import { Route as CatalogoRouteImport } from './routes/catalogo'
@@ -54,6 +55,7 @@ const AdminEmailTemplatesLazyRouteImport = createFileRoute(
 const AdminDisenoLazyRouteImport = createFileRoute('/admin/diseno')()
 const AdminDataioLazyRouteImport = createFileRoute('/admin/dataio')()
 const AdminClientesLazyRouteImport = createFileRoute('/admin/clientes')()
+const AdminCarritosLazyRouteImport = createFileRoute('/admin/carritos')()
 const AdminTalleresIndexLazyRouteImport = createFileRoute('/admin/talleres/')()
 const AdminSpecsIndexLazyRouteImport = createFileRoute('/admin/specs/')()
 const AdminPedidosIndexLazyRouteImport = createFileRoute('/admin/pedidos/')()
@@ -131,6 +133,11 @@ const PrivacidadRoute = PrivacidadRouteImport.update({
 const PreguntasFrecuentesRoute = PreguntasFrecuentesRouteImport.update({
   id: '/preguntas-frecuentes',
   path: '/preguntas-frecuentes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KitPreviewRoute = KitPreviewRouteImport.update({
+  id: '/kit-preview',
+  path: '/kit-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EstudioRoute = EstudioRouteImport.update({
@@ -236,6 +243,13 @@ const AdminClientesLazyRoute = AdminClientesLazyRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any).lazy(() =>
   import('./routes/admin/clientes.lazy').then((d) => d.Route),
+)
+const AdminCarritosLazyRoute = AdminCarritosLazyRouteImport.update({
+  id: '/carritos',
+  path: '/carritos',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/carritos.lazy').then((d) => d.Route),
 )
 const WorkshopsSlugRoute = WorkshopsSlugRouteImport.update({
   id: '/$slug',
@@ -465,6 +479,7 @@ export interface FileRoutesByFullPath {
   '/catalogo': typeof CatalogoRoute
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
+  '/kit-preview': typeof KitPreviewRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
   '/rental': typeof RentalRoute
@@ -484,6 +499,7 @@ export interface FileRoutesByFullPath {
   '/equipo/$slug': typeof EquipoSlugRoute
   '/talleres/$slug': typeof TalleresSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
+  '/admin/carritos': typeof AdminCarritosLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/dataio': typeof AdminDataioLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
@@ -523,6 +539,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/catalogo': typeof CatalogoRoute
   '/estudio': typeof EstudioRoute
+  '/kit-preview': typeof KitPreviewRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
   '/rental': typeof RentalRoute
@@ -537,6 +554,7 @@ export interface FileRoutesByTo {
   '/equipo/$slug': typeof EquipoSlugRoute
   '/talleres/$slug': typeof TalleresSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
+  '/admin/carritos': typeof AdminCarritosLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/dataio': typeof AdminDataioLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
@@ -579,6 +597,7 @@ export interface FileRoutesById {
   '/catalogo': typeof CatalogoRoute
   '/cliente': typeof ClienteRouteWithChildren
   '/estudio': typeof EstudioRoute
+  '/kit-preview': typeof KitPreviewRoute
   '/preguntas-frecuentes': typeof PreguntasFrecuentesRoute
   '/privacidad': typeof PrivacidadRoute
   '/rental': typeof RentalRoute
@@ -598,6 +617,7 @@ export interface FileRoutesById {
   '/equipo/$slug': typeof EquipoSlugRoute
   '/talleres/$slug': typeof TalleresSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
+  '/admin/carritos': typeof AdminCarritosLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/dataio': typeof AdminDataioLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
@@ -641,6 +661,7 @@ export interface FileRouteTypes {
     | '/catalogo'
     | '/cliente'
     | '/estudio'
+    | '/kit-preview'
     | '/preguntas-frecuentes'
     | '/privacidad'
     | '/rental'
@@ -660,6 +681,7 @@ export interface FileRouteTypes {
     | '/equipo/$slug'
     | '/talleres/$slug'
     | '/workshops/$slug'
+    | '/admin/carritos'
     | '/admin/clientes'
     | '/admin/dataio'
     | '/admin/diseno'
@@ -699,6 +721,7 @@ export interface FileRouteTypes {
     | '/'
     | '/catalogo'
     | '/estudio'
+    | '/kit-preview'
     | '/preguntas-frecuentes'
     | '/privacidad'
     | '/rental'
@@ -713,6 +736,7 @@ export interface FileRouteTypes {
     | '/equipo/$slug'
     | '/talleres/$slug'
     | '/workshops/$slug'
+    | '/admin/carritos'
     | '/admin/clientes'
     | '/admin/dataio'
     | '/admin/diseno'
@@ -754,6 +778,7 @@ export interface FileRouteTypes {
     | '/catalogo'
     | '/cliente'
     | '/estudio'
+    | '/kit-preview'
     | '/preguntas-frecuentes'
     | '/privacidad'
     | '/rental'
@@ -773,6 +798,7 @@ export interface FileRouteTypes {
     | '/equipo/$slug'
     | '/talleres/$slug'
     | '/workshops/$slug'
+    | '/admin/carritos'
     | '/admin/clientes'
     | '/admin/dataio'
     | '/admin/diseno'
@@ -815,6 +841,7 @@ export interface RootRouteChildren {
   CatalogoRoute: typeof CatalogoRoute
   ClienteRoute: typeof ClienteRouteWithChildren
   EstudioRoute: typeof EstudioRoute
+  KitPreviewRoute: typeof KitPreviewRoute
   PreguntasFrecuentesRoute: typeof PreguntasFrecuentesRoute
   PrivacidadRoute: typeof PrivacidadRoute
   RentalRoute: typeof RentalRoute
@@ -867,6 +894,13 @@ declare module '@tanstack/react-router' {
       path: '/preguntas-frecuentes'
       fullPath: '/preguntas-frecuentes'
       preLoaderRoute: typeof PreguntasFrecuentesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kit-preview': {
+      id: '/kit-preview'
+      path: '/kit-preview'
+      fullPath: '/kit-preview'
+      preLoaderRoute: typeof KitPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/estudio': {
@@ -993,6 +1027,13 @@ declare module '@tanstack/react-router' {
       path: '/clientes'
       fullPath: '/admin/clientes'
       preLoaderRoute: typeof AdminClientesLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/carritos': {
+      id: '/admin/carritos'
+      path: '/carritos'
+      fullPath: '/admin/carritos'
+      preLoaderRoute: typeof AdminCarritosLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/workshops/$slug': {
@@ -1290,6 +1331,7 @@ interface AdminRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
   AdminNovedadesRoute: typeof AdminNovedadesRoute
   AdminTalleresRoute: typeof AdminTalleresRouteWithChildren
+  AdminCarritosLazyRoute: typeof AdminCarritosLazyRoute
   AdminClientesLazyRoute: typeof AdminClientesLazyRoute
   AdminDataioLazyRoute: typeof AdminDataioLazyRoute
   AdminDisenoLazyRoute: typeof AdminDisenoLazyRoute
@@ -1319,6 +1361,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
   AdminNovedadesRoute: AdminNovedadesRoute,
   AdminTalleresRoute: AdminTalleresRouteWithChildren,
+  AdminCarritosLazyRoute: AdminCarritosLazyRoute,
   AdminClientesLazyRoute: AdminClientesLazyRoute,
   AdminDataioLazyRoute: AdminDataioLazyRoute,
   AdminDisenoLazyRoute: AdminDisenoLazyRoute,
@@ -1399,6 +1442,7 @@ const rootRouteChildren: RootRouteChildren = {
   CatalogoRoute: CatalogoRoute,
   ClienteRoute: ClienteRouteWithChildren,
   EstudioRoute: EstudioRoute,
+  KitPreviewRoute: KitPreviewRoute,
   PreguntasFrecuentesRoute: PreguntasFrecuentesRoute,
   PrivacidadRoute: PrivacidadRoute,
   RentalRoute: RentalRoute,

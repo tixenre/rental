@@ -29,12 +29,11 @@ import { KitSection, BoxItemsSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";
 import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
 import { SpecsGrid } from "@/components/rental/equipment/shared/SpecsGrid";
+import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { Lightbox } from "@/components/rental/Lightbox";
 import { backendToEquipment } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
-import { formatARS } from "@/lib/format";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
-import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { buildCategoriaSlug } from "@/lib/categoria-slug";
 import { SITE_URL } from "@/lib/site";
@@ -257,8 +256,9 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const remove = useCart((s) => s.remove);
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
-  const price = priceBreakdown(item.pricePerDay, jornadas, 1);
   const showPeriodTotal = hasDateRange && jornadas > 1;
+  const { data: clienteSession } = useClienteSession();
+  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
   // Ficha técnica: abierta por default si son pocas specs, colapsada si hay muchas.
   // La ficha técnica es el corazón de la página → visible por default.
   const [specsOpen, setSpecsOpen] = useState(true);
@@ -364,7 +364,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
 
       {/* Header con marca, nombre, badges */}
       <header className="space-y-2">
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground flex-wrap">
+        <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground flex-wrap">
           <span>{item.brand}</span>
           <span>·</span>
           {/* Categorías como chips: clickeables, deep-link al catálogo
@@ -394,7 +394,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             </span>
           )}
           {faltantes.length > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/30 text-amber px-2 py-0.5 text-[10px] font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/30 text-amber px-2 py-0.5 text-2xs font-medium">
               <AlertTriangle className="h-2.5 w-2.5" />
               parcialmente disponible
             </span>
@@ -404,7 +404,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           <h1 className="font-display text-3xl md:text-4xl text-ink leading-tight">{item.name}</h1>
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 rounded-full border hairline px-3 py-1.5 text-xs hover:border-foreground/40 transition shrink-0"
+            className="flex items-center justify-center gap-1.5 rounded-full border hairline px-3 py-1.5 text-xs hover:border-foreground/40 transition shrink-0 min-h-11 min-w-11 sm:min-w-0"
             aria-label="Compartir"
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
@@ -416,7 +416,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
       {/* Precio + agregar (sticky en mobile bottom bar). En desktop el precio
        *  vive en la columna derecha sticky. */}
       <div className="md:hidden sticky bottom-0 -mx-4 z-10 bg-background border-t hairline px-4 py-3 flex items-center justify-between gap-3">
-        <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} />
+        <PriceBlock perDay={item.pricePerDay} jornadas={jornadas} conIva={conIva} size="md" />
         <CartButtons
           qty={qty}
           sinStock={sinStock}
@@ -449,7 +449,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                   fetchPriority="high"
                   className="h-full w-full object-contain p-4 transition group-hover:scale-[1.01]"
                 />
-                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-[10px] font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-2xs font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
                   <Maximize2 className="h-3 w-3" /> Ampliar
                 </span>
               </>
@@ -495,7 +495,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
 
           {/* Precio + agregar (desktop — en la col visual) */}
           <div className="hidden md:flex items-center justify-between gap-3 rounded-xl border hairline bg-surface px-4 py-3">
-            <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} large />
+            <PriceBlock perDay={item.pricePerDay} jornadas={jornadas} conIva={conIva} size="lg" />
             <CartButtons
               qty={qty}
               sinStock={sinStock}
@@ -523,7 +523,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                   </li>
                 ))}
               </ul>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Podés reservar igual. Confirmaremos la disponibilidad de estos items al momento del
                 pedido.
               </p>
@@ -533,7 +533,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           {/* Descripción */}
           {desc && (
             <section className="space-y-2">
-              <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                 Descripción
               </h2>
               <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
@@ -543,7 +543,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                 <button
                   type="button"
                   onClick={() => setDescExpanded((v) => !v)}
-                  className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-4 transition hover:text-ink hover:underline"
+                  className="font-mono text-2xs uppercase tracking-widest text-muted-foreground underline-offset-4 transition hover:text-ink hover:underline"
                 >
                   {descExpanded ? "Ver menos" : "Ver más"}
                 </button>
@@ -573,7 +573,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                 aria-expanded={specsOpen}
                 className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:text-ink"
               >
-                <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                   Ficha técnica
                   <span className="ml-2 text-ink/40">({item.specs.length})</span>
                 </h2>
@@ -626,41 +626,6 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   );
 }
 
-function PriceBlock({
-  price,
-  item,
-  showPeriodTotal,
-  large = false,
-}: {
-  price: ReturnType<typeof priceBreakdown>;
-  item: Equipment;
-  showPeriodTotal: boolean;
-  large?: boolean;
-}) {
-  const { data: clienteSession } = useClienteSession();
-  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
-  return (
-    <div>
-      <div className={`font-display ${large ? "text-3xl" : "text-xl"} tabular text-ink`}>
-        {formatARS(item.pricePerDay)}
-      </div>
-      <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        / jornada{conIva ? " +IVA" : ""}
-      </div>
-      {showPeriodTotal && (
-        <div className="mt-1 flex items-baseline gap-1.5">
-          <span className={`font-display ${large ? "text-lg" : "text-sm"} tabular text-amber`}>
-            {formatARS(price.total)}
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            · {price.jornadas} jornadas{conIva ? " + IVA" : ""}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function CartButtons({
   qty,
   sinStock,
@@ -679,7 +644,7 @@ function CartButtons({
       <button
         onClick={() => !sinStock && onAdd()}
         disabled={sinStock}
-        className="inline-flex items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-amber transition hover:bg-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex items-center justify-center gap-1.5 min-h-11 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-amber transition hover:bg-foreground disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Plus className="h-4 w-4" /> {sinStock ? "Sin stock" : "Agregar"}
       </button>
@@ -701,14 +666,14 @@ function CartButtons({
 function FichaPillSection({ title, items }: { title: string; items: string[] }) {
   return (
     <section className="space-y-2">
-      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         {title}
       </h2>
       <div className="flex flex-wrap gap-1.5">
         {items.map((it, i) => (
           <span
             key={`${title}-${i}`}
-            className="inline-flex items-center rounded-md border hairline bg-background px-2 py-1 text-[12px] text-ink/90"
+            className="inline-flex items-center rounded-md border hairline bg-background px-2 py-1 text-xs text-ink/90"
           >
             {it}
           </span>
@@ -737,7 +702,7 @@ function YouTubeEmbed({ url }: { url: string }) {
   if (!id) return null;
   return (
     <section className="space-y-2">
-      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         Video demo
       </h2>
       <div

@@ -16,7 +16,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, X, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/design-system/ui/button";
 import { cn } from "@/lib/utils";
 
 // ── Toggle ─────────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ export function EquiposCountToggle({
       <button
         type="button"
         onClick={onAddWhenEmpty}
-        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink transition shrink-0 underline-offset-2 hover:underline"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-ink transition shrink-0 underline-offset-2 hover:underline"
         title="Agregar equipos a esta categoría"
       >
         <Plus className="h-3 w-3" /> equipos
@@ -51,7 +51,7 @@ export function EquiposCountToggle({
     <button
       type="button"
       onClick={onToggle}
-      className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink transition shrink-0"
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-ink transition shrink-0"
       title={isOpen ? "Ocultar equipos" : "Ver equipos asignados directamente"}
     >
       <ChevronRight className={cn("h-3 w-3 transition-transform", isOpen && "rotate-90")} />
@@ -116,19 +116,19 @@ export function EquiposPanel({
         <button
           type="button"
           onClick={() => onAddEquipos(categoriaId, categoriaNombre)}
-          className="inline-flex items-center gap-1 text-[11px] text-ink hover:text-amber transition py-0.5"
+          className="inline-flex items-center gap-1 text-xs text-ink hover:text-amber transition py-0.5"
           title="Agregar más equipos a esta categoría"
         >
           <Plus className="h-3 w-3" /> Agregar equipos
         </button>
       )}
       {equiposQ.isLoading && (
-        <div className="flex items-center gap-2 py-1 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
           <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
         </div>
       )}
       {equiposQ.isSuccess && equiposDirectos.length === 0 && (
-        <div className="py-1 text-[11px] text-muted-foreground italic">
+        <div className="py-1 text-xs text-muted-foreground italic">
           Sin equipos directos. Los que cuenta esta categoría vienen de sus subcategorías.
         </div>
       )}
@@ -173,7 +173,7 @@ function EquipoRow({
       <div className="flex-1 min-w-0">
         <div className="truncate text-ink">{equipo.nombre}</div>
         {equipo.marca && (
-          <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground truncate">
+          <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground truncate">
             {equipo.marca}
           </div>
         )}

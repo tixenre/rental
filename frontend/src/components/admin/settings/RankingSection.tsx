@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/design-system/ui/button";
 
 import { adminApi } from "@/lib/admin/api";
 

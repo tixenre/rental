@@ -5,6 +5,8 @@ import { useEquipos, useMarcas, useCategorias } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { useShallow } from "zustand/react/shallow";
 import { formatARS } from "@/lib/format";
+import { useCotizacion } from "@/lib/cotizacion";
+import { toLocalISO } from "@/lib/rental-dates";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { useRetomarPedido } from "@/lib/verificacion";
@@ -28,7 +30,7 @@ const CARTBAR_BG = "color-mix(in oklch, var(--background) 96%, transparent)";
 /* ── Main CatalogoMovil component ────────────────────────────────── */
 export function CatalogoMovil() {
   // Equipment data
-  const { data: allEquipos, isLoading } = useEquipos();
+  const { data: allEquipos, isLoading, isError } = useEquipos();
   // Marcas: misma source que BrandCarousel del desktop + admin/marcas.
   // Trae logo_url, destacada, orden, popularidad_score, etc.
   const { data: marcasData } = useMarcas();
@@ -209,12 +211,23 @@ export function CatalogoMovil() {
   // (esa la elige el tab) y búsqueda (esa tiene su propio input visible).
   const activeFiltersCount = (stockOnly ? 1 : 0) + (selectedBrand ? 1 : 0);
 
-  // Cart totals
+  // Cart totals — el TOTAL lo calcula el BACKEND (fuente única /api/cotizar),
+  // igual que el drawer: incluye el descuento del cliente y el IVA. El reduce
+  // client-side anterior mostraba el BRUTO (precio × jornadas, sin descuento) →
+  // no coincidía con el carrito ni con el pedido real (#967).
   const totalItems = Object.values(cart.items).reduce((s, q) => s + q, 0);
-  const totalARS = Object.entries(cart.items).reduce((s, [id, q]) => {
-    const eq = allEquipos.find((e) => e.id === id);
-    return s + (eq ? eq.pricePerDay * q * jornadas : 0);
-  }, 0);
+  const cotizarItems = Object.entries(cart.items)
+    .map(([id, q]) => {
+      const eq = allEquipos?.find((e) => e.id === id);
+      return eq ? { equipoId: eq._backendId ?? Number(eq.id), cantidad: q } : null;
+    })
+    .filter((x): x is { equipoId: number; cantidad: number } => x !== null);
+  const hayFechas = !!(fechaDesde && fechaHasta);
+  const { totalNeto: cartTotal, conIva: cartConIva } = useCotizacion({
+    items: cotizarItems,
+    fechaDesde: hayFechas ? toLocalISO(fechaDesde, horaDesde) : null,
+    fechaHasta: hayFechas ? toLocalISO(fechaHasta, horaHasta) : null,
+  }).data;
 
   const handleAddToCart = useCallback(
     (id: string, delta: number) => {
@@ -263,7 +276,7 @@ export function CatalogoMovil() {
               <Calendar size={14} className="shrink-0 text-amber" />
               <span>{datePillLabel}</span>
               {fechaDesde && (
-                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink/60">
+                <span className="font-mono text-xs uppercase tracking-[0.2em] text-ink/60">
                   · {jornadas} jorn.
                 </span>
               )}
@@ -341,7 +354,7 @@ export function CatalogoMovil() {
                 >
                   <span
                     className={cn(
-                      "font-sans text-[13px] leading-none",
+                      "font-sans text-sm leading-none",
                       activeTab === cat
                         ? "font-bold text-ink"
                         : "font-medium text-muted-foreground",
@@ -349,7 +362,7 @@ export function CatalogoMovil() {
                   >
                     {cat}
                   </span>
-                  <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground leading-none">
+                  <span className="font-mono text-2xs tracking-[0.15em] text-muted-foreground leading-none">
                     {count}
                   </span>
                 </button>
@@ -362,7 +375,7 @@ export function CatalogoMovil() {
         <div className="flex items-center gap-1.5 px-4 py-2">
           <button
             className={cn(
-              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
+              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-xs font-medium text-ink transition-all",
               stockOnly
                 ? "bg-amber-soft border-amber/60 font-semibold"
                 : "border-hairline bg-transparent hover:border-ink hover:bg-muted",
@@ -388,7 +401,7 @@ export function CatalogoMovil() {
             type="button"
             onClick={() => setShowBrandSheet(true)}
             className={cn(
-              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
+              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-xs font-medium text-ink transition-all",
               selectedBrand
                 ? "bg-amber-soft border-amber/60 font-semibold"
                 : "border-hairline bg-transparent hover:border-ink hover:bg-muted",
@@ -401,7 +414,7 @@ export function CatalogoMovil() {
             type="button"
             onClick={() => setShowFiltrosSheet(true)}
             className={cn(
-              "relative flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium transition-all",
+              "relative flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-xs font-medium transition-all",
               activeFiltersCount > 0
                 ? "border-ink text-ink"
                 : "border-hairline text-muted-foreground hover:border-ink hover:text-ink",
@@ -410,7 +423,7 @@ export function CatalogoMovil() {
             <SlidersHorizontal size={11} />
             Filtros
             {activeFiltersCount > 0 && (
-              <span className="inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[10px] font-bold text-amber">
+              <span className="inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-ink px-1 font-mono text-2xs font-bold text-amber">
                 {activeFiltersCount}
               </span>
             )}
@@ -429,7 +442,14 @@ export function CatalogoMovil() {
               Cargando equipos…
             </div>
           )}
-          {!isLoading && filteredEquipos.length === 0 && (
+          {/* Error de carga (API caída): mensaje propio, no "sin resultados"
+              (que sugiere que el filtro no matcheó). Espeja el isError del desktop. */}
+          {!isLoading && isError && (
+            <div className="text-center py-8 px-4 text-muted-foreground font-sans text-sm">
+              No se pudo cargar el catálogo. Revisá tu conexión e intentá de nuevo.
+            </div>
+          )}
+          {!isLoading && !isError && filteredEquipos.length === 0 && (
             <div className="text-center py-8 text-muted-foreground font-sans text-sm">
               Sin resultados. Probá con otra categoría o término.
             </div>
@@ -455,7 +475,7 @@ export function CatalogoMovil() {
           <div
             role="button"
             tabIndex={0}
-            aria-label={`Ver tu rental: ${totalItems} ${totalItems === 1 ? "ítem" : "ítems"}, total ${formatARS(totalARS)}`}
+            aria-label={`Ver tu rental: ${totalItems} ${totalItems === 1 ? "ítem" : "ítems"}, total ${formatARS(cartTotal)}`}
             className="sticky bottom-0 z-40 flex items-center gap-2.5 px-4 cursor-pointer border-t-[1.5px] border-amber backdrop-blur-lg transition-colors hover:bg-amber/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber focus-visible:ring-inset"
             style={{
               background: CARTBAR_BG,
@@ -474,23 +494,26 @@ export function CatalogoMovil() {
             }}
           >
             <div className="flex-1">
-              <div className="font-sans text-[13px] font-bold text-ink leading-tight">
+              <div className="font-sans text-sm font-bold text-ink leading-tight">
                 {totalItems} {totalItems === 1 ? "ítem" : "ítems"}
               </div>
-              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mt-0.5">
+              <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground mt-0.5">
                 {fechaDesde ? `${jornadas} jornadas` : "elegí fechas"}
               </div>
             </div>
             <div className="flex-1" />
             <div className="text-right">
-              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
+              <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground">
                 Total
               </div>
               <div
                 className="font-mono font-bold text-ink leading-none"
                 style={{ fontSize: 18, fontVariantNumeric: "tabular-nums" }}
               >
-                {formatARS(totalARS)}
+                {formatARS(cartTotal)}
+                {cartConIva && (
+                  <span className="text-xs font-normal text-muted-foreground"> + IVA</span>
+                )}
               </div>
             </div>
             <ChevronUp

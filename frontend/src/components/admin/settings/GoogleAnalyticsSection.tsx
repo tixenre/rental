@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 
 import { adminApi } from "@/lib/admin/api";
 
@@ -48,11 +48,11 @@ export function GoogleAnalyticsSection() {
         <h2 className="font-display text-lg text-ink">Google Analytics</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
           Pegá el <strong>Measurement ID</strong> de tu propiedad de Google Analytics (formato{" "}
-          <code className="text-[11px]">G-XXXXXXXXXX</code>) para medir el tráfico del catálogo
-          público. Lo sacás de Google Analytics → Admin → Flujos de datos → Web. Dejalo vacío para
-          apagar la medición.
+          <code className="text-xs">G-XXXXXXXXXX</code>) para medir el tráfico del catálogo público.
+          Lo sacás de Google Analytics → Admin → Flujos de datos → Web. Dejalo vacío para apagar la
+          medición.
         </p>
-        <p className="text-[11px] text-muted-foreground mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           Solo mide el catálogo público (el back-office y el portal de clientes quedan afuera). La
           medición se activa únicamente en el sitio real de producción; en el ambiente de prueba no
           corre, para no ensuciar los datos.
@@ -60,7 +60,7 @@ export function GoogleAnalyticsSection() {
       </div>
       <div className="flex flex-wrap items-end gap-2 border-t hairline pt-3">
         <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <div className="text-2xs uppercase tracking-wide text-muted-foreground">
             Measurement ID
           </div>
           <Input

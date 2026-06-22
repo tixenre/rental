@@ -21,10 +21,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+} from "@/design-system/ui/dialog";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Button } from "@/design-system/ui/button";
 
 import { adminApi, type Equipo, type CategoriaAdmin } from "@/lib/admin/api";
 import { uploadFileToBucket } from "@/lib/equipment/photos";
@@ -200,7 +200,7 @@ export function ComboBuilderDialog({
               ) : (
                 <label className="flex flex-col items-center justify-center w-24 h-24 rounded border hairline border-dashed cursor-pointer hover:bg-accent transition-colors bg-muted/20">
                   <Upload className="h-5 w-5 text-muted-foreground mb-1" />
-                  <span className="text-[11px] text-muted-foreground">Subir</span>
+                  <span className="text-xs text-muted-foreground">Subir</span>
                   <input
                     type="file"
                     accept="image/*"

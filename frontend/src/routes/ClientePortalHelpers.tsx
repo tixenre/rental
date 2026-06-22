@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { nombreCliente } from "@/lib/cliente-nombre";
-import { GoogleIcon } from "@/components/ui/GoogleIcon";
+import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { formatARS } from "@/lib/format";
 import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
 import type { Perfil } from "./ClientePortalTypes";
@@ -64,7 +64,7 @@ export function SidebarNavItem({
       {count != null && count > 0 && (
         <span
           className={cn(
-            "font-mono text-[10px] tabular-nums rounded-full px-1.5 py-px",
+            "font-mono text-2xs tabular-nums rounded-full px-1.5 py-px",
             active ? "bg-amber text-ink" : "bg-muted text-muted-foreground",
           )}
         >
@@ -100,7 +100,7 @@ export function BottomNavItem({
       <span className={cn("transition", active && "text-ink")}>{icon}</span>
       <span
         className={cn(
-          "font-mono text-[9px] uppercase tracking-[0.12em] transition",
+          "font-mono text-2xs uppercase tracking-[0.12em] transition",
           active ? "text-ink font-semibold" : "text-muted-foreground",
         )}
       >
@@ -119,7 +119,7 @@ export function NotificacionesSection() {
   return (
     <div className="px-5 lg:px-10 pt-8">
       <div className="flex items-baseline justify-between gap-3 mb-8">
-        <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em]">
+        <h2 className="font-display text-22 font-black text-ink tracking-[-0.01em]">
           notificaciones.
         </h2>
       </div>
@@ -128,7 +128,7 @@ export function NotificacionesSection() {
           <Bell className="h-6 w-6" strokeWidth={1.5} />
         </div>
         <div className="font-display text-xl font-black text-ink mb-1.5">Sin notificaciones</div>
-        <div className="font-sans text-[13px] text-muted-foreground max-w-[30ch] mx-auto">
+        <div className="font-sans text-sm text-muted-foreground max-w-[30ch] mx-auto">
           Cuando haya novedades sobre tus pedidos o documentos aparecerán acá.
         </div>
         {/* TODO: conectar a /api/cliente/notificaciones cuando el endpoint esté disponible */}
@@ -195,7 +195,7 @@ export function IdentidadSection({
   const inner = (
     <>
       {!compact && (
-        <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-6">
+        <h2 className="font-display text-22 font-black text-ink tracking-[-0.01em] mb-6">
           identidad.
         </h2>
       )}
@@ -205,7 +205,7 @@ export function IdentidadSection({
         <div className="flex items-center gap-3 rounded-xl border hairline bg-surface px-4 py-4 mb-6">
           <ShieldCheck className="h-7 w-7 text-muted-foreground shrink-0 animate-pulse" />
           <div>
-            <div className="font-sans font-semibold text-[15px] text-ink">
+            <div className="font-sans font-semibold text-15 text-ink">
               Confirmando tu verificación…
             </div>
             <div className="font-sans text-xs text-muted-foreground mt-0.5">
@@ -217,9 +217,7 @@ export function IdentidadSection({
         <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-4 mb-6">
           <XCircle className="h-7 w-7 text-destructive shrink-0 mt-0.5" />
           <div>
-            <div className="font-sans font-semibold text-[15px] text-ink">
-              Verificación rechazada
-            </div>
+            <div className="font-sans font-semibold text-15 text-ink">Verificación rechazada</div>
             <div className="font-sans text-xs text-muted-foreground mt-0.5">
               {motivo ? motivo : "Tu verificación no pudo completarse. Podés intentarlo de nuevo."}
             </div>
@@ -229,7 +227,7 @@ export function IdentidadSection({
         <div className="flex items-center gap-3 rounded-xl border border-amber bg-amber-soft px-4 py-4 mb-6">
           <Clock className="h-7 w-7 text-amber shrink-0" />
           <div>
-            <div className="font-sans font-semibold text-[15px] text-ink">En revisión</div>
+            <div className="font-sans font-semibold text-15 text-ink">En revisión</div>
             <div className="font-sans text-xs text-muted-foreground mt-0.5">
               Tu verificación está siendo revisada. Vas a recibir novedades pronto.
             </div>
@@ -248,7 +246,7 @@ export function IdentidadSection({
             <ShieldAlert className="h-7 w-7 text-amber shrink-0" />
           )}
           <div>
-            <div className="font-sans font-semibold text-[15px] text-ink">
+            <div className="font-sans font-semibold text-15 text-ink">
               {verificado ? "Identidad verificada" : "Identidad sin verificar"}
             </div>
             <div className="font-sans text-xs text-muted-foreground mt-0.5">
@@ -270,7 +268,7 @@ export function IdentidadSection({
                 <div className="font-sans text-sm text-ink">
                   {[perfil.nombre_renaper, perfil.apellido_renaper].filter(Boolean).join(" ")}
                 </div>
-                <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                <div className="font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                   Nombre legal (RENAPER)
                 </div>
               </div>
@@ -302,7 +300,7 @@ export function IdentidadSection({
                 <span className="font-sans text-sm text-ink">
                   {perfil.fecha_nacimiento_renaper}
                 </span>
-                <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                <div className="font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                   Fecha de nacimiento
                 </div>
               </div>
@@ -314,7 +312,7 @@ export function IdentidadSection({
               <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
               <div className="flex-1">
                 <span className="font-sans text-sm text-ink">{perfil.direccion_renaper}</span>
-                <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                <div className="font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                   Domicilio (RENAPER)
                 </div>
               </div>
@@ -327,7 +325,7 @@ export function IdentidadSection({
       {/* Botón de verificación (no verificado y no estamos confirmando ni en revisión) */}
       {!verificado && !confirmando && estado !== "en_revision" && (
         <div className="mb-6">
-          <p className="font-sans text-[13px] text-muted-foreground mb-4 leading-[1.5]">
+          <p className="font-sans text-sm text-muted-foreground mb-4 leading-[1.5]">
             La verificación usa tu DNI y una selfie. Tarda menos de 2 minutos y la hace Didit, que
             consulta la base de RENAPER. Solo guardamos tu nombre, DNI y dirección oficial — nunca
             la foto.
@@ -336,7 +334,7 @@ export function IdentidadSection({
             type="button"
             onClick={iniciarVerificacion}
             disabled={iniciando}
-            className="w-full flex items-center justify-center gap-2 rounded-[10px] bg-ink h-[46px] font-sans text-[15px] font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 rounded-[10px] bg-ink h-[46px] font-sans text-15 font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-50"
           >
             <ShieldCheck className="h-4 w-4" />
             {iniciando ? "Iniciando…" : "Verificar mi identidad"}
@@ -346,7 +344,7 @@ export function IdentidadSection({
 
       {/* Apodo (siempre editable) */}
       <div className="mb-2">
-        <label className="block font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground mb-2">
+        <label className="block font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground mb-2">
           Apodo (opcional)
         </label>
         <div className="flex gap-2">
@@ -421,28 +419,27 @@ export function PerfilSection({
 
   return (
     <div className="px-5 lg:px-10 pt-8 max-w-xl">
-      <h2 className="font-display text-[22px] font-black text-ink tracking-[-0.01em] mb-6">
+      <h2 className="font-display text-22 font-black text-ink tracking-[-0.01em] mb-6">
         mi perfil.
       </h2>
 
       {/* Avatar + nombre */}
       <div className="flex items-center gap-4 mb-6">
         <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-amber">
-          <span className="font-display font-black text-[20px] text-ink leading-none">
-            {initial}
-          </span>
+          <span className="font-display font-black text-xl text-ink leading-none">{initial}</span>
         </div>
         <div>
+          {/* eslint-disable-next-line no-restricted-syntax -- nombre en tarjeta de perfil: entre text-base y text-lg, extra-bold lo equilibra */}
           <div className="font-sans font-bold text-[17px] text-ink">{fullName}</div>
           {memberSince && (
-            <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
+            <div className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
               {memberSince}
             </div>
           )}
           {/* Badge Google (siempre OAuth) */}
           <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border hairline px-2 py-0.5">
             <GoogleIcon size={12} />
-            <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+            <span className="font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground">
               Google
             </span>
           </div>
@@ -454,7 +451,7 @@ export function PerfilSection({
         <div className="flex items-center gap-3 px-4 py-3">
           <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="font-sans text-sm text-ink flex-1 min-w-0 truncate">{perfil.email}</span>
-          <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+          <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground">
             <Lock className="h-2.5 w-2.5" /> Verificado
           </span>
         </div>
@@ -462,7 +459,7 @@ export function PerfilSection({
           <div className="flex items-center gap-3 px-4 py-3">
             <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="font-sans text-sm text-ink flex-1">{perfil.telefono}</span>
-            <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground">
               <Lock className="h-2.5 w-2.5" /> Verificado
             </span>
           </div>
@@ -491,18 +488,19 @@ export function PerfilSection({
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 mb-6">
         <div className="rounded-lg border hairline bg-card px-4 py-3 text-center">
+          {/* eslint-disable-next-line no-restricted-syntax -- stat number display: entre text-2xl (24px) y text-3xl (30px) */}
           <div className="font-sans font-extrabold text-[26px] text-ink leading-none tabular-nums">
             {pedidosCount}
           </div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
+          <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mt-1">
             Pedidos
           </div>
         </div>
         <div className="rounded-lg border hairline bg-card px-4 py-3 text-center">
-          <div className="font-sans font-extrabold text-[22px] text-ink leading-none tabular-nums">
+          <div className="font-sans font-extrabold text-22 text-ink leading-none tabular-nums">
             {formatARS(totalAlquilado)}
           </div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mt-1">
+          <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mt-1">
             Total alquilado
           </div>
         </div>
@@ -510,7 +508,7 @@ export function PerfilSection({
 
       {/* Identidad — embebida en perfil */}
       <div className="border-t hairline pt-6 mb-6">
-        <h3 className="font-display text-[18px] font-black text-ink tracking-[-0.01em] mb-4">
+        <h3 className="font-display text-lg font-black text-ink tracking-[-0.01em] mb-4">
           identidad.
         </h3>
         <IdentidadSection

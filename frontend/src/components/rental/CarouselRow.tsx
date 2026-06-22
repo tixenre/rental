@@ -54,7 +54,7 @@ export function CarouselRow({
         <div className="flex items-baseline gap-3">
           <h2 className="wordmark text-3xl text-ink lg:text-4xl">{title}</h2>
           {typeof count === "number" && (
-            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground tabular">
+            <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground tabular">
               {count} ítems
             </span>
           )}

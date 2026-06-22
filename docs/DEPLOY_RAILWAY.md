@@ -164,8 +164,34 @@ uvicorn main:app --port 8000
 
 # 3. Login local — desde la consola del navegador en localhost:3000 (guarda la cookie HttpOnly):
 #    fetch("/auth/staging-login", { method:"POST", headers:{"Content-Type":"application/json"},
-#      body: JSON.stringify({ secret:"<STAGING_LOGIN_SECRET>", target:"cliente" }), credentials:"include" })
+#      body: JSON.stringify({ secret:"<STAGING_LOGIN_SECRET>", target:"cliente", cliente_id:209 }), credentials:"include" })
+#    (sin `cliente_id` impersona STAGING_CLIENTE_EMAIL; con `cliente_id` impersonás un cliente real del clon.)
 ```
+
+⚠️ **Apagá los fixtures de dev para ver datos REALES.** `frontend/dev/api-fixtures-plugin.ts`
+(`apply: "serve"`) intercepta `GET /api/equipos|categorias|marcas|talleres` y `POST /api/cotizar`
+**siempre que exista `frontend/dev/api-fixtures/`** — NO chequea si el backend está levantado. O sea:
+con el backend local corriendo, el catálogo y la cotización del carrito igual salen del **mock**
+(catálogo viejo + descuentos/IVA aproximados), no de tu clon. Para iterar con datos reales, **borrá o
+renombrá `frontend/dev/api-fixtures/`** (el plugin se desactiva solo si la carpeta no existe) y reiniciá
+vite. Verificá: `curl -sI localhost:3000/api/equipos | grep -i x-rambla-fixture` no debe devolver nada.
+
+⚠️ **Cuenta VERIFICADA en local sin Didit.** El flujo de pedido gatea por verificación de identidad
+(Didit + RENAPER), que **no corre local**. La fuente única del gate es `clientes.dni_validado_at IS NOT
+NULL` (`backend/routes/cliente_portal/core.py::cliente_verificado`) y el front la lee **en vivo** de
+`GET /api/cliente/me` → una cookie/sesión no alcanza, hay que tocar la BD. Lo más limpio es un UPDATE
+local que **espeja lo que escribe el webhook Didit aprobado** (`routes/didit.py::_guardar_verificacion`):
+
+```sql
+-- marcar verificado (cliente_id del clon, ej. 209 = Tincho)
+UPDATE clientes SET dni_validado_at = now(), dni_verificacion_estado = 'verificado',
+       dni_verificacion_motivo = NULL WHERE id = 209;
+-- revertir / probar el gate de "no verificado"
+UPDATE clientes SET dni_validado_at = NULL, dni_verificacion_estado = 'no_verificado' WHERE id = 209;
+```
+
+> Durable (opcional, requiere código): extender `staging-login` `target="cliente"` para que, en dev,
+> haga ese UPDATE idempotente sobre el cliente impersonado — así sobrevive a cada re-clon sin SQL a mano.
 
 ⚠️ El clon es **read-only sobre la remota** (cero escritura a staging/prod). **Nunca** pongas
 la `DATABASE_URL` remota en el `.env` local: `init_db()` corre al arranque y le haría

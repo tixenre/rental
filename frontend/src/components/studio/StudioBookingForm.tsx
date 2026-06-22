@@ -12,17 +12,17 @@ import {
   Minus,
   Plus,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { GoogleIcon } from "@/components/ui/GoogleIcon";
-import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/design-system/ui/button";
+import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
+import { Calendar } from "@/design-system/ui/calendar";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+} from "@/design-system/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/design-system/ui/popover";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";
@@ -77,7 +77,7 @@ function Section({
   return (
     <section className={cn("rounded-2xl border hairline bg-surface p-5 sm:p-6", className)}>
       <header className="flex items-baseline gap-2 mb-4">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular">
+        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular">
           {pad(step)}
         </span>
         <h3 className="font-display text-lg sm:text-xl">{title}</h3>
@@ -89,7 +89,7 @@ function Section({
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+    <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
       {children}
     </label>
   );
@@ -355,7 +355,7 @@ export function StudioBookingForm({
   return (
     <div className="space-y-4">
       {returnedFromLogin && auth === "in" && (
-        <div className="rounded-xl border border-verde/30 bg-verde/10 px-4 py-3 text-sm text-verde">
+        <div className="rounded-xl border border-verde/30 bg-verde/10 px-4 py-3 text-sm text-verde-ink">
           <span className="font-medium">Todo listo.</span> Revisá los datos y apretá Reservar para
           confirmar.
         </div>
@@ -449,7 +449,7 @@ export function StudioBookingForm({
             role="radiogroup"
             aria-label="¿Qué reservás?"
           >
-            <legend className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2 sm:col-span-2">
+            <legend className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2 sm:col-span-2">
               ¿Qué reservás?
             </legend>
 
@@ -524,7 +524,7 @@ export function StudioBookingForm({
           {/* Banda verde — solo cuando hay fecha y está libre */}
           {fechaISO && disponibilidad === "libre" && (
             <div className="flex items-center gap-2.5 px-4 py-2.5 bg-verde/5 border-y border-verde/10">
-              <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-verde/10 text-verde border-verde/20">
+              <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-verde/10 text-verde-ink border-verde/20">
                 <Check className="h-3 w-3" /> Disponible
               </span>
               <span className="text-xs text-muted-foreground tabular">
@@ -553,7 +553,7 @@ export function StudioBookingForm({
 
           {/* Total */}
           <div className="px-4 py-3.5">
-            <div className="flex justify-between items-baseline text-[15px] font-bold text-ink">
+            <div className="flex justify-between items-baseline text-15 font-bold text-ink">
               <span>Total</span>
               <span className="font-mono tabular">{total > 0 ? formatARS(total) : "—"}</span>
             </div>
@@ -642,7 +642,7 @@ export function StudioBookingForm({
               </div>
             )}
             <div className="mt-2 flex items-baseline justify-between border-t hairline pt-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                 Total estimado
               </span>
               <span className="font-semibold tabular">

@@ -37,7 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "@/design-system/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,20 +47,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+} from "@/design-system/ui/alert-dialog";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Button } from "@/design-system/ui/button";
+import { Switch } from "@/design-system/ui/switch";
+import { Textarea } from "@/design-system/ui/textarea";
+import { Badge } from "@/design-system/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
 
@@ -1182,13 +1182,13 @@ export function EquipoFormDialogV2({
                   </label>
                 )}
                 {autoGenDisponible && nombrePublicoAuto && (
-                  <p className="text-[10px] text-muted-foreground italic">
+                  <p className="text-2xs text-muted-foreground italic">
                     Tu edición se mantiene en esta sesión. Si cambia el template o los specs, el
                     campo se regenera (toggle OFF para fijarlo).
                   </p>
                 )}
                 {!autoGenDisponible && categoriaRoot && (
-                  <p className="text-[11px] text-muted-foreground italic">
+                  <p className="text-xs text-muted-foreground italic">
                     Sin template auto para "{categoriaRoot}". Escribilo a mano.
                   </p>
                 )}
@@ -1260,7 +1260,7 @@ export function EquipoFormDialogV2({
       {isEdit && (
         <section className="space-y-2 pt-2 border-t hairline">
           <p className="text-xs font-medium text-ink/80">Galería de fotos</p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             La foto marcada como principal aparece en la ficha pública y en el catálogo.
           </p>
           <PhotoGallery
@@ -1509,7 +1509,7 @@ export function EquipoFormDialogV2({
             <div className="space-y-1.5">
               <div className="flex flex-wrap gap-1">
                 {tags.map((t) => (
-                  <Badge key={t} variant="secondary" className="text-[10px] gap-1">
+                  <Badge key={t} variant="secondary" className="text-2xs gap-1">
                     {t}
                     <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))}>
                       <X className="h-3 w-3" />
@@ -1536,7 +1536,7 @@ export function EquipoFormDialogV2({
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Se usan para búsqueda, filtros del catálogo y chips visibles en la ficha pública.
               </p>
             </div>
@@ -1792,7 +1792,7 @@ ${fotoTag}
       <>
         <div className="px-4 md:px-6 py-6 pb-28 max-w-6xl mx-auto">
           <header className="mb-6">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Inventario · Equipos
             </div>
             <h1 className="font-display text-3xl text-ink">{titleText}</h1>
@@ -1830,7 +1830,7 @@ ${fotoTag}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                     $ / jornada
                   </div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
@@ -1838,7 +1838,7 @@ ${fotoTag}
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                     % día
                   </div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
@@ -1846,7 +1846,7 @@ ${fotoTag}
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5 col-span-2">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                     Valor reposición
                   </div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">

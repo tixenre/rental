@@ -7,9 +7,9 @@ import { z } from "zod";
 import { Plus, Trash2, Save, Loader2, Package, Search } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { PhotoGallery, type GalleryFoto } from "@/components/common/PhotoGallery";
@@ -131,7 +131,7 @@ function EstudioAdminPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 py-6 space-y-8">
       <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Back-office
         </div>
         <h1 className="font-display text-3xl text-ink">Estudio</h1>
@@ -296,7 +296,7 @@ function PackSection() {
               </div>
               <div className="min-w-0 flex-1">
                 {p.marca && (
-                  <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                     {p.marca}
                   </div>
                 )}
@@ -918,7 +918,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <label className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </label>
       {children}

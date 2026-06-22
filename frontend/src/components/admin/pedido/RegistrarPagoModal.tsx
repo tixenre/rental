@@ -7,10 +7,10 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/design-system/ui/dialog";
 import { cn } from "@/lib/utils";
 import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
 import { fmtArs } from "@/lib/format";
@@ -115,7 +115,7 @@ export function RegistrarPagoModal({
           <div className="h-2 rounded-full bg-muted overflow-hidden">
             <div className="h-full bg-amber transition-all" style={{ width: `${progressPct}%` }} />
           </div>
-          <div className="font-mono text-[11px] text-muted-foreground">
+          <div className="font-mono text-xs text-muted-foreground">
             {fmtArs(pagado)} de {fmtArs(total)} · resta {fmtArs(saldo)}
           </div>
         </div>
@@ -147,7 +147,7 @@ export function RegistrarPagoModal({
 
         {/* Monto */}
         <div className="space-y-1">
-          <Label className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+          <Label className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
             Monto
           </Label>
           <div className="flex items-center gap-1.5 rounded-md border hairline bg-surface-elevated px-3 h-12">
@@ -167,7 +167,7 @@ export function RegistrarPagoModal({
         <div className="space-y-1">
           <Label
             htmlFor="pago-concepto"
-            className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground"
+            className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground"
           >
             Concepto
           </Label>
@@ -183,7 +183,7 @@ export function RegistrarPagoModal({
         {/* Destinatario + método */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            <Label className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
               Cobró
             </Label>
             <div className="flex gap-1.5">
@@ -205,7 +205,7 @@ export function RegistrarPagoModal({
             </div>
           </div>
           <div className="space-y-1">
-            <Label className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            <Label className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
               Método
             </Label>
             <div className="flex gap-1.5">

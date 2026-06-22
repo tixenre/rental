@@ -27,11 +27,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Star, FileText, Filter, Info, X } from "lucide-react";
-import { ModalBackdrop } from "@/components/ui/modal-backdrop";
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/design-system/ui/button";
+import { Switch } from "@/design-system/ui/switch";
+import { Badge } from "@/design-system/ui/badge";
 import { authedJson } from "@/lib/authedFetch";
 
 type SpecTipo =
@@ -233,19 +233,19 @@ function SortableSpecRow({ spec, onSelect }: { spec: Spec; onSelect: () => void 
       <div className="flex-1 min-w-0 cursor-pointer" onClick={onSelect}>
         <div className="flex items-baseline gap-2">
           <span className="text-sm font-medium text-ink truncate">{spec.label}</span>
-          <Badge variant="outline" className="text-[10px] font-mono px-1 py-0">
+          <Badge variant="outline" className="text-2xs font-mono px-1 py-0">
             {spec.tipo}
           </Badge>
           {spec.unidad && (
-            <span className="text-[10px] text-muted-foreground font-mono">{spec.unidad}</span>
+            <span className="text-2xs text-muted-foreground font-mono">{spec.unidad}</span>
           )}
           {spec.es_compatibilidad && (
-            <Badge className="text-[10px] px-1 py-0 bg-amber/20 text-amber-foreground border-amber/40">
+            <Badge className="text-2xs px-1 py-0 bg-amber/20 text-amber-foreground border-amber/40">
               compat
             </Badge>
           )}
         </div>
-        <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
+        <div className="text-xs text-muted-foreground font-mono mt-0.5">
           {spec.spec_key}
           <span className="ml-2">· {spec.uso_equipos} equipos</span>
         </div>
@@ -288,7 +288,7 @@ function FlagSwitch({
 }) {
   return (
     <label className="flex items-center gap-1.5 cursor-pointer select-none">
-      <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <span className="flex items-center gap-1 text-2xs uppercase tracking-wider text-muted-foreground">
         {icon}
         <span className="hidden sm:inline">{label}</span>
       </span>
@@ -311,7 +311,7 @@ export function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () =>
       <div className="bg-background w-full max-w-md h-full overflow-y-auto p-6 shadow-2xl border-l">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
               spec_key
             </div>
             <div className="font-mono text-sm text-ink">{fresh.spec_key}</div>
@@ -397,7 +397,7 @@ export function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () =>
           </DetailRow>
 
           <div className="border-t pt-4 mt-6 space-y-3">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <h3 className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
               Flags
             </h3>
             <FlagDisplay
@@ -429,7 +429,7 @@ export function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () =>
 
           {fresh.es_compatibilidad && (
             <div className="border-t pt-4 space-y-2">
-              <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <h3 className="font-mono text-2xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Info className="h-3 w-3" />
                 Motor de compatibilidad
               </h3>
@@ -448,7 +448,7 @@ export function SpecDetailDrawer({ spec, onClose }: { spec: Spec; onClose: () =>
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
       <div className="mt-0.5">{children}</div>
@@ -474,11 +474,11 @@ function FlagDisplay({
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-ink">{label}</span>
           {checked ? (
-            <Badge className="text-[10px] px-1.5 py-0 bg-amber/20 text-amber-foreground border-amber/40">
+            <Badge className="text-2xs px-1.5 py-0 bg-amber/20 text-amber-foreground border-amber/40">
               ON
             </Badge>
           ) : (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+            <Badge variant="secondary" className="text-2xs px-1.5 py-0">
               OFF
             </Badge>
           )}
@@ -558,7 +558,7 @@ function NombreTemplateEditor({
         <FileText className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium text-ink">Plantilla del nombre auto-generado</span>
         {currentTemplate && (
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+          <Badge variant="secondary" className="text-2xs px-1.5 py-0">
             configurado
           </Badge>
         )}
@@ -589,7 +589,7 @@ function NombreTemplateEditor({
 
         {specsEnNombre.length > 0 && (
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+            <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground mb-1.5">
               Insertar spec (click)
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -687,7 +687,7 @@ function NameFormatEditor({ spec }: { spec: Spec }) {
 
   return (
     <div className="space-y-2">
-      <h3 className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <h3 className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
         Formato en título auto
       </h3>
       <div className="text-xs text-muted-foreground">

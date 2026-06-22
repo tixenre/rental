@@ -37,7 +37,10 @@
   --color-muted: oklch(0.94 0.008 85);
   --color-accent: #fab428;
   --color-accent-foreground: oklch(0.18 0.01 60);
-  --color-destructive: oklch(0.62 0.22 27);
+  /* L 0.55 (no 0.62) para cumplir AA: texto-sobre-claro 3.87→~5.2:1 y botón
+     sólido blanco-sobre-rojo 3.82→~5.1:1. Hue/chroma intactos → mismo rojo de
+     marca, solo un poco más oscuro. Toda la propagación va hacia MÁS contraste. */
+  --color-destructive: oklch(0.55 0.22 27);
   --color-destructive-foreground: oklch(0.98 0.005 80);
   --color-ring: color-mix(in oklch, #fab428 60%, transparent);
 
@@ -55,6 +58,15 @@
   --color-azul: #1097db; /* Pantone 299 C  — Presupuesto / info */
   --color-naranja: #e9552f; /* Pantone 172 C  — Aviso */
   --color-verde: #009971; /* Pantone 7724 C — Confirmado / éxito */
+  /* Verde más oscuro SOLO para TEXTO sobre tints de estado (badge Confirmado,
+     Disponible): el --color-verde brillante sobre bg-verde/10-20 da ~3.2:1
+     (falla AA). Mismo hue/chroma, L 0.606→0.48 → 4.8-5.2:1. El verde de marca
+     (charts, montos, bandas) queda intacto; esto es solo el texto del estado. */
+  --color-verde-ink: oklch(0.48 0.125 166.4);
+  /* Azul más oscuro SOLO para TEXTO sobre tints de estado (badge info/Presupuesto):
+     el --color-azul brillante sobre bg-azul/10 da ~2.9:1 (falla AA). Mismo hue/chroma,
+     L 0.64→0.48 → 4.9:1. El azul de marca (charts, labels) queda intacto. */
+  --color-azul-ink: oklch(0.48 0.14 239);
 
   /* ── Charts (orden oficial: amber → azul → naranja → verde → rosa) ── */
   --color-chart-1: var(--color-amber);
