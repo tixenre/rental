@@ -33,15 +33,15 @@ const ESTADO_MAP: Record<EstadoPedido, { label: string; cls: string }> = {
   },
   confirmado: {
     label: "Confirmado",
-    cls: "bg-verde/10 text-verde border-verde/30",
+    cls: "bg-verde/10 text-verde-ink border-verde/30",
   },
   retirado: {
     label: "Retirado",
-    cls: "bg-verde/20 text-verde border-verde/40",
+    cls: "bg-verde/20 text-verde-ink border-verde/40",
   },
   entregado: {
     label: "Entregado",
-    cls: "bg-verde/20 text-verde border-verde/40",
+    cls: "bg-verde/20 text-verde-ink border-verde/40",
   },
   devuelto: {
     label: "Devuelto",

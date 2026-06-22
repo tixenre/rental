@@ -398,7 +398,7 @@ export function PagosSidebar({
       <div
         className={cn(
           "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-          estadoPago === "pagado" ? "bg-verde/10 text-verde" : "bg-amber/15 text-ink",
+          estadoPago === "pagado" ? "bg-verde/10 text-verde-ink" : "bg-amber/15 text-ink",
         )}
       >
         {estadoPago === "pagado" ? "Pagado" : "Pago pendiente"}
