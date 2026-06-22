@@ -59,16 +59,16 @@ export function MobileStickyBar({
         >
           <CalendarIcon className="h-4 w-4 shrink-0" />
           {hasDates ? (
-            <div className="flex-1 min-w-0 text-[13px] font-medium leading-none tabular-nums truncate">
+            <div className="flex-1 min-w-0 text-sm font-medium leading-none tabular-nums truncate">
               {format(startDate!, "dd MMM", { locale: es })} {startTime}
               <span className="mx-1 text-muted-foreground">→</span>
               {format(endDate!, "dd MMM", { locale: es })} {endTime}
-              <span className="ml-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="ml-1.5 font-mono text-2xs uppercase tracking-wider text-muted-foreground">
                 · {jornadas}j
               </span>
             </div>
           ) : (
-            <div className="flex-1 min-w-0 text-[13px] font-medium leading-none">Elegir fechas</div>
+            <div className="flex-1 min-w-0 text-sm font-medium leading-none">Elegir fechas</div>
           )}
         </button>
 
@@ -88,7 +88,7 @@ export function MobileStickyBar({
         >
           <SlidersHorizontal className="h-4 w-4" />
           {activeFilters > 0 && (
-            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-ink px-1 text-[9px] font-bold text-amber">
+            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-ink px-1 text-3xs font-bold text-amber">
               {activeFilters}
             </span>
           )}

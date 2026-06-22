@@ -178,7 +178,7 @@ function DataIoPage() {
   return (
     <div className="px-4 md:px-6 py-6 space-y-8 max-w-4xl mx-auto">
       <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Back-office
         </div>
         <h1 className="font-display text-3xl text-ink">Datos y backups</h1>

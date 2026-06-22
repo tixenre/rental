@@ -172,7 +172,7 @@ export function HeroBanner({
         <button
           type="button"
           onClick={() => navigate({ to: "/estudio" })}
-          className="absolute left-4 bottom-4 inline-flex min-h-[44px] items-center gap-1.5 bg-ink text-amber font-bold text-[13px] tracking-[-0.01em] px-4 py-2.5 rounded-full"
+          className="absolute left-4 bottom-4 inline-flex min-h-[44px] items-center gap-1.5 bg-ink text-amber font-bold text-sm tracking-[-0.01em] px-4 py-2.5 rounded-full"
           style={{ zIndex: 1 }}
         >
           Conocé el estudio
@@ -195,17 +195,18 @@ export function HeroBanner({
 
       {/* Copy section — amber. */}
       <div className="bg-amber" style={{ padding: "24px 20px 32px" }}>
-        <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-ink/55 mb-3">
+        <div className="font-mono text-xs uppercase tracking-[0.24em] text-ink/55 mb-3">
           Catálogo · {equipCount} equipos · Mar del Plata
         </div>
 
+        {/* eslint-disable-next-line no-restricted-syntax -- display hero number: entre text-4xl (36px) y text-5xl (48px), óptico */}
         <div className="font-display text-[42px] font-black text-ink leading-[1] tracking-[-0.02em] mb-4">
           {tagline[0]}
           <br />
           {tagline[1]}
         </div>
 
-        <p className="font-sans text-[14px] leading-[1.55] text-ink/72 mb-8">
+        <p className="font-sans text-sm leading-[1.55] text-ink/72 mb-8">
           Cámaras, ópticas, luces, audio y soportes para producciones audiovisuales en Mar del
           Plata.
         </p>
@@ -214,7 +215,7 @@ export function HeroBanner({
         <button
           type="button"
           onClick={onDateOpen}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-full bg-ink text-amber font-sans text-[15px] font-bold transition active:scale-[0.97]"
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-full bg-ink text-amber font-sans text-15 font-bold transition active:scale-[0.97]"
         >
           <Calendar size={16} />
           Elegir fechas
@@ -267,13 +268,13 @@ function CartItem({
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground">
+        <div className="font-mono text-2xs tracking-[0.18em] uppercase text-muted-foreground">
           {eq.brand}
         </div>
         <div className="font-sans text-sm font-bold text-ink leading-tight mt-0.5 truncate">
           {eq.name}
         </div>
-        <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+        <div className="font-mono text-2xs text-muted-foreground mt-0.5">
           {fechaDesde
             ? `${qty} × ${formatARS(eq.pricePerDay)} / jorn.`
             : `${formatARS(eq.pricePerDay)} / jornada`}
@@ -286,7 +287,7 @@ function CartItem({
         >
           {formatARS(eq.pricePerDay * qty * jornadasEfectivas)}
         </div>
-        <div className="font-mono text-[11px] tracking-[0.1em] text-muted-foreground mt-0.5">
+        <div className="font-mono text-xs tracking-[0.1em] text-muted-foreground mt-0.5">
           {fechaDesde ? `${jornadas} jorn.` : "/ jorn."}
         </div>
       </div>
@@ -456,34 +457,30 @@ export function CartSheet({
           >
             <div className="flex-1 flex items-center gap-2.5">
               <div>
-                <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
+                <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
                   Salida
                 </div>
                 <div className="font-sans text-sm font-bold leading-tight text-ink">
                   {fmtDate(fechaDesde)}
                 </div>
-                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
-                  {horaDesde}
-                </div>
+                <div className="font-mono text-xs text-muted-foreground mt-0.5">{horaDesde}</div>
               </div>
               <ChevronRight size={14} className="text-muted-foreground/50 shrink-0" />
               <div>
-                <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
+                <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
                   Devolución
                 </div>
                 <div className="font-sans text-sm font-bold leading-tight text-ink">
                   {fmtDate(fechaHasta)}
                 </div>
-                <div className="font-mono text-[11px] text-muted-foreground mt-0.5">
-                  {horaHasta}
-                </div>
+                <div className="font-mono text-xs text-muted-foreground mt-0.5">{horaHasta}</div>
               </div>
             </div>
             <div
               className="text-center shrink-0 pl-3 border-l"
               style={{ borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)" }}
             >
-              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
+              <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground mb-0.5">
                 Jorn.
               </div>
               <div
@@ -508,10 +505,10 @@ export function CartSheet({
             }}
           >
             <div className="flex-1">
-              <div className="font-sans text-[13px] font-bold text-ink leading-tight">
+              <div className="font-sans text-sm font-bold text-ink leading-tight">
                 Elegí las fechas para ver el precio total
               </div>
-              <div className="font-mono text-[11px] tracking-[0.15em] uppercase text-muted-foreground mt-0.5">
+              <div className="font-mono text-xs tracking-[0.15em] uppercase text-muted-foreground mt-0.5">
                 Precios mostrados por jornada
               </div>
             </div>
@@ -545,23 +542,23 @@ export function CartSheet({
           <div className="border-t border-hairline mt-auto">
             <div className="flex flex-col gap-2 px-5 py-3.5">
               <div className="flex justify-between items-baseline">
-                <span className="font-sans text-[13px] text-muted-foreground">
+                <span className="font-sans text-sm text-muted-foreground">
                   {hayFechas
                     ? `Subtotal · ${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`
                     : "Subtotal · por jornada"}
                 </span>
-                <span className="font-mono text-[13px] font-semibold text-ink tabular-nums">
+                <span className="font-mono text-sm font-semibold text-ink tabular-nums">
                   {formatARS(subtotal)}
                 </span>
               </div>
 
               {descuentoPct > 0 && (
                 <div className="flex items-center justify-between py-1">
-                  <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     {descuentoLabel(descuentoOrigen, jornadas, clienteSession?.nombre)}
                     <span
                       className={cn(
-                        "inline-flex items-center px-1.5 py-px rounded-full font-mono text-[11px] font-bold",
+                        "inline-flex items-center px-1.5 py-px rounded-full font-mono text-xs font-bold",
                         descuentoOrigen === "cliente"
                           ? "bg-verde/10 text-verde-ink"
                           : "bg-azul/10 text-azul",
@@ -570,21 +567,21 @@ export function CartSheet({
                       −{descuentoPct}%
                     </span>
                   </div>
-                  <span className="font-mono text-[13px] font-semibold text-verde tabular-nums">
+                  <span className="font-mono text-sm font-semibold text-verde tabular-nums">
                     −{formatARS(descuentoMonto)}
                   </span>
                 </div>
               )}
 
               <div className="flex justify-between items-baseline opacity-45">
-                <span className="font-sans text-[13px] text-muted-foreground">
+                <span className="font-sans text-sm text-muted-foreground">
                   Depósito de seguridad
                 </span>
-                <span className="font-mono text-[13px] text-muted-foreground">A definir</span>
+                <span className="font-mono text-sm text-muted-foreground">A definir</span>
               </div>
 
               <div className="flex justify-between items-baseline pt-2 border-t border-hairline mt-1">
-                <span className="font-sans text-[15px] font-bold text-ink">
+                <span className="font-sans text-15 font-bold text-ink">
                   {hayFechas ? "Total" : "Estimado / jornada"}
                 </span>
                 <span
@@ -660,7 +657,7 @@ export function CartSheet({
             />
           ) : (
             <button
-              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-[15px] font-bold hover:bg-amber hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-15 font-bold hover:bg-amber hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleSubmit}
               disabled={submitting}
             >
@@ -717,7 +714,7 @@ export function FichaSheet({
         <div className="w-9 h-1 rounded-full bg-hairline mx-auto mt-2.5 shrink-0" />
         <div className="flex items-start justify-between px-5 py-3 border-b border-hairline shrink-0">
           <div>
-            <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
+            <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground">
               {eq.brand} · {eq.category}
             </div>
             <div className="font-sans text-base font-bold text-ink mt-0.5">{eq.name}</div>
@@ -756,7 +753,7 @@ export function FichaSheet({
               >
                 {fechaDesde ? formatARS(eq.pricePerDay * jornadas) : formatARS(eq.pricePerDay)}
               </div>
-              <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted-foreground mt-0.5">
+              <div className="font-mono text-2xs tracking-[0.18em] uppercase text-muted-foreground mt-0.5">
                 {fechaDesde
                   ? `${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`
                   : "/ jornada"}
@@ -771,10 +768,10 @@ export function FichaSheet({
 
           {/* Specs */}
           <div className="px-5 py-3 border-b border-hairline">
-            <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-1">
+            <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground mb-1">
               Especificaciones
             </div>
-            <div className="font-sans text-[13px] text-muted-foreground leading-relaxed">
+            <div className="font-sans text-sm text-muted-foreground leading-relaxed">
               {eq.description || specsText || "—"}
             </div>
             {eq.specs.length > 0 && (
@@ -791,7 +788,7 @@ export function FichaSheet({
           {/* Includes */}
           {eq.includes && eq.includes.length > 0 && (
             <div className="px-5 py-3 border-b border-hairline">
-              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mb-1.5">
+              <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground mb-1.5">
                 Incluye
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -833,7 +830,7 @@ export function FichaSheet({
             </div>
           ) : (
             <button
-              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-[15px] font-bold hover:bg-amber hover:text-ink transition-colors"
+              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-15 font-bold hover:bg-amber hover:text-ink transition-colors"
               onClick={() => {
                 onAddToCart(eq.id, 1);
                 onClose();
@@ -936,7 +933,7 @@ export function EquipmentRow({
 
         {/* Info */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase leading-none tracking-[0.1em] text-muted-foreground">
+          <div className="flex items-center gap-1.5 font-mono text-2xs uppercase leading-none tracking-[0.1em] text-muted-foreground">
             <span className="min-w-0 truncate">{eq.category}</span>
             {/* Solo el estado accionable (agotado) en el listado; el stock bajo
                 queda para el panel expandido y la ficha, evitando ruido. */}
@@ -945,7 +942,7 @@ export function EquipmentRow({
             )}
           </div>
           <div className="mt-0.5 flex items-start gap-1.5">
-            <span className="line-clamp-2 font-sans text-[15px] font-bold leading-[1.2] text-ink">
+            <span className="line-clamp-2 font-sans text-15 font-bold leading-[1.2] text-ink">
               {nombrePublico}
             </span>
             <ChevronDown
@@ -1019,11 +1016,11 @@ export function EquipmentRow({
               size="lg"
             />
             {inCart > 1 ? (
-              <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+              <span className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
                 {inCart} unidades
               </span>
             ) : pocoStock ? (
-              <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-amber">
+              <span className="font-mono text-xs uppercase tracking-[0.15em] text-amber">
                 {/* Rental, no e-commerce: mostramos el stock como dato neutro
                     ("1 disponible"), no escasez tipo "última unidad" — tener 1
                     unidad es lo normal acá. El stepper ya capa en el stock. */}
@@ -1035,14 +1032,14 @@ export function EquipmentRow({
           {/* Includes — 2 columnas */}
           {eq.includes && eq.includes.length > 0 && (
             <div className="mb-2">
-              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="mb-1.5 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                 Incluye
               </div>
               <div className="grid grid-cols-2 gap-1">
                 {eq.includes.map((item, i) => (
                   <span
                     key={i}
-                    className="rounded-full border border-hairline bg-card px-2.5 py-0.5 font-sans text-[11px] text-ink"
+                    className="rounded-full border border-hairline bg-card px-2.5 py-0.5 font-sans text-xs text-ink"
                   >
                     <svg
                       width="8"
@@ -1071,9 +1068,9 @@ export function EquipmentRow({
                 return (
                   <span
                     key={f.label}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-card px-2 py-0.5 font-sans text-[11px]"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-card px-2 py-0.5 font-sans text-xs"
                   >
-                    <span className="font-mono uppercase tracking-wider text-[11px] text-muted-foreground">
+                    <span className="font-mono uppercase tracking-wider text-xs text-muted-foreground">
                       {f.label}
                     </span>
                     {hasValue && <span className="font-medium text-ink">{f.value}</span>}
@@ -1164,14 +1161,14 @@ export function BrandSheet({
                     {b.nombre}
                   </div>
                   {b.destacada && (
-                    <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-amber/80 mt-0.5">
+                    <div className="font-mono text-xs uppercase tracking-[0.18em] text-amber/80 mt-0.5">
                       Destacada
                     </div>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                <span className="font-mono text-2xs tabular-nums text-muted-foreground">
                   {b.count}
                 </span>
                 {active && <Check className="h-4 w-4 text-amber" />}
@@ -1266,7 +1263,7 @@ export function FiltrosSheet({
         <div className="rounded-lg border border-hairline px-3.5 py-3 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="font-sans text-sm font-semibold text-ink">Disponibles</div>
-            <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+            <div className="font-mono text-2xs text-muted-foreground mt-0.5">
               Esconder equipos sin stock para tus fechas
             </div>
           </div>
@@ -1297,7 +1294,7 @@ export function FiltrosSheet({
         >
           <div className="min-w-0">
             <div className="font-sans text-sm font-semibold text-ink">Marca</div>
-            <div className="font-mono text-[10px] text-muted-foreground mt-0.5 truncate">
+            <div className="font-mono text-2xs text-muted-foreground mt-0.5 truncate">
               {selectedBrand ?? "Todas"}
             </div>
           </div>

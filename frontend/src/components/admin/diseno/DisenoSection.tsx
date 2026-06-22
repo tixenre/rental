@@ -248,7 +248,7 @@ function SortableRow({
         >
           {categoria.nombre}
         </div>
-        <div className="text-[10px] text-muted-foreground tabular-nums">
+        <div className="text-2xs text-muted-foreground tabular-nums">
           {categoria.total} {categoria.total === 1 ? "equipo" : "equipos"}
         </div>
       </div>
@@ -294,7 +294,7 @@ function PlainRow({
         >
           {categoria.nombre}
         </div>
-        <div className="text-[10px] text-muted-foreground tabular-nums">
+        <div className="text-2xs text-muted-foreground tabular-nums">
           {categoria.total} {categoria.total === 1 ? "equipo" : "equipos"}
         </div>
       </div>

@@ -276,7 +276,7 @@ export function CatalogoMovil() {
               <Calendar size={14} className="shrink-0 text-amber" />
               <span>{datePillLabel}</span>
               {fechaDesde && (
-                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink/60">
+                <span className="font-mono text-xs uppercase tracking-[0.2em] text-ink/60">
                   · {jornadas} jorn.
                 </span>
               )}
@@ -354,7 +354,7 @@ export function CatalogoMovil() {
                 >
                   <span
                     className={cn(
-                      "font-sans text-[13px] leading-none",
+                      "font-sans text-sm leading-none",
                       activeTab === cat
                         ? "font-bold text-ink"
                         : "font-medium text-muted-foreground",
@@ -362,7 +362,7 @@ export function CatalogoMovil() {
                   >
                     {cat}
                   </span>
-                  <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground leading-none">
+                  <span className="font-mono text-2xs tracking-[0.15em] text-muted-foreground leading-none">
                     {count}
                   </span>
                 </button>
@@ -375,7 +375,7 @@ export function CatalogoMovil() {
         <div className="flex items-center gap-1.5 px-4 py-2">
           <button
             className={cn(
-              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
+              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-xs font-medium text-ink transition-all",
               stockOnly
                 ? "bg-amber-soft border-amber/60 font-semibold"
                 : "border-hairline bg-transparent hover:border-ink hover:bg-muted",
@@ -401,7 +401,7 @@ export function CatalogoMovil() {
             type="button"
             onClick={() => setShowBrandSheet(true)}
             className={cn(
-              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium text-ink transition-all",
+              "flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-xs font-medium text-ink transition-all",
               selectedBrand
                 ? "bg-amber-soft border-amber/60 font-semibold"
                 : "border-hairline bg-transparent hover:border-ink hover:bg-muted",
@@ -414,7 +414,7 @@ export function CatalogoMovil() {
             type="button"
             onClick={() => setShowFiltrosSheet(true)}
             className={cn(
-              "relative flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-[11px] font-medium transition-all",
+              "relative flex min-h-[44px] items-center gap-1.5 px-[11px] py-[5px] rounded-full border font-sans text-xs font-medium transition-all",
               activeFiltersCount > 0
                 ? "border-ink text-ink"
                 : "border-hairline text-muted-foreground hover:border-ink hover:text-ink",
@@ -423,7 +423,7 @@ export function CatalogoMovil() {
             <SlidersHorizontal size={11} />
             Filtros
             {activeFiltersCount > 0 && (
-              <span className="inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[10px] font-bold text-amber">
+              <span className="inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-ink px-1 font-mono text-2xs font-bold text-amber">
                 {activeFiltersCount}
               </span>
             )}
@@ -494,16 +494,16 @@ export function CatalogoMovil() {
             }}
           >
             <div className="flex-1">
-              <div className="font-sans text-[13px] font-bold text-ink leading-tight">
+              <div className="font-sans text-sm font-bold text-ink leading-tight">
                 {totalItems} {totalItems === 1 ? "ítem" : "ítems"}
               </div>
-              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground mt-0.5">
+              <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground mt-0.5">
                 {fechaDesde ? `${jornadas} jornadas` : "elegí fechas"}
               </div>
             </div>
             <div className="flex-1" />
             <div className="text-right">
-              <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
+              <div className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground">
                 Total
               </div>
               <div
@@ -512,7 +512,7 @@ export function CatalogoMovil() {
               >
                 {formatARS(cartTotal)}
                 {cartConIva && (
-                  <span className="text-[11px] font-normal text-muted-foreground"> + IVA</span>
+                  <span className="text-xs font-normal text-muted-foreground"> + IVA</span>
                 )}
               </div>
             </div>

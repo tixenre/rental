@@ -124,7 +124,7 @@ export function EquipmentRow({
           className="flex min-w-0 flex-1 flex-col text-left"
         >
           {/* Categoría — solo la categoría (sin marca) */}
-          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <div className="flex items-center gap-1.5 font-mono text-2xs uppercase tracking-[0.18em] text-muted-foreground">
             <span className="truncate">{item.category}</span>
             {disponible !== undefined && (sinStock || stockBajo) && (
               <span className={cn("shrink-0", sinStock ? "text-destructive" : "text-amber")}>
@@ -135,7 +135,7 @@ export function EquipmentRow({
 
           {/* Nombre: font-sans bold 15px */}
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-sans text-[15px] font-bold leading-tight text-ink">
+            <span className="truncate font-sans text-15 font-bold leading-tight text-ink">
               {nombrePublico}
             </span>
             <ChevronDown
@@ -217,7 +217,7 @@ export function EquipmentRow({
                   {quickFacts.map((f) => (
                     <span
                       key={f.label}
-                      className="inline-flex items-center gap-1.5 rounded-full border hairline bg-background px-2 py-0.5 text-[11px]"
+                      className="inline-flex items-center gap-1.5 rounded-full border hairline bg-background px-2 py-0.5 text-xs"
                     >
                       <span className="font-mono uppercase tracking-wider text-muted-foreground">
                         {f.label}

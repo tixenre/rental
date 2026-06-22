@@ -25,7 +25,7 @@ export function ActiveFiltersChips({
 
   return (
     <div className="-mx-3 mb-3 flex items-center gap-1.5 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-      <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground hidden sm:inline">
+      <span className="shrink-0 text-2xs uppercase tracking-wider text-muted-foreground hidden sm:inline">
         Filtros:
       </span>
       {trimmed && (

@@ -48,7 +48,7 @@ function SpecsConsolidadasPage() {
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-6xl mx-auto">
       <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Back-office · Inventario
         </div>
         <h1 className="font-display text-3xl text-ink">Specs</h1>
@@ -86,7 +86,7 @@ function SpecsConsolidadasPage() {
             {categorias.map((cat) => (
               <TabsTrigger key={cat.id} value={String(cat.id)} className="gap-2">
                 {cat.nombre}
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                <Badge variant="secondary" className="text-2xs px-1.5 py-0">
                   {cat.specs.length}
                 </Badge>
               </TabsTrigger>

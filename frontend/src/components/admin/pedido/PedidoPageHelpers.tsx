@@ -121,12 +121,12 @@ export function ItemRow({
           ) : (
             <>
               <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
-              <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+              <div className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
                 {it.marca && <span className="truncate">{it.marca}</span>}
                 {stock && (
                   <span
                     className={cn(
-                      "inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px]",
+                      "inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-2xs",
                       disponible <= 0
                         ? "bg-destructive/10 text-destructive"
                         : "bg-muted text-muted-foreground",
@@ -245,7 +245,7 @@ export function SaveIndicator({ status }: { status: string }) {
   const s = map[status] ?? map.idle;
   if (!s.tx) return null;
   return (
-    <span className={cn("inline-flex items-center gap-1 font-mono text-[11px]", s.cls)}>
+    <span className={cn("inline-flex items-center gap-1 font-mono text-xs", s.cls)}>
       {status === "saved" && <Check className="h-3 w-3" />}
       {s.tx}
     </span>
@@ -286,7 +286,7 @@ export function FieldLabel({
 }) {
   return (
     <label className={cn("block", className)}>
-      <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
+      <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
         {label}
       </span>
       {children}
@@ -297,7 +297,7 @@ export function FieldLabel({
 export function RailSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
+      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
         {label}
       </div>
       <div className="space-y-2">{children}</div>

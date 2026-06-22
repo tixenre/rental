@@ -54,7 +54,7 @@ export function PriceBlock({
   const { total } = priceBreakdown(perDay, jornadas, qty);
   const ivaSuffix = conIva ? " +IVA" : "";
 
-  const amountClass = size === "lg" ? "text-[19px]" : size === "md" ? "text-[17px]" : "text-[14px]";
+  const amountClass = size === "lg" ? "text-[19px]" : size === "md" ? "text-[17px]" : "text-sm"; // eslint-disable-line no-restricted-syntax -- tamaños ópticos del precio: escala entre text-sm y text-xl calibrada para moneda
 
   return (
     <div
@@ -75,13 +75,13 @@ export function PriceBlock({
       </span>
 
       {/* Label secundario */}
-      <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground leading-none">
+      <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground leading-none">
         {showPeriodTotal ? `${jornadas} jornadas` : `/ jornada${ivaSuffix}`}
       </span>
 
       {/* Por-jornada cuando mostramos total del período (oculto en compact) */}
       {showPeriodTotal && !compact && (
-        <span className="font-mono text-[11px] tabular-nums text-muted-foreground leading-none whitespace-nowrap">
+        <span className="font-mono text-xs tabular-nums text-muted-foreground leading-none whitespace-nowrap">
           {formatARS(perDay)} / jornada{ivaSuffix}
         </span>
       )}

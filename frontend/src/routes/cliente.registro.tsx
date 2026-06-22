@@ -189,7 +189,7 @@ export default function ClienteRegistroPage() {
       <div className="min-h-screen bg-background grid place-items-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 rounded-full border-2 border-amber border-t-transparent animate-spin" />
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <p className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Verificando…
           </p>
         </div>
@@ -210,14 +210,14 @@ export default function ClienteRegistroPage() {
           {/* Wordmark */}
           <div className="mb-8 flex items-center gap-3">
             <span className="wordmark text-2xl text-ink">rambla rental.</span>
-            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+            <span className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
               Portal
             </span>
           </div>
 
           {/* Heading */}
           <div className="mb-7">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
               Un paso más
             </div>
             <h1 className="font-display text-[2.25rem] leading-[0.95] text-ink lowercase">
@@ -235,13 +235,13 @@ export default function ClienteRegistroPage() {
                 <div className="font-mono text-[8.5px] uppercase tracking-[0.18em] text-muted-foreground mb-0.5">
                   Cuenta verificada
                 </div>
-                <div className="font-sans text-[13px] font-semibold text-ink truncate">
+                <div className="font-sans text-sm font-semibold text-ink truncate">
                   {info.email}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1 rounded-full border border-[#4285F4]/20 bg-[#4285F4]/10 px-2 py-1">
                 <GoogleIcon size={14} />
-                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#4285F4]">
+                <span className="font-mono text-2xs uppercase tracking-[0.1em] text-[#4285F4]">
                   Google
                 </span>
               </div>
@@ -374,7 +374,7 @@ export default function ClienteRegistroPage() {
                 {/* Datos para Factura A */}
                 {esRI && (
                   <div className="rounded-xl border border-amber/30 bg-amber-soft/40 p-4 space-y-3">
-                    <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-ink/60">
+                    <div className="flex items-center gap-2 font-mono text-2xs uppercase tracking-[0.22em] text-ink/60">
                       <Receipt className="h-3.5 w-3.5" strokeWidth={1.5} />
                       Factura A
                     </div>
@@ -407,7 +407,7 @@ export default function ClienteRegistroPage() {
                 {sending ? "Guardando…" : "Completar registro →"}
               </button>
 
-              <p className="text-center font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
+              <p className="text-center font-mono text-2xs tracking-[0.1em] text-muted-foreground">
                 Tus datos quedan guardados para la próxima vez.
               </p>
             </form>
@@ -422,7 +422,7 @@ export default function ClienteRegistroPage() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+    <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
       {children}
     </div>
   );

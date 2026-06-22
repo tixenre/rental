@@ -44,7 +44,7 @@ function PagosLogPage() {
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
       <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Back-office · Finanzas
         </div>
         <h1 className="font-display text-3xl text-ink">Cobros de pedidos</h1>
@@ -104,7 +104,7 @@ function PagosLogPage() {
 
       {/* Total del subconjunto */}
       <div className="flex items-baseline gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Total {q.data ? `(${q.data.count})` : ""}
         </span>
         <span className="font-mono text-xl font-semibold tabular-nums text-ink">
@@ -129,7 +129,7 @@ function PagosLogPage() {
         <div className="overflow-x-auto rounded-lg border hairline">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b hairline text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Fecha</th>
                 <th className="px-3 py-2 font-medium">Pedido</th>
                 <th className="px-3 py-2 font-medium">Cliente</th>
@@ -183,7 +183,7 @@ function PagosLogPage() {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+    <label className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
       {children}
     </label>
   );

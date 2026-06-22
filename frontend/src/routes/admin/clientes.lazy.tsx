@@ -92,7 +92,7 @@ function ClientesPage() {
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-7xl mx-auto">
       <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Back-office
           </div>
           <h1 className="font-display text-3xl text-ink">Clientes</h1>
@@ -429,7 +429,7 @@ function ClienteHistorialSheet({
                     </div>
                   )}
                 </div>
-                <div className="text-[10px] text-muted-foreground font-mono">
+                <div className="text-2xs text-muted-foreground font-mono">
                   Verificado {fmtFecha(cliente.dni_validado_at)}
                 </div>
               </div>
@@ -448,7 +448,7 @@ function ClienteHistorialSheet({
                       <input
                         readOnly
                         value={linkVerif}
-                        className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-[11px] text-ink outline-none truncate"
+                        className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-xs text-ink outline-none truncate"
                       />
                       <button
                         type="button"
@@ -561,7 +561,7 @@ function Info({
 }) {
   return (
     <div className={className}>
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </div>
       <div className="text-ink">{value}</div>

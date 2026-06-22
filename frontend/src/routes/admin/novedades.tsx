@@ -14,7 +14,7 @@ function NovedadesPage() {
   return (
     <div className="px-4 md:px-8 py-6 md:py-10 max-w-3xl mx-auto">
       <div className="mb-8">
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Back-office
         </div>
         <h1 className="font-display text-3xl md:text-4xl text-ink flex items-center gap-2">
@@ -47,17 +47,17 @@ function EntryCard({ entry }: { entry: ChangelogEntry }) {
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-base text-ink leading-snug">{entry.title}</h2>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                 {fmtDate(entry.date)}
               </span>
               {entry.labels?.map((l) => (
-                <Badge key={l} variant="outline" className="text-[10px] py-0 h-5">
+                <Badge key={l} variant="outline" className="text-2xs py-0 h-5">
                   {l}
                 </Badge>
               ))}
             </div>
           </div>
-          <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="shrink-0 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             #{entry.number}
           </span>
         </header>

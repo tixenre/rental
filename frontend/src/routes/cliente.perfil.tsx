@@ -112,7 +112,7 @@ function PerfilPage() {
       {/* Sub-header amarillo */}
       <div className="bg-amber border-b hairline">
         <div className="max-w-xl mx-auto px-4 py-5">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink/70">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-ink/70">
             Portal de clientes
           </div>
           <h1 className="font-display text-3xl text-ink mt-1">Mi perfil</h1>
@@ -276,10 +276,10 @@ function Field({
   return (
     <div className="space-y-1.5">
       <label className="block">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           {label}
         </span>
-        {hint && <span className="block text-[11px] text-muted-foreground/80 mt-0.5">{hint}</span>}
+        {hint && <span className="block text-xs text-muted-foreground/80 mt-0.5">{hint}</span>}
       </label>
       {children}
     </div>

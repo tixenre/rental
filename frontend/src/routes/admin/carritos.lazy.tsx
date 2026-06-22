@@ -66,7 +66,7 @@ function CarritosPage() {
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-6xl mx-auto">
       <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Back-office
         </div>
         <div className="flex items-end justify-between gap-3 flex-wrap">

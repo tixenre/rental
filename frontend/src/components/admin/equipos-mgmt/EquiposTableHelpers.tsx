@@ -229,7 +229,7 @@ export function PrecioJornadaInline({ equipo, onSaved }: { equipo: Equipo; onSav
 
   return (
     <div className="relative ml-auto w-28">
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">
+      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
         $
       </span>
       <Input
@@ -261,7 +261,7 @@ export function PrecioJornadaInline({ equipo, onSaved }: { equipo: Equipo; onSav
       />
       {isManual && (
         <span
-          className="absolute -top-1.5 -right-1 rounded-full bg-amber px-1 text-[10px] font-mono uppercase tracking-wide text-ink"
+          className="absolute -top-1.5 -right-1 rounded-full bg-amber px-1 text-2xs font-mono uppercase tracking-wide text-ink"
           title="Manual"
         >
           M
@@ -300,13 +300,13 @@ export function KpiCard({
           : "hairline",
       )}
     >
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
         {label}
       </div>
       <div className="font-display text-2xl sm:text-3xl font-black text-ink tabular-nums leading-none mt-1">
         {value}
       </div>
-      <div className="font-sans text-[11px] text-muted-foreground mt-1">{meta}</div>
+      <div className="font-sans text-xs text-muted-foreground mt-1">{meta}</div>
     </div>
   );
 }

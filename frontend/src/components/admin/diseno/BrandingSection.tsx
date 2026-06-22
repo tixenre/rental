@@ -196,7 +196,7 @@ export function BrandingSection() {
                 </>
               )}
             </Button>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               JPG o PNG, máx 5MB. Se recorta automáticamente a 1200×630.
             </p>
           </div>
@@ -212,7 +212,7 @@ export function BrandingSection() {
         <p className="text-xs text-muted-foreground">
           Número que se usa para el botón "Consulta por WhatsApp" en el catálogo y en cada card de
           pedido del portal del cliente. Formato internacional:
-          <code className="ml-1 font-mono text-[11px] bg-muted px-1 rounded">+549...</code>
+          <code className="ml-1 font-mono text-xs bg-muted px-1 rounded">+549...</code>
         </p>
 
         <div className="flex gap-2 items-center">

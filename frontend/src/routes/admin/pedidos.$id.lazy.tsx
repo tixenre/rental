@@ -361,7 +361,7 @@ function PedidoEditorPage() {
           <span className="font-display text-lg text-ink truncate">
             {p.cliente_nombre || "Sin cliente"}
           </span>
-          <span className="font-mono text-[11px] text-muted-foreground">
+          <span className="font-mono text-xs text-muted-foreground">
             #{p.numero_pedido ?? p.id}
           </span>
           <EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />
@@ -405,7 +405,7 @@ function PedidoEditorPage() {
                     </span>
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-[10px]",
+                        "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-2xs",
                         p.cliente_dni_validado_at
                           ? "bg-verde/10 text-verde"
                           : "bg-amber/15 text-ink",
@@ -419,7 +419,7 @@ function PedidoEditorPage() {
                       {p.cliente_dni_validado_at ? "Verificado" : "Sin verificar"}
                     </span>
                   </div>
-                  <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+                  <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                     {[datos.cliente_email, datos.cliente_telefono].filter(Boolean).join(" · ") ||
                       "sin contacto"}
                   </div>
@@ -454,7 +454,7 @@ function PedidoEditorPage() {
                     )
                   }
                 />
-                <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+                <p className="mt-1.5 font-mono text-xs text-muted-foreground">
                   O cargá el contacto a mano abajo (pedido sin ficha vinculada).
                 </p>
               </div>
@@ -488,15 +488,15 @@ function PedidoEditorPage() {
             title="Fechas del alquiler"
             aside={
               !datos.fecha_desde || !datos.fecha_hasta ? (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-destructive">
+                <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.2em] text-destructive">
                   <AlertTriangle className="h-3 w-3" /> sin fechas
                 </span>
               ) : hasOverstock ? (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-destructive">
+                <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.2em] text-destructive">
                   <AlertTriangle className="h-3 w-3" /> revisar stock
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-verde">
+                <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.2em] text-verde">
                   <Check className="h-3 w-3" /> stock OK
                 </span>
               )
@@ -524,7 +524,7 @@ function PedidoEditorPage() {
                     <span className="font-mono text-base font-semibold leading-none">
                       {jornadas}
                     </span>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground ml-1">
+                    <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground ml-1">
                       {jornadas === 1 ? "jornada" : "jornadas"}
                     </span>
                   </span>
@@ -637,7 +637,7 @@ function PedidoEditorPage() {
                     <input
                       readOnly
                       value={linkVerif}
-                      className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-[11px] text-ink outline-none truncate"
+                      className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-xs text-ink outline-none truncate"
                     />
                     <button
                       type="button"
@@ -722,13 +722,13 @@ function PedidoEditorPage() {
           {/* Cobranza */}
           <RailSection label="Cobranza">
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] text-muted-foreground">
+              <span className="font-mono text-xs text-muted-foreground">
                 {fmtArs(pagadoMonto)} de {fmtArs(total)}
                 {pagadoMonto === 0 ? " · sin seña" : ""}
               </span>
               <span
                 className={cn(
-                  "font-mono text-[11px] font-semibold",
+                  "font-mono text-xs font-semibold",
                   pagadoMonto >= total && total > 0 ? "text-verde" : "text-destructive",
                 )}
               >
@@ -769,7 +769,7 @@ function PedidoEditorPage() {
                     href={`${pedidoPdfUrl(p.id, doc.kind)}?format=html`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 rounded-md border hairline px-2 py-1 font-mono text-[11px] text-muted-foreground hover:text-ink hover:border-ink"
+                    className="inline-flex items-center gap-1 rounded-md border hairline px-2 py-1 font-mono text-xs text-muted-foreground hover:text-ink hover:border-ink"
                     title={`Ver ${doc.label}`}
                   >
                     <Eye className="h-3 w-3" />
@@ -823,7 +823,7 @@ function PedidoEditorPage() {
       {/* Barra inferior sticky (mobile) */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 flex items-center gap-2 px-4 py-2.5 border-t hairline bg-surface-elevated safe-b">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Total
           </div>
           <div className="font-mono text-base font-semibold tabular-nums">{fmtArs(total)}</div>
@@ -949,7 +949,7 @@ function FlowStrip({ estado }: { estado: PedidoEstado }) {
   if (estado === "cancelado") {
     return (
       <div className="flex items-center">
-        <span className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-[10px] text-destructive">
+        <span className="inline-flex items-center gap-1 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 font-mono text-2xs text-destructive">
           Cancelado
         </span>
       </div>
@@ -962,7 +962,7 @@ function FlowStrip({ estado }: { estado: PedidoEstado }) {
         <span key={e} className="inline-flex items-center gap-1">
           <span
             className={cn(
-              "font-mono text-[10px]",
+              "font-mono text-2xs",
               i < idx && "text-verde",
               i === idx && "text-ink font-semibold",
               i > idx && "text-muted-foreground/60",
@@ -971,7 +971,7 @@ function FlowStrip({ estado }: { estado: PedidoEstado }) {
           >
             {ESTADO_LABEL[e].slice(0, 5)}
           </span>
-          {i < FLOW.length - 1 && <span className="text-muted-foreground/40 text-[10px]">›</span>}
+          {i < FLOW.length - 1 && <span className="text-muted-foreground/40 text-2xs">›</span>}
         </span>
       ))}
     </div>

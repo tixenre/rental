@@ -38,7 +38,7 @@ function ReporteMensualPage() {
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-4xl mx-auto">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Back-office · Finanzas
           </div>
           <h1 className="font-display text-3xl text-ink">Reporte mensual</h1>
@@ -99,7 +99,7 @@ function ReporteMensualPage() {
             <div className="overflow-x-auto rounded-lg border hairline">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b hairline text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Socio</th>
                     <th className="px-3 py-2 font-medium text-right">Su parte</th>
                     <th className="px-3 py-2 font-medium text-right">Cobró</th>
@@ -187,7 +187,7 @@ function Kpi({
 }) {
   return (
     <div className="rounded-xl border hairline bg-surface-elevated p-5">
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </div>
       <div
@@ -205,7 +205,7 @@ function Kpi({
 function Section({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         {titulo}
       </div>
       {children}

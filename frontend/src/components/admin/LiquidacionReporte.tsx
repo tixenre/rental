@@ -412,7 +412,7 @@ export function Kpi({
     <div className="rounded-lg border hairline bg-background p-3">
       <div className="flex items-center gap-2 text-muted-foreground">
         <Icon className="h-4 w-4" />
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em]">{label}</div>
+        <div className="font-mono text-2xs uppercase tracking-[0.2em]">{label}</div>
       </div>
       <div className="font-display text-2xl text-ink mt-1.5 truncate">{value}</div>
       {sub && <div className="text-xs text-muted-foreground tabular-nums">{sub}</div>}
@@ -454,14 +454,14 @@ export function BarChart({
     <div className="flex items-end gap-1 h-32">
       {data.map((d) => (
         <div key={d.label} className="flex-1 flex flex-col items-center gap-1 group">
-          <div className="text-[9px] font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
+          <div className="text-3xs font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
             {valueFormat(d.value)}
           </div>
           <div
             className="w-full bg-ink/80 hover:bg-ink rounded-sm transition-colors min-h-[2px]"
             style={{ height: `${(d.value / max) * 100}%` }}
           />
-          <div className="text-[9px] font-mono text-muted-foreground truncate w-full text-center">
+          <div className="text-3xs font-mono text-muted-foreground truncate w-full text-center">
             {labelFn(d.label)}
           </div>
         </div>

@@ -202,17 +202,17 @@ export function PhotoCard({
             </button>
             <div className="absolute bottom-1 left-1">
               {pendingFile && (
-                <Badge variant="secondary" className="text-[9px]">
+                <Badge variant="secondary" className="text-3xs">
                   Local — al guardar
                 </Badge>
               )}
               {isHosted && (
-                <Badge variant="default" className="text-[9px]">
+                <Badge variant="default" className="text-3xs">
                   ✓ En R2
                 </Badge>
               )}
               {isExternal && (
-                <Badge variant="outline" className="text-[9px]">
+                <Badge variant="outline" className="text-3xs">
                   URL externa
                 </Badge>
               )}
@@ -349,7 +349,7 @@ export function CategoriasPicker({
                     <button key={c.id} type="button" onClick={() => toggle(c.id)}>
                       <Badge
                         variant={selected.has(c.id) ? "default" : "secondary"}
-                        className="cursor-pointer text-[10px]"
+                        className="cursor-pointer text-2xs"
                       >
                         {c.nombre}
                       </Badge>

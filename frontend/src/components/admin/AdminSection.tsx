@@ -70,7 +70,7 @@ export function AdminSection({
             !open && "-rotate-90",
           )}
         />
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           {title}
         </span>
         {badge && (

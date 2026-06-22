@@ -38,7 +38,7 @@ export function PreviewPane({
       <button
         type="button"
         onClick={onOpen}
-        className="sticky top-[140px] z-[var(--z-sub-toolbar)] hidden lg:flex items-center justify-center gap-1.5 h-32 w-7 self-start [writing-mode:vertical-rl] rotate-180 rounded-l-md border border-r-0 border-[var(--hairline)] bg-card font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink hover:border-ink transition"
+        className="sticky top-[140px] z-[var(--z-sub-toolbar)] hidden lg:flex items-center justify-center gap-1.5 h-32 w-7 self-start [writing-mode:vertical-rl] rotate-180 rounded-l-md border border-r-0 border-[var(--hairline)] bg-card font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground hover:text-ink hover:border-ink transition"
         aria-label="Mostrar panel de detalle"
       >
         Detalle <ArrowRight className="h-3 w-3" />
@@ -52,7 +52,7 @@ export function PreviewPane({
       aria-label="Panel de detalle del equipo seleccionado"
     >
       <div className="flex items-center justify-between border-b border-[var(--hairline)] px-4 py-2 shrink-0">
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+        <span className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
           Detalle
         </span>
         <button
@@ -75,7 +75,7 @@ function PreviewEmpty() {
       <div className="opacity-25">
         <ShoppingBag className="h-12 w-12" strokeWidth={1.2} />
       </div>
-      <div className="font-sans text-[13px] leading-[1.5]">
+      <div className="font-sans text-sm leading-[1.5]">
         Hacé click en un equipo de la lista para ver su detalle, precio y agregarlo al rental.
       </div>
     </div>
@@ -120,29 +120,29 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
 
         <div className="p-5 flex flex-col gap-3.5">
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               {item.brand} · {item.category}
             </div>
-            <h3 className="font-sans text-[22px] font-bold text-ink leading-[1.1] tracking-[-0.015em] mt-1">
+            <h3 className="font-sans text-22 font-bold text-ink leading-[1.1] tracking-[-0.015em] mt-1">
               {item.name}
             </h3>
           </div>
 
           <div className="flex justify-between items-baseline rounded-lg border border-[color-mix(in_oklch,var(--amber)_35%,transparent)] bg-amber-soft px-3.5 py-3">
             <div>
-              <div className="font-mono text-[22px] font-bold text-ink tabular-nums leading-none">
+              <div className="font-mono text-22 font-bold text-ink tabular-nums leading-none">
                 {formatARS(item.pricePerDay)}
               </div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground mt-1">
+              <div className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground mt-1">
                 / jornada
               </div>
             </div>
             {showPeriodTotal && (
               <div className="text-right">
-                <div className="font-mono text-[11px] text-muted-foreground">
+                <div className="font-mono text-xs text-muted-foreground">
                   {price.jornadas}j · total
                 </div>
-                <div className="font-mono text-[13px] font-bold text-ink tabular-nums mt-0.5">
+                <div className="font-mono text-sm font-bold text-ink tabular-nums mt-0.5">
                   {formatARS(price.total)}
                 </div>
               </div>
@@ -151,7 +151,7 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
 
           {specs.length > 0 && (
             <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+              <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mb-2">
                 Detalles
               </div>
               <ul className="font-sans text-xs text-muted-foreground leading-[1.6]">
@@ -167,7 +167,7 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
           {disponible !== undefined && (
             <div
               className={cn(
-                "font-mono text-[10px]",
+                "font-mono text-2xs",
                 sinStock ? "text-destructive" : "text-muted-foreground",
               )}
             >
@@ -209,8 +209,8 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
               <Minus className="h-4 w-4" />
             </button>
             <div className="text-center">
-              <div className="font-display text-[22px] font-black text-ink leading-none">{qty}</div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink/70">
+              <div className="font-display text-22 font-black text-ink leading-none">{qty}</div>
+              <div className="font-mono text-2xs uppercase tracking-[0.15em] text-ink/70">
                 {qty === 1 ? "unidad" : "unidades"}
               </div>
             </div>

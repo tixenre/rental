@@ -125,7 +125,7 @@ export function CambioYPreciosSection() {
               placeholder="1200"
               className="mt-1"
             />
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground">
               Última actualización: {fmtFecha(settingQ.data?.updated_at ?? null)}
               {settingQ.data?.updated_by && ` · ${settingQ.data.updated_by}`}
             </p>
@@ -142,7 +142,7 @@ export function CambioYPreciosSection() {
           <div>
             <div className="text-ink font-medium">Recalcular precios</div>
             <p className="text-xs text-muted-foreground">
-              <code className="font-mono text-[11px] bg-muted/50 px-1 py-0.5 rounded">
+              <code className="font-mono text-xs bg-muted/50 px-1 py-0.5 rounded">
                 precio_jornada = precio_usd × usd_rate × (roi_pct / 100)
               </code>{" "}
               — redondeado al múltiplo de 100 más cercano.
@@ -316,7 +316,7 @@ function PreciosManualesPanel({ onRecalcSelected }: { onRecalcSelected: (ids: nu
               <button
                 type="button"
                 onClick={toggleAll}
-                className="text-[11px] underline hover:text-ink"
+                className="text-xs underline hover:text-ink"
               >
                 {selected.size === conDelta.length
                   ? "Deseleccionar todos"
@@ -333,7 +333,7 @@ function PreciosManualesPanel({ onRecalcSelected }: { onRecalcSelected: (ids: nu
             </div>
           )}
           <table className="w-full text-xs">
-            <thead className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <thead className="text-2xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-1.5 w-8"></th>
                 <th className="text-left px-3 py-1.5">Equipo</th>

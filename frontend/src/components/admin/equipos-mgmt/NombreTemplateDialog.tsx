@@ -112,7 +112,7 @@ export function NombreTemplateDialog({
                   key={p}
                   type="button"
                   onClick={() => insertPlaceholder(p)}
-                  className="rounded-md border hairline px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition"
+                  className="rounded-md border hairline px-2 py-0.5 font-mono text-xs text-ink hover:bg-amber-soft transition"
                 >
                   {p}
                 </button>
@@ -122,7 +122,7 @@ export function NombreTemplateDialog({
                   key={label}
                   type="button"
                   onClick={() => insertPlaceholder(`{spec:${label}}`)}
-                  className="rounded-md border hairline border-amber/40 bg-amber-soft/30 px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition"
+                  className="rounded-md border hairline border-amber/40 bg-amber-soft/30 px-2 py-0.5 font-mono text-xs text-ink hover:bg-amber-soft transition"
                 >
                   {`{spec:${label}}`}
                 </button>
@@ -139,7 +139,7 @@ export function NombreTemplateDialog({
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1">
+            <p className="text-2xs text-muted-foreground mt-1">
               Ejemplo simulado con marca "Sony", modelo "FX3". Los valores de specs muestran su
               label entre &lt;…&gt;.
             </p>

@@ -33,10 +33,7 @@ export function IncludesLine({
   const rest = includes.length > max ? ` · +${includes.length - max}` : "";
   return (
     <p
-      className={cn(
-        "truncate font-mono text-[11px] tracking-[0.1em] text-muted-foreground",
-        className,
-      )}
+      className={cn("truncate font-mono text-xs tracking-[0.1em] text-muted-foreground", className)}
     >
       {label && <span className="opacity-70">{label} </span>}
       {shown + rest}

@@ -545,7 +545,7 @@ function Index() {
                     {cat}
                     <span
                       className={cn(
-                        "font-mono text-[10px] tracking-[0.1em] tabular",
+                        "font-mono text-2xs tracking-[0.1em] tabular",
                         isActive ? "text-ink/70" : "text-muted-foreground",
                       )}
                     >
@@ -572,7 +572,7 @@ function Index() {
                 >
                   <Heart className={cn("h-3 w-3", favoritosOnly && "fill-current")} />
                   Favoritos
-                  <span className="font-mono text-[9px] tabular">{fav.count}</span>
+                  <span className="font-mono text-3xs tabular">{fav.count}</span>
                 </button>
               )}
 
@@ -639,7 +639,7 @@ function Index() {
             scrollear). */}
       {mode === "list" && (
         <div className="hidden sm:flex items-center gap-2 px-6 py-2 border-b hairline bg-background overflow-x-auto scrollbar-none">
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground shrink-0">
+          <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground shrink-0">
             Populares:
           </span>
           {POPULAR_CHIPS.map((chip) => (
@@ -841,7 +841,7 @@ function GridMode({
       {isFiltered && (
         <div className="px-4 lg:px-12">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Filtrando por
             </span>
             {selectedBrand && (
@@ -905,7 +905,7 @@ function GridMode({
           <section className="px-4 lg:px-12">
             <div className="mb-4 flex items-end justify-between gap-3">
               <h2 className="font-display text-2xl sm:text-3xl">Resultados</h2>
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular">
+              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular">
                 {filtered.length} {filtered.length === 1 ? "equipo" : "equipos"}
               </span>
             </div>
@@ -935,7 +935,7 @@ function GridMode({
               >
                 <div className="mb-4 flex items-end justify-between gap-3">
                   <h2 className="font-display text-2xl sm:text-3xl">{c}</h2>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular">
+                  <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular">
                     {items.length} {items.length === 1 ? "equipo" : "equipos"}
                   </span>
                 </div>
@@ -1174,14 +1174,14 @@ function ListMode({
               {hasMore && (
                 <div
                   ref={sentinelRef}
-                  className="flex items-center justify-center py-6 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
+                  className="flex items-center justify-center py-6 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground"
                 >
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Cargando más equipos…
                 </div>
               )}
               {!hasMore && filtered.length > PAGE_SIZE && (
-                <div className="py-6 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                <div className="py-6 text-center font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                   Fin del catálogo · {filtered.length} equipos
                 </div>
               )}

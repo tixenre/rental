@@ -151,7 +151,7 @@ export function NombreTemplateBuilder({
 
       <div className="p-3 space-y-3">
         <div>
-          <div className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider mb-1">
+          <div className="text-xs text-muted-foreground font-mono uppercase tracking-wider mb-1">
             Template — escribí libre, insertá placeholders donde quieras
           </div>
           <Textarea
@@ -162,7 +162,7 @@ export function NombreTemplateBuilder({
             rows={2}
             className="font-mono text-sm"
           />
-          <p className="text-[10px] text-muted-foreground mt-1">
+          <p className="text-2xs text-muted-foreground mt-1">
             Sintaxis: <code className="font-mono">{"{marca}"}</code>,{" "}
             <code className="font-mono">{"{modelo}"}</code>,{" "}
             <code className="font-mono">{"{tipo}"}</code>,{" "}
@@ -173,7 +173,7 @@ export function NombreTemplateBuilder({
         </div>
 
         <div>
-          <div className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider mb-1">
+          <div className="text-xs text-muted-foreground font-mono uppercase tracking-wider mb-1">
             Insertar — click para agregar en la posición del cursor
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -182,7 +182,7 @@ export function NombreTemplateBuilder({
                 key={p.placeholder}
                 type="button"
                 onClick={() => insertPlaceholder(p.placeholder)}
-                className="inline-flex items-center gap-1 rounded border hairline px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition"
+                className="inline-flex items-center gap-1 rounded border hairline px-2 py-0.5 font-mono text-xs text-ink hover:bg-amber-soft transition"
                 title={`Insertar ${p.placeholder}`}
               >
                 <Plus className="h-3 w-3" /> {p.label}
@@ -196,7 +196,7 @@ export function NombreTemplateBuilder({
                   <button
                     type="button"
                     onClick={() => insertPlaceholder(ph)}
-                    className="inline-flex items-center gap-1 rounded border hairline border-amber/40 bg-amber-soft/30 px-2 py-0.5 font-mono text-[11px] text-ink hover:bg-amber-soft transition"
+                    className="inline-flex items-center gap-1 rounded border hairline border-amber/40 bg-amber-soft/30 px-2 py-0.5 font-mono text-xs text-ink hover:bg-amber-soft transition"
                     title={`Insertar ${ph}${t.tipo === "tabla" ? " — devuelve toda la tabla formateada" : ""}`}
                   >
                     <Plus className="h-3 w-3" /> {t.label}
@@ -212,7 +212,7 @@ export function NombreTemplateBuilder({
                             key={c.key}
                             type="button"
                             onClick={() => insertPlaceholder(subPh)}
-                            className="inline-flex items-center gap-0.5 rounded border hairline border-amber/30 bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:text-ink hover:bg-amber-soft/30 transition"
+                            className="inline-flex items-center gap-0.5 rounded border hairline border-amber/30 bg-background px-1.5 py-0.5 font-mono text-2xs text-muted-foreground hover:text-ink hover:bg-amber-soft/30 transition"
                             title={`Insertar ${subPh} — extrae solo la columna ${c.label} de la primera fila`}
                           >
                             <Plus className="h-2.5 w-2.5" /> {c.key}
@@ -229,11 +229,11 @@ export function NombreTemplateBuilder({
 
         <div>
           <div className="flex items-baseline justify-between gap-2 mb-1">
-            <div className="text-[11px] text-muted-foreground font-mono uppercase tracking-wider">
+            <div className="text-xs text-muted-foreground font-mono uppercase tracking-wider">
               Vista previa
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground">Equipo:</span>
+              <span className="text-2xs text-muted-foreground">Equipo:</span>
               <Select
                 value={previewEquipoId != null ? String(previewEquipoId) : "__dummy"}
                 onValueChange={(v) => setPreviewEquipoId(v === "__dummy" ? null : Number(v))}
@@ -259,7 +259,7 @@ export function NombreTemplateBuilder({
               </span>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">
+          <p className="text-2xs text-muted-foreground mt-1">
             {previewEquipo
               ? `Datos reales del equipo "${previewEquipo.nombre}". Los specs vacíos quedan como "".`
               : `Ejemplo simulado con marca "Sony", modelo "FX3", tipo "${categoriaNombre}". Los specs muestran su label entre <…>.`}
@@ -274,9 +274,7 @@ export function NombreTemplateBuilder({
           >
             {saveMut.isPending ? "Guardando…" : "Guardar plantilla"}
           </Button>
-          {isDirty && (
-            <span className="text-[10px] text-muted-foreground">Cambios sin guardar</span>
-          )}
+          {isDirty && <span className="text-2xs text-muted-foreground">Cambios sin guardar</span>}
         </div>
       </div>
     </div>

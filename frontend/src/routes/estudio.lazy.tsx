@@ -170,7 +170,7 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
     >
       <div className="flex items-center gap-3 border-t hairline bg-background/95 backdrop-blur-xl px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Reservar el estudio
           </div>
           <div className="truncate text-sm font-medium">{priceLabel}</div>
@@ -292,7 +292,7 @@ function EstudioPage() {
         <section className="relative overflow-hidden bg-ink px-4 lg:px-12 py-[clamp(2.5rem,5vw,4.5rem)] pb-[clamp(3rem,6vw,5rem)]">
           <Grain />
           <div className="relative">
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/60 mb-4">
+            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/60 mb-4">
               Estudio fotográfico y de video · Mar del Plata
             </p>
             <h1 className="font-display font-black text-amber leading-[0.88] tracking-[-0.02em] lowercase text-[clamp(5rem,22vw,13rem)]">
@@ -339,7 +339,7 @@ function EstudioPage() {
                 Deslizá para ver el estudio completo.
               </p>
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground tabular-nums shrink-0">
+            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums shrink-0">
               {photos.length} fotos
             </span>
           </div>
@@ -352,7 +352,7 @@ function EstudioPage() {
           <div className="relative overflow-hidden bg-ink px-[clamp(1.5rem,4vw,3.5rem)] py-[clamp(2.5rem,5vw,4.5rem)] flex flex-col justify-center">
             <Grain opacity={10} />
             <div className="relative">
-              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/55 mb-5">
+              <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/55 mb-5">
                 La pieza central
               </p>
               <div className="flex items-baseline gap-1 leading-none">
@@ -377,7 +377,7 @@ function EstudioPage() {
                 {["Curva continua", "Sin sombras", "Potencia extra", "Fondos de papel"].map((t) => (
                   <span
                     key={t}
-                    className="inline-flex items-center rounded-full border border-amber/30 px-3.5 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-amber/70 whitespace-nowrap"
+                    className="inline-flex items-center rounded-full border border-amber/30 px-3.5 py-1 font-mono text-2xs uppercase tracking-[0.2em] text-amber/70 whitespace-nowrap"
                   >
                     {t}
                   </span>
@@ -417,7 +417,7 @@ function EstudioPage() {
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {visibles.map((f) => (
                   <div key={f.label} className="rounded-xl border hairline bg-background p-3.5">
-                    <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
+                    <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
                       {f.label}
                     </div>
                     <div className="font-semibold text-[0.9375rem]">{f.value}</div>
@@ -437,7 +437,7 @@ function EstudioPage() {
           <div className="relative">
             <div className="flex flex-wrap items-end justify-between gap-3 mb-7">
               <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-ink/55 mb-2.5">
+                <p className="font-mono text-2xs uppercase tracking-[0.3em] text-ink/55 mb-2.5">
                   Reservas
                 </p>
                 <h2 className="font-display font-black lowercase leading-[0.95] text-ink text-[clamp(1.75rem,4vw,2.75rem)]">
@@ -447,7 +447,7 @@ function EstudioPage() {
                   Mínimo {minHours} horas. Elegí día y horario — te contactamos para confirmar.
                 </p>
               </div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink/50 tabular-nums whitespace-nowrap shrink-0">
+              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-ink/50 tabular-nums whitespace-nowrap shrink-0">
                 {priceLabel}
               </span>
             </div>
@@ -459,7 +459,7 @@ function EstudioPage() {
               />
               {packActivo && (
                 <aside className="rounded-2xl border border-ink/20 bg-ink/8 p-5 lg:sticky lg:top-20 lg:self-start">
-                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink/55 mb-3.5">
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-ink/55 mb-3.5">
                     Estudio + equipos · qué incluye
                   </div>
                   {withPack ? (
@@ -491,7 +491,7 @@ function EstudioPage() {
         <section className="bg-ink px-4 lg:px-12 py-14">
           <div className="flex flex-wrap items-end justify-between gap-3 mb-8">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/50 mb-2.5">
+              <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/50 mb-2.5">
                 Producciones
               </p>
               <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,3.5rem)]">
@@ -517,7 +517,7 @@ function EstudioPage() {
                   />
                 </div>
                 <div className="px-3.5 py-3 flex items-center gap-2">
-                  <span className="rounded-full bg-amber/18 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-amber whitespace-nowrap">
+                  <span className="rounded-full bg-amber/18 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber whitespace-nowrap">
                     {i % 2 === 0 ? "Fotografía" : "Video"}
                   </span>
                   <span className="text-[0.8125rem] text-background/65 truncate">{photo.alt}</span>
@@ -596,7 +596,7 @@ function EstudioPage() {
         {/* ── CTA "hablemos." ───────────────────────────────────────── */}
         <section className="bg-ink px-4 lg:px-12 py-16">
           <div className="max-w-xl">
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber/60 mb-3">
+            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/60 mb-3">
               ¿Tenés dudas?
             </p>
             <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,4rem)]">

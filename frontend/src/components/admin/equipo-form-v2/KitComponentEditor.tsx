@@ -216,12 +216,12 @@ export function KitComponentEditor({ equipoId, mode }: { equipoId: number; mode:
               )}
               <div className="flex-1 min-w-0">
                 <div className="text-sm truncate">{r.nombre}</div>
-                <div className="text-[11px] text-muted-foreground truncate">
+                <div className="text-xs text-muted-foreground truncate">
                   {[r.marca, r.modelo].filter(Boolean).join(" / ")} · stock {r.cantidad}
                 </div>
               </div>
               {items.some((i) => i.componente_id === r.id) ? (
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" className="text-2xs">
                   {cfg.badgeText}
                 </Badge>
               ) : (
@@ -242,7 +242,7 @@ export function KitComponentEditor({ equipoId, mode }: { equipoId: number; mode:
           )}
         </Label>
         {mode === "combo" && (
-          <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">
+          <p className="text-xs text-muted-foreground mt-0.5 mb-2">
             <strong>Esencial</strong>: si falta, el combo no está disponible.{" "}
             <strong>Best-effort</strong>: si falta, el combo igual se puede reservar.
           </p>
@@ -343,7 +343,7 @@ function SortableItem({
 
         <div className="flex-1 min-w-0">
           <div className="text-sm truncate">{item.nombre}</div>
-          {item.marca && <div className="text-[11px] text-muted-foreground">{item.marca}</div>}
+          {item.marca && <div className="text-xs text-muted-foreground">{item.marca}</div>}
         </div>
 
         <Input
@@ -403,7 +403,7 @@ function SortableItem({
 
         <div className="flex-1 min-w-0">
           <div className="text-sm truncate">{item.nombre}</div>
-          {item.marca && <div className="text-[11px] text-muted-foreground">{item.marca}</div>}
+          {item.marca && <div className="text-xs text-muted-foreground">{item.marca}</div>}
         </div>
 
         <Button
@@ -421,7 +421,7 @@ function SortableItem({
       {/* Row 2: cantidad + descuento + esencial */}
       <div className="flex items-center gap-2 pl-6">
         <div className="flex items-center gap-1">
-          <span className="text-[11px] text-muted-foreground w-14">Cant.</span>
+          <span className="text-xs text-muted-foreground w-14">Cant.</span>
           <Input
             type="number"
             min={1}
@@ -437,7 +437,7 @@ function SortableItem({
         </div>
 
         <div className="flex items-center gap-1">
-          <span className="text-[11px] text-muted-foreground w-16">Descuento</span>
+          <span className="text-xs text-muted-foreground w-16">Descuento</span>
           <div className="flex items-center gap-0.5">
             <Input
               type="number"
@@ -466,7 +466,7 @@ function SortableItem({
           }
           onClick={() => onUpdate(item.componente_id, { esencial: !esencial })}
           disabled={busy === item.componente_id}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] border hairline hover:bg-accent transition-colors disabled:opacity-50"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs border hairline hover:bg-accent transition-colors disabled:opacity-50"
         >
           {esencial ? (
             <>

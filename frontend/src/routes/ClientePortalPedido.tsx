@@ -262,12 +262,12 @@ export function PedidoEmpty({
         <Icon className="h-6 w-6" strokeWidth={1.5} />
       </div>
       <div className="font-display text-xl font-black text-ink mb-1.5">{title}</div>
-      <div className="font-sans text-[13px] text-muted-foreground mb-[18px]">{sub}</div>
+      <div className="font-sans text-sm text-muted-foreground mb-[18px]">{sub}</div>
       {actionLabel && onAction ? (
         <button
           type="button"
           onClick={onAction}
-          className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-bold text-amber transition hover:bg-amber hover:text-ink"
+          className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-sm font-bold text-amber transition hover:bg-amber hover:text-ink"
         >
           {actionLabel} <XIcon className="h-3.5 w-3.5" />
         </button>
@@ -275,7 +275,7 @@ export function PedidoEmpty({
         cta && (
           <Link
             to="/rental"
-            className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-[13px] font-bold text-amber transition hover:bg-amber hover:text-ink"
+            className="inline-flex items-center gap-1.5 rounded-full bg-ink px-5 py-2.5 font-sans text-sm font-bold text-amber transition hover:bg-amber hover:text-ink"
           >
             Explorar catálogo <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -410,11 +410,11 @@ export function PedidoCard({
           onClick={handleToggle}
           className="flex-1 min-w-0 flex items-center gap-3.5 px-4 sm:px-[18px] py-3.5 transition hover:bg-[color-mix(in_oklch,var(--ink)_2%,transparent)] text-left"
         >
-          <span className="font-mono text-[13px] font-bold text-ink tracking-[0.04em]">
+          <span className="font-mono text-sm font-bold text-ink tracking-[0.04em]">
             #{pedido.numero_pedido}
           </span>
           {pendiente ? (
-            <span className="inline-flex items-center rounded-full border border-amber/30 bg-amber/15 px-2 py-0.5 text-[10px] font-medium text-ink">
+            <span className="inline-flex items-center rounded-full border border-amber/30 bg-amber/15 px-2 py-0.5 text-2xs font-medium text-ink">
               Mod. pendiente
             </span>
           ) : (
@@ -423,12 +423,13 @@ export function PedidoCard({
           {pedido.monto_total != null && (
             <PagoBadge pagado={pagado} total={total} estado={pedido.estado} />
           )}
-          <span className="font-sans text-[13px] text-muted-foreground flex-1 min-w-0 truncate">
+          <span className="font-sans text-sm text-muted-foreground flex-1 min-w-0 truncate">
             {fmtDate(pedido.fecha_desde)}
             <span className="opacity-40 mx-1">→</span>
             {fmtDate(pedido.fecha_hasta)}
           </span>
           {pedido.monto_total != null && (
+            // eslint-disable-next-line no-restricted-syntax -- precio de resumen: entre text-base (16px) y text-lg (18px), extra-bold lo equilibra
             <span className="font-sans text-[17px] font-extrabold text-ink tabular-nums shrink-0">
               {/* Header colapsado: muestra el total que el cliente paga
                   (con IVA si es RI) — alineado con el desglose expandido y
@@ -472,7 +473,7 @@ export function PedidoCard({
                 <section className="rounded-md border border-amber bg-amber-soft px-3.5 py-3 flex items-start gap-2.5">
                   <CircleCheckBig className="h-4 w-4 text-amber mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-sans text-[13px] font-semibold text-ink">
+                    <div className="font-sans text-sm font-semibold text-ink">
                       ¡Recibimos tu solicitud!
                     </div>
                     <div className="font-sans text-xs text-ink/70 mt-0.5">
@@ -487,7 +488,7 @@ export function PedidoCard({
                 <section className="rounded-md border border-amber bg-amber-soft px-3.5 py-3 flex items-start gap-2.5">
                   <Clock className="h-4 w-4 text-amber mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-sans text-[13px] font-semibold text-ink">
+                    <div className="font-sans text-sm font-semibold text-ink">
                       Solicitud de modificación pendiente
                     </div>
                     <div className="font-sans text-xs text-ink/70 mt-0.5">
@@ -534,7 +535,7 @@ export function PedidoCard({
                         <Info className="h-4 w-4 text-azul mt-0.5 shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="font-sans text-[13px] font-semibold text-ink">{titulo}</div>
+                        <div className="font-sans text-sm font-semibold text-ink">{titulo}</div>
                         {ultimaResuelta.respuesta && (
                           <div className="font-sans text-xs text-ink/80 mt-0.5 whitespace-pre-wrap">
                             {isSystemCancel ? ultimaResuelta.respuesta : ultimaResuelta.respuesta}
@@ -550,7 +551,7 @@ export function PedidoCard({
           {/* ── Timeline: card propia, full width ── */}
           <section className="[grid-area:timeline] rounded-lg border border-[var(--hairline)] bg-card px-5 pt-[18px] pb-4">
             <div className="flex items-baseline justify-between gap-3 mb-3.5">
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+              <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
                 Estado del pedido
               </h3>
               {tlCurrent && (
@@ -567,31 +568,29 @@ export function PedidoCard({
           <div className="[grid-area:main] flex flex-col gap-5 min-w-0">
             <section className="grid grid-cols-3 gap-2">
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
                   Retiro
                 </div>
                 <div className="font-sans text-sm font-semibold text-ink mt-0.5">
                   {fmtDate(pedido.fecha_desde)}
                 </div>
                 {retiroTime && (
-                  <div className="font-mono text-[10px] text-muted-foreground">{retiroTime}</div>
+                  <div className="font-mono text-2xs text-muted-foreground">{retiroTime}</div>
                 )}
               </div>
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
                   Devolución
                 </div>
                 <div className="font-sans text-sm font-semibold text-ink mt-0.5">
                   {fmtDate(pedido.fecha_hasta)}
                 </div>
                 {devolucionTime && (
-                  <div className="font-mono text-[10px] text-muted-foreground">
-                    {devolucionTime}
-                  </div>
+                  <div className="font-mono text-2xs text-muted-foreground">{devolucionTime}</div>
                 )}
               </div>
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
                   Jornadas
                 </div>
                 <div className="font-sans text-2xl font-extrabold text-ink tabular-nums leading-none mt-1">
@@ -601,7 +600,7 @@ export function PedidoCard({
             </section>
 
             <section>
-              <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+              <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mb-2">
                 Equipos ({pedido.items.length})
               </h3>
               <ul>
@@ -629,18 +628,18 @@ export function PedidoCard({
                       )}
                       <div className="min-w-0 flex-1">
                         {item.marca && (
-                          <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground leading-none">
+                          <div className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground leading-none">
                             {item.marca}
                           </div>
                         )}
-                        <div className="font-sans text-[13px] font-semibold text-ink leading-tight mt-0.5 truncate">
+                        <div className="font-sans text-sm font-semibold text-ink leading-tight mt-0.5 truncate">
                           {display}
                         </div>
-                        <div className="font-mono text-[10px] text-muted-foreground tabular-nums mt-0.5">
+                        <div className="font-mono text-2xs text-muted-foreground tabular-nums mt-0.5">
                           {item.cantidad} × {fmt(item.precio_jornada)}/j · {jornadas}j
                         </div>
                       </div>
-                      <div className="font-mono text-[13px] font-bold text-ink tabular-nums shrink-0">
+                      <div className="font-mono text-sm font-bold text-ink tabular-nums shrink-0">
                         {fmt(item.subtotal)}
                       </div>
                     </li>
@@ -659,7 +658,7 @@ export function PedidoCard({
                       params: { id: String(pedido.id) },
                     })
                   }
-                  className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 font-sans text-[13px] font-bold text-amber hover:bg-amber hover:text-ink transition"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 font-sans text-sm font-bold text-amber hover:bg-amber hover:text-ink transition"
                 >
                   <Pencil className="h-3.5 w-3.5" /> Modificar pedido
                 </button>
@@ -714,7 +713,7 @@ export function PedidoCard({
                   borderColor: "color-mix(in oklch, var(--amber) 35%, transparent)",
                 }}
               >
-                <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink/70 mb-2">
+                <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-ink/70 mb-2">
                   Documentos
                 </h3>
                 <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
@@ -744,14 +743,14 @@ export function PedidoCard({
             )}
 
             <section className="flex flex-col gap-1.5 rounded-md border border-[var(--hairline)] bg-card px-3.5 py-3">
-              <div className="flex justify-between items-baseline font-sans text-[13px]">
+              <div className="flex justify-between items-baseline font-sans text-sm">
                 <span className="text-muted-foreground">Subtotal equipos</span>
                 <span className="font-mono font-semibold text-ink tabular-nums">
                   {fmt(subtotalItems)}
                 </span>
               </div>
               {descuentoPct > 0 && (
-                <div className="flex justify-between items-baseline font-sans text-[13px]">
+                <div className="flex justify-between items-baseline font-sans text-sm">
                   <span className="text-muted-foreground">Descuento ({descuentoPct}%)</span>
                   <span className="font-mono font-semibold tabular-nums text-verde">
                     −{fmt(descuentoMonto)}
@@ -760,13 +759,13 @@ export function PedidoCard({
               )}
               {conIva && (
                 <>
-                  <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <div className="flex justify-between items-baseline font-sans text-sm">
                     <span className="text-muted-foreground">Subtotal neto</span>
                     <span className="font-mono font-semibold text-ink tabular-nums">
                       {fmt(totalNeto)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <div className="flex justify-between items-baseline font-sans text-sm">
                     <span className="text-muted-foreground">IVA {ivaPct}%</span>
                     <span className="font-mono font-semibold text-ink tabular-nums">
                       +{fmt(ivaMonto)}
@@ -775,22 +774,22 @@ export function PedidoCard({
                 </>
               )}
               <div className="flex justify-between items-baseline pt-1.5 mt-1 border-t border-[var(--hairline)]">
-                <span className="font-sans text-[15px] font-bold text-ink">
+                <span className="font-sans text-15 font-bold text-ink">
                   Total{conIva ? " · IVA incluído" : ""}
                 </span>
-                <span className="font-sans text-[22px] font-extrabold text-ink tabular-nums">
+                <span className="font-sans text-22 font-extrabold text-ink tabular-nums">
                   {fmt(total)}
                 </span>
               </div>
               {pagado > 0 && (
                 <>
-                  <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <div className="flex justify-between items-baseline font-sans text-sm">
                     <span className="text-muted-foreground">Pagado</span>
                     <span className="font-mono font-semibold tabular-nums text-verde">
                       {fmt(pagado)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-baseline font-sans text-[13px]">
+                  <div className="flex justify-between items-baseline font-sans text-sm">
                     <span className="text-muted-foreground">
                       {balance > 0 ? "Balance pendiente" : "Saldo"}
                     </span>
@@ -809,7 +808,7 @@ export function PedidoCard({
 
             {pedido.pagos && pedido.pagos.length > 0 && (
               <section>
-                <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+                <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mb-2">
                   Pagos
                 </h3>
                 <ul className="flex flex-col gap-1">
@@ -833,7 +832,7 @@ export function PedidoCard({
 
             {pedido.notas && (
               <section>
-                <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+                <h3 className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mb-2">
                   Notas
                 </h3>
                 <div className="rounded-md border border-[color-mix(in_oklch,var(--amber)_40%,transparent)] bg-amber-soft px-3.5 py-3 font-sans text-xs text-ink leading-[1.5] whitespace-pre-wrap">
@@ -938,7 +937,7 @@ function DocActions({
           className="flex-1 relative flex items-center gap-2.5 rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5 text-left transition hover:border-ink hover:bg-muted"
         >
           {showNewBadge && (
-            <span className="absolute -top-1.5 -right-1.5 rounded-full bg-ink text-amber text-[10px] font-bold tracking-wide px-1.5 py-0.5 leading-none shadow">
+            <span className="absolute -top-1.5 -right-1.5 rounded-full bg-ink text-amber text-2xs font-bold tracking-wide px-1.5 py-0.5 leading-none shadow">
               Nuevo
             </span>
           )}
@@ -948,11 +947,11 @@ function DocActions({
           <div className="min-w-0">
             <div className="font-sans text-xs font-semibold text-ink leading-tight">{label}</div>
             {description ? (
-              <div className="font-sans text-[11px] text-muted-foreground leading-tight mt-0.5 line-clamp-2">
+              <div className="font-sans text-xs text-muted-foreground leading-tight mt-0.5 line-clamp-2">
                 {description}
               </div>
             ) : (
-              <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+              <div className="font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                 Ver · PDF
               </div>
             )}

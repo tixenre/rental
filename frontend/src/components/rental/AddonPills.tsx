@@ -31,7 +31,7 @@ export function AddonPills({
   if (list.length === 0) {
     return (
       <div className={cn("flex items-center", className)}>
-        <span className="inline-flex items-center rounded-full border border-hairline px-2 py-0.5 text-[10px] italic text-muted-foreground">
+        <span className="inline-flex items-center rounded-full border border-hairline px-2 py-0.5 text-2xs italic text-muted-foreground">
           {emptyLabel}
         </span>
       </div>
@@ -48,7 +48,7 @@ export function AddonPills({
         <AddonPill key={`${it.id ?? it.name}-${i}`} item={it} />
       ))}
       {overflow && extraCount > 0 && (
-        <span className="inline-flex shrink-0 items-center rounded-full border border-dashed border-muted-foreground/40 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
+        <span className="inline-flex shrink-0 items-center rounded-full border border-dashed border-muted-foreground/40 px-2 py-0.5 text-2xs font-mono uppercase tracking-wider text-muted-foreground">
           +{extraCount}
         </span>
       )}
@@ -60,13 +60,13 @@ function AddonPill({ item }: { item: IncludedItem }) {
   const qty = item.qty && item.qty > 1 ? item.qty : null;
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber/15 py-0.5 pl-1.5 pr-1 text-[10px] text-ink"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber/15 py-0.5 pl-1.5 pr-1 text-2xs text-ink"
       title={item.name + (qty ? ` ×${qty}` : "")}
     >
       <Check className="h-2.5 w-2.5 shrink-0 text-amber" strokeWidth={3} />
       <span className="max-w-[140px] truncate">{item.name}</span>
       {qty && (
-        <span className="ml-0.5 inline-flex h-[14px] min-w-[16px] items-center justify-center rounded-full bg-ink px-1 font-mono text-[9px] font-bold text-amber">
+        <span className="ml-0.5 inline-flex h-[14px] min-w-[16px] items-center justify-center rounded-full bg-ink px-1 font-mono text-3xs font-bold text-amber">
           ×{qty}
         </span>
       )}

@@ -19,6 +19,15 @@ const GENERIC_COLOR_MSG =
   "Excepciones Tier 3 (paletas categóricas) y Tier 4 (marcas de terceros) van con eslint-disable + comentario. " +
   "Ver docs/DESIGN_SYSTEM.md → Tiers de color.";
 
+// Guardrail tipográfico: prohíbe tamaños de fuente mágicos (text-[Npx]).
+// Usá las utilidades del DS: text-3xs (9px), text-2xs (10px), text-xs (12px),
+// text-sm (14px), text-15 (15px), text-base (16px), text-22 (22px) etc.
+// Tamaños sin equivalente en el scale → eslint-disable-line + comentario del por qué.
+const MAGIC_SIZE_RE = "text-\\[\\d+px\\]";
+const MAGIC_SIZE_MSG =
+  "Usá utilidades del DS en vez de tamaños mágicos: text-3xs/text-2xs/text-xs/text-sm/text-15/text-base/text-22… " +
+  "Tamaño sin equivalente → eslint-disable-line + comentario del por qué.";
+
 export default tseslint.config(
   { ignores: ["dist", ".output", ".vinxi", "docs/**"] },
   {
@@ -60,6 +69,11 @@ export default tseslint.config(
         {
           selector: `TemplateElement[value.raw=/${GENERIC_COLOR_RE}/]`,
           message: GENERIC_COLOR_MSG,
+        },
+        { selector: `Literal[value=/${MAGIC_SIZE_RE}/]`, message: MAGIC_SIZE_MSG },
+        {
+          selector: `TemplateElement[value.raw=/${MAGIC_SIZE_RE}/]`,
+          message: MAGIC_SIZE_MSG,
         },
       ],
     },

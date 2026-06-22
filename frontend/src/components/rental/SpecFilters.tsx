@@ -41,7 +41,7 @@ export function SpecFilters({
           key={spec.key}
           className={cn("flex gap-1.5", layout === "stacked" ? "flex-col" : "flex-col min-w-0")}
         >
-          <label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-medium">
+          <label className="text-2xs uppercase tracking-[0.18em] text-muted-foreground font-medium">
             {spec.label}
           </label>
           <div className="flex flex-wrap gap-1">
@@ -53,7 +53,7 @@ export function SpecFilters({
                   type="button"
                   onClick={() => onChange(spec.key, isActive ? null : value)}
                   className={cn(
-                    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] transition",
+                    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs transition",
                     isActive
                       ? "border-amber bg-amber-soft text-ink"
                       : "border-ink/15 bg-background text-muted-foreground hover:border-ink/30 hover:text-ink",

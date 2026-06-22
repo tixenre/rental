@@ -95,7 +95,7 @@ function UnidadesPage() {
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-4xl mx-auto">
       <header className="flex items-end justify-between gap-3">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Back-office › Specs
           </div>
           <h1 className="font-display text-3xl text-ink flex items-center gap-2">
@@ -150,7 +150,7 @@ function UnidadesPage() {
 
           {grupos.map((g) => (
             <div key={g.dimension} className="rounded-md border hairline overflow-hidden">
-              <header className="bg-muted/40 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              <header className="bg-muted/40 px-3 py-1.5 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
                 {g.dimension} ({g.unidades.length})
               </header>
               <div className="divide-y hairline">
@@ -161,7 +161,7 @@ function UnidadesPage() {
                   >
                     <span className="font-mono text-ink">{u.simbolo}</span>
                     <span className="text-muted-foreground">{u.nombre}</span>
-                    <span className="text-[11px] text-muted-foreground italic">
+                    <span className="text-xs text-muted-foreground italic">
                       {u.dimension ?? "—"}
                     </span>
                     <div className="flex justify-end gap-1">
@@ -311,7 +311,7 @@ function UnidadFormModal({
               onChange={(e) => setForm({ ...form, dimension: e.target.value })}
               placeholder="luminosidad, temperatura, voltaje…"
             />
-            <p className="text-[10px] text-muted-foreground mt-1">
+            <p className="text-2xs text-muted-foreground mt-1">
               Sirve para agrupar visualmente las unidades en la pantalla.
             </p>
           </div>
