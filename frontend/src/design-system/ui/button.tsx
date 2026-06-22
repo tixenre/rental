@@ -3,6 +3,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
+import { Spinner } from "@/design-system/ui/spinner";
 
 // eslint-disable-next-line react-refresh/only-export-components -- variantes cva del patrón shadcn; conviven con el componente Button en este archivo
 export const buttonVariants = cva(
@@ -54,17 +55,27 @@ export const buttonVariants = cva(
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  /** Muestra un Spinner y deshabilita el botón. No aplica cuando asChild=true. */
+  loading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, shape, asChild = false, ...props }, ref) => {
+  (
+    { className, variant, size, shape, asChild = false, loading, disabled, children, ...props },
+    ref,
+  ) => {
     const Comp = asChild ? Slot : "button";
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, shape, className }))}
         ref={ref}
+        disabled={disabled || (loading && !asChild)}
+        aria-busy={loading && !asChild ? true : undefined}
         {...props}
-      />
+      >
+        {loading && !asChild ? <Spinner size="sm" /> : null}
+        {children}
+      </Comp>
     );
   },
 );

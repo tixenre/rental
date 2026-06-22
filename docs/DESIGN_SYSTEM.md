@@ -248,6 +248,7 @@ de un componente):
 `--duration-xslow` matchea exactamente la `duration: 0.55` del
 FlyToCartLayer. `--ease-default` es el del CartDrawer Framer Motion.
 `--ease-bounce` es la signature del badge pop al sumar al carrito.
+`--duration-xslow` también lo usa el `<Spinner>` para su velocidad de rotación.
 
 Uso opt-in:
 
@@ -383,6 +384,29 @@ reconocimiento visual rápido en listas/headers (idea de Booqable). Tamaño/typo
 `className`. Reusable en admin y portal. No crear avatares ad-hoc con `bg-ink`
 inline.
 
+### Spinner / loading (`src/design-system/ui/spinner.tsx`)
+
+Primitivo canónico de carga. Consolida los 34 `<Loader2 className="animate-spin …" />` del repo.
+
+```tsx
+import { Spinner } from "@/design-system/ui/spinner";
+
+<Spinner />            // md (20px) por default
+<Spinner size="sm" /> // 16px — para usar dentro de Button
+<Spinner size="lg" /> // 24px — para estados de página completa
+```
+
+Velocidad: usa `--duration-xslow` (550ms/vuelta). El `Button` acepta `loading={true}` para
+mostrar el Spinner automáticamente y deshabilitar el botón hasta que la acción termine:
+
+```tsx
+import { Button } from "@/design-system/ui/button";
+
+<Button loading={isPending}>Guardar</Button>
+```
+
+No crear spinners con `Loader2` suelto — siempre `<Spinner>`.
+
 ### Otros componentes del kit (`src/design-system/kit/`)
 
 Versiones presentacionales del kit ya disponibles para adopción
@@ -400,7 +424,7 @@ piecewise (PR #577 las trajo a producción):
 > + monto**, alto contraste y jerarquía clara. Es el patrón a reproducir en el
 > resto de la web cuando se listan entidades con estado + plata.
 
-La ruta pública `/kit-preview` (sin login, `noindex`) los muestra todos
+La ruta `/kit-preview` (admin-only, sin indexar) los muestra todos
 para QA visual antes de adoptarlos en una pantalla concreta.
 
 ### TopBar — navegación modular por área (`src/components/rental/TopBar.tsx`)

@@ -48,7 +48,7 @@
 
 ## 2. Tokens & color
 
-**Arquitectura (fortaleza):** tokens modulares en `frontend/src/styles/tokens/*` (colors/typography/
+**Arquitectura (fortaleza):** tokens modulares en `frontend/src/design-system/styles/tokens/*` (colors/typography/
 shadows/motion/z-index), OKLCH, sombras tintadas con ink cálido, dark-mode completo (sin toggle hoy).
 **Disciplina de color enforced (fortaleza real):** `no-restricted-syntax` en `eslint.config.js` bloquea
 escalas genéricas de Tailwind → solo 9 hex en todo el repo (excepciones documentadas) + 2 `eslint-disable`
