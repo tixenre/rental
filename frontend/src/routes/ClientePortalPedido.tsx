@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { clienteApi } from "@/lib/cliente/api";
 import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
+import { PagoBadge } from "@/design-system/kit/PagoBadge";
 import {
   ArrowRight,
   ChevronDown,
@@ -418,6 +419,13 @@ export function PedidoCard({
             </span>
           ) : (
             <EstadoBadge estado={pedido.estado} />
+          )}
+          {pedido.monto_total != null && (
+            <PagoBadge
+              pagado={pagado}
+              total={total}
+              estado={pedido.estado}
+            />
           )}
           <span className="font-sans text-[13px] text-muted-foreground flex-1 min-w-0 truncate">
             {fmtDate(pedido.fecha_desde)}

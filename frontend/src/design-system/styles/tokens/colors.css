@@ -63,6 +63,10 @@
      (falla AA). Mismo hue/chroma, L 0.606→0.48 → 4.8-5.2:1. El verde de marca
      (charts, montos, bandas) queda intacto; esto es solo el texto del estado. */
   --color-verde-ink: oklch(0.48 0.125 166.4);
+  /* Azul más oscuro SOLO para TEXTO sobre tints de estado (badge info/Presupuesto):
+     el --color-azul brillante sobre bg-azul/10 da ~2.9:1 (falla AA). Mismo hue/chroma,
+     L 0.64→0.48 → 4.9:1. El azul de marca (charts, labels) queda intacto. */
+  --color-azul-ink: oklch(0.48 0.14 239);
 
   /* ── Charts (orden oficial: amber → azul → naranja → verde → rosa) ── */
   --color-chart-1: var(--color-amber);
