@@ -37,7 +37,10 @@
   --color-muted: oklch(0.94 0.008 85);
   --color-accent: #fab428;
   --color-accent-foreground: oklch(0.18 0.01 60);
-  --color-destructive: oklch(0.62 0.22 27);
+  /* L 0.55 (no 0.62) para cumplir AA: texto-sobre-claro 3.87→~5.2:1 y botón
+     sólido blanco-sobre-rojo 3.82→~5.1:1. Hue/chroma intactos → mismo rojo de
+     marca, solo un poco más oscuro. Toda la propagación va hacia MÁS contraste. */
+  --color-destructive: oklch(0.55 0.22 27);
   --color-destructive-foreground: oklch(0.98 0.005 80);
   --color-ring: color-mix(in oklch, #fab428 60%, transparent);
 
