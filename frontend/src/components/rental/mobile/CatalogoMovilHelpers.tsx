@@ -1024,7 +1024,10 @@ export function EquipmentRow({
               </span>
             ) : pocoStock ? (
               <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-amber">
-                {eq.cantidad === 1 ? "última unidad" : `${eq.cantidad} disponibles`}
+                {/* Rental, no e-commerce: mostramos el stock como dato neutro
+                    ("1 disponible"), no escasez tipo "última unidad" — tener 1
+                    unidad es lo normal acá. El stepper ya capa en el stock. */}
+                {eq.cantidad} {eq.cantidad === 1 ? "disponible" : "disponibles"}
               </span>
             ) : null}
           </div>

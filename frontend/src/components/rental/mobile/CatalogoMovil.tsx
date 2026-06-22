@@ -5,6 +5,8 @@ import { useEquipos, useMarcas, useCategorias } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { useShallow } from "zustand/react/shallow";
 import { formatARS } from "@/lib/format";
+import { useCotizacion } from "@/lib/cotizacion";
+import { toLocalISO } from "@/lib/rental-dates";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { useRetomarPedido } from "@/lib/verificacion";
@@ -209,12 +211,23 @@ export function CatalogoMovil() {
   // (esa la elige el tab) y búsqueda (esa tiene su propio input visible).
   const activeFiltersCount = (stockOnly ? 1 : 0) + (selectedBrand ? 1 : 0);
 
-  // Cart totals
+  // Cart totals — el TOTAL lo calcula el BACKEND (fuente única /api/cotizar),
+  // igual que el drawer: incluye el descuento del cliente y el IVA. El reduce
+  // client-side anterior mostraba el BRUTO (precio × jornadas, sin descuento) →
+  // no coincidía con el carrito ni con el pedido real (#967).
   const totalItems = Object.values(cart.items).reduce((s, q) => s + q, 0);
-  const totalARS = Object.entries(cart.items).reduce((s, [id, q]) => {
-    const eq = allEquipos.find((e) => e.id === id);
-    return s + (eq ? eq.pricePerDay * q * jornadas : 0);
-  }, 0);
+  const cotizarItems = Object.entries(cart.items)
+    .map(([id, q]) => {
+      const eq = allEquipos?.find((e) => e.id === id);
+      return eq ? { equipoId: eq._backendId ?? Number(eq.id), cantidad: q } : null;
+    })
+    .filter((x): x is { equipoId: number; cantidad: number } => x !== null);
+  const hayFechas = !!(fechaDesde && fechaHasta);
+  const { totalNeto: cartTotal, conIva: cartConIva } = useCotizacion({
+    items: cotizarItems,
+    fechaDesde: hayFechas ? toLocalISO(fechaDesde, horaDesde) : null,
+    fechaHasta: hayFechas ? toLocalISO(fechaHasta, horaHasta) : null,
+  }).data;
 
   const handleAddToCart = useCallback(
     (id: string, delta: number) => {
@@ -455,7 +468,7 @@ export function CatalogoMovil() {
           <div
             role="button"
             tabIndex={0}
-            aria-label={`Ver tu rental: ${totalItems} ${totalItems === 1 ? "ítem" : "ítems"}, total ${formatARS(totalARS)}`}
+            aria-label={`Ver tu rental: ${totalItems} ${totalItems === 1 ? "ítem" : "ítems"}, total ${formatARS(cartTotal)}`}
             className="sticky bottom-0 z-40 flex items-center gap-2.5 px-4 cursor-pointer border-t-[1.5px] border-amber backdrop-blur-lg transition-colors hover:bg-amber/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber focus-visible:ring-inset"
             style={{
               background: CARTBAR_BG,
@@ -490,7 +503,10 @@ export function CatalogoMovil() {
                 className="font-mono font-bold text-ink leading-none"
                 style={{ fontSize: 18, fontVariantNumeric: "tabular-nums" }}
               >
-                {formatARS(totalARS)}
+                {formatARS(cartTotal)}
+                {cartConIva && (
+                  <span className="text-[11px] font-normal text-muted-foreground"> + IVA</span>
+                )}
               </div>
             </div>
             <ChevronUp
