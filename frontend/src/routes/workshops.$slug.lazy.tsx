@@ -73,9 +73,7 @@ function TallerLandingPage() {
         <section className="relative bg-ink overflow-hidden">
           <Grain opacity={10} />
           <div className="relative max-w-[1100px] mx-auto px-4 sm:px-6 py-16 sm:py-24">
-            <p className="font-mono text-[0.625rem] tracking-[0.3em] uppercase text-rosa mb-4">
-              Workshop
-            </p>
+            <p className="font-mono text-2xs tracking-[0.3em] uppercase text-rosa mb-4">Workshop</p>
             <h1
               className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-background"
               style={{ fontSize: "clamp(2.75rem, 8vw, 5.5rem)" }}
@@ -148,7 +146,7 @@ function TallerLandingPage() {
               {taller.programa_teorica.length > 0 && (
                 <section>
                   <div className="mb-4">
-                    <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-rosa mb-1">
+                    <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-1">
                       Clase 1 — Teórica
                     </p>
                     <h2 className="font-display text-2xl font-bold text-ink lowercase tracking-tight">
@@ -172,7 +170,7 @@ function TallerLandingPage() {
               {taller.programa_practica.length > 0 && (
                 <section>
                   <div className="mb-4">
-                    <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-rosa mb-1">
+                    <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-1">
                       Clase 2 — Práctica
                     </p>
                     <h2 className="font-display text-2xl font-bold text-ink lowercase tracking-tight">
@@ -189,7 +187,7 @@ function TallerLandingPage() {
 
               {/* About */}
               <section className="rounded-2xl border border-border/60 bg-muted/20 px-6 py-7">
-                <p className="font-mono text-[0.625rem] tracking-[0.25em] uppercase text-muted-foreground mb-4">
+                <p className="font-mono text-2xs tracking-[0.25em] uppercase text-muted-foreground mb-4">
                   Sobre
                 </p>
                 <h2
@@ -201,7 +199,7 @@ function TallerLandingPage() {
                 <p className="text-base text-ink/80 leading-relaxed">{taller.instructor_bio}</p>
                 {taller.instructor_proyectos?.length > 0 && (
                   <div className="mt-6">
-                    <p className="font-mono text-[0.625rem] tracking-[0.2em] uppercase text-muted-foreground mb-3">
+                    <p className="font-mono text-2xs tracking-[0.2em] uppercase text-muted-foreground mb-3">
                       Trabajó con
                     </p>
                     <div className="flex flex-wrap gap-2">

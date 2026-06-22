@@ -37,7 +37,7 @@ function LandingHub() {
       <main className="flex-1 flex flex-col">
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <section className="flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24 bg-background">
-          <p className="font-mono text-[0.625rem] tracking-[0.35em] uppercase text-muted-foreground mb-6">
+          <p className="font-mono text-2xs tracking-[0.35em] uppercase text-muted-foreground mb-6">
             Chaco 1392 — Mar del Plata
           </p>
           <Logo linkTo={null} color="text-ink" className="!h-[clamp(3rem,12vw,8rem)]" />
@@ -53,7 +53,7 @@ function LandingHub() {
             to="/rental"
             className="group relative flex flex-col justify-end p-8 sm:p-10 bg-amber text-ink min-h-[320px] md:min-h-0 transition-[filter] hover:brightness-105 active:brightness-95"
           >
-            <p className="font-mono text-[0.625rem] tracking-[0.28em] uppercase text-ink/55 mb-5">
+            <p className="font-mono text-2xs tracking-[0.28em] uppercase text-ink/55 mb-5">
               Equipos audiovisuales
             </p>
             <h2
@@ -91,7 +91,7 @@ function LandingHub() {
               />
             )}
             <div className="relative">
-              <p className="font-mono text-[0.625rem] tracking-[0.28em] uppercase mb-5 text-ink">
+              <p className="font-mono text-2xs tracking-[0.28em] uppercase mb-5 text-ink">
                 El Estudio
               </p>
               <h2
@@ -121,7 +121,7 @@ function LandingHub() {
             className="group relative flex flex-col justify-end p-8 sm:p-10 text-ink min-h-[320px] md:min-h-0 transition-[filter] hover:brightness-105 active:brightness-95"
             style={{ backgroundColor: "var(--color-rosa)" }}
           >
-            <p className="font-mono text-[0.625rem] tracking-[0.28em] uppercase text-ink/55 mb-5">
+            <p className="font-mono text-2xs tracking-[0.28em] uppercase text-ink/55 mb-5">
               Workshops & Talleres
             </p>
             <h2

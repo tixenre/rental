@@ -36,7 +36,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
           {/* Left: copy */}
           <div className="flex flex-col justify-between gap-6 p-[clamp(2rem,5vw,3.5rem)_clamp(1.5rem,4vw,2.75rem)]">
             <div>
-              <p className="font-mono text-[0.625rem] tracking-[0.22em] uppercase text-ink/60">
+              <p className="font-mono text-2xs tracking-[0.22em] uppercase text-ink/60">
                 Catálogo · {equipmentCount ? `${equipmentCount}+` : "120+"} equipos · Mar del Plata
               </p>
               <h1
@@ -46,7 +46,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
                 <span className="block">{tagline[0]}</span>
                 <span className="block">{tagline[1]}</span>
               </h1>
-              <p className="text-[0.9375rem] leading-[1.6] text-ink/78 max-w-[360px] mt-3.5">
+              <p className="text-15 leading-[1.6] text-ink/78 max-w-[360px] mt-3.5">
                 Cámaras, lentes, luces, audio y soportes para producciones audiovisuales en Mar del
                 Plata. Elegí fechas y armá tu pedido.
               </p>
@@ -56,7 +56,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
                 {["Cámaras", "Luces", "Audio", "Gimbals", "Lentes", "Soporte"].map((label) => (
                   <span
                     key={label}
-                    className="inline-flex items-center gap-1 px-3 py-[5px] rounded-full font-mono text-[0.5625rem] font-semibold uppercase tracking-[0.18em] text-ink/65 border border-ink/20 transition-all duration-150 hover:border-ink/45 hover:text-ink hover:bg-ink/4 whitespace-nowrap"
+                    className="inline-flex items-center gap-1 px-3 py-[5px] rounded-full font-mono text-3xs font-semibold uppercase tracking-[0.18em] text-ink/65 border border-ink/20 transition-all duration-150 hover:border-ink/45 hover:text-ink hover:bg-ink/4 whitespace-nowrap"
                   >
                     {label}
                   </span>
@@ -69,7 +69,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
               <button
                 onClick={onDateOpen}
                 className={cn(
-                  "inline-flex items-center gap-2.5 bg-ink text-amber rounded-full px-[26px] py-[14px] text-[0.9375rem] font-bold tracking-[-0.01em] whitespace-nowrap shadow-[0_4px_20px_oklch(0.14_0.01_60/24%)] transition-colors duration-150 hover:bg-black active:scale-[0.97]",
+                  "inline-flex items-center gap-2.5 bg-ink text-amber rounded-full px-[26px] py-[14px] text-15 font-bold tracking-[-0.01em] whitespace-nowrap shadow-[0_4px_20px_oklch(0.14_0.01_60/24%)] transition-colors duration-150 hover:bg-black active:scale-[0.97]",
                   reducedMotion && "no-motion",
                 )}
               >
@@ -102,7 +102,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-ink/28 opacity-85 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
 
             {/* "Conocé el estudio" pill */}
-            <div className="absolute left-[18px] bottom-[18px] z-[2] inline-flex items-center gap-2 bg-ink text-amber font-bold text-[0.8125rem] tracking-[-0.01em] px-[15px] py-[9px] rounded-full shadow-[0_6px_18px_oklch(0.14_0.01_60/34%)] group-hover:bg-black transition-[background,gap] duration-[180ms]">
+            <div className="absolute left-[18px] bottom-[18px] z-[2] inline-flex items-center gap-2 bg-ink text-amber font-bold text-sm tracking-[-0.01em] px-[15px] py-[9px] rounded-full shadow-[0_6px_18px_oklch(0.14_0.01_60/34%)] group-hover:bg-black transition-[background,gap] duration-[180ms]">
               Conocé el estudio
               <span className="grid place-items-center w-[22px] h-[22px] rounded-full bg-amber text-ink group-hover:translate-x-[2px] transition-transform duration-200">
                 <ArrowRight size={11} strokeWidth={2.5} />
@@ -169,7 +169,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
           </span>
           <ArrowRight size={11} strokeWidth={2.5} className="text-amber" />
         </Link>
-        <span className="font-mono text-[0.5625rem] uppercase tracking-[0.2em] text-background/45 whitespace-nowrap">
+        <span className="font-mono text-3xs uppercase tracking-[0.2em] text-background/45 whitespace-nowrap">
           Foto y video · por hora · luces incluidas
         </span>
       </div>
