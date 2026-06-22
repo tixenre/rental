@@ -223,6 +223,44 @@
     text-decoration: line-through;
     opacity: 0.7;
   }
+
+  /* ── Hit-area ≥44px (HIG, MEMORIA 2026-06-05) ─────────────
+     Extiende el área TOCABLE a ≥44px con un ::before invisible,
+     SIN agrandar el visual. Generaliza el patrón SIMÉTRICO de
+     FavButton (equipment/shared). OJO: StepperPill usa a propósito
+     un hit-area ASIMÉTRICO (solo hacia el flanco externo, para no
+     disparar el botón equivocado en el par −/+) → NO migrarlo a
+     esta utilidad. El elemento debe ser position:relative (o
+     inline-flex/inline-block); el ::before es transparente: solo
+     amplía el target del puntero, no pinta. */
+  .hit-area-44 {
+    position: relative;
+  }
+  .hit-area-44::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+  }
+
+  /* Variante INLINE para links/chips de texto en fila: extiende
+     SOLO el alto a 44px (centrado vertical) y respeta el ancho del
+     texto → no pisa los vecinos horizontales (chips, pills, nav). */
+  .hit-area-inline {
+    position: relative;
+  }
+  .hit-area-inline::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    height: 44px;
+  }
 }
 
 /* ── Keyframes ─────────────────────────────────────────────── */

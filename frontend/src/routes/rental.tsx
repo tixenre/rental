@@ -968,7 +968,7 @@ function GridMode({
                   real ? (
                     <button
                       onClick={() => onJumpToCategory(c)}
-                      className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
+                      className="hit-area-inline flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink"
                     >
                       Ver sólo {c} <ArrowRight className="h-3 w-3" />
                     </button>

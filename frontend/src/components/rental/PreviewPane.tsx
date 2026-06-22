@@ -58,7 +58,7 @@ export function PreviewPane({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex items-center gap-1 rounded-full bg-ink text-amber px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider hover:bg-amber hover:text-ink transition"
+          className="hit-area-44 inline-flex items-center gap-1 rounded-full bg-ink text-amber px-2.5 py-1 font-mono text-[9px] uppercase tracking-wider hover:bg-amber hover:text-ink transition"
         >
           Ocultar <X className="h-2.5 w-2.5" />
         </button>
@@ -180,7 +180,7 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
             onClick={() =>
               navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } })
             }
-            className="inline-flex items-center gap-1.5 self-start font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-ink transition"
+            className="hit-area-inline inline-flex items-center gap-1.5 self-start font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-ink transition"
           >
             Ver ficha completa <ArrowRight className="h-3 w-3" />
           </button>
