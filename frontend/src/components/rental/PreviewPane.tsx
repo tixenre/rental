@@ -6,6 +6,7 @@ import { formatARS } from "@/lib/format";
 import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
+import { Button } from "@/design-system/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -55,13 +56,15 @@ export function PreviewPane({
         <span className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground">
           Detalle
         </span>
-        <button
+        <Button
           type="button"
+          variant="primary"
+          shape="pill"
           onClick={onClose}
-          className="hit-area-44 inline-flex items-center gap-1 rounded-full bg-ink text-amber px-2.5 py-1 font-mono text-xs uppercase tracking-wider hover:bg-amber hover:text-ink transition"
+          className="hit-area-44 h-auto px-2.5 py-1 font-mono text-xs uppercase tracking-wider gap-1"
         >
           Ocultar <X className="h-2.5 w-2.5" />
-        </button>
+        </Button>
       </div>
 
       {item ? <PreviewBody item={item} disponible={disponible} /> : <PreviewEmpty />}
@@ -189,15 +192,17 @@ function PreviewBody({ item, disponible }: { item: Equipment; disponible?: numbe
 
       <div className="border-t border-[var(--hairline)] bg-card p-3.5 shrink-0">
         {qty === 0 ? (
-          <button
+          <Button
             type="button"
+            variant="primary"
+            shape="pill"
             onClick={() => !sinStock && add(item.id)}
             disabled={sinStock}
-            className="w-full flex items-center justify-center gap-2 rounded-full bg-ink text-amber py-3.5 font-sans text-sm font-bold transition hover:bg-amber hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full h-auto py-3.5 font-bold disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus className="h-4 w-4" />
             {sinStock ? "Sin stock" : "Agregar al rental"}
-          </button>
+          </Button>
         ) : (
           <div className="flex items-center justify-between rounded-full border-[1.5px] border-amber bg-amber px-2 py-1">
             <button

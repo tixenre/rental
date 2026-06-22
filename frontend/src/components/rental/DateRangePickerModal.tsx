@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/design-system/ui/dialog";
 import { Calendar } from "@/design-system/ui/calendar";
+import { Button } from "@/design-system/ui/button";
 import { Pill } from "@/design-system/kit/Pill";
 import {
   computeJornadas,
@@ -459,13 +460,15 @@ export function DateRangePickerModal({
             {footerLabel}
           </div>
 
-          <button
+          <Button
+            variant="amber"
+            shape="pill"
             onClick={apply}
             disabled={!hasStart || blocked}
-            className="inline-flex items-center justify-center min-h-11 rounded-full bg-amber px-6 py-2.5 sm:py-2 text-sm font-semibold text-ink hover:brightness-110 transition shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-40 disabled:cursor-not-allowed"
+            className="min-h-11 h-auto px-6 py-2.5 sm:py-2 font-semibold focus-visible:ring-2 focus-visible:ring-ink disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Aplicar
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

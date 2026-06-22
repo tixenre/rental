@@ -73,8 +73,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading && !asChild ? true : undefined}
         {...props}
       >
-        {loading && !asChild ? <Spinner size="sm" /> : null}
-        {children}
+        {/* asChild ⇒ Comp es Radix Slot, que exige UN solo hijo: pasamos `children`
+            crudo (sin el `null` del spinner, que lo convertiría en [null, child] y
+            rompería React.Children.only). El loading no aplica con asChild. */}
+        {asChild ? (
+          children
+        ) : (
+          <>
+            {loading ? <Spinner size="sm" /> : null}
+            {children}
+          </>
+        )}
       </Comp>
     );
   },
