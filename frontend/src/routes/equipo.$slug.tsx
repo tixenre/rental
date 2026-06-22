@@ -29,12 +29,11 @@ import { KitSection, BoxItemsSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";
 import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
 import { SpecsGrid } from "@/components/rental/equipment/shared/SpecsGrid";
+import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { Lightbox } from "@/components/rental/Lightbox";
 import { backendToEquipment } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
-import { formatARS } from "@/lib/format";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
-import { priceBreakdown } from "@/lib/pricing";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { buildCategoriaSlug } from "@/lib/categoria-slug";
 import { SITE_URL } from "@/lib/site";
@@ -257,8 +256,9 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const remove = useCart((s) => s.remove);
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
-  const price = priceBreakdown(item.pricePerDay, jornadas, 1);
   const showPeriodTotal = hasDateRange && jornadas > 1;
+  const { data: clienteSession } = useClienteSession();
+  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
   // Ficha técnica: abierta por default si son pocas specs, colapsada si hay muchas.
   // La ficha técnica es el corazón de la página → visible por default.
   const [specsOpen, setSpecsOpen] = useState(true);
@@ -416,7 +416,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
       {/* Precio + agregar (sticky en mobile bottom bar). En desktop el precio
        *  vive en la columna derecha sticky. */}
       <div className="md:hidden sticky bottom-0 -mx-4 z-10 bg-background border-t hairline px-4 py-3 flex items-center justify-between gap-3">
-        <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} />
+        <PriceBlock perDay={item.pricePerDay} jornadas={jornadas} conIva={conIva} size="md" />
         <CartButtons
           qty={qty}
           sinStock={sinStock}
@@ -495,7 +495,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
 
           {/* Precio + agregar (desktop — en la col visual) */}
           <div className="hidden md:flex items-center justify-between gap-3 rounded-xl border hairline bg-surface px-4 py-3">
-            <PriceBlock price={price} item={item} showPeriodTotal={showPeriodTotal} large />
+            <PriceBlock perDay={item.pricePerDay} jornadas={jornadas} conIva={conIva} size="lg" />
             <CartButtons
               qty={qty}
               sinStock={sinStock}
@@ -623,41 +623,6 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         onIndexChange={setSelectedPhoto}
       />
     </article>
-  );
-}
-
-function PriceBlock({
-  price,
-  item,
-  showPeriodTotal,
-  large = false,
-}: {
-  price: ReturnType<typeof priceBreakdown>;
-  item: Equipment;
-  showPeriodTotal: boolean;
-  large?: boolean;
-}) {
-  const { data: clienteSession } = useClienteSession();
-  const conIva = aplicaIva(clienteSession?.perfil_impuestos);
-  return (
-    <div>
-      <div className={`font-display ${large ? "text-3xl" : "text-xl"} tabular text-ink`}>
-        {formatARS(item.pricePerDay)}
-      </div>
-      <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        / jornada{conIva ? " +IVA" : ""}
-      </div>
-      {showPeriodTotal && (
-        <div className="mt-1 flex items-baseline gap-1.5">
-          <span className={`font-display ${large ? "text-lg" : "text-sm"} tabular text-amber`}>
-            {formatARS(price.total)}
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            · {price.jornadas} jornadas{conIva ? " + IVA" : ""}
-          </span>
-        </div>
-      )}
-    </div>
   );
 }
 
