@@ -41,7 +41,9 @@ export function ShareButton({ item, size = "sm", className }: ShareButtonProps) 
       }}
       aria-label="Compartir"
       className={cn(
-        "grid place-items-center rounded-full border bg-background/80 backdrop-blur-sm transition-colors",
+        // `hit-area-44`: área táctil ≥44px sin agrandar el visual (igual que su
+        // hermano FavButton, con el que convive en el overlay de la card).
+        "hit-area-44 grid place-items-center rounded-full border bg-background/80 backdrop-blur-sm transition-colors",
         copied ? "border-amber/40 text-ink" : "hairline text-muted-foreground hover:text-ink",
         btnSize,
         className,

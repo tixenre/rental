@@ -234,7 +234,7 @@ export function DateRangePickerModal({
           </div>
           <button
             onClick={() => onOpenChange(false)}
-            className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
+            className="hit-area-44 grid h-9 w-9 place-items-center rounded-full hover:bg-muted transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber"
             aria-label="Cerrar"
           >
             <X className="h-4 w-4" />
@@ -435,7 +435,7 @@ export function DateRangePickerModal({
           <button
             onClick={clear}
             disabled={!hasStart}
-            className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition px-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="hit-area-44 flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition px-2 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Eraser className="h-3.5 w-3.5" />
             Limpiar

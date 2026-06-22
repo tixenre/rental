@@ -484,7 +484,7 @@ export default function ClientePortal() {
                     <button
                       type="button"
                       onClick={() => setQuery("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 grid h-[22px] w-[22px] place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 grid h-[22px] w-[22px] place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
                       aria-label="Limpiar búsqueda"
                     >
                       <XIcon className="h-3 w-3" />
@@ -504,7 +504,7 @@ export default function ClientePortal() {
                         type="button"
                         onClick={() => setTab(value)}
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 font-sans text-xs font-semibold transition",
+                          "hit-area-inline inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 font-sans text-xs font-semibold transition",
                           active
                             ? "bg-ink text-amber border-ink"
                             : "border-hairline text-muted-foreground hover:text-ink hover:border-ink",
