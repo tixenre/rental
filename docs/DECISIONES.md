@@ -864,3 +864,48 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Consecuencias.** Refuerza la _Barra de calidad de ingeniería (2026-05-25)_ (modularidad, no duplicar) y
   la _Memoria en capas (2026-05-25)_ (los Issues/commits/`dev` son la verdad del estado). El supervisor marca
   una reimplementación de algo ya presente en el repo o en `dev`.
+
+### 2026-06-22 — Creación de pedidos concurrente: serializar por equipo con advisory lock (no tocar el gate)
+
+- **Contexto.** Reservas concurrentes del **mismo equipo** daban **500 intermitente**. Root cause (traceback
+  real, no de los logs block-buffered): `psycopg2.errors.DeadlockDetected` — el `INSERT` de `alquiler_items`
+  toma un FK **KEY-SHARE** sobre la fila de `equipos`, y el gate de stock pide luego `SELECT … FOR UPDATE`
+  (exclusivo) sobre la **misma fila** → dos transacciones se bloquean en el _upgrade_ de lock y PG aborta una.
+- **Decisión.** `create_pedido` (`backend/routes/alquileres/core.py`) toma
+  `pg_advisory_xact_lock(_ADVISORY_NS_PEDIDO, equipo_id)` por cada equipo del pedido, **en orden de id**,
+  ANTES de insertar los ítems → serializa las creaciones concurrentes del mismo equipo (cola, no deadlock; se
+  libera al commit/rollback). `create_pedido_retry` es la **puerta única** de creación (cliente + admin):
+  reintenta ante `DeadlockDetected` como backstop y, agotados los intentos, devuelve **503** (carga puntual),
+  **nunca 500**. **NO se toca el `FOR UPDATE` del gate** (`reservas/gate.py`).
+- **Why.** El motor de reservas es **sagrado** (cero overbooking). El advisory lock vive **afuera** del gate
+  (no cambia su lógica), elimina el deadlock **en origen** (no solo lo sobrevive), y el orden por id evita
+  auto-deadlock entre transacciones. El retry queda de red por si aparece un deadlock residual (ej. composites
+  que comparten componentes). 503 (no 500) le dice al cliente "reintentá", no "se rompió".
+- **Consecuencias.** Refina _backend/reservas = motor único (2026-05-30)_ y _expansión recursiva (2026-05-31)_
+  **sin tocarlas**. Regresión: `test_crear_pedidos_concurrentes_sin_deadlock_ni_overbooking` (opt-in
+  `RESERVAS_DB_TEST=1`, Postgres real). Verificado en vivo: 15 reservas paralelas → 6×201 + 9×409, **0×500**,
+  en la DB 6 pedidos / 6 unidades = sin sobreventa ni huérfanos. PR #969.
+
+### 2026-06-22 — Los hallazgos de una auditoría son hipótesis: confirmar (código + en vivo) antes de arreglar
+
+- **Contexto.** Tras una auditoría profunda (skill `auditoria-profunda`) se fueron a corregir sus hallazgos.
+  Al confirmarlos uno por uno, **varios eran falsos o stale**: el bug del mini-bar estaba en `CatalogoMovil`
+  (no en el `CartMiniBar` que señalaba el audit); el "catálogo en blanco" era un artefacto del harness
+  (`ui-edge.mjs` con un glob `**/api/equipos**` que en dev matcheaba el **módulo fuente**
+  `/src/.../equipos.ts` → al interceptarlo con JSON rompía el import y dejaba la página en blanco, cosa que
+  NO pasa en prod); los overflows de admin estaban stale (páginas ya redirect / read-only / 0-overflow); los
+  contrastes "1.66/1.73" venían del parser de color, no eran reales; y los "datos rotos" (DESTACADA,
+  `nombre_publico` duplicado) estaban bien en la DB.
+- **Decisión.** Un hallazgo de auditoría —de un agente o de un harness— es una **hipótesis**, no un hecho.
+  Antes de **arreglarlo** se re-confirma **en el código + en vivo** (la extensión **Chrome MCP**: clickear de
+  verdad, medir computed styles por JS, inspeccionar la red). El contraste sobre `oklch` se **recalcula del
+  token** (OKLab→sRGB→WCAG, sobre el color compuesto para tints), no se reporta el número del parser. Quien
+  arregla **no hereda el hallazgo como verdad**.
+- **Why.** Las herramientas y los agentes exageran, se quedan cortos o miran un estado viejo; arreglar un
+  no-bug genera churn, puede romper diseño intencional (ej. las variaciones a propósito del `EstadoBadge`) y
+  erosiona la confianza en la auditoría. Confirmar es barato; deshacer un fix equivocado es caro. _Honestidad
+  > actividad._
+- **Consecuencias.** Extiende la _Regla de oro_ del skill `auditoria-profunda` ("verificar antes de reportar")
+  al que **arregla**, y _Fijarse en el repo antes de implementar (2026-06-20)_. Materializado: gotchas del
+  glob (dev sirve módulos fuente) y del parser de contraste documentados en el skill; varios "bugs" de la
+  pasada cerrados **sin código** por ser falsas alarmas (PR #976 fijó el glob del harness).

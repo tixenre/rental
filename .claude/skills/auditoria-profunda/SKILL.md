@@ -21,6 +21,15 @@ herramientas Y la intuición mienten). **Honestidad > actividad**: si algo está
 se dice; no se fabrica churn. Si una medición es dudosa (ej. contraste sobre imagen,
 hit-area por pseudo-elemento), se marca como "verificar", no se afirma.
 
+**Los hallazgos son HIPÓTESIS, no hechos** (lección 2026-06-22). Varios de una pasada real
+resultaron falsos al confirmarlos: el bug del mini-bar estaba en OTRO componente que el
+reportado, el "catálogo en blanco" era un artefacto del harness, los overflows de admin
+estaban stale (la página ya era un redirect / read-only / 0-overflow) y los contrastes
+"1.66/1.73" venían del parser, no eran reales. **Antes de ARREGLAR un hallazgo, re-confirmalo
+en el código + EN VIVO.** La extensión **Chrome MCP** es ideal para esto: clickea de verdad,
+mide computed styles por JS e inspecciona la red — así se cazaron el N+1 de `/api/cliente/favoritos`
+(~90→1) y el artefacto del glob. Quien arregla NO hereda el hallazgo como verdad: lo re-verifica.
+
 ## Setup (datos reales, local)
 Ver `docs/DEPLOY_RAILWAY.md` → "Iterar local con datos reales": backend `:8000` + vite
 `:3000` (fixtures **apagadas**) + clon de staging en Postgres local + **cuenta
@@ -49,6 +58,12 @@ LABEL=before node ...ui-audit.mjs   # baseline → docs/audit-ui-screenshots/bef
 - Mide en página (parser de color por canvas → maneja `oklch` de Tailwind v4) y
   **guarda 1 screenshot por pantalla×tamaño** en `docs/audit-ui-screenshots/<label>/`
   + un `_report.json` con todos los hallazgos → **comparar antes/después**.
+- ⚠️ El **contraste del parser es aproximado**: opacidades apiladas (`/40`, `/65`), texto
+  sobre imagen y el redondeo oklch dan falsos (esta pasada tiró 1.66/1.73 que no eran). Para
+  cualquier contraste que vayas a ARREGLAR, **recalculá del TOKEN** — oklch→sRGB lineal→
+  luminancia→WCAG (~15 líneas de node) — y para tints, sobre el color compuesto (verde@10% sobre
+  bone). El parser propone candidatos; el número se confirma a mano. Patrón de fix: token de
+  texto más oscuro mismo hue/chroma (ej. `--color-verde-ink`, `--color-destructive` a L 0.55).
 - Gotcha del layout: en **mobile** scrollea un **contenedor interno**
   (`div.flex-1.overflow-y-auto`), no el document; el harness lo detecta y screenshotea
   ese elemento; en desktop usa `fullPage`.
@@ -89,6 +104,11 @@ abierto, card expandida, pedido del portal expandido, popup de documentos.
 error, catálogo/portal vacíos, cotizar 500, tabs del portal (Notif/Perfil), discovery sheet mobile,
 y el **panel de verificación** (`VERIF=1`, correr con el cliente NO verificado por psql). Captura un
 snippet del texto visible para juzgar el estado. (Ampliar acá a medida que aparezcan estados nuevos.)
+- ⚠️ **Gotcha del glob (2026-06-22):** el matcher de `page.route` tiene que apuntar al **XHR**
+  (regex `/\/api\/equipos\?/`), NO a un glob amplio `**/api/equipos**`: en dev Vite sirve el
+  **módulo fuente** `/src/lib/admin/api/equipos.ts`, que ese glob también matchea → lo interceptás
+  con JSON, se rompe el import y la página queda **en blanco**. Eso disparó una falsa alarma de
+  "catálogo roto" que NO pasa en prod (ahí no se sirven módulos fuente). Acotá siempre al request real.
 
 ### Nomenclatura de evidencia (para saber "cuál es cuál")
 - Carpeta por corrida: `docs/audit-ui-screenshots/<LABEL>/` (gitignored; regenerable).

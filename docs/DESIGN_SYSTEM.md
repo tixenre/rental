@@ -105,9 +105,10 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
 | `--muted-foreground`  | `oklch(0.42 0.01 70)`   | Secondary text, eyebrows               |
 | `--rosa`              | `#ED7BAD`               | Status palette                         |
 | `--azul`              | `#1097DB`               | Status palette (Presupuesto)           |
-| `--verde`             | `#009971`               | Status palette (Confirmado)            |
+| `--verde`             | `#009971`               | Status palette (Confirmado) — charts/montos/bandas |
+| `--verde-ink`         | `oklch(0.48 0.125 166.4)` | Texto de estado verde sobre tints (AA); NO el verde de marca |
 | `--naranja`           | `#E9552F`               | Status palette (Warning)               |
-| `--destructive`       | `oklch(0.62 0.22 27)`   | Errors, delete, Cancelado              |
+| `--destructive`       | `oklch(0.55 0.22 27)`   | Errors/delete/Cancelado — AA texto-sobre-claro y blanco-sobre-rojo (era 0.62, #971) |
 
 **Regla del color (single-accent discipline):** la página es \*\*bone + ink
 
@@ -115,6 +116,14 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
   status de pedido y gráficos — nunca en superficies de marketing.
 
 **Orden de gráficos** (siempre): amber → azul → naranja → verde → rosa.
+
+**Texto sobre tints de marca (AA):** un color de marca usado como TEXTO sobre su propio tint
+(`text-verde` sobre `bg-verde/10` ≈ 3.2:1, o blanco sobre el naranja del hub ≈ 2.4:1) suele
+fallar AA. El fix **no** es tocar el color de marca (rompe charts/montos/fondos), sino: (a) un
+**token de texto más oscuro**, mismo hue/chroma, menor L — `--verde-ink` (0.48), `--destructive`
+ya a 0.55 — aplicado al TEXTO dejando el tint; o (b) sobre fondo de marca sólido, texto **ink
+opaco** (no blanco translúcido). El verde de WhatsApp (`#25D366` + blanco) es **excepción
+tier-4 a propósito** (identidad de marca) — no se "arregla". Decisión: 2026-06-22.
 
 Las utilities Tailwind correspondientes (`bg-amber`, `text-ink`,
 `border-hairline`, `bg-rosa/10`, etc.) las genera Tailwind v4 directo de
@@ -284,6 +293,24 @@ Defined as utility classes en `src/styles.css`:
 .wordmark      /* Champ Black, lowercase, tracking -0.01em */
 .grain         /* dot-grain texture overlay ~40% opacity */
 ```
+
+## Hit-area / tap targets (≥44px, HIG)
+
+Utilidades canónicas en `src/styles/utilities.css` para llevar el área **tocable** a 44px
+**sin agrandar el visual** (generalizan el `::before` que vivía en StepperPill — fuente única):
+
+```
+.hit-area-44      /* ::before transparente 44×44 centrado — botones-ícono aislados */
+.hit-area-inline  /* ::before que extiende SÓLO el alto a 44px — links/chips de texto en fila */
+```
+
+- **Gotcha (importante):** el `::before` se **solapa entre vecinos** en `flex-wrap` o filas
+  apiladas (dos hit-areas de 44px con gap chico → zona de click ambigua). Ahí **NO** uses el
+  `::before`: usá **`min-h-11`** (agranda la caja, sin solape), gateado a mobile si en desktop
+  hay mouse — ej. `min-h-11 md:min-h-0` para el sidebar admin (Sheet táctil en mobile / fijo en
+  desktop) o las celdas del calendario.
+- El elemento debe ser `position:relative` (las clases lo setean). **OJO** con elementos ya
+  `absolute`: forzar `relative` los rompe → ahí poné el `before:` inline directo (no la clase).
 
 ---
 

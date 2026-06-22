@@ -219,6 +219,27 @@ perfil/salir del portal) al menú, logo a la izquierda; la landing (`/`) no llev
 _Filosofía de diseño del DS (2026-06-20)_ en la navegación; detalle en `DESIGN_SYSTEM.md`. El supervisor
 marca un topbar fuera del shell o una lista de áreas duplicada.
 
+### 2026-06-22 — Creación de pedidos concurrente: serializar por equipo con advisory lock (no tocar el gate)
+
+Reservas concurrentes del mismo equipo se deadlockeaban (FK KEY-SHARE del insert de ítems + `FOR
+UPDATE` del gate sobre la misma fila de `equipos`) → **500 intermitente**. Fix: `create_pedido` toma
+`pg_advisory_xact_lock` por equipo **en orden de id** ANTES de insertar (serializa, no deadlock);
+`create_pedido_retry` es la puerta única de creación (cliente+admin) y reintenta como backstop → **503**
+si persiste, **nunca 500**. **NO toca el `FOR UPDATE`** (motor de reservas sagrado). Verificado: 15
+paralelas → 6×201 + 9×409, 0×500, sin sobreventa ni huérfanos. Refina _motor único de reservas
+(2026-05-30)_. PR #969.
+
+### 2026-06-22 — Los hallazgos de una auditoría son hipótesis: confirmar (código + en vivo) antes de arreglar
+
+Un hallazgo de auditoría —de un agente o un harness— es **hipótesis, no hecho**: se re-confirma en el
+código + **en vivo** (Chrome MCP: clickear, medir computed styles por JS, ver la red) antes de
+arreglarlo. En una pasada real varios eran falsos: el bug del mini-bar estaba en otro componente, el
+"catálogo en blanco" era artefacto del harness (glob que matcheaba un módulo fuente en dev), los
+overflows de admin estaban stale, los contrastes "1.66/1.73" eran del parser, y los datos "rotos"
+(DESTACADA, `nombre_publico`) estaban bien. Contraste oklch → **recalcular del token**
+(OKLab→sRGB→WCAG), no creerle al parser. Refuerza _honestidad > actividad_ y _fijarse en el repo antes
+de implementar (2026-06-20)_; el detalle de método vive en el skill `auditoria-profunda`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
