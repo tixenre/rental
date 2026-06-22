@@ -12,12 +12,25 @@ import { useClienteSession } from "@/lib/iva";
  *   recarga del servidor. La operación es secuencial para evitar race conditions.
  * - Cada toggle: actualiza local (optimistic) + llama al endpoint si logueado.
  */
+// Guard a nivel módulo: el sync (merge local→server + recarga del server) es
+// GLOBAL, no por-componente. A `useFavoritos` lo usan ~90 FavButton del catálogo;
+// sin este guard cada uno disparaba su propio sync → ~90 GET /api/cliente/favoritos
+// por carga. Con el guard corre UNA sola vez por sesión (los effects de los demás
+// componentes ven el id ya seteado y saltan). Se resetea al desloguear para
+// re-sincronizar al volver a entrar.
+let _favSyncedFor: number | null = null;
+
 export function useFavoritos() {
   const store = useFavoritesStore();
   const { data: session } = useClienteSession();
 
   useEffect(() => {
-    if (!session?.id) return;
+    if (!session?.id) {
+      _favSyncedFor = null;
+      return;
+    }
+    if (_favSyncedFor === session.id) return; // ya sincronizado para esta sesión
+    _favSyncedFor = session.id;
     const sync = async () => {
       if (store.items.length > 0) {
         await clienteApi.syncFavoritos(store.items).catch(console.warn);
