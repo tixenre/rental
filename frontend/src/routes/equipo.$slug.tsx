@@ -364,7 +364,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
 
       {/* Header con marca, nombre, badges */}
       <header className="space-y-2">
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground flex-wrap">
+        <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground flex-wrap">
           <span>{item.brand}</span>
           <span>·</span>
           {/* Categorías como chips: clickeables, deep-link al catálogo
@@ -404,7 +404,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           <h1 className="font-display text-3xl md:text-4xl text-ink leading-tight">{item.name}</h1>
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 rounded-full border hairline px-3 py-1.5 text-xs hover:border-foreground/40 transition shrink-0"
+            className="flex items-center justify-center gap-1.5 rounded-full border hairline px-3 py-1.5 text-xs hover:border-foreground/40 transition shrink-0 min-h-11 min-w-11 sm:min-w-0"
             aria-label="Compartir"
           >
             {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
@@ -679,7 +679,7 @@ function CartButtons({
       <button
         onClick={() => !sinStock && onAdd()}
         disabled={sinStock}
-        className="inline-flex items-center gap-1.5 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-amber transition hover:bg-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex items-center justify-center gap-1.5 min-h-11 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-amber transition hover:bg-foreground disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Plus className="h-4 w-4" /> {sinStock ? "Sin stock" : "Agregar"}
       </button>
