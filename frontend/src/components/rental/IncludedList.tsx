@@ -32,7 +32,7 @@ export function IncludedList({ item }: { item: Equipment }) {
           <dl className="grid grid-cols-2 gap-x-3 gap-y-2 sm:hidden">
             {highlights.map((s, i) => (
               <div key={`m-${s.label}-${i}`} className="min-w-0 leading-tight">
-                <dt className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                   {s.label}
                 </dt>
                 <dd className="truncate text-[13px] font-medium text-ink">{s.value}</dd>
@@ -54,7 +54,7 @@ export function IncludedList({ item }: { item: Equipment }) {
                 key={`d-${s.label}-${i}`}
                 className="inline-flex items-baseline gap-1.5 rounded-full border hairline bg-background/70 px-2.5 py-1"
               >
-                <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                   {s.label}
                 </span>
                 <span className="text-xs font-medium text-ink">{s.value}</span>

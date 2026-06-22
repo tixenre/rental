@@ -524,7 +524,7 @@ function PedidoEditorPage() {
                     <span className="font-mono text-base font-semibold leading-none">
                       {jornadas}
                     </span>
-                    <span className="font-mono text-[8px] uppercase tracking-[0.2em] text-muted-foreground ml-1">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground ml-1">
                       {jornadas === 1 ? "jornada" : "jornadas"}
                     </span>
                   </span>
@@ -823,7 +823,7 @@ function PedidoEditorPage() {
       {/* Barra inferior sticky (mobile) */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 flex items-center gap-2 px-4 py-2.5 border-t hairline bg-surface-elevated safe-b">
         <div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Total
           </div>
           <div className="font-mono text-base font-semibold tabular-nums">{fmtArs(total)}</div>

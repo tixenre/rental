@@ -106,7 +106,7 @@ export function PhotoGallery({
 
               {/* Badge principal */}
               {foto.es_principal && (
-                <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-amber px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink">
+                <div className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-amber px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink">
                   <Star className="h-2.5 w-2.5 fill-current" />
                   Principal
                 </div>

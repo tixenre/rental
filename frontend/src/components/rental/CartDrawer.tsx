@@ -422,7 +422,7 @@ export function CartDrawer({
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                                <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                                   {it.brand}
                                 </div>
                                 <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">

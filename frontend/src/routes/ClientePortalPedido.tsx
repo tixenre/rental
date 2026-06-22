@@ -546,7 +546,7 @@ export function PedidoCard({
           {/* ── Timeline: card propia, full width ── */}
           <section className="[grid-area:timeline] rounded-lg border border-[var(--hairline)] bg-card px-5 pt-[18px] pb-4">
             <div className="flex items-baseline justify-between gap-3 mb-3.5">
-              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                 Estado del pedido
               </h3>
               {tlCurrent && (
@@ -563,7 +563,7 @@ export function PedidoCard({
           <div className="[grid-area:main] flex flex-col gap-5 min-w-0">
             <section className="grid grid-cols-3 gap-2">
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                   Retiro
                 </div>
                 <div className="font-sans text-sm font-semibold text-ink mt-0.5">
@@ -574,7 +574,7 @@ export function PedidoCard({
                 )}
               </div>
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                   Devolución
                 </div>
                 <div className="font-sans text-sm font-semibold text-ink mt-0.5">
@@ -587,7 +587,7 @@ export function PedidoCard({
                 )}
               </div>
               <div className="rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5">
-                <div className="font-mono text-[8px] uppercase tracking-[0.22em] text-muted-foreground">
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
                   Jornadas
                 </div>
                 <div className="font-sans text-2xl font-extrabold text-ink tabular-nums leading-none mt-1">
@@ -597,7 +597,7 @@ export function PedidoCard({
             </section>
 
             <section>
-              <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
                 Equipos ({pedido.items.length})
               </h3>
               <ul>
@@ -625,7 +625,7 @@ export function PedidoCard({
                       )}
                       <div className="min-w-0 flex-1">
                         {item.marca && (
-                          <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-muted-foreground leading-none">
+                          <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground leading-none">
                             {item.marca}
                           </div>
                         )}
@@ -710,7 +710,7 @@ export function PedidoCard({
                   borderColor: "color-mix(in oklch, var(--amber) 35%, transparent)",
                 }}
               >
-                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-ink/70 mb-2">
+                <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink/70 mb-2">
                   Documentos
                 </h3>
                 <div className="grid gap-2 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
@@ -805,7 +805,7 @@ export function PedidoCard({
 
             {pedido.pagos && pedido.pagos.length > 0 && (
               <section>
-                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+                <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
                   Pagos
                 </h3>
                 <ul className="flex flex-col gap-1">
@@ -829,7 +829,7 @@ export function PedidoCard({
 
             {pedido.notas && (
               <section>
-                <h3 className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
+                <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-2">
                   Notas
                 </h3>
                 <div className="rounded-md border border-[color-mix(in_oklch,var(--amber)_40%,transparent)] bg-amber-soft px-3.5 py-3 font-sans text-xs text-ink leading-[1.5] whitespace-pre-wrap">
@@ -934,7 +934,7 @@ function DocActions({
           className="flex-1 relative flex items-center gap-2.5 rounded-md border border-[var(--hairline)] bg-card px-3 py-2.5 text-left transition hover:border-ink hover:bg-muted"
         >
           {showNewBadge && (
-            <span className="absolute -top-1.5 -right-1.5 rounded-full bg-ink text-amber text-[9px] font-bold tracking-wide px-1.5 py-0.5 leading-none shadow">
+            <span className="absolute -top-1.5 -right-1.5 rounded-full bg-ink text-amber text-[10px] font-bold tracking-wide px-1.5 py-0.5 leading-none shadow">
               Nuevo
             </span>
           )}
@@ -948,7 +948,7 @@ function DocActions({
                 {description}
               </div>
             ) : (
-              <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+              <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                 Ver · PDF
               </div>
             )}

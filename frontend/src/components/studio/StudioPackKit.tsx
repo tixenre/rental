@@ -58,7 +58,7 @@ export function StudioPackKit({
             </div>
             <div className="min-w-0 flex-1">
               {e.marca && (
-                <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                   {e.marca}
                 </div>
               )}

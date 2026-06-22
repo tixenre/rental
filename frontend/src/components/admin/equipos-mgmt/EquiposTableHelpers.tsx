@@ -261,7 +261,7 @@ export function PrecioJornadaInline({ equipo, onSaved }: { equipo: Equipo; onSav
       />
       {isManual && (
         <span
-          className="absolute -top-1.5 -right-1 rounded-full bg-amber px-1 text-[8px] font-mono uppercase tracking-wide text-ink"
+          className="absolute -top-1.5 -right-1 rounded-full bg-amber px-1 text-[10px] font-mono uppercase tracking-wide text-ink"
           title="Manual"
         >
           M
@@ -300,7 +300,7 @@ export function KpiCard({
           : "hairline",
       )}
     >
-      <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
         {label}
       </div>
       <div className="font-display text-2xl sm:text-3xl font-black text-ink tabular-nums leading-none mt-1">

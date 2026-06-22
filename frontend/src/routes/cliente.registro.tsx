@@ -210,7 +210,7 @@ export default function ClienteRegistroPage() {
           {/* Wordmark */}
           <div className="mb-8 flex items-center gap-3">
             <span className="wordmark text-2xl text-ink">rambla rental.</span>
-            <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
               Portal
             </span>
           </div>
@@ -241,7 +241,7 @@ export default function ClienteRegistroPage() {
               </div>
               <div className="flex shrink-0 items-center gap-1 rounded-full border border-[#4285F4]/20 bg-[#4285F4]/10 px-2 py-1">
                 <GoogleIcon size={14} />
-                <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-[#4285F4]">
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#4285F4]">
                   Google
                 </span>
               </div>
@@ -374,7 +374,7 @@ export default function ClienteRegistroPage() {
                 {/* Datos para Factura A */}
                 {esRI && (
                   <div className="rounded-xl border border-amber/30 bg-amber-soft/40 p-4 space-y-3">
-                    <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.22em] text-ink/60">
+                    <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-ink/60">
                       <Receipt className="h-3.5 w-3.5" strokeWidth={1.5} />
                       Factura A
                     </div>
@@ -422,7 +422,7 @@ export default function ClienteRegistroPage() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
+    <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
       {children}
     </div>
   );

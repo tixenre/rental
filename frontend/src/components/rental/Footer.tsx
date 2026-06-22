@@ -110,7 +110,7 @@ function FooterMobile() {
         </div>
 
         {/* Copyright */}
-        <div className="pt-3 border-t hairline font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="pt-3 border-t hairline font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           © {new Date().getFullYear()} Rambla Rental
         </div>
       </div>
