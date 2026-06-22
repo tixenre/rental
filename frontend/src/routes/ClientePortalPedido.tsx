@@ -421,11 +421,7 @@ export function PedidoCard({
             <EstadoBadge estado={pedido.estado} />
           )}
           {pedido.monto_total != null && (
-            <PagoBadge
-              pagado={pagado}
-              total={total}
-              estado={pedido.estado}
-            />
+            <PagoBadge pagado={pagado} total={total} estado={pedido.estado} />
           )}
           <span className="font-sans text-[13px] text-muted-foreground flex-1 min-w-0 truncate">
             {fmtDate(pedido.fecha_desde)}
