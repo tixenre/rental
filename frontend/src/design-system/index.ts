@@ -6,3 +6,4 @@ export * from "./kit/EstadoBadge";
 export * from "./kit/PagoBadge";
 export * from "./kit/ClienteAvatar";
 export type * from "./kit/types";
+export * from "./ui/spinner";
