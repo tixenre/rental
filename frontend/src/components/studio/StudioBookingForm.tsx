@@ -355,7 +355,7 @@ export function StudioBookingForm({
   return (
     <div className="space-y-4">
       {returnedFromLogin && auth === "in" && (
-        <div className="rounded-xl border border-verde/30 bg-verde/10 px-4 py-3 text-sm text-verde">
+        <div className="rounded-xl border border-verde/30 bg-verde/10 px-4 py-3 text-sm text-verde-ink">
           <span className="font-medium">Todo listo.</span> Revisá los datos y apretá Reservar para
           confirmar.
         </div>
@@ -524,7 +524,7 @@ export function StudioBookingForm({
           {/* Banda verde — solo cuando hay fecha y está libre */}
           {fechaISO && disponibilidad === "libre" && (
             <div className="flex items-center gap-2.5 px-4 py-2.5 bg-verde/5 border-y border-verde/10">
-              <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-verde/10 text-verde border-verde/20">
+              <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-verde/10 text-verde-ink border-verde/20">
                 <Check className="h-3 w-3" /> Disponible
               </span>
               <span className="text-xs text-muted-foreground tabular">

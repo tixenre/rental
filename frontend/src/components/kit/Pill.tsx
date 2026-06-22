@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 export type PillTone = "success" | "warning" | "danger" | "info" | "neutral";
 
 const TONE: Record<PillTone, string> = {
-  success: "bg-verde/10 text-verde border-verde/30",
+  success: "bg-verde/10 text-verde-ink border-verde/30",
   warning: "bg-amber/15 text-ink border-amber/40",
   danger: "bg-destructive/10 text-destructive border-destructive/30",
   info: "bg-azul/10 text-azul border-azul/30",

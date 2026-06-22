@@ -58,6 +58,11 @@
   --color-azul: #1097db; /* Pantone 299 C  — Presupuesto / info */
   --color-naranja: #e9552f; /* Pantone 172 C  — Aviso */
   --color-verde: #009971; /* Pantone 7724 C — Confirmado / éxito */
+  /* Verde más oscuro SOLO para TEXTO sobre tints de estado (badge Confirmado,
+     Disponible): el --color-verde brillante sobre bg-verde/10-20 da ~3.2:1
+     (falla AA). Mismo hue/chroma, L 0.606→0.48 → 4.8-5.2:1. El verde de marca
+     (charts, montos, bandas) queda intacto; esto es solo el texto del estado. */
+  --color-verde-ink: oklch(0.48 0.125 166.4);
 
   /* ── Charts (orden oficial: amber → azul → naranja → verde → rosa) ── */
   --color-chart-1: var(--color-amber);

@@ -563,7 +563,7 @@ export function CartSheet({
                       className={cn(
                         "inline-flex items-center px-1.5 py-px rounded-full font-mono text-[11px] font-bold",
                         descuentoOrigen === "cliente"
-                          ? "bg-verde/10 text-verde"
+                          ? "bg-verde/10 text-verde-ink"
                           : "bg-azul/10 text-azul",
                       )}
                     >

@@ -128,7 +128,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
             ? "bg-rosa/15 text-rosa"
             : cuposDisponibles <= 3
               ? "bg-rosa/10 text-rosa"
-              : "bg-verde/10 text-verde"
+              : "bg-verde/10 text-verde-ink"
         }`}
       >
         {enListaActual
