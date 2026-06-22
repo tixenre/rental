@@ -494,14 +494,17 @@
   diseño (`design-system` para el paquete, `importar-diseno` para implementar handoffs).
 - **Decisión (del dueño):** **todo lo de UI / front-end / design system / Claude Design / import +
   implementación vive en UN solo lugar, con lo último y lo mejor.** (1) El DS canónico es la app:
-  componentes en `src/components/{ui,kit,rental}`, tokens/tipografía/utilities/fuentes en `src/styles/`
-  (entry `src/ds-styles.css`, cableado desde `src/styles.css`). (2) El paquete `@rambla/design-system`
+  primitivos en `src/design-system/{ui,kit}`, negocio en `src/components/{rental,admin}`,
+  tokens/tipografía/utilities/fuentes en `src/design-system/styles/` (entry
+  `src/design-system/ds-styles.css`; PR #981 reorgó desde `src/styles/` + `src/components/{ui,kit}`).
+  (2) El paquete `@rambla/design-system`
   y su workspace se **retiraron** (los tokens/CSS/fuentes se migraron a `src/` **verbatim** — CSS
   compilado verificado como subconjunto del previo, cero regresión visual; las copias de componentes
   drifteadas se descartaron, gana la app). (3) **Un solo skill: `importar-diseno`** — implementa
   diseños Y mantiene/consume la librería (reuse-first). El skill `design-system` se retiró.
-- **Cómo aplica / quién hace cumplir:** un token/utility se edita en `src/styles/`, una pieza en
-  `src/components/`; **no se recrea un paquete workspace** ni se duplica una pieza que ya existe. El
+- **Cómo aplica / quién hace cumplir:** un token/utility se edita en `src/design-system/styles/`,
+  una pieza de DS en `src/design-system/{ui,kit}` o de negocio en `src/components/{rental,admin}`;
+  **no se recrea un paquete workspace** ni se duplica una pieza que ya existe. El
   supervisor marca como hallazgo cualquier intento de reintroducir el paquete o un segundo skill de DS.
   Cierra la iniciativa #662 (invertir la fuente de verdad hacia el paquete — abandonada por esta
   decisión); los trackers de migración por pantalla (#612) y handoff (#605) siguen vigentes sobre `src/`.

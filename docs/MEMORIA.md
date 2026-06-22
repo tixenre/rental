@@ -154,9 +154,11 @@ supervisor marca `ILIKE`/`LIKE` o normalizadores ad-hoc, e índices cuya expresi
 
 ### 2026-06-06 — Design system consolidado en la app; un solo skill de UI
 
-El DS canónico es la app: componentes en `src/components/{ui,kit,rental}`, tokens/fuentes en `src/styles/`
-(entry `src/ds-styles.css`). **Un solo skill: `importar-diseno`.** No reintroducir el paquete workspace
-`@rambla/design-system` ni un segundo skill de DS; no duplicar una pieza que ya existe.
+El DS canónico es la app: primitivos en `src/design-system/{ui,kit}`, componentes de negocio en
+`src/components/{rental,admin}`, tokens/fuentes en `src/design-system/styles/` (entry
+`src/design-system/ds-styles.css`). **Un solo skill: `importar-diseno`.** No reintroducir el paquete
+workspace `@rambla/design-system` ni un segundo skill de DS; no duplicar una pieza que ya existe.
+_(Paths actualizados post-PR #981 — reorg a `src/design-system/`.)_
 
 ### 2026-06-07 — `backend/contabilidad/` = motor único de la plata "de adentro" (cierra #809)
 
