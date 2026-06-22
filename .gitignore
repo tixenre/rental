@@ -56,3 +56,9 @@ blob-report
 # Claude Code SDK internal artifacts
 .claude/worktrees/
 .vite/
+
+# Screenshots de auditoría UI (regenerables con .claude/skills/auditoria-profunda/ui-audit.mjs)
+docs/audit-ui-screenshots/
+
+# SQLite stray (la app es Postgres-only; esto lo deja algún tooling local)
+backend/app.db
