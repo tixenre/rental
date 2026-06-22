@@ -185,9 +185,7 @@ export function MantenimientoEquipoDialog({
               <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label className="text-2xs uppercase tracking-wide text-muted-foreground">
-                Tipo
-              </Label>
+              <Label className="text-2xs uppercase tracking-wide text-muted-foreground">Tipo</Label>
               <Select value={tipo} onValueChange={setTipo}>
                 <SelectTrigger>
                   <SelectValue />
