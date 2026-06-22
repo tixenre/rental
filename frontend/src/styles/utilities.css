@@ -36,12 +36,17 @@
     outline-offset: 1px;
   }
 
-  /* iOS: evita el zoom al enfocar inputs < 16px */
+  /* iOS: evita el zoom al enfocar inputs < 16px en mobile. `!important` porque
+     una clase utilitaria (ej. `text-sm` = 14px, especificidad de clase) le gana
+     a este selector de ELEMENTO en la cascada → sin él el input queda en 14px e
+     iOS hace zoom al enfocar. Es un floor de 16px (no encoge inputs ya ≥16px);
+     desktop (≥768px) no se toca. Fuente única del anti-zoom — evita parchear
+     `text-base sm:text-sm` input por input. */
   @media (max-width: 767px) {
     input,
     textarea,
     select {
-      font-size: max(16px, 1em);
+      font-size: max(16px, 1em) !important;
     }
   }
 }
