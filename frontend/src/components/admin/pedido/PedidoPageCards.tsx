@@ -603,9 +603,7 @@ export function HistorialModificaciones({ items }: { items: PedidoHistorialItem[
                 {HIST_ESTADO_LABEL[h.estado]}
               </Badge>
               {isDirecto && (
-                <span className="text-2xs uppercase tracking-wide text-muted-foreground">
-                  Auto
-                </span>
+                <span className="text-2xs uppercase tracking-wide text-muted-foreground">Auto</span>
               )}
               {overrideAplicado && (
                 <span className="text-2xs text-amber">modificada al aprobar</span>

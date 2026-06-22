@@ -274,9 +274,7 @@ export function NombreTemplateBuilder({
           >
             {saveMut.isPending ? "Guardando…" : "Guardar plantilla"}
           </Button>
-          {isDirty && (
-            <span className="text-2xs text-muted-foreground">Cambios sin guardar</span>
-          )}
+          {isDirty && <span className="text-2xs text-muted-foreground">Cambios sin guardar</span>}
         </div>
       </div>
     </div>

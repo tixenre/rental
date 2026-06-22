@@ -212,9 +212,7 @@ export function EnviarDocsDialog({
 
             {preview && (
               <div className="space-y-1 rounded-md border hairline bg-muted/20 p-2">
-                <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Asunto
-                </div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">Asunto</div>
                 <div className="break-words text-sm font-medium text-ink">{preview.subject}</div>
                 <iframe
                   srcDoc={preview.html}

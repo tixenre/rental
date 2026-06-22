@@ -48,9 +48,9 @@ export function GoogleAnalyticsSection() {
         <h2 className="font-display text-lg text-ink">Google Analytics</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
           Pegá el <strong>Measurement ID</strong> de tu propiedad de Google Analytics (formato{" "}
-          <code className="text-xs">G-XXXXXXXXXX</code>) para medir el tráfico del catálogo
-          público. Lo sacás de Google Analytics → Admin → Flujos de datos → Web. Dejalo vacío para
-          apagar la medición.
+          <code className="text-xs">G-XXXXXXXXXX</code>) para medir el tráfico del catálogo público.
+          Lo sacás de Google Analytics → Admin → Flujos de datos → Web. Dejalo vacío para apagar la
+          medición.
         </p>
         <p className="text-xs text-muted-foreground mt-1">
           Solo mide el catálogo público (el back-office y el portal de clientes quedan afuera). La

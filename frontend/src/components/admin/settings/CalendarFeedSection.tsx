@@ -71,9 +71,7 @@ export function CalendarFeedSection() {
       </div>
 
       <div className="border-t hairline pt-3 space-y-2">
-        <div className="text-2xs uppercase tracking-wide text-muted-foreground">
-          URL del feed
-        </div>
+        <div className="text-2xs uppercase tracking-wide text-muted-foreground">URL del feed</div>
         {feedQ.isLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Cargando…

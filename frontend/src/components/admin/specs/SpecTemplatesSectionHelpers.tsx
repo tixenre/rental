@@ -158,9 +158,7 @@ export function SortableSpecRow({
 
       <div className="min-w-0">
         <div className="truncate text-ink">{template.label}</div>
-        <div className="font-mono text-2xs text-muted-foreground truncate">
-          {template.spec_key}
-        </div>
+        <div className="font-mono text-2xs text-muted-foreground truncate">{template.spec_key}</div>
       </div>
 
       <div className="text-xs min-w-0">
@@ -447,9 +445,7 @@ export function SpecTemplateFormModal({
                     <div className="flex items-center gap-1.5">
                       {d.validado && <span className="text-verde">✓</span>}
                       <span className="text-ink font-medium">{d.label}</span>
-                      <span className="font-mono text-3xs text-muted-foreground">
-                        {d.spec_key}
-                      </span>
+                      <span className="font-mono text-3xs text-muted-foreground">{d.spec_key}</span>
                       <span className="text-3xs text-muted-foreground ml-auto">
                         {TIPO_LABEL[d.tipo]}
                         {d.unidad ? ` · ${d.unidad}` : ""}

@@ -122,9 +122,7 @@ export function WhatsAppButton({
             <div>
               <div className="text-sm font-medium">{t.label}</div>
               {t.message && (
-                <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                  {t.message}
-                </div>
+                <div className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{t.message}</div>
               )}
             </div>
           </DropdownMenuItem>
