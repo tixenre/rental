@@ -9,8 +9,8 @@ import {
   Plus,
   AlertTriangle,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/design-system/ui/dialog";
+import { Calendar } from "@/design-system/ui/calendar";
 import {
   computeJornadas,
   deriveEndDate,

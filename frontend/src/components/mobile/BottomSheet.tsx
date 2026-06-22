@@ -1,4 +1,4 @@
-import { Drawer, DrawerClose, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { Drawer, DrawerClose, DrawerContent, DrawerTitle } from "@/design-system/ui/drawer";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 

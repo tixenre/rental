@@ -12,17 +12,17 @@ import {
   Minus,
   Plus,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { GoogleIcon } from "@/components/ui/GoogleIcon";
-import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/design-system/ui/button";
+import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
+import { Calendar } from "@/design-system/ui/calendar";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+} from "@/design-system/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/design-system/ui/popover";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { authedFetch } from "@/lib/authedFetch";

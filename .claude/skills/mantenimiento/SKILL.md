@@ -152,7 +152,7 @@ positivos típicos (**NO borrar**):
   que registra algo. La **llamada se queda**; en F841 se tira solo la **asignación** sin usar.
 - **Tooling / scripts CLI:** skills (`.claude/skills/**`), `scripts/*.mjs`, migraciones de imports.
   No los importa nadie a propósito (se corren a mano) → knip los marca, pero **se quedan**.
-- **Librería mantenida a propósito:** primitivos shadcn (`src/components/ui/*`) y sus deps `radix`
+- **Librería mantenida a propósito:** primitivos shadcn (`src/design-system/ui/*`) y sus deps `radix`
   son la caja de herramientas del design system → se conservan aunque estén sin consumir hoy.
 
 > **Respetar la MEMORIA.** Antes de borrar, chequear que no contradiga una decisión registrada.
@@ -450,7 +450,7 @@ porque la corazonada dice "ya está". Acá la regla de oro pesa doble: **cerrar 
 2. Core sagrado: `backend/reservas/`, `backend/reportes/` (y todo cálculo de stock/overlap/plata).
 3. Motores únicos: `backend/busqueda/`, `backend/services/branding/`.
 4. Barrel documentado `src/components/rental/equipment/index.ts` (MEMORIA *2026-05-29*).
-5. Primitivos shadcn `src/components/ui/*` + sus deps `@radix-ui/*` (librería del DS).
+5. Primitivos shadcn `src/design-system/ui/*` + sus deps `@radix-ui/*` (librería del DS).
 6. Analytics (`src/lib/analytics.ts`) — eventos dinámicos (MEMORIA *2026-06-02*).
 7. Parámetros de funciones, imports/llamadas con efecto, scripts de tooling/skills.
 

@@ -11,16 +11,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, ClipboardPaste } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 import type { SpecTablaColumna } from "@/lib/admin/api";
 
 /** Para columnas tipo `valor_unidad`, cada celda guarda un objeto con

@@ -27,11 +27,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Star, FileText, Filter, Info, X } from "lucide-react";
-import { ModalBackdrop } from "@/components/ui/modal-backdrop";
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/design-system/ui/button";
+import { Switch } from "@/design-system/ui/switch";
+import { Badge } from "@/design-system/ui/badge";
 import { authedJson } from "@/lib/authedFetch";
 
 type SpecTipo =

@@ -12,17 +12,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@/design-system/ui/dialog";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 
 import { adminApi, type Cliente, type ClienteInput } from "@/lib/admin/api";
 

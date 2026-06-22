@@ -33,10 +33,10 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Button } from "@/design-system/ui/button";
+import { Badge } from "@/design-system/ui/badge";
 
 import { adminApi, type Equipo, type KitComponente } from "@/lib/admin/api";
 

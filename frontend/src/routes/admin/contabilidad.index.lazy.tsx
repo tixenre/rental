@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { adminApi, type CuentaSaldo } from "@/lib/admin/api";
 import { formatARS, formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/design-system/ui/badge";
 
 export const Route = createLazyFileRoute("/admin/contabilidad/")({
   component: ContabilidadTablero,

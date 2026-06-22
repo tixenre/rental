@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { adminApi, type CuentaSaldo, type TipoCuenta } from "@/lib/admin/api";
 import { formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/design-system/ui/badge";
 import { cn } from "@/lib/utils";
 
 // El socio se crea desde el sistema (seed); acá solo cajas/cuentas genéricas.

@@ -19,10 +19,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Badge } from "@/design-system/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +32,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 import { adminApi, pedidoPdfUrl, type PedidoHistorialItem } from "@/lib/admin/api";

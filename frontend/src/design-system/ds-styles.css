@@ -2,7 +2,7 @@
    Rambla Rental — Design System  ·  ENTRY canónico (tokens/tipografía/utilities)
    ------------------------------------------------------------
    Fuente de verdad de tokens, tipografía y utilities de marca.
-   La app lo consume vía `@import "./ds-styles.css"` en `src/styles.css`.
+   La app lo consume vía `@import "./design-system/ds-styles.css"` en `src/styles.css`.
 
    Orden de carga (importa para Tailwind v4):
      1. tailwindcss        → preflight + engine
@@ -17,7 +17,7 @@
 
 /* source(none) = allowlist explícito (no se escanea node_modules). Escaneamos
    `src/` para que Tailwind encuentre las clases usadas en la app. */
-@source ".";
+@source "..";
 
 /* Modo oscuro por clase .dark en <html> (no media-query) */
 @custom-variant dark (&:where(.dark, .dark *));

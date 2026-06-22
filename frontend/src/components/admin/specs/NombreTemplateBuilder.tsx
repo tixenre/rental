@@ -18,15 +18,15 @@ import { toast } from "sonner";
 import { Tag, Plus } from "lucide-react";
 
 import { adminApi, type SpecTemplate } from "@/lib/admin/api";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/design-system/ui/button";
+import { Textarea } from "@/design-system/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 
 export function NombreTemplateBuilder({

@@ -15,8 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 import {
   Table,
   TableBody,
@@ -24,7 +24,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/design-system/ui/table";
 import { ActionMenu, BottomSheet } from "@/components/mobile";
 import {
   AlertDialog,
@@ -35,10 +35,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 
 import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
-import { EstadoBadge } from "@/components/kit/EstadoBadge";
+import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";

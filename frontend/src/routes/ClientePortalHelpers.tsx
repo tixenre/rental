@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { nombreCliente } from "@/lib/cliente-nombre";
-import { GoogleIcon } from "@/components/ui/GoogleIcon";
+import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { formatARS } from "@/lib/format";
 import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
 import type { Perfil } from "./ClientePortalTypes";

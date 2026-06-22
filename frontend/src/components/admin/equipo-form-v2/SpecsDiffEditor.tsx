@@ -38,15 +38,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Button } from "@/design-system/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 import type { SpecTemplate } from "@/lib/admin/api";
 
 import { type Spec, sameLabel, extractNumericPart } from "./spec-helpers";

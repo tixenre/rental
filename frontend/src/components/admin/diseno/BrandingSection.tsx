@@ -24,8 +24,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 import { adminApi } from "@/lib/admin/api";
 import { authedJson } from "@/lib/authedFetch";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines, type HeroTagline } from "@/lib/hero-taglines";

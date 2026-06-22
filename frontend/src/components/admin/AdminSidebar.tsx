@@ -44,7 +44,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   useSidebar,
-} from "@/components/ui/sidebar";
+} from "@/design-system/ui/sidebar";
 import { authedFetch } from "@/lib/authedFetch";
 
 type SubItem = { title: string; url: string; icon?: typeof LayoutDashboard };

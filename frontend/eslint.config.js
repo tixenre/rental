@@ -65,6 +65,43 @@ export default tseslint.config(
     },
   },
   {
+    // Boundary del design-system: los archivos en design-system/ no pueden
+    // importar de la app (api, stores, componentes de negocio, rutas).
+    // Esto mantiene la capa portable; si necesitás algo de la app, pasalo
+    // como prop/callback. Equivale al boundary de un paquete workspace, sin
+    // la ceremonia de monorepo.
+    files: ["src/design-system/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "server-only",
+              message:
+                "TanStack Start does not use the Next.js `server-only` package.",
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                "@/lib/api*",
+                "@/lib/*-store",
+                "@/components/rental*",
+                "@/components/admin*",
+                "@/routes*",
+                "@/hooks/use-*",
+              ],
+              message:
+                "El design-system no puede importar de la app (lib/api, stores, rental, admin, routes). " +
+                "Extraé la dependencia a un prop o callback.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Tier 4 (marca de terceros): el componente es enteramente la identidad de
     // WhatsApp (verde de WhatsApp). Ver docs/DESIGN_SYSTEM.md → Tiers de color.
     files: ["src/components/admin/WhatsAppButton.tsx"],

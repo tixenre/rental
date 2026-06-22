@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { Logo } from "@/components/rental/Logo";
-import { GoogleIcon } from "@/components/ui/GoogleIcon";
+import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({

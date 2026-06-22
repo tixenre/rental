@@ -21,10 +21,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+} from "@/design-system/ui/dialog";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Button } from "@/design-system/ui/button";
 
 import { adminApi, type Equipo, type CategoriaAdmin } from "@/lib/admin/api";
 import { uploadFileToBucket } from "@/lib/equipment/photos";

@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@/design-system/ui/input";
 import { cn } from "@/lib/utils";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { fmtArs } from "@/lib/format";

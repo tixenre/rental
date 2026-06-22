@@ -1,7 +1,7 @@
 import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/design-system/ui/sonner";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { FaviconSync } from "@/components/rental/FaviconSync";
 import { useCartHeartbeat } from "@/hooks/useCartHeartbeat";

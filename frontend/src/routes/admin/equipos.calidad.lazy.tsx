@@ -17,7 +17,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/design-system/ui/button";
 import {
   adminApi,
   type CalidadInventario,

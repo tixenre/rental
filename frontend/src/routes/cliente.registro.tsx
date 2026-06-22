@@ -20,7 +20,7 @@ import { useEffect, useState } from "react";
 import { Receipt } from "lucide-react";
 import { authedFetch } from "@/lib/authedFetch";
 import { cn } from "@/lib/utils";
-import { GoogleIcon } from "@/components/ui/GoogleIcon";
+import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 
 export const Route = createFileRoute("/cliente/registro")({
   head: () => ({ meta: [{ title: "Completá tu perfil — Rambla Rental" }] }),

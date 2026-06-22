@@ -5,8 +5,8 @@
 > tiene que decidir un color, un tamaño tipográfico, un radio, una
 > animación o un texto — empezás acá.
 >
-> La fuente canónica del design system es este doc + `src/styles/` (tokens/tipografía/utilities/
-> fuentes; entry `src/ds-styles.css`) + `src/components/` (primitivos y piezas).
+> La fuente canónica del design system es este doc + `src/design-system/` (tokens/tipografía/utilities/
+> fuentes en `styles/`; entry `ds-styles.css`; primitivos en `ui/` y `kit/`).
 
 ---
 
@@ -87,7 +87,7 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
 
 ---
 
-## Tokens en `src/styles.css`
+## Tokens en `src/design-system/styles/`
 
 ### Colores (lo que hay hoy)
 
@@ -296,7 +296,7 @@ Defined as utility classes en `src/styles.css`:
 
 ## Hit-area / tap targets (≥44px, HIG)
 
-Utilidades canónicas en `src/styles/utilities.css` para llevar el área **tocable** a 44px
+Utilidades canónicas en `src/design-system/styles/utilities.css` para llevar el área **tocable** a 44px
 **sin agrandar el visual** (generalizan el `::before` que vivía en StepperPill — fuente única):
 
 ```
@@ -318,15 +318,15 @@ Utilidades canónicas en `src/styles/utilities.css` para llevar el área **tocab
 
 | Categoría                                          | Dónde vive                | Notas                                                                                                                                  |
 | -------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/components/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
+| **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
 | **Componentes de aplicación (`rental/`)**          | `src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar integrados con queries + estado.                                                            |
 | **Componentes admin**                              | `src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
-| **Kit portátil ports**                             | `src/components/kit/*`    | Versiones presentacionales del kit, con paleta de marca. Adoptadas piecewise (issue #575). EstadoBadge ya es la única fuente del repo. |
+| **Kit portátil ports**                             | `src/design-system/kit/*`    | Versiones presentacionales del kit, con paleta de marca. Adoptadas piecewise (issue #575). EstadoBadge ya es la única fuente del repo. |
 
-### Button (`src/components/ui/button.tsx`)
+### Button (`src/design-system/ui/button.tsx`)
 
 ```tsx
-import { Button } from "@/components/ui/button";
+import { Button } from "@/design-system/ui/button";
 
 // variants: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "primary" | "amber"
 // sizes:    "default" (h-9) | "sm" (h-8) | "lg" (h-10) | "icon" (h-9 w-9)
@@ -346,7 +346,7 @@ import { Button } from "@/components/ui/button";
 
 ### EstadoBadge
 
-**Fuente única**: `src/components/kit/EstadoBadge.tsx`, con la paleta
+**Fuente única**: `src/design-system/kit/EstadoBadge.tsx`, con la paleta
 secundaria oficial de marca (`bg-azul/10`, `bg-verde/10`, …).
 
 Usado por `/cliente/portal` (PR E1) **y por el admin** (`/admin/pedidos`
@@ -364,7 +364,7 @@ de pedido).
 
 ### PagoBadge
 
-**Fuente única**: `src/components/kit/PagoBadge.tsx`. Hermano de `EstadoBadge`:
+**Fuente única**: `src/design-system/kit/PagoBadge.tsx`. Hermano de `EstadoBadge`:
 mientras ese muestra el **estado del pedido**, este muestra la **cobranza con el
 monto** — `Pagado` (verde) · `Debe $X` (rojo si urgente = retirado/entregado,
 ámbar si no) · `Seña $X` (cotización con seña). Idea tomada de cómo Booqable hace
@@ -376,14 +376,14 @@ inline, usar este chip.
 
 ### ClienteAvatar
 
-**Fuente única**: `src/components/kit/ClienteAvatar.tsx`. Círculo con iniciales y
+**Fuente única**: `src/design-system/kit/ClienteAvatar.tsx`. Círculo con iniciales y
 color **determinístico por nombre** (hash sobre paleta acotada de tokens, todos
 con buen contraste) → el mismo nombre siempre cae en el mismo color, para
 reconocimiento visual rápido en listas/headers (idea de Booqable). Tamaño/typo por
 `className`. Reusable en admin y portal. No crear avatares ad-hoc con `bg-ink`
 inline.
 
-### Otros componentes del kit (`src/components/kit/`)
+### Otros componentes del kit (`src/design-system/kit/`)
 
 Versiones presentacionales del kit ya disponibles para adopción
 piecewise (PR #577 las trajo a producción):

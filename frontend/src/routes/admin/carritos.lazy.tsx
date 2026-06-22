@@ -21,7 +21,7 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { fmtArs, formatFechaCorta } from "@/lib/format";
 import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
-import { Pill } from "@/components/kit/Pill";
+import { Pill } from "@/design-system/kit/Pill";
 import { Kpi, Section, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
 
 export const Route = createLazyFileRoute("/admin/carritos")({

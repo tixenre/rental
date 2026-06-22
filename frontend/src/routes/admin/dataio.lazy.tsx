@@ -35,9 +35,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from "@/design-system/ui/alert-dialog";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 import { authedFetch } from "@/lib/authedFetch";
 import { useDocumentTitle } from "@/lib/use-document-title";
 

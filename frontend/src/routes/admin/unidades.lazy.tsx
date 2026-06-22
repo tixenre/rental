@@ -12,10 +12,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Ruler, Search, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { ModalBackdrop } from "@/components/ui/modal-backdrop";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/design-system/ui/button";
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +25,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 
 import { adminApi, type Unidad, type UnidadInput } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";

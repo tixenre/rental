@@ -34,15 +34,15 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/design-system/ui/button";
+import { Label } from "@/design-system/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@/design-system/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,7 +52,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 
 import { adminApi, type CategoriaAdmin, type SpecTemplate } from "@/lib/admin/api";
 import { NombreTemplateBuilder } from "./NombreTemplateBuilder";

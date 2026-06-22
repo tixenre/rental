@@ -15,12 +15,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Send, Eye, Pencil, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { ModalBackdrop } from "@/components/ui/modal-backdrop";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/design-system/ui/button";
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Switch } from "@/design-system/ui/switch";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/design-system/ui/tabs";
 
 import {
   adminApi,
