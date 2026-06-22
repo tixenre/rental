@@ -242,12 +242,14 @@ export function DateRangePickerModal({
         </div>
 
         {/* ── Retiro + Jornadas + Devolución ──────────────────────── */}
-        <div className="px-5 sm:px-6 pt-5 pb-4 shrink-0 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Mobile: compacto (pt/pb/space chicos) para dejarle alto al calendario,
+            que es la interacción principal. Desktop (sm:) mantiene el aire. */}
+        <div className="px-5 sm:px-6 pt-3 sm:pt-5 pb-3 sm:pb-4 shrink-0 space-y-2.5 sm:space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
             {/* ── Retiro ─────────────────────────────────────────── */}
             <div
               className={cn(
-                "rounded-xl px-3.5 py-3 border bg-surface/40",
+                "rounded-xl px-3.5 py-2.5 sm:py-3 border bg-surface/40",
                 hasStart
                   ? "border-ink/15" // fecha elegida: borde sutil
                   : "border-dashed hairline", // vacío: borde dashed
@@ -280,39 +282,43 @@ export function DateRangePickerModal({
               </div>
             </div>
 
-            {/* ── Jornadas stepper ───────────────────────────────── */}
-            <div className="rounded-xl border border-ink/15 bg-amber-soft/40 px-3.5 py-3">
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
-                Jornadas
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={decJornada}
-                  disabled={!hasStart || jornadas <= 1}
-                  aria-label="Quitar una jornada"
-                  className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <Minus className="h-4 w-4" />
-                </button>
-                <div className="flex items-baseline gap-1.5 leading-none">
-                  <span
-                    data-testid="jornadas-count"
-                    className="font-display text-2xl font-black text-ink tabular-nums"
-                  >
-                    {hasStart ? jornadas : "—"}
-                  </span>
-                  <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
-                    {jornadas === 1 ? "jornada" : "jornadas"}
-                  </span>
+            {/* ── Jornadas stepper ──── Mobile: una sola fila compacta
+                 (eyebrow + stepper inline). Desktop (sm:): 2 líneas como las
+                 demás cards del grid, para igualar alto con Retiro. */}
+            <div className="rounded-xl border border-ink/15 bg-amber-soft/40 px-3.5 py-2 sm:py-3">
+              <div className="flex items-center justify-between gap-2 sm:block">
+                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground sm:mb-1.5">
+                  Jornadas
                 </div>
-                <button
-                  onClick={incJornada}
-                  disabled={!hasStart}
-                  aria-label="Agregar una jornada"
-                  className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink hover:bg-amber disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2 sm:justify-between">
+                  <button
+                    onClick={decJornada}
+                    disabled={!hasStart || jornadas <= 1}
+                    aria-label="Quitar una jornada"
+                    className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <div className="flex items-baseline gap-1.5 leading-none">
+                    <span
+                      data-testid="jornadas-count"
+                      className="font-display text-xl sm:text-2xl font-black text-ink tabular-nums"
+                    >
+                      {hasStart ? jornadas : "—"}
+                    </span>
+                    <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                      {jornadas === 1 ? "jornada" : "jornadas"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={incJornada}
+                    disabled={!hasStart}
+                    aria-label="Agregar una jornada"
+                    className="grid h-8 w-8 place-items-center rounded-full border hairline bg-background text-ink transition hover:border-ink hover:bg-amber disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -321,7 +327,7 @@ export function DateRangePickerModal({
           {hasRange && (
             <div
               className={cn(
-                "rounded-xl border px-3.5 py-3 flex items-center justify-between gap-3",
+                "rounded-xl border px-3.5 py-2.5 sm:py-3 flex items-center justify-between gap-3",
                 // Jerarquía de estados visuales (de mayor a menor prioridad):
                 // 1. devolucionCerrada → destructive (bloquea)
                 // 2. sumaJornadaPorHora → naranja (advierte)
