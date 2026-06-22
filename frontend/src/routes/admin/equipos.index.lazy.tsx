@@ -321,7 +321,7 @@ function EquiposPage() {
             {equiposQ.isLoading ? "Cargando…" : `${total} equipos`}
           </p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5 md:justify-end">
           <Button
             variant="outline"
             onClick={() => setOpenDashboard(true)}
@@ -368,7 +368,7 @@ function EquiposPage() {
         />
       )}
 
-      <div className="flex flex-col md:flex-row gap-2">
+      <div className="flex flex-col md:flex-row md:flex-wrap gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
