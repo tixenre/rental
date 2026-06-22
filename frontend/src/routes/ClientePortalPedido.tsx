@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { clienteApi } from "@/lib/cliente/api";
-import { EstadoBadge } from "@/components/kit/EstadoBadge";
+import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 import {
   ArrowRight,
   ChevronDown,
@@ -37,7 +37,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -45,9 +45,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { ModalBackdrop } from "@/components/ui/modal-backdrop";
+} from "@/design-system/ui/dialog";
+import { Button } from "@/design-system/ui/button";
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { useBusinessPhone } from "@/lib/business";
 import { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";
 import { whatsappLink } from "@/lib/whatsapp";

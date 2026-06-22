@@ -16,7 +16,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, X, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/design-system/ui/button";
 import { cn } from "@/lib/utils";
 
 // ── Toggle ─────────────────────────────────────────────────────────────

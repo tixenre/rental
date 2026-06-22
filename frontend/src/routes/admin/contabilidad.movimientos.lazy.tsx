@@ -22,7 +22,7 @@ import {
 } from "@/lib/admin/api";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/design-system/ui/badge";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/contabilidad/movimientos")({

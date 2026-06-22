@@ -33,8 +33,8 @@ Antes de trazar un píxel, explorar `tixenre/rental` (con GitHub MCP):
 - **La librería del design system** vive EN LA APP, en `src/`: la **fuente canónica** de tokens,
   primitivos y piezas reusables. Es lo que tenés que reusar. Mirá:
   - `src/components/{ui,kit,rental}/` → qué piezas existen (primitivos shadcn + piezas de marca).
-  - `src/styles/tokens/*` → **tokens canónicos** (colores, tipografía, sombras, motion); entry
-    `src/ds-styles.css`, cableado desde `src/styles.css`.
+  - `src/design-system/styles/tokens/*` → **tokens canónicos** (colores, tipografía, sombras, motion); entry
+    `src/design-system/ds-styles.css`, cableado desde `src/styles.css`.
   - `docs/DESIGN_SYSTEM.md` → el design system en prosa (voz, patterns, reglas).
   - Referencia visual: renderizá la app real con `render.mjs` (rutas) / `render-doc.py` (PDFs).
 - `src/routes/` → ¿la ruta existe? Si existe, el diseño es un **patch**, no una pantalla nueva.
@@ -143,7 +143,7 @@ para que el **`.html` renderice**?
 - ❌ **Como fuente de verdad** (drift): NO mandar reglas del repo duplicadas (`HANDOFF.md`/`CONTEXT.md`
   por carpeta), NI snapshots de tokens (`colors_and_type.css`, `CLAUDE_DESIGN_SYSTEM.md`), NI el `kit/`,
   NI `preview/`, HTML duplicados del root, screenshots. Los tokens/reglas canónicos viven en
-  `src/styles/tokens/*` + `docs/DESIGN_SYSTEM.md` — Claude Code los lee de ahí, **nunca del bundle**.
+  `src/design-system/styles/tokens/*` + `docs/DESIGN_SYSTEM.md` — Claude Code los lee de ahí, **nunca del bundle**.
 - ✅ **Como dependencia de render del `.html`** (fuentes vendoreadas, `proto.css`): pueden viajar en el
   bundle bajo `assets/` si el `.html` las necesita para verse bien — pero son **import-time**: Claude
   Code rasteriza con ellas y **NO las commitea al repo** (pesan y son fuentes licenciadas, ~1 MB). Lo
@@ -160,7 +160,7 @@ para que el **`.html` renderice**?
 
 ## Checklist pre-handoff
 
-- [ ] Leí la librería del DS (`src/components/` + `src/styles/`; render visual con `render.mjs`) y el código de la ruta/componente existente (si existe).
+- [ ] Leí la librería del DS (`src/components/` + `src/design-system/styles/`; render visual con `render.mjs`) y el código de la ruta/componente existente (si existe).
 - [ ] Apliqué reuse-first: identifiqué qué componentes del repo reuso; los nuevos son de librería.
 - [ ] Verifiqué que los datos ya los da la API; marqué `TODO:` lo que falta (lectura simple vs sensible).
 - [ ] Si hay máquina de estados, espeja las reglas **reales** del backend (`ESTADOS_VALIDOS` + precondiciones), sin inventar un grafo.

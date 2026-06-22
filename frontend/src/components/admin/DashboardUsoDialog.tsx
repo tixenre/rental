@@ -15,9 +15,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+} from "@/design-system/ui/dialog";
+import { Button } from "@/design-system/ui/button";
+import { Badge } from "@/design-system/ui/badge";
 import {
   Table,
   TableBody,
@@ -25,7 +25,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/design-system/ui/table";
 
 import { adminApi } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";

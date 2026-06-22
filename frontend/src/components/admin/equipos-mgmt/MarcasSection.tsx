@@ -46,15 +46,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Button } from "@/design-system/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/design-system/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,17 +64,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+} from "@/design-system/ui/dropdown-menu";
 import { adminApi, type MarcaAdmin } from "@/lib/admin/api";
-import { InlineSvg } from "@/components/ui/InlineSvg";
-import { isSvgUrl } from "@/components/ui/inline-svg-utils";
+import { InlineSvg } from "@/design-system/ui/InlineSvg";
+import { isSvgUrl } from "@/design-system/ui/inline-svg-utils";
 
 export function MarcasSection() {
   const qc = useQueryClient();

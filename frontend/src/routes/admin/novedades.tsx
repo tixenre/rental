@@ -2,7 +2,7 @@ import type * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Sparkles, ExternalLink, Bug, Wrench, Plus, FileText, Tag } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/design-system/ui/badge";
 import { changelog, type ChangelogEntry } from "@/data/changelog";
 
 export const Route = createFileRoute("/admin/novedades")({

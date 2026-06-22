@@ -16,9 +16,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+} from "@/design-system/ui/dialog";
+import { Input } from "@/design-system/ui/input";
+import { Button } from "@/design-system/ui/button";
 import { adminApi } from "@/lib/admin/api";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 

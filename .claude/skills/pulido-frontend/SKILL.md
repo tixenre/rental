@@ -26,7 +26,7 @@ Qué reusás de los otros (NO lo re-expliques acá):
 - **Motor visual `render.mjs`** (rasterizar rutas/HTML, `--both`, `--click`/`--eval` para estados
   internos) → vive en `importar-diseno`. Lo corrés tal cual.
 - **Librería del DS y reuse-first** (chequear si un primitivo ya existe antes de crearlo; extraer
-  a `src/components/{ui,kit,rental,admin}` + tokens en `src/styles/`) → es propiedad de `importar-diseno`.
+  a `src/design-system/{ui,kit} + src/components/{rental,admin}` + tokens en `src/design-system/styles/`) → es propiedad de `importar-diseno`.
   Este skill **consume** esa disciplina; no inventa componentes sueltos.
 - **Método seguro** (rutear por riesgo, red de tests, commits atómicos, supervisor, el dueño prueba
   en staging) → `mantenimiento`. La regla de oro **"verificá antes de actuar"** y **"honestidad >

@@ -46,7 +46,7 @@ import { useCart } from "@/lib/cart-store";
 import { toast } from "sonner";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/design-system/ui/skeleton";
 
 const POPULAR_CHIPS = [
   "Pack boda",

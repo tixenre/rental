@@ -26,11 +26,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { EstadoBadge } from "@/components/kit/EstadoBadge";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Textarea } from "@/design-system/ui/textarea";
+import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 import { ActionMenu } from "@/components/mobile";
 import {
   DropdownMenu,
@@ -38,7 +38,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+} from "@/design-system/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,7 +48,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 import { adminApi, ESTADO_LABEL, type PedidoEstado } from "@/lib/admin/api";

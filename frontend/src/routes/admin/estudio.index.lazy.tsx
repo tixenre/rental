@@ -7,9 +7,9 @@ import { z } from "zod";
 import { Plus, Trash2, Save, Loader2, Package, Search } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import { cn } from "@/lib/utils";
 import { formatARS } from "@/lib/format";
 import { PhotoGallery, type GalleryFoto } from "@/components/common/PhotoGallery";

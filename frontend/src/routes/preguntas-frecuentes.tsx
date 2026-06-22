@@ -7,7 +7,7 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
+} from "@/design-system/ui/accordion";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { useFaqGroups } from "@/data/faq";
 import { whatsappUrl } from "@/data/contact";

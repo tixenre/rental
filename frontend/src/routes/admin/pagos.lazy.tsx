@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/design-system/ui/badge";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/pagos")({

@@ -17,11 +17,11 @@ import { toast } from "sonner";
 import { authedFetch, authedJson } from "@/lib/authedFetch";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/design-system/ui/button";
+import { Badge } from "@/design-system/ui/badge";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Textarea } from "@/design-system/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +31,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@/design-system/ui/alert-dialog";
 
 export const Route = createLazyFileRoute("/admin/solicitudes")({
   component: SolicitudesPage,

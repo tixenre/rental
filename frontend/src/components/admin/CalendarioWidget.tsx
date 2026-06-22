@@ -3,9 +3,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/design-system/ui/button";
 import { adminApi, type CalendarioPedido } from "@/lib/admin/api";
-import { EstadoBadge } from "@/components/kit/EstadoBadge";
+import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 
 const MESES = [
   "Enero",

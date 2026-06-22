@@ -28,10 +28,10 @@ import { toast } from "sonner";
 import { adminApi } from "@/lib/admin/api";
 import type { LiquidacionMes } from "@/lib/admin/api";
 import { fmtArs } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Label } from "@/design-system/ui/label";
+import { Textarea } from "@/design-system/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +39,7 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from "@/design-system/ui/dialog";
 
 export function LiquidacionReporte() {
   const pad = (n: number) => String(n).padStart(2, "0");

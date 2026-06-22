@@ -15,8 +15,8 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/design-system/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/design-system/ui/tabs";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { authedJson } from "@/lib/authedFetch";
 import {

@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ChevronRight, Search, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system/ui/tabs";
 import type { Equipment } from "@/data/equipment";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { normalizar, tokenizar } from "@/lib/search/normalize";

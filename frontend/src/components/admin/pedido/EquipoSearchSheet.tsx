@@ -7,8 +7,8 @@ import { useMemo, useState } from "react";
 import { Search, Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 import { BottomSheet } from "@/components/mobile";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { fmtArs } from "@/lib/format";

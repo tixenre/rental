@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GoogleIcon } from "@/components/ui/GoogleIcon";
+import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { useEffect, useState } from "react";
 import { TopBar } from "@/components/rental/TopBar";
 import { useBusinessPhone } from "@/lib/business";

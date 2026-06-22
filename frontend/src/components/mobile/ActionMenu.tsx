@@ -1,4 +1,4 @@
-import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerTitle } from "@/design-system/ui/drawer";
 import { cn } from "@/lib/utils";
 
 type Action = {

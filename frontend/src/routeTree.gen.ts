@@ -1002,18 +1002,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDataioLazyRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/carritos': {
-      id: '/admin/carritos'
-      path: '/carritos'
-      fullPath: '/admin/carritos'
-      preLoaderRoute: typeof AdminCarritosLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/clientes': {
       id: '/admin/clientes'
       path: '/clientes'
       fullPath: '/admin/clientes'
       preLoaderRoute: typeof AdminClientesLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/carritos': {
+      id: '/admin/carritos'
+      path: '/carritos'
+      fullPath: '/admin/carritos'
+      preLoaderRoute: typeof AdminCarritosLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/workshops/$slug': {

@@ -6,7 +6,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/design-system/ui/dialog";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "rambla.view_intro_seen";

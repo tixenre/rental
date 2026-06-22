@@ -8,9 +8,9 @@ import { useRef, useState } from "react";
 import { Plus, Trash2, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/design-system/ui/input";
+import { Button } from "@/design-system/ui/button";
+import { Label } from "@/design-system/ui/label";
 import { uploadFileToBucket } from "@/lib/equipment/photos";
 import type { ContenidoIncluidoItem } from "@/data/equipment";
 

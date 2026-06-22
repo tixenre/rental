@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/design-system/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,16 +26,16 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+} from "@/design-system/ui/alert-dialog";
+import { Input } from "@/design-system/ui/input";
+import { Skeleton } from "@/design-system/ui/skeleton";
 import { adminApi, ESTADO_LABEL, type Pedido } from "@/lib/admin/api";
 import { nextStep, type EstadoPedido } from "@/lib/pedido-estados";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
-import { EstadoBadge } from "@/components/kit/EstadoBadge";
-import { PagoBadge } from "@/components/kit/PagoBadge";
+import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
+import { PagoBadge } from "@/design-system/kit/PagoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
-import { ClienteAvatar } from "@/components/kit/ClienteAvatar";
+import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
 import { RegistrarPagoModal } from "@/components/admin/pedido/RegistrarPagoModal";
 import { EnviarDocsDialog } from "@/components/admin/pedido/EnviarDocsDialog";
 import { AdminCard, FAB } from "@/components/mobile";
