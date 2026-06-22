@@ -16,7 +16,7 @@ const TONE: Record<PillTone, string> = {
   success: "bg-verde/10 text-verde-ink border-verde/30",
   warning: "bg-amber/15 text-ink border-amber/40",
   danger: "bg-destructive/10 text-destructive border-destructive/30",
-  info: "bg-azul/10 text-azul border-azul/30",
+  info: "bg-azul/10 text-azul-ink border-azul/30",
   neutral: "bg-muted text-muted-foreground border-transparent",
 };
 
