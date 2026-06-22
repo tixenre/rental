@@ -10,7 +10,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/design-system/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/design-system/ui/collapsible";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Button } from "@/design-system/ui/button";
