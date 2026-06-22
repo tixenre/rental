@@ -107,6 +107,7 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
 | `--azul`              | `#1097DB`               | Status palette (Presupuesto)           |
 | `--verde`             | `#009971`               | Status palette (Confirmado) — charts/montos/bandas |
 | `--verde-ink`         | `oklch(0.48 0.125 166.4)` | Texto de estado verde sobre tints (AA); NO el verde de marca |
+| `--azul-ink`          | `oklch(0.48 0.14 239)`  | Texto de estado azul/info sobre tints (AA); hermano de `verde-ink`; NO el azul de marca |
 | `--naranja`           | `#E9552F`               | Status palette (Warning)               |
 | `--destructive`       | `oklch(0.55 0.22 27)`   | Errors/delete/Cancelado — AA texto-sobre-claro y blanco-sobre-rojo (era 0.62, #971) |
 
@@ -120,14 +121,14 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
 **Texto sobre tints de marca (AA):** un color de marca usado como TEXTO sobre su propio tint
 (`text-verde` sobre `bg-verde/10` ≈ 3.2:1, o blanco sobre el naranja del hub ≈ 2.4:1) suele
 fallar AA. El fix **no** es tocar el color de marca (rompe charts/montos/fondos), sino: (a) un
-**token de texto más oscuro**, mismo hue/chroma, menor L — `--verde-ink` (0.48), `--destructive`
-ya a 0.55 — aplicado al TEXTO dejando el tint; o (b) sobre fondo de marca sólido, texto **ink
+**token de texto más oscuro**, mismo hue/chroma, menor L — `--verde-ink` (0.48), `--azul-ink`
+(0.48), `--destructive` ya a 0.55 — aplicado al TEXTO dejando el tint; o (b) sobre fondo de marca sólido, texto **ink
 opaco** (no blanco translúcido). El verde de WhatsApp (`#25D366` + blanco) es **excepción
 tier-4 a propósito** (identidad de marca) — no se "arregla". Decisión: 2026-06-22.
 
 Las utilities Tailwind correspondientes (`bg-amber`, `text-ink`,
 `border-hairline`, `bg-rosa/10`, etc.) las genera Tailwind v4 directo de
-estos tokens vía el bloque `@theme inline` al inicio de `src/styles.css`.
+estos tokens vía el bloque `@theme` de `src/design-system/styles/tokens/colors.css`.
 
 #### Tiers de color (de dónde puede salir un color)
 
@@ -168,6 +169,21 @@ La escala genérica `amber-NNN` de Tailwind (`text-amber-700`, etc.) **también 
 --font-mono: "JetBrains Mono", ui-monospace, monospace;
 ```
 
+**Escala extendida** (en `tokens/typography.css`, además de la escala default de
+Tailwind `text-xs`…). Cubre tamaños frecuentes del codebase que antes iban como
+`text-[Npx]` mágico:
+
+```css
+--text-3xs: 0.5625rem; /* 9px  — micro-labels: counts, badges → text-3xs */
+--text-2xs: 0.625rem; /* 10px — el px más frecuente del codebase → text-2xs */
+--text-15: 0.9375rem; /* 15px — product names, CTAs (entre text-sm y text-base) → text-15 */
+--text-22: 1.375rem; /* 22px — display headings (entre text-xl y text-2xl) → text-22 */
+```
+
+> Sin token para 11px (usá `text-xs`) ni 13px (usá `text-sm`): el 1px es
+> imperceptible a toda DPI. La escala se consume como utility Tailwind (`text-2xs`,
+> `text-15`, …) — la genera Tailwind v4 de estos tokens.
+
 **Reglas:**
 
 - **Champ Black** = SÓLO para hero taglines (`.t-display-1`/`.t-display-2`)
@@ -179,14 +195,23 @@ La escala genérica `amber-NNN` de Tailwind (`text-amber-700`, etc.) **también 
 - **Numbers** tabulares siempre que aparezcan (precios, fechas, counts,
   IDs). Tailwind: `tabular-nums` o nuestra utility `.tabular`.
 
+**Guardrail tipográfico (CI):** `eslint.config.js` bloquea los tamaños de fuente
+mágicos en `className` — `text-[Npx]`, `text-[Nrem]` y `text-[Nem]` (regla
+`no-restricted-syntax`, regex `MAGIC_SIZE_RE`). Usá los tokens del DS
+(`text-3xs`/`text-2xs`/`text-xs`/`text-sm`/`text-15`/`text-base`/`text-22`…); un
+tamaño óptico sin equivalente va con `eslint-disable-line` + comentario del por qué.
+
 ### Radii
 
 ```css
---radius: 0.75rem /* base = 12px */ --radius-sm: 8px /* inputs, chips chicos */ --radius-md: 10px
+--radius-sm: 8px /* inputs, chips chicos */ --radius-md: 10px
   /* buttons, icon containers */ --radius-lg: 12px /* cards (default) */ --radius-xl: 16px
   /* feature blocks */ --radius-2xl: 20px /* studio CTA hero */ --radius-3xl: 24px /* — */
   --radius-4xl: 28px /* — */ /* + rounded-full = 9999px para pills, filter chips, CTAs */;
 ```
+
+> No hay `--radius` base: la escala arranca en `--radius-sm`. Viven en
+> `tokens/typography.css` (junto a las fuentes), expuestos como `rounded-sm`…`rounded-4xl`.
 
 ### Z-index (project-specific, NO el genérico del kit)
 
@@ -241,7 +266,7 @@ de un componente):
 --duration-xslow: 550ms; /* fly-to-cart, hero reveals */
 
 --ease-default: cubic-bezier(0.32, 0.72, 0, 1); /* snappy settle, drawer */
---ease-out: cubic-bezier(0, 0, 0.2, 1); /* standard decel */
+--ease-out-brand: cubic-bezier(0, 0, 0.2, 1); /* standard decel */
 --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoot, badge pop */
 ```
 
@@ -256,8 +281,17 @@ Uso opt-in:
 className = "transition duration-[var(--duration-fast)] ease-[var(--ease-default)]";
 ```
 
-Tailwind defaults (`duration-150`, `ease-out`) siguen funcionando para
-el resto.
+Como están en `@theme`, Tailwind v4 también genera las clases directo:
+`duration-xslow`, `ease-default`, `ease-out-brand`, `ease-bounce`.
+
+**El sistema de motion es híbrido, a propósito** — no se exige tokenizar todo:
+
+- **Tokens** (`--duration-*` / `--ease-*`) para las **durations signature**: la
+  velocidad del `<Spinner>` (`xslow`), el fly-to-cart, el settle del drawer, el
+  badge pop. Son las que definen el "feel" de la marca.
+- **Utilities de Tailwind** (`duration-200`, `ease-out`, etc.) para las
+  **transiciones triviales** (hover de color, fades simples). No hace falta un
+  token para cada `transition`.
 
 ### Spacing — Tailwind ya cubre
 
@@ -279,20 +313,21 @@ intuición de devs que conocen Tailwind. Referencia rápida:
 
 ## Recipes tipográficas
 
-Defined as utility classes en `src/styles.css`:
+Defined as utility classes en `src/design-system/styles/utilities.css`:
 
 ```
-.t-display-1   /* Champ Black, clamp(56px, 9vw, 128px), lh 0.88, lowercase */
-.t-display-2   /* Champ Black, clamp(40px, 6vw, 72px), lh 0.92 */
-.t-h1          /* TT Commons 700, 30px */
-.t-h2          /* TT Commons 700, 24px */
-.t-h3          /* TT Commons 600, 18px */
+.t-display-1   /* Champ Black, clamp(3.5rem, 9vw, 8.5rem), lh 0.9, lowercase */
+.t-display-2   /* Champ Black, clamp(2.25rem, 5vw, 4rem), lh 1 */
+.t-h1          /* TT Commons 700, 30px (1.875rem) */
+.t-h2          /* TT Commons 700, 24px (1.5rem) */
+.t-h3          /* TT Commons 600, 18px (1.125rem) */
 .t-body        /* TT Commons 400, 16px, lh 1.55 */
 .t-small       /* TT Commons 400, 14px, muted */
-.t-eyebrow     /* JetBrains Mono 500, 10px, tracking 0.25em, uppercase, muted */
+.t-mono        /* JetBrains Mono, tabular-nums */
+.t-eyebrow     /* JetBrains Mono 500, 10px, tracking 0.2em, uppercase, muted */
 .tabular       /* font-variant-numeric: tabular-nums */
-.wordmark      /* Champ Black, lowercase, tracking -0.01em */
-.grain         /* dot-grain texture overlay ~40% opacity */
+.wordmark      /* Champ Black, lowercase, tracking 0.01em, ss01, lh 0.9 */
+.grain         /* dot-grain texture overlay, 5% opacity (oklch ink @ 0.05) */
 ```
 
 ## Hit-area / tap targets (≥44px, HIG)
@@ -322,7 +357,7 @@ Utilidades canónicas en `src/design-system/styles/utilities.css` para llevar el
 | **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
 | **Componentes de aplicación (`rental/`)**          | `src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar integrados con queries + estado.                                                            |
 | **Componentes admin**                              | `src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
-| **Kit portátil ports**                             | `src/design-system/kit/*`    | Versiones presentacionales del kit, con paleta de marca. Adoptadas piecewise (issue #575). EstadoBadge ya es la única fuente del repo. |
+| **Kit de marca** (`kit/`)                          | `src/design-system/kit/*`    | **SOLO 4 piezas**: `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar` (+ `types.ts`). Presentacionales, con paleta de marca; `EstadoBadge` es la única fuente del repo. Otras piezas presentacionales (AddonPills/EmptyState/PriceBlock/ViewToggle/StatCard) viven en `components/rental/`. |
 
 ### Button (`src/design-system/ui/button.tsx`)
 
@@ -344,6 +379,13 @@ import { Button } from "@/design-system/ui/button";
 > `<Button variant="default">` que existen hoy. Las variantes de marca
 > (`primary` = fondo ink que invierte a amber en hover; `amber` = siempre amber,
 > sin inversión; + el axis `shape`) entran como **adición**, no como reemplazo.
+
+> **CTA primario = ink + texto hueso (bone), NO dorado.** En reposo el
+> `variant="primary"` es **fondo ink + texto bone** (`bg-ink text-background`) e
+> **invierte a amber en hover** (`hover:bg-amber hover:text-ink`). El texto en
+> reposo es hueso a propósito — **decisión de marca explícita del dueño
+> (2026-06-22)**, NO un bug. No "arreglarlo" a texto dorado: el dorado aparece
+> recién en el hover (la inversión es la jugada signature).
 
 ### EstadoBadge
 
@@ -391,9 +433,10 @@ Primitivo canónico de carga. Consolida los 34 `<Loader2 className="animate-spin
 ```tsx
 import { Spinner } from "@/design-system/ui/spinner";
 
-<Spinner />            // md (20px) por default
-<Spinner size="sm" /> // 16px — para usar dentro de Button
-<Spinner size="lg" /> // 24px — para estados de página completa
+<Spinner />            // md (size-5, 20px) por default
+<Spinner size="xs" /> // size-3 (12px) — inline en chips/badges chicos
+<Spinner size="sm" /> // size-4 (16px) — para usar dentro de Button
+<Spinner size="lg" /> // size-6 (24px) — para estados de página completa
 ```
 
 Velocidad: usa `--duration-xslow` (550ms/vuelta). El `Button` acepta `loading={true}` para
@@ -407,25 +450,33 @@ import { Button } from "@/design-system/ui/button";
 
 No crear spinners con `Loader2` suelto — siempre `<Spinner>`.
 
-### Otros componentes del kit (`src/design-system/kit/`)
+### Componentes presentacionales (`src/components/rental/`)
 
-Versiones presentacionales del kit ya disponibles para adopción
-piecewise (PR #577 las trajo a producción):
+> **OJO — ubicación.** Estas piezas **NO viven en `kit/`** (el `kit/` solo tiene
+> `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar`). Viven en
+> `src/components/rental/` (una, en `equipment/shared/`):
 
-- `AddonPills` — items "incluye" sobre rows de equipo.
-- `EmptyState` — pattern "nada para mostrar".
-- `PriceBlock` — precio + tarifa display.
-- `ViewToggle` — segmented control con pill deslizante.
-- `StatCard` — número grande para dashboards.
-- `Input` + `SearchInput` + `FieldLabel` — variantes branded de inputs.
+- `AddonPills` (`rental/AddonPills.tsx`) — items "incluye" sobre rows de equipo.
+- `EmptyState` (`rental/EmptyState.tsx`) — pattern "nada para mostrar".
+- `PriceBlock` (`rental/equipment/shared/PriceBlock.tsx`) — precio + tarifa display.
+- `ViewToggle` (`rental/ViewToggle.tsx`) — segmented control con pill deslizante.
+- `StatCard` (`rental/StatCard.tsx`) — número grande para dashboards.
+
+El primitivo `Input` vive en **`src/design-system/ui/input.tsx`** (no en `kit/`).
+**No existe** un `SearchInput` en el repo. **`FieldLabel` no es una pieza única**:
+está duplicado inline en 3 lugares (`StudioBookingForm`, `PedidoPageHelpers`,
+`pagos.lazy`) → es un **patrón pendiente de extraer** a una pieza compartida, no un
+componente del DS hoy.
 
 > **Patrón de lista de pedidos (Booqable-inspired, 2026-06):** una fila se lee de
 > un vistazo con **avatar (`ClienteAvatar`) + nombre + `EstadoBadge` + `PagoBadge`
 > + monto**, alto contraste y jerarquía clara. Es el patrón a reproducir en el
 > resto de la web cuando se listan entidades con estado + plata.
 
-La ruta `/kit-preview` (admin-only, sin indexar) los muestra todos
-para QA visual antes de adoptarlos en una pantalla concreta.
+La ruta `/kit-preview` (`noindex,nofollow`; **sin guard de admin ni gate de
+ambiente** — hoy accesible por URL directa en cualquier ambiente, prod incluido;
+si se quiere restringir a staging es trabajo de código) muestra los componentes
+del `kit/` (`Pill`, `EstadoBadge`, `PagoBadge`, `Button`, `Spinner`) para QA visual.
 
 ### TopBar — navegación modular por área (`src/components/rental/TopBar.tsx`)
 
@@ -517,18 +568,28 @@ chrome y navegación, no acciones críticas.
 ## Focus y accesibilidad
 
 ```css
-/* Siempre :focus-visible, nunca :focus crudo */
+/* Siempre :focus-visible, nunca :focus crudo. Fuente única: utilities.css */
 :focus-visible {
-  outline: 3px solid var(--amber);
+  outline: 2px solid var(--color-amber);
   outline-offset: 2px;
+  border-radius: 2px;
 }
+/* Inputs / campos de forma: mismo outline, offset más ajustado (1px) */
 input:focus-visible,
-textarea:focus-visible {
-  outline: none;
-  border-color: var(--amber);
-  box-shadow: 0 0 0 3px var(--amber-soft);
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 1px;
 }
 ```
+
+> **Doble capa del foco, una sola fuente de verdad.** El **foco visible canónico**
+> es el `outline` amber de **2px** del `:focus-visible` global en
+> `styles/utilities.css` — aplica a todo elemento enfocable, sin que cada
+> componente lo repita. El `focus-visible:ring-1 ring-ring` que traen algunos
+> primitivos shadcn (ej. `Button`) es **decorativo encima**, no la fuente. Siempre
+> `focus-visible:` — **nunca** `focus:` crudo (dispararía en click de mouse, no
+> solo en teclado).
 
 **Contraste WCAG:**
 
@@ -543,25 +604,19 @@ romperlos — si un texto no se lee, usá `ink` sobre lo que sea.
 
 ## Micro-interactions
 
-```css
-/* Press state — todos los buttons */
-button:active {
-  transform: scale(0.97);
-  transition: transform 120ms cubic-bezier(0.32, 0.72, 0, 1);
-}
+**Press state — vive en el primitivo `Button`, no en un `button:active` global.**
+`buttonVariants` (`ui/button.tsx`) trae `active:scale-[0.97]`, así que el bump al
+apretar aplica a **todo lo que use `<Button>`** (cualquier variante). No hay regla
+CSS global de `button:active`. Si un control que no es `<Button>` necesita el
+press, replicá la clase `active:scale-[0.97]`.
 
-/* Card hover interactivo — usá la utility Tailwind hoy. Cuando exista el
-   token --shadow-md en src/styles.css, podés switchear a box-shadow: var(--shadow-md). */
-.card-interactive:hover {
-  transform: translateY(-2px);
-  @apply shadow-md;
-}
-
-/* Stagger en grid de catálogo */
-.catalog-grid > *:nth-child(n) {
-  animation-delay: calc(n * 40ms);
-}
+```tsx
+// ui/button.tsx — extracto de buttonVariants
+"… transition [transition-duration:var(--duration-base)] active:scale-[0.97] …";
 ```
+
+**Card hover lift** — usá la utility Tailwind directo (`hover:-translate-y-0.5
+hover:shadow-[var(--shadow-md)]`). No hay clase `.card-interactive` en el repo.
 
 **Reverse signature (ink ↔ amber):** los botones primarios de marca
 (`variant="amber"` o el `default` cuando se hace el upgrade) invierten
@@ -606,31 +661,18 @@ del progreso del hero invierte logo + date pill + user button.
 
 ## Skeleton / loading
 
-```css
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--surface) 25%,
-    var(--surface-elevated) 50%,
-    var(--surface) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease infinite;
-  border-radius: var(--radius-sm);
-}
+Componente canónico `<Skeleton>` (`src/design-system/ui/skeleton.tsx`) — un `div`
+con `animate-pulse rounded-md bg-primary/10`. No hay clase `.skeleton` ni
+`@keyframes shimmer` propios: el pulse sale de `animate-pulse` de Tailwind.
 
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
+```tsx
+import { Skeleton } from "@/design-system/ui/skeleton";
+
+<Skeleton className="h-9 w-32" />; // dale el tamaño/forma del bloque real
 ```
 
-**Regla:** el skeleton **espeja el layout del componente real** para no
-generar CLS (Content Layout Shift) al hidratar.
+**Regla:** el skeleton **espeja el layout del componente real** (vía `className`)
+para no generar CLS (Content Layout Shift) al hidratar.
 
 ---
 
@@ -704,9 +746,15 @@ ocasionalmente.
 
 ## Source-of-truth ladder (cuando algo está en varios lados)
 
-1. **`src/styles.css`** — los tokens que el build de producción usa.
-   Si Tailwind v4 genera `bg-amber` es porque `--color-amber` vive acá.
-2. **`src/components/*`** — los componentes que renderean en producción.
+1. **`src/design-system/styles/tokens/*.css`** — los tokens que el build de
+   producción usa (`colors.css`, `typography.css`, `shadows.css`, `motion.css`,
+   `z-index.css`). Si Tailwind v4 genera `bg-amber` es porque `--color-amber`
+   vive en `tokens/colors.css`. El entry que los cablea es
+   `src/design-system/ds-styles.css`, consumido por `src/styles.css` (que solo
+   importa el DS + define vars de runtime y alias planos transicionales).
+2. **`src/design-system/{ui,kit}/*`** y **`src/components/{rental,admin}/*`** —
+   los componentes que renderean en producción (primitivos + piezas de marca en
+   `design-system/`, componentes de negocio en `components/`).
 3. **Este doc (`docs/DESIGN_SYSTEM.md`)** — explica el por qué.
 
 En cada PR de UI: si tocás algo en (1) o (2), tocá también (3) si
@@ -724,5 +772,6 @@ corresponde. El supervisor cuida que no quede drift silencioso.
 - **Sos sesión de Claude Code arrancando**: leé "Stack real", "Tokens",
   "Patterns que nunca se rompen", y `docs/MEMORIA.md` para criterio.
 
-Si dudás cómo aplicar algo, leé el código real en `src/components/*` —
-casi siempre hay un ejemplo vivo.
+Si dudás cómo aplicar algo, leé el código real en `src/design-system/{ui,kit}/*`
+(primitivos + piezas de marca) o `src/components/{rental,admin}/*` (componentes de
+negocio) — casi siempre hay un ejemplo vivo.
