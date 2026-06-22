@@ -30,7 +30,7 @@ const CARTBAR_BG = "color-mix(in oklch, var(--background) 96%, transparent)";
 /* ── Main CatalogoMovil component ────────────────────────────────── */
 export function CatalogoMovil() {
   // Equipment data
-  const { data: allEquipos, isLoading } = useEquipos();
+  const { data: allEquipos, isLoading, isError } = useEquipos();
   // Marcas: misma source que BrandCarousel del desktop + admin/marcas.
   // Trae logo_url, destacada, orden, popularidad_score, etc.
   const { data: marcasData } = useMarcas();
@@ -442,7 +442,14 @@ export function CatalogoMovil() {
               Cargando equipos…
             </div>
           )}
-          {!isLoading && filteredEquipos.length === 0 && (
+          {/* Error de carga (API caída): mensaje propio, no "sin resultados"
+              (que sugiere que el filtro no matcheó). Espeja el isError del desktop. */}
+          {!isLoading && isError && (
+            <div className="text-center py-8 px-4 text-muted-foreground font-sans text-sm">
+              No se pudo cargar el catálogo. Revisá tu conexión e intentá de nuevo.
+            </div>
+          )}
+          {!isLoading && !isError && filteredEquipos.length === 0 && (
             <div className="text-center py-8 text-muted-foreground font-sans text-sm">
               Sin resultados. Probá con otra categoría o término.
             </div>
