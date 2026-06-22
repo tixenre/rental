@@ -149,7 +149,7 @@ function PagosLogPage() {
                     <Link
                       to="/admin/pedidos/$id"
                       params={{ id: String(p.pedido_id) }}
-                      className="text-amber hover:underline font-mono"
+                      className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber font-mono"
                     >
                       #{p.numero_pedido ?? p.pedido_id}
                     </Link>
