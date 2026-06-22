@@ -11,6 +11,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { clienteApi } from "@/lib/cliente/api";
 import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 import { PagoBadge } from "@/design-system/kit/PagoBadge";
+import { Pill } from "@/design-system/kit/Pill";
 import {
   ArrowRight,
   ChevronDown,
@@ -414,9 +415,7 @@ export function PedidoCard({
             #{pedido.numero_pedido}
           </span>
           {pendiente ? (
-            <span className="inline-flex items-center rounded-full border border-amber/30 bg-amber/15 px-2 py-0.5 text-2xs font-medium text-ink">
-              Mod. pendiente
-            </span>
+            <Pill tone="warning">Mod. pendiente</Pill>
           ) : (
             <EstadoBadge estado={pedido.estado} />
           )}
