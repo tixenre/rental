@@ -188,7 +188,7 @@ export function CalendarioWidget({
           {DIAS.map((d) => (
             <div
               key={d}
-              className="px-2 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground text-center"
+              className="px-2 py-1.5 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground text-center"
             >
               {d}
             </div>
@@ -225,7 +225,7 @@ export function CalendarioWidget({
                       onClick={() =>
                         navigate({ to: "/admin/pedidos/$id", params: { id: String(p.id) } })
                       }
-                      className="block w-full text-left rounded-sm bg-accent/40 hover:bg-accent/70 px-1 py-0.5 text-[10px] leading-tight"
+                      className="block w-full text-left rounded-sm bg-accent/40 hover:bg-accent/70 px-1 py-0.5 text-2xs leading-tight"
                       title={`#${p.numero_pedido ?? p.id} · ${p.cliente_nombre ?? ""} · ${p.equipos ?? ""}`}
                     >
                       <div className="truncate text-ink">
@@ -234,7 +234,7 @@ export function CalendarioWidget({
                     </button>
                   ))}
                   {pedidos.length > maxPedidosPorDia && (
-                    <div className="text-[10px] text-muted-foreground pl-1">
+                    <div className="text-2xs text-muted-foreground pl-1">
                       +{pedidos.length - maxPedidosPorDia} más
                     </div>
                   )}

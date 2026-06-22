@@ -225,7 +225,7 @@ export function DateRangePickerModal({
           style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
         >
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Fechas del alquiler
             </div>
             <h2 className="font-display text-xl sm:text-2xl text-ink leading-tight">
@@ -255,7 +255,7 @@ export function DateRangePickerModal({
                   : "border-dashed hairline", // vacío: borde dashed
               )}
             >
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
+              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1.5">
                 Retiro
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -287,7 +287,7 @@ export function DateRangePickerModal({
                  demás cards del grid, para igualar alto con Retiro. */}
             <div className="rounded-xl border border-ink/15 bg-amber-soft/40 px-3.5 py-2 sm:py-3">
               <div className="flex items-center justify-between gap-2 sm:block">
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground sm:mb-1.5">
+                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground sm:mb-1.5">
                   Jornadas
                 </div>
                 <div className="flex items-center gap-2 sm:justify-between">
@@ -306,7 +306,7 @@ export function DateRangePickerModal({
                     >
                       {hasStart ? jornadas : "—"}
                     </span>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                       {jornadas === 1 ? "jornada" : "jornadas"}
                     </span>
                   </div>
@@ -340,7 +340,7 @@ export function DateRangePickerModal({
               )}
             >
               <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-1">
+                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
                   Devolución
                 </div>
                 <div className="flex items-center gap-1.5 leading-none">
@@ -354,7 +354,7 @@ export function DateRangePickerModal({
                   </span>
                   {/* Badge "+1 J" — solo cuando suma jornada por hora */}
                   {sumaJornadaPorHora && !devolucionCerrada && (
-                    <span className="rounded-full bg-naranja/20 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-naranja">
+                    <span className="rounded-full bg-naranja/20 px-1.5 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-naranja">
                       +1 J
                     </span>
                   )}
@@ -379,7 +379,7 @@ export function DateRangePickerModal({
           {/* ── Feedback (jerarquía: error > warn > hint) ──────────── */}
           {devolucionCerrada ? (
             /* ERROR: día cerrado → bloquea Aplicar */
-            <p className="flex items-start gap-1.5 text-[11px] text-destructive">
+            <p className="flex items-start gap-1.5 text-xs text-destructive">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               La devolución cae el{" "}
               <strong>{format(endDate!, "EEEE dd MMM", { locale: es })}</strong>, que está cerrado.
@@ -387,7 +387,7 @@ export function DateRangePickerModal({
             </p>
           ) : rangoCruzaBloqueado ? (
             /* WARN: sin stock en el rango — no bloquea Aplicar, advierte para revisar el carrito */
-            <p className="flex items-start gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-[11px] text-ink">
+            <p className="flex items-start gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber" />
               <span>
                 Algunos equipos del carrito no tienen stock en estas fechas —{" "}
@@ -396,7 +396,7 @@ export function DateRangePickerModal({
             </p>
           ) : sumaJornadaPorHora ? (
             /* WARN: jornada extra por hora → Aplicar habilitado (avisa, no bloquea) */
-            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-[11px] text-ink">
+            <p className="flex items-center gap-1.5 rounded-md bg-amber-soft/70 border border-amber/40 px-2.5 py-1.5 text-xs text-ink">
               <Clock className="h-3.5 w-3.5 shrink-0 text-amber" />
               <span>
                 Devolvés a las <strong>{endTime}</strong>, más tarde que tu retiro ({startTime}) →{" "}
@@ -406,7 +406,7 @@ export function DateRangePickerModal({
             </p>
           ) : (
             /* HINT: info contextual — cambia según si hay fecha o no */
-            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
               {hasStart
                 ? "Horarios cada 30 min — sujeto a confirmación. Devolver más tarde que la hora de retiro suma una jornada."

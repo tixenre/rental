@@ -243,7 +243,7 @@ export function SortableRootItem({
                 />
               ))}
               {children.length === 0 && (
-                <li className="px-3 py-3 text-[11px] text-muted-foreground/60 italic">
+                <li className="px-3 py-3 text-xs text-muted-foreground/60 italic">
                   Sin subcategorías. Arrastrá una de otra raíz acá, o creá nueva con el +.
                 </li>
               )}

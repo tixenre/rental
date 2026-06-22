@@ -132,14 +132,14 @@ export function EquipoComboSearch({
                         <div className="text-sm text-ink truncate">
                           {eq.nombre_publico || eq.nombre}
                         </div>
-                        <div className="font-mono text-[11px] text-muted-foreground truncate">
+                        <div className="font-mono text-xs text-muted-foreground truncate">
                           {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
                           {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
                         </div>
                       </div>
                       <span
                         className={cn(
-                          "shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px]",
+                          "shrink-0 rounded px-1.5 py-0.5 font-mono text-2xs",
                           sinStock
                             ? "bg-destructive/10 text-destructive"
                             : "bg-muted text-muted-foreground",
@@ -158,7 +158,7 @@ export function EquipoComboSearch({
                 );
               })}
               {overflow > 0 && (
-                <li className="px-3 py-2 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                <li className="px-3 py-2 text-center font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                   +{overflow} más · seguí escribiendo para afinar
                 </li>
               )}

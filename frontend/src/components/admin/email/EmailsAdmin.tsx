@@ -184,14 +184,14 @@ function TemplateRow({
           <div className="font-display text-base text-ink">
             {meta?.label ?? tpl.key}
             {!tpl.enabled && (
-              <span className="ml-2 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+              <span className="ml-2 font-mono text-2xs uppercase tracking-wide text-muted-foreground">
                 apagado
               </span>
             )}
           </div>
           <div className="text-xs text-muted-foreground mt-0.5 truncate">{tpl.subject}</div>
           {meta && (
-            <div className="text-[11px] text-muted-foreground/70 mt-0.5">{meta.description}</div>
+            <div className="text-xs text-muted-foreground/70 mt-0.5">{meta.description}</div>
           )}
         </div>
         <Pencil className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-1" />
@@ -255,7 +255,7 @@ function RecordatorioControls() {
       <div className="flex items-center justify-between border-t hairline pt-3">
         <div>
           <div className="text-sm text-ink">Enviar recordatorios automáticos</div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-xs text-muted-foreground">
             {q.isLoading ? "Cargando…" : enabled ? "Activado" : "Apagado"}
           </div>
         </div>
@@ -271,7 +271,7 @@ function RecordatorioControls() {
 
       <div className="flex flex-wrap items-end gap-3 border-t hairline pt-3">
         <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <div className="text-2xs uppercase tracking-wide text-muted-foreground">
             Hora del barrido (0–23)
           </div>
           <Input
@@ -284,7 +284,7 @@ function RecordatorioControls() {
           />
         </div>
         <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          <div className="text-2xs uppercase tracking-wide text-muted-foreground">
             Días antes (1–14)
           </div>
           <Input
@@ -437,7 +437,7 @@ function EmailLogRow({ entry }: { entry: EmailLogEntry }) {
   const failed = entry.status === "failed";
   return (
     <tr className="align-top">
-      <td className="px-3 py-2 whitespace-nowrap font-mono text-[11px] text-muted-foreground">
+      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-muted-foreground">
         {entry.sent_at
           ? new Date(entry.sent_at).toLocaleString("es-AR", {
               day: "2-digit",
@@ -449,7 +449,7 @@ function EmailLogRow({ entry }: { entry: EmailLogEntry }) {
       </td>
       <td className="px-3 py-2 whitespace-nowrap">
         <span
-          className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
+          className={`inline-block rounded-full px-2 py-0.5 text-2xs font-medium ${
             ok
               ? "bg-verde/10 text-verde border border-verde/30"
               : failed
@@ -461,12 +461,12 @@ function EmailLogRow({ entry }: { entry: EmailLogEntry }) {
         </span>
       </td>
       <td className="px-3 py-2">{meta?.label ?? entry.template_key}</td>
-      <td className="px-3 py-2 font-mono text-[11px]">{entry.to_addr}</td>
+      <td className="px-3 py-2 font-mono text-xs">{entry.to_addr}</td>
       <td className="px-3 py-2 text-muted-foreground">
         {entry.error ? (
           <span className="text-destructive">{entry.error}</span>
         ) : (
-          <span className="font-mono text-[11px] text-muted-foreground/70">
+          <span className="font-mono text-xs text-muted-foreground/70">
             {entry.provider}
             {entry.provider_id ? ` · ${entry.provider_id}` : ""}
           </span>
@@ -563,7 +563,7 @@ function TemplateEditorModal({ tplKey, onClose }: { tplKey: string; onClose: () 
       <div className="w-full max-w-4xl max-h-[92vh] rounded-lg bg-background border hairline shadow-lg flex flex-col">
         <header className="border-b hairline px-4 py-3 shrink-0">
           <div className="font-display text-base text-ink">{meta?.label ?? tplKey}</div>
-          <div className="font-mono text-[10px] text-muted-foreground mt-0.5">key: {tplKey}</div>
+          <div className="font-mono text-2xs text-muted-foreground mt-0.5">key: {tplKey}</div>
         </header>
 
         <Tabs
@@ -658,14 +658,14 @@ function EditTab({
         </div>
       </div>
       <aside className="border-l hairline pl-4">
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
           Variables
         </div>
-        <ul className="space-y-1.5 text-[11px]">
+        <ul className="space-y-1.5 text-xs">
           {AVAILABLE_VARS.map((v) => (
             <li key={v.name}>
               <code className="font-mono text-ink">{`{{ ${v.name} }}`}</code>
-              <div className="text-[10px] text-muted-foreground/70">{v.help}</div>
+              <div className="text-2xs text-muted-foreground/70">{v.help}</div>
             </li>
           ))}
         </ul>
@@ -691,7 +691,7 @@ function PreviewTab({ tplKey }: { tplKey: string }) {
   const d = previewQ.data!;
   return (
     <div className="space-y-4">
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         Renderizado con datos de ejemplo. Después de guardar cambios refrescá esta pestaña.
       </p>
       <div>
@@ -737,7 +737,7 @@ function TestTab({ tplKey }: { tplKey: string }) {
 
   return (
     <div className="space-y-3 max-w-md">
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         Envía un mail real al destinatario que pongas. Se loggea en
         <code className="font-mono ml-1">emails_log</code> con el resto. Usa los cambios{" "}
         <strong>guardados</strong> del template (no los del editor). El test ignora el on/off, así

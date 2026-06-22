@@ -337,7 +337,7 @@ export function MarcasSection() {
                         }
                       }}
                       disabled={mergeMut.isPending}
-                      className="rounded-md border hairline bg-background px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-ink hover:bg-amber-soft transition disabled:opacity-50"
+                      className="rounded-md border hairline bg-background px-2 py-1 text-2xs font-mono uppercase tracking-wider text-ink hover:bg-amber-soft transition disabled:opacity-50"
                     >
                       Fusionar
                     </button>
@@ -353,7 +353,7 @@ export function MarcasSection() {
         <div className="space-y-4">
           {/* Destacadas con drag-drop */}
           <div className="space-y-1">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1">
+            <div className="text-2xs uppercase tracking-wider text-muted-foreground px-1">
               Destacadas — orden del carrusel
             </div>
             <DndContext
@@ -393,7 +393,7 @@ export function MarcasSection() {
           {/* Otras marcas (no destacadas) */}
           {otrasShown.length > 0 && (
             <div className="space-y-1">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1">
+              <div className="text-2xs uppercase tracking-wider text-muted-foreground px-1">
                 Otras marcas — no aparecen en el carrusel
               </div>
               <div className="border hairline rounded-md divide-y divide-muted/40">
@@ -536,7 +536,7 @@ function MarcaAvatar({ marca }: { marca: MarcaAdmin }) {
   }
   const initial = marca.nombre.trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className="h-8 w-8 rounded grid place-items-center bg-muted text-[11px] font-medium text-muted-foreground shrink-0">
+    <div className="h-8 w-8 rounded grid place-items-center bg-muted text-xs font-medium text-muted-foreground shrink-0">
       {initial}
     </div>
   );
@@ -585,7 +585,7 @@ function SortableMarcaRow(props: RowProps) {
 
       <div className="flex-1 min-w-0">
         <div className="truncate text-sm text-ink">{marca.nombre}</div>
-        <div className="text-[10px] text-muted-foreground tabular-nums">
+        <div className="text-2xs text-muted-foreground tabular-nums">
           {marca.total} {marca.total === 1 ? "equipo" : "equipos"}
         </div>
       </div>

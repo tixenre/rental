@@ -309,7 +309,7 @@ export function CartDrawer({
             {/* Header sticky */}
             <div className="flex items-center justify-between gap-3 border-b hairline px-5 py-4 sm:px-6">
               <div className="min-w-0">
-                <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                   Tu pedido
                 </div>
                 <h2 id={titleId} className="font-display text-2xl leading-tight">
@@ -344,7 +344,7 @@ export function CartDrawer({
                     <span>
                       {format(endDate, "EEE dd MMM", { locale: es })} {endTime}
                     </span>
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
                       · {d} {d === 1 ? "jornada" : "jornadas"}
                     </span>
                   </span>
@@ -416,7 +416,7 @@ export function CartDrawer({
                                 )}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                                <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
                                   {it.brand}
                                 </div>
                                 <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">
@@ -425,17 +425,17 @@ export function CartDrawer({
                                 <IncludesLine
                                   includes={it.includes}
                                   label="Incluye:"
-                                  className="mt-0.5 text-[10px]"
+                                  className="mt-0.5 text-2xs"
                                 />
                                 {noDisponible && (
                                   <div className="mt-1 flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1 text-[10px] font-semibold text-destructive uppercase tracking-wide">
+                                    <div className="flex items-center gap-1 text-2xs font-semibold text-destructive uppercase tracking-wide">
                                       <AlertCircle className="h-3 w-3 shrink-0" />
                                       Sin stock en estas fechas
                                     </div>
                                     <button
                                       onClick={() => remove(it.id)}
-                                      className="flex items-center gap-1 text-[10px] font-medium text-destructive/80 underline underline-offset-2 transition hover:text-destructive"
+                                      className="flex items-center gap-1 text-2xs font-medium text-destructive/80 underline underline-offset-2 transition hover:text-destructive"
                                     >
                                       Quitar
                                     </button>
@@ -457,7 +457,7 @@ export function CartDrawer({
                                       <span className="text-muted-foreground"> /día</span>
                                     </div>
                                     {d > 0 && (
-                                      <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-[11px] tabular">
+                                      <div className="hidden sm:flex items-center justify-end gap-1 mt-0.5 text-xs tabular">
                                         {lineaDto > 0 && (
                                           <span className="line-through text-muted-foreground/60">
                                             {formatARS(lineaBruta)}
@@ -492,7 +492,7 @@ export function CartDrawer({
                     {/* Notas opcionales */}
                     {showNotas && (
                       <div className="mt-4 space-y-2 rounded-lg border hairline bg-surface p-4">
-                        <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                        <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground mb-1">
                           Notas para nosotros (opcional)
                         </div>
                         <textarea
@@ -540,7 +540,7 @@ export function CartDrawer({
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                  <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
                     {hayFechas ? "Total" : "Estimado · por jornada"}
                   </span>
                   <span className="font-display text-3xl tabular text-ink">
@@ -576,7 +576,7 @@ export function CartDrawer({
                     <span className="flex items-center gap-2">
                       Confirmar solicitud
                       {list.length > 0 && totalNeto > 0 && (
-                        <span className="font-mono text-[11px] font-normal opacity-70 tracking-normal normal-case tabular-nums">
+                        <span className="font-mono text-xs font-normal opacity-70 tracking-normal normal-case tabular-nums">
                           · {formatARS(totalNeto)}
                           {conIva ? " + IVA" : ""}
                         </span>

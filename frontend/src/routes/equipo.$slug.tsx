@@ -394,7 +394,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             </span>
           )}
           {faltantes.length > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/30 text-amber px-2 py-0.5 text-[10px] font-medium">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/30 text-amber px-2 py-0.5 text-2xs font-medium">
               <AlertTriangle className="h-2.5 w-2.5" />
               parcialmente disponible
             </span>
@@ -449,7 +449,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                   fetchPriority="high"
                   className="h-full w-full object-contain p-4 transition group-hover:scale-[1.01]"
                 />
-                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-[10px] font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-2xs font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
                   <Maximize2 className="h-3 w-3" /> Ampliar
                 </span>
               </>
@@ -523,7 +523,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                   </li>
                 ))}
               </ul>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Podés reservar igual. Confirmaremos la disponibilidad de estos items al momento del
                 pedido.
               </p>
@@ -533,7 +533,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
           {/* Descripción */}
           {desc && (
             <section className="space-y-2">
-              <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                 Descripción
               </h2>
               <p className="text-base leading-relaxed text-foreground/90 whitespace-pre-line">
@@ -543,7 +543,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                 <button
                   type="button"
                   onClick={() => setDescExpanded((v) => !v)}
-                  className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-4 transition hover:text-ink hover:underline"
+                  className="font-mono text-2xs uppercase tracking-widest text-muted-foreground underline-offset-4 transition hover:text-ink hover:underline"
                 >
                   {descExpanded ? "Ver menos" : "Ver más"}
                 </button>
@@ -573,7 +573,7 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
                 aria-expanded={specsOpen}
                 className="flex w-full items-center justify-between gap-3 py-1 text-left transition hover:text-ink"
               >
-                <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                   Ficha técnica
                   <span className="ml-2 text-ink/40">({item.specs.length})</span>
                 </h2>
@@ -666,14 +666,14 @@ function CartButtons({
 function FichaPillSection({ title, items }: { title: string; items: string[] }) {
   return (
     <section className="space-y-2">
-      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         {title}
       </h2>
       <div className="flex flex-wrap gap-1.5">
         {items.map((it, i) => (
           <span
             key={`${title}-${i}`}
-            className="inline-flex items-center rounded-md border hairline bg-background px-2 py-1 text-[12px] text-ink/90"
+            className="inline-flex items-center rounded-md border hairline bg-background px-2 py-1 text-xs text-ink/90"
           >
             {it}
           </span>
@@ -702,7 +702,7 @@ function YouTubeEmbed({ url }: { url: string }) {
   if (!id) return null;
   return (
     <section className="space-y-2">
-      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         Video demo
       </h2>
       <div

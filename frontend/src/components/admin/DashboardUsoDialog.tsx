@@ -147,18 +147,18 @@ export function DashboardUsoDialog({
                       )}
                       <div className="min-w-0 flex-1">
                         <div className="font-medium text-sm truncate">{e.nombre}</div>
-                        <div className="text-[11px] text-muted-foreground truncate">
+                        <div className="text-xs text-muted-foreground truncate">
                           {[e.marca, e.modelo].filter(Boolean).join(" / ")}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="font-medium tabular-nums text-sm">
                           {e.cant_pedidos}{" "}
-                          <span className="text-[10px] text-muted-foreground font-normal">
+                          <span className="text-2xs text-muted-foreground font-normal">
                             pedidos
                           </span>
                         </div>
-                        <div className="text-[11px] text-muted-foreground tabular-nums">
+                        <div className="text-xs text-muted-foreground tabular-nums">
                           {fmtMoneda(e.revenue_total)}
                         </div>
                       </div>
@@ -206,7 +206,7 @@ export function DashboardUsoDialog({
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-xs">{e.nombre}</div>
-                          <div className="text-[11px] text-muted-foreground">
+                          <div className="text-xs text-muted-foreground">
                             {[e.marca, e.modelo].filter(Boolean).join(" / ")}
                           </div>
                         </TableCell>
@@ -259,19 +259,19 @@ export function DashboardUsoDialog({
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="font-medium text-sm truncate">{e.nombre}</div>
-                          <div className="text-[11px] text-muted-foreground truncate">
+                          <div className="text-xs text-muted-foreground truncate">
                             {[e.marca, e.modelo].filter(Boolean).join(" / ")}
                           </div>
-                          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                             {e.ultimo_alquiler ? (
                               <>
                                 <span>{fmtFecha(e.ultimo_alquiler)}</span>
-                                <Badge variant="outline" className="text-[9px]">
+                                <Badge variant="outline" className="text-3xs">
                                   {dias != null ? `${dias}d` : ""}
                                 </Badge>
                               </>
                             ) : (
-                              <Badge variant="destructive" className="text-[10px]">
+                              <Badge variant="destructive" className="text-2xs">
                                 Nunca alquilado
                               </Badge>
                             )}
@@ -283,7 +283,7 @@ export function DashboardUsoDialog({
                               ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}`
                               : "—"}
                           </div>
-                          <div className="text-[10px] text-muted-foreground tabular-nums">
+                          <div className="text-2xs text-muted-foreground tabular-nums">
                             {e.total_alquileres} total
                           </div>
                         </div>
@@ -335,7 +335,7 @@ export function DashboardUsoDialog({
                           </TableCell>
                           <TableCell>
                             <div className="font-medium text-xs">{e.nombre}</div>
-                            <div className="text-[11px] text-muted-foreground">
+                            <div className="text-xs text-muted-foreground">
                               {[e.marca, e.modelo].filter(Boolean).join(" / ")}
                             </div>
                           </TableCell>
@@ -343,12 +343,12 @@ export function DashboardUsoDialog({
                             {e.ultimo_alquiler ? (
                               <div>
                                 <div>{fmtFecha(e.ultimo_alquiler)}</div>
-                                <Badge variant="outline" className="text-[9px]">
+                                <Badge variant="outline" className="text-3xs">
                                   {dias != null ? `${dias}d` : ""}
                                 </Badge>
                               </div>
                             ) : (
-                              <Badge variant="destructive" className="text-[10px]">
+                              <Badge variant="destructive" className="text-2xs">
                                 Nunca
                               </Badge>
                             )}
@@ -378,7 +378,7 @@ export function DashboardUsoDialog({
                 </span>
               </h2>
               <div className="rounded-md border hairline bg-amber-soft/30 p-3 mb-2">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <div className="text-2xs uppercase tracking-wide text-muted-foreground">
                   Total adeudado
                 </div>
                 <div className="text-2xl font-medium tabular-nums">
@@ -400,7 +400,7 @@ export function DashboardUsoDialog({
                             <span className="font-mono text-xs shrink-0">
                               {p.numero_pedido ?? `#${p.id}`}
                             </span>
-                            <Badge variant="outline" className="text-[10px]">
+                            <Badge variant="outline" className="text-2xs">
                               {p.estado}
                             </Badge>
                           </div>
@@ -408,19 +408,19 @@ export function DashboardUsoDialog({
                             <div className="text-xs tabular-nums font-medium text-amber">
                               {fmtMoneda(p.pendiente)}
                             </div>
-                            <div className="text-[10px] text-muted-foreground tabular-nums">
+                            <div className="text-2xs text-muted-foreground tabular-nums">
                               de {fmtMoneda(p.monto_total)}
                             </div>
                           </div>
                         </div>
                         <div className="text-xs truncate">{p.cliente}</div>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                           {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
                         </div>
                       </div>
                     ))}
                     {dataQ.data.por_cobrar.count > dataQ.data.por_cobrar.items.length && (
-                      <p className="text-[11px] text-muted-foreground italic text-center pt-1">
+                      <p className="text-xs text-muted-foreground italic text-center pt-1">
                         Mostrando top {dataQ.data.por_cobrar.items.length} de{" "}
                         {dataQ.data.por_cobrar.count}.
                       </p>
@@ -447,13 +447,13 @@ export function DashboardUsoDialog({
                                 <span className="font-mono text-xs">
                                   {p.numero_pedido ?? `#${p.id}`}
                                 </span>
-                                <Badge variant="outline" className="text-[10px]">
+                                <Badge variant="outline" className="text-2xs">
                                   {p.estado}
                                 </Badge>
                               </div>
                             </TableCell>
                             <TableCell className="text-xs">{p.cliente}</TableCell>
-                            <TableCell className="text-[11px] text-muted-foreground">
+                            <TableCell className="text-xs text-muted-foreground">
                               {fmtFecha(p.fecha_desde)} → {fmtFecha(p.fecha_hasta)}
                             </TableCell>
                             <TableCell className="text-right tabular-nums text-xs">
@@ -467,7 +467,7 @@ export function DashboardUsoDialog({
                       </TableBody>
                     </Table>
                     {dataQ.data.por_cobrar.count > dataQ.data.por_cobrar.items.length && (
-                      <p className="text-[11px] text-muted-foreground italic px-2 py-1.5 bg-muted/20">
+                      <p className="text-xs text-muted-foreground italic px-2 py-1.5 bg-muted/20">
                         Mostrando top {dataQ.data.por_cobrar.items.length} de{" "}
                         {dataQ.data.por_cobrar.count} — el resto suma al total de arriba.
                       </p>
@@ -495,7 +495,7 @@ export function DashboardUsoDialog({
                       <div className="font-medium text-sm truncate">{c.nombre}</div>
                       <div className="text-right shrink-0">
                         <div className="text-sm tabular-nums">{fmtMoneda(c.revenue_total)}</div>
-                        <div className="text-[10px] text-muted-foreground tabular-nums">
+                        <div className="text-2xs text-muted-foreground tabular-nums">
                           {c.cant_pedidos} pedidos
                         </div>
                       </div>
@@ -564,7 +564,7 @@ function Stat({
 }) {
   return (
     <div className="rounded-md border hairline bg-muted/20 p-3">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+      <div className="text-2xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
         {icon} {label}
       </div>
       <div className="text-lg font-medium tabular-nums mt-0.5">{value}</div>

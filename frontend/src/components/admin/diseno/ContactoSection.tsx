@@ -139,7 +139,7 @@ function FieldRow({ field }: { field: FieldDef }) {
           )}
         </Button>
       </div>
-      {field.helper && <p className="text-[11px] text-muted-foreground">{field.helper}</p>}
+      {field.helper && <p className="text-xs text-muted-foreground">{field.helper}</p>}
     </div>
   );
 }

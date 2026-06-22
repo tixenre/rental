@@ -39,7 +39,7 @@ export function AdminCardHeader({
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0 flex-1">
         {label && (
-          <div className="mb-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="mb-0.5 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             {label}
           </div>
         )}

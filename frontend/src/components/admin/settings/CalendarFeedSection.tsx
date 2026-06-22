@@ -64,14 +64,14 @@ export function CalendarFeedSection() {
           horario). Se actualiza solo cada algunas horas y es <strong>solo lectura</strong>: editás
           las reservas en Rambla, el calendario las refleja.
         </p>
-        <p className="text-[11px] text-muted-foreground mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           En Google Calendar: <em>Otros calendarios → Suscribirse con URL</em> → pegá el enlace.
           También funciona en Apple Calendar y Outlook.
         </p>
       </div>
 
       <div className="border-t hairline pt-3 space-y-2">
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        <div className="text-2xs uppercase tracking-wide text-muted-foreground">
           URL del feed
         </div>
         {feedQ.isLoading ? (
@@ -106,11 +106,11 @@ export function CalendarFeedSection() {
             </Button>
           </div>
         )}
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           <strong>Suscribir</strong> abre tu app de calendario directo; o copiá la URL y pegala a
           mano (Google Calendar: <em>Otros calendarios → Suscribirse con URL</em>).
         </p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           La URL es secreta: cualquiera que la tenga puede ver tus reservas. Si se filtró,
           regenerala (se corta el acceso anterior y hay que volver a suscribir el calendario).
         </p>

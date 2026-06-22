@@ -193,7 +193,7 @@ function RentalTopBar() {
           {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
           <span className="mx-1.5 opacity-50">→</span>
           {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
-          <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-ink/60">
+          <span className="ml-2 font-mono text-2xs uppercase tracking-wider text-ink/60">
             · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
           </span>
         </span>

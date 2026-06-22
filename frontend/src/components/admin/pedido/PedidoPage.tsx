@@ -139,7 +139,7 @@ function SidebarSection({
         <span>
           {title}
           {badge != null && badge > 0 && (
-            <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] h-4 min-w-4 px-1">
+            <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground text-2xs h-4 min-w-4 px-1">
               {badge}
             </span>
           )}

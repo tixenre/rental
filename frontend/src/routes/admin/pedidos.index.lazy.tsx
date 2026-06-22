@@ -191,7 +191,7 @@ function PedidosPage() {
       <div className="px-4 md:px-6 pt-3 md:pt-5 pb-2 md:pb-3 shrink-0">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Operaciones · Pedidos
             </div>
             <h1 className="font-display text-2xl md:text-3xl text-ink">Pedidos</h1>
@@ -208,7 +208,7 @@ function PedidosPage() {
             >
               <Pencil className="h-4 w-4 mr-1" /> Solicitudes
               {pendientes > 0 && (
-                <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-[10px] font-bold text-ink">
+                <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-2xs font-bold text-ink">
                   {pendientes}
                 </span>
               )}
@@ -256,7 +256,7 @@ function PedidosPage() {
                 >
                   {f.label}
                   {f.id === "activos" && (
-                    <span className="font-mono text-[10px] tabular-nums">{activosCount}</span>
+                    <span className="font-mono text-2xs tabular-nums">{activosCount}</span>
                   )}
                 </button>
               ))}
@@ -275,7 +275,7 @@ function PedidosPage() {
         >
           {/* Barra del listado: contador + acciones (eliminar el seleccionado · ancho del panel) */}
           <div className="flex items-center gap-1 px-3 py-2 border-b hairline bg-surface-elevated shrink-0">
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               {items.length} pedido{items.length !== 1 ? "s" : ""}
             </span>
             <div className="flex-1" />
@@ -351,7 +351,7 @@ function PedidosPage() {
           <Pencil className="h-4 w-4 text-muted-foreground" />
           Solicitudes de cambio
           {pendientes > 0 && (
-            <span className="ml-auto inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-[10px] font-bold text-ink">
+            <span className="ml-auto inline-flex min-w-[18px] items-center justify-center rounded-full bg-amber px-1.5 font-mono text-2xs font-bold text-ink">
               {pendientes}
             </span>
           )}
@@ -367,7 +367,7 @@ function PedidosPage() {
           <AdminCard key={p.id} onClick={() => openEditor(p.id)}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <div className="mb-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                <div className="mb-0.5 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                   #{p.numero_pedido ?? p.id}
                 </div>
                 <div className="truncate font-medium text-ink">
@@ -414,13 +414,13 @@ function PedidosPage() {
 function hoyTag(p: Pedido): ReactNode | null {
   if (esHoy(p.fecha_desde) && p.estado === "confirmado")
     return (
-      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-amber">
+      <span className="font-mono text-2xs font-bold uppercase tracking-[0.2em] text-amber">
         retira hoy
       </span>
     );
   if (esHoy(p.fecha_hasta) && p.estado === "retirado")
     return (
-      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-rosa">
+      <span className="font-mono text-2xs font-bold uppercase tracking-[0.2em] text-rosa">
         devuelve hoy
       </span>
     );
@@ -467,7 +467,7 @@ function MasterList({
                 sel ? "border-amber bg-amber-soft" : "border-transparent hover:bg-surface",
               )}
             >
-              <ClienteAvatar nombre={p.cliente_nombre} className="mt-0.5 h-9 w-9 text-[11px]" />
+              <ClienteAvatar nombre={p.cliente_nombre} className="mt-0.5 h-9 w-9 text-xs" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate font-medium text-ink">
@@ -479,7 +479,7 @@ function MasterList({
                     className="shrink-0"
                   />
                 </div>
-                <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                <div className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
                   <span>#{p.numero_pedido ?? p.id}</span>
                   <span>·</span>
                   {hoyTag(p) ?? (
@@ -582,7 +582,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
               </h2>
               <EstadoBadge estado={p.estado} label={ESTADO_LABEL[p.estado]} />
             </div>
-            <div className="mt-1 font-mono text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
+            <div className="mt-1 font-mono text-xs text-muted-foreground flex items-center gap-1.5 flex-wrap">
               <span>Pedido #{p.numero_pedido ?? p.id}</span>
               {creadoHace(p.created_at) && (
                 <>
@@ -625,7 +625,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         {/* Siguiente paso — ejecuta la transición acá mismo (compacto, sin aire muerto) */}
         {ns && (
           <div className="flex w-fit items-center gap-3 rounded-lg border border-amber bg-amber-soft py-2 pl-3.5 pr-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Siguiente paso
             </span>
             <Button
@@ -645,24 +645,24 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         {/* Fechas + total */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Fechas
             </div>
             <div className="mt-1 text-ink font-medium tabular-nums">
               {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
             </div>
-            <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+            <div className="mt-0.5 font-mono text-xs text-muted-foreground">
               {jornadas} jornada{jornadas !== 1 ? "s" : ""}
             </div>
           </div>
           <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Total neto
             </div>
             <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
               {fmtArs(total)}
             </div>
-            <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+            <div className="mt-0.5 font-mono text-xs text-muted-foreground">
               {pagado >= total && total > 0
                 ? "pagado"
                 : pagado > 0
@@ -675,11 +675,11 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         {/* Equipos */}
         <div className="rounded-xl border hairline bg-surface-elevated">
           <div className="flex items-center justify-between px-4 py-2.5 border-b hairline">
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Equipos · {nItems}
             </span>
             {nItems > 0 && (
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
                 precio / jornada
               </span>
             )}
@@ -695,7 +695,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-ink truncate">{it.nombre_publico || it.nombre}</div>
                   {it.marca && (
-                    <div className="font-mono text-[11px] text-muted-foreground">{it.marca}</div>
+                    <div className="font-mono text-xs text-muted-foreground">{it.marca}</div>
                   )}
                 </div>
                 <div className="font-mono text-sm tabular-nums text-ink shrink-0">

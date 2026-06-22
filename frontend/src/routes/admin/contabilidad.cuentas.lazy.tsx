@@ -44,7 +44,7 @@ function CuentasPage() {
     <div className="px-4 md:px-6 py-6 space-y-8 max-w-4xl mx-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Back-office · Finanzas
           </div>
           <h1 className="font-display text-3xl text-ink">Cuentas</h1>
@@ -71,7 +71,7 @@ function CuentasPage() {
       {/* Socios · Cuenta corriente */}
       {socios.length > 0 && (
         <section className="space-y-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Socios · Cuenta corriente
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -90,13 +90,13 @@ function CuentasPage() {
       {/* Cajas · Plata del negocio */}
       {q.data && (
         <section className="space-y-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Cajas · Plata del negocio
           </div>
           <div className="overflow-x-auto rounded-lg border hairline">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b hairline text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Caja</th>
                   <th className="px-3 py-2 font-medium">Tipo</th>
                   <th className="px-3 py-2 font-medium text-right">Saldo inicial</th>
@@ -224,7 +224,7 @@ function SocioCard({
         <div className="font-medium text-ink">{socio.nombre}</div>
         <span
           className={cn(
-            "font-mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full",
+            "font-mono text-2xs uppercase tracking-wider px-2 py-0.5 rounded-full",
             tagColor,
           )}
         >
@@ -235,7 +235,7 @@ function SocioCard({
         {formatMoney(abs, socio.moneda)}
       </div>
       <div className="text-sm text-muted-foreground">{frase}</div>
-      <div className="font-mono text-[11px] text-muted-foreground tabular-nums">
+      <div className="font-mono text-xs text-muted-foreground tabular-nums">
         arranque {formatMoney(socio.saldo_inicial, socio.moneda)} · cobró{" "}
         {formatMoney(socio.ingresos_alquiler, socio.moneda)} · su parte{" "}
         {formatMoney(socio.su_parte, socio.moneda)}
@@ -307,7 +307,7 @@ function SocioCard({
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {dir === "pago"
               ? `${socio.nombre} entrega plata → baja su deuda y entra a la caja.`
               : `Rambla puso plata por ${socio.nombre} (ej. le compró algo) → sube su deuda y sale de la caja.`}
@@ -526,12 +526,12 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
       }}
       className="rounded-lg border hairline p-4 space-y-3"
     >
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         Nueva caja
       </div>
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Nombre
           </span>
           <input
@@ -542,7 +542,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           />
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Tipo
           </span>
           <select
@@ -558,7 +558,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Moneda
           </span>
           <select
@@ -571,7 +571,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Saldo inicial
           </span>
           <input

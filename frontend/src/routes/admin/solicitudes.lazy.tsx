@@ -127,7 +127,7 @@ function SolicitudesPage() {
   return (
     <div className="space-y-6 p-4 md:p-6 max-w-4xl mx-auto">
       <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Operaciones · Solicitudes
         </div>
         <h1 className="font-display text-3xl text-ink">Solicitudes</h1>
@@ -401,7 +401,7 @@ function SolicitudCard({
             <Pencil className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium text-ink">Aprobar con cambios</span>
             {hayOverride && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-2xs">
                 Modificada
               </Badge>
             )}
@@ -462,7 +462,7 @@ function SolicitudCard({
                 return (
                   <li key={equipo_id} className="px-3 py-1.5 flex items-center gap-2">
                     <span className="flex-1 text-ink truncate text-sm">{nombre}</span>
-                    {dirty && <span className="text-[10px] text-amber">cliente: {original}</span>}
+                    {dirty && <span className="text-2xs text-amber">cliente: {original}</span>}
                     <div className="flex items-center gap-0.5">
                       <Button
                         size="icon"

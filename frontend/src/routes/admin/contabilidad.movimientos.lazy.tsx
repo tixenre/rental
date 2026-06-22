@@ -125,7 +125,7 @@ function MovimientosPage() {
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Back-office · Finanzas
           </div>
           <h1 className="font-display text-3xl text-ink">Movimientos</h1>
@@ -202,7 +202,7 @@ function MovimientosPage() {
         <div className="overflow-x-auto rounded-lg border hairline">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b hairline text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Fecha</th>
                 <th className="px-3 py-2 font-medium">Tipo</th>
                 <th className="px-3 py-2 font-medium">Detalle</th>
@@ -266,23 +266,23 @@ function MovimientoRow({
             <button
               type="button"
               onClick={() => onBeneficiario(mov.beneficiario!)}
-              className="text-[11px] text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+              className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
               title="Ver el historial de este beneficiario"
             >
               {mov.beneficiario}
             </button>
           </div>
         )}
-        {mov.nota && <div className="text-[11px] text-muted-foreground">{mov.nota}</div>}
+        {mov.nota && <div className="text-xs text-muted-foreground">{mov.nota}</div>}
         {mov.anulado && mov.anulado_motivo && (
-          <div className="text-[11px] text-destructive">Anulado: {mov.anulado_motivo}</div>
+          <div className="text-xs text-destructive">Anulado: {mov.anulado_motivo}</div>
         )}
         {mov.comprobante_url && (
           <a
             href={mov.comprobante_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+            className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
           >
             Ver comprobante
           </a>
@@ -322,7 +322,7 @@ function CobroRow({ cobro }: { cobro: CobroMensual }) {
       </td>
       <td className="px-3 py-2">
         <span className="capitalize text-ink">Cobro alquileres · {mesLabel(cobro.mes)}</span>
-        <div className="text-[11px] text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           {cobro.cantidad} pago(s) ·{" "}
           <Link
             to="/admin/pagos"
@@ -335,7 +335,7 @@ function CobroRow({ cobro }: { cobro: CobroMensual }) {
       <td className="px-3 py-2 text-right font-mono tabular-nums text-verde">
         + {formatMoney(cobro.monto, "ARS")}
       </td>
-      <td className="px-3 py-2 text-right text-[11px] text-muted-foreground">automático</td>
+      <td className="px-3 py-2 text-right text-xs text-muted-foreground">automático</td>
     </tr>
   );
 }
@@ -433,7 +433,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
       }}
       className="rounded-lg border hairline p-4 space-y-3"
     >
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         Nuevo movimiento
       </div>
 
@@ -584,7 +584,7 @@ function CuentaSelect({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="space-y-1">
-      <span className="block font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+      <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </span>
       {children}

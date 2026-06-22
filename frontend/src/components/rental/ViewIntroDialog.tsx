@@ -102,7 +102,7 @@ export function ViewIntroDialog({ onPick }: { onPick: (mode: "grid" | "list") =>
           />
         </div>
 
-        <p className="text-[11px] text-muted-foreground text-center pt-1">
+        <p className="text-xs text-muted-foreground text-center pt-1">
           Tu elección se guarda en este navegador. Podés volver a cambiarla en cualquier momento.
         </p>
       </DialogContent>
@@ -137,7 +137,7 @@ function ViewOption({
         <span className="font-display text-lg text-ink">{label}</span>
       </div>
       <span className="text-xs font-medium text-ink/80">{tagline}</span>
-      <ul className="space-y-1 text-[11px] text-muted-foreground leading-snug">
+      <ul className="space-y-1 text-xs text-muted-foreground leading-snug">
         {bullets.map((b) => (
           <li key={b} className="flex gap-1.5">
             <span className="text-amber shrink-0" aria-hidden>

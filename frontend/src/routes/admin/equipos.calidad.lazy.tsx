@@ -41,7 +41,7 @@ function CalidadPage() {
   return (
     <div className="px-4 md:px-8 py-6 md:py-10 max-w-3xl mx-auto">
       <header className="mb-8">
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Back-office › Equipos
         </div>
         <h1 className="font-display text-3xl md:text-4xl text-ink flex items-center gap-2">
@@ -58,7 +58,7 @@ function CalidadPage() {
 
       {isError && (
         <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-6 text-sm text-destructive">
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] mb-2">
+          <div className="flex items-center gap-2 font-mono text-2xs uppercase tracking-[0.2em] mb-2">
             <AlertCircle className="h-3.5 w-3.5" /> Error
           </div>
           <div>{(error as Error)?.message ?? "No se pudo cargar la calidad del inventario."}</div>
@@ -119,7 +119,7 @@ function SugerenciasSection() {
     <section className="mt-8 rounded-2xl border hairline bg-surface">
       <header className="flex items-center gap-2 px-5 pt-4 pb-3 border-b hairline">
         <Lightbulb className="h-4 w-4 text-amber" />
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Sugerencias del sistema · {data.total}
         </span>
       </header>
@@ -173,7 +173,7 @@ function SugerenciasSection() {
                 </div>
               </div>
               {s.marcas && s.marcas.length > 0 && (
-                <ul className="ml-1 mt-2 text-[11px] text-muted-foreground space-y-0.5">
+                <ul className="ml-1 mt-2 text-xs text-muted-foreground space-y-0.5">
                   {s.marcas.map((m, idx) => (
                     <li key={m.id} className="font-mono tabular">
                       {idx === 0 ? "→ " : "   "}
@@ -188,7 +188,7 @@ function SugerenciasSection() {
                 </ul>
               )}
               {s.equipos && s.equipos.length > 0 && (
-                <details className="text-[11px] text-muted-foreground">
+                <details className="text-xs text-muted-foreground">
                   <summary className="cursor-pointer hover:text-ink">
                     Ver equipos ({s.equipos.length})
                   </summary>
@@ -225,7 +225,7 @@ function CalidadView({ data }: { data: CalidadInventario }) {
   return (
     <>
       <section className="rounded-2xl border hairline bg-surface p-6 mb-6">
-        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
+        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
           Inventario
         </div>
         <div className="flex items-baseline gap-3 mb-4">
@@ -233,14 +233,14 @@ function CalidadView({ data }: { data: CalidadInventario }) {
           <div className="text-sm text-muted-foreground">equipos activos</div>
         </div>
         <ProgressBar pct={data.completos_pct} />
-        <div className="mt-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        <div className="mt-2 flex items-center gap-2 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
           <span className="tabular text-ink">{data.completos_pct}%</span>
           <span>completos</span>
         </div>
       </section>
 
       <section className="rounded-2xl border hairline bg-surface">
-        <header className="px-5 pt-4 pb-3 border-b hairline font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <header className="px-5 pt-4 pb-3 border-b hairline font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Faltantes por campo
         </header>
         <ul>
@@ -265,11 +265,11 @@ function CalidadView({ data }: { data: CalidadInventario }) {
                         <span className="font-display text-base tabular text-ink">{n}</span>{" "}
                         <span className="text-muted-foreground">{label}</span>
                       </div>
-                      <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
                         {pct}% del inventario
                       </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition group-hover:text-ink">
+                    <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-widest text-muted-foreground transition group-hover:text-ink">
                       Completar
                       <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
                     </span>

@@ -269,7 +269,7 @@ export function SpecTemplatesSection({
                     className="rounded-md border hairline p-3 text-left text-sm transition hover:border-amber hover:bg-amber-soft/30 active:bg-amber-soft/50"
                   >
                     <div className="font-medium text-ink leading-snug">{c.nombre}</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                    <div className="text-xs text-muted-foreground mt-0.5">
                       {count > 0 ? `${count} specs` : "sin specs aún"}
                     </div>
                   </button>
@@ -320,7 +320,7 @@ export function SpecTemplatesSection({
               </div>
             </SortableContext>
           </DndContext>
-          <p className="border-t hairline px-3 py-2 text-[10px] text-muted-foreground bg-muted/20">
+          <p className="border-t hairline px-3 py-2 text-2xs text-muted-foreground bg-muted/20">
             Arrastrá una fila para cambiar el orden — la primera es la más prominente en el form de
             equipo y en la card del catálogo.
           </p>
