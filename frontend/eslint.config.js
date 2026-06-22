@@ -78,7 +78,8 @@ export default tseslint.config(
           paths: [
             {
               name: "server-only",
-              message: "TanStack Start does not use the Next.js `server-only` package.",
+              message:
+                "TanStack Start does not use the Next.js `server-only` package.",
             },
           ],
           patterns: [
