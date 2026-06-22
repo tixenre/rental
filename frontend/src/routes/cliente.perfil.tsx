@@ -122,7 +122,7 @@ function PerfilPage() {
       <div className="max-w-xl mx-auto px-4 py-8">
         <Link
           to="/cliente/portal"
-          className="inline-flex items-center gap-1.5 mb-6 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
+          className="hit-area-inline inline-flex items-center gap-1.5 mb-6 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-ink transition"
         >
           <ArrowLeft className="h-3 w-3" /> Mis pedidos
         </Link>

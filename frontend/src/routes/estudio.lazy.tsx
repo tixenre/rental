@@ -177,7 +177,7 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
         </div>
         <a
           href="#reservar"
-          className="inline-flex items-center justify-center rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-amber hover:brightness-110 transition shrink-0"
+          className="inline-flex items-center justify-center min-h-11 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-amber hover:brightness-110 transition shrink-0"
         >
           Reservar
         </a>

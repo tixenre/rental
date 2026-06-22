@@ -46,8 +46,11 @@ function FooterMobile() {
           </a>
         </div>
 
-        {/* Links de navegación en chips */}
-        <nav className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
+        {/* Links de navegación — text-sm (≥14px legible; eran 12px). El text-sm
+            ya da más alto de toque; no se fuerza hit-area 44 acá porque en
+            flex-wrap los ::before de filas apiladas se solaparían (mismo criterio
+            que las pills de categoría). */}
+        <nav className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
           <Link to="/rental" className="text-ink hover:text-amber transition">
             Catálogo
           </Link>
@@ -76,7 +79,7 @@ function FooterMobile() {
         </nav>
 
         {/* Legal */}
-        <nav className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <nav className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
           <Link to="/privacidad" className="hover:text-ink transition">
             Privacidad
           </Link>
@@ -87,7 +90,7 @@ function FooterMobile() {
         </nav>
 
         {/* Contacto compacto */}
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
           <a
             href={contact.mapsUrl}
             target="_blank"
