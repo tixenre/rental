@@ -8,7 +8,10 @@ descuentos) viven en submódulos que registran sus rutas sobre este router.
 
 import datetime
 import logging
+import time
 from typing import Optional
+
+import psycopg2.errors
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, field_validator, model_validator
@@ -685,6 +688,12 @@ def _dispatch_pedido_creado_emails(background: Optional[BackgroundTasks], pedido
             send_email("pedido_creado_admin", admin_to, ctx, pedido_id)
 
 
+# Namespace (clave1 de `pg_advisory_xact_lock`) para serializar creación de
+# pedidos por equipo. Arbitrario y privado de este flujo; evita colisión con
+# otros advisory locks de la app.
+_ADVISORY_NS_PEDIDO = 5390412
+
+
 def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = None,
                   es_admin: bool = False):
     """Lógica interna de creación de pedido. Llamada por el endpoint admin
@@ -725,6 +734,21 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 if d0 < hoy and not es_admin:
                     raise HTTPException(400, "fecha_desde no puede ser en el pasado")
 
+            # Serializar la creación sobre cada equipo del pedido ANTES de
+            # insertar los ítems. El insert de `alquiler_items` toma un FK
+            # KEY-SHARE sobre la fila de `equipos`; el gate de stock pide luego
+            # FOR UPDATE (exclusivo) sobre la misma fila → dos pedidos concurrentes
+            # del mismo equipo se deadlockean en el upgrade de lock (salía 500).
+            # El advisory lock (xact-scoped, tomado en orden de id para no
+            # deadlockear entre transacciones) los pone en fila: cada uno espera
+            # su turno y corre limpio (201 o 409 real por falta de stock). NO toca
+            # el FOR UPDATE del gate (motor de reservas = sagrado); se libera solo
+            # al commit/rollback. `create_pedido_retry` queda de backstop.
+            for _eid in sorted({it.equipo_id for it in data.items
+                                if getattr(it, "equipo_id", None)}):
+                conn.execute("SELECT pg_advisory_xact_lock(?, ?)",
+                             (_ADVISORY_NS_PEDIDO, _eid))
+
             estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
             next_num = _next_numero_pedido(conn)
             # Cabecera primero con totales en 0; los ítems se aplican vía el helper
@@ -756,6 +780,14 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
 
             conn.commit()
             pedido = _get_alquiler_detail(conn, pedido_id)
+        except psycopg2.errors.DeadlockDetected:
+            # Deadlock transitorio por upgrade de lock bajo concurrencia (FK
+            # KEY-SHARE del insert de ítems + FOR UPDATE del gate sobre la misma
+            # fila de `equipos`). PG aborta una de las transacciones. NO es un
+            # error nuestro: el caller (`create_pedido_retry`) reintenta. No lo
+            # logueamos como error para no ensuciar; sólo rollback + propagar.
+            conn.rollback()
+            raise
         except Exception:
             logger.error("Error creando pedido", exc_info=True)
             conn.rollback()
@@ -767,6 +799,37 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
     if pedido and pedido.get("estado") != "borrador":
         _dispatch_pedido_creado_emails(background, pedido)
     return pedido
+
+
+def create_pedido_retry(data: PedidoCreate, background: Optional[BackgroundTasks] = None,
+                        es_admin: bool = False, intentos: int = 5):
+    """Crea un pedido reintentando ante deadlock de Postgres (concurrencia).
+
+    Bajo reservas concurrentes del mismo equipo, dos transacciones se bloquean
+    mutuamente — el insert de `alquiler_items` toma un FK KEY-SHARE sobre la fila
+    de `equipos` y el gate de stock pide FOR UPDATE (exclusivo) sobre esa misma
+    fila → PG detecta el deadlock y aborta una (`DeadlockDetected`), que sin esto
+    salía como **500**. Reintentar es el patrón estándar: serializa y resuelve,
+    SIN tocar el lock (el motor de reservas es sagrado), sin overbooking (el gate
+    corre íntegro en cada intento) ni pedidos huérfanos (rollback antes de cada
+    reintento). Agotados los intentos → **503** (carga puntual), nunca 500.
+
+    Es la ÚNICA puerta de creación de pedidos para los endpoints (cliente y
+    back-office): centraliza el reintento en una sola fuente.
+    """
+    for i in range(intentos):
+        try:
+            return create_pedido(data, background=background, es_admin=es_admin)
+        except psycopg2.errors.DeadlockDetected:
+            if i == intentos - 1:
+                logger.warning("Pedido: deadlock persistente tras %d intentos → 503", intentos)
+                raise HTTPException(
+                    503, "Hay mucha demanda sobre ese equipo en este momento. "
+                         "Reintentá en unos segundos.")
+            time.sleep(0.04 * (i + 1))   # backoff corto; el scheduling rompe el ciclo
+    # Inalcanzable con intentos >= 1 (la última vuelta siempre retorna o tira 503);
+    # blindaje por si se invocara con intentos <= 0.
+    raise HTTPException(503, "No se pudo crear el pedido")
 
 
 def _recalcular_total_pedido(conn, id: int) -> None:
