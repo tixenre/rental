@@ -9,6 +9,7 @@ import { apiGetEstudio } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { Button } from "@/design-system/ui/button";
 
 export const Route = createLazyFileRoute("/estudio")({
   component: EstudioPage,
@@ -175,12 +176,14 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
           </div>
           <div className="truncate text-sm font-medium">{priceLabel}</div>
         </div>
-        <a
-          href="#reservar"
-          className="inline-flex items-center justify-center min-h-11 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-amber hover:brightness-110 transition shrink-0"
+        <Button
+          asChild
+          variant="primary"
+          shape="pill"
+          className="min-h-11 h-auto px-5 py-2.5 font-semibold shrink-0"
         >
-          Reservar
-        </a>
+          <a href="#reservar">Reservar</a>
+        </Button>
       </div>
     </div>
   );
@@ -303,12 +306,9 @@ function EstudioPage() {
               Ideal para rodajes grandes — flexible para los chicos.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
-              <a
-                href="#reservar"
-                className="inline-flex items-center justify-center rounded-full bg-amber px-6 py-3 text-sm font-bold text-ink hover:brightness-105 transition"
-              >
-                Reservar
-              </a>
+              <Button asChild variant="amber" shape="pill" className="h-auto px-6 py-3 font-bold">
+                <a href="#reservar">Reservar</a>
+              </Button>
               <span className="inline-flex items-center rounded-full border border-background/20 px-4 py-2 font-mono text-xs text-background/70 tabular-nums whitespace-nowrap">
                 {priceLabel}
               </span>
@@ -383,13 +383,17 @@ function EstudioPage() {
                   </span>
                 ))}
               </div>
-              <a
-                href="#reservar"
-                className="mt-8 self-start inline-flex items-center gap-2 rounded-full bg-amber px-5 py-2.5 text-sm font-bold text-ink hover:brightness-105 transition"
+              <Button
+                asChild
+                variant="amber"
+                shape="pill"
+                className="mt-8 self-start h-auto px-5 py-2.5 font-bold"
               >
-                Reservar el espacio
-                <ArrowRight className="h-3.5 w-3.5" />
-              </a>
+                <a href="#reservar">
+                  Reservar el espacio
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </a>
+              </Button>
             </div>
           </div>
           {/* Foto ciclorama */}
@@ -605,15 +609,21 @@ function EstudioPage() {
             <p className="mt-4 text-[0.9375rem] leading-relaxed text-amber/65 max-w-sm">
               Te respondemos en el día. Contanos qué necesitás y armamos un presupuesto a medida.
             </p>
-            <a
-              href={`https://wa.me/${STUDIO_PHONE}?text=${encodeURIComponent("Hola Rambla! Quería consultar por el estudio.")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-7 inline-flex items-center gap-2 rounded-full bg-amber px-6 py-3 text-[0.9375rem] font-bold text-ink hover:brightness-105 transition"
+            <Button
+              asChild
+              variant="amber"
+              shape="pill"
+              className="mt-7 h-auto px-6 py-3 text-[0.9375rem] font-bold"
             >
-              <MessageCircle className="h-4 w-4" />
-              Escribir por WhatsApp
-            </a>
+              <a
+                href={`https://wa.me/${STUDIO_PHONE}?text=${encodeURIComponent("Hola Rambla! Quería consultar por el estudio.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Escribir por WhatsApp
+              </a>
+            </Button>
           </div>
         </section>
       </main>

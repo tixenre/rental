@@ -1,4 +1,5 @@
 import { ShieldCheck } from "lucide-react";
+import { Button } from "@/design-system/ui/button";
 
 export function VerificacionRequeridaPanel({
   onVerificar,
@@ -14,15 +15,16 @@ export function VerificacionRequeridaPanel({
         Alquilamos equipo de valor: necesitamos confirmar tu DNI (consulta RENAPER vía Didit). Es un
         solo paso, tarda menos de 2 minutos y guardamos solo texto — nunca la foto.
       </p>
-      <button
+      <Button
         type="button"
+        variant="primary"
         onClick={onVerificar}
         disabled={iniciando}
-        className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-ink text-sm font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-50"
+        className="h-11 w-full font-bold"
       >
         <ShieldCheck className="h-4 w-4" />
         {iniciando ? "Iniciando…" : "Verificar mi identidad"}
-      </button>
+      </Button>
     </div>
   );
 }
