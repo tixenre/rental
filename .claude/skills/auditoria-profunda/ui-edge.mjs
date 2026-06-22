@@ -57,9 +57,9 @@ const seedCart = (page) => page.evaluate(() => localStorage.setItem("rental-cart
   } else {
     for (const w of VIEWPORTS) {
       // 1. catálogo con error 500
-      await run("catalog-error-500", w, async () => { await page.route("**/api/equipos**", r=>r.fulfill({status:500, contentType:"application/json", body:'{"detail":"boom"}'})); await page.goto(BASE+"/rental",{waitUntil:"networkidle"}); await page.unroute("**/api/equipos**"); });
+      await run("catalog-error-500", w, async () => { await page.route(/\/api\/equipos\?/, r=>r.fulfill({status:500, contentType:"application/json", body:'{"detail":"boom"}'})); await page.goto(BASE+"/rental",{waitUntil:"networkidle"}); await page.unroute(/\/api\/equipos\?/); });
       // 2. catálogo vacío
-      await run("catalog-empty", w, async () => { await page.route("**/api/equipos**", r=>r.fulfill({status:200, contentType:"application/json", body:'{"items":[]}'})); await page.goto(BASE+"/rental",{waitUntil:"networkidle"}); await page.unroute("**/api/equipos**"); });
+      await run("catalog-empty", w, async () => { await page.route(/\/api\/equipos\?/, r=>r.fulfill({status:200, contentType:"application/json", body:'{"items":[]}'})); await page.goto(BASE+"/rental",{waitUntil:"networkidle"}); await page.unroute(/\/api\/equipos\?/); });
       // 3. portal sin pedidos
       await run("portal-empty", w, async () => { await page.route("**/api/cliente/pedidos**", r=>r.fulfill({status:200, contentType:"application/json", body:'[]'})); await page.goto(BASE+"/cliente/portal",{waitUntil:"networkidle"}); await page.waitForTimeout(600); await page.unroute("**/api/cliente/pedidos**"); });
       // 4. cotizar 500 con carrito
