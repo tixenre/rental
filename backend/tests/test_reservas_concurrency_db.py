@@ -192,3 +192,115 @@ def test_la_verdad_quedo_consistente_en_la_db(db_setup):
         assert disp.get(str(EQ_ID), 0) >= 0
     finally:
         conn.close()
+
+
+# ── Creación concurrente: regresión del deadlock de `create_pedido` ───────────
+# El test de arriba ejerce el path de CONFIRMACIÓN (validar_stock sobre pedidos
+# ya insertados). Este cubre el path de CREACIÓN (`create_pedido`), donde el
+# insert de `alquiler_items` toma FK KEY-SHARE sobre la fila de `equipos` y el
+# gate pide FOR UPDATE → bajo concurrencia se deadlockeaban y salía 500. La fix
+# (advisory xact-lock por equipo, en orden de id, antes del insert) los serializa.
+
+EQ_ID2 = 9_000_002
+STOCK2 = 3
+N_CONC = 10
+FD2 = "2026-10-01T08:00:00"
+FH2 = "2026-10-02T20:00:00"
+_NOMBRE_TEST = "Test concurrencia crear"
+
+
+@pytest.fixture
+def db_setup_crear():
+    from database import get_db, init_db
+
+    init_db()
+    conn = get_db()
+    try:
+        _limpiar_crear(conn)
+        conn.execute(
+            "INSERT INTO equipos (id, nombre, cantidad, precio_jornada) VALUES (?, ?, ?, ?)",
+            (EQ_ID2, "Equipo de test (crear concurrente)", STOCK2, 1000),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    yield
+
+    conn = get_db()
+    try:
+        _limpiar_crear(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _limpiar_crear(conn):
+    conn.execute(
+        "DELETE FROM alquiler_items WHERE pedido_id IN "
+        "(SELECT id FROM alquileres WHERE cliente_nombre = ?)",
+        (_NOMBRE_TEST,),
+    )
+    conn.execute("DELETE FROM alquileres WHERE cliente_nombre = ?", (_NOMBRE_TEST,))
+    conn.execute("DELETE FROM equipos WHERE id = ?", (EQ_ID2,))
+
+
+def _crear(barrera, idx, resultados, errores):
+    from fastapi import BackgroundTasks, HTTPException
+    from routes.alquileres import create_pedido_retry, PedidoCreate, PedidoItem
+
+    data = PedidoCreate(
+        cliente_nombre=_NOMBRE_TEST, fecha_desde=FD2, fecha_hasta=FH2,
+        estado="presupuesto",
+        items=[PedidoItem(equipo_id=EQ_ID2, cantidad=1, precio_jornada=1000)],
+    )
+    try:
+        barrera.wait(timeout=5)
+        pedido = create_pedido_retry(data, background=BackgroundTasks())
+        resultados[idx] = ("ok", pedido["id"])
+    except HTTPException as e:
+        resultados[idx] = ("http", e.status_code)
+    except Exception as e:  # noqa: BLE001 — lo capturamos para fallar el test
+        errores[idx] = repr(e)
+
+
+def test_crear_pedidos_concurrentes_sin_deadlock_ni_overbooking(db_setup_crear):
+    """N reservas concurrentes del mismo equipo (stock=STOCK2): exactamente
+    STOCK2 se crean, el resto recibe 409 (sin stock) o 503 (carga) — NUNCA 500
+    ni excepción no controlada (el deadlock), y cero overbooking en la DB."""
+    barrera = threading.Barrier(N_CONC)
+    resultados: dict[int, object] = {}
+    errores: dict[int, str] = {}
+    threads = [
+        threading.Thread(target=_crear, args=(barrera, i, resultados, errores))
+        for i in range(N_CONC)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=30)
+
+    assert all(not t.is_alive() for t in threads), "deadlock: algún hilo no terminó"
+    # CLAVE: ninguna excepción no controlada (el deadlock salía como 500).
+    assert not errores, f"excepciones no controladas (¿deadlock?): {errores}"
+
+    oks = [v for v in resultados.values() if v[0] == "ok"]
+    codes = [v[1] for v in resultados.values() if v[0] == "http"]
+    assert len(oks) == STOCK2, f"esperaba {STOCK2} creados, hubo {len(oks)}: {resultados}"
+    assert all(c in (409, 503) for c in codes), f"códigos inesperados (¿500?): {codes}"
+
+    # La verdad en la DB: exactamente STOCK2 pedidos y disponibilidad no negativa.
+    from database import get_db
+    from reservas import calcular_disponibilidad
+
+    conn = get_db()
+    try:
+        creados = conn.execute(
+            "SELECT COUNT(*) AS n FROM alquileres WHERE cliente_nombre = ?",
+            (_NOMBRE_TEST,),
+        ).fetchone()["n"]
+        assert creados == STOCK2, f"esperaba {STOCK2} pedidos en la DB, hay {creados}"
+        disp = calcular_disponibilidad(conn, FD2, FH2)
+        assert disp.get(str(EQ_ID2), 0) >= 0
+    finally:
+        conn.close()

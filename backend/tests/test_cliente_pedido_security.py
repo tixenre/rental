@@ -92,17 +92,18 @@ def test_cliente_no_decide_precio_jornada(monkeypatch):
         lambda: FakeConn(precios_catalogo),
     )
 
-    # 4. Interceptar `create_pedido` (no la ejecutamos de verdad) para
-    #    capturar el payload que recibió.
+    # 4. Interceptar `create_pedido_retry` —la puerta ÚNICA de creación que usa
+    #    el endpoint (envuelve a `create_pedido` con reintento de deadlock)— sin
+    #    ejecutarla de verdad, para capturar el payload que recibió.
     captured = {}
 
-    def fake_create_pedido(payload, background=None):
+    def fake_create_pedido_retry(payload, background=None):
         captured["payload"] = payload
         return {"id": 1, "ok": True}
 
     monkeypatch.setattr(
-        "routes.alquileres.create_pedido",
-        fake_create_pedido,
+        "routes.alquileres.create_pedido_retry",
+        fake_create_pedido_retry,
     )
 
     # 5. Llamar al endpoint con un body que intenta colar precio_jornada=1.
