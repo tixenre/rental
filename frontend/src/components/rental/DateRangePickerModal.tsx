@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/design-system/ui/dialog";
 import { Calendar } from "@/design-system/ui/calendar";
+import { Pill } from "@/design-system/kit/Pill";
 import {
   computeJornadas,
   deriveEndDate,
@@ -354,9 +355,9 @@ export function DateRangePickerModal({
                   </span>
                   {/* Badge "+1 J" — solo cuando suma jornada por hora */}
                   {sumaJornadaPorHora && !devolucionCerrada && (
-                    <span className="rounded-full bg-naranja/20 px-1.5 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wider text-naranja">
+                    <Pill className="bg-naranja/20 px-1.5 font-mono font-semibold uppercase tracking-wider text-ink">
                       +1 J
-                    </span>
+                    </Pill>
                   )}
                 </div>
               </div>

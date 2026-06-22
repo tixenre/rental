@@ -120,3 +120,56 @@ No se crea cola paralela: se foldea en **epic #936** + **#967** (UI cliente) + *
 4. **Sync del doc DESIGN_SYSTEM.md (O9)** — va junto al reorg del DS (carpeta `design-system/`).
 5. **Primitivo de loading (O4)**, **decisión motion tokens (O7)**, **`/kit-preview` vivo (O8)**.
 6. **`PriceBlock` shared en detalle (O5)** — toca plata visible → rama+PR. **CTAs `Button` en carrito (O6)**.
+
+---
+
+## 7. Pasada fina post-prod (2026-06-22) — el delta tras #981–#986
+
+> Re-auditoría **después** de shippear la ola #981–#986 a prod (DS reorg + azul-ink + PagoBadge
+> portal + Spinner/Button-loading + kit-preview + escala tipográfica + tap targets #986). Método:
+> grep exhaustivo + 2 agents de lectura completa (drift doc · estados/reuse) + harness multi-viewport
+> (`ds-audit`, 320/768/1280) + **contraste recomputado del token** (OKLab→sRGB→WCAG). El "20% que
+> falta" ya **no es a11y roto** (eso se cerró) — es **adopción incompleta del DS**.
+
+### O1–O9: estado tras la ola
+✅ **Cerrados:** O2 (azul-ink, #982) · O3 (PagoBadge portal, #982) · O4 (Spinner/Button-loading, #984) ·
+O5 (PriceBlock shared, `5cabf3f2`) · O6 (CTAs carrito, `5d8a7934` — **solo el carrito**) · O8 (/kit-preview, #984).
+🟡 **A medias:** O1 (#985 mató los `text-[Npx]` pero **quedan 52 `text-[Nrem]`** — ver N2) · O7 (motion movido
+a `@theme` pero adopción mínima — ver N5) · O9 (drift del doc **sigue** — ver N7).
+
+### Hallazgos NUEVOS / residuales (confirmados, no falsos positivos)
+| # | Hallazgo | Evidencia (recomputada/leída) | Sev | Ruteo |
+| --- | --- | --- | --- | --- |
+| **N1** | **Chip "Visible" admin sin contraste AA** | `equipos.index.lazy.tsx:748` `bg-verde/15 text-verde` = **2.80:1** (token recomputado). Reincidencia de O2/verde que no llegó a este span inline. Fix conocido: `text-verde-ink` → **4.57:1** | 🔴 | trivial (1 línea) |
+| **N2** | **Gap del guardrail tipográfico #985** | el regex era `text-\[\d+px\]` (solo px). **52 `text-[Nrem]`** escaparon (ej. `text-[0.6875rem]`=11px, `text-[1.0625rem]`=17px). El guardrail no los frena → O1 quedó a medias | 🟡 | normal |
+| **N3** | **~19 CTAs crudos replican `<Button variant=primary/amber>`** | confirmado leyendo: 13 `bg-ink…hover:bg-amber` + 6 `bg-amber…`. Concentración: `CatalogoMovilHelpers`(4), `ClientePortalPedido`(3), `estudio.lazy`(3), `ClientePortalHelpers`(2). Varios desvían el token (`hover:brightness` en vez de `hover:bg-amber-hot`). O6 cerró **solo** el carrito | 🔴 | normal (lo ve el cliente → rama+PR) |
+| **N4** | **~7 pills de estado a mano** | replican `kit/Pill`. Match exacto: `EquipmentCard.tsx:138` (danger), `ClientePortalPedido.tsx:417` (warning). Deberían derivar de `<Pill tone>` | 🟡 | normal |
+| **N5** | **Motion: adopción mínima** (O7) | **3** usos de tokens (`button`+`spinner`) vs **47** transiciones hardcoded (`duration-200`/`transition-all`/`ease-in-out`). Decisión pendiente con datos: adoptar masivo **o** retirar y documentar honesto | 🟡 | decisión + normal |
+| **N6** | **Focus ring: ancho inconsistente** | `ring-1` (shadcn primitivos) vs `ring-2` (Rambla). **El color SÍ está unificado** (amber vía `--ring`/`--sidebar-ring`/`ring-amber` = mismo hue — no es caos). + `button.tsx` no define `active:` (press-scale vive fuera, replicado ad-hoc) + 2-3 `focus:` crudo (`select.tsx:22`) vs `focus-visible:` | 🟡 | normal |
+| **N7** | **Drift del doc `DESIGN_SYSTEM.md`** (O9 sigue) | 🔴 del doc: `.skeleton`/shimmer inexistente (real = `<Skeleton>` animate-pulse), `SearchInput` fantasma, `FieldLabel` duplicado 3× inline, componentes del kit listados en `kit/` pero viven en `rental/`, `button:active` global inexistente. 🟡: paths `src/styles.css`, focus 3px→2px, `.card-interactive`/`.catalog-grid` inexistentes, `/kit-preview` "admin-only" pero **público**, `--radius` base inexistente, `.grain` 40%→5%, `--ease-out`→`--ease-out-brand`, tokens huérfanos sin documentar (`--azul-ink`, escala `text-2xs/3xs/15/22`) | 🟡 | doc-sync |
+
+### Falsos positivos descartados (honestidad > actividad)
+- **ViewToggle "Grid/Lista" c:1.66** → recomputado **11.03:1** (amber sobre el sliding-indicator `bg-ink`; el parser no vio el stacking). ✅
+- **"Conocé el estudio" c:1.06** → texto sobre **imagen** (hero estudio); el skill manda saltearlo (no medible vs sólido).
+- **`font_lt_min` del harness** → todos `undefinedpx` = el parser no leyó el px (placeholders de input + footer links). Ruido.
+- **5 hex "crudos"** → colores de marca de **terceros** (Google `#4285F4`, WhatsApp `#25D366`) + preview de mail. Legítimos por convención (no se tematizan).
+- **`z-[60]/z-[61]` en `CatalogoMovilHelpers`** → coinciden con `--z-scrim`/`--z-drawer`; cosmético (podrían usar el token, no es bug).
+- **harness `hub` = 0 flags** en 320/768/1280; los `tap<44` son mayormente footer text-links + elementos con `hit-area-44` (el harness no descuenta el `::before`).
+
+### Veredicto
+El DS está **sólido en lo que se shippeó** (a11y multi-viewport, tap targets reales, contraste de marca,
+kit `Pill`→badges, estados de `switch`/`calendar`/`input`). El delta es **adopción y prolijidad**, no
+roturas: **N1** (trivial, contraste real) y **N3** (lo ve el cliente) son los de mayor valor; **N2/N5/N7**
+cierran huecos que la ola dejó a medias. Ninguno toca el core de reservas.
+
+### Addendum — destapado al implementar PR1 (el render-compare paga)
+- **N1 creció:** al migrar los chips a `<Pill>` aparecieron **2 contrastes rotos más** (no solo el admin):
+  `equipo.$slug:397` "parcialmente disponible" `text-amber`/amber@10 = **1.61:1**, y `DateRangePicker:357`
+  "+1 J" `text-naranja`/naranja@20 = **2.56:1**. Ambos por desviarse del estándar `text-ink`. Arreglados en PR1.
+- **Badge "Presupuesto/Solicitado" (`EstadoBadge`)** usaba `text-azul` **brillante** (rgb 16,151,219 → **2.91:1**) —
+  no tomó el `azul-ink` de #982 porque está en su `cls` map, no en el `tone="info"`. Visible en portal + admin.
+  Arreglado en PR1 (`text-azul-ink` → 5.57:1). Confirmado en vivo en `/kit-preview`.
+- **N8 (NUEVO, encolado — PR aparte):** `text-verde` **brillante** sobre fondo normal (bone/white/surface) =
+  **3.32–3.62:1** (<AA texto normal). ~49 usos = montos de plata "positivos" (CartDrawer, CatalogoMovil,
+  liquidación admin) + íconos. `verde-ink` daría 5.59:1. **Ojo:** los montos grandes/bold pasan a 3:1 (large
+  text) → revisar caso por caso (no es mecánico). No entra en PR1 (scope: PR1 = chips de estado).
