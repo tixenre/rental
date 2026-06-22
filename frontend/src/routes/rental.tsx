@@ -185,7 +185,7 @@ type Mode = "grid" | "list";
 function Index() {
   // Datos de la API
   const { startDate, endDate, items, setQty, setDrawerOpen } = useCart();
-  const { data: allEquipos = [], isLoading, isError } = useEquipos(startDate, endDate);
+  const { data: allEquipos = [], isLoading, isError, refetch } = useEquipos(startDate, endDate);
 
   // Reconciliación: elimina del carrito items cuyo ID ya no existe en el catálogo
   // (equipo borrado, ocultado o archivado después de que el cliente lo agregó).
@@ -489,155 +489,158 @@ function Index() {
       <RentalDateModal open={dateModalOpen} onOpenChange={setDateModalOpen} />
 
       {/* Toggle Modo + búsqueda sticky, justo bajo el topbar (top-16). */}
-      <div className="sticky top-16 z-30 border-b hairline bg-background/95 backdrop-blur-xl">
-        {/* Mobile */}
-        <div className="sm:hidden px-3 py-3">
-          <MobileStickyBar
-            allEquipos={allEquipos}
-            query={query}
-            setQuery={setQuery}
-            categories={apiCategories}
-            brands={marcas}
-            selectedCategories={selectedCats}
-            onToggleCategory={toggleCat}
-            selectedBrand={brand}
-            onBrand={setBrand}
-            onClear={() => {
-              setSelectedCats(new Set());
-              setBrand(null);
-              setQuery("");
-              setSpecFilters({});
-            }}
-            resultCount={filtered.length}
-          />
-        </div>
+      {/* Ocultar cuando hay error: no tiene sentido filtrar un catálogo vacío */}
+      {!isError && (
+        <div className="sticky top-16 z-30 border-b hairline bg-background/95 backdrop-blur-xl">
+          {/* Mobile */}
+          <div className="sm:hidden px-3 py-3">
+            <MobileStickyBar
+              allEquipos={allEquipos}
+              query={query}
+              setQuery={setQuery}
+              categories={apiCategories}
+              brands={marcas}
+              selectedCategories={selectedCats}
+              onToggleCategory={toggleCat}
+              selectedBrand={brand}
+              onBrand={setBrand}
+              onClear={() => {
+                setSelectedCats(new Set());
+                setBrand(null);
+                setQuery("");
+                setSpecFilters({});
+              }}
+              resultCount={filtered.length}
+            />
+          </div>
 
-        {/* Desktop: cat-bar 2 filas (cat-pills+filtros+toggle / buscador
+          {/* Desktop: cat-bar 2 filas (cat-pills+filtros+toggle / buscador
               full-width) siguiendo el handoff de Claude Design. Popular chips
               en su propia fila debajo (solo en modo lista). */}
-        <div className="hidden sm:block">
-          {/* Fila 1: Cat-pills (izq, scroll) + Favoritos/Disponibles + ViewToggle (der) */}
-          <div className="flex items-center gap-3 px-6 py-2.5 border-b hairline">
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-none min-w-0">
-              {["Todo", ...apiCategories].map((cat) => {
-                // En browse mode el highlight sigue al scroll-spy (spyCat),
-                // sin filtrar; al filtrar/buscar vuelve a basarse en selectedCats.
-                const isActive = browseMode
-                  ? cat === (spyCat ?? "Todo")
-                  : cat === "Todo"
-                    ? selectedCats.size === 0
-                    : selectedCats.has(cat);
-                const count = cat === "Todo" ? allEquipos.length : (categoryCounts.get(cat) ?? 0);
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      if (cat === "Todo") setSelectedCats(new Set());
-                      else setSelectedCats(new Set([cat]));
-                    }}
-                    className={cn(
-                      "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 py-2.5 whitespace-nowrap shrink-0 text-sm transition",
-                      isActive
-                        ? "border-transparent bg-amber font-bold text-ink"
-                        : "border-hairline font-medium text-muted-foreground hover:border-ink hover:text-ink",
-                    )}
-                  >
-                    {cat}
-                    <span
+          <div className="hidden sm:block">
+            {/* Fila 1: Cat-pills (izq, scroll) + Favoritos/Disponibles + ViewToggle (der) */}
+            <div className="flex items-center gap-3 px-6 py-2.5 border-b hairline">
+              <div className="flex gap-1.5 overflow-x-auto scrollbar-none min-w-0">
+                {["Todo", ...apiCategories].map((cat) => {
+                  // En browse mode el highlight sigue al scroll-spy (spyCat),
+                  // sin filtrar; al filtrar/buscar vuelve a basarse en selectedCats.
+                  const isActive = browseMode
+                    ? cat === (spyCat ?? "Todo")
+                    : cat === "Todo"
+                      ? selectedCats.size === 0
+                      : selectedCats.has(cat);
+                  const count = cat === "Todo" ? allEquipos.length : (categoryCounts.get(cat) ?? 0);
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        if (cat === "Todo") setSelectedCats(new Set());
+                        else setSelectedCats(new Set([cat]));
+                      }}
                       className={cn(
-                        "font-mono text-2xs tracking-[0.1em] tabular",
-                        isActive ? "text-ink/70" : "text-muted-foreground",
+                        "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 py-2.5 whitespace-nowrap shrink-0 text-sm transition",
+                        isActive
+                          ? "border-transparent bg-amber font-bold text-ink"
+                          : "border-hairline font-medium text-muted-foreground hover:border-ink hover:text-ink",
                       )}
                     >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                      {cat}
+                      <span
+                        className={cn(
+                          "font-mono text-2xs tracking-[0.1em] tabular",
+                          isActive ? "text-ink/70" : "text-muted-foreground",
+                        )}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="flex items-center gap-2 ml-auto shrink-0">
-              {/* Filtro Favoritos */}
-              {fav.count > 0 && (
+              <div className="flex items-center gap-2 ml-auto shrink-0">
+                {/* Filtro Favoritos */}
+                {fav.count > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setFavoritosOnly((v) => !v)}
+                    className={cn(
+                      "shrink-0 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition whitespace-nowrap",
+                      favoritosOnly
+                        ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
+                        : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
+                    )}
+                    aria-pressed={favoritosOnly}
+                  >
+                    <Heart className={cn("h-3 w-3", favoritosOnly && "fill-current")} />
+                    Favoritos
+                    <span className="font-mono text-3xs tabular">{fav.count}</span>
+                  </button>
+                )}
+
+                {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
                 <button
                   type="button"
-                  onClick={() => setFavoritosOnly((v) => !v)}
+                  onClick={() => setDisponiblesOnly((v) => !v)}
                   className={cn(
                     "shrink-0 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition whitespace-nowrap",
-                    favoritosOnly
+                    disponiblesOnly
                       ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
                       : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
                   )}
-                  aria-pressed={favoritosOnly}
+                  aria-pressed={disponiblesOnly}
+                  title="Mostrar solo equipos disponibles para las fechas elegidas"
                 >
-                  <Heart className={cn("h-3 w-3", favoritosOnly && "fill-current")} />
-                  Favoritos
-                  <span className="font-mono text-3xs tabular">{fav.count}</span>
+                  <Check className="h-3 w-3" />
+                  Disponibles
                 </button>
-              )}
 
-              {/* Filtro Disponibles — solo tiene efecto con fechas pickeadas */}
-              <button
-                type="button"
-                onClick={() => setDisponiblesOnly((v) => !v)}
-                className={cn(
-                  "shrink-0 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition whitespace-nowrap",
-                  disponiblesOnly
-                    ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
-                    : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
-                )}
-                aria-pressed={disponiblesOnly}
-                title="Mostrar solo equipos disponibles para las fechas elegidas"
-              >
-                <Check className="h-3 w-3" />
-                Disponibles
-              </button>
-
-              <ViewToggle
-                options={[
-                  {
-                    value: "grid" as Mode,
-                    label: "Grid",
-                    icon: <LayoutGrid className="h-3 w-3" />,
-                  },
-                  { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
-                ]}
-                value={mode}
-                onChange={setMode}
-              />
+                <ViewToggle
+                  options={[
+                    {
+                      value: "grid" as Mode,
+                      label: "Grid",
+                      icon: <LayoutGrid className="h-3 w-3" />,
+                    },
+                    { value: "list" as Mode, label: "Lista", icon: <List className="h-3 w-3" /> },
+                  ]}
+                  value={mode}
+                  onChange={setMode}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Fila 2: Buscador full-width */}
-          <div className="px-6 py-2.5">
-            <div className="relative w-full">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar equipo, marca o categoría…"
-                aria-label="Buscar equipos"
-                className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
-                  aria-label="Limpiar"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
+            {/* Fila 2: Buscador full-width */}
+            <div className="px-6 py-2.5">
+              <div className="relative w-full">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar equipo, marca o categoría…"
+                  aria-label="Buscar equipos"
+                  className="w-full rounded-full border border-ink/15 bg-surface-elevated py-2.5 pl-11 pr-9 text-sm font-medium shadow-sm placeholder:font-normal placeholder:text-muted-foreground focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none transition"
+                />
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    aria-label="Limpiar"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-ink"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Popular bar — fila separada bajo el cat-bar, solo en modo lista.
             No sticky: scrollea fuera con el contenido (mismo patrón que el
             móvil — los populares no tienen sentido después de empezar a
             scrollear). */}
-      {mode === "list" && (
+      {mode === "list" && !isError && (
         <div className="hidden sm:flex items-center gap-2 px-6 py-2 border-b hairline bg-background overflow-x-auto scrollbar-none">
           <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground shrink-0">
             Populares:
@@ -696,13 +699,17 @@ function Index() {
           </div>
         )
       ) : isError ? (
-        <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-16 text-center mt-8 lg:mx-12">
-          <div className="font-display text-2xl text-muted-foreground">
-            No se pudo cargar el catálogo
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Verificá tu conexión e intentá de nuevo.
+        <div className="mx-4 rounded-lg border hairline bg-surface px-6 py-20 text-center mt-6 lg:mx-12 flex flex-col items-center gap-4">
+          <div className="font-display text-2xl text-ink">No se pudo cargar el catálogo</div>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Revisá tu conexión e intentá de nuevo.
           </p>
+          <button
+            onClick={() => void refetch()}
+            className="inline-flex items-center justify-center min-h-11 rounded-full border hairline px-6 text-sm font-semibold text-ink hover:bg-muted/50 transition"
+          >
+            Reintentar
+          </button>
         </div>
       ) : mode === "grid" ? (
         <GridMode

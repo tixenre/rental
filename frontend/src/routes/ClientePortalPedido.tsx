@@ -1117,9 +1117,8 @@ export function DocAvailablePopup({
                   )}
                 </div>
                 <Button
-                  size="sm"
                   variant="outline"
-                  className="shrink-0"
+                  className="shrink-0 min-h-11"
                   onClick={() => onVerPedido(d.pedidoId)}
                 >
                   Ver pedido
@@ -1129,7 +1128,9 @@ export function DocAvailablePopup({
           })}
         </ul>
         <DialogFooter>
-          <Button onClick={onDismiss}>Entendido</Button>
+          <Button className="min-h-11" onClick={onDismiss}>
+            Entendido
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
