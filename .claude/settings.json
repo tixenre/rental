@@ -6,6 +6,21 @@
           {
             "type": "command",
             "command": "node scripts/check-docs.mjs"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-cola.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/log-skill.sh"
           }
         ]
       }

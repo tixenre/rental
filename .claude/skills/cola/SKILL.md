@@ -158,4 +158,19 @@ cola está sana, la respuesta correcta es decirlo, no fabricar cierres para most
 
 6. "¿CÓMO ESTÁ LA COLA?": reporte de salud (abiertos / probablemente-hechos / duplicados /
    viejos / gaps de label / someday) — propone, NO cierra solo. El loop liviano y frecuente.
+
+Al cerrar cada uso: escribir {"last-run": "<ISO UTC>"} en .claude/cola-state.json
+(el hook SessionStart lo lee → avisa si lleva > 7 días sin revisar).
 ```
+
+## Auto-mejora (correr al cerrar cada uso)
+
+Preguntate, crítico: ¿alguna regla me desorientó o quedó vieja porque el repo cambió? ¿pegué un
+gotcha que merece ser "caso testigo"? ¿overlap con otro skill? ¿repetí a mano un paso que debería
+estar codificado acá?
+
+Si **SÍ** → anotá la propuesta en [`docs/PROPUESTAS_SKILLS.md`](../../../docs/PROPUESTAS_SKILLS.md)
+(formato: `fecha · skill · qué cambiar · por qué`). Proponés, no aplicás — el dueño aprueba, igual
+que la memoria; el supervisor puede validar.
+
+Si **NO** → no fabriques churn. **Honestidad > actividad.**
