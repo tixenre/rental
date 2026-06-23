@@ -177,12 +177,11 @@ def admin_listar_carritos(request: Request, horas: int = 72):
 
     El parámetro `horas` amplía la ventana de la lista (ej. ?horas=168 = 7 días).
     """
-    from admin_guard import require_admin
-    from reservas.disponibilidad import calcular_disponibilidad
-
-    require_admin(request)
-
     try:
+        from admin_guard import require_admin
+        from reservas.disponibilidad import calcular_disponibilidad
+        require_admin(request)
+
         with get_db() as conn:
             # Estampar abandono: la primera vez que un carrito cruza el umbral sin
             # actividad le ponemos `abandonado_en`. Idempotente; un heartbeat nuevo
