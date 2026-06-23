@@ -1,11 +1,13 @@
 """
 routes/talleres.py — Workshops públicos: listing, detalle, upload comprobante,
-inscripción + notificaciones por email. Vista admin (read-only) de inscripciones.
+inscripción + notificaciones por email. Vista admin: inscripciones + edición de contenido.
 """
 
 import logging
 import time
 import uuid
+
+import json as _json
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
@@ -234,6 +236,20 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
 
 # ── Endpoints admin ───────────────────────────────────────────────────────────
 
+FOTO_MAX_MB = 8
+
+
+class TallerUpdateBody(BaseModel):
+    nombre: str | None = None
+    subtitulo: str | None = None
+    descripcion: str | None = None
+    publico_objetivo: str | None = None
+    instructor_bio: str | None = None
+    instructor_proyectos: str | None = None
+    programa_teorica: list[str] | None = None
+    programa_practica: list[str] | None = None
+
+
 @router.get("/admin/talleres")
 def admin_list_talleres(request: Request):
     """Lista todos los talleres (admin)."""
@@ -243,6 +259,90 @@ def admin_list_talleres(request: Request):
             "SELECT * FROM talleres ORDER BY fecha_inicio DESC"
         ).fetchall()
     return [_taller_to_dict(r) for r in rows]
+
+
+@router.patch("/admin/talleres/{taller_id}")
+def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request):
+    """Actualiza campos editables del taller (descripción, textos, programa)."""
+    require_admin(request)
+    sets = []
+    params: list = []
+    if body.nombre is not None:
+        sets.append("nombre = %s"); params.append(body.nombre.strip())
+    if body.subtitulo is not None:
+        sets.append("subtitulo = %s"); params.append(body.subtitulo.strip())
+    if body.descripcion is not None:
+        sets.append("descripcion = %s"); params.append(body.descripcion.strip())
+    if body.publico_objetivo is not None:
+        sets.append("publico_objetivo = %s"); params.append(body.publico_objetivo.strip())
+    if body.instructor_bio is not None:
+        sets.append("instructor_bio = %s"); params.append(body.instructor_bio.strip())
+    if body.instructor_proyectos is not None:
+        sets.append("instructor_proyectos = %s"); params.append(body.instructor_proyectos.strip())
+    if body.programa_teorica is not None:
+        sets.append("programa_teorica = %s::jsonb")
+        params.append(_json.dumps(body.programa_teorica, ensure_ascii=False))
+    if body.programa_practica is not None:
+        sets.append("programa_practica = %s::jsonb")
+        params.append(_json.dumps(body.programa_practica, ensure_ascii=False))
+    if not sets:
+        raise HTTPException(400, "No hay campos para actualizar")
+    sets.append("updated_at = NOW()")
+    params.append(taller_id)
+    with get_db() as conn:
+        cur = conn.execute(
+            f"UPDATE talleres SET {', '.join(sets)} WHERE id = %s RETURNING id",
+            params,
+        )
+        if cur.fetchone() is None:
+            raise HTTPException(404, "Taller no encontrado")
+        row = conn.execute("SELECT * FROM talleres WHERE id = %s", (taller_id,)).fetchone()
+    return _taller_to_dict(row)
+
+
+@router.post("/admin/talleres/{taller_id}/upload-foto-instructor")
+async def admin_upload_foto_instructor(taller_id: int, request: Request):
+    """Sube la foto de la instructora a R2 y actualiza instructor_foto_url."""
+    require_admin(request)
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id FROM talleres WHERE id = %s", (taller_id,)
+        ).fetchone()
+        if row is None:
+            raise HTTPException(404, "Taller no encontrado")
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file' en el form-data")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw) > FOTO_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, f"Archivo muy grande (máx {FOTO_MAX_MB} MB)")
+
+    content_type = getattr(file, "content_type", None) or "application/octet-stream"
+    ext_map = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+    ext = ext_map.get(content_type, "jpg")
+
+    ts = int(time.time() * 1000)
+    uid = uuid.uuid4().hex[:8]
+    key = f"talleres/{taller_id}/instructor-{ts}-{uid}.{ext}"
+
+    try:
+        url = _r2_put(key, raw, content_type)
+    except Exception as e:
+        logger.error("upload_foto_instructor: R2 error: %s", e)
+        raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")
+
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE talleres SET instructor_foto_url = %s, updated_at = NOW() WHERE id = %s",
+            (url, taller_id),
+        )
+
+    return {"ok": True, "url": url}
 
 
 @router.get("/admin/talleres/{taller_id}/inscripciones")
