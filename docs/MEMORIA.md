@@ -250,6 +250,30 @@ no "corregir" a dorado (el dorado es la jugada del hover, la _reverse signature_
 _Filosofía de diseño del DS (2026-06-20)_ (una sola forma del CTA). El supervisor marca un CTA primario que
 vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente el gesto en vez de usar `<Button>`.
 
+### 2026-06-23 — Capa de skills auto-gobernada y portable: registro verificado + routing de modelo + loop de aprendizaje
+
+La capa de skills se gobierna como el código y la memoria (**fuente única + guardrail mecánico +
+propone-no-escribe**). El **mapa canónico** es la tabla "Skills — cuál uso para qué" de `CLAUDE.md` (árbol
+de decisión por disparador + columna **Modelo**); `scripts/check-docs.mjs` —config-driven vía
+`.claude/governance.config.mjs`, **portable a otros repos**— verifica que todo skill en disco esté listado
+ahí (Bloque 4) y bien formado (Bloque 5: frontmatter `name`/`description`/`model`/`last-reviewed`/`version`;
+staleness = warning). El **routing de modelo** materializa _Eficiencia de sesión (2026-05-26)_ en el `model:`
+de cada skill (criterio/diagnóstico→**opus**, ejecución→**sonnet**; los de criterio delegan la ejecución a
+subagentes `sonnet`). Blueprint del Curator de Hermes Agent, **nativo** (no un segundo agente). El **loop de
+aprendizaje** (Etapa 1B): buzón `docs/PROPUESTAS_SKILLS.md` (auto-mejora **propone**, el dueño aprueba),
+telemetría de uso por hook y check-in proactivo de la cola. Plantilla `.claude/skill-template.md` (fuera de
+`skillsDir`). El supervisor marca un skill en disco sin fila en `CLAUDE.md` o un `model:` que no pegue con el task.
+
+### 2026-06-23 — cola = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
+
+Toda administración de la cola (reconciliar issues abiertos contra commits/PRs shippeados para cazar
+**hecho-pero-abierto**, triagear con evidencia, deduplicar trackers, etiquetar, intake de brain-dumps, reporte
+"¿cómo está la cola?") vive en el skill **`cola`** (`.claude/skills/cola/SKILL.md`), **fuente única**, para que
+tenga la atención continua y liviana que necesita. El **Frente D de `mantenimiento` apunta acá** (ya no duplica
+el método). Refina _Issues: la cola espeja el código (2026-06-08)_ y _Protocolo de brain-dumps (2026-05-25)_.
+Regla de oro: **cerrar es afirmar** → solo con evidencia (PR/commit) o la orden del dueño; el dueño dirige, la
+sesión recomienda.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
