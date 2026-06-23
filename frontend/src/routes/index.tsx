@@ -37,7 +37,7 @@ function LandingHub() {
       <main className="flex-1 flex flex-col">
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
         <section className="flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24 bg-background">
-          <p className="font-mono text-[0.625rem] tracking-[0.35em] uppercase text-muted-foreground mb-6">
+          <p className="font-mono text-2xs tracking-[0.35em] uppercase text-muted-foreground mb-6">
             Chaco 1392 — Mar del Plata
           </p>
           <Logo linkTo={null} color="text-ink" className="!h-[clamp(3rem,12vw,8rem)]" />
@@ -51,9 +51,9 @@ function LandingHub() {
           {/* Rental */}
           <Link
             to="/rental"
-            className="group relative flex flex-col justify-end p-8 sm:p-10 bg-amber text-ink min-h-[320px] md:min-h-0 transition-[filter] hover:brightness-105 active:brightness-95"
+            className="group relative flex flex-col justify-start p-8 sm:p-10 bg-amber text-ink min-h-[320px] md:min-h-0 transition-[filter] hover:brightness-105 active:brightness-95"
           >
-            <p className="font-mono text-[0.625rem] tracking-[0.28em] uppercase text-ink/55 mb-5">
+            <p className="font-mono text-2xs tracking-[0.28em] uppercase text-ink/55 mb-5">
               Equipos audiovisuales
             </p>
             <h2
@@ -68,7 +68,7 @@ function LandingHub() {
                 que necesitás.
               </span>
             </h2>
-            <p className="text-ink/65 text-sm mb-7 leading-relaxed max-w-xs">
+            <p className="text-ink/65 text-sm mb-7 leading-relaxed max-w-xs md:min-h-[2lh]">
               Cámaras, lentes, iluminación, audio y soportes. Retiro en el estudio.
             </p>
             <span className="inline-flex items-center gap-2 w-fit rounded-full bg-ink text-background px-5 py-2.5 text-sm font-bold tracking-[-0.01em] transition-[gap] duration-150 group-hover:gap-3.5">
@@ -79,7 +79,7 @@ function LandingHub() {
           {/* Estudio */}
           <Link
             to="/estudio"
-            className="group relative flex flex-col justify-end p-8 sm:p-10 min-h-[320px] md:min-h-0 overflow-hidden transition-[filter] hover:brightness-105 active:brightness-95"
+            className="group relative flex flex-col justify-start p-8 sm:p-10 min-h-[320px] md:min-h-0 overflow-hidden transition-[filter] hover:brightness-105 active:brightness-95"
             style={{ backgroundColor: "var(--color-naranja)" }}
           >
             {studioPic && (
@@ -91,7 +91,7 @@ function LandingHub() {
               />
             )}
             <div className="relative">
-              <p className="font-mono text-[0.625rem] tracking-[0.28em] uppercase mb-5 text-ink">
+              <p className="font-mono text-2xs tracking-[0.28em] uppercase mb-5 text-ink">
                 El Estudio
               </p>
               <h2
@@ -106,7 +106,7 @@ function LandingHub() {
                   pasan cosas.
                 </span>
               </h2>
-              <p className="text-ink text-sm mb-7 leading-relaxed max-w-xs">
+              <p className="text-ink text-sm mb-7 leading-relaxed max-w-xs md:min-h-[2lh]">
                 Set con fondo infinito, ciclorama y luz natural. Por hora.
               </p>
               <span className="inline-flex items-center gap-2 w-fit rounded-full bg-white text-ink px-5 py-2.5 text-sm font-bold tracking-[-0.01em] transition-[gap] duration-150 group-hover:gap-3.5">
@@ -118,10 +118,10 @@ function LandingHub() {
           {/* Talleres */}
           <Link
             to="/workshops"
-            className="group relative flex flex-col justify-end p-8 sm:p-10 text-ink min-h-[320px] md:min-h-0 transition-[filter] hover:brightness-105 active:brightness-95"
+            className="group relative flex flex-col justify-start p-8 sm:p-10 text-ink min-h-[320px] md:min-h-0 transition-[filter] hover:brightness-105 active:brightness-95"
             style={{ backgroundColor: "var(--color-rosa)" }}
           >
-            <p className="font-mono text-[0.625rem] tracking-[0.28em] uppercase text-ink/55 mb-5">
+            <p className="font-mono text-2xs tracking-[0.28em] uppercase text-ink/55 mb-5">
               Workshops & Talleres
             </p>
             <h2
@@ -136,7 +136,7 @@ function LandingHub() {
                 haciendo.
               </span>
             </h2>
-            <p className="text-ink/65 text-sm mb-7 leading-relaxed max-w-xs">
+            <p className="text-ink/65 text-sm mb-7 leading-relaxed max-w-xs md:min-h-[2lh]">
               Clases prácticas de dirección de arte, foto y video. Cupos limitados.
             </p>
             <span className="inline-flex items-center gap-2 w-fit rounded-full bg-ink text-background px-5 py-2.5 text-sm font-bold tracking-[-0.01em] transition-[gap] duration-150 group-hover:gap-3.5">

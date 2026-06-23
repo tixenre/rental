@@ -13,7 +13,7 @@ export function FaqTeaser() {
     <section id="faq" className="py-[clamp(2.75rem,6vw,4.5rem)] bg-surface">
       <div className="max-w-[760px] mx-auto px-[clamp(16px,4vw,28px)]">
         <div className="mb-[clamp(1.5rem,4vw,2.5rem)]">
-          <p className="font-mono text-[0.6875rem] tracking-[0.2em] uppercase text-muted-foreground">
+          <p className="font-mono text-xs tracking-[0.2em] uppercase text-muted-foreground">
             Preguntas frecuentes
           </p>
           <h2 className="font-sans font-bold text-[clamp(1.7rem,4.2vw,2.6rem)] tracking-[-0.02em] leading-[1.05] mt-2 text-balance">
@@ -26,7 +26,7 @@ export function FaqTeaser() {
             return (
               <div key={i} className="border-b hairline">
                 <button
-                  className="w-full flex items-center justify-between gap-4 py-[18px] px-1 text-left text-[1.0625rem] font-bold tracking-[-0.01em] text-ink"
+                  className="w-full flex items-center justify-between gap-4 py-[18px] px-1 text-left text-lg font-bold tracking-[-0.01em] text-ink"
                   onClick={() => setOpen(isOpen ? -1 : i)}
                   aria-expanded={isOpen}
                 >
@@ -43,7 +43,7 @@ export function FaqTeaser() {
                   className="overflow-hidden transition-[max-height] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
                   style={{ maxHeight: isOpen ? 200 : 0 }}
                 >
-                  <p className="px-1 pb-[18px] text-[0.9375rem] leading-[1.6] text-muted-foreground max-w-[60ch]">
+                  <p className="px-1 pb-[18px] text-15 leading-[1.6] text-muted-foreground max-w-[60ch]">
                     {f.a}
                   </p>
                 </div>
@@ -52,7 +52,7 @@ export function FaqTeaser() {
           })}
           <Link
             to="/preguntas-frecuentes"
-            className="inline-flex items-center gap-[7px] mt-5 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-ink transition-[gap] duration-150 hover:gap-[11px]"
+            className="inline-flex items-center gap-[7px] mt-5 font-mono text-xs font-semibold uppercase tracking-[0.16em] text-ink transition-[gap] duration-150 hover:gap-[11px]"
           >
             Ver todas las preguntas <ArrowRight size={14} strokeWidth={2.2} />
           </Link>

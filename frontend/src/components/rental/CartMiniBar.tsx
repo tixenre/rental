@@ -6,6 +6,7 @@ import { useFlyToCart } from "@/lib/fly-to-cart-store";
 import { type Equipment } from "@/data/equipment";
 import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
+import { Button } from "@/design-system/ui/button";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion } from "@/lib/cotizacion";
 
@@ -116,13 +117,15 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
           </div>
         </div>
 
-        <button
+        <Button
+          variant="amber"
+          shape="pill"
           onClick={() => setDrawerOpen(true, "bottom")}
           disabled={isEmpty}
-          className="rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-amber/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-auto px-4 py-2.5 font-semibold disabled:cursor-not-allowed disabled:opacity-40"
         >
           Ver carrito
-        </button>
+        </Button>
       </div>
     </div>
   );

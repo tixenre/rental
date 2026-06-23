@@ -18,6 +18,7 @@ import {
   Plus,
 } from "lucide-react";
 import { BottomSheet } from "@/components/mobile/BottomSheet";
+import { Button } from "@/design-system/ui/button";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -169,15 +170,17 @@ export function HeroBanner({
         ))}
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-ink/30" />
-        <button
+        <Button
           type="button"
+          variant="primary"
+          shape="pill"
           onClick={() => navigate({ to: "/estudio" })}
-          className="absolute left-4 bottom-4 inline-flex min-h-[44px] items-center gap-1.5 bg-ink text-amber font-bold text-sm tracking-[-0.01em] px-4 py-2.5 rounded-full"
+          className="absolute left-4 bottom-4 min-h-[44px] h-auto gap-1.5 font-bold tracking-[-0.01em] px-4 py-2.5"
           style={{ zIndex: 1 }}
         >
           Conocé el estudio
           <ChevronRight size={13} strokeWidth={2.5} />
-        </button>
+        </Button>
         {/* Navigation dots */}
         <div className="absolute right-4 bottom-5 flex gap-[5px]" style={{ zIndex: 1 }}>
           {photos.map((_, i) => (
@@ -512,15 +515,17 @@ export function CartSheet({
                 Precios mostrados por jornada
               </div>
             </div>
-            <button
-              className="px-3.5 py-1.5 rounded-full bg-ink text-amber text-xs font-bold font-sans shrink-0 hover:bg-amber hover:text-ink transition-colors whitespace-nowrap"
+            <Button
+              variant="primary"
+              shape="pill"
+              className="h-auto px-3.5 py-1.5 text-xs font-bold font-sans shrink-0 whitespace-nowrap"
               onClick={() => {
                 onClose();
                 onOpenDateSheet();
               }}
             >
               Asignar fechas
-            </button>
+            </Button>
           </div>
         )}
 
@@ -656,8 +661,10 @@ export function CartSheet({
               }}
             />
           ) : (
-            <button
-              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-15 font-bold hover:bg-amber hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            <Button
+              variant="primary"
+              shape="pill"
+              className="w-full h-auto py-3.5 font-sans text-15 font-bold disabled:cursor-not-allowed"
               onClick={handleSubmit}
               disabled={submitting}
             >
@@ -666,7 +673,7 @@ export function CartSheet({
               ) : (
                 "Solicitar rental"
               )}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -829,15 +836,17 @@ export function FichaSheet({
               </button>
             </div>
           ) : (
-            <button
-              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-15 font-bold hover:bg-amber hover:text-ink transition-colors"
+            <Button
+              variant="primary"
+              shape="pill"
+              className="w-full h-auto py-3.5 font-sans text-15 font-bold"
               onClick={() => {
                 onAddToCart(eq.id, 1);
                 onClose();
               }}
             >
               Agregar al carrito
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -1248,13 +1257,15 @@ export function FiltrosSheet({
           >
             Limpiar
           </button>
-          <button
+          <Button
             type="button"
+            variant="primary"
+            shape="pill"
             onClick={() => onOpenChange(false)}
-            className="flex-1 py-3 rounded-full bg-ink text-amber font-sans text-sm font-bold transition hover:bg-amber hover:text-ink"
+            className="flex-1 h-auto py-3 font-sans text-sm font-bold"
           >
             Aplicar
-          </button>
+          </Button>
         </div>
       }
     >
