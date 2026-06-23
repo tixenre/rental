@@ -581,7 +581,7 @@ def listar_compatibles(
 
 
 # ── Compat asistida por IA (F6: skill gear-compatibility) ───────────────
-# Endpoints consumidos por el skill .claude/skills/gear-compatibility.md
+# Endpoints consumidos por el skill .claude/skills/gear-compatibility/SKILL.md
 # para escribir compat auto-generadas y propuestas de specs.
 
 @router.post("/admin/compat/bulk")

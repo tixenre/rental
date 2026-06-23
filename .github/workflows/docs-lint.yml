@@ -3,7 +3,8 @@ name: Docs lint
 # El CI de código (ci.yml) IGNORA los cambios de docs (paths-ignore: **/*.md, docs/**),
 # así que el drift documental nunca se cazaba. Este workflow cubre justo ese hueco: corre
 # SOLO cuando cambian docs o el sistema de gobernanza (.claude/**), y valida con
-# scripts/check-docs.mjs (paridad digest↔log, import presente, links vivos).
+# scripts/check-docs.mjs (paridad digest↔log, import presente, links vivos, paridad
+# skills↔registro y linter de frontmatter de skills).
 on:
   pull_request:
     branches: [main, dev]
