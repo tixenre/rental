@@ -40,8 +40,8 @@ function CarritosPage() {
   const { data, isLoading, isError, error, dataUpdatedAt } = useQuery({
     queryKey: ["admin", "carritos"],
     queryFn: () => adminApi.listCarritos(),
-    refetchInterval: 30_000,
-    staleTime: 10_000,
+    refetchInterval: 120_000,
+    staleTime: 30_000,
   });
 
   const [filtro, setFiltro] = useState<Filtro>("todos");
