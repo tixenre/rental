@@ -268,8 +268,8 @@ telemetría de uso por hook y check-in proactivo de la cola. Plantilla `.claude/
 
 ### 2026-06-23 — Gobernanza Etapa 2: Auto-mejora universal + meta-skill gobernanza (dashboard, auditoría, dry-run)
 
-**Auto-mejora propagada a todos los skills** (`mantenimiento`, `auditoria-profunda`, `pulido-frontend`,
-`importar-diseno`, `gear-compatibility`). El linter (Bloque 5 de `check-docs.mjs`) ahora **exige**
+**Auto-mejora propagada a todos los skills activos** (`mantenimiento`, `auditoria-profunda`, `pulido-frontend`,
+`gear-compatibility`; `importar-diseno` recibió la sección pero fue archivado en 2026-06-23). El linter (Bloque 5 de `check-docs.mjs`) ahora **exige**
 `## Auto-mejora` en todo `SKILL.md` — skills sin ella fallan el CI. El **meta-skill `gobernanza`**
 (`.claude/skills/gobernanza/SKILL.md`, `model: opus`) implementa el loop completo: dashboard `/skills`
 (qué hay, último uso del ledger, staleness, propuestas pendientes), auditoría profunda de drift/overlap/
@@ -295,6 +295,16 @@ issues — `pulido-frontend` los aplica. Es **read-only**: nunca edita código. 
 diseño se refina directamente en Claude Code, no desde handoffs externos; su rol de implementar lo toma
 `pulido-frontend` cuando aplique. El cuadro completo: `design-system` gobierna · `pulido-frontend` ejecuta UI ·
 `mantenimiento` ejecuta código. Refina _Design system consolidado (2026-06-06)_.
+
+### 2026-06-23 — 6 skills nuevos: calidad-codigo, auditoria-seguridad, performance, specs, catalogo, calidad-tests
+
+Capa de skills ampliada con 6 skills de auditoría y gobernanza (todos `model: opus`, proponen-no-aplican):
+**`calidad-codigo`** (TypeScript, React patterns, duplicación lógica, complejidad); **`auditoria-seguridad`**
+(OWASP, auth, CORS, headers, secretos, deps vulnerables); **`performance`** (bundle, code splitting, N+1, caching,
+Core Web Vitals); **`specs`** (taxonomía de specs de equipos: consistencia, gaps, specs informales); **`catalogo`**
+(completitud de datos: fotos, descripciones, precios, specs mínimas por categoría); **`calidad-tests`** (cobertura
+de módulos críticos, calidad de assertions, edge cases sin tests). Todos son read-only y siguen el patrón
+propone-aprobás. `scripts/check-docs.mjs` los verifica como al resto.
 
 ---
 
