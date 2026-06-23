@@ -118,15 +118,20 @@ async def _global_exception_handler(request: Request, exc: Exception):
 
 
 @app.on_event("startup")
-async def _acotar_threadpool() -> None:
-    """Alinea el threadpool de Starlette con el pool de conexiones a la BD.
+async def _startup() -> None:
+    """Startup: acota el threadpool + arranca el init de BD en background.
 
-    FastAPI corre los handlers sync en el threadpool de AnyIO (default 40). Cada
+    Threadpool: FastAPI corre los handlers sync en el threadpool de AnyIO (default 40). Cada
     handler toma una conexión del pool (maxconn). Si los threads superan al pool,
     el excedente NO espera: psycopg2 lanza `PoolError: connection pool exhausted`
     → 500 en cascada. Acotando el threadpool a `pool_max()` menos un margen para
     workers de fondo (scheduler, init de BD, webhooks async que tocan la BD),
     los requests de más hacen cola en vez de explotar. Back-pressure, no errores.
+
+    DB init: arranca aquí (no a nivel de módulo) para evitar que `import main`
+    en los tests lance el thread antes de que el test tenga la BD preparada,
+    lo que causaba un deadlock entre el upgrade de Alembic y el init_db() del
+    fixture del test.
     """
     import anyio.to_thread
     from database import pool_max
@@ -138,6 +143,10 @@ async def _acotar_threadpool() -> None:
         "Threadpool acotado a %d (pool_max=%d, margen=%d) — back-pressure activo",
         tokens, pool_max(), margen_fondo,
     )
+
+    global db_init_thread
+    db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
+    db_init_thread.start()
 
 
 async def request_id_middleware(request: Request, call_next):
@@ -691,8 +700,7 @@ def _maybe_run_initial_ranking() -> None:
         conn.close()
 
 
-db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
-db_init_thread.start()
+db_init_thread: threading.Thread | None = None  # arranca en el startup event
 
 # Scheduler in-process de recordatorios de retiro (opt-in por REMINDERS_ENABLED).
 # Decisión 2026-06-04 / issue #735: corre dentro de este proceso, no es un
