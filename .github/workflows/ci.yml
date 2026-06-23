@@ -234,3 +234,6 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+      # Budget de performance: falla si el bundle supera los umbrales de .size-limit.json
+      # (entry/vendors/CSS, brotli). Frena el "engorde silencioso" del peso de la web.
+      - run: npm run size
