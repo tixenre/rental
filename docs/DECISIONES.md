@@ -912,3 +912,22 @@ cancel-in-progress` ya cancela corridas viejas.
   al que **arregla**, y _Fijarse en el repo antes de implementar (2026-06-20)_. Materializado: gotchas del
   glob (dev sirve módulos fuente) y del parser de contraste documentados en el skill; varios "bugs" de la
   pasada cerrados **sin código** por ser falsas alarmas (PR #976 fijó el glob del harness).
+
+### 2026-06-22 — CTA primario = ink + texto hueso (no dorado); el dorado es la jugada del hover
+
+- **Contexto.** Al migrar ~14 CTAs crudos al primitivo `Button` (auditoría fina del DS, #988 N3), apareció
+  que el CTA principal vivía en **dos formas**: la mayoría del catálogo/reserva con `bg-ink text-amber`
+  (texto **dorado** en reposo), y el `variant="primary"` del DS con `bg-ink text-background` (texto
+  **hueso**). Unificar a "una sola forma" exigía elegir el canon. El dueño pidió ver el botón antes de decidir.
+- **Decisión.** El dueño comparó ambas en vivo (render real, fuentes y colores de marca, reposo + hover) y
+  eligió **hueso**: `variant="primary"` = **fondo ink + texto hueso/bone** en reposo, invierte a **amber +
+  ink** en hover. El texto hueso en reposo es **decisión de marca, NO un bug**: no "corregir" a dorado.
+  El dorado es la jugada del **hover** (la _reverse signature_ ink↔amber).
+- **Why.** Dos formas del mismo CTA violan "una sola forma de hacer cada cosa" (_Filosofía de diseño del DS,
+  2026-06-20_). Hueso da más contraste sobre ink (19:1 vs 11:1 del dorado — ambos AA holgado) y un look más
+  limpio; el dorado queda reservado al gesto del hover, más fuerte que un simple aclarado. Anclar la decisión
+  evita el churn de que un futuro cambio la "corrija" creyéndola un bug.
+- **Consecuencias.** Los ~14 CTAs migraron a `variant="primary"` (texto dorado → hueso) en PR #990. El
+  supervisor marca un CTA primario que vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente
+  el gesto en vez de usar `<Button>`. Documentado en `DESIGN_SYSTEM.md` (sección Button). Espeja las decisiones
+  tipo "no lo arregles, es del dueño" (_Presupuesto muestra IVA aparte (2026-06-06)_, verde WhatsApp tier-4).

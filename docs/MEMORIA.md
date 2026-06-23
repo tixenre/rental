@@ -242,6 +242,14 @@ overflows de admin estaban stale, los contrastes "1.66/1.73" eran del parser, y 
 (OKLab→sRGB→WCAG), no creerle al parser. Refuerza _honestidad > actividad_ y _fijarse en el repo antes
 de implementar (2026-06-20)_; el detalle de método vive en el skill `auditoria-profunda`.
 
+### 2026-06-22 — CTA primario = ink + texto hueso (no dorado); el dorado es la jugada del hover
+
+El `variant="primary"` del `Button` es **fondo ink + texto hueso/bone** en reposo (`bg-ink text-background`) e
+invierte a **amber + ink** en hover. El texto hueso en reposo es **decisión de marca del dueño, NO un bug**:
+no "corregir" a dorado (el dorado es la jugada del hover, la _reverse signature_ ink↔amber). Materializa la
+_Filosofía de diseño del DS (2026-06-20)_ (una sola forma del CTA). El supervisor marca un CTA primario que
+vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente el gesto en vez de usar `<Button>`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
