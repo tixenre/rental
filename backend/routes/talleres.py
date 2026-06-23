@@ -194,6 +194,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
                 "UPDATE talleres SET cupos_confirmados = cupos_confirmados + 1 WHERE id = %s",
                 (taller["id"],),
             )
+        conn.commit()
 
     nombre_pila = nombre.split()[0]
     fecha_str = now_ar().strftime("%-d de %B de %Y, %H:%M hs")
@@ -296,6 +297,7 @@ def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request
         )
         if cur.fetchone() is None:
             raise HTTPException(404, "Taller no encontrado")
+        conn.commit()
         row = conn.execute("SELECT * FROM talleres WHERE id = %s", (taller_id,)).fetchone()
     return _taller_to_dict(row)
 
@@ -341,6 +343,7 @@ async def admin_upload_foto_instructor(taller_id: int, request: Request):
             "UPDATE talleres SET instructor_foto_url = %s, updated_at = NOW() WHERE id = %s",
             (url, taller_id),
         )
+        conn.commit()
 
     return {"ok": True, "url": url}
 
