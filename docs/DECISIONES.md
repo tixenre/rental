@@ -1013,8 +1013,9 @@ cancel-in-progress` ya cancela corridas viejas.
   `cola`. Etapa 2 propaga el ritual de auto-mejora a todos los skills y crea el meta-skill que cierra el
   ciclo: el sistema puede auditarse a sí mismo.
 - **Decisión.**
-  1. **Auto-mejora universal** — la sección `## Auto-mejora` se propagó a los 5 skills restantes
-     (`mantenimiento`, `auditoria-profunda`, `pulido-frontend`, `importar-diseno`, `gear-compatibility`).
+  1. **Auto-mejora universal** — la sección `## Auto-mejora` se propagó a los 5 skills que existían
+     entonces (`mantenimiento`, `auditoria-profunda`, `pulido-frontend`, `importar-diseno`,
+     `gear-compatibility`); `importar-diseno` fue archivado en 2026-06-23.
      El Bloque 5 del linter (`check-docs.mjs`) ahora **exige** la sección en todo `SKILL.md` (error, no
      warning) — el CI la caza automáticamente si se crea un skill sin ella.
   2. **Meta-skill `gobernanza`** (`.claude/skills/gobernanza/SKILL.md`, `model: opus`) implementa el loop
@@ -1060,3 +1061,31 @@ cancel-in-progress` ya cancela corridas viejas.
   linter). `CLAUDE.md` reemplaza la fila de `importar-diseno` por `design-system`. El supervisor
   marca un skill en disco sin fila en la tabla. Cadencia sugerida: mensual o tras merge que toque
   `src/design-system/` o `docs/DESIGN_SYSTEM.md`.
+
+### 2026-06-23 — 6 skills nuevos: calidad-codigo, auditoria-seguridad, performance, specs, catalogo, calidad-tests
+
+- **Contexto.** La capa de skills cubría ejecución (pulido-frontend, gear-compatibility) y auditoría
+  de negocio (auditoria-profunda, mantenimiento) pero tenía vacíos sistemáticos: calidad del código en
+  sí, seguridad, performance, taxonomía de specs y completitud del catálogo. El dueño pidió estos skills
+  explícitamente; `calidad-tests` se propuso como fundamental faltante.
+- **Decisión.** 6 skills nuevos, todos `model: opus` (criterio/diagnóstico), todos read-only
+  (proponen-no-aplican), todos con el patrón propone-aprobás y `## Auto-mejora`:
+  1. **`calidad-codigo`** — TypeScript preciso, patterns React, duplicación lógica, naming, complejidad.
+     Distinto de `mantenimiento` (que busca código muerto/god-modules) y de `calidad-tests`.
+  2. **`auditoria-seguridad`** — OWASP Top 10, auth/cookies, CORS, headers HTTP, SQL injection/IDOR,
+     secretos hardcodeados, deps vulnerables (npm audit + pip-audit), rate limiting.
+  3. **`performance`** — bundle size, code splitting, re-renders React, N+1 en DB, caching React Query,
+     HTTP cache, fuentes/CLS.
+  4. **`specs`** — taxonomía de especificaciones técnicas: duplicados con nombres distintos, gaps por
+     categoría, specs informales que deberían ser estructuradas, motor de specs.
+  5. **`catalogo`** — completitud de datos de equipos: fotos, nombre_publico, descripción, precio > $0,
+     specs mínimas por categoría. Propone borradores de descripción para aprobación.
+  6. **`calidad-tests`** — cobertura de módulos críticos (reservas, contabilidad, auth, reportes),
+     calidad de assertions (comportamiento vs implementación), edge cases sin tests.
+- **Why.** La gobernanza sin cobertura de seguridad y performance es incompleta — son los dos ejes que
+  generan incidentes en producción. La calidad de código y tests son la deuda técnica silenciosa. Specs
+  y catálogo son la calidad del producto (lo que el cliente ve). Todos siguen el mismo blueprint
+  propone-aprobás para mantener la consistencia de la capa.
+- **Consecuencias.** 13 skills en disco (6 activos previos + 6 nuevos + `cola` = 13 total).
+  `CLAUDE.md` tiene 13 filas en la tabla de skills. `scripts/check-docs.mjs` los verifica todos.
+  El supervisor marca cualquier skill en disco sin fila, o un skill que aplique sin aprobación.
