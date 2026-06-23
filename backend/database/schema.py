@@ -1631,7 +1631,7 @@ def _init_db_schema(conn):
             'Si llegaste hasta acá: gracias, estoy muy emocionada por hacer realidad este proyecto. '
             'El workshop incluye 2 clases en Rambla Estudio y son 12 cupos, porque quiero que sea '
             'un espacio donde podamos tener un intercambio de aprendizajes y conocimientos.',
-            'Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafxs, filmmakers · '
+            'Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · '
             'Estudiantes de comunicación audiovisual, cine o fotografía · '
             'Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos',
             %s::jsonb, %s::jsonb,
@@ -1665,6 +1665,15 @@ def _init_db_schema(conn):
             "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos "
             "creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos "
             "digitales y físicos.",
+            "direccion-de-arte-jime-troncoso",
+        ),
+    )
+    conn.execute(
+        "UPDATE talleres SET publico_objetivo = %s WHERE slug = %s",
+        (
+            "Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · "
+            "Estudiantes de comunicación audiovisual, cine o fotografía · "
+            "Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos",
             "direccion-de-arte-jime-troncoso",
         ),
     )
