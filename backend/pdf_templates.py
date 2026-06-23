@@ -63,7 +63,7 @@ OWNER_CUIL      = os.getenv("OWNER_CUIL",      "23-37389102-9")
 OWNER_DIRECCION = os.getenv("OWNER_DIRECCION", "Falucho 4625, Mar del Plata")
 OWNER_TELEFONO  = os.getenv("OWNER_TELEFONO",  "223 590-9080")
 OWNER_EMAIL     = os.getenv("OWNER_EMAIL",     "ramblarental@gmail.com")
-OWNER_WEB       = os.getenv("OWNER_WEB",       "ramblarental.com.ar")
+OWNER_WEB       = os.getenv("OWNER_WEB",       "rambla.house")
 
 # Directorio de fuentes vendoreadas (ajustar al layout real del repo)
 FONTS_DIR = os.getenv(

@@ -51,8 +51,8 @@ _PREVIEW_CONTEXT: dict[str, Any] = {
     "notas": "Necesito un trípode extra.",
     "items_html": _PREVIEW_ITEMS_HTML,
     "items_text": "- Sony FX3 × 1\n- RØDE NTG × 2",
-    "admin_url": "https://www.ramblarental.com.ar/admin/pedidos/1234",
-    "portal_url": "https://www.ramblarental.com.ar/cliente/portal",
+    "admin_url": "https://rambla.house/admin/pedidos/1234",
+    "portal_url": "https://rambla.house/cliente/portal",
     # Sample para que el botón "Agregar al calendario" (confirmado) se vea en
     # el Preview; en el envío real lo arma `_pedido_email_context`.
     "gcal_url": "https://calendar.google.com/calendar/render?action=TEMPLATE",
