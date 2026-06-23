@@ -25,7 +25,7 @@ const ESTADO_MAP: Record<EstadoPedido, { label: string; cls: string }> = {
   },
   presupuesto: {
     label: "Presupuesto",
-    cls: "bg-azul/10 text-azul border-azul/30",
+    cls: "bg-azul/10 text-azul-ink border-azul/30",
   },
   solicitado: {
     label: "Solicitado",

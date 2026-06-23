@@ -5,25 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
     <!-- SEO básico — meta tags se sobrescriben por página vía TanStack Router. -->
-    <title>Rambla Rental — Alquiler de equipos de cine y foto en Mar del Plata</title>
-    <meta name="description" content="Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Estudio de foto y video en Mar del Plata." />
+    <title>Rambla — Rental, estudio y workshops audiovisuales</title>
+    <meta name="description" content="Alquiler de equipos audiovisuales, estudio de foto y video, y workshops de producción en Mar del Plata." />
     <meta name="keywords" content="alquiler equipos cine, rental cámaras Mar del Plata, alquiler lentes, iluminación producciones, estudio foto video" />
-    <link rel="canonical" href="https://www.ramblarental.com.ar/" />
+    <link rel="canonical" href="https://rambla.house/" />
 
     <!-- Open Graph (Facebook, WhatsApp, LinkedIn, Slack). -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.ramblarental.com.ar/" />
-    <meta property="og:title" content="Rambla Rental — Alquiler de equipos de cine y foto" />
-    <meta property="og:description" content="Cámaras, lentes, iluminación, audio y soportes para producciones audiovisuales. Estudio de foto y video en Mar del Plata." />
-    <meta property="og:image" content="https://www.ramblarental.com.ar/icon-512.png" />
+    <meta property="og:url" content="https://rambla.house/" />
+    <meta property="og:title" content="Rambla — Rental, estudio y workshops audiovisuales" />
+    <meta property="og:description" content="Alquiler de equipos audiovisuales, estudio de foto y video, y workshops de producción en Mar del Plata." />
+    <meta property="og:image" content="https://rambla.house/og-image.png" />
     <meta property="og:locale" content="es_AR" />
-    <meta property="og:site_name" content="Rambla Rental" />
+    <meta property="og:site_name" content="Rambla" />
 
     <!-- Twitter Cards. -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Rambla Rental — Alquiler de equipos de cine y foto" />
-    <meta name="twitter:description" content="Cámaras, lentes, iluminación, audio y soportes. Mar del Plata." />
-    <meta name="twitter:image" content="https://www.ramblarental.com.ar/icon-512.png" />
+    <meta name="twitter:title" content="Rambla — Rental, estudio y workshops audiovisuales" />
+    <meta name="twitter:description" content="Alquiler de equipos, estudio y workshops audiovisuales en Mar del Plata." />
+    <meta name="twitter:image" content="https://rambla.house/og-image.png" />
 
     <!-- Structured data: Organization (Google Knowledge Panel). -->
     <script type="application/ld+json">
@@ -32,7 +32,7 @@
       "@type": "LocalBusiness",
       "name": "Rambla Rental",
       "description": "Alquiler de equipos audiovisuales y estudio de foto/video en Mar del Plata.",
-      "url": "https://www.ramblarental.com.ar/",
+      "url": "https://rambla.house/",
       "telephone": "+5492235852510",
       "email": "ramblarental@gmail.com",
       "address": {
@@ -48,7 +48,7 @@
         { "@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "10:00", "closes": "14:00" }
       ],
       "priceRange": "$$",
-      "image": "https://www.ramblarental.com.ar/icon-512.png",
+      "image": "https://rambla.house/icon-512.png",
       "sameAs": ["https://instagram.com/ramblarental"]
     }
     </script>
@@ -68,7 +68,9 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <!-- JetBrains Mono asíncrona: no bloquea el render (est. -320ms en slow 4G). -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" /></noscript>
   </head>
   <body>
     <div id="root"></div>

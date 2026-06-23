@@ -132,7 +132,8 @@ function PedidosPage() {
   const pedidosQ = useQuery({
     queryKey: ["admin", "pedidos", { q }],
     queryFn: () => adminApi.listPedidos({ q: q || undefined, per_page: 200 }),
-    refetchInterval: 5000,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 
   const solicitudesQ = useQuery({

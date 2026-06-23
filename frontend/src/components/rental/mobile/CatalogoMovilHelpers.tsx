@@ -18,6 +18,7 @@ import {
   Plus,
 } from "lucide-react";
 import { BottomSheet } from "@/components/mobile/BottomSheet";
+import { Button } from "@/design-system/ui/button";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
+import { buildFotoSrcSet } from "@/lib/srcset";
 
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
@@ -138,30 +140,32 @@ export function HeroBanner({
   return (
     <div ref={heroRef} className="bg-ink">
       {/* Foto rotante 16:9 full-bleed (banner cinematográfico). Crossfade con
-          divs de background-image (NO <img>): background-size:cover es a prueba
-          de balas en todos los browsers y recorta la foto para llenar el 16:9
-          (las fotos del estudio son apaisadas ~3:2 → se recorta arriba/abajo).
-          A todo el ancho, pegada al topbar arriba y a la sección amber abajo.
+          <img> object-fit:cover — equivalente a background-size:cover pero permite
+          srcset/sizes y fetchpriority, lo que habilita al browser a elegir la
+          variante 800px en mobile (vs 1600px antes → ~4× menos bytes).
           bg-ink tapa cualquier gap subpíxel. */}
       <div
         className="relative overflow-hidden bg-ink"
-        style={{
-          width: "100%",
-          aspectRatio: "16 / 9",
-        }}
-        role="img"
+        style={{ width: "100%", aspectRatio: "16 / 9" }}
         aria-label="El Estudio — Rambla Rental"
       >
-        {photos.map((src, i) => (
-          <div
-            key={src}
-            aria-hidden
+        {photos.map((photo, i) => (
+          <img
+            key={photo.url}
+            src={photo.url}
+            srcSet={photo.urlSm ? `${photo.urlSm} 800w, ${photo.url} 1600w` : undefined}
+            sizes="100vw"
+            alt="El Estudio — Rambla Rental"
+            loading={i === 0 ? "eager" : "lazy"}
+            fetchPriority={i === 0 ? "high" : undefined}
+            aria-hidden={i !== photoIdx}
             style={{
               position: "absolute",
               inset: 0,
-              backgroundImage: `url(${src})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center",
               opacity: i === photoIdx ? 1 : 0,
               transition: "opacity 900ms",
             }}
@@ -169,15 +173,17 @@ export function HeroBanner({
         ))}
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-ink/30" />
-        <button
+        <Button
           type="button"
+          variant="primary"
+          shape="pill"
           onClick={() => navigate({ to: "/estudio" })}
-          className="absolute left-4 bottom-4 inline-flex min-h-[44px] items-center gap-1.5 bg-ink text-amber font-bold text-sm tracking-[-0.01em] px-4 py-2.5 rounded-full"
+          className="absolute left-4 bottom-4 min-h-[44px] h-auto gap-1.5 font-bold tracking-[-0.01em] px-4 py-2.5"
           style={{ zIndex: 1 }}
         >
           Conocé el estudio
           <ChevronRight size={13} strokeWidth={2.5} />
-        </button>
+        </Button>
         {/* Navigation dots */}
         <div className="absolute right-4 bottom-5 flex gap-[5px]" style={{ zIndex: 1 }}>
           {photos.map((_, i) => (
@@ -212,14 +218,16 @@ export function HeroBanner({
         </p>
 
         {/* CTA principal */}
-        <button
+        <Button
           type="button"
+          variant="primary"
+          shape="pill"
           onClick={onDateOpen}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-full bg-ink text-amber font-sans text-15 font-bold transition active:scale-[0.97]"
+          className="w-full h-auto py-4 text-15 font-bold"
         >
           <Calendar size={16} />
           Elegir fechas
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -258,6 +266,8 @@ function CartItem({
         {eq.fotoUrl && !imgFailed ? (
           <img
             src={eq.fotoUrl}
+            srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+            sizes="44px"
             alt={eq.name}
             className="w-full h-full object-contain p-1"
             loading="lazy"
@@ -512,15 +522,17 @@ export function CartSheet({
                 Precios mostrados por jornada
               </div>
             </div>
-            <button
-              className="px-3.5 py-1.5 rounded-full bg-ink text-amber text-xs font-bold font-sans shrink-0 hover:bg-amber hover:text-ink transition-colors whitespace-nowrap"
+            <Button
+              variant="primary"
+              shape="pill"
+              className="h-auto px-3.5 py-1.5 text-xs font-bold font-sans shrink-0 whitespace-nowrap"
               onClick={() => {
                 onClose();
                 onOpenDateSheet();
               }}
             >
               Asignar fechas
-            </button>
+            </Button>
           </div>
         )}
 
@@ -567,7 +579,7 @@ export function CartSheet({
                       −{descuentoPct}%
                     </span>
                   </div>
-                  <span className="font-mono text-sm font-semibold text-verde tabular-nums">
+                  <span className="font-mono text-sm font-semibold text-verde-ink tabular-nums">
                     −{formatARS(descuentoMonto)}
                   </span>
                 </div>
@@ -656,8 +668,10 @@ export function CartSheet({
               }}
             />
           ) : (
-            <button
-              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-15 font-bold hover:bg-amber hover:text-ink transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            <Button
+              variant="primary"
+              shape="pill"
+              className="w-full h-auto py-3.5 font-sans text-15 font-bold disabled:cursor-not-allowed"
               onClick={handleSubmit}
               disabled={submitting}
             >
@@ -666,7 +680,7 @@ export function CartSheet({
               ) : (
                 "Solicitar rental"
               )}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -734,6 +748,8 @@ export function FichaSheet({
             {eq.fotoUrl && !imgFailed ? (
               <img
                 src={eq.fotoUrl}
+                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+                sizes="(max-width: 640px) 92vw, 400px"
                 alt={eq.name}
                 className="w-full h-full object-contain p-4"
                 loading="lazy"
@@ -829,15 +845,17 @@ export function FichaSheet({
               </button>
             </div>
           ) : (
-            <button
-              className="w-full py-3.5 rounded-full bg-ink text-amber font-sans text-15 font-bold hover:bg-amber hover:text-ink transition-colors"
+            <Button
+              variant="primary"
+              shape="pill"
+              className="w-full h-auto py-3.5 font-sans text-15 font-bold"
               onClick={() => {
                 onAddToCart(eq.id, 1);
                 onClose();
               }}
             >
               Agregar al carrito
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -919,6 +937,8 @@ export function EquipmentRow({
             {eq.fotoUrl && !imgFailed ? (
               <img
                 src={eq.fotoUrl}
+                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+                sizes="48px"
                 alt={nombrePublico}
                 className="h-full w-full object-contain p-1.5"
                 loading="lazy"
@@ -1248,13 +1268,15 @@ export function FiltrosSheet({
           >
             Limpiar
           </button>
-          <button
+          <Button
             type="button"
+            variant="primary"
+            shape="pill"
             onClick={() => onOpenChange(false)}
-            className="flex-1 py-3 rounded-full bg-ink text-amber font-sans text-sm font-bold transition hover:bg-amber hover:text-ink"
+            className="flex-1 h-auto py-3 font-sans text-sm font-bold"
           >
             Aplicar
-          </button>
+          </Button>
         </div>
       }
     >

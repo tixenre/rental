@@ -23,7 +23,9 @@ const GENERIC_COLOR_MSG =
 // Usá las utilidades del DS: text-3xs (9px), text-2xs (10px), text-xs (12px),
 // text-sm (14px), text-15 (15px), text-base (16px), text-22 (22px) etc.
 // Tamaños sin equivalente en el scale → eslint-disable-line + comentario del por qué.
-const MAGIC_SIZE_RE = "text-\\[\\d+px\\]";
+// Atrapa px Y rem/em arbitrarios (text-[13px], text-[0.8125rem], text-[1.2em]) —
+// el codemod tipográfico migró los rem residuales a tokens; el guardrail cierra el boquete.
+const MAGIC_SIZE_RE = "text-\\[[0-9.]+(px|rem|em)\\]";
 const MAGIC_SIZE_MSG =
   "Usá utilidades del DS en vez de tamaños mágicos: text-3xs/text-2xs/text-xs/text-sm/text-15/text-base/text-22… " +
   "Tamaño sin equivalente → eslint-disable-line + comentario del por qué.";

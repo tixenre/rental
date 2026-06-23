@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { PriceBlock } from "./equipment/shared/PriceBlock";
 import { FavButton } from "./equipment/shared/FavButton";
+import { buildFotoSrcSet } from "@/lib/srcset";
 
 /**
  * EquipmentRow — vista de lista del catálogo (desktop + mobile responsive).
@@ -103,6 +104,8 @@ export function EquipmentRow({
             {item.fotoUrl && !imgFailed ? (
               <img
                 src={item.fotoUrl}
+                srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm)}
+                sizes="52px"
                 alt={nombrePublico}
                 className="h-full w-full object-contain p-1.5"
                 loading={index < 4 ? "eager" : "lazy"}

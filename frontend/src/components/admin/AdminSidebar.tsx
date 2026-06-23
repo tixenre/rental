@@ -27,6 +27,7 @@ import {
   Calculator,
   GraduationCap,
   ShoppingCart,
+  AlertTriangle,
 } from "lucide-react";
 
 import {
@@ -101,6 +102,7 @@ const items: NavItem[] = [
   { title: "Novedades", url: "/admin/novedades", icon: Sparkles },
   { title: "Datos y backups", url: "/admin/dataio", icon: HardDriveDownload },
   { title: "Settings", url: "/admin/settings", icon: Settings },
+  { title: "Errores del servidor", url: "/admin/errores", icon: AlertTriangle },
 ];
 
 export function AdminSidebar({ email }: { email: string }) {

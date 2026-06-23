@@ -55,13 +55,17 @@ def _trim_and_square(img, padding_pct: float = 0.06):
     return canvas
 
 
-def _optimize_image(content: bytes, *, square: bool = True, fmt: str = "webp") -> tuple[bytes, str, int, int]:
+def _optimize_image(
+    content: bytes, *, square: bool = True, fmt: str = "webp", max_width: int | None = None
+) -> tuple[bytes, str, int, int]:
     """Optimiza la imagen y la guarda como WebP q=85 (o JPEG q=82 si fmt='jpeg').
     Devuelve (bytes, ct, w, h).
     Si algo falla, devuelve el contenido original como fallback.
 
-    - `square=True` → fotos de EQUIPOS: trim + cuadrado + fondo blanco + 1200×1200.
-    - `square=False` → branding/estudio (hero): mantiene aspect ratio, max 1600px.
+    - `square=True` → fotos de EQUIPOS: trim + cuadrado + fondo blanco, lado `max_width` (default 1200).
+    - `square=False` → branding/estudio (hero): mantiene aspect ratio, máx `max_width` (default 1600).
+
+    `max_width` permite derivar variantes más chicas para srcset (ej. 'display-sm' a 600).
     """
     try:
         from PIL import Image, ImageOps
@@ -82,7 +86,7 @@ def _optimize_image(content: bytes, *, square: bool = True, fmt: str = "webp") -
             except Exception as e:
                 logger.warning("optimize_image: trim_and_square falló, sigo sin trim: %s", e)
 
-            TARGET_SIDE = 1200
+            TARGET_SIDE = max_width or 1200
             if img.width > TARGET_SIDE:
                 img = img.resize((TARGET_SIDE, TARGET_SIDE), Image.Resampling.LANCZOS)
         else:
@@ -93,7 +97,7 @@ def _optimize_image(content: bytes, *, square: bool = True, fmt: str = "webp") -
             else:
                 img = img.convert("RGB")
 
-            MAX_SIDE = 1600
+            MAX_SIDE = max_width or 1600
             longest = max(img.width, img.height)
             if longest > MAX_SIDE:
                 scale = MAX_SIDE / longest

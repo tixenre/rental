@@ -56,6 +56,8 @@ blob-report
 # Claude Code SDK internal artifacts
 .claude/worktrees/
 .vite/
+.claude/skill-ledger.jsonl
+.claude/cola-state.json
 
 # Screenshots de auditoría UI (regenerables con .claude/skills/auditoria-profunda/ui-audit.mjs)
 docs/audit-ui-screenshots/

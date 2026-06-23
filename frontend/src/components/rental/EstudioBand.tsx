@@ -17,7 +17,9 @@ export function EstudioBand() {
       >
         {bandPhoto && (
           <img
-            src={bandPhoto}
+            src={bandPhoto.url}
+            srcSet={bandPhoto.urlSm ? `${bandPhoto.urlSm} 800w, ${bandPhoto.url} 1600w` : undefined}
+            sizes="(max-width: 768px) 100vw, 46vw"
             alt="El Estudio — Rambla Rental"
             className="w-full h-full object-cover block transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
             loading="lazy"
@@ -26,7 +28,7 @@ export function EstudioBand() {
       </Link>
       <div className="flex flex-col justify-center gap-5 p-[clamp(2.25rem,5vw,4rem)_clamp(1.5rem,4vw,3.5rem)]">
         <p
-          className="font-mono text-[0.6875rem] tracking-[0.2em] uppercase"
+          className="font-mono text-xs tracking-[0.2em] uppercase"
           style={{ color: "color-mix(in oklch, var(--amber) 80%, white)" }}
         >
           El Estudio
@@ -47,7 +49,7 @@ export function EstudioBand() {
           ].map((feature, i) => (
             <li
               key={i}
-              className="flex items-start gap-[11px] text-[0.9375rem] leading-[1.45] text-background/82"
+              className="flex items-start gap-[11px] text-15 leading-[1.45] text-background/82"
             >
               <span className="shrink-0 w-[22px] h-[22px] rounded-full bg-amber text-ink grid place-items-center mt-[1px]">
                 <Check size={13} strokeWidth={2.4} />
@@ -58,7 +60,7 @@ export function EstudioBand() {
         </ul>
         <Link
           to="/estudio"
-          className="inline-flex items-center gap-[9px] w-fit bg-amber text-ink rounded-full px-6 py-[13px] text-[0.9375rem] font-bold tracking-[-0.01em] transition-[gap,background] duration-[180ms] hover:gap-[13px] hover:brightness-110 active:scale-[0.97]"
+          className="inline-flex items-center gap-[9px] w-fit bg-amber text-ink rounded-full px-6 py-[13px] text-15 font-bold tracking-[-0.01em] transition-[gap,background] duration-[180ms] hover:gap-[13px] hover:brightness-110 active:scale-[0.97]"
         >
           Conocé el estudio <ArrowRight size={15} strokeWidth={2.4} />
         </Link>

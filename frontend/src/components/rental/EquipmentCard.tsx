@@ -8,7 +8,9 @@ import { type Equipment } from "@/data/equipment";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
+import { buildFotoSrcSet } from "@/lib/srcset";
 import { cn } from "@/lib/utils";
+import { Pill } from "@/design-system/kit/Pill";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { PriceBlock } from "./equipment/shared/PriceBlock";
 import { FavButton } from "./equipment/shared/FavButton";
@@ -102,6 +104,8 @@ export function EquipmentCard({
           {item.fotoUrl && !imgFailed ? (
             <img
               src={item.fotoUrl}
+              srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm)}
+              sizes="(max-width: 640px) 45vw, 250px"
               alt={nombrePublico}
               loading={index < 4 ? "eager" : "lazy"}
               decoding="async"
@@ -135,11 +139,14 @@ export function EquipmentCard({
         {/* No disponible overlay — rojo suave */}
         {sinStock && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-            <span className="rounded-full border border-destructive/30 bg-destructive/10 px-[10px] py-[5px] text-center font-mono text-2xs uppercase leading-snug tracking-[0.15em] text-destructive">
+            <Pill
+              tone="danger"
+              className="px-[10px] py-[5px] text-center font-mono uppercase leading-snug tracking-[0.15em]"
+            >
               {disponible !== undefined
                 ? "Sin disponibilidad en estas fechas"
                 : "Sin stock disponible"}
-            </span>
+            </Pill>
           </div>
         )}
 

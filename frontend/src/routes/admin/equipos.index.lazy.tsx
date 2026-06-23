@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
+import { Pill } from "@/design-system/kit/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Checkbox } from "@/design-system/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -745,13 +746,13 @@ function EquiposPage() {
                 </TableCell>
                 <TableCell>
                   {eq.visible_catalogo ? (
-                    <span className="inline-flex items-center rounded-full bg-verde/15 text-verde px-2 py-0.5 font-mono text-2xs font-bold uppercase tracking-[0.1em]">
+                    <Pill tone="success" className="font-mono font-bold uppercase tracking-[0.1em]">
                       Visible
-                    </span>
+                    </Pill>
                   ) : (
-                    <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 font-mono text-2xs font-bold uppercase tracking-[0.1em]">
+                    <Pill tone="neutral" className="font-mono font-bold uppercase tracking-[0.1em]">
                       Oculto
-                    </span>
+                    </Pill>
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">

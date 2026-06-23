@@ -28,6 +28,7 @@ import { EmptyImage } from "@/components/rental/EmptyImage";
 import { KitSection, BoxItemsSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";
 import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
+import { Pill } from "@/design-system/kit/Pill";
 import { SpecsGrid } from "@/components/rental/equipment/shared/SpecsGrid";
 import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { Lightbox } from "@/components/rental/Lightbox";
@@ -389,15 +390,15 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             </span>
           )}
           {item.destacado && (
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-amber/15 text-ink px-1.5 py-0.5">
+            <Pill className="gap-0.5 border-transparent bg-amber/15 px-1.5 text-ink">
               ★ destacado
-            </span>
+            </Pill>
           )}
           {faltantes.length > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber/10 border border-amber/30 text-amber px-2 py-0.5 text-2xs font-medium">
+            <Pill tone="warning" className="gap-1">
               <AlertTriangle className="h-2.5 w-2.5" />
               parcialmente disponible
-            </span>
+            </Pill>
           )}
         </div>
         <div className="flex items-start justify-between gap-3">

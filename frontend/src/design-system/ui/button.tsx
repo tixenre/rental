@@ -7,7 +7,7 @@ import { Spinner } from "@/design-system/ui/spinner";
 
 // eslint-disable-next-line react-refresh/only-export-components -- variantes cva del patrón shadcn; conviven con el componente Button en este archivo
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors [transition-duration:var(--duration-base)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition [transition-duration:var(--duration-base)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -73,8 +73,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading && !asChild ? true : undefined}
         {...props}
       >
-        {loading && !asChild ? <Spinner size="sm" /> : null}
-        {children}
+        {/* asChild ⇒ Comp es Radix Slot, que exige UN solo hijo: pasamos `children`
+            crudo (sin el `null` del spinner, que lo convertiría en [null, child] y
+            rompería React.Children.only). El loading no aplica con asChild. */}
+        {asChild ? (
+          children
+        ) : (
+          <>
+            {loading ? <Spinner size="sm" /> : null}
+            {children}
+          </>
+        )}
       </Comp>
     );
   },

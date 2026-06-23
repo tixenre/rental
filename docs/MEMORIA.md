@@ -41,7 +41,7 @@ branch default es **`main`**, se **auto-cierra al promover `dev → main`** (cua
 citar la issue, no solo el `#PR`. La **promoción `dev → main` reconcilia**: su PR lista las issues que
 cierra el lote → cierre en bloque con evidencia. Features grandes diferidas con label **`someday`**
 (separa lo diferido de la cola activa; no es deuda sin cerrar). Triage **liviano y seguido** vía skill
-`mantenimiento` (frente D): verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
+`cola`: verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
 tracking (no uno por fase).
 
 ### 2026-05-25 — Modus operandi durable, sesión efímera
@@ -241,6 +241,49 @@ overflows de admin estaban stale, los contrastes "1.66/1.73" eran del parser, y 
 (DESTACADA, `nombre_publico`) estaban bien. Contraste oklch → **recalcular del token**
 (OKLab→sRGB→WCAG), no creerle al parser. Refuerza _honestidad > actividad_ y _fijarse en el repo antes
 de implementar (2026-06-20)_; el detalle de método vive en el skill `auditoria-profunda`.
+
+### 2026-06-22 — CTA primario = ink + texto hueso (no dorado); el dorado es la jugada del hover
+
+El `variant="primary"` del `Button` es **fondo ink + texto hueso/bone** en reposo (`bg-ink text-background`) e
+invierte a **amber + ink** en hover. El texto hueso en reposo es **decisión de marca del dueño, NO un bug**:
+no "corregir" a dorado (el dorado es la jugada del hover, la _reverse signature_ ink↔amber). Materializa la
+_Filosofía de diseño del DS (2026-06-20)_ (una sola forma del CTA). El supervisor marca un CTA primario que
+vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente el gesto en vez de usar `<Button>`.
+
+### 2026-06-23 — Capa de skills auto-gobernada y portable: registro verificado + routing de modelo + loop de aprendizaje
+
+La capa de skills se gobierna como el código y la memoria (**fuente única + guardrail mecánico +
+propone-no-escribe**). El **mapa canónico** es la tabla "Skills — cuál uso para qué" de `CLAUDE.md` (árbol
+de decisión por disparador + columna **Modelo**); `scripts/check-docs.mjs` —config-driven vía
+`.claude/governance.config.mjs`, **portable a otros repos**— verifica que todo skill en disco esté listado
+ahí (Bloque 4) y bien formado (Bloque 5: frontmatter `name`/`description`/`model`/`last-reviewed`/`version`;
+staleness = warning). El **routing de modelo** materializa _Eficiencia de sesión (2026-05-26)_ en el `model:`
+de cada skill (criterio/diagnóstico→**opus**, ejecución→**sonnet**; los de criterio delegan la ejecución a
+subagentes `sonnet`). Blueprint del Curator de Hermes Agent, **nativo** (no un segundo agente). El **loop de
+aprendizaje** (Etapa 1B): buzón `docs/PROPUESTAS_SKILLS.md` (auto-mejora **propone**, el dueño aprueba),
+telemetría de uso por hook y check-in proactivo de la cola. Plantilla `.claude/skill-template.md` (fuera de
+`skillsDir`). El supervisor marca un skill en disco sin fila en `CLAUDE.md` o un `model:` que no pegue con el task.
+
+### 2026-06-23 — Gobernanza Etapa 2: Auto-mejora universal + meta-skill gobernanza (dashboard, auditoría, dry-run)
+
+**Auto-mejora propagada a todos los skills** (`mantenimiento`, `auditoria-profunda`, `pulido-frontend`,
+`importar-diseno`, `gear-compatibility`). El linter (Bloque 5 de `check-docs.mjs`) ahora **exige**
+`## Auto-mejora` en todo `SKILL.md` — skills sin ella fallan el CI. El **meta-skill `gobernanza`**
+(`.claude/skills/gobernanza/SKILL.md`, `model: opus`) implementa el loop completo: dashboard `/skills`
+(qué hay, último uso del ledger, staleness, propuestas pendientes), auditoría profunda de drift/overlap/
+bloat/routing de modelo, consumo del buzón + ledger, consolidación en modo **dry-run** (propone-no-borra,
+archiva a `.claude/skills/.archive/`), y cierre periódico mensual. Modo propone-aprobás en todos los pasos.
+El supervisor marca skills sin `## Auto-mejora` o un `gobernanza` que aplique cambios sin aprobación.
+
+### 2026-06-23 — cola = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
+
+Toda administración de la cola (reconciliar issues abiertos contra commits/PRs shippeados para cazar
+**hecho-pero-abierto**, triagear con evidencia, deduplicar trackers, etiquetar, intake de brain-dumps, reporte
+"¿cómo está la cola?") vive en el skill **`cola`** (`.claude/skills/cola/SKILL.md`), **fuente única**, para que
+tenga la atención continua y liviana que necesita. El **Frente D de `mantenimiento` apunta acá** (ya no duplica
+el método). Refina _Issues: la cola espeja el código (2026-06-08)_ y _Protocolo de brain-dumps (2026-05-25)_.
+Regla de oro: **cerrar es afirmar** → solo con evidencia (PR/commit) o la orden del dueño; el dueño dirige, la
+sesión recomienda.
 
 ---
 

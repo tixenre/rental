@@ -1,11 +1,13 @@
 """
 routes/talleres.py — Workshops públicos: listing, detalle, upload comprobante,
-inscripción + notificaciones por email. Vista admin (read-only) de inscripciones.
+inscripción + notificaciones por email. Vista admin: inscripciones + edición de contenido.
 """
 
 import logging
 import time
 import uuid
+
+import json as _json
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
@@ -52,7 +54,29 @@ def _get_taller(conn, slug: str):
     return row
 
 
+def _edicion_lite(row) -> dict:
+    """Datos mínimos de una edición para mostrar en la página de otra edición."""
+    keys = row.keys()
+    return {
+        "slug": row["slug"],
+        "numero_edicion": row["numero_edicion"] if "numero_edicion" in keys else 1,
+        "fecha_inicio": str(row["fecha_inicio"]),
+        "fecha_fin": str(row["fecha_fin"]),
+        "horario": row["horario"],
+        "cupos_total": row["cupos_total"],
+        "cupos_confirmados": row["cupos_confirmados"],
+        "cupos_disponibles": max(0, row["cupos_total"] - row["cupos_confirmados"]),
+        "precio_total": row["precio_total"],
+        "precio_sena": row["precio_sena"],
+        "pago_alias": row["pago_alias"],
+        "pago_cbu": row["pago_cbu"],
+        "pago_banco": row["pago_banco"],
+        "direccion": row["direccion"],
+    }
+
+
 def _taller_to_dict(row) -> dict:
+    keys = row.keys()
     return {
         "id": row["id"],
         "slug": row["slug"],
@@ -77,6 +101,9 @@ def _taller_to_dict(row) -> dict:
         "pago_cbu": row["pago_cbu"],
         "pago_banco": row["pago_banco"],
         "direccion": row["direccion"],
+        "instructor_foto_url": row["instructor_foto_url"] if "instructor_foto_url" in keys else "",
+        "numero_edicion": row["numero_edicion"] if "numero_edicion" in keys else 1,
+        "proxima_edicion_slug": row["proxima_edicion_slug"] if "proxima_edicion_slug" in keys else "",
     }
 
 
@@ -94,10 +121,26 @@ def list_talleres():
 
 @router.get("/talleres/{slug}")
 def get_taller(slug: str):
-    """Detalle de un taller."""
+    """Detalle de un taller. Incluye proxima_edicion y edicion_anterior si existen."""
     with get_db() as conn:
         row = _get_taller(conn, slug)
-    return _taller_to_dict(row)
+        d = _taller_to_dict(row)
+        # Proxima edicion
+        if d["proxima_edicion_slug"]:
+            pr = conn.execute(
+                "SELECT * FROM talleres WHERE slug = %s AND activo = TRUE",
+                (d["proxima_edicion_slug"],),
+            ).fetchone()
+            d["proxima_edicion"] = _edicion_lite(pr) if pr else None
+        else:
+            d["proxima_edicion"] = None
+        # Edicion anterior (cualquier taller que apunte a este slug como proxima)
+        ant = conn.execute(
+            "SELECT * FROM talleres WHERE proxima_edicion_slug = %s AND activo = TRUE LIMIT 1",
+            (slug,),
+        ).fetchone()
+        d["edicion_anterior"] = _edicion_lite(ant) if ant else None
+    return d
 
 
 @router.post("/talleres/{slug}/upload-comprobante")
@@ -191,6 +234,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
                 "UPDATE talleres SET cupos_confirmados = cupos_confirmados + 1 WHERE id = %s",
                 (taller["id"],),
             )
+        conn.commit()
 
     nombre_pila = nombre.split()[0]
     fecha_str = now_ar().strftime("%-d de %B de %Y, %H:%M hs")
@@ -233,6 +277,20 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
 
 # ── Endpoints admin ───────────────────────────────────────────────────────────
 
+FOTO_MAX_MB = 8
+
+
+class TallerUpdateBody(BaseModel):
+    nombre: str | None = None
+    subtitulo: str | None = None
+    descripcion: str | None = None
+    publico_objetivo: str | None = None
+    instructor_bio: str | None = None
+    instructor_proyectos: str | None = None
+    programa_teorica: list[str] | None = None
+    programa_practica: list[str] | None = None
+
+
 @router.get("/admin/talleres")
 def admin_list_talleres(request: Request):
     """Lista todos los talleres (admin)."""
@@ -242,6 +300,92 @@ def admin_list_talleres(request: Request):
             "SELECT * FROM talleres ORDER BY fecha_inicio DESC"
         ).fetchall()
     return [_taller_to_dict(r) for r in rows]
+
+
+@router.patch("/admin/talleres/{taller_id}")
+def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request):
+    """Actualiza campos editables del taller (descripción, textos, programa)."""
+    require_admin(request)
+    sets = []
+    params: list = []
+    if body.nombre is not None:
+        sets.append("nombre = %s"); params.append(body.nombre.strip())
+    if body.subtitulo is not None:
+        sets.append("subtitulo = %s"); params.append(body.subtitulo.strip())
+    if body.descripcion is not None:
+        sets.append("descripcion = %s"); params.append(body.descripcion.strip())
+    if body.publico_objetivo is not None:
+        sets.append("publico_objetivo = %s"); params.append(body.publico_objetivo.strip())
+    if body.instructor_bio is not None:
+        sets.append("instructor_bio = %s"); params.append(body.instructor_bio.strip())
+    if body.instructor_proyectos is not None:
+        sets.append("instructor_proyectos = %s"); params.append(body.instructor_proyectos.strip())
+    if body.programa_teorica is not None:
+        sets.append("programa_teorica = %s::jsonb")
+        params.append(_json.dumps(body.programa_teorica, ensure_ascii=False))
+    if body.programa_practica is not None:
+        sets.append("programa_practica = %s::jsonb")
+        params.append(_json.dumps(body.programa_practica, ensure_ascii=False))
+    if not sets:
+        raise HTTPException(400, "No hay campos para actualizar")
+    sets.append("updated_at = NOW()")
+    params.append(taller_id)
+    with get_db() as conn:
+        cur = conn.execute(
+            f"UPDATE talleres SET {', '.join(sets)} WHERE id = %s RETURNING id",
+            params,
+        )
+        if cur.fetchone() is None:
+            raise HTTPException(404, "Taller no encontrado")
+        conn.commit()
+        row = conn.execute("SELECT * FROM talleres WHERE id = %s", (taller_id,)).fetchone()
+    return _taller_to_dict(row)
+
+
+@router.post("/admin/talleres/{taller_id}/upload-foto-instructor")
+async def admin_upload_foto_instructor(taller_id: int, request: Request):
+    """Sube la foto de la instructora a R2 y actualiza instructor_foto_url."""
+    require_admin(request)
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id FROM talleres WHERE id = %s", (taller_id,)
+        ).fetchone()
+        if row is None:
+            raise HTTPException(404, "Taller no encontrado")
+
+    form = await request.form()
+    file = form.get("file")
+    if file is None or not hasattr(file, "read"):
+        raise HTTPException(400, "Falta el campo 'file' en el form-data")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Archivo vacío")
+    if len(raw) > FOTO_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, f"Archivo muy grande (máx {FOTO_MAX_MB} MB)")
+
+    content_type = getattr(file, "content_type", None) or "application/octet-stream"
+    ext_map = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+    ext = ext_map.get(content_type, "jpg")
+
+    ts = int(time.time() * 1000)
+    uid = uuid.uuid4().hex[:8]
+    key = f"talleres/{taller_id}/instructor-{ts}-{uid}.{ext}"
+
+    try:
+        url = _r2_put(key, raw, content_type)
+    except Exception as e:
+        logger.error("upload_foto_instructor: R2 error: %s", e)
+        raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")
+
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE talleres SET instructor_foto_url = %s, updated_at = NOW() WHERE id = %s",
+            (url, taller_id),
+        )
+        conn.commit()
+
+    return {"ok": True, "url": url}
 
 
 @router.get("/admin/talleres/{taller_id}/inscripciones")

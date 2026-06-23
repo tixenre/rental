@@ -87,6 +87,7 @@ export type BackendEquipo = {
   precio_jornada: number | null;
   precio_usd: number | null;
   foto_url: string | null;
+  foto_url_sm?: string | null; // variante 600px de la principal para srcset (puede faltar)
   estado: string;
   visible_catalogo: number;
   relevancia_manual?: number;
@@ -197,6 +198,7 @@ export function apiGetMarcs() {
 export type EstudioFoto = {
   id: number;
   url: string;
+  url_sm?: string | null; // variante 800px (keep-aspect) para srcset; null = sin backfill aún
   path: string | null;
   orden: number;
   es_principal: boolean;
@@ -307,6 +309,24 @@ export async function apiCrearReservaEstudio(body: EstudioReservaBody) {
 
 // ── Talleres ─────────────────────────────────────────────────────────────────
 
+/** Datos mínimos de una edición hermana (para mostrar en la página de otra edición). */
+export type EdicionLite = {
+  slug: string;
+  numero_edicion: number;
+  fecha_inicio: string;
+  fecha_fin: string;
+  horario: string;
+  cupos_total: number;
+  cupos_confirmados: number;
+  cupos_disponibles: number;
+  precio_total: number;
+  precio_sena: number;
+  pago_alias: string;
+  pago_cbu: string;
+  pago_banco: string;
+  direccion: string;
+};
+
 export type Taller = {
   id: number;
   slug: string;
@@ -331,6 +351,11 @@ export type Taller = {
   pago_cbu: string;
   pago_banco: string;
   direccion: string;
+  instructor_foto_url?: string;
+  numero_edicion: number;
+  proxima_edicion_slug: string;
+  proxima_edicion?: EdicionLite | null;
+  edicion_anterior?: EdicionLite | null;
 };
 
 export type InscripcionBody = {

@@ -6,7 +6,7 @@ export function TalleresBand() {
     <section className="bg-background border-y border-border/60">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col sm:flex-row items-center justify-between gap-8">
         <div className="flex flex-col gap-4 max-w-xl">
-          <p className="font-mono text-[0.6875rem] tracking-[0.25em] uppercase text-muted-foreground">
+          <p className="font-mono text-xs tracking-[0.25em] uppercase text-muted-foreground">
             Workshops & Talleres
           </p>
           <h2
@@ -15,13 +15,13 @@ export function TalleresBand() {
           >
             aprender haciendo.
           </h2>
-          <p className="text-[0.9375rem] leading-[1.5] text-muted-foreground">
+          <p className="text-15 leading-[1.5] text-muted-foreground">
             Clases prácticas de dirección de arte, fotografía y video en Rambla Estudio. Cupos
             limitados.
           </p>
           <Link
             to="/workshops"
-            className="inline-flex items-center gap-[9px] w-fit rounded-full border border-ink text-ink px-6 py-3 text-[0.9375rem] font-bold tracking-[-0.01em] transition-[gap,background] duration-[180ms] hover:gap-[13px] hover:bg-ink hover:text-background active:scale-[0.97]"
+            className="inline-flex items-center gap-[9px] w-fit rounded-full border border-ink text-ink px-6 py-3 text-15 font-bold tracking-[-0.01em] transition-[gap,background] duration-[180ms] hover:gap-[13px] hover:bg-ink hover:text-background active:scale-[0.97]"
           >
             Ver talleres <ArrowRight size={15} strokeWidth={2.4} />
           </Link>

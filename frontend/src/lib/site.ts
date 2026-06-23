@@ -9,8 +9,8 @@
  *
  * El backend tiene su propia fuente única (`config.SITE_URL`, env `SITE_URL`)
  * usada por sitemap y mails — mantener ambos alineados. Dominio canónico de
- * prod: https://www.ramblarental.com.ar
+ * prod: https://rambla.house
  */
 export const SITE_URL = (
-  (import.meta.env.VITE_SITE_URL as string | undefined) ?? "https://www.ramblarental.com.ar"
+  (import.meta.env.VITE_SITE_URL as string | undefined) ?? "https://rambla.house"
 ).replace(/\/+$/, "");

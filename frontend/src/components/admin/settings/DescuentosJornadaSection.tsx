@@ -77,7 +77,7 @@ export function DescuentosJornadaSection() {
                     <td className="px-3 py-2 tabular-nums font-medium">
                       {p.jornadas} {p.jornadas === 1 ? "día" : "días"}
                     </td>
-                    <td className="px-3 py-2 tabular-nums text-verde font-medium">{p.pct}%</td>
+                    <td className="px-3 py-2 tabular-nums text-verde-ink font-medium">{p.pct}%</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {pctMedio !== null ? `${medio} días → ${pctMedio}%` : "—"}
                     </td>

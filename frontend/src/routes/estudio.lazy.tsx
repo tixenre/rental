@@ -9,6 +9,7 @@ import { apiGetEstudio } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { Button } from "@/design-system/ui/button";
 
 export const Route = createLazyFileRoute("/estudio")({
   component: EstudioPage,
@@ -175,12 +176,14 @@ function MobileBookBar({ priceLabel }: { priceLabel: string }) {
           </div>
           <div className="truncate text-sm font-medium">{priceLabel}</div>
         </div>
-        <a
-          href="#reservar"
-          className="inline-flex items-center justify-center min-h-11 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-amber hover:brightness-110 transition shrink-0"
+        <Button
+          asChild
+          variant="primary"
+          shape="pill"
+          className="min-h-11 h-auto px-5 py-2.5 font-semibold shrink-0"
         >
-          Reservar
-        </a>
+          <a href="#reservar">Reservar</a>
+        </Button>
       </div>
     </div>
   );
@@ -303,12 +306,9 @@ function EstudioPage() {
               Ideal para rodajes grandes — flexible para los chicos.
             </p>
             <div className="mt-7 flex flex-wrap items-center gap-3">
-              <a
-                href="#reservar"
-                className="inline-flex items-center justify-center rounded-full bg-amber px-6 py-3 text-sm font-bold text-ink hover:brightness-105 transition"
-              >
-                Reservar
-              </a>
+              <Button asChild variant="amber" shape="pill" className="h-auto px-6 py-3 font-bold">
+                <a href="#reservar">Reservar</a>
+              </Button>
               <span className="inline-flex items-center rounded-full border border-background/20 px-4 py-2 font-mono text-xs text-background/70 tabular-nums whitespace-nowrap">
                 {priceLabel}
               </span>
@@ -366,7 +366,7 @@ function EstudioPage() {
               <h2 className="font-display font-black text-amber lowercase leading-[0.9] tracking-[-0.02em] text-[clamp(2.25rem,6vw,4rem)] mt-1">
                 ciclorama.
               </h2>
-              <p className="mt-5 max-w-sm text-[0.9375rem] leading-relaxed text-background/65">
+              <p className="mt-5 max-w-sm text-15 leading-relaxed text-background/65">
                 La curva continua elimina el horizonte. Fondo limpio, sin sombras, listo para usar —
                 sin postproducción.
               </p>
@@ -383,13 +383,17 @@ function EstudioPage() {
                   </span>
                 ))}
               </div>
-              <a
-                href="#reservar"
-                className="mt-8 self-start inline-flex items-center gap-2 rounded-full bg-amber px-5 py-2.5 text-sm font-bold text-ink hover:brightness-105 transition"
+              <Button
+                asChild
+                variant="amber"
+                shape="pill"
+                className="mt-8 self-start h-auto px-5 py-2.5 font-bold"
               >
-                Reservar el espacio
-                <ArrowRight className="h-3.5 w-3.5" />
-              </a>
+                <a href="#reservar">
+                  Reservar el espacio
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </a>
+              </Button>
             </div>
           </div>
           {/* Foto ciclorama */}
@@ -420,7 +424,7 @@ function EstudioPage() {
                     <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
                       {f.label}
                     </div>
-                    <div className="font-semibold text-[0.9375rem]">{f.value}</div>
+                    <div className="font-semibold text-15">{f.value}</div>
                   </div>
                 ))}
               </div>
@@ -443,7 +447,7 @@ function EstudioPage() {
                 <h2 className="font-display font-black lowercase leading-[0.95] text-ink text-[clamp(1.75rem,4vw,2.75rem)]">
                   reservá tu sesión.
                 </h2>
-                <p className="mt-2.5 max-w-md text-[0.9375rem] text-ink/65 leading-relaxed">
+                <p className="mt-2.5 max-w-md text-15 text-ink/65 leading-relaxed">
                   Mínimo {minHours} horas. Elegí día y horario — te contactamos para confirmar.
                 </p>
               </div>
@@ -468,7 +472,7 @@ function EstudioPage() {
                     ) : (
                       <div className="flex flex-col gap-2.5">
                         {STUDIO.addon.includes.map((item) => (
-                          <div key={item} className="flex gap-2.5 text-[0.8125rem] leading-relaxed">
+                          <div key={item} className="flex gap-2.5 text-sm leading-relaxed">
                             <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-ink shrink-0" />
                             <span>{item}</span>
                           </div>
@@ -476,7 +480,7 @@ function EstudioPage() {
                       </div>
                     )
                   ) : (
-                    <p className="text-[0.8125rem] text-ink/60 leading-relaxed">
+                    <p className="text-sm text-ink/60 leading-relaxed">
                       Seleccioná "Estudio + equipos" para ver qué incluye el pack de luces y
                       griperías.
                     </p>
@@ -497,7 +501,7 @@ function EstudioPage() {
               <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,3.5rem)]">
                 en acción.
               </h2>
-              <p className="mt-3 text-[0.9375rem] text-background/55 max-w-md">
+              <p className="mt-3 text-15 text-background/55 max-w-md">
                 Trabajos hechos por gente copada que pasó por el estudio.
               </p>
             </div>
@@ -520,7 +524,7 @@ function EstudioPage() {
                   <span className="rounded-full bg-amber/18 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber whitespace-nowrap">
                     {i % 2 === 0 ? "Fotografía" : "Video"}
                   </span>
-                  <span className="text-[0.8125rem] text-background/65 truncate">{photo.alt}</span>
+                  <span className="text-sm text-background/65 truncate">{photo.alt}</span>
                 </div>
               </div>
             ))}
@@ -538,9 +542,7 @@ function EstudioPage() {
                 <MapPin className="h-4 w-4 text-amber mt-0.5 shrink-0" />
                 <p className="text-base font-semibold leading-snug">{direccion}</p>
               </div>
-              <p className="text-[0.9375rem] text-muted-foreground leading-relaxed pl-7">
-                {comoLlegar}
-              </p>
+              <p className="text-15 text-muted-foreground leading-relaxed pl-7">{comoLlegar}</p>
               <div className="pl-7">
                 <a
                   href={verMapaHref}
@@ -578,7 +580,7 @@ function EstudioPage() {
                     key={item.q}
                     className="group rounded-xl border hairline bg-surface overflow-hidden"
                   >
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 font-semibold text-[0.9375rem] select-none">
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 font-semibold text-15 select-none">
                       {item.q}
                       <span className="text-muted-foreground shrink-0 transition-transform group-open:rotate-180">
                         ▾
@@ -602,18 +604,24 @@ function EstudioPage() {
             <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,4rem)]">
               hablemos.
             </h2>
-            <p className="mt-4 text-[0.9375rem] leading-relaxed text-amber/65 max-w-sm">
+            <p className="mt-4 text-15 leading-relaxed text-amber/65 max-w-sm">
               Te respondemos en el día. Contanos qué necesitás y armamos un presupuesto a medida.
             </p>
-            <a
-              href={`https://wa.me/${STUDIO_PHONE}?text=${encodeURIComponent("Hola Rambla! Quería consultar por el estudio.")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-7 inline-flex items-center gap-2 rounded-full bg-amber px-6 py-3 text-[0.9375rem] font-bold text-ink hover:brightness-105 transition"
+            <Button
+              asChild
+              variant="amber"
+              shape="pill"
+              className="mt-7 h-auto px-6 py-3 text-15 font-bold"
             >
-              <MessageCircle className="h-4 w-4" />
-              Escribir por WhatsApp
-            </a>
+              <a
+                href={`https://wa.me/${STUDIO_PHONE}?text=${encodeURIComponent("Hola Rambla! Quería consultar por el estudio.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Escribir por WhatsApp
+              </a>
+            </Button>
           </div>
         </section>
       </main>
