@@ -433,7 +433,7 @@ export default function ClientePortal() {
                     label="A pagar"
                     value={pendientePago > 0 ? fmt(pendientePago) : "$ 0"}
                     meta={pendientePago > 0 ? "saldo pendiente" : "todo al día"}
-                    valueClassName={pendientePago === 0 ? "text-verde" : undefined}
+                    valueClassName={pendientePago === 0 ? "text-verde-ink" : undefined}
                   />
                   <StatCard
                     label="Histórico"

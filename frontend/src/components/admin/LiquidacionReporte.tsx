@@ -234,7 +234,7 @@ export function LiquidacionReporte() {
       </p>
 
       {recon && recon.ok && (
-        <div className="flex items-center gap-2 rounded-md border hairline border-verde/30 bg-verde/5 px-3 py-2 text-sm text-verde">
+        <div className="flex items-center gap-2 rounded-md border hairline border-verde/30 bg-verde/5 px-3 py-2 text-sm text-verde-ink">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           Datos de liquidación consistentes.
         </div>

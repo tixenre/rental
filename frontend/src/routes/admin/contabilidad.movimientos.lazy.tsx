@@ -83,7 +83,7 @@ function direccionMov(m: Movimiento): Direccion {
   return "neutral";
 }
 function montoClass(dir: Direccion): string {
-  return dir === "in" ? "text-verde" : dir === "out" ? "text-destructive" : "text-ink";
+  return dir === "in" ? "text-verde-ink" : dir === "out" ? "text-destructive" : "text-ink";
 }
 function montoSigno(dir: Direccion): string {
   return dir === "in" ? "+ " : dir === "out" ? "− " : "";
@@ -332,7 +332,7 @@ function CobroRow({ cobro }: { cobro: CobroMensual }) {
           </Link>
         </div>
       </td>
-      <td className="px-3 py-2 text-right font-mono tabular-nums text-verde">
+      <td className="px-3 py-2 text-right font-mono tabular-nums text-verde-ink">
         + {formatMoney(cobro.monto, "ARS")}
       </td>
       <td className="px-3 py-2 text-right text-xs text-muted-foreground">automático</td>

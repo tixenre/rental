@@ -1112,7 +1112,7 @@ export function EquipoFormDialogV2({
                 )}
               </Button>
               {htmlSourceUrl && (
-                <span className="flex items-center gap-1 text-xs text-verde font-medium">
+                <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
                   <FileCode className="h-3 w-3" /> HTML guardado
                 </span>
               )}

@@ -471,7 +471,7 @@ function SortableItem({
           {esencial ? (
             <>
               <ShieldCheck className="h-3.5 w-3.5 text-verde" />
-              <span className="text-verde font-medium">Esencial</span>
+              <span className="text-verde-ink font-medium">Esencial</span>
             </>
           ) : (
             <>

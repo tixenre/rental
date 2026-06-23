@@ -207,7 +207,7 @@ function SocioCard({
     socio.estado === "deudor"
       ? "text-destructive"
       : socio.estado === "acreedor"
-        ? "text-verde"
+        ? "text-verde-ink"
         : "text-ink";
   const tag =
     socio.estado === "deudor" ? "Deudor" : socio.estado === "acreedor" ? "Acreedor" : "Saldado";
@@ -215,7 +215,7 @@ function SocioCard({
     socio.estado === "deudor"
       ? "bg-destructive/10 text-destructive"
       : socio.estado === "acreedor"
-        ? "bg-verde/10 text-verde"
+        ? "bg-verde/10 text-verde-ink"
         : "bg-muted text-muted-foreground";
 
   return (
