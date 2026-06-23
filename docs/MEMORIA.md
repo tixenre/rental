@@ -306,6 +306,15 @@ Core Web Vitals); **`specs`** (taxonomía de specs de equipos: consistencia, gap
 de módulos críticos, calidad de assertions, edge cases sin tests). Todos son read-only y siguen el patrón
 propone-aprobás. `scripts/check-docs.mjs` los verifica como al resto.
 
+### 2026-06-23 — docs/MARCA.md = hub de marca; skill `marca` gobierna el inventario de features
+
+**`docs/MARCA.md`** es la fuente canónica de identidad de marca: quiénes somos, selling points por área
+(rental completo; estudio y workshops con `[TODO]` para que el dueño complete), voz/tono (referencia a
+`DESIGN_SYSTEM.md`), assets canónicos (URL, handle Instagram, rutas de logo). El inventario detallado de
+features de cara al usuario vive en **`docs/CAMPAÑA_FEATURES.md`** (no se duplica). El skill **`marca`**
+(`model: opus`, read-only) audita que las features reales de la app estén reflejadas en ambos docs, detecta
+features nuevas sin comunicar y selling points stale, y propone borradores de copy para aprobación del dueño.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
