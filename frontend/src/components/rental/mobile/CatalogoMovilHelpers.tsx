@@ -39,6 +39,7 @@ import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
+import { buildFotoSrcSet } from "@/lib/srcset";
 
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
@@ -263,6 +264,8 @@ function CartItem({
         {eq.fotoUrl && !imgFailed ? (
           <img
             src={eq.fotoUrl}
+            srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+            sizes="44px"
             alt={eq.name}
             className="w-full h-full object-contain p-1"
             loading="lazy"
@@ -743,6 +746,8 @@ export function FichaSheet({
             {eq.fotoUrl && !imgFailed ? (
               <img
                 src={eq.fotoUrl}
+                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+                sizes="(max-width: 640px) 92vw, 400px"
                 alt={eq.name}
                 className="w-full h-full object-contain p-4"
                 loading="lazy"
@@ -930,6 +935,8 @@ export function EquipmentRow({
             {eq.fotoUrl && !imgFailed ? (
               <img
                 src={eq.fotoUrl}
+                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+                sizes="48px"
                 alt={nombrePublico}
                 className="h-full w-full object-contain p-1.5"
                 loading="lazy"

@@ -87,6 +87,7 @@ export type BackendEquipo = {
   precio_jornada: number | null;
   precio_usd: number | null;
   foto_url: string | null;
+  foto_url_sm?: string | null; // variante 600px de la principal para srcset (puede faltar)
   estado: string;
   visible_catalogo: number;
   relevancia_manual?: number;

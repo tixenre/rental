@@ -80,6 +80,7 @@ def _init_db_schema(conn):
             roi_pct          FLOAT,
             valor_reposicion FLOAT,
             foto_url         TEXT,
+            foto_url_sm      TEXT,   -- variante 600px de la foto principal para srcset (NULL = sin variante → el front usa foto_url)
             fecha_compra     DATE,
             serie            TEXT,
             bh_url           TEXT,
