@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link, notFound } from "@tanstack/react-router";
-import { Calendar, MapPin, Users, CheckCircle2, Clock } from "lucide-react";
+import { Calendar, MapPin, Users, CheckCircle2, Clock, X } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { Logo } from "@/components/rental/Logo";
@@ -75,6 +76,62 @@ function EdicionBadge({
   );
 }
 
+function SoldOutModal({
+  proxima,
+  onDismiss,
+}: {
+  proxima: EdicionLite;
+  onDismiss: () => void;
+}) {
+  const opts: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" };
+  const fechaA = new Date(proxima.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", opts);
+  const fechaB = new Date(proxima.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", opts);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+      style={{ background: "oklch(0.15 0 0 / 65%)" }}
+      onClick={(e) => e.target === e.currentTarget && onDismiss()}
+    >
+      <div className="relative w-full max-w-sm rounded-2xl bg-background border border-border/60 p-7 shadow-2xl">
+        <button
+          onClick={onDismiss}
+          aria-label="Cerrar"
+          className="absolute top-4 right-4 p-1.5 rounded-full text-muted-foreground hover:text-ink hover:bg-muted transition"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-3">
+          1ra edición
+        </p>
+        <h2
+          className="font-display font-bold lowercase text-ink leading-tight mb-2"
+          style={{ fontSize: "1.6rem" }}
+        >
+          los cupos se agotaron
+        </h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Pero hay lugar en la{" "}
+          <strong className="text-ink">2da edición</strong> —{" "}
+          {fechaA} y {fechaB}.
+        </p>
+        <a
+          href="#inscripcion"
+          onClick={onDismiss}
+          className="flex items-center justify-center w-full rounded-full bg-rosa text-ink font-bold py-3 hover:brightness-110 active:scale-[0.97] transition-all"
+        >
+          Inscribirme en la 2da edición
+        </a>
+        <button
+          onClick={onDismiss}
+          className="w-full mt-3 text-sm text-muted-foreground hover:text-ink transition py-1"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function TallerLandingPage() {
   const { slug } = Route.useParams();
   const {
@@ -86,6 +143,9 @@ function TallerLandingPage() {
     queryFn: () => apiGetTaller(slug),
     staleTime: 1000 * 60 * 5,
   });
+
+  // Hook antes del early-return (regla de hooks de React)
+  const [soldOutModalDismissed, setSoldOutModalDismissed] = useState(false);
 
   if (isLoading) {
     return (
@@ -99,14 +159,6 @@ function TallerLandingPage() {
     throw notFound();
   }
 
-  const fechaInicio = new Date(taller.fecha_inicio + "T12:00:00");
-  const fechaFin = new Date(taller.fecha_fin + "T12:00:00");
-  const optsLong: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" };
-  const fechaInicioStr = fechaInicio.toLocaleDateString("es-AR", optsLong);
-  const fechaFinStr = fechaFin.toLocaleDateString("es-AR", optsLong);
-
-  // Cuando la edición actual está sold out y hay una próxima con cupos, el form
-  // apunta directamente a la próxima edición (sin lista de espera).
   const proxima = taller.proxima_edicion;
   const switchToProxima =
     taller.cupos_disponibles === 0 && proxima != null && proxima.cupos_disponibles > 0;
@@ -114,7 +166,19 @@ function TallerLandingPage() {
     ? ({ ...taller, ...proxima } as Taller)
     : taller;
 
+  // Cuando está sold out, las fechas de toda la página muestran la 2da edición
+  const optsLong: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" };
+  const fechaInicio = new Date(formTaller.fecha_inicio + "T12:00:00");
+  const fechaFin = new Date(formTaller.fecha_fin + "T12:00:00");
+  const fechaInicioStr = fechaInicio.toLocaleDateString("es-AR", optsLong);
+  const fechaFinStr = fechaFin.toLocaleDateString("es-AR", optsLong);
+
+
   return (
+    <>
+      {switchToProxima && !soldOutModalDismissed && (
+        <SoldOutModal proxima={proxima!} onDismiss={() => setSoldOutModalDismissed(true)} />
+      )}
     <PublicLayout
       topBar={{ variant: "workshops", cta: { label: "Inscribirme", href: "#inscripcion" } }}
     >
@@ -364,5 +428,6 @@ function TallerLandingPage() {
         </footer>
       </div>
     </PublicLayout>
+    </>
   );
 }
