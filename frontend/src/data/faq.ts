@@ -4,8 +4,9 @@
  * Separadas de las del Estudio (data/studio.ts) — el estudio tiene su FAQ
  * propia más enfocada en la operativa del espacio.
  *
- * TODO: revisar respuestas con el dueño antes de publicar al público.
- * Las marcadas con [BORRADOR] son redacción tentativa.
+ * Esto es el DEFAULT (fallback). La fuente editable vive en el setting
+ * `faq_json` (app_settings), que el admin edita desde /admin/settings →
+ * sección "Preguntas frecuentes". Ver `useFaqGroups()` más abajo.
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -55,27 +56,27 @@ export const FAQ_GROUPS: FaqGroup[] = [
         a:
           "Buscá el equipo en el catálogo, agregalo al carrito y elegí las fechas. " +
           "Después confirmás la cotización y te respondemos por WhatsApp para " +
-          "coordinar retiro y forma de pago.",
+          "coordinar el retiro y la forma de pago.",
       },
       {
         q: "¿Cuánto tiempo antes tengo que reservar?",
         a:
-          "[BORRADOR] Idealmente con 48-72 hs de anticipación para asegurar " +
-          "disponibilidad, sobre todo en fines de semana largos. Para reservas " +
-          "más urgentes escribinos por WhatsApp.",
+          "Idealmente con 48 a 72 hs de anticipación para asegurar disponibilidad. " +
+          "Para consultas o reservas urgentes, escribinos por WhatsApp y lo vemos.",
       },
       {
         q: "¿Puedo modificar o cancelar una reserva?",
         a:
-          "[BORRADOR] Sí, podés modificar fechas o equipos hasta 24 hs antes " +
-          "del retiro sin costo. Cancelaciones con menos aviso pueden tener costo " +
-          "de reserva.",
+          "Sí. Si necesitás cambiar las fechas, los equipos o cancelar, escribinos " +
+          "por WhatsApp lo antes posible y lo resolvemos juntos. Cuanto más aviso " +
+          "nos des, más fácil es reacomodar todo.",
       },
       {
         q: "¿Puedo ver el equipo antes de retirarlo?",
         a:
-          "Sí, podés pasar por el local en horario de atención. También se hace " +
-          "una verificación juntos al momento del retiro.",
+          "Sí. Coordinando antes con nosotros podés pasar por el local a verlo. " +
+          "Además, al momento del retiro revisamos juntos el equipo para que salgas " +
+          "sabiendo que está todo en orden.",
       },
     ],
   },
@@ -92,15 +93,15 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         q: "¿Necesito dejar un depósito?",
         a:
-          "[BORRADOR] Para equipos de mayor valor pedimos un depósito en garantía " +
-          "que se devuelve al regresar el equipo en buenas condiciones. Para clientes " +
-          "habituales con cuenta puede no ser necesario.",
+          "En algunos casos, según el equipo, podemos pedir un depósito en garantía " +
+          "que se devuelve al regresar el equipo en buenas condiciones. Si aplica a " +
+          "tu reserva, te lo avisamos al confirmarla.",
       },
       {
         q: "¿Hacen factura?",
         a:
-          "[BORRADOR] Sí, emitimos factura A o B según necesidad. Avisanos al " +
-          "momento de la reserva.",
+          "Sí. Avisanos al momento de la reserva que necesitás factura y qué tipo, " +
+          "y la coordinamos.",
       },
     ],
   },
@@ -108,24 +109,27 @@ export const FAQ_GROUPS: FaqGroup[] = [
     title: "Retiro y devolución",
     items: [
       {
-        q: "¿Hacen envíos / pueden ir a buscar el equipo?",
+        q: "¿Hacen envíos o pueden ir a buscar el equipo?",
         a:
-          "[BORRADOR] Por defecto el retiro y devolución son en nuestro local en " +
-          "Mar del Plata. Para producciones grandes podemos coordinar logística " +
-          "en la ciudad — consultanos.",
+          "Por defecto, el retiro y la devolución son en nuestro local de Mar del " +
+          "Plata. Para producciones grandes podemos coordinar logística dentro de la " +
+          "ciudad — consultanos y lo vemos según el caso.",
       },
       {
         q: "¿Qué necesito presentar al retirar?",
         a:
-          "[BORRADOR] DNI vigente y comprobante de la seña. Para clientes nuevos " +
-          "también pedimos un segundo documento o referencia.",
+          "Un documento de identidad vigente y el comprobante de la seña. Si es tu " +
+          "primera vez con nosotros, puede que te pidamos algún dato adicional; " +
+          "cualquier requisito puntual te lo aclaramos al confirmar la reserva.",
       },
       {
         q: "¿Qué pasa si devuelvo el equipo más tarde?",
         a:
-          "[BORRADOR] Avisanos lo antes posible. Demoras de algunas horas suelen " +
-          "no tener costo si no afectan otra reserva. Demoras mayores se cobran " +
-          "como jornadas adicionales.",
+          "Avisanos lo antes posible. Una demora de algunas horas no suele tener " +
+          "costo si no afecta a otra reserva, pero como dejamos un margen de " +
+          "preparación entre alquileres, devolver tarde puede complicar la entrega " +
+          "siguiente. Las demoras que pasan a otra jornada se cobran como jornadas " +
+          "adicionales.",
       },
     ],
   },
@@ -135,16 +139,16 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         q: "¿Qué pasa si se rompe el equipo?",
         a:
-          "[BORRADOR] Si el daño es por uso normal y razonable lo cubre Rambla. " +
-          "Daños por negligencia, mal uso o accidente quedan a cargo del cliente. " +
-          "Cobramos el costo de reparación o reposición según corresponda.",
+          "Si el daño es por uso normal y razonable, lo cubre Rambla. Los daños por " +
+          "negligencia, mal uso o accidente quedan a cargo del cliente: se cobra el " +
+          "costo de reparación o reposición según corresponda. Ante cualquier " +
+          "inconveniente con un equipo, avisanos enseguida.",
       },
       {
-        q: "¿Tienen seguro propio?",
+        q: "¿Necesito un seguro para alquilar?",
         a:
-          "[BORRADOR] Los equipos están cubiertos para uso interno. Para producciones " +
-          "que requieran seguro técnico específico, consultanos antes — podemos " +
-          "ayudarte a contratar uno por la fecha del rodaje.",
+          "Para un alquiler común no hace falta. Si tu producción requiere un seguro " +
+          "técnico específico, escribinos antes y lo vemos según el caso.",
       },
     ],
   },
@@ -162,9 +166,11 @@ export const FAQ_GROUPS: FaqGroup[] = [
       {
         q: "¿En qué horarios puedo retirar y devolver?",
         a:
-          "Trabajamos con horarios de atención que pueden variar según el día de la " +
-          "semana. Cuando elegís las fechas, el sistema te muestra solo los horarios " +
-          "disponibles de cada día — los días en que estamos cerrados no se pueden elegir.",
+          "Cuando elegís las fechas, el sistema te muestra los horarios de cada día " +
+          "según nuestra configuración (los días cerrados no se pueden elegir). Son " +
+          "horarios de referencia: que figuren disponibles no significa que estemos " +
+          "en el local en ese momento. Coordiná siempre el retiro y la devolución con " +
+          "nosotros por WhatsApp antes de venir.",
       },
       {
         q: "¿Cómo sé si un equipo está disponible en mis fechas?",
