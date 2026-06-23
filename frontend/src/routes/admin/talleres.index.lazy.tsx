@@ -109,7 +109,7 @@ function TalleresAdminPage() {
               {taller.cupos_total} cupos confirmados
             </span>
             {taller.cupos_disponibles > 0 ? (
-              <span className="text-verde">{taller.cupos_disponibles} disponibles</span>
+              <span className="text-verde-ink">{taller.cupos_disponibles} disponibles</span>
             ) : (
               <span className="text-amber">Sin cupos — lista de espera activa</span>
             )}

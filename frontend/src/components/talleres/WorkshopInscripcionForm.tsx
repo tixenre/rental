@@ -235,7 +235,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm text-verde">
+              <div className="flex items-center gap-2 text-sm text-verde-ink">
                 <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                 <span className="truncate">{upload.fileName}</span>
               </div>

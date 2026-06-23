@@ -407,7 +407,7 @@ function PedidoEditorPage() {
                       className={cn(
                         "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-2xs",
                         p.cliente_dni_validado_at
-                          ? "bg-verde/10 text-verde"
+                          ? "bg-verde/10 text-verde-ink"
                           : "bg-amber/15 text-ink",
                       )}
                     >
@@ -496,7 +496,7 @@ function PedidoEditorPage() {
                   <AlertTriangle className="h-3 w-3" /> revisar stock
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.2em] text-verde">
+                <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.2em] text-verde-ink">
                   <Check className="h-3 w-3" /> stock OK
                 </span>
               )
@@ -729,7 +729,7 @@ function PedidoEditorPage() {
               <span
                 className={cn(
                   "font-mono text-xs font-semibold",
-                  pagadoMonto >= total && total > 0 ? "text-verde" : "text-destructive",
+                  pagadoMonto >= total && total > 0 ? "text-verde-ink" : "text-destructive",
                 )}
               >
                 {pagadoMonto >= total && total > 0 ? "pagado" : `resta ${fmtArs(restante)}`}
@@ -963,7 +963,7 @@ function FlowStrip({ estado }: { estado: PedidoEstado }) {
           <span
             className={cn(
               "font-mono text-2xs",
-              i < idx && "text-verde",
+              i < idx && "text-verde-ink",
               i === idx && "text-ink font-semibold",
               i > idx && "text-muted-foreground/60",
             )}

@@ -451,7 +451,7 @@ function EmailLogRow({ entry }: { entry: EmailLogEntry }) {
         <span
           className={`inline-block rounded-full px-2 py-0.5 text-2xs font-medium ${
             ok
-              ? "bg-verde/10 text-verde border border-verde/30"
+              ? "bg-verde/10 text-verde-ink border border-verde/30"
               : failed
                 ? "bg-destructive/10 text-destructive border border-destructive/30"
                 : "bg-muted/40 text-muted-foreground border hairline"

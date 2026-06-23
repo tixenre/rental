@@ -443,7 +443,7 @@ export function SpecTemplateFormModal({
                     }
                   >
                     <div className="flex items-center gap-1.5">
-                      {d.validado && <span className="text-verde">✓</span>}
+                      {d.validado && <span className="text-verde-ink">✓</span>}
                       <span className="text-ink font-medium">{d.label}</span>
                       <span className="font-mono text-3xs text-muted-foreground">{d.spec_key}</span>
                       <span className="text-3xs text-muted-foreground ml-auto">

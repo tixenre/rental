@@ -89,7 +89,7 @@ export function RankingSection() {
                         {c.antes.score} → {c.despues.score}
                       </span>
                       <span
-                        className={`tabular shrink-0 inline-flex items-center gap-0.5 ${delta > 0 ? "text-verde" : delta < 0 ? "text-destructive" : "text-muted-foreground"}`}
+                        className={`tabular shrink-0 inline-flex items-center gap-0.5 ${delta > 0 ? "text-verde-ink" : delta < 0 ? "text-destructive" : "text-muted-foreground"}`}
                       >
                         {delta > 0 ? (
                           <TrendingUp className="h-3 w-3" />

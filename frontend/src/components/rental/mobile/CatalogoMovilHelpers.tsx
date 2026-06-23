@@ -572,7 +572,7 @@ export function CartSheet({
                       −{descuentoPct}%
                     </span>
                   </div>
-                  <span className="font-mono text-sm font-semibold text-verde tabular-nums">
+                  <span className="font-mono text-sm font-semibold text-verde-ink tabular-nums">
                     −{formatARS(descuentoMonto)}
                   </span>
                 </div>

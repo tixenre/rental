@@ -24,7 +24,7 @@ export const AREAS = {
     desc: "Set de foto y video",
     href: "/estudio",
     bg: "bg-naranja",
-    fg: "text-white",
+    fg: "text-ink",
     accent: "text-naranja",
   },
   workshops: {
