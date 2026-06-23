@@ -54,7 +54,29 @@ def _get_taller(conn, slug: str):
     return row
 
 
+def _edicion_lite(row) -> dict:
+    """Datos mínimos de una edición para mostrar en la página de otra edición."""
+    keys = row.keys()
+    return {
+        "slug": row["slug"],
+        "numero_edicion": row["numero_edicion"] if "numero_edicion" in keys else 1,
+        "fecha_inicio": str(row["fecha_inicio"]),
+        "fecha_fin": str(row["fecha_fin"]),
+        "horario": row["horario"],
+        "cupos_total": row["cupos_total"],
+        "cupos_confirmados": row["cupos_confirmados"],
+        "cupos_disponibles": max(0, row["cupos_total"] - row["cupos_confirmados"]),
+        "precio_total": row["precio_total"],
+        "precio_sena": row["precio_sena"],
+        "pago_alias": row["pago_alias"],
+        "pago_cbu": row["pago_cbu"],
+        "pago_banco": row["pago_banco"],
+        "direccion": row["direccion"],
+    }
+
+
 def _taller_to_dict(row) -> dict:
+    keys = row.keys()
     return {
         "id": row["id"],
         "slug": row["slug"],
@@ -79,7 +101,9 @@ def _taller_to_dict(row) -> dict:
         "pago_cbu": row["pago_cbu"],
         "pago_banco": row["pago_banco"],
         "direccion": row["direccion"],
-        "instructor_foto_url": row["instructor_foto_url"] if "instructor_foto_url" in row.keys() else "",
+        "instructor_foto_url": row["instructor_foto_url"] if "instructor_foto_url" in keys else "",
+        "numero_edicion": row["numero_edicion"] if "numero_edicion" in keys else 1,
+        "proxima_edicion_slug": row["proxima_edicion_slug"] if "proxima_edicion_slug" in keys else "",
     }
 
 
@@ -97,10 +121,26 @@ def list_talleres():
 
 @router.get("/talleres/{slug}")
 def get_taller(slug: str):
-    """Detalle de un taller."""
+    """Detalle de un taller. Incluye proxima_edicion y edicion_anterior si existen."""
     with get_db() as conn:
         row = _get_taller(conn, slug)
-    return _taller_to_dict(row)
+        d = _taller_to_dict(row)
+        # Proxima edicion
+        if d["proxima_edicion_slug"]:
+            pr = conn.execute(
+                "SELECT * FROM talleres WHERE slug = %s AND activo = TRUE",
+                (d["proxima_edicion_slug"],),
+            ).fetchone()
+            d["proxima_edicion"] = _edicion_lite(pr) if pr else None
+        else:
+            d["proxima_edicion"] = None
+        # Edicion anterior (cualquier taller que apunte a este slug como proxima)
+        ant = conn.execute(
+            "SELECT * FROM talleres WHERE proxima_edicion_slug = %s AND activo = TRUE LIMIT 1",
+            (slug,),
+        ).fetchone()
+        d["edicion_anterior"] = _edicion_lite(ant) if ant else None
+    return d
 
 
 @router.post("/talleres/{slug}/upload-comprobante")

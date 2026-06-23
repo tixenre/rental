@@ -5,7 +5,7 @@ import { Calendar, MapPin, Users, CheckCircle2, Clock } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { Logo } from "@/components/rental/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
-import { apiGetTaller, type Taller } from "@/lib/api";
+import { apiGetTaller, type EdicionLite, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 
 export const Route = createLazyFileRoute("/workshops/$slug")({
@@ -31,6 +31,47 @@ function ProgramaItem({ text, index }: { text: string; index: number }) {
       </span>
       <span className="text-sm leading-relaxed text-muted-foreground">{text}</span>
     </li>
+  );
+}
+
+function ordinalEdicion(n: number): string {
+  const map: Record<number, string> = { 1: "1ra", 2: "2da", 3: "3ra", 4: "4ta" };
+  return map[n] ?? `${n}ta`;
+}
+
+function EdicionBadge({
+  edicion,
+  activa,
+}: {
+  edicion: EdicionLite & { nombre?: string };
+  activa: boolean;
+}) {
+  const soldOut = edicion.cupos_disponibles === 0;
+  const label = `${ordinalEdicion(edicion.numero_edicion)} edición`;
+  const status = soldOut ? "sold out" : `${edicion.cupos_disponibles} cupos`;
+  const className = activa
+    ? "inline-flex items-center gap-1.5 rounded-full border border-background/40 bg-background/15 px-3 py-1.5 text-xs font-semibold text-background"
+    : soldOut
+      ? "inline-flex items-center gap-1.5 rounded-full border border-background/20 px-3 py-1.5 text-xs text-background/40 line-through-status"
+      : "inline-flex items-center gap-1.5 rounded-full border border-background/25 px-3 py-1.5 text-xs text-background/60";
+
+  if (activa) {
+    return (
+      <span className={className}>
+        {label} <span className="opacity-60">—</span> {status}
+      </span>
+    );
+  }
+  return (
+    <Link
+      to="/workshops/$slug"
+      params={{ slug: edicion.slug }}
+      className={className}
+      style={soldOut ? { opacity: 0.5 } : undefined}
+    >
+      {label} <span className="opacity-50">—</span>{" "}
+      {soldOut ? <s>{status}</s> : status}
+    </Link>
   );
 }
 
@@ -64,6 +105,15 @@ function TallerLandingPage() {
   const fechaInicioStr = fechaInicio.toLocaleDateString("es-AR", optsLong);
   const fechaFinStr = fechaFin.toLocaleDateString("es-AR", optsLong);
 
+  // Cuando la edición actual está sold out y hay una próxima con cupos, el form
+  // apunta directamente a la próxima edición (sin lista de espera).
+  const proxima = taller.proxima_edicion;
+  const switchToProxima =
+    taller.cupos_disponibles === 0 && proxima != null && proxima.cupos_disponibles > 0;
+  const formTaller: Taller = switchToProxima
+    ? ({ ...taller, ...proxima } as Taller)
+    : taller;
+
   return (
     <PublicLayout
       topBar={{ variant: "workshops", cta: { label: "Inscribirme", href: "#inscripcion" } }}
@@ -89,6 +139,22 @@ function TallerLandingPage() {
             >
               {taller.subtitulo}
             </p>
+
+            {/* Badges de edición */}
+            {(taller.edicion_anterior || taller.proxima_edicion) && (
+              <div className="mt-6 flex flex-wrap gap-2">
+                {taller.edicion_anterior && (
+                  <EdicionBadge edicion={taller.edicion_anterior} activa={false} />
+                )}
+                <EdicionBadge
+                  edicion={{ ...taller, cupos_disponibles: taller.cupos_disponibles }}
+                  activa={true}
+                />
+                {taller.proxima_edicion && (
+                  <EdicionBadge edicion={taller.proxima_edicion} activa={false} />
+                )}
+              </div>
+            )}
 
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-background/60">
               <span className="flex items-center gap-2">
@@ -259,7 +325,28 @@ function TallerLandingPage() {
 
               {/* Formulario de inscripción */}
               <div id="inscripcion" className="scroll-mt-20">
-                <WorkshopInscripcionForm taller={taller} />
+                {switchToProxima && (
+                  <div className="mb-4 rounded-xl border border-border/60 bg-ink px-4 py-3 text-background">
+                    <p className="text-xs font-mono uppercase tracking-widest opacity-50 mb-0.5">
+                      {ordinalEdicion(taller.numero_edicion)} edición
+                    </p>
+                    <p className="font-bold text-sm">Sold out</p>
+                    <p className="text-xs opacity-60 mt-1">
+                      Te anotamos en la {ordinalEdicion(proxima!.numero_edicion)} edición (
+                      {new Date(proxima!.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", {
+                        day: "numeric",
+                        month: "long",
+                      })}{" "}
+                      y{" "}
+                      {new Date(proxima!.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", {
+                        day: "numeric",
+                        month: "long",
+                      })}
+                      )
+                    </p>
+                  </div>
+                )}
+                <WorkshopInscripcionForm taller={formTaller} />
               </div>
             </div>
           </div>

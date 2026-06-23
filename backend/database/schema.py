@@ -1588,6 +1588,8 @@ def _init_db_schema(conn):
     )
     # Seed idempotente del workshop de Jime Troncoso (julio 2026)
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_foto_url TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS numero_edicion INTEGER NOT NULL DEFAULT 1")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS proxima_edicion_slug TEXT NOT NULL DEFAULT ''")
     import json as _json_t
     _programa_teorica = _json_t.dumps([
         "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
@@ -1676,6 +1678,63 @@ def _init_db_schema(conn):
             "Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos",
             "direccion-de-arte-jime-troncoso",
         ),
+    )
+    # Seed 2da edición (agosto 2026) — mismos contenidos, fechas distintas.
+    _descripcion_taller = (
+        "Si llegaste hasta acá: gracias, estoy muy emocionada por hacer realidad este proyecto. "
+        "El workshop incluye 2 clases en Rambla Estudio y son 12 cupos, porque quiero que sea "
+        "un espacio donde podamos tener un intercambio de aprendizajes y conocimientos."
+    )
+    _publico_objetivo_taller = (
+        "Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · "
+        "Estudiantes de comunicación audiovisual, cine o fotografía · "
+        "Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos"
+    )
+    _instructor_bio_taller = (
+        "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos "
+        "creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos "
+        "digitales y físicos."
+    )
+    conn.execute(
+        """
+        INSERT INTO talleres (
+            slug, nombre, subtitulo,
+            instructor_nombre, instructor_bio, instructor_proyectos,
+            descripcion, publico_objetivo,
+            programa_teorica, programa_practica,
+            fecha_inicio, fecha_fin, horario,
+            cupos_total, precio_total, precio_sena,
+            pago_alias, pago_cbu, pago_banco,
+            direccion, notif_email, activo,
+            numero_edicion
+        )
+        VALUES (
+            'direccion-de-arte-jime-troncoso-2',
+            'Workshop Dirección de Arte', 'x Jime Troncoso',
+            'Jime Troncoso',
+            %s, %s, %s, %s,
+            %s::jsonb, %s::jsonb,
+            '2026-08-15', '2026-08-22', '9 a 13 hs',
+            12, 200000, 100000,
+            'rambla.estudio', '0170239440000032889112', 'BBVA',
+            'Chaco 1392 — Rambla Estudio',
+            'jimetroncoso44@gmail.com',
+            TRUE, 2
+        )
+        ON CONFLICT (slug) DO NOTHING
+        """,
+        (
+            _instructor_bio_taller, _instructor_proyectos,
+            _descripcion_taller, _publico_objetivo_taller,
+            _programa_teorica, _programa_practica,
+        ),
+    )
+    # Linkear ediciones y asegurar numero_edicion correcto.
+    conn.execute(
+        "UPDATE talleres SET numero_edicion = 1, proxima_edicion_slug = 'direccion-de-arte-jime-troncoso-2' WHERE slug = 'direccion-de-arte-jime-troncoso'",
+    )
+    conn.execute(
+        "UPDATE talleres SET numero_edicion = 2, proxima_edicion_slug = '' WHERE slug = 'direccion-de-arte-jime-troncoso-2'",
     )
 
     # ── Carritos activos (#280 Fase 1): persistencia server-side ──────────────
