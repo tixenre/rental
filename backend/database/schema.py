@@ -1684,6 +1684,23 @@ def _init_db_schema(conn):
         "ON carritos_activos(updated_at DESC) WHERE NOT confirmado"
     )
 
+    # ── Registro de errores del servidor ──────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS server_errors (
+            id          SERIAL PRIMARY KEY,
+            route       TEXT NOT NULL,
+            error_type  TEXT NOT NULL,
+            message     TEXT NOT NULL DEFAULT '',
+            traceback   TEXT NOT NULL DEFAULT '',
+            request_id  TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_server_errors_created "
+        "ON server_errors(created_at DESC)"
+    )
+
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")
 
     # Seed the sequence to the current max so nextval never collides with existing data.

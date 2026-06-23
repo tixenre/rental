@@ -37,6 +37,7 @@ import { pedidosMethods } from "./pedidos";
 import { contabilidadMethods } from "./contabilidad";
 import { brandingMethods } from "./branding";
 import { carritosMethods } from "./carritos";
+import { erroresMethods } from "./errores";
 
 export const adminApi = {
   ...equiposMethods,
@@ -45,4 +46,5 @@ export const adminApi = {
   ...contabilidadMethods,
   ...brandingMethods,
   ...carritosMethods,
+  ...erroresMethods,
 };

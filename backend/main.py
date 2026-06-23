@@ -73,6 +73,7 @@ from routes.estudio          import router as estudio_router
 from routes.didit            import router as didit_router
 from routes.talleres         import router as talleres_router
 from routes.carritos         import router as carritos_router
+from routes.errores_admin    import router as errores_admin_router
 from middleware          import auth_middleware
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,33 @@ app = FastAPI(title="Rambla Rental API", version="2.0")
 from rate_limit import limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    """Captura cualquier excepción no manejada, la persiste en server_errors y
+    devuelve el tipo + mensaje al cliente (en vez de "Internal Server Error").
+
+    HTTPException y RateLimitExceeded se propagan normalmente — este handler
+    solo atrapa lo inesperado.
+    """
+    from fastapi import HTTPException as _HTTPException
+    from fastapi.responses import JSONResponse as _JSONResponse
+    from services.error_log import log_server_error
+    from logging_config import request_id_var
+
+    if isinstance(exc, _HTTPException):
+        raise exc
+
+    route = str(request.url.path)
+    rid = request_id_var.get(None)
+    logger.exception("Error no manejado en %s (rid=%s)", route, rid)
+    log_server_error(route, exc, request_id=rid)
+
+    return _JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {exc}"},
+    )
 
 
 @app.on_event("startup")
@@ -226,6 +254,7 @@ app.include_router(estudio_router,        prefix="/api")
 app.include_router(didit_router,          prefix="/api")
 app.include_router(talleres_router,       prefix="/api")
 app.include_router(carritos_router,       prefix="/api")
+app.include_router(errores_admin_router,  prefix="/api")
 app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
 app.include_router(calendar_router)  # /calendar/feed.ics (root) + /api/admin/calendar/*
 app.include_router(cliente_portal_router)
