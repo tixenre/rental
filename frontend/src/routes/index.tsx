@@ -84,7 +84,7 @@ function LandingHub() {
           >
             {studioPic && (
               <img
-                src={studioPic}
+                src={studioPic.url}
                 alt="Rambla Estudio"
                 className="absolute inset-0 w-full h-full object-cover opacity-[0.12] transition-transform duration-700 group-hover:scale-[1.04]"
                 loading="lazy"

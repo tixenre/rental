@@ -17,7 +17,9 @@ export function EstudioBand() {
       >
         {bandPhoto && (
           <img
-            src={bandPhoto}
+            src={bandPhoto.url}
+            srcSet={bandPhoto.urlSm ? `${bandPhoto.urlSm} 800w, ${bandPhoto.url} 1600w` : undefined}
+            sizes="(max-width: 768px) 100vw, 46vw"
             alt="El Estudio — Rambla Rental"
             className="w-full h-full object-cover block transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
             loading="lazy"

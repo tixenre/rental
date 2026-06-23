@@ -198,6 +198,7 @@ export function apiGetMarcs() {
 export type EstudioFoto = {
   id: number;
   url: string;
+  url_sm?: string | null; // variante 800px (keep-aspect) para srcset; null = sin backfill aún
   path: string | null;
   orden: number;
   es_principal: boolean;

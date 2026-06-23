@@ -4,6 +4,12 @@ from .models import DeriveSpec
 # Foto de branding / hero / estudio: mantiene aspect ratio, máx 1600px.
 DISPLAY_KEEP_ASPECT = DeriveSpec(name="display", square=False)
 
+# Variante chica de la foto hero/estudio para srcset (hero en mobile, donde la
+# imagen se ve a ~400-500px): mantiene aspect ratio, máx 800px. El navegador elige
+# `display-sm` en pantallas chicas y `display` en grandes → ~4× menos bytes en mobile.
+# Acompaña a DISPLAY_KEEP_ASPECT.
+DISPLAY_KEEP_ASPECT_SM = DeriveSpec(name="display-sm", square=False, max_width=800)
+
 # Foto de equipo / catálogo: cuadrada 1200×1200 con fondo blanco.
 DISPLAY_SQUARE = DeriveSpec(name="display", square=True)
 

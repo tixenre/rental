@@ -84,10 +84,12 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
             className="relative overflow-hidden block bg-ink min-h-[clamp(300px,52vw,460px)] md:min-h-0 border-l border-ink/14 group"
             aria-label="Conocé el estudio"
           >
-            {photos.map((src, i) => (
+            {photos.map((photo, i) => (
               <img
-                key={src}
-                src={src}
+                key={photo.url}
+                src={photo.url}
+                srcSet={photo.urlSm ? `${photo.urlSm} 800w, ${photo.url} 1600w` : undefined}
+                sizes="(max-width: 768px) 100vw, 42vw"
                 alt="El Estudio — Rambla Rental"
                 className={cn(
                   "absolute inset-0 w-full h-full object-cover transition-[opacity] group-hover:scale-[1.04]",
@@ -95,6 +97,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
                 )}
                 style={{ transitionDuration: "900ms" }}
                 loading={i === 0 ? "eager" : "lazy"}
+                fetchPriority={i === 0 ? "high" : undefined}
               />
             ))}
 
