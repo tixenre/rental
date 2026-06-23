@@ -215,14 +215,16 @@ export function HeroBanner({
         </p>
 
         {/* CTA principal */}
-        <button
+        <Button
           type="button"
+          variant="primary"
+          shape="pill"
           onClick={onDateOpen}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-full bg-ink text-amber font-sans text-15 font-bold transition active:scale-[0.97]"
+          className="w-full h-auto py-4 text-15 font-bold"
         >
           <Calendar size={16} />
           Elegir fechas
-        </button>
+        </Button>
       </div>
     </div>
   );
