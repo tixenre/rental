@@ -154,9 +154,11 @@ supervisor marca `ILIKE`/`LIKE` o normalizadores ad-hoc, e índices cuya expresi
 
 ### 2026-06-06 — Design system consolidado en la app; un solo skill de UI
 
-El DS canónico es la app: componentes en `src/components/{ui,kit,rental}`, tokens/fuentes en `src/styles/`
-(entry `src/ds-styles.css`). **Un solo skill: `importar-diseno`.** No reintroducir el paquete workspace
-`@rambla/design-system` ni un segundo skill de DS; no duplicar una pieza que ya existe.
+El DS canónico es la app: primitivos en `src/design-system/{ui,kit}`, componentes de negocio en
+`src/components/{rental,admin}`, tokens/fuentes en `src/design-system/styles/` (entry
+`src/design-system/ds-styles.css`). **Un solo skill: `importar-diseno`.** No reintroducir el paquete
+workspace `@rambla/design-system` ni un segundo skill de DS; no duplicar una pieza que ya existe.
+_(Paths actualizados post-PR #981 — reorg a `src/design-system/`.)_
 
 ### 2026-06-07 — `backend/contabilidad/` = motor único de la plata "de adentro" (cierra #809)
 
@@ -194,8 +196,59 @@ ningún deploy pasa) → un deploy que no sirve el SPA **no se promueve**. Cazó
 (servía `"Frontend not built"`). Regla durable: las paths a assets de la **raíz** del repo
 (`FRONT`/`FRONT_NEW` → `frontend/public`/`dist`) se anclan a la raíz, **no** con `Path(__file__).parent`
 relativo al paquete — un **split** (`database.py` → paquete `database/`) las corre un nivel y quedan en
-`backend/…`. Staging no cubre "el backend Railway sirviendo el SPA" (el front de dev va por Vercel) → el
-gate es la red. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
+`backend/…`. Staging sirve el SPA por Railway igual que prod → el gate `/health/frontend` cubre **staging y
+prod**. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
+
+### 2026-06-20 — Iteración local con datos reales (clon de staging) + verificar sin mocks
+
+Para iterar flujos autenticados / con datos reales: **backend local + BD de staging clonada a Postgres
+local** (`pg_dump` read-only de la remota → restore local) + **staging-login** para impersonar
+(`POST /auth/staging-login {target:"cliente"|"admin"}`; cliente por `STAGING_CLIENTE_EMAIL` o `cliente_id`).
+**Nunca** apuntar el backend local a la BD remota: `init_db()` corre al startup y le escribiría el esquema +
+expone PII (clon = solo lectura sobre la remota). `.env` local gitignored. El loop render-compare se valida
+con **datos/assets reales, no solo mocks** (así apareció el wordmark custom no themeable). Extiende
+_Staging-login (2026-06-19)_ al portal cliente y al loop local; setup en `DEPLOY_RAILWAY.md`.
+
+### 2026-06-20 — TopBar modular por área: shell único, color de marca, logo themeable
+
+Un **shell único** (`TopBarShell`, `components/rental/TopBar.tsx`) → TODAS las variantes
+(rental/estudio/workshops/cliente): mismo alto/padding/logo, **color de marca por área** y **logo blanco
+themeable** (el wordmark normaliza sus fills a `currentColor`; isologo mono vía `LogoMark`). **Fuente única**
+de las áreas en `src/data/areas.ts` (label/desc/href/color), consumida por el topbar Y el menú. La
+navegación entre áreas vive en un **menú hamburguesa** (sheet con identidad del hub). **Mobile simplifica**:
+label del área solo si hay lugar (no con date pill central), acciones redundantes (CTA de sección,
+perfil/salir del portal) al menú, logo a la izquierda; la landing (`/`) no lleva topbar. Materializa la
+_Filosofía de diseño del DS (2026-06-20)_ en la navegación; detalle en `DESIGN_SYSTEM.md`. El supervisor
+marca un topbar fuera del shell o una lista de áreas duplicada.
+
+### 2026-06-22 — Creación de pedidos concurrente: serializar por equipo con advisory lock (no tocar el gate)
+
+Reservas concurrentes del mismo equipo se deadlockeaban (FK KEY-SHARE del insert de ítems + `FOR
+UPDATE` del gate sobre la misma fila de `equipos`) → **500 intermitente**. Fix: `create_pedido` toma
+`pg_advisory_xact_lock` por equipo **en orden de id** ANTES de insertar (serializa, no deadlock);
+`create_pedido_retry` es la puerta única de creación (cliente+admin) y reintenta como backstop → **503**
+si persiste, **nunca 500**. **NO toca el `FOR UPDATE`** (motor de reservas sagrado). Verificado: 15
+paralelas → 6×201 + 9×409, 0×500, sin sobreventa ni huérfanos. Refina _motor único de reservas
+(2026-05-30)_. PR #969.
+
+### 2026-06-22 — Los hallazgos de una auditoría son hipótesis: confirmar (código + en vivo) antes de arreglar
+
+Un hallazgo de auditoría —de un agente o un harness— es **hipótesis, no hecho**: se re-confirma en el
+código + **en vivo** (Chrome MCP: clickear, medir computed styles por JS, ver la red) antes de
+arreglarlo. En una pasada real varios eran falsos: el bug del mini-bar estaba en otro componente, el
+"catálogo en blanco" era artefacto del harness (glob que matcheaba un módulo fuente en dev), los
+overflows de admin estaban stale, los contrastes "1.66/1.73" eran del parser, y los datos "rotos"
+(DESTACADA, `nombre_publico`) estaban bien. Contraste oklch → **recalcular del token**
+(OKLab→sRGB→WCAG), no creerle al parser. Refuerza _honestidad > actividad_ y _fijarse en el repo antes
+de implementar (2026-06-20)_; el detalle de método vive en el skill `auditoria-profunda`.
+
+### 2026-06-22 — CTA primario = ink + texto hueso (no dorado); el dorado es la jugada del hover
+
+El `variant="primary"` del `Button` es **fondo ink + texto hueso/bone** en reposo (`bg-ink text-background`) e
+invierte a **amber + ink** en hover. El texto hueso en reposo es **decisión de marca del dueño, NO un bug**:
+no "corregir" a dorado (el dorado es la jugada del hover, la _reverse signature_ ink↔amber). Materializa la
+_Filosofía de diseño del DS (2026-06-20)_ (una sola forma del CTA). El supervisor marca un CTA primario que
+vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente el gesto en vez de usar `<Button>`.
 
 ---
 
@@ -251,3 +304,20 @@ hacer en la misma pasada una **lectura comprensiva del sistema completo** para c
 La referencia default para UX mobile/táctil es **Apple HIG**. Materialización: **tap target mínimo 44×44px**
 (`h-11 w-11`); inputs ≥ 16px; `.safe-*` cerca de notch/home-bar. El valor vive en los specs del DS (no acá).
 El supervisor marca un tap target nuevo < 44px o una decisión táctil que contradiga HIG sin justificación.
+
+### 2026-06-20 — Filosofía de diseño del DS: enforceable, la esencia del front
+
+Toda UI nueva o rediseñada sigue la **Filosofía de diseño** del DS (`DESIGN_SYSTEM.md`, primera sección,
+11 principios): la info se tiene que ver (contraste/peso reales), **estado + plata visibles** (`Debe $X`,
+no "sin seña" gris), un foco por pantalla, **una sola forma de hacer cada cosa** (sin controles/botones
+duplicados), lo más usado a mano, reconocimiento > lectura (avatares/pills), densidad sin aire muerto,
+**reusar no recrear** (la forma del pill vive en `kit/Pill`; `EstadoBadge`/`PagoBadge` derivan, cero clases
+copiadas), mobile/a11y no son extra, el core es presentación. El supervisor la hace cumplir; el detalle
+vive en el doc. Es la contraparte visual de la _Barra de calidad de ingeniería (2026-05-25)_.
+
+### 2026-06-20 — Fijarse en el repo antes de implementar (sobre todo tras mergear dev)
+
+Antes de codear algo, **verificar si ya existe** en el repo —con prioridad tras mergear `dev`, porque lo que
+avanzó allá puede ya cubrir el pedido (caso: el staging-login de cliente ya estaba hecho, #961). Vale para
+features, helpers, endpoints y patrones. Refuerza la _Barra de calidad de ingeniería (2026-05-25)_ (no
+duplicar, fuente única); el supervisor marca reimplementaciones de algo ya presente.

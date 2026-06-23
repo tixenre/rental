@@ -25,15 +25,16 @@ except ImportError:
 # ── Paths ────────────────────────────────────────────────────────────────────
 
 BASE = pathlib.Path(__file__).parent
-# El frontend clásico y el SPA Vite viven en la RAÍZ del repo (/app en Docker:
-# el Dockerfile hace `COPY --from=frontend /app/dist ./dist`). `database/` es un
-# paquete (#501) → desde `database/core.py` hay que subir DOS niveles
+# El frontend vive en `frontend/` en la RAÍZ del repo (simétrico a `backend/`).
+# En Docker el Dockerfile hace `COPY --from=frontend /app/dist ./frontend/dist`
+# y `COPY frontend/src/assets/fonts ./frontend/src/assets/fonts`. `database/` es
+# un paquete (#501) → desde `database/core.py` hay que subir DOS niveles
 # (database/ → backend/ → raíz). Antes era `backend/database.py` y alcanzaba un
 # nivel; el split lo bajó uno → prod servía "Frontend not built" porque apuntaba
 # a `backend/dist`. (Regresión del split, hotfix.)
 FRONT = BASE.parent.parent / "frontend" / "public"
-# Nuevo frontend (rental-refine, Vite SPA) — compilado en la raíz
-FRONT_NEW = BASE.parent.parent / "dist"
+# SPA Vite (rental-refine) — compilado en `frontend/dist`.
+FRONT_NEW = BASE.parent.parent / "frontend" / "dist"
 
 # ── Fragmentos SQL canónicos ─────────────────────────────────────────────────
 #

@@ -129,6 +129,17 @@ El wrapper [`<PublicLayout>`](src/components/rental/PublicLayout.tsx) provee Top
 
 Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md). Procedimiento en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
+### Iterar local con datos reales
+
+**Para iterar UI o flujos que necesitan sesión / datos reales (portal cliente, back-office, cualquier cosa con assets del admin), no alcanza con los fixtures.** Los bugs de theming/datos no aparecen con mocks — el wordmark custom del admin se veía amber sobre los topbars de color en staging/prod pero nunca con el SVG bundleado local. El **loop render-compare se valida con datos/assets reales**, no solo mocks.
+
+Montaje del entorno local con datos reales:
+1. **Backend local** — `uvicorn main:app --port 8000` con un `.env` (gitignored): `SECRET_KEY`, `STAGING_LOGIN_SECRET`, `DATABASE_URL` apuntando a tu **Postgres local**.
+2. **BD de staging clonada a local** — `pg_dump` **read-only** de la base de staging → restore en tu Postgres local (cuidar versiones de pg). **Nunca** apuntes el backend local a la base remota: `init_db()` corre al startup y le escribiría el esquema, y es PII real. El clon es solo lectura sobre la remota.
+3. **Login programático** — `POST /auth/staging-login {secret, target:"cliente"|"admin"}` mintea la cookie; el cliente se resuelve por `STAGING_CLIENTE_EMAIL` o un `cliente_id`. Desde el navegador en `localhost:3000` (así guarda la cookie HttpOnly del proxy).
+
+Setup detallado en [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md). Regla viva: _Iteración local con datos reales (2026-06-20)_ en [`docs/MEMORIA.md`](docs/MEMORIA.md).
+
 ---
 
 ## 4. Glossary

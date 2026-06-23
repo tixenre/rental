@@ -1,6 +1,6 @@
 ---
 name: importar-diseno
-description: Implementa un diseño de Claude Design en el repo real — su front-end (rutas/componentes React) Y sus documentos PDF (presupuesto, albarán/remito, contrato, packing list, reportes). Úsalo siempre que el usuario pase un handoff de Claude Design (carpeta design_handoff_<feature>/ con HTML de referencia + .tsx + README), O simplemente pegue imágenes/mockups y pida que algo "quede así", "se vea como el diseño", "alineá X al mockup". Dispará también cuando el pedido sea sobre un DOCUMENTO/PDF — "rediseñá el presupuesto / remito / contrato / packing / reporte", "que el PDF quede como el diseño", "alineá los documentos al mockup" — aunque no mencione "Claude Design" ni una carpeta de handoff. El skill orienta TODO el recorrido: VER el render (rutas web con render.mjs; documentos PDF con render-doc.py), reusar la librería/infra del repo (componentes React o helpers de pdf_templates.py), implementar, conectar los datos reales y verificar contra el mockup. Su corazón es el loop render-compare: renderizar el output real → comparar con el mockup → implementar → re-renderizar hasta que coincidan. También MANTENÉS y CONSUMÍS la librería del design system, que vive EN LA APP (`src/components/{ui,kit,rental}` + tokens/tipografía/utilities/fuentes en `src/styles/`): reuse-first (chequear si un botón/badge/precio/stepper/estado ya existe antes de recrearlo), agregar/editar tokens o piezas, no duplicar. Es el lugar para IMPLEMENTAR un diseño ya hecho (handoff/mockup) y mantener la librería del design system en el código real. NO es para diseñar pantallas/documentos desde cero (eso lo hace Claude Design, en otro proyecto). Tampoco es para AUDITAR/MEJORAR una pantalla que ya existe y funciona pero "está rara" o se puede pulir (UX/UI/performance/modularización sin un diseño dado) — para eso está el skill `pulido-frontend`, que diagnostica con rúbrica y delega en ESTE skill la implementación fiel y el motor render-compare.
+description: Implementa un diseño de Claude Design en el repo real — su front-end (rutas/componentes React) Y sus documentos PDF (presupuesto, albarán/remito, contrato, packing list, reportes). Úsalo siempre que el usuario pase un handoff de Claude Design (carpeta design_handoff_<feature>/ con HTML de referencia + .tsx + README), O simplemente pegue imágenes/mockups y pida que algo "quede así", "se vea como el diseño", "alineá X al mockup". Dispará también cuando el pedido sea sobre un DOCUMENTO/PDF — "rediseñá el presupuesto / remito / contrato / packing / reporte", "que el PDF quede como el diseño", "alineá los documentos al mockup" — aunque no mencione "Claude Design" ni una carpeta de handoff. El skill orienta TODO el recorrido: VER el render (rutas web con render.mjs; documentos PDF con render-doc.py), reusar la librería/infra del repo (componentes React o helpers de pdf_templates.py), implementar, conectar los datos reales y verificar contra el mockup. Su corazón es el loop render-compare: renderizar el output real → comparar con el mockup → implementar → re-renderizar hasta que coincidan. También MANTENÉS y CONSUMÍS la librería del design system, que vive EN LA APP (`src/design-system/{ui,kit} + src/components/rental` + tokens/tipografía/utilities/fuentes en `src/design-system/styles/`): reuse-first (chequear si un botón/badge/precio/stepper/estado ya existe antes de recrearlo), agregar/editar tokens o piezas, no duplicar. Es el lugar para IMPLEMENTAR un diseño ya hecho (handoff/mockup) y mantener la librería del design system en el código real. NO es para diseñar pantallas/documentos desde cero (eso lo hace Claude Design, en otro proyecto). Tampoco es para AUDITAR/MEJORAR una pantalla que ya existe y funciona pero "está rara" o se puede pulir (UX/UI/performance/modularización sin un diseño dado) — para eso está el skill `pulido-frontend`, que diagnostica con rúbrica y delega en ESTE skill la implementación fiel y el motor render-compare.
 ---
 
 # importar-diseno — del handoff de Claude Design al front real del repo
@@ -118,13 +118,16 @@ son referencia, pero el repo manda.
    ```bash
    node .claude/skills/importar-diseno/render.mjs /cliente/portal --mobile
    ```
-   **Rutas autenticadas (admin / portal con login + datos):** el render-compare en vivo puede **no ser
-   posible** (necesita sesión + backend + datos reales — imposible en la nube efímera). Ahí: construí
-   **fiel al render del prototipo** (que sí podés rasterizar — usá `--click`/`--eval` para alcanzar los
-   estados internos, ver paso 3) y verificá con **screenshots del dueño en staging** (su captura vs el
-   render del prototipo). Funciona igual de bien. El agujero conocido —no poder auto-render-comparar el
-   **componente real** de una ruta autenticada— se cierra con un harness de preview con mocks: tracking
-   en **#743**.
+   **Rutas autenticadas (admin / portal con login + datos):** en la nube efímera no hay sesión+datos, pero
+   el render-compare en vivo **sí es posible localmente** montando el **entorno local con datos reales** —
+   backend local + **BD de staging clonada a Postgres local** (dump read-only) + **`staging-login`**
+   (`target:"cliente"|"admin"`) para impersonar— y corriendo el render-compare sobre el **componente real**
+   logueado (MEMORIA *2026-06-20 — Iteración local con datos reales*; setup en `docs/DEPLOY_RAILWAY.md`).
+   **Nunca** apuntar el backend local a la base remota (`init_db()` le escribe el esquema; es PII). Esto es
+   clave porque los **bugs de theming/datos no se ven con mocks** (caso: el wordmark custom del admin se veía
+   amber sobre los topbars de color, invisible con el SVG bundleado) — verificá **con datos/assets reales**.
+   Alternativa sin montar el entorno: construir fiel al render del prototipo y verificar con **screenshots
+   del dueño en staging**. El harness de preview con mocks queda como tracking en **#743**.
 
 ## Handoff de documentos (PDF) — el mismo loop, otro medio
 

@@ -27,7 +27,7 @@ Qué cambia respecto del template anterior
 
 Fuentes
 -------
-TT Commons y Champ Black están vendoreadas en el repo (src/assets/fonts/).
+TT Commons y Champ Black están vendoreadas en el repo (frontend/src/assets/fonts/).
 Playwright renderiza con base `about:blank`, así que las embebemos en base64
 vía `_fonts_css()`. Ajustá `FONTS_DIR` si tu layout difiere. JetBrains Mono
 se trae de Google Fonts (igual que el catálogo).
@@ -68,7 +68,7 @@ OWNER_WEB       = os.getenv("OWNER_WEB",       "ramblarental.com.ar")
 # Directorio de fuentes vendoreadas (ajustar al layout real del repo)
 FONTS_DIR = os.getenv(
     "PDF_FONTS_DIR",
-    os.path.join(os.path.dirname(__file__), "..", "src", "assets", "fonts"),
+    os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "assets", "fonts"),
 )
 
 # Archivo : (family, weight)  — TT Commons familia + Champ Black display

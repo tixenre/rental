@@ -26,7 +26,7 @@ Qué reusás de los otros (NO lo re-expliques acá):
 - **Motor visual `render.mjs`** (rasterizar rutas/HTML, `--both`, `--click`/`--eval` para estados
   internos) → vive en `importar-diseno`. Lo corrés tal cual.
 - **Librería del DS y reuse-first** (chequear si un primitivo ya existe antes de crearlo; extraer
-  a `src/components/{ui,kit,rental,admin}` + tokens en `src/styles/`) → es propiedad de `importar-diseno`.
+  a `src/design-system/{ui,kit} + src/components/{rental,admin}` + tokens en `src/design-system/styles/`) → es propiedad de `importar-diseno`.
   Este skill **consume** esa disciplina; no inventa componentes sueltos.
 - **Método seguro** (rutear por riesgo, red de tests, commits atómicos, supervisor, el dueño prueba
   en staging) → `mantenimiento`. La regla de oro **"verificá antes de actuar"** y **"honestidad >
@@ -62,10 +62,15 @@ No se toca nada todavía. Se **ve** la pantalla viva y se mapea la deuda de expe
 - **Ruta pública** → `node .claude/skills/importar-diseno/render.mjs /la-ruta --both` (desktop+mobile).
 - **Estados internos** (editor, modal, dark) → `--click "<sel>"` / `--eval "<js>"` (rutean por estado
   de React, no por URL).
-- **Ruta autenticada (admin/portal)** → en la nube no hay sesión+datos; logueate vía **`staging-login`**
-  (MEMORIA *2026-06-19*; receta en `docs/DEPLOY_RAILWAY.md`, secreto en env, **nunca** en el repo) y
-  recorré staging con browser real (cookie de sesión inyectada). Caso testigo: la auditoría del flujo
-  de **Pedidos** se hizo así, pantalla por pantalla (lista, tabs, editor, alta, mobile).
+- **Ruta autenticada (admin/portal) o que use datos/assets reales** → los fixtures no alcanzan: los bugs
+  de theming/datos no se ven con mocks (caso testigo: el wordmark custom del admin se veía amber sobre los
+  topbars de color, invisible con el SVG bundleado local). Dos caminos, ambos vía **`staging-login`**
+  (`target:"cliente"|"admin"`; MEMORIA *2026-06-19*, secreto en env, **nunca** en el repo): (a) recorrer
+  **staging** con browser real; (b) **montar el entorno local con datos reales** —backend local + **BD de
+  staging clonada a Postgres local** (dump read-only) + staging-login— y correr el render-compare **en vivo
+  localmente** (MEMORIA *2026-06-20 — Iteración local con datos reales*; setup en `docs/DEPLOY_RAILWAY.md`).
+  **Nunca** apuntar el backend local a la base remota. Caso testigo: la auditoría de **Pedidos** (staging) y
+  el pulido del **portal cliente** (clon local, impersonando un cliente).
 - **Mobile es obligatorio** — viewport real 375×667 (no alcanza leer clases `hidden sm:*`).
 
 **Salida** = hallazgos en formato `pantalla:zona | eje | 🔴/🟡/🟢 | qué | propuesta`. Igual que el

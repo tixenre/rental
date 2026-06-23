@@ -70,7 +70,9 @@ def sitemap():
     # Páginas estáticas con priority/changefreq.
     urls: list[dict] = [
         {"loc": f"{SITE_URL}/", "lastmod": today, "changefreq": "daily", "priority": "1.0"},
+        {"loc": f"{SITE_URL}/rental", "lastmod": today, "changefreq": "daily", "priority": "0.9"},
         {"loc": f"{SITE_URL}/estudio", "lastmod": today, "changefreq": "monthly", "priority": "0.8"},
+        {"loc": f"{SITE_URL}/workshops", "lastmod": today, "changefreq": "weekly", "priority": "0.8"},
         {"loc": f"{SITE_URL}/preguntas-frecuentes", "lastmod": today, "changefreq": "monthly", "priority": "0.6"},
     ]
 

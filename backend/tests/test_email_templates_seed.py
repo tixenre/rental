@@ -16,6 +16,8 @@ EXPECTED_KEYS = {
     "modificacion_solicitada_admin",
     "modificacion_resuelta_cliente",
     "modificacion_cancelada_admin",
+    "taller_inscripcion_admin",
+    "taller_inscripcion_cliente",
 }
 
 

@@ -34,12 +34,27 @@ class CartItemIn(BaseModel):
     # (ver `cliente_crear_pedido`).
     precio_jornada: int = 0
 
+    @field_validator("cantidad")
+    @classmethod
+    def _v_cantidad(cls, v: int) -> int:
+        # Espejo de `PedidoItem.validate_cantidad` (routes/alquileres/core.py).
+        # Acá la validación vive en el PARSE → 422 limpio; sin esto, una cantidad
+        # inválida explotaba recién al construir `PedidoItem` adentro del handler → 500.
+        if v is None or v < 1:
+            raise ValueError("cantidad debe ser >= 1")
+        if v > 999:
+            raise ValueError("cantidad demasiado alta (máx 999)")
+        return v
+
 
 class PedidoClienteCreate(BaseModel):
     fecha_desde: Optional[str] = None
     fecha_hasta: Optional[str] = None
     notas:       Optional[str] = None
     items:       list[CartItemIn] = []
+    # session_id del carrito (#280 Fase 1): si viene, marcamos el carrito como
+    # confirmado en carritos_activos para cerrar el funnel de conversión.
+    session_id:  Optional[str] = None
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
@@ -61,13 +76,22 @@ def cliente_crear_pedido(
     if not data.fecha_desde or not data.fecha_hasta:
         raise HTTPException(400, "Elegí la fecha de retiro y de devolución")
 
+    # Caps espejo de la UI (el cliente las tiene en el front; la API no las
+    # validaba → defensa en profundidad). El rango de 120 días es límite del
+    # cliente, NO del admin, por eso vive acá y no en `create_pedido`.
+    if data.notas and len(data.notas) > 500:
+        raise HTTPException(400, "Las notas no pueden superar los 500 caracteres")
+    from datetime import datetime as _dt
+    if (_dt.fromisoformat(data.fecha_hasta) - _dt.fromisoformat(data.fecha_desde)).days > 120:
+        raise HTTPException(400, "El rango del alquiler no puede superar los 120 días")
+
     # Horas habilitadas de retiro/devolución (setting `horarios_retiro`).
     from routes.alquileres import _validar_horarios_habilitados
     with get_db() as _conn:
         _validar_horarios_habilitados(_conn, data.fecha_desde, data.fecha_hasta)
 
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
-    from routes.alquileres import create_pedido, PedidoCreate, PedidoItem
+    from routes.alquileres import create_pedido_retry, PedidoCreate, PedidoItem
 
     # SEGURIDAD: el cliente nunca decide el precio. Resolvemos cada
     # `precio_jornada` desde `equipos.precio_jornada` y descartamos lo
@@ -80,13 +104,17 @@ def cliente_crear_pedido(
         for it in data.items:
             if it.equipo_id in precios:
                 continue
+            # Sólo equipos del catálogo público y con precio: sin el gate de
+            # `visible_catalogo`, un cliente podía reservar por API un equipo
+            # oculto/interno (o sin precio) enumerando ids → pedido $0.
             row = conn.execute(
-                "SELECT precio_jornada FROM equipos WHERE id = ?",
+                "SELECT precio_jornada FROM equipos "
+                "WHERE id = ? AND visible_catalogo = 1 AND precio_jornada IS NOT NULL",
                 (it.equipo_id,),
             ).fetchone()
             if not row:
-                raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado")
-            precios[it.equipo_id] = int(row["precio_jornada"] or 0)
+                raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado en el catálogo")
+            precios[it.equipo_id] = int(row["precio_jornada"])
 
     payload = PedidoCreate(
         cliente_id=cliente_id,
@@ -103,7 +131,22 @@ def cliente_crear_pedido(
             for i in data.items
         ],
     )
-    return create_pedido(payload, background=background)
+    # `create_pedido_retry` reintenta ante deadlock de concurrencia (→ 503 si
+    # persiste, nunca 500). Ver helper en `routes/alquileres/core.py`.
+    resultado = create_pedido_retry(payload, background=background)
+
+    # Cerrar el funnel de conversión (#280 Fase 1): marcar el carrito como
+    # confirmado para que desaparezca del dashboard de carritos activos.
+    if data.session_id:
+        try:
+            from routes.carritos import marcar_confirmado
+            with get_db() as conn:
+                marcar_confirmado(data.session_id, conn)
+                conn.commit()
+        except Exception:
+            pass  # No crítico — el pedido ya se creó
+
+    return resultado
 
 
 @router.patch("/api/cliente/pedidos/{id}/cancelar")

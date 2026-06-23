@@ -46,12 +46,23 @@ PUBLIC_API_ANY = (
     # vive bajo /api/estudio/reservas y tiene su propio `_require_cliente` en el
     # handler, así que el guard de cliente se sigue aplicando ahí.
     "/api/estudio",
+    # /api/talleres: lista, detalle, upload de comprobante e inscripción son todos
+    # públicos (cualquier visitante puede inscribirse sin sesión). Los endpoints
+    # admin de talleres viven bajo /api/admin/talleres y tienen su propio
+    # require_admin, por lo que quedan protegidos igual que el resto del admin.
+    "/api/talleres",
     # Webhooks server-to-server (Didit): los llama un tercero SIN cookie de
     # sesión, así que el guard de sesión los cortaría con 401 antes del handler
     # (y la verificación de identidad nunca se persistiría). Se autentican por
     # firma HMAC-SHA256 dentro del handler (`verify_webhook`, fail-closed si el
     # secret no está) — NO por sesión. Por eso van exentos del middleware.
     "/api/webhooks/",
+    # Heartbeat de carrito (#280 Fase 1): visitantes anónimos también persisten
+    # su carrito. El handler valida el session_id internamente (UUID válido) y
+    # solo asocia cliente_id si hay sesión activa — auth opcional, no ausente.
+    # El endpoint admin de carritos (/api/admin/carritos) no tiene este prefijo
+    # y sigue protegido por require_admin dentro del handler.
+    "/api/cart/heartbeat",
 )
 
 # Archivos estáticos que viven en la raíz del build de Vite (`public/` se copia
@@ -86,6 +97,16 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
     # Assets estáticos de dist root (no-/api/ con extensión de archivo).
     if not path.startswith("/api/") and path.endswith(STATIC_EXTENSIONS):
+        return await call_next(request)
+
+    # Páginas del SPA por URL directa (deep link / refresh): toda ruta limpia que
+    # NO sea /api/ ni /admin la sirve el catch-all (index.html), y el SPA hace su
+    # routing + auth client-side (el portal cliente redirige a /cliente/login solo;
+    # los datos siguen detrás de /api/ con sesión → 401). Sin esto, un deep link o
+    # refresh a una página pública (/rental, /estudio, /workshops, /preguntas-*) caía
+    # a /login —regresión al mover el catálogo de `/` a `/rental`—. /admin y /api se
+    # siguen protegiendo server-side abajo.
+    if not path.startswith("/api/") and not path.startswith("/admin"):
         return await call_next(request)
 
     session = get_session(request)

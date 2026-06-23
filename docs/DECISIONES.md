@@ -494,14 +494,17 @@
   diseño (`design-system` para el paquete, `importar-diseno` para implementar handoffs).
 - **Decisión (del dueño):** **todo lo de UI / front-end / design system / Claude Design / import +
   implementación vive en UN solo lugar, con lo último y lo mejor.** (1) El DS canónico es la app:
-  componentes en `src/components/{ui,kit,rental}`, tokens/tipografía/utilities/fuentes en `src/styles/`
-  (entry `src/ds-styles.css`, cableado desde `src/styles.css`). (2) El paquete `@rambla/design-system`
+  primitivos en `src/design-system/{ui,kit}`, negocio en `src/components/{rental,admin}`,
+  tokens/tipografía/utilities/fuentes en `src/design-system/styles/` (entry
+  `src/design-system/ds-styles.css`; PR #981 reorgó desde `src/styles/` + `src/components/{ui,kit}`).
+  (2) El paquete `@rambla/design-system`
   y su workspace se **retiraron** (los tokens/CSS/fuentes se migraron a `src/` **verbatim** — CSS
   compilado verificado como subconjunto del previo, cero regresión visual; las copias de componentes
   drifteadas se descartaron, gana la app). (3) **Un solo skill: `importar-diseno`** — implementa
   diseños Y mantiene/consume la librería (reuse-first). El skill `design-system` se retiró.
-- **Cómo aplica / quién hace cumplir:** un token/utility se edita en `src/styles/`, una pieza en
-  `src/components/`; **no se recrea un paquete workspace** ni se duplica una pieza que ya existe. El
+- **Cómo aplica / quién hace cumplir:** un token/utility se edita en `src/design-system/styles/`,
+  una pieza de DS en `src/design-system/{ui,kit}` o de negocio en `src/components/{rental,admin}`;
+  **no se recrea un paquete workspace** ni se duplica una pieza que ya existe. El
   supervisor marca como hallazgo cualquier intento de reintroducir el paquete o un segundo skill de DS.
   Cierra la iniciativa #662 (invertir la fuente de verdad hacia el paquete — abandonada por esta
   decisión); los trackers de migración por pantalla (#612) y handoff (#605) siguen vigentes sobre `src/`.
@@ -642,8 +645,8 @@
   (#501) bajó `core.py` un nivel y `FRONT_NEW = BASE.parent / "dist"` (con `BASE = Path(__file__).parent`)
   pasó a apuntar a `backend/dist` en vez de la raíz `/app/dist` (donde el Dockerfile copia el build) →
   `_serve_frontend` no encontraba el index → 503.
-- **Por qué no se cazó antes.** En staging el frontend lo sirve **Vercel**; el backend Railway de dev nunca
-  sirve el SPA → la regresión quedó **dormida** y solo fue fatal en prod. Y el healthcheck de Railway apuntaba
+- **Por qué no se cazó antes.** En ese momento el backend Railway de dev no servía el SPA (lo hacía un front
+  aparte) → la regresión quedó **dormida** y solo fue fatal en prod. Y el healthcheck de Railway apuntaba
   a `/health` (siempre 200, a propósito, para tolerar fallos de migración) → el deploy roto pasó como sano.
 - **Decisión / gate.** (1) `GET /health/frontend` → 503 si `FRONT_NEW/index.html` no existe; `railway.json`
   apunta el healthcheck ahí → un deploy que no puede servir el SPA **falla el healthcheck y no se promueve**
@@ -652,9 +655,57 @@
   repo (`FRONT`/`FRONT_NEW`) se anclan a la raíz, no con `__file__` relativo al paquete.
 - **Consecuencia / gotcha durable.** Un **split de paquete** (`x.py` → `x/`) **corre un nivel** todo
   `Path(__file__).parent…` → en un move-verbatim hay que revisar las **paths relativas** (a assets, .env,
-  templates), no solo el código. Dos asimetrías de entorno a recordar: el front de dev va por Vercel (el
-  backend Railway de staging no sirve el SPA) y `/health` es liveness-siempre-200 (no readiness). Regresión:
+  templates), no solo el código. Staging ahora sirve el SPA por Railway igual que prod → el gate
+  `/health/frontend` cubre **staging y prod** (la vieja asimetría del front de dev por un servicio aparte ya
+  no existe). Recordar la otra asimetría: `/health` es liveness-siempre-200 (no readiness). Regresión:
   `test_front_paths.py` (FRONT_NEW hermano de `backend/`) + `test_health_frontend_gate.py` (503/200 del gate).
+
+### 2026-06-20 — Iteración local con datos reales (clon de staging) + verificar sin mocks
+
+- **Contexto.** Iterar el portal cliente —y cualquier flujo con sesión o datos reales— con fixtures no
+  alcanza: los bugs de theming/datos no se ven con mocks. El wordmark custom del admin (color hardcodeado
+  en un `<style>`) se veía **amber** sobre los topbars de color en staging/prod, pero con el SVG bundleado
+  local (currentColor) **nunca** aparecía. Solo cargando el portal logueado con el SVG real saltó.
+- **Decisión.** Para iterar flujos autenticados / con datos reales se monta un **entorno local con datos
+  reales**: (1) **backend local** (`uvicorn`, `.env` gitignored); (2) **BD de staging clonada a Postgres
+  local** vía `pg_dump` **read-only** de la remota → restore local (cuidar versiones: pg 18↔18); (3)
+  **staging-login** para impersonar (`POST /auth/staging-login {secret, target:"cliente"|"admin"}`; el
+  cliente se resuelve por `STAGING_CLIENTE_EMAIL` o un `cliente_id`). **Nunca** apuntar el backend local a
+  la BD remota: `init_db()` corre al startup y le haría `ALTER/CREATE` al esquema (escritura), además de que
+  es PII real. Corolario enforceable: el **loop render-compare se valida con datos/assets reales, no solo
+  mocks**, antes de pasar el cambio al dueño.
+- **Why.** Ver el producto "como es de verdad" (logueado, con los SVG/datos reales) caza una clase de bugs
+  que el entorno mockeado oculta. Extiende _Staging-login (2026-06-19)_ —que ya auto-probaba el back-office—
+  al **portal cliente** y al **loop local**, manteniendo el gate del dueño (él prueba en staging; la sesión
+  verifica antes).
+- **Consecuencias.** El staging-login de cliente vive en `auth.py` (`STAGING_CLIENTE_EMAIL`,
+  `_resolve_staging_cliente`, `target`), #961. El clon es **solo lectura** sobre la remota (cero escritura a
+  staging/prod). Setup en `DEPLOY_RAILWAY.md` / `MANIFIESTO`. Cazó el wordmark no themeable (arreglado:
+  `Logo` normaliza los fills —atributo y `<style>`— a `currentColor`).
+
+### 2026-06-20 — TopBar modular por área: shell único, color de marca, logo themeable
+
+- **Contexto.** La web tiene varias áreas (rental/estudio/workshops + portal cliente) y el hub. Cada una
+  arrastraba un topbar ad-hoc (alturas, paddings, logos y comportamientos distintos): inconsistente y
+  duplicado.
+- **Decisión.** Un **shell único** —`TopBarShell` en `components/rental/TopBar.tsx`— del que salen TODAS las
+  variantes con el **mismo alto/padding/logo**. Cada área tiene su **color de marca de fondo** y el **logo
+  en blanco themeable**: el wordmark normaliza sus fills (atributo `fill=` y `<style> fill:`) a
+  `currentColor`, y el isologo mobile es un **isologo mono** (`LogoMark`, silueta `currentColor` + R
+  recortada) que funciona sobre cualquier color. La lista de áreas es **fuente única** en
+  `src/data/areas.ts` (label/desc/href/color), consumida por el topbar Y el menú. La **navegación entre
+  áreas** vive en un **menú hamburguesa** (sheet con la identidad del hub: áreas + acceso/portal + links).
+  **Mobile simplifica**: el label del área aparece solo si hay lugar (se oculta cuando hay date pill
+  central), las acciones redundantes (CTA de sección, perfil/salir del portal) se mueven al menú, el logo va
+  a la izquierda; la landing (`/`) no lleva topbar; el login del portal usa el mismo topbar que el portal.
+- **Why.** Una sola estructura → consistencia automática y un único lugar para cambiar alto/padding/color.
+  La fuente única de áreas evita duplicar color/ruta/label. Es la materialización en la navegación de la
+  _Filosofía de diseño del DS (2026-06-20)_ (una sola forma de hacer cada cosa, reusar no recrear) y de la
+  _Barra de calidad de ingeniería (2026-05-25)_ (modularidad a prueba de balas, mobile-first).
+- **Consecuencias.** Documentado en `DESIGN_SYSTEM.md` (sistema TopBar). Piezas: `TopBarShell`,
+  `SectionLogo`, `AreaMenu`, `LogoMark`, `Logo` (themeable), `src/data/areas.ts`. El supervisor marca un
+  topbar nuevo que no salga del shell, una lista de áreas duplicada, o un logo/asset de marca con color
+  hardcodeado donde deba ser themeable.
 
 ---
 
@@ -778,3 +829,105 @@ cancel-in-progress` ya cancela corridas viejas.
   valor concreto se documenta en el design system (acá vive el **criterio**, no la tabla de números). El
   **supervisor lo hace cumplir**: marca como hallazgo un tap target nuevo < 44px, o una decisión táctil
   que contradiga HIG sin justificación.
+
+### 2026-06-20 — Filosofía de diseño del DS: enforceable, la esencia del front
+
+- **Contexto.** El rediseño de Pedidos (jun 2026) no fue una lista de fixes sino la aplicación de un
+  criterio repetible. El dueño pidió capturar **la esencia** —el _por qué_— para reproducirla en toda la
+  web, no solo los componentes sueltos (avatar, badges).
+- **Decisión.** La **Filosofía de diseño** vive como **primera sección** de `DESIGN_SYSTEM.md` (11
+  principios) y es **enforceable**: el supervisor mide toda UI nueva o rediseñada contra ella antes que
+  contra cualquier detalle. Los principios: (1) la info se tiene que ver (contraste/peso reales, WCAG de
+  piso); (2) mostrá el estado y la plata, no los escondas (`Debe $X`, no "sin seña" gris; el estado se
+  **deriva** del backend); (3) un foco por pantalla; (4) **una sola forma de hacer cada cosa** (sin tres
+  controles para una acción ni botones duplicados); (5) lo más usado, a mano; (6) reconocimiento >
+  lectura (avatares, pills, selección obvia); (7) densidad útil sin aire muerto; (8) decí lo que hace
+  (copy/labels/empty states, voz "vos"); (9) **reusar no recrear** (la forma del pill vive en `kit/Pill`;
+  `EstadoBadge`/`PagoBadge` derivan; cero clases copiadas a mano); (10) mobile/a11y no son extra (HIG,
+  ≥44px, foco visible); (11) el core es sagrado, el diseño es presentación.
+- **Why.** Sin el _por qué_ escrito, cada pantalla re-discute el mismo criterio y el front deriva. La
+  esencia documentada + enforceable es lo que hace que el rollout a toda la web sea consistente y no una
+  colección de one-offs.
+- **Consecuencias.** Materializado en código: `kit/Pill` (forma + tonos semánticos única), `kit/PagoBadge`
+  (estado de pago con monto), `kit/ClienteAvatar` (avatar determinístico). El **contraste de los tints de
+  `EstadoBadge`** queda como decisión visual aparte (pendiente, afecta también el portal del cliente).
+  Refina —no reemplaza— _Apple HIG (2026-06-05)_ y es la contraparte visual de la _Barra de calidad de
+  ingeniería (2026-05-25)_: les da el marco de diseño unificado.
+
+### 2026-06-20 — Fijarse en el repo antes de implementar (sobre todo tras mergear dev)
+
+- **Contexto.** Se iba a implementar un staging-login de cliente que **ya existía en `dev`** (#961). El
+  dueño frenó —"fijate en el repo antes de seguir"— y efectivamente estaba hecho: bastó traer `dev`.
+- **Decisión.** Antes de implementar algo, **verificar si ya existe** en el repo, con prioridad **después de
+  mergear `dev`**: lo que avanzó allá puede ya cubrir el pedido entero o en parte. Aplica a features,
+  helpers, endpoints, migraciones y patrones; ante la duda, `git grep` / revisar `dev` antes de codear.
+- **Why.** Reimplementar algo existente genera duplicación, deuda y conflictos de merge, y viola la _fuente
+  única_. Chequear es barato; deshacer una reimplementación es caro. El dueño no debería tener que frenar la
+  sesión para señalarlo.
+- **Consecuencias.** Refuerza la _Barra de calidad de ingeniería (2026-05-25)_ (modularidad, no duplicar) y
+  la _Memoria en capas (2026-05-25)_ (los Issues/commits/`dev` son la verdad del estado). El supervisor marca
+  una reimplementación de algo ya presente en el repo o en `dev`.
+
+### 2026-06-22 — Creación de pedidos concurrente: serializar por equipo con advisory lock (no tocar el gate)
+
+- **Contexto.** Reservas concurrentes del **mismo equipo** daban **500 intermitente**. Root cause (traceback
+  real, no de los logs block-buffered): `psycopg2.errors.DeadlockDetected` — el `INSERT` de `alquiler_items`
+  toma un FK **KEY-SHARE** sobre la fila de `equipos`, y el gate de stock pide luego `SELECT … FOR UPDATE`
+  (exclusivo) sobre la **misma fila** → dos transacciones se bloquean en el _upgrade_ de lock y PG aborta una.
+- **Decisión.** `create_pedido` (`backend/routes/alquileres/core.py`) toma
+  `pg_advisory_xact_lock(_ADVISORY_NS_PEDIDO, equipo_id)` por cada equipo del pedido, **en orden de id**,
+  ANTES de insertar los ítems → serializa las creaciones concurrentes del mismo equipo (cola, no deadlock; se
+  libera al commit/rollback). `create_pedido_retry` es la **puerta única** de creación (cliente + admin):
+  reintenta ante `DeadlockDetected` como backstop y, agotados los intentos, devuelve **503** (carga puntual),
+  **nunca 500**. **NO se toca el `FOR UPDATE` del gate** (`reservas/gate.py`).
+- **Why.** El motor de reservas es **sagrado** (cero overbooking). El advisory lock vive **afuera** del gate
+  (no cambia su lógica), elimina el deadlock **en origen** (no solo lo sobrevive), y el orden por id evita
+  auto-deadlock entre transacciones. El retry queda de red por si aparece un deadlock residual (ej. composites
+  que comparten componentes). 503 (no 500) le dice al cliente "reintentá", no "se rompió".
+- **Consecuencias.** Refina _backend/reservas = motor único (2026-05-30)_ y _expansión recursiva (2026-05-31)_
+  **sin tocarlas**. Regresión: `test_crear_pedidos_concurrentes_sin_deadlock_ni_overbooking` (opt-in
+  `RESERVAS_DB_TEST=1`, Postgres real). Verificado en vivo: 15 reservas paralelas → 6×201 + 9×409, **0×500**,
+  en la DB 6 pedidos / 6 unidades = sin sobreventa ni huérfanos. PR #969.
+
+### 2026-06-22 — Los hallazgos de una auditoría son hipótesis: confirmar (código + en vivo) antes de arreglar
+
+- **Contexto.** Tras una auditoría profunda (skill `auditoria-profunda`) se fueron a corregir sus hallazgos.
+  Al confirmarlos uno por uno, **varios eran falsos o stale**: el bug del mini-bar estaba en `CatalogoMovil`
+  (no en el `CartMiniBar` que señalaba el audit); el "catálogo en blanco" era un artefacto del harness
+  (`ui-edge.mjs` con un glob `**/api/equipos**` que en dev matcheaba el **módulo fuente**
+  `/src/.../equipos.ts` → al interceptarlo con JSON rompía el import y dejaba la página en blanco, cosa que
+  NO pasa en prod); los overflows de admin estaban stale (páginas ya redirect / read-only / 0-overflow); los
+  contrastes "1.66/1.73" venían del parser de color, no eran reales; y los "datos rotos" (DESTACADA,
+  `nombre_publico` duplicado) estaban bien en la DB.
+- **Decisión.** Un hallazgo de auditoría —de un agente o de un harness— es una **hipótesis**, no un hecho.
+  Antes de **arreglarlo** se re-confirma **en el código + en vivo** (la extensión **Chrome MCP**: clickear de
+  verdad, medir computed styles por JS, inspeccionar la red). El contraste sobre `oklch` se **recalcula del
+  token** (OKLab→sRGB→WCAG, sobre el color compuesto para tints), no se reporta el número del parser. Quien
+  arregla **no hereda el hallazgo como verdad**.
+- **Why.** Las herramientas y los agentes exageran, se quedan cortos o miran un estado viejo; arreglar un
+  no-bug genera churn, puede romper diseño intencional (ej. las variaciones a propósito del `EstadoBadge`) y
+  erosiona la confianza en la auditoría. Confirmar es barato; deshacer un fix equivocado es caro. _Honestidad
+  > actividad._
+- **Consecuencias.** Extiende la _Regla de oro_ del skill `auditoria-profunda` ("verificar antes de reportar")
+  al que **arregla**, y _Fijarse en el repo antes de implementar (2026-06-20)_. Materializado: gotchas del
+  glob (dev sirve módulos fuente) y del parser de contraste documentados en el skill; varios "bugs" de la
+  pasada cerrados **sin código** por ser falsas alarmas (PR #976 fijó el glob del harness).
+
+### 2026-06-22 — CTA primario = ink + texto hueso (no dorado); el dorado es la jugada del hover
+
+- **Contexto.** Al migrar ~14 CTAs crudos al primitivo `Button` (auditoría fina del DS, #988 N3), apareció
+  que el CTA principal vivía en **dos formas**: la mayoría del catálogo/reserva con `bg-ink text-amber`
+  (texto **dorado** en reposo), y el `variant="primary"` del DS con `bg-ink text-background` (texto
+  **hueso**). Unificar a "una sola forma" exigía elegir el canon. El dueño pidió ver el botón antes de decidir.
+- **Decisión.** El dueño comparó ambas en vivo (render real, fuentes y colores de marca, reposo + hover) y
+  eligió **hueso**: `variant="primary"` = **fondo ink + texto hueso/bone** en reposo, invierte a **amber +
+  ink** en hover. El texto hueso en reposo es **decisión de marca, NO un bug**: no "corregir" a dorado.
+  El dorado es la jugada del **hover** (la _reverse signature_ ink↔amber).
+- **Why.** Dos formas del mismo CTA violan "una sola forma de hacer cada cosa" (_Filosofía de diseño del DS,
+  2026-06-20_). Hueso da más contraste sobre ink (19:1 vs 11:1 del dorado — ambos AA holgado) y un look más
+  limpio; el dorado queda reservado al gesto del hover, más fuerte que un simple aclarado. Anclar la decisión
+  evita el churn de que un futuro cambio la "corrija" creyéndola un bug.
+- **Consecuencias.** Los ~14 CTAs migraron a `variant="primary"` (texto dorado → hueso) en PR #990. El
+  supervisor marca un CTA primario que vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente
+  el gesto en vez de usar `<Button>`. Documentado en `DESIGN_SYSTEM.md` (sección Button). Espeja las decisiones
+  tipo "no lo arregles, es del dueño" (_Presupuesto muestra IVA aparte (2026-06-06)_, verde WhatsApp tier-4).

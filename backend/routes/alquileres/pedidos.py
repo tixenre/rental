@@ -22,7 +22,7 @@ from routes.alquileres.core import (
     PedidoEstado,
     PedidoDatos,
     PedidoItemUpdate,
-    create_pedido,
+    create_pedido_retry,
     _es_historico,
     _maybe_finalizar,
     _next_numero_pedido,
@@ -60,7 +60,7 @@ def create_pedido_endpoint(data: PedidoCreate, request: Request, background: Bac
     """Endpoint admin para crear pedido. La lógica está en `create_pedido`,
     así el portal cliente (cliente_portal.py) la reutiliza sin pasar por admin guard."""
     require_admin(request)
-    return create_pedido(data, background=background, es_admin=True)
+    return create_pedido_retry(data, background=background, es_admin=True)
 
 
 @router.get("/alquileres")
@@ -227,7 +227,6 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                         {"errores": [f"Sin stock suficiente: {s}" for s in sin_stock]},
                     )
 
-            es_historico    = _es_historico(p_row["fuente"])
             estado_anterior = p_row["estado"]
             updates         = {"estado": data.estado}
 
