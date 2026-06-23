@@ -55,7 +55,7 @@ no fabriques churn.
 
 Preguntate, crítico: ¿alguna regla me desorientó o quedó vieja porque el repo cambió? ¿pegué un gotcha
 que merece ser "caso testigo"? ¿overlap con otro skill? ¿repetí a mano un paso que debería estar
-codificado acá? Si SÍ → **anotá la propuesta en `docs/PROPUESTAS_SKILLS.md`** (proponés, no aplicás — el
+codificado acá? Si SÍ → **anotá la propuesta en `docs/PROPUESTAS_SKILLS.md` (ruta relativa desde un skill: `../../../docs/PROPUESTAS_SKILLS.md`)** (proponés, no aplicás — el
 dueño aprueba, igual que la memoria; el supervisor puede validar). Si NO → no fabriques churn.
 
 ## Cheatsheet
