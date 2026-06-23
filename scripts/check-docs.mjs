@@ -219,6 +219,11 @@ if (existsSync(SKILLS_DIR)) {
         }
       }
     }
+    if (!/^## Auto-mejora/m.test(src)) {
+      errors.push(
+        `${relPath}: falta la sección \`## Auto-mejora\` (ritual post-uso que deposita en el buzón).`,
+      );
+    }
   }
 }
 

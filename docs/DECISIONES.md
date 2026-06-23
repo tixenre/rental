@@ -1007,3 +1007,31 @@ cancel-in-progress` ya cancela corridas viejas.
   como puntero. Refina _Issues: la cola espeja el código (2026-06-08)_ y _Protocolo de brain-dumps (2026-05-25)_.
   La Auto-mejora del skill (Etapa 1B) lo hace recursivo. Regla de oro heredada: **cerrar es afirmar "esto está
   hecho"** → nunca sin evidencia o sin la orden del dueño.
+
+---
+
+### 2026-06-23 — Gobernanza Etapa 2: Auto-mejora universal + meta-skill gobernanza (dashboard, auditoría, dry-run)
+
+- **Contexto.** Etapa 1A + 1B establecieron el registro verificado y el loop de aprendizaje en el skill
+  `cola`. Etapa 2 propaga el ritual de auto-mejora a todos los skills y crea el meta-skill que cierra el
+  ciclo: el sistema puede auditarse a sí mismo.
+- **Decisión.**
+  1. **Auto-mejora universal** — la sección `## Auto-mejora` se propagó a los 5 skills restantes
+     (`mantenimiento`, `auditoria-profunda`, `pulido-frontend`, `importar-diseno`, `gear-compatibility`).
+     El Bloque 5 del linter (`check-docs.mjs`) ahora **exige** la sección en todo `SKILL.md` (error, no
+     warning) — el CI la caza automáticamente si se crea un skill sin ella.
+  2. **Meta-skill `gobernanza`** (`.claude/skills/gobernanza/SKILL.md`, `model: opus`) implementa el loop
+     completo de curación: dashboard `/skills` (qué hay, uso real del ledger, staleness, buzón); auditoría
+     profunda (drift de `model:`, overlap, staleness de contenido, bloat, cross-refs); consumo del buzón
+     (`PROPUESTAS_SKILLS.md`) y el ledger (`.claude/skill-ledger.jsonl`); consolidación dry-run (propone
+     archivar a `.claude/skills/.archive/`, no borra); cierre periódico mensual con digest. Blueprint:
+     Curator de Hermes, nativo. Modo propone-aprobás en todos los pasos.
+- **Why.** El sistema aprende de su propio uso (ledger → qué se invoca de verdad) y de las mejoras
+  detectadas durante el uso (buzón → propuestas acumuladas). Sin el meta-skill, la telemetría y el buzón
+  son datos sin consumidor. El ritual mensual convierte "tengo datos" en "el sistema evoluciona con
+  criterio, no al azar". La sección Auto-mejora universal cierra el loop recursivo: cualquier skill puede
+  proponer su propia mejora, independientemente de quién lo corra.
+- **Consecuencias.** 7 skills registrados y bien formados (`check-docs.mjs` verde). El linter exige
+  `## Auto-mejora` → un skill mal formado falla el CI desde ahora. La tabla de `CLAUDE.md` incluye
+  `gobernanza` con sus disparadores y `model: opus`. El supervisor marca skills sin `## Auto-mejora` o
+  un `gobernanza` que aplique cambios sin aprobación explícita del dueño.

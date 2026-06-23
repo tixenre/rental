@@ -480,3 +480,15 @@ E · MODULARIZACIÓN (split, 1 PR/corte)    C · RAMAS
 
 CIERRE (todos los frentes): commits atómicos + body con "lo que se dejó" → supervisor → plan de prueba
 ```
+
+## Auto-mejora (correr al cerrar cada uso)
+
+Preguntate, crítico: ¿alguna regla me desorientó o quedó vieja porque el repo cambió? ¿pegué un
+gotcha que merece ser "caso testigo"? ¿overlap con otro skill? ¿repetí a mano un paso que debería
+estar codificado acá?
+
+Si **SÍ** → anotá la propuesta en [`docs/PROPUESTAS_SKILLS.md`](../../../docs/PROPUESTAS_SKILLS.md)
+(formato: `fecha · skill · qué cambiar · por qué`). Proponés, no aplicás — el dueño aprueba, igual
+que la memoria; el supervisor puede validar.
+
+Si **NO** → no fabriques churn. **Honestidad > actividad.**

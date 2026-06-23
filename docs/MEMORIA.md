@@ -264,6 +264,17 @@ aprendizaje** (Etapa 1B): buzón `docs/PROPUESTAS_SKILLS.md` (auto-mejora **prop
 telemetría de uso por hook y check-in proactivo de la cola. Plantilla `.claude/skill-template.md` (fuera de
 `skillsDir`). El supervisor marca un skill en disco sin fila en `CLAUDE.md` o un `model:` que no pegue con el task.
 
+### 2026-06-23 — Gobernanza Etapa 2: Auto-mejora universal + meta-skill gobernanza (dashboard, auditoría, dry-run)
+
+**Auto-mejora propagada a todos los skills** (`mantenimiento`, `auditoria-profunda`, `pulido-frontend`,
+`importar-diseno`, `gear-compatibility`). El linter (Bloque 5 de `check-docs.mjs`) ahora **exige**
+`## Auto-mejora` en todo `SKILL.md` — skills sin ella fallan el CI. El **meta-skill `gobernanza`**
+(`.claude/skills/gobernanza/SKILL.md`, `model: opus`) implementa el loop completo: dashboard `/skills`
+(qué hay, último uso del ledger, staleness, propuestas pendientes), auditoría profunda de drift/overlap/
+bloat/routing de modelo, consumo del buzón + ledger, consolidación en modo **dry-run** (propone-no-borra,
+archiva a `.claude/skills/.archive/`), y cierre periódico mensual. Modo propone-aprobás en todos los pasos.
+El supervisor marca skills sin `## Auto-mejora` o un `gobernanza` que aplique cambios sin aprobación.
+
 ### 2026-06-23 — cola = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
 
 Toda administración de la cola (reconciliar issues abiertos contra commits/PRs shippeados para cazar
