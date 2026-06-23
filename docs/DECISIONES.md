@@ -1089,3 +1089,28 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Consecuencias.** 13 skills en disco (6 activos previos + 6 nuevos + `cola` = 13 total).
   `CLAUDE.md` tiene 13 filas en la tabla de skills. `scripts/check-docs.mjs` los verifica todos.
   El supervisor marca cualquier skill en disco sin fila, o un skill que aplique sin aprobación.
+
+### 2026-06-23 — docs/MARCA.md = hub de marca; skill `marca` gobierna el inventario de features
+
+- **Contexto.** El contenido de marca/marketing de Rambla estaba disperso: en slides de Instagram, en la
+  cabeza del dueño y parcialmente en `docs/CAMPAÑA_FEATURES.md` (inventario de features, fechado
+  2026-06-08, curado para una campaña puntual). No había fuente canónica para "qué es Rambla, qué
+  representa y por qué alguien debería usarla". El dueño quería un lugar donde viviera esa info — tanto
+  como doc en el repo como posible sección del back-office (segunda etapa).
+- **Decisión.**
+  1. **`docs/MARCA.md`** — hub de identidad: quiénes somos, tagline canónico, selling points por área
+     (rental completo desde las placas de Instagram; estudio y workshops con `[TODO]` para que el dueño
+     complete), voz/tono (referencia a `DESIGN_SYSTEM.md`, sin duplicar), assets canónicos (URL, handle
+     Instagram, rutas de logo en el repo). El inventario detallado de features queda en
+     `docs/CAMPAÑA_FEATURES.md` — `MARCA.md` no lo duplica, lo referencia.
+  2. **Skill `marca`** (`model: opus`, read-only) — gobernador de marca: audita que las features reales
+     de la app estén en `docs/MARCA.md` y `docs/CAMPAÑA_FEATURES.md`, detecta features nuevas sin
+     comunicar y selling points stale, propone borradores de copy para aprobación del dueño. Nunca edita
+     los docs sin aprobación explícita.
+- **Why.** La marca no es un artefacto estático — la app crece y los selling points pueden quedar
+  desactualizados. El skill `marca` cierra ese loop: cada vez que se agrega una feature importante, el
+  skill lo detecta y propone actualizar el doc. Separar identidad (`MARCA.md`) de inventario
+  (`CAMPAÑA_FEATURES.md`) mantiene ambos docs manejables.
+- **Consecuencias.** 14 skills en disco. `CLAUDE.md` tiene 14 filas. El supervisor marca drift entre
+  features en código y `docs/MARCA.md` o `docs/CAMPAÑA_FEATURES.md` como hallazgo de marca. Los TODOs
+  de Estudio/Workshops en `MARCA.md` son intencionales — el dueño los completa cuando tenga el copy.

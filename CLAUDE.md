@@ -76,5 +76,6 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 | [`specs`](.claude/skills/specs/SKILL.md) | "auditá las specs", "las specs están inconsistentes?", "qué specs faltan?", "hay specs duplicadas con nombres distintos?", "el sistema de specs está sano?", "normalizá las specs" → gobernador de la taxonomía de specs de equipos | `opus` |
 | [`catalogo`](.claude/skills/catalogo/SKILL.md) | "los equipos están completos?", "qué equipos les faltan fotos?", "hay equipos sin descripción?", "auditá el catálogo", "qué está incompleto?", "los equipos están bien cargados?" → completitud del catálogo: fotos, descripciones, specs, precios | `opus` |
 | [`calidad-tests`](.claude/skills/calidad-tests/SKILL.md) | "cómo están los tests?", "hay paths sin tests?", "qué falta testear?", "auditá la cobertura", "los tests son buenos?", "qué casos borde no están testeados?" → cobertura de módulos críticos, calidad de assertions, edge cases sin tests | `opus` |
+| [`marca`](.claude/skills/marca/SKILL.md) | "actualizá el marketing", "qué features no están comunicadas?", "el marketing está al día?", "auditá la marca", "qué hay de nuevo desde la última campaña?", "qué features tiene la web?" → gobernador de marca: cruza features reales vs. docs/MARCA.md + CAMPAÑA_FEATURES.md, propone updates y borradores de copy | `opus` |
 
 @docs/MEMORIA.md
