@@ -193,3 +193,15 @@ es *probar en staging*; "no romper la experiencia" pesa más que "cuánto la pul
 4. TRACKEAR: marcar fila en #612 (misma PR) · issues con labels · commits atómicos →
    supervisor → plan de prueba → el dueño prueba en staging
 ```
+
+## Auto-mejora (correr al cerrar cada uso)
+
+Preguntate, crítico: ¿alguna regla me desorientó o quedó vieja porque el repo cambió? ¿pegué un
+gotcha que merece ser "caso testigo"? ¿overlap con otro skill? ¿repetí a mano un paso que debería
+estar codificado acá?
+
+Si **SÍ** → anotá la propuesta en [`docs/PROPUESTAS_SKILLS.md`](../../../docs/PROPUESTAS_SKILLS.md)
+(formato: `fecha · skill · qué cambiar · por qué`). Proponés, no aplicás — el dueño aprueba, igual
+que la memoria; el supervisor puede validar.
+
+Si **NO** → no fabriques churn. **Honestidad > actividad.**

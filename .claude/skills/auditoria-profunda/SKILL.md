@@ -207,3 +207,15 @@ snippet del texto visible para juzgar el estado. (Ampliar acá a medida que apar
 - Pulir/arreglar lo encontrado → `pulido-frontend` (UI) / `importar-diseno` (DS) / fix con tests.
 - Salud del repo (código muerto, ramas, deps, split) → `mantenimiento`.
 - Tocar el motor de reservas → sagrado; un bug del motor se reporta con repro + va con Opus + test.
+
+## Auto-mejora (correr al cerrar cada uso)
+
+Preguntate, crítico: ¿alguna regla me desorientó o quedó vieja porque el repo cambió? ¿pegué un
+gotcha que merece ser "caso testigo"? ¿overlap con otro skill? ¿repetí a mano un paso que debería
+estar codificado acá?
+
+Si **SÍ** → anotá la propuesta en [`docs/PROPUESTAS_SKILLS.md`](../../../docs/PROPUESTAS_SKILLS.md)
+(formato: `fecha · skill · qué cambiar · por qué`). Proponés, no aplicás — el dueño aprueba, igual
+que la memoria; el supervisor puede validar.
+
+Si **NO** → no fabriques churn. **Honestidad > actividad.**

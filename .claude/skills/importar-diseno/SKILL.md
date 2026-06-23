@@ -301,3 +301,15 @@ imágenes. Para revisar mobile-first, usá `--both` y compará. (`DISENO_BASE_UR
   core de reservas ni metiendo migraciones/escrituras sensibles sin avisar.
 - **Una iniciativa de import = una rama + PR.** El handoff se implementa, se verifica con render-compare,
   pasa el supervisor, y recién ahí se propone merge.
+
+## Auto-mejora (correr al cerrar cada uso)
+
+Preguntate, crítico: ¿alguna regla me desorientó o quedó vieja porque el repo cambió? ¿pegué un
+gotcha que merece ser "caso testigo"? ¿overlap con otro skill? ¿repetí a mano un paso que debería
+estar codificado acá?
+
+Si **SÍ** → anotá la propuesta en [`docs/PROPUESTAS_SKILLS.md`](../../../docs/PROPUESTAS_SKILLS.md)
+(formato: `fecha · skill · qué cambiar · por qué`). Proponés, no aplicás — el dueño aprueba, igual
+que la memoria; el supervisor puede validar.
+
+Si **NO** → no fabriques churn. **Honestidad > actividad.**

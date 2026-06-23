@@ -69,5 +69,6 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 | [`pulido-frontend`](.claude/skills/pulido-frontend/SKILL.md) | "esta pantalla está rara / pulí la UX-UI" → diagnosticar y mejorar una pantalla que **ya existe** (no implementar un diseño dado) | `opus` |
 | [`importar-diseno`](.claude/skills/importar-diseno/SKILL.md) | "implementá este handoff/mockup", "que el front/PDF quede como el diseño" → implementar un diseño **dado** + mantener la librería del DS | `sonnet` |
 | [`gear-compatibility`](.claude/skills/gear-compatibility/SKILL.md) | "generá compatibilidades entre equipos" → razonar sobre specs (vía API; propuestas encolan para aprobación humana) | `sonnet` |
+| [`gobernanza`](.claude/skills/gobernanza/SKILL.md) | "¿cómo están los skills?", "qué skills tenemos", "revisá la gobernanza", "hay skills solapados?", "propuestas pendientes", "cierre mensual" → auditar y curar la capa de skills (dashboard `/skills`, auditoría, buzón, ledger, consolidación dry-run) | `opus` |
 
 @docs/MEMORIA.md
