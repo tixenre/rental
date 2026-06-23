@@ -203,7 +203,8 @@ export default function ClientePortal() {
           nuevos.push({ pedidoId: p.id, numero: String(p.numero_pedido ?? p.id), tipo });
       }
     }
-    setDocsNuevos(nuevos);
+    nuevos.sort((a, b) => b.pedidoId - a.pedidoId);
+    setDocsNuevos(nuevos.slice(0, 5));
   }, [pedidos]);
 
   function dismissDocsPopup() {
