@@ -98,6 +98,7 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
                 style={{ transitionDuration: "900ms" }}
                 loading={i === 0 ? "eager" : "lazy"}
                 fetchPriority={i === 0 ? "high" : undefined}
+                decoding="async"
               />
             ))}
 
