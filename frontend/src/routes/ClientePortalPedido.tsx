@@ -751,7 +751,7 @@ export function PedidoCard({
               {descuentoPct > 0 && (
                 <div className="flex justify-between items-baseline font-sans text-sm">
                   <span className="text-muted-foreground">Descuento ({descuentoPct}%)</span>
-                  <span className="font-mono font-semibold tabular-nums text-verde">
+                  <span className="font-mono font-semibold tabular-nums text-verde-ink">
                     −{fmt(descuentoMonto)}
                   </span>
                 </div>
@@ -784,7 +784,7 @@ export function PedidoCard({
                 <>
                   <div className="flex justify-between items-baseline font-sans text-sm">
                     <span className="text-muted-foreground">Pagado</span>
-                    <span className="font-mono font-semibold tabular-nums text-verde">
+                    <span className="font-mono font-semibold tabular-nums text-verde-ink">
                       {fmt(pagado)}
                     </span>
                   </div>
@@ -795,7 +795,7 @@ export function PedidoCard({
                     <span
                       className={cn(
                         "font-mono font-bold tabular-nums",
-                        balance > 0 ? "text-ink" : "text-verde",
+                        balance > 0 ? "text-ink" : "text-verde-ink",
                       )}
                     >
                       {fmt(balance)}
@@ -820,7 +820,7 @@ export function PedidoCard({
                         {fmtDate(pg.fecha)}
                         {pg.concepto ? ` · ${pg.concepto}` : ""}
                       </span>
-                      <span className="font-mono tabular-nums text-verde shrink-0">
+                      <span className="font-mono tabular-nums text-verde-ink shrink-0">
                         {fmt(pg.monto)}
                       </span>
                     </li>
@@ -1076,6 +1076,9 @@ export function DocAvailablePopup({
   onVerPedido: (pedidoId: number) => void;
 }) {
   const open = nuevos.length > 0;
+  const MAX_VISIBLE = 4;
+  const visibles = nuevos.slice(0, MAX_VISIBLE);
+  const resto = nuevos.length - visibles.length;
   return (
     <Dialog
       open={open}
@@ -1091,7 +1094,7 @@ export function DocAvailablePopup({
           </DialogDescription>
         </DialogHeader>
         <ul className="space-y-2.5 my-2">
-          {nuevos.map((d) => {
+          {visibles.map((d) => {
             const Icon =
               d.tipo === "contrato" ? FileSignature : d.tipo === "albaran" ? Truck : FileText;
             return (
@@ -1125,6 +1128,11 @@ export function DocAvailablePopup({
               </li>
             );
           })}
+          {resto > 0 && (
+            <li className="px-3 py-1 text-center font-sans text-xs text-muted-foreground">
+              y {resto} documento{resto > 1 ? "s" : ""} más en tu portal
+            </li>
+          )}
         </ul>
         <DialogFooter>
           <Button className="min-h-11" onClick={onDismiss}>

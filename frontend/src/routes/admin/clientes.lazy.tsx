@@ -346,7 +346,7 @@ function ClienteHistorialSheet({
             {/* Identidad Didit */}
             {cliente.dni_validado_at ? (
               <div className="rounded-lg border border-verde/30 bg-verde/8 px-3 py-2.5 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-verde text-sm font-semibold">
+                <div className="flex items-center gap-1.5 text-verde-ink text-sm font-semibold">
                   <ShieldCheck className="h-4 w-4 shrink-0" />
                   Identidad verificada
                 </div>

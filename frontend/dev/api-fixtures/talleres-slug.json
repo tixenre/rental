@@ -2,25 +2,42 @@
   "id": 1,
   "slug": "direccion-de-arte-jime-troncoso",
   "nombre": "Workshop Dirección de Arte",
-  "subtitulo": "rambla × jime troncoso",
+  "subtitulo": "x Jime Troncoso",
   "instructor_nombre": "Jime Troncoso",
-  "instructor_bio": "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos creativos en proyectos artísticos, audiovisuales y fotográficos.",
-  "instructor_proyectos": ["Universal LATAM", "CheNetflix", "Shorta", "Spotify", "Gancia", "Skyy", "Lucciano's", "Atomik", "Luigi Bosca", "Shell", "Las Pastillas del Abuelo", "Los Pericos & El Plan de la Mariposa", "Kevin Johansen", "Bruto", "Hops"],
-  "descripcion": "Un workshop intensivo de dos sábados para aprender a pensar y ejecutar la dirección de arte en producciones reales: desde la moodboard hasta el set.",
-  "publico_objetivo": "Para fotógrafas, directoras de arte, productoras audiovisuales y cualquier persona con curiosidad por el detrás de escena visual de una producción.",
+  "instructor_bio": "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos digitales y físicos.",
+  "instructor_foto_url": "",
+  "numero_edicion": 1,
+  "proxima_edicion_slug": "direccion-de-arte-jime-troncoso-2",
+  "proxima_edicion": {
+    "slug": "direccion-de-arte-jime-troncoso-2",
+    "numero_edicion": 2,
+    "fecha_inicio": "2026-08-15",
+    "fecha_fin": "2026-08-22",
+    "horario": "9 a 13 hs",
+    "cupos_total": 12,
+    "cupos_confirmados": 0,
+    "cupos_disponibles": 12,
+    "precio_total": 200000,
+    "precio_sena": 100000,
+    "pago_alias": "rambla.estudio",
+    "pago_cbu": "0170239440000032889112",
+    "pago_banco": "BBVA",
+    "direccion": "Chaco 1392 — Rambla Estudio"
+  },
+  "edicion_anterior": null,
+  "instructor_proyectos": "Universal LATAM, CheNetflix, Shorta, Spotify, Gancia, Skyy, Dr Lemon, Luigi Bosca, Las Pastillas del Abuelo, Kevin Johansen, Los Pericos & El Plan de la Mariposa, Agapornis, Guolis, Lucciano's, La Fonte D'Oro, Billabong, Atomik, Kappa x Huracán, Bruto, Turboblender, Shell, Hops",
+  "descripcion": "Si llegaste hasta acá: gracias, estoy muy emocionada por hacer realidad este proyecto. El workshop incluye 2 clases en Rambla Estudio y son 12 cupos, porque quiero que sea un espacio donde podamos tener un intercambio de aprendizajes y conocimientos.",
+  "publico_objetivo": "Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · Estudiantes de comunicación audiovisual, cine o fotografía · Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos",
   "programa_teorica": [
-    "¿Qué es la dirección de arte y por qué importa?",
-    "Referentes y construcción de moodboard",
-    "Paleta de color, texturas y objetos",
-    "Comunicación con el fotógrafo y el director",
-    "Cómo cotizar y presentar tu trabajo"
+    "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
+    "Cómo se compone y se coordina un equipo",
+    "Análisis de proyectos reales: videoclip, publicidad, ambientación en evento y foto producto",
+    "Armado de presupuesto (sí, vamos a hablar de números)",
+    "Cómo mostrar tus proyectos y crecer dentro de la industria"
   ],
   "programa_practica": [
-    "Producción de una sesión real en Rambla Estudio",
-    "Selección y construcción del set",
-    "Trabajo con modelos y vestuario",
-    "Coordinación con el equipo de foto (Pablo Isa + Tincho + Rambla Rental)",
-    "Feedback en vivo y cierre"
+    "Llegamos a la mejor parte (o la que a mí más me divierte): crear el set.",
+    "En esta instancia se suman el director de fotografía (Pablo Isa) y el gaffer (Tincho Santini), que se encargarán del equipo técnico, junto con Rambla Rental, para que la práctica sea aún más real y podamos ver el resultado final."
   ],
   "fecha_inicio": "2026-07-11",
   "fecha_fin": "2026-07-18",
@@ -33,5 +50,5 @@
   "pago_alias": "rambla.estudio",
   "pago_cbu": "0170239440000032889112",
   "pago_banco": "BBVA",
-  "direccion": "Chaco 1392"
+  "direccion": "Chaco 1392 — Rambla Estudio"
 }

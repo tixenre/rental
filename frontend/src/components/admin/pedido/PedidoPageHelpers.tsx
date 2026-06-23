@@ -237,7 +237,7 @@ export function BackLink({ onClick }: { onClick: () => void }) {
 export function SaveIndicator({ status }: { status: string }) {
   const map: Record<string, { tx: string; cls: string }> = {
     saving: { tx: "Guardando…", cls: "text-muted-foreground" },
-    saved: { tx: "Guardado", cls: "text-verde" },
+    saved: { tx: "Guardado", cls: "text-verde-ink" },
     dirty: { tx: "Sin guardar", cls: "text-muted-foreground" },
     error: { tx: "Error al guardar", cls: "text-destructive" },
     idle: { tx: "", cls: "" },

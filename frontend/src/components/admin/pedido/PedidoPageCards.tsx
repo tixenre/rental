@@ -744,7 +744,7 @@ export function SolicitudDiffDialog({
               <ul className="divide-y hairline -mx-3">
                 {itemsDiff.map((d) => {
                   const delta = d.despues - d.antes;
-                  const cls = delta > 0 ? "text-verde" : "text-destructive";
+                  const cls = delta > 0 ? "text-verde-ink" : "text-destructive";
                   return (
                     <li key={d.id} className="px-3 py-1.5 flex items-center gap-2">
                       <span className="flex-1 text-ink truncate">{d.nombre}</span>

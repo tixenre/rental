@@ -160,7 +160,7 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
           {/* Bloque de datos RENAPER — solo lectura cuando el cliente está verificado */}
           {editing && cliente?.dni_validado_at && (
             <div className="col-span-2 rounded-lg border border-verde/30 bg-verde/5 px-3 py-2.5 space-y-2">
-              <div className="flex items-center gap-1.5 text-xs text-verde font-semibold">
+              <div className="flex items-center gap-1.5 text-xs text-verde-ink font-semibold">
                 <Lock className="h-3.5 w-3.5 shrink-0" />
                 Datos verificados por RENAPER — solo lectura
               </div>

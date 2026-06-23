@@ -244,7 +244,7 @@ export function BrandingSection() {
             href={`https://wa.me/${phoneQ.data.replace(/[^0-9]/g, "")}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-verde hover:text-verde/80 transition"
+            className="inline-flex items-center gap-1.5 text-xs text-verde-ink hover:text-verde-ink/80 transition"
           >
             Probar enlace →
           </a>

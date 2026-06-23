@@ -225,7 +225,7 @@ function CuentaCorrienteMini({ socio }: { socio: CuentaSaldo }) {
     socio.estado === "deudor"
       ? "text-destructive"
       : socio.estado === "acreedor"
-        ? "text-verde"
+        ? "text-verde-ink"
         : "text-ink";
   return (
     <div className="rounded-lg border hairline p-4">

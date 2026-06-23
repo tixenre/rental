@@ -39,6 +39,8 @@ import {
   fmtDate,
   wasDocSeen,
   markDocSeen,
+  docSeenInitialized,
+  markDocSeenInitialized,
   ACTIVE_STATES,
   HIST_STATES,
   DOC_NOTIFICABLE,
@@ -194,6 +196,19 @@ export default function ClientePortal() {
   }, [verificacion, navigate, return_to]);
 
   useEffect(() => {
+    if (pedidos.length === 0) return; // esperar a que carguen los pedidos
+    // Primera carga en este device: marcar lo existente como visto (silencioso, sin
+    // popup) para no listar decenas de docs históricos en un localStorage limpio.
+    if (!docSeenInitialized()) {
+      for (const p of pedidos) {
+        const docs = p.documentos_disponibles;
+        if (!docs) continue;
+        for (const tipo of DOC_NOTIFICABLE) if (docs[tipo]) markDocSeen(p.id, tipo);
+      }
+      markDocSeenInitialized();
+      return;
+    }
+    // Cargas siguientes: solo los docs que aparecieron desde la última visita.
     const nuevos: Array<{ pedidoId: number; numero: string; tipo: DocTipo }> = [];
     for (const p of pedidos) {
       const docs = p.documentos_disponibles;
@@ -433,7 +448,7 @@ export default function ClientePortal() {
                     label="A pagar"
                     value={pendientePago > 0 ? fmt(pendientePago) : "$ 0"}
                     meta={pendientePago > 0 ? "saldo pendiente" : "todo al día"}
-                    valueClassName={pendientePago === 0 ? "text-verde" : undefined}
+                    valueClassName={pendientePago === 0 ? "text-verde-ink" : undefined}
                   />
                   <StatCard
                     label="Histórico"

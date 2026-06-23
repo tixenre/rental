@@ -15,7 +15,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -67,6 +73,7 @@ from routes.estudio          import router as estudio_router
 from routes.didit            import router as didit_router
 from routes.talleres         import router as talleres_router
 from routes.carritos         import router as carritos_router
+from routes.errores_admin    import router as errores_admin_router
 from middleware          import auth_middleware
 
 logger = logging.getLogger(__name__)
@@ -81,6 +88,33 @@ app = FastAPI(title="Rambla Rental API", version="2.0")
 from rate_limit import limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    """Captura cualquier excepción no manejada, la persiste en server_errors y
+    devuelve el tipo + mensaje al cliente (en vez de "Internal Server Error").
+
+    HTTPException y RateLimitExceeded se propagan normalmente — este handler
+    solo atrapa lo inesperado.
+    """
+    from fastapi import HTTPException as _HTTPException
+    from fastapi.responses import JSONResponse as _JSONResponse
+    from services.error_log import log_server_error
+    from logging_config import request_id_var
+
+    if isinstance(exc, _HTTPException):
+        raise exc
+
+    route = str(request.url.path)
+    rid = request_id_var.get(None)
+    logger.exception("Error no manejado en %s (rid=%s)", route, rid)
+    log_server_error(route, exc, request_id=rid)
+
+    return _JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {exc}"},
+    )
 
 
 @app.on_event("startup")
@@ -134,6 +168,35 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
             "Revisá la env var en Railway (no debe tener localhost ni '*')."
         )
 
+# ── Content-Security-Policy (Report-Only) ──────────────────────────────────────
+# Arranca en Report-Only: NO bloquea nada, solo reporta violaciones a /csp-report
+# para mapear las fuentes reales en prod antes de pasar a enforcing. Fuentes
+# relevadas del código: self · Google Fonts (googleapis/gstatic) · GA4
+# (googletagmanager/google-analytics) · R2 (imágenes, *.r2.dev) · embeds (Google
+# Maps, YouTube) · simpleicons (logos de marca). 'unsafe-inline' en style-src es
+# inevitable por los `style={}` de React + el <style> que inyecta Google Fonts.
+# Solo se aplica al HTML del SPA (no a /api ni assets, que no ejecutan nada).
+CSP_REPORT_ONLY = "; ".join(
+    [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'self'",
+        "form-action 'self'",
+        "script-src 'self' https://www.googletagmanager.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https://*.r2.dev https://www.googletagmanager.com "
+        "https://*.google-analytics.com https://cdn.simpleicons.org",
+        "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com "
+        "https://*.r2.dev",
+        "frame-src 'self' blob: https://www.google.com https://maps.google.com "
+        "https://www.youtube.com https://*.r2.dev",
+        "report-uri /csp-report",
+    ]
+)
+
+
 @app.middleware("http")
 async def security_headers(request, call_next):
     response = await call_next(request)
@@ -144,6 +207,10 @@ async def security_headers(request, call_next):
     # pise de vuelta a DENY.
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # CSP solo en el HTML del SPA (lo único que ejecuta scripts/estilos). Report-Only
+    # → reporta, no bloquea: cero riesgo de romper prod mientras se mapean las fuentes.
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Content-Security-Policy-Report-Only"] = CSP_REPORT_ONLY
     return response
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -187,9 +254,31 @@ app.include_router(estudio_router,        prefix="/api")
 app.include_router(didit_router,          prefix="/api")
 app.include_router(talleres_router,       prefix="/api")
 app.include_router(carritos_router,       prefix="/api")
+app.include_router(errores_admin_router,  prefix="/api")
 app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
 app.include_router(calendar_router)  # /calendar/feed.ics (root) + /api/admin/calendar/*
 app.include_router(cliente_portal_router)
+
+# ── CSP violation report sink ────────────────────────────────────────────────
+
+_csp_logger = logging.getLogger("csp")
+
+
+@app.post("/csp-report", include_in_schema=False)
+async def csp_report(request: Request):
+    """Recibe violaciones del CSP Report-Only (browser → report-uri).
+
+    Las loggea para mapear qué fuentes reales usa prod antes de pasar a enforcing.
+    Devuelve 204 sin cuerpo. Capea el payload para no loggear basura enorme.
+    """
+    try:
+        body = await request.body()
+        if body:
+            _csp_logger.warning("csp-violation %s", body[:2000].decode("utf-8", "replace"))
+    except Exception:  # nunca debe fallar la respuesta por un report malformado
+        pass
+    return Response(status_code=204)
+
 
 # ── Health Check ─────────────────────────────────────────────────────────────
 

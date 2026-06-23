@@ -21,6 +21,7 @@ import { Receipt } from "lucide-react";
 import { authedFetch } from "@/lib/authedFetch";
 import { cn } from "@/lib/utils";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
+import { Button } from "@/design-system/ui/button";
 
 export const Route = createFileRoute("/cliente/registro")({
   head: () => ({ meta: [{ title: "Completá tu perfil — Rambla Rental" }] }),
@@ -399,13 +400,15 @@ export default function ClienteRegistroPage() {
               </section>
 
               {/* Submit */}
-              <button
+              <Button
                 type="submit"
+                variant="primary"
+                shape="pill"
                 disabled={sending}
-                className="w-full rounded-full bg-ink py-3 font-sans text-sm font-semibold text-amber transition hover:bg-amber hover:text-ink active:scale-[0.98] disabled:opacity-50 min-h-[48px]"
+                className="w-full h-auto py-3 font-semibold min-h-[48px]"
               >
                 {sending ? "Guardando…" : "Completar registro →"}
-              </button>
+              </Button>
 
               <p className="text-center font-mono text-2xs tracking-[0.1em] text-muted-foreground">
                 Tus datos quedan guardados para la próxima vez.

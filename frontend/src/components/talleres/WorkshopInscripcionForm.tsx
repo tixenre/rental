@@ -26,6 +26,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [telefonoError, setTelefonoError] = useState(false);
   const [experiencia, setExperiencia] = useState("");
   const [upload, setUpload] = useState<UploadState>({ status: "idle" });
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
@@ -59,12 +60,27 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
     if (fileRef.current) fileRef.current.value = "";
   };
 
+  const telefonoValido = (tel: string) => {
+    const digits = tel.replace(/\D/g, "");
+    return digits.length >= 6 && digits.length <= 15;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim() || !email.trim() || !telefono.trim()) {
       toast.error("Completá nombre, email y teléfono");
       return;
     }
+    if (!telefonoValido(telefono)) {
+      setTelefonoError(true);
+      toast.error("El teléfono no parece válido — ingresá solo números, sin letras");
+      return;
+    }
+    if (!enListaActual && upload.status !== "done") {
+      toast.error("Adjuntá el comprobante de pago para reservar tu cupo");
+      return;
+    }
+    setTelefonoError(false);
     setSubmitState("submitting");
     try {
       const result = await apiCrearInscripcion(taller.slug, {
@@ -156,11 +172,20 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
             id="ins-telefono"
             type="tel"
             value={telefono}
-            onChange={(e) => setTelefono(e.target.value)}
+            onChange={(e) => {
+              setTelefono(e.target.value);
+              if (telefonoError) setTelefonoError(false);
+            }}
             placeholder="+54 9 223 000-0000"
             required
             disabled={submitState === "submitting"}
+            className={telefonoError ? "border-destructive focus-visible:ring-destructive/30" : ""}
           />
+          {telefonoError && (
+            <p className="text-xs text-destructive">
+              Ingresá un número válido (solo dígitos, sin letras)
+            </p>
+          )}
         </div>
       </div>
 
@@ -196,7 +221,9 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
 
       {/* Comprobante upload */}
       <div className="flex flex-col gap-1.5">
-        <Label>Comprobante de transferencia</Label>
+        <Label>
+          Comprobante de transferencia {!enListaActual && <span className="text-rosa">*</span>}
+        </Label>
         <p className="text-xs text-muted-foreground -mt-0.5">
           Para reservar tu cupo, realizá el pago del 50% ({formatARS(taller.precio_sena)}) y adjuntá
           el comprobante.
@@ -235,7 +262,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm text-verde">
+              <div className="flex items-center gap-2 text-sm text-verde-ink">
                 <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                 <span className="truncate">{upload.fileName}</span>
               </div>

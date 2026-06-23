@@ -39,6 +39,7 @@ import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
+import { buildFotoSrcSet } from "@/lib/srcset";
 
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
@@ -215,14 +216,16 @@ export function HeroBanner({
         </p>
 
         {/* CTA principal */}
-        <button
+        <Button
           type="button"
+          variant="primary"
+          shape="pill"
           onClick={onDateOpen}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-full bg-ink text-amber font-sans text-15 font-bold transition active:scale-[0.97]"
+          className="w-full h-auto py-4 text-15 font-bold"
         >
           <Calendar size={16} />
           Elegir fechas
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -261,6 +264,8 @@ function CartItem({
         {eq.fotoUrl && !imgFailed ? (
           <img
             src={eq.fotoUrl}
+            srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+            sizes="44px"
             alt={eq.name}
             className="w-full h-full object-contain p-1"
             loading="lazy"
@@ -572,7 +577,7 @@ export function CartSheet({
                       −{descuentoPct}%
                     </span>
                   </div>
-                  <span className="font-mono text-sm font-semibold text-verde tabular-nums">
+                  <span className="font-mono text-sm font-semibold text-verde-ink tabular-nums">
                     −{formatARS(descuentoMonto)}
                   </span>
                 </div>
@@ -741,6 +746,8 @@ export function FichaSheet({
             {eq.fotoUrl && !imgFailed ? (
               <img
                 src={eq.fotoUrl}
+                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+                sizes="(max-width: 640px) 92vw, 400px"
                 alt={eq.name}
                 className="w-full h-full object-contain p-4"
                 loading="lazy"
@@ -928,6 +935,8 @@ export function EquipmentRow({
             {eq.fotoUrl && !imgFailed ? (
               <img
                 src={eq.fotoUrl}
+                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+                sizes="48px"
                 alt={nombrePublico}
                 className="h-full w-full object-contain p-1.5"
                 loading="lazy"

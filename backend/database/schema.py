@@ -80,6 +80,7 @@ def _init_db_schema(conn):
             roi_pct          FLOAT,
             valor_reposicion FLOAT,
             foto_url         TEXT,
+            foto_url_sm      TEXT,   -- variante 600px de la foto principal para srcset (NULL = sin variante → el front usa foto_url)
             fecha_compra     DATE,
             serie            TEXT,
             bh_url           TEXT,
@@ -1586,6 +1587,9 @@ def _init_db_schema(conn):
         "ON taller_inscripciones(taller_id)"
     )
     # Seed idempotente del workshop de Jime Troncoso (julio 2026)
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_foto_url TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS numero_edicion INTEGER NOT NULL DEFAULT 1")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS proxima_edicion_slug TEXT NOT NULL DEFAULT ''")
     import json as _json_t
     _programa_teorica = _json_t.dumps([
         "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
@@ -1595,12 +1599,17 @@ def _init_db_schema(conn):
         "Cómo mostrar tus proyectos y crecer dentro de la industria",
     ])
     _programa_practica = _json_t.dumps([
-        "Crear el set: la clase práctica se construye sobre el proyecto elegido en la clase teórica",
-        "Nos dividimos en equipos con 1 semana de preproducción previa",
-        "Se suman el director de fotografía Pablo Isa y el gaffer Tincho Santini",
-        "Rambla Rental provee el equipo técnico para que la práctica sea lo más real posible",
-        "Vemos el resultado final juntos",
+        "Llegamos a la mejor parte (o la que a mí más me divierte): crear el set.",
+        "En esta instancia se suman el director de fotografía (Pablo Isa) y el gaffer (Tincho Santini), "
+        "que se encargarán del equipo técnico, junto con Rambla Rental, para que la práctica sea aún "
+        "más real y podamos ver el resultado final.",
     ])
+    _instructor_proyectos = (
+        "Universal LATAM, CheNetflix, Shorta, Spotify, Gancia, Skyy, Dr Lemon, Luigi Bosca, "
+        "Las Pastillas del Abuelo, Kevin Johansen, Los Pericos & El Plan de la Mariposa, "
+        "Agapornis, Guolis, Lucciano's, La Fonte D'Oro, Billabong, Atomik, Kappa x Huracán, "
+        "Bruto, Turboblender, Shell, Hops"
+    )
     conn.execute(
         """
         INSERT INTO talleres (
@@ -1620,13 +1629,11 @@ def _init_db_schema(conn):
             '26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos '
             'creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos '
             'digitales y físicos.',
-            'Universal LATAM, CheNetflix, Shorta, Spotify, Gancia, Skyy, Lucciano''s, Atomik, Luigi Bosca, '
-            'Shell, Las Pastillas del Abuelo, Los Pericos & El Plan de la Mariposa, Kevin Johansen, Bruto, '
-            'Hops, entre otros.',
+            %s,
             'Si llegaste hasta acá: gracias, estoy muy emocionada por hacer realidad este proyecto. '
             'El workshop incluye 2 clases en Rambla Estudio y son 12 cupos, porque quiero que sea '
             'un espacio donde podamos tener un intercambio de aprendizajes y conocimientos.',
-            'Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafxs, filmmakers · '
+            'Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · '
             'Estudiantes de comunicación audiovisual, cine o fotografía · '
             'Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos',
             %s::jsonb, %s::jsonb,
@@ -1639,12 +1646,95 @@ def _init_db_schema(conn):
         )
         ON CONFLICT (slug) DO NOTHING
         """,
-        (_programa_teorica, _programa_practica),
+        (_instructor_proyectos, _programa_teorica, _programa_practica),
     )
-    # Fix idempotente: si la fila ya existía (ON CONFLICT DO NOTHING), actualiza notif_email.
+    # Actualizaciones idempotentes para filas ya existentes (ON CONFLICT DO NOTHING no las toca).
     conn.execute(
         "UPDATE talleres SET notif_email = %s WHERE slug = %s AND notif_email = ''",
         ("jimetroncoso44@gmail.com", "direccion-de-arte-jime-troncoso"),
+    )
+    conn.execute(
+        "UPDATE talleres SET instructor_proyectos = %s WHERE slug = %s",
+        (_instructor_proyectos, "direccion-de-arte-jime-troncoso"),
+    )
+    conn.execute(
+        "UPDATE talleres SET programa_teorica = %s::jsonb, programa_practica = %s::jsonb WHERE slug = %s",
+        (_programa_teorica, _programa_practica, "direccion-de-arte-jime-troncoso"),
+    )
+    conn.execute(
+        "UPDATE talleres SET instructor_bio = %s WHERE slug = %s",
+        (
+            "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos "
+            "creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos "
+            "digitales y físicos.",
+            "direccion-de-arte-jime-troncoso",
+        ),
+    )
+    conn.execute(
+        "UPDATE talleres SET publico_objetivo = %s WHERE slug = %s",
+        (
+            "Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · "
+            "Estudiantes de comunicación audiovisual, cine o fotografía · "
+            "Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos",
+            "direccion-de-arte-jime-troncoso",
+        ),
+    )
+    # Seed 2da edición (agosto 2026) — mismos contenidos, fechas distintas.
+    _descripcion_taller = (
+        "Si llegaste hasta acá: gracias, estoy muy emocionada por hacer realidad este proyecto. "
+        "El workshop incluye 2 clases en Rambla Estudio y son 12 cupos, porque quiero que sea "
+        "un espacio donde podamos tener un intercambio de aprendizajes y conocimientos."
+    )
+    _publico_objetivo_taller = (
+        "Directores/as, asistentes y ayudantes de arte · Creadores de contenido, fotógrafos/as, filmmakers · "
+        "Estudiantes de comunicación audiovisual, cine o fotografía · "
+        "Personas que les interese trabajar sobre lo artístico y estético a la hora de crear proyectos"
+    )
+    _instructor_bio_taller = (
+        "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos "
+        "creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos "
+        "digitales y físicos."
+    )
+    conn.execute(
+        """
+        INSERT INTO talleres (
+            slug, nombre, subtitulo,
+            instructor_nombre, instructor_bio, instructor_proyectos,
+            descripcion, publico_objetivo,
+            programa_teorica, programa_practica,
+            fecha_inicio, fecha_fin, horario,
+            cupos_total, precio_total, precio_sena,
+            pago_alias, pago_cbu, pago_banco,
+            direccion, notif_email, activo,
+            numero_edicion
+        )
+        VALUES (
+            'direccion-de-arte-jime-troncoso-2',
+            'Workshop Dirección de Arte', 'x Jime Troncoso',
+            'Jime Troncoso',
+            %s, %s, %s, %s,
+            %s::jsonb, %s::jsonb,
+            '2026-08-15', '2026-08-22', '9 a 13 hs',
+            12, 200000, 100000,
+            'rambla.estudio', '0170239440000032889112', 'BBVA',
+            'Chaco 1392 — Rambla Estudio',
+            'jimetroncoso44@gmail.com',
+            TRUE, 2
+        )
+        ON CONFLICT (slug) DO NOTHING
+        """,
+        (
+            _instructor_bio_taller, _instructor_proyectos,
+            _descripcion_taller, _publico_objetivo_taller,
+            _programa_teorica, _programa_practica,
+        ),
+    )
+    # Linkear ediciones y asegurar numero_edicion correcto.
+    conn.execute(
+        "UPDATE talleres SET numero_edicion = 1, proxima_edicion_slug = 'direccion-de-arte-jime-troncoso-2' WHERE slug = 'direccion-de-arte-jime-troncoso'",
+    )
+    conn.execute(
+        "UPDATE talleres SET numero_edicion = 2, proxima_edicion_slug = '' WHERE slug = 'direccion-de-arte-jime-troncoso-2'",
     )
 
     # ── Carritos activos (#280 Fase 1): persistencia server-side ──────────────
@@ -1681,6 +1771,23 @@ def _init_db_schema(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_carritos_activos_no_conf "
         "ON carritos_activos(updated_at DESC) WHERE NOT confirmado"
+    )
+
+    # ── Registro de errores del servidor ──────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS server_errors (
+            id          SERIAL PRIMARY KEY,
+            route       TEXT NOT NULL,
+            error_type  TEXT NOT NULL,
+            message     TEXT NOT NULL DEFAULT '',
+            traceback   TEXT NOT NULL DEFAULT '',
+            request_id  TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_server_errors_created "
+        "ON server_errors(created_at DESC)"
     )
 
     conn.execute("CREATE SEQUENCE IF NOT EXISTS numero_pedido_seq")

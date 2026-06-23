@@ -197,7 +197,7 @@ function SocioCard({ socio }: { socio: CuentaSaldo }) {
     socio.estado === "deudor"
       ? "text-destructive"
       : socio.estado === "acreedor"
-        ? "text-verde"
+        ? "text-verde-ink"
         : "text-ink";
   const tag =
     socio.estado === "deudor" ? "Deudor" : socio.estado === "acreedor" ? "Acreedor" : "Saldado";
