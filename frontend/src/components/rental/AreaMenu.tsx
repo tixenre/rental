@@ -85,12 +85,7 @@ export function AreaMenu({ current }: { current?: AreaKey | "cliente" }) {
                       <span className="font-display text-lg font-black lowercase leading-none">
                         {a.label}
                       </span>
-                      <span
-                        className={cn(
-                          "mt-1 block text-xs",
-                          a.fg === "text-white" ? "text-ink" : "opacity-70",
-                        )}
-                      >
+                      <span className="mt-1 block text-xs opacity-70">
                         {a.desc}
                       </span>
                     </span>
