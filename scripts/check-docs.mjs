@@ -106,7 +106,7 @@ function mdFilesIn(dir) {
   const out = [];
   if (!existsSync(dir)) return out;
   for (const e of readdirSync(dir, { withFileTypes: true })) {
-    if (e.name === "archive") continue; // docs/archive/ = histórico congelado, no se mantiene
+    if (e.name === "archive" || e.name.startsWith(".")) continue; // histórico / dirs ocultos (incl. .archive/)
     const p = join(dir, e.name);
     if (e.isDirectory()) out.push(...mdFilesIn(p));
     else if (e.name.endsWith(".md")) out.push(p);
