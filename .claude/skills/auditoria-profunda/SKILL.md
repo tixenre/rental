@@ -1,5 +1,8 @@
 ---
 name: auditoria-profunda
+model: opus
+last-reviewed: 2026-06-23
+version: 1.0
 description: El go-to para AUDITORÍAS PROFUNDAS, exhaustivas y REPETIBLES — cazar fallas (no pulir) en el flujo de reserva y la UI del cliente, anotando todo y abriendo issues. Dos motores con la misma disciplina (1) ROBUSTEZ/SEGURIDAD del backend del flujo de reserva — concurrencia/sobreventa/race, auth/IDOR, integridad de precio, inyección/XSS, descuentos, fechas/horarios, validación de input — probado por API/curl/psql con datos reales; (2) UI MULTI-VIEWPORT — un harness Playwright (Chrome real) que recorre 320→1920, clickea de verdad, mide tap targets/font/contraste/overflow/truncación y GUARDA UN SCREENSHOT por pantalla×tamaño para comparar antes/después. Úsalo cuando el dueño pida "auditá a fondo / profundo", "buscá fallas / bugs", "probá si es seguro", "tocá todos los botones", "probá en varios tamaños", "stress test", "edge cases", "que no se rompa con mucha demanda", o quiera screenshots para comparar. El corazón es el MÉTODO + la LISTA DE CRITERIOS (abajo): verificar antes de reportar, datos reales, etiquetar y limpiar datos de prueba, todo a un test-log + issues, harnesses re-ejecutables. NO es para pulir/arreglar (eso es `pulido-frontend` / `importar-diseno`) ni para salud del repo (`mantenimiento`): este SÓLO encuentra y documenta. El core de reservas es sagrado → read-only sobre la lógica.
 ---
 
