@@ -222,8 +222,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
       {/* Comprobante upload */}
       <div className="flex flex-col gap-1.5">
         <Label>
-          Comprobante de transferencia{" "}
-          {!enListaActual && <span className="text-rosa">*</span>}
+          Comprobante de transferencia {!enListaActual && <span className="text-rosa">*</span>}
         </Label>
         <p className="text-xs text-muted-foreground -mt-0.5">
           Para reservar tu cupo, realizá el pago del 50% ({formatARS(taller.precio_sena)}) y adjuntá

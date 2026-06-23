@@ -101,7 +101,8 @@ function FotoSection({ taller }: { taller: TallerAdmin }) {
         )}
         <div className="flex flex-col gap-2">
           <p className="text-sm text-muted-foreground">
-            JPG, PNG o WebP · máx. 8 MB. Se muestra en la sección "Sobre" de la landing del workshop.
+            JPG, PNG o WebP · máx. 8 MB. Se muestra en la sección "Sobre" de la landing del
+            workshop.
           </p>
           <div>
             <input
@@ -121,7 +122,11 @@ function FotoSection({ taller }: { taller: TallerAdmin }) {
               onClick={() => fileRef.current?.click()}
               className="gap-2"
             >
-              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              {uploading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
               {taller.instructor_foto_url ? "Cambiar foto" : "Subir foto"}
             </Button>
           </div>
@@ -145,6 +150,8 @@ function ContenidoSection({ taller }: { taller: TallerAdmin }) {
     programa_practica: (taller.programa_practica ?? []).join("\n"),
   });
 
+  // Solo reiniciar el form cuando cambia el taller (por id), no en cada actualización parcial.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setForm({
       nombre: taller.nombre,
