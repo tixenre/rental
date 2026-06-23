@@ -1,5 +1,8 @@
 ---
 name: mantenimiento
+model: opus
+last-reviewed: 2026-06-23
+version: 1.0
 description: El go-to para AUDITAR y MEJORAR el repo sin romper nada. Flujo completo de salud del repositorio — diagnosticar (rúbrica de calidad) → rutear por riesgo → ejecutar en 5 frentes con la misma disciplina — (A) código muerto/imports/archivos/deps/DRY/optimizar; (B) seguridad + bugs; (C) ramas; (D) issues; (E) modularización / split de god-modules (move-verbatim, gateado). Úsalo cuando el dueño pida "auditá", "mejorá el repo", "está bien hecho?", "es profesional?", "hay deuda?", "limpiá / housekeeping", "sacá lo que no se usa", "código muerto", "hay legacy", "revisá seguridad/bugs", "está todo seguro?", "limpiá ramas", "ordená los issues", "modularizá / partí ese god-module", o cuando detectes cruft/drift mientras trabajás. El corazón NO es una lista de ítems, sino el MÉTODO seguro: diagnosticar con rúbrica → verificar antes de ACTUAR (borrar/cerrar/afirmar — las herramientas Y la intuición mienten) → red de tests → no perder tracking → commits atómicos → supervisor. Los cortes grandes (Frente E, core sagrado) NO son barridos rápidos: van como iniciativa gateada, UNA PR por corte.
 ---
 
@@ -419,28 +422,16 @@ sin auditar es la mentira más cara — tranquiliza al dueño sobre un agujero r
    **"Automatically delete head branches"** en Settings del repo (las borra solas al mergear, de ahí
    en más). Nunca afirmar "borré las ramas" si el entorno no lo permitió.
 
-## Frente D — Issues
+## Frente D — Issues → skill `cola` (fuente única)
 
-"Hacé housekeeping de los issues, casi todos se pueden cerrar." El riesgo es **enterrar backlog real**
-porque la corazonada dice "ya está". Acá la regla de oro pesa doble: **cerrar es afirmar "esto está hecho".**
+La administración de la cola (reconciliar issues contra el código, triagear con evidencia, deduplicar
+trackers, etiquetar, intake de brain-dumps, reporte "¿cómo está la cola?") **vive en su propio skill**,
+[`cola`](../cola/SKILL.md) — para que tenga la atención **continua y liviana** que necesita, en vez de
+correr solo cuando se audita el repo entero. Es la **fuente única**.
 
-1. **Listar + agrupar por tópico.** `mcp__github__list_issues` (devuelve `{issues, totalCount, pageInfo}`
-   — es un dict, no una lista) → mapear cada uno a su tema para ver solapamientos.
-2. **Cerrar SOLO con evidencia.** Un issue se cierra cuando hay un PR/commit que lo resuelve, o el dueño
-   lo confirma explícitamente. Cerrar = `mcp__github__issue_write` con `state:closed` + `state_reason`
-   (`completed`/`not_planned`) **+ un comentario** que linkee la evidencia (PR/commit/decisión). Sin
-   comentario, el "por qué se cerró" se pierde.
-3. **No cerrar backlog real.** Si el issue describe trabajo pendiente que **no** se hizo, queda abierto
-   aunque "suene viejo" (caso testigo: **#476**, promover reglas de lint a bloqueante — pendiente real,
-   se dejó abierto y se flageó). Parciales = abiertos.
-4. **Consolidar trackers/umbrellas solapados.** Cuando N issues cubren la misma iniciativa (caso testigo:
-   DS #612/#605/#479 → #612; specs #526/#528/#535 → #526), **rescatá primero los ítems únicos** de cada
-   uno hacia el tracker que sobrevive, **después** cerrá los redundantes apuntando al consolidador. Un
-   **umbrella** se cierra cuando su pasada está completa; si quedan sub-tareas, sobrevive con el checklist
-   actualizado.
-5. **El dueño dirige, la sesión recomienda.** Proponé la lista de cierres con su razón; el dueño da la
-   orden ("borrá 234 476 764…" — ojo a los typos: "476" era probablemente "477"). Ante un número dudoso,
-   **confirmá** antes de cerrar.
+Cuando una pasada de mantenimiento toque issues (cerrar lo que el barrido shippeó, abrir issues de los
+hallazgos), **delegá en `cola`**. La regla de oro vale igual: **cerrar es afirmar "esto está hecho"** →
+solo con evidencia (PR/commit) o la orden del dueño; parciales = abiertos; no enterrar backlog real.
 
 ---
 
@@ -482,12 +473,10 @@ E · MODULARIZACIÓN (split, 1 PR/corte)    C · RAMAS
 2. extraer concern → submódulo            2. borrable solo si PR=MERGED (squash ≠ git branch --merged)
 3. __init__ re-exporta superficie         3. sandbox no borra (403) → reportar lista + auto-delete
 4. VERIFICAR: set de rutas idéntico +
-   ruff + suite + gate test + byte-AST    D · ISSUES
-5. el INSERT/gate de reservas NO se mueve 1. listar + agrupar por tópico
-   (queda en el spine)                    2. cerrar SOLO con evidencia (state_reason + comentario)
-                                          3. no enterrar backlog real (parciales = abiertos)
-                                          4. consolidar trackers/umbrellas (rescatar únicos primero)
-                                          5. el dueño dirige, la sesión recomienda
+   ruff + suite + gate test + byte-AST    D · ISSUES → skill `cola` (fuente única)
+5. el INSERT/gate de reservas NO se mueve    reconciliar / triagear / deduplicar / etiquetar /
+   (queda en el spine)                       reporte de salud → delegá en `cola` (regla de oro:
+                                             cerrar solo con evidencia)
 
 CIERRE (todos los frentes): commits atómicos + body con "lo que se dejó" → supervisor → plan de prueba
 ```

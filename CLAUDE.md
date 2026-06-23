@@ -51,10 +51,23 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 | [`docs/ISSUE_LABELS.md`](docs/ISSUE_LABELS.md)                               | Labels (3 dimensiones obligatorias)                                                                                                                                                                         |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md)                               | Criterio mobile + status por ruta                                                                                                                                                                           |
 | [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)                             | Design system canónico: tokens, componentes, mobile rules, voz/tono, patterns                                                                                                                               |
-| [`.claude/skills/importar-diseno/`](.claude/skills/importar-diseno/SKILL.md) | **Único skill de UI / front-end / design system / Claude Design / import + implementación.** Implementa handoffs en el front real (loop render-compare) Y mantiene/consume la librería del DS, que vive en la app: tokens/ui/kit en `src/design-system/`, componentes de negocio en `src/components/`. Contrato del handoff: `INSTRUCCIONES_CLAUDE_DESIGN.md` |
-| [`.claude/skills/mantenimiento/`](.claude/skills/mantenimiento/SKILL.md)               | **El go-to para auditar y mejorar el repo.** Diagnosticar (rúbrica de `PROTOCOLO`) → rutear por riesgo → ejecutar en **5 frentes** (A código muerto/DRY/optimizar · B seguridad+bugs · C ramas · D issues · **E modularización / split de god-modules, move-verbatim y gateado**), con el método y la red de tests (incl. Postgres real) para verificar antes de actuar y no romper ni enterrar nada |
-| [`.claude/skills/pulido-frontend/`](.claude/skills/pulido-frontend/SKILL.md)         | **El go-to para auditar y pulir una pantalla del front que ya existe** pero "está rara" / se puede mejorar. Loop: diagnosticar con rúbrica front-end (`PROTOCOLO` ejes P-U, viendo la pantalla viva) → rutear por riesgo → mejorar DS-first en 4 lentes (UX · UI/estética · modularización · performance) → verificar (render-compare + mobile gate + a11y + perf) → trackear página-por-página. Delega implementación + motor render-compare en `importar-diseno` y método seguro + tests en `mantenimiento`. NO es para implementar un diseño dado ni para salud del repo |
-| [`.claude/skills/gear-compatibility.md`](.claude/skills/gear-compatibility.md) | Genera relaciones de compatibilidad entre equipos (cámaras/lentes/luces/monitores/grabadores) razonando sobre specs; complementa el algoritmo determinístico `_compute_compat`. Siempre vía API del backend (nunca toca la DB directo); las propuestas de specs encolan para aprobación humana |
 | [`.claude/agents/supervisor.md`](.claude/agents/supervisor.md)               | El agente revisor                                                                                                                                                                                           |
+
+## Skills — cuál uso para qué (+ modelo)
+
+> **Mapa de fronteras canónico.** Elegí el skill por el **disparador**, no por el tema. La columna
+> **Modelo** materializa _2026-05-26 — Eficiencia de sesión_ (criterio/diagnóstico → Opus; ejecución
+> mecánica → Sonnet) en el frontmatter `model:` de cada skill: al invocarlo, **cambia el modelo solo**.
+> Los skills de criterio (Opus) **delegan la ejecución mecánica a subagentes `model: sonnet`**.
+> `scripts/check-docs.mjs` verifica que todo skill en disco esté listado acá y bien formado.
+
+| Skill | Cuándo lo uso (disparador) | Modelo |
+| --- | --- | --- |
+| [`cola`](.claude/skills/cola/SKILL.md) | "ordená/triageá los issues", "¿cómo está la cola?", "cerrá lo hecho", brain-dumps → administrar la cola sin que se desfase | `sonnet` |
+| [`mantenimiento`](.claude/skills/mantenimiento/SKILL.md) | "auditá/limpiá el repo", "¿hay deuda/legacy?", "modularizá ese god-module" → salud del repo en 5 frentes (muerto/seguridad/ramas/issues→`cola`/split) | `opus` |
+| [`auditoria-profunda`](.claude/skills/auditoria-profunda/SKILL.md) | "auditá a fondo", "buscá fallas/bugs", "probá si es seguro / con mucha demanda", "screenshots en varios tamaños" → cazar fallas repetible (solo encuentra y documenta) | `opus` |
+| [`pulido-frontend`](.claude/skills/pulido-frontend/SKILL.md) | "esta pantalla está rara / pulí la UX-UI" → diagnosticar y mejorar una pantalla que **ya existe** (no implementar un diseño dado) | `opus` |
+| [`importar-diseno`](.claude/skills/importar-diseno/SKILL.md) | "implementá este handoff/mockup", "que el front/PDF quede como el diseño" → implementar un diseño **dado** + mantener la librería del DS | `sonnet` |
+| [`gear-compatibility`](.claude/skills/gear-compatibility/SKILL.md) | "generá compatibilidades entre equipos" → razonar sobre specs (vía API; propuestas encolan para aprobación humana) | `sonnet` |
 
 @docs/MEMORIA.md

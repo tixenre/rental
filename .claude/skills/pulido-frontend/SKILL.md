@@ -1,5 +1,8 @@
 ---
 name: pulido-frontend
+model: opus
+last-reviewed: 2026-06-23
+version: 1.0
 description: El go-to para AUDITAR y MEJORAR una pantalla/flujo del front que YA EXISTE y funciona, pero "está raro", no se ve bien, o se puede pulir. Flujo completo de calidad de experiencia — diagnosticar (rúbrica front-end, ejes P-U de PROTOCOLO) → rutear por riesgo → mejorar DS-first en 4 lentes (UX · UI/estética · modularización · performance) → verificar (render-compare + mobile gate + a11y + perf) → trackear página-por-página. Úsalo cuando el dueño diga "pulí la UX/UI", "esta pantalla está rara / no me cierra", "optimizá el flujo de X", "que se vea perfecto / más lindo", "mejorá la experiencia de X", "está lento el front", "modularizá esta pantalla", "auditá la UI de X con criterios de UX", o cuando detectes fricción/inconsistencia visual mientras trabajás. NO es para implementar un diseño ya hecho (handoff/mockup → skill `importar-diseno`), ni para diseñar desde cero (eso es Claude Design), ni para salud del repo / código muerto / seguridad (skill `mantenimiento`). Este skill DIAGNOSTICA qué falla en la experiencia y lo PULE de a poco — el corazón NO es una lista de fixes, sino el MÉTODO: recorrer la pantalla en vivo con rúbrica → rutear por riesgo → reusar/extender la librería del DS (nunca one-offs) → verificar contra el render real, mobile y accesibilidad → no romper el core de reservas. Delega: implementación fiel y motor render-compare en `importar-diseno`; método seguro + tests + supervisor en `mantenimiento`.
 ---
 

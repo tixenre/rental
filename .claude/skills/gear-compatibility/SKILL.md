@@ -1,5 +1,8 @@
 ---
 name: gear-compatibility
+model: sonnet
+last-reviewed: 2026-06-23
+version: 1.0
 description: Generates automatic equipment compatibility relationships between AV gear (cameras, lenses, monitors, recorders, lights, etc.) using existing specs as a baseline plus reasoning over scraped product data. Includes a spec resolver/normalizer that maps incoming labels to canonical specs and proposes new specs/options when warranted. Always operates against a backend API — never modifies the DB directly. Specs proposals never auto-apply; they queue for human approval.
 ---
 
