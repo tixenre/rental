@@ -115,7 +115,15 @@ function MarcaPage() {
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+}) {
   return (
     <section className="space-y-3">
       <div>
