@@ -8,6 +8,7 @@ import { type Equipment } from "@/data/equipment";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
+import { buildFotoSrcSet } from "@/lib/srcset";
 import { cn } from "@/lib/utils";
 import { Pill } from "@/design-system/kit/Pill";
 import { StepperPill } from "./equipment/shared/StepperPill";
@@ -103,6 +104,8 @@ export function EquipmentCard({
           {item.fotoUrl && !imgFailed ? (
             <img
               src={item.fotoUrl}
+              srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm)}
+              sizes="(max-width: 640px) 45vw, 250px"
               alt={nombrePublico}
               loading={index < 4 ? "eager" : "lazy"}
               decoding="async"

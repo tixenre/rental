@@ -6,9 +6,12 @@ from typing import Optional
 @dataclass
 class DeriveSpec:
     """Especificación para derivar una variante a partir del original."""
-    name: str    # 'display' | 'square' | 'nobg' | 'og' | 'bg:#hex' …
+    name: str    # 'display' | 'square' | 'display-sm' | 'nobg' | 'og' | 'bg:#hex' …
     square: bool  # pasado a _optimize_image
     fmt: str = "webp"  # formato de salida: 'webp' (default) | 'jpeg' (ej. OG para WhatsApp)
+    # Ancho/lado máximo de la variante. None = default del pipeline (1200 square /
+    # 1600 keep-aspect). Para srcset: variantes más chicas (ej. 'display-sm' a 600).
+    max_width: Optional[int] = None
 
 
 @dataclass

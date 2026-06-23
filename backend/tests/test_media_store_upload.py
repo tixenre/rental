@@ -123,6 +123,27 @@ class TestStoreUploadHappyPath:
         # URL pública debe contener la public_base
         assert display.url.startswith("https://cdn.example.com/")
 
+    def test_genera_variante_display_sm_para_srcset(self, monkeypatch):
+        """El upload de equipo deriva display (1200) + display-sm (600) para srcset."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE, DISPLAY_SQUARE_SM
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        raw = _png_bytes(2000, 2000)
+        conn = _FakeConn()
+        asset = store_upload(
+            raw, kind="equipo", derive_specs=[DISPLAY_SQUARE, DISPLAY_SQUARE_SM], conn=conn
+        )
+
+        display = asset.variant("display")
+        sm = asset.variant("display-sm")
+        assert display is not None and sm is not None
+        assert display.width == 1200 and sm.width == 600  # srcset: 600w + 1200w
+        assert sm.key.endswith("/display-sm.webp")
+        assert sm.bytes < display.bytes  # la variante chica pesa menos
+
     def test_asset_id_en_la_key(self, monkeypatch):
         from services.media.service import store_upload
         from services.media.specs import DISPLAY_KEEP_ASPECT
