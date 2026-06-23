@@ -177,17 +177,13 @@ function TallerLandingPage() {
                       {fechaFinStr}, {taller.horario}
                     </h2>
                   </div>
-                  <ul className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-4">
                     {taller.programa_practica.map((item, i) => (
-                      <ProgramaItem key={i} text={item} index={i} />
+                      <p key={i} className="text-sm leading-relaxed text-foreground/80">
+                        {item}
+                      </p>
                     ))}
-                  </ul>
-                  <p className="mt-5 text-sm text-muted-foreground italic">
-                    Llegamos a la mejor parte (o la que a mí más me divierte): crear el set. En esta
-                    instancia se suman el director de fotografía (Pablo Isa) y el gaffer (Tincho
-                    Santini), que se encargarán del equipo técnico, junto con Rambla Rental, para que
-                    la práctica sea aún más real y podamos ver el resultado final.
-                  </p>
+                  </div>
                 </section>
               )}
 
