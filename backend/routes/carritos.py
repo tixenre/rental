@@ -10,6 +10,7 @@ El conflicto de stock se calcula READ-ONLY reusando el motor de reservas
 """
 
 import json
+import logging
 import uuid as _uuid
 from typing import Optional
 
@@ -20,6 +21,7 @@ from database import get_db, row_to_dict
 from routes.auth import get_session
 
 router = APIRouter(tags=["carritos"])
+logger = logging.getLogger(__name__)
 
 # Un carrito sin actividad por más de esto se considera abandonado (se le estampa
 # `abandonado_en` la primera vez que lo detectamos; un heartbeat nuevo lo limpia).
@@ -180,93 +182,100 @@ def admin_listar_carritos(request: Request, horas: int = 72):
 
     require_admin(request)
 
-    with get_db() as conn:
-        # Estampar abandono: la primera vez que un carrito cruza el umbral sin
-        # actividad le ponemos `abandonado_en`. Idempotente; un heartbeat nuevo
-        # lo limpia (ver upsert). Es bookkeeping barato sobre el índice de updated_at.
-        conn.execute(
-            """
-            UPDATE carritos_activos
-            SET abandonado_en = NOW()
-            WHERE NOT confirmado
-              AND abandonado_en IS NULL
-              AND total_items > 0
-              AND updated_at < NOW() - (? * INTERVAL '1 hour')
-            """,
-            (ABANDONO_HORAS,),
-        )
-        conn.commit()
+    try:
+        with get_db() as conn:
+            # Estampar abandono: la primera vez que un carrito cruza el umbral sin
+            # actividad le ponemos `abandonado_en`. Idempotente; un heartbeat nuevo
+            # lo limpia (ver upsert). Es bookkeeping barato sobre el índice de updated_at.
+            conn.execute(
+                """
+                UPDATE carritos_activos
+                SET abandonado_en = NOW()
+                WHERE NOT confirmado
+                  AND abandonado_en IS NULL
+                  AND total_items > 0
+                  AND updated_at < NOW() - (? || ' hours')::interval
+                """,
+                (str(ABANDONO_HORAS),),
+            )
+            conn.commit()
 
-        rows = conn.execute(
-            """
-            SELECT
-                ca.id,
-                ca.session_id,
-                ca.cliente_id,
-                cl.nombre       AS cliente_nombre,
-                cl.email        AS cliente_email,
-                cl.telefono     AS cliente_telefono,
-                ca.items_json,
-                ca.fecha_desde,
-                ca.fecha_hasta,
-                ca.hora_desde,
-                ca.hora_hasta,
-                ca.total_items,
-                ca.monto_estimado,
-                ca.confirmado,
-                ca.abandonado_en,
-                ca.created_at,
-                ca.updated_at
-            FROM carritos_activos ca
-            LEFT JOIN clientes cl ON cl.id = ca.cliente_id
-            WHERE NOT ca.confirmado
-              AND ca.total_items > 0
-              AND ca.updated_at > NOW() - (? * INTERVAL '1 hour')
-            ORDER BY ca.updated_at DESC
-            LIMIT 200
-            """,
-            (int(horas),),
-        ).fetchall()
+            rows = conn.execute(
+                """
+                SELECT
+                    ca.id,
+                    ca.session_id,
+                    ca.cliente_id,
+                    cl.nombre       AS cliente_nombre,
+                    cl.email        AS cliente_email,
+                    cl.telefono     AS cliente_telefono,
+                    ca.items_json,
+                    ca.fecha_desde,
+                    ca.fecha_hasta,
+                    ca.hora_desde,
+                    ca.hora_hasta,
+                    ca.total_items,
+                    ca.monto_estimado,
+                    ca.confirmado,
+                    ca.abandonado_en,
+                    ca.created_at,
+                    ca.updated_at
+                FROM carritos_activos ca
+                LEFT JOIN clientes cl ON cl.id = ca.cliente_id
+                WHERE NOT ca.confirmado
+                  AND ca.total_items > 0
+                  AND ca.updated_at > NOW() - (? || ' hours')::interval
+                ORDER BY ca.updated_at DESC
+                LIMIT 200
+                """,
+                (str(horas),),
+            ).fetchall()
 
-        carritos = []
-        for r in rows:
-            d = row_to_dict(r)
-            d["items"] = json.loads(d.pop("items_json") or "[]")
-            d["abandonado"] = d.pop("abandonado_en", None) is not None
-            carritos.append(d)
+            carritos = []
+            for r in rows:
+                d = row_to_dict(r)
+                raw = d.pop("items_json")
+                d["items"] = raw if isinstance(raw, list) else json.loads(raw or "[]")
+                d["abandonado"] = d.pop("abandonado_en", None) is not None
+                carritos.append(d)
 
-        # Conflicto de stock por carrito (READ-ONLY, motor de reservas). Cacheamos
-        # la disponibilidad por par de fechas para no recalcular el motor por carrito.
-        disp_cache: dict[tuple[str, str], dict] = {}
-        for c in carritos:
-            fd, fh = c.get("fecha_desde"), c.get("fecha_hasta")
-            if not fd or not fh:
-                c["sin_stock"] = False
-                continue
-            fd, fh = str(fd), str(fh)
-            key = (fd, fh)
-            if key not in disp_cache:
-                disp_cache[key] = calcular_disponibilidad(conn, fd, fh)
-            disp = disp_cache[key]
-            sin_stock = False
-            for it in c["items"]:
-                libres = disp.get(str(it["equipo_id"]))
-                it["disponible"] = libres
-                if libres is not None and it.get("cantidad", 0) > libres:
-                    sin_stock = True
-            c["sin_stock"] = sin_stock
+            # Conflicto de stock por carrito (READ-ONLY, motor de reservas). Cacheamos
+            # la disponibilidad por par de fechas para no recalcular el motor por carrito.
+            disp_cache: dict[tuple[str, str], dict] = {}
+            for c in carritos:
+                fd, fh = c.get("fecha_desde"), c.get("fecha_hasta")
+                if not fd or not fh:
+                    c["sin_stock"] = False
+                    continue
+                fd, fh = str(fd), str(fh)
+                key = (fd, fh)
+                if key not in disp_cache:
+                    disp_cache[key] = calcular_disponibilidad(conn, fd, fh)
+                disp = disp_cache[key]
+                sin_stock = False
+                for it in c["items"]:
+                    libres = disp.get(str(it["equipo_id"]))
+                    it["disponible"] = libres
+                    if libres is not None and it.get("cantidad", 0) > libres:
+                        sin_stock = True
+                c["sin_stock"] = sin_stock
 
-        stats = _calcular_stats(conn, carritos)
-        demanda = _calcular_demanda(carritos)
-        por_dia = _carritos_por_dia(conn)
+            stats = _calcular_stats(conn, carritos)
+            demanda = _calcular_demanda(carritos)
+            por_dia = _carritos_por_dia(conn)
 
-    return {
-        "carritos": carritos,
-        "total": len(carritos),
-        "stats": stats,
-        "demanda": demanda,
-        "por_dia": por_dia,
-    }
+        return {
+            "carritos": carritos,
+            "total": len(carritos),
+            "stats": stats,
+            "demanda": demanda,
+            "por_dia": por_dia,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("admin_listar_carritos falló")
+        raise HTTPException(500, detail=f"{type(exc).__name__}: {exc}")
 
 
 def _calcular_stats(conn, carritos: list[dict]) -> dict:
