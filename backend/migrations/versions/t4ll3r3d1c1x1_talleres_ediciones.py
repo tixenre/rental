@@ -3,14 +3,14 @@
 Permite vincular ediciones del mismo workshop (ej. julio → agosto).
 ADD COLUMN IF NOT EXISTS = idempotente.
 
-Revision ID: b2c3d4e5f6a7
-Revises: a1b2c3d4e5f6
+Revision ID: t4ll3r3d1c1x1
+Revises: t3ll4r1nst4x1
 Create Date: 2026-06-23
 """
 from alembic import op
 
-revision = "b2c3d4e5f6a7"
-down_revision = "a1b2c3d4e5f6"
+revision = "t4ll3r3d1c1x1"
+down_revision = "t3ll4r1nst4x1"
 branch_labels = None
 depends_on = None
 
