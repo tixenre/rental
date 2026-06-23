@@ -484,7 +484,7 @@
   _2026-06-03 (`reportes/`)_ y el esquema en dos capas _2026-06-03_ (extensiones + `f_unaccent` +
   índices + `search_clicks` viven en `init_db()` Y migración).
 
-### 2026-06-06 — Design system consolidado en la app; un solo skill de UI
+### 2026-06-06 — Design system consolidado en la app; `design-system` gobierna, `pulido-frontend` aplica
 
 - **Contexto:** convivían DOS implementaciones del DS: el paquete workspace
   `@rambla/design-system` (tokens/CSS/fuentes — consumidos vía `@import` — **+** copias paralelas de
@@ -492,22 +492,19 @@
   reales de la app en `src/components` (los que usó el rediseño de Pedidos v2 = lo último/canónico). El
   paquete no se consumía para componentes (0 imports JS), solo para CSS. Además había dos skills de
   diseño (`design-system` para el paquete, `importar-diseno` para implementar handoffs).
-- **Decisión (del dueño):** **todo lo de UI / front-end / design system / Claude Design / import +
-  implementación vive en UN solo lugar, con lo último y lo mejor.** (1) El DS canónico es la app:
-  primitivos en `src/design-system/{ui,kit}`, negocio en `src/components/{rental,admin}`,
-  tokens/tipografía/utilities/fuentes en `src/design-system/styles/` (entry
-  `src/design-system/ds-styles.css`; PR #981 reorgó desde `src/styles/` + `src/components/{ui,kit}`).
-  (2) El paquete `@rambla/design-system`
-  y su workspace se **retiraron** (los tokens/CSS/fuentes se migraron a `src/` **verbatim** — CSS
-  compilado verificado como subconjunto del previo, cero regresión visual; las copias de componentes
-  drifteadas se descartaron, gana la app). (3) **Un solo skill: `importar-diseno`** — implementa
-  diseños Y mantiene/consume la librería (reuse-first). El skill `design-system` se retiró.
+- **Decisión original (2026-06-06):** todo el DS en la app; un solo skill (`importar-diseno`). El
+  paquete workspace `@rambla/design-system` retirado. Cierra #662.
+- **Refinamiento (2026-06-23):** `importar-diseno` archivado — el diseño se refina directamente en
+  Claude Code, ya no vienen handoffs de Adobe/PDF externos. El rol de gobernanza del DS lo toma el
+  skill **`design-system`** (`model: opus`): audita sistémicamente (tokens, adopción,
+  reimplementaciones, 11 principios, drift del doc `DESIGN_SYSTEM.md`), proporciona el dashboard `/ds`,
+  y propone issues. **`pulido-frontend`** aplica los fixes en pantalla. Cuadro de roles: `design-system`
+  gobierna · `pulido-frontend` ejecuta UI · `mantenimiento` ejecuta código.
 - **Cómo aplica / quién hace cumplir:** un token/utility se edita en `src/design-system/styles/`,
   una pieza de DS en `src/design-system/{ui,kit}` o de negocio en `src/components/{rental,admin}`;
   **no se recrea un paquete workspace** ni se duplica una pieza que ya existe. El
-  supervisor marca como hallazgo cualquier intento de reintroducir el paquete o un segundo skill de DS.
-  Cierra la iniciativa #662 (invertir la fuente de verdad hacia el paquete — abandonada por esta
-  decisión); los trackers de migración por pantalla (#612) y handoff (#605) siguen vigentes sobre `src/`.
+  supervisor marca un skill en disco que no esté listado en `CLAUDE.md`; `check-docs.mjs` lo caza.
+  Los trackers de migración por pantalla (#612) siguen vigentes sobre `src/`.
 
 ### 2026-06-07 — `backend/contabilidad/` = motor único de la plata "de adentro" (cierra #809)
 
@@ -1035,3 +1032,31 @@ cancel-in-progress` ya cancela corridas viejas.
   `## Auto-mejora` → un skill mal formado falla el CI desde ahora. La tabla de `CLAUDE.md` incluye
   `gobernanza` con sus disparadores y `model: opus`. El supervisor marca skills sin `## Auto-mejora` o
   un `gobernanza` que aplique cambios sin aprobación explícita del dueño.
+
+### 2026-06-23 — design-system = gobernador del DS; importar-diseno archivado
+
+- **Contexto.** El DS de Rambla tiene estructura sólida (tokens OKLCH modulares, 4 piezas `kit/` con
+  fuente única, guardrails ESLint) pero **adopción incompleta** que acumula drift en cada PR: ~19 CTAs
+  crudos, ~52 `text-[Nrem]` escapados, ~7 pills manuales, tokens de motion sin adoptar (~0%), N1/N8
+  (contrastes WCAG bajo AA). No existía un skill que auditara el DS sistémicamente — `pulido-frontend`
+  lo hace pantalla por pantalla y `auditoria-profunda` va por flujo de negocio, no por DS. Por otra
+  parte, `importar-diseno` dejó de tener uso real: el diseño ya no viene de handoffs de Adobe/PDF
+  externos sino que se refina directamente en Claude Code.
+- **Decisión.**
+  1. **Archivar `importar-diseno`** → `.claude/skills/.archive/importar-diseno/` (reversible vía git;
+     no se borra). El rol de implementar cambios al DS lo toma `pulido-frontend` cuando corresponda.
+  2. **Crear el skill `design-system`** (`.claude/skills/design-system/SKILL.md`, `model: opus`) como
+     **gobernador del DS**: audita sistémicamente (Fase 1: grep mecánico de colores/sizes/componentes/
+     a11y; Fase 2: contraste WCAG + 11 principios + adopción de tokens; Fase 3: drift entre
+     `docs/DESIGN_SYSTEM.md` y el código), dashboard `/ds` (estado rápido sin auditoría completa),
+     y propone issues con drafts — el dueño aprueba, la sesión los crea. **Read-only: nunca edita
+     código.** `pulido-frontend` aplica los fixes en pantalla.
+  3. **Actualizar `CLAUDE.md`** y la entrada de MEMORIA 2026-06-06 para reflejar el nuevo cuadro.
+- **Why.** El mismo ciclo propone-aprobás que `gobernanza` y `cola` — detecta antes de que acumule
+  deuda. La separación gobernador/ejecutor evita que el skill de auditoría mezcle diagnosis con
+  escritura (honestidad > movimiento). `importar-diseno` era un skill sin uso: archivarlo limpia el
+  mapa y el linter.
+- **Consecuencias.** 7 skills en disco (idem, `importar-diseno` en `.archive/` ignorado por el
+  linter). `CLAUDE.md` reemplaza la fila de `importar-diseno` por `design-system`. El supervisor
+  marca un skill en disco sin fila en la tabla. Cadencia sugerida: mensual o tras merge que toque
+  `src/design-system/` o `docs/DESIGN_SYSTEM.md`.

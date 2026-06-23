@@ -152,12 +152,14 @@ Toda búsqueda de texto (clientes/equipos/catálogo) pasa por `backend/busqueda/
 con normalización espejada en `src/lib/search/normalize.ts`. Nombre del cliente vía helper único. El
 supervisor marca `ILIKE`/`LIKE` o normalizadores ad-hoc, e índices cuya expresión no sea la canónica.
 
-### 2026-06-06 — Design system consolidado en la app; un solo skill de UI
+### 2026-06-06 — Design system consolidado en la app; `design-system` gobierna, `pulido-frontend` aplica
 
 El DS canónico es la app: primitivos en `src/design-system/{ui,kit}`, componentes de negocio en
 `src/components/{rental,admin}`, tokens/fuentes en `src/design-system/styles/` (entry
-`src/design-system/ds-styles.css`). **Un solo skill: `importar-diseno`.** No reintroducir el paquete
-workspace `@rambla/design-system` ni un segundo skill de DS; no duplicar una pieza que ya existe.
+`src/design-system/ds-styles.css`). **El skill `design-system` (opus) gobierna** (audita sistémicamente,
+dashboard `/ds`, propone issues); **`pulido-frontend` aplica** los fixes en pantalla. `importar-diseno`
+archivado — el diseño se refina directamente en Claude Code, no desde handoffs externos. No reintroducir el
+paquete workspace `@rambla/design-system`; no duplicar una pieza que ya existe.
 _(Paths actualizados post-PR #981 — reorg a `src/design-system/`.)_
 
 ### 2026-06-07 — `backend/contabilidad/` = motor único de la plata "de adentro" (cierra #809)
@@ -284,6 +286,15 @@ tenga la atención continua y liviana que necesita. El **Frente D de `mantenimie
 el método). Refina _Issues: la cola espeja el código (2026-06-08)_ y _Protocolo de brain-dumps (2026-05-25)_.
 Regla de oro: **cerrar es afirmar** → solo con evidencia (PR/commit) o la orden del dueño; el dueño dirige, la
 sesión recomienda.
+
+### 2026-06-23 — design-system = gobernador del DS; importar-diseno archivado
+
+El skill **`design-system`** (`model: opus`) gobierna el Design System: audita sistémicamente (tokens, adopción,
+reimplementaciones, 11 principios, drift del doc), dashboard `/ds` (estado rápido sin auditoría completa), propone
+issues — `pulido-frontend` los aplica. Es **read-only**: nunca edita código. **`importar-diseno` archivado** — el
+diseño se refina directamente en Claude Code, no desde handoffs externos; su rol de implementar lo toma
+`pulido-frontend` cuando aplique. El cuadro completo: `design-system` gobierna · `pulido-frontend` ejecuta UI ·
+`mantenimiento` ejecuta código. Refina _Design system consolidado (2026-06-06)_.
 
 ---
 
