@@ -146,3 +146,24 @@ export function markDocSeen(pedidoId: number, tipo: DocTipo): void {
     /* ignore */
   }
 }
+
+// El "visto" de docs vive en localStorage → un device nuevo (o storage limpio)
+// no tiene nada marcado y vería TODOS los docs históricos como "nuevos". Este flag
+// marca que ya se hizo la inicialización: en la primera carga con pedidos se marca
+// lo existente como visto (silencioso, sin popup) y solo los docs que aparezcan
+// DESPUÉS disparan la notificación.
+const DOC_SEEN_INIT_KEY = "rambla.doc_seen.initialized";
+export function docSeenInitialized(): boolean {
+  try {
+    return localStorage.getItem(DOC_SEEN_INIT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+export function markDocSeenInitialized(): void {
+  try {
+    localStorage.setItem(DOC_SEEN_INIT_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
