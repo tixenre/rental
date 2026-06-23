@@ -99,7 +99,7 @@ const items: NavItem[] = [
       { title: "Glosario", url: "/admin/contabilidad/glosario", icon: BookOpen },
     ],
   },
-  { title: "Diseño y marca", url: "/admin/diseno", icon: Palette },
+  { title: "Assets y diseño", url: "/admin/diseno", icon: Palette },
   { title: "Marca", url: "/admin/marca", icon: Megaphone },
   { title: "Novedades", url: "/admin/novedades", icon: Sparkles },
   { title: "Datos y backups", url: "/admin/dataio", icon: HardDriveDownload },
