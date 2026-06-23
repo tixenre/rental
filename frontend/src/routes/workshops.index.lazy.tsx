@@ -193,9 +193,11 @@ function TalleresPage() {
           </div>
         )}
 
-        {talleres.map((t) => (
-          <WorkshopCard key={t.id} taller={t} />
-        ))}
+        {talleres
+          .filter((_, i) => talleres.slice(0, i).every((prev) => prev.cupos_disponibles === 0))
+          .map((t) => (
+            <WorkshopCard key={t.id} taller={t} />
+          ))}
 
         {/* Ediciones anteriores */}
         <div className="mt-6 flex flex-col gap-3">

@@ -194,7 +194,9 @@ function TallerLandingPage() {
               </p>
 
               {/* Badges de edición */}
-              {(taller.edicion_anterior || taller.proxima_edicion) && (
+              {/* La próxima edición se muestra solo cuando esta está sold out */}
+              {(taller.edicion_anterior ||
+                (taller.proxima_edicion && taller.cupos_disponibles === 0)) && (
                 <div className="mt-6 flex flex-wrap gap-2">
                   {taller.edicion_anterior && (
                     <EdicionBadge edicion={taller.edicion_anterior} activa={false} />
@@ -203,7 +205,7 @@ function TallerLandingPage() {
                     edicion={{ ...taller, cupos_disponibles: taller.cupos_disponibles }}
                     activa={true}
                   />
-                  {taller.proxima_edicion && (
+                  {taller.proxima_edicion && taller.cupos_disponibles === 0 && (
                     <EdicionBadge edicion={taller.proxima_edicion} activa={false} />
                   )}
                 </div>

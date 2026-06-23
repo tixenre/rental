@@ -41,7 +41,7 @@ branch default es **`main`**, se **auto-cierra al promover `dev → main`** (cua
 citar la issue, no solo el `#PR`. La **promoción `dev → main` reconcilia**: su PR lista las issues que
 cierra el lote → cierre en bloque con evidencia. Features grandes diferidas con label **`someday`**
 (separa lo diferido de la cola activa; no es deuda sin cerrar). Triage **liviano y seguido** vía skill
-`mantenimiento` (frente D): verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
+`cola`: verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
 tracking (no uno por fase).
 
 ### 2026-05-25 — Modus operandi durable, sesión efímera
@@ -152,12 +152,14 @@ Toda búsqueda de texto (clientes/equipos/catálogo) pasa por `backend/busqueda/
 con normalización espejada en `src/lib/search/normalize.ts`. Nombre del cliente vía helper único. El
 supervisor marca `ILIKE`/`LIKE` o normalizadores ad-hoc, e índices cuya expresión no sea la canónica.
 
-### 2026-06-06 — Design system consolidado en la app; un solo skill de UI
+### 2026-06-06 — Design system consolidado en la app; `design-system` gobierna, `pulido-frontend` aplica
 
 El DS canónico es la app: primitivos en `src/design-system/{ui,kit}`, componentes de negocio en
 `src/components/{rental,admin}`, tokens/fuentes en `src/design-system/styles/` (entry
-`src/design-system/ds-styles.css`). **Un solo skill: `importar-diseno`.** No reintroducir el paquete
-workspace `@rambla/design-system` ni un segundo skill de DS; no duplicar una pieza que ya existe.
+`src/design-system/ds-styles.css`). **El skill `design-system` (opus) gobierna** (audita sistémicamente,
+dashboard `/ds`, propone issues); **`pulido-frontend` aplica** los fixes en pantalla. `importar-diseno`
+archivado — el diseño se refina directamente en Claude Code, no desde handoffs externos. No reintroducir el
+paquete workspace `@rambla/design-system`; no duplicar una pieza que ya existe.
 _(Paths actualizados post-PR #981 — reorg a `src/design-system/`.)_
 
 ### 2026-06-07 — `backend/contabilidad/` = motor único de la plata "de adentro" (cierra #809)
@@ -249,6 +251,69 @@ invierte a **amber + ink** en hover. El texto hueso en reposo es **decisión de 
 no "corregir" a dorado (el dorado es la jugada del hover, la _reverse signature_ ink↔amber). Materializa la
 _Filosofía de diseño del DS (2026-06-20)_ (una sola forma del CTA). El supervisor marca un CTA primario que
 vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente el gesto en vez de usar `<Button>`.
+
+### 2026-06-23 — Capa de skills auto-gobernada y portable: registro verificado + routing de modelo + loop de aprendizaje
+
+La capa de skills se gobierna como el código y la memoria (**fuente única + guardrail mecánico +
+propone-no-escribe**). El **mapa canónico** es la tabla "Skills — cuál uso para qué" de `CLAUDE.md` (árbol
+de decisión por disparador + columna **Modelo**); `scripts/check-docs.mjs` —config-driven vía
+`.claude/governance.config.mjs`, **portable a otros repos**— verifica que todo skill en disco esté listado
+ahí (Bloque 4) y bien formado (Bloque 5: frontmatter `name`/`description`/`model`/`last-reviewed`/`version`;
+staleness = warning). El **routing de modelo** materializa _Eficiencia de sesión (2026-05-26)_ en el `model:`
+de cada skill (criterio/diagnóstico→**opus**, ejecución→**sonnet**; los de criterio delegan la ejecución a
+subagentes `sonnet`). Blueprint del Curator de Hermes Agent, **nativo** (no un segundo agente). El **loop de
+aprendizaje** (Etapa 1B): buzón `docs/PROPUESTAS_SKILLS.md` (auto-mejora **propone**, el dueño aprueba),
+telemetría de uso por hook y check-in proactivo de la cola. Plantilla `.claude/skill-template.md` (fuera de
+`skillsDir`). El supervisor marca un skill en disco sin fila en `CLAUDE.md` o un `model:` que no pegue con el task.
+
+### 2026-06-23 — Gobernanza Etapa 2: Auto-mejora universal + meta-skill gobernanza (dashboard, auditoría, dry-run)
+
+**Auto-mejora propagada a todos los skills activos** (`mantenimiento`, `auditoria-profunda`, `pulido-frontend`,
+`gear-compatibility`; `importar-diseno` recibió la sección pero fue archivado en 2026-06-23). El linter (Bloque 5 de `check-docs.mjs`) ahora **exige**
+`## Auto-mejora` en todo `SKILL.md` — skills sin ella fallan el CI. El **meta-skill `gobernanza`**
+(`.claude/skills/gobernanza/SKILL.md`, `model: opus`) implementa el loop completo: dashboard `/skills`
+(qué hay, último uso del ledger, staleness, propuestas pendientes), auditoría profunda de drift/overlap/
+bloat/routing de modelo, consumo del buzón + ledger, consolidación en modo **dry-run** (propone-no-borra,
+archiva a `.claude/skills/.archive/`), y cierre periódico mensual. Modo propone-aprobás en todos los pasos.
+El supervisor marca skills sin `## Auto-mejora` o un `gobernanza` que aplique cambios sin aprobación.
+
+### 2026-06-23 — cola = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
+
+Toda administración de la cola (reconciliar issues abiertos contra commits/PRs shippeados para cazar
+**hecho-pero-abierto**, triagear con evidencia, deduplicar trackers, etiquetar, intake de brain-dumps, reporte
+"¿cómo está la cola?") vive en el skill **`cola`** (`.claude/skills/cola/SKILL.md`), **fuente única**, para que
+tenga la atención continua y liviana que necesita. El **Frente D de `mantenimiento` apunta acá** (ya no duplica
+el método). Refina _Issues: la cola espeja el código (2026-06-08)_ y _Protocolo de brain-dumps (2026-05-25)_.
+Regla de oro: **cerrar es afirmar** → solo con evidencia (PR/commit) o la orden del dueño; el dueño dirige, la
+sesión recomienda.
+
+### 2026-06-23 — design-system = gobernador del DS; importar-diseno archivado
+
+El skill **`design-system`** (`model: opus`) gobierna el Design System: audita sistémicamente (tokens, adopción,
+reimplementaciones, 11 principios, drift del doc), dashboard `/ds` (estado rápido sin auditoría completa), propone
+issues — `pulido-frontend` los aplica. Es **read-only**: nunca edita código. **`importar-diseno` archivado** — el
+diseño se refina directamente en Claude Code, no desde handoffs externos; su rol de implementar lo toma
+`pulido-frontend` cuando aplique. El cuadro completo: `design-system` gobierna · `pulido-frontend` ejecuta UI ·
+`mantenimiento` ejecuta código. Refina _Design system consolidado (2026-06-06)_.
+
+### 2026-06-23 — 6 skills nuevos: calidad-codigo, auditoria-seguridad, performance, specs, catalogo, calidad-tests
+
+Capa de skills ampliada con 6 skills de auditoría y gobernanza (todos `model: opus`, proponen-no-aplican):
+**`calidad-codigo`** (TypeScript, React patterns, duplicación lógica, complejidad); **`auditoria-seguridad`**
+(OWASP, auth, CORS, headers, secretos, deps vulnerables); **`performance`** (bundle, code splitting, N+1, caching,
+Core Web Vitals); **`specs`** (taxonomía de specs de equipos: consistencia, gaps, specs informales); **`catalogo`**
+(completitud de datos: fotos, descripciones, precios, specs mínimas por categoría); **`calidad-tests`** (cobertura
+de módulos críticos, calidad de assertions, edge cases sin tests). Todos son read-only y siguen el patrón
+propone-aprobás. `scripts/check-docs.mjs` los verifica como al resto.
+
+### 2026-06-23 — docs/MARCA.md = hub de marca; skill `marca` gobierna el inventario de features
+
+**`docs/MARCA.md`** es la fuente canónica de identidad de marca: quiénes somos, selling points por área
+(rental completo; estudio y workshops con `[TODO]` para que el dueño complete), voz/tono (referencia a
+`DESIGN_SYSTEM.md`), assets canónicos (URL, handle Instagram, rutas de logo). El inventario detallado de
+features de cara al usuario vive en **`docs/CAMPAÑA_FEATURES.md`** (no se duplica). El skill **`marca`**
+(`model: opus`, read-only) audita que las features reales de la app estén reflejadas en ambos docs, detecta
+features nuevas sin comunicar y selling points stale, y propone borradores de copy para aprobación del dueño.
 
 ---
 
