@@ -77,6 +77,7 @@ def _taller_to_dict(row) -> dict:
         "pago_cbu": row["pago_cbu"],
         "pago_banco": row["pago_banco"],
         "direccion": row["direccion"],
+        "instructor_foto_url": row["instructor_foto_url"] if "instructor_foto_url" in row.keys() else "",
     }
 
 

@@ -182,6 +182,12 @@ function TallerLandingPage() {
                       <ProgramaItem key={i} text={item} index={i} />
                     ))}
                   </ul>
+                  <p className="mt-5 text-sm text-muted-foreground italic">
+                    Llegamos a la mejor parte (o la que a mí más me divierte): crear el set. En esta
+                    instancia se suman el director de fotografía (Pablo Isa) y el gaffer (Tincho
+                    Santini), que se encargarán del equipo técnico, junto con Rambla Rental, para que
+                    la práctica sea aún más real y podamos ver el resultado final.
+                  </p>
                 </section>
               )}
 
@@ -190,12 +196,21 @@ function TallerLandingPage() {
                 <p className="font-mono text-2xs tracking-[0.25em] uppercase text-muted-foreground mb-4">
                   Sobre
                 </p>
-                <h2
-                  className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink mb-5"
-                  style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
-                >
-                  {taller.instructor_nombre}
-                </h2>
+                <div className="flex items-start gap-5 mb-5">
+                  {taller.instructor_foto_url && (
+                    <img
+                      src={taller.instructor_foto_url}
+                      alt={taller.instructor_nombre}
+                      className="shrink-0 w-20 h-20 rounded-full object-cover object-top border border-border/40"
+                    />
+                  )}
+                  <h2
+                    className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink self-center"
+                    style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
+                  >
+                    {taller.instructor_nombre}
+                  </h2>
+                </div>
                 <p className="text-base text-ink/80 leading-relaxed">{taller.instructor_bio}</p>
                 {taller.instructor_proyectos?.length > 0 && (
                   <div className="mt-6">

@@ -332,6 +332,7 @@ export type Taller = {
   pago_cbu: string;
   pago_banco: string;
   direccion: string;
+  instructor_foto_url?: string;
 };
 
 export type InscripcionBody = {

@@ -1587,6 +1587,7 @@ def _init_db_schema(conn):
         "ON taller_inscripciones(taller_id)"
     )
     # Seed idempotente del workshop de Jime Troncoso (julio 2026)
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_foto_url TEXT NOT NULL DEFAULT ''")
     import json as _json_t
     _programa_teorica = _json_t.dumps([
         "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
@@ -1602,6 +1603,12 @@ def _init_db_schema(conn):
         "Rambla Rental provee el equipo técnico para que la práctica sea lo más real posible",
         "Vemos el resultado final juntos",
     ])
+    _instructor_proyectos = (
+        "Universal LATAM, CheNetflix, Shorta, Spotify, Gancia, Skyy, Dr Lemon, Luigi Bosca, "
+        "Las Pastillas del Abuelo, Kevin Johansen, Los Pericos & El Plan de la Mariposa, "
+        "Agapornis, Guolis, Lucciano's, La Fonte D'Oro, Billabong, Atomik, Kappa x Huracán, "
+        "Bruto, Turboblender, Shell, Hops"
+    )
     conn.execute(
         """
         INSERT INTO talleres (
@@ -1621,9 +1628,7 @@ def _init_db_schema(conn):
             '26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos '
             'creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos '
             'digitales y físicos.',
-            'Universal LATAM, CheNetflix, Shorta, Spotify, Gancia, Skyy, Lucciano''s, Atomik, Luigi Bosca, '
-            'Shell, Las Pastillas del Abuelo, Los Pericos & El Plan de la Mariposa, Kevin Johansen, Bruto, '
-            'Hops, entre otros.',
+            %s,
             'Si llegaste hasta acá: gracias, estoy muy emocionada por hacer realidad este proyecto. '
             'El workshop incluye 2 clases en Rambla Estudio y son 12 cupos, porque quiero que sea '
             'un espacio donde podamos tener un intercambio de aprendizajes y conocimientos.',
@@ -1640,12 +1645,29 @@ def _init_db_schema(conn):
         )
         ON CONFLICT (slug) DO NOTHING
         """,
-        (_programa_teorica, _programa_practica),
+        (_instructor_proyectos, _programa_teorica, _programa_practica),
     )
-    # Fix idempotente: si la fila ya existía (ON CONFLICT DO NOTHING), actualiza notif_email.
+    # Actualizaciones idempotentes para filas ya existentes (ON CONFLICT DO NOTHING no las toca).
     conn.execute(
         "UPDATE talleres SET notif_email = %s WHERE slug = %s AND notif_email = ''",
         ("jimetroncoso44@gmail.com", "direccion-de-arte-jime-troncoso"),
+    )
+    conn.execute(
+        "UPDATE talleres SET instructor_proyectos = %s WHERE slug = %s",
+        (_instructor_proyectos, "direccion-de-arte-jime-troncoso"),
+    )
+    conn.execute(
+        "UPDATE talleres SET programa_teorica = %s::jsonb, programa_practica = %s::jsonb WHERE slug = %s",
+        (_programa_teorica, _programa_practica, "direccion-de-arte-jime-troncoso"),
+    )
+    conn.execute(
+        "UPDATE talleres SET instructor_bio = %s WHERE slug = %s",
+        (
+            "26 años, marplatense viviendo en CABA. Desde 2020 colabora con marcas, agencias y equipos "
+            "creativos en proyectos artísticos, audiovisuales y fotográficos, pensados para entornos "
+            "digitales y físicos.",
+            "direccion-de-arte-jime-troncoso",
+        ),
     )
 
     # ── Carritos activos (#280 Fase 1): persistencia server-side ──────────────
