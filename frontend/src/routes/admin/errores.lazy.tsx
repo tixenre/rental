@@ -73,8 +73,8 @@ function ErroresPage() {
   const { data, isLoading, isError, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: ["admin", "server-errors"],
     queryFn: () => adminApi.listServerErrors(),
-    refetchInterval: 30_000,
-    staleTime: 10_000,
+    refetchInterval: 5 * 60_000,
+    staleTime: 60_000,
   });
 
   const errores = data?.errores ?? [];
@@ -105,7 +105,7 @@ function ErroresPage() {
         <p className="text-xs text-muted-foreground">
           Actualizado {formatDistanceToNow(updatedAt, { addSuffix: true, locale: es })}
           {" · "}
-          Refresca automático cada 30s
+          Refresca automático cada 5 min
         </p>
       )}
 
