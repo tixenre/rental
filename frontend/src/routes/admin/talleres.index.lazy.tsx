@@ -150,8 +150,6 @@ function ContenidoSection({ taller }: { taller: TallerAdmin }) {
     programa_practica: (taller.programa_practica ?? []).join("\n"),
   });
 
-  // Solo reiniciar el form cuando cambia el taller (por id), no en cada actualización parcial.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setForm({
       nombre: taller.nombre,
@@ -163,7 +161,8 @@ function ContenidoSection({ taller }: { taller: TallerAdmin }) {
       programa_teorica: (taller.programa_teorica ?? []).join("\n"),
       programa_practica: (taller.programa_practica ?? []).join("\n"),
     });
-  }, [taller.id]);
+    // Solo reiniciar el form cuando cambia el taller (por id), no en cada actualización parcial.
+  }, [taller.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mut = useMutation({
     mutationFn: (body: UpdateBody) =>
