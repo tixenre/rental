@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import DOMPurify from "dompurify";
 
 /**
  * Inline-a un SVG remoto dentro del DOM (via dangerouslySetInnerHTML) para
@@ -6,8 +7,9 @@ import { useQuery } from "@tanstack/react-query";
  * `fill="currentColor"` — con `<img>` no se puede aplicar color desde CSS.
  *
  * Seguridad:
- *  - Sanitiza client-side strip de <script>, on*, <foreignObject>.
- *  - El backend ya sanitiza al upload (defensa en profundidad).
+ *  - Sanitiza client-side con **DOMPurify** (perfil SVG): elimina <script>, on*,
+ *    <foreignObject>, `href="javascript:"` y demás vectores, de forma robusta
+ *    (no por regex frágil). El backend ya sanitiza al upload (defensa en profundidad).
  *
  * Sizing:
  *  - El SVG inlined hereda el tamaño del span contenedor mediante
@@ -35,7 +37,10 @@ export function InlineSvg({
       const res = await fetch(url);
       if (!res.ok) throw new Error(`SVG fetch ${res.status}`);
       const text = await res.text();
-      return tintSvg(sanitizeSvg(text));
+      // DOMPurify con perfil SVG + filtros; mantiene <style>/fill/stroke (que tintSvg
+      // necesita) y elimina script/on*/foreignObject/href-javascript de forma robusta.
+      const clean = DOMPurify.sanitize(text, { USE_PROFILES: { svg: true, svgFilters: true } });
+      return tintSvg(clean);
     },
     staleTime: Infinity,
     gcTime: Infinity,
@@ -55,15 +60,6 @@ export function InlineSvg({
       dangerouslySetInnerHTML={{ __html: q.data }}
     />
   );
-}
-
-function sanitizeSvg(text: string): string {
-  return text
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<script\b[^>]*\/>/gi, "")
-    .replace(/\son\w+\s*=\s*(["'])[\s\S]*?\1/gi, "")
-    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
-    .replace(/<foreignObject\b[^>]*>[\s\S]*?<\/foreignObject>/gi, "");
 }
 
 /**
