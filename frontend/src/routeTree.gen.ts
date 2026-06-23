@@ -49,6 +49,7 @@ const AdminPagosLazyRouteImport = createFileRoute('/admin/pagos')()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
+const AdminErroresLazyRouteImport = createFileRoute('/admin/errores')()
 const AdminEmailTemplatesLazyRouteImport = createFileRoute(
   '/admin/email-templates',
 )()
@@ -56,7 +57,6 @@ const AdminDisenoLazyRouteImport = createFileRoute('/admin/diseno')()
 const AdminDataioLazyRouteImport = createFileRoute('/admin/dataio')()
 const AdminClientesLazyRouteImport = createFileRoute('/admin/clientes')()
 const AdminCarritosLazyRouteImport = createFileRoute('/admin/carritos')()
-const AdminErroesLazyRouteImport = createFileRoute('/admin/errores')()
 const AdminTalleresIndexLazyRouteImport = createFileRoute('/admin/talleres/')()
 const AdminSpecsIndexLazyRouteImport = createFileRoute('/admin/specs/')()
 const AdminPedidosIndexLazyRouteImport = createFileRoute('/admin/pedidos/')()
@@ -221,6 +221,11 @@ const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/estadisticas.lazy').then((d) => d.Route),
 )
+const AdminErroresLazyRoute = AdminErroresLazyRouteImport.update({
+  id: '/errores',
+  path: '/errores',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() => import('./routes/admin/errores.lazy').then((d) => d.Route))
 const AdminEmailTemplatesLazyRoute = AdminEmailTemplatesLazyRouteImport.update({
   id: '/email-templates',
   path: '/email-templates',
@@ -251,13 +256,6 @@ const AdminCarritosLazyRoute = AdminCarritosLazyRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any).lazy(() =>
   import('./routes/admin/carritos.lazy').then((d) => d.Route),
-)
-const AdminErroesLazyRoute = AdminErroesLazyRouteImport.update({
-  id: '/errores',
-  path: '/errores',
-  getParentRoute: () => AdminRoute,
-} as any).lazy(() =>
-  import('./routes/admin/errores.lazy').then((d) => d.Route),
 )
 const WorkshopsSlugRoute = WorkshopsSlugRouteImport.update({
   id: '/$slug',
@@ -508,11 +506,11 @@ export interface FileRoutesByFullPath {
   '/talleres/$slug': typeof TalleresSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
   '/admin/carritos': typeof AdminCarritosLazyRoute
-  '/admin/errores': typeof AdminErroesLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/dataio': typeof AdminDataioLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
+  '/admin/errores': typeof AdminErroresLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/pagos': typeof AdminPagosLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
@@ -564,11 +562,11 @@ export interface FileRoutesByTo {
   '/talleres/$slug': typeof TalleresSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
   '/admin/carritos': typeof AdminCarritosLazyRoute
-  '/admin/errores': typeof AdminErroesLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/dataio': typeof AdminDataioLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
+  '/admin/errores': typeof AdminErroresLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/pagos': typeof AdminPagosLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
@@ -628,11 +626,11 @@ export interface FileRoutesById {
   '/talleres/$slug': typeof TalleresSlugRoute
   '/workshops/$slug': typeof WorkshopsSlugRoute
   '/admin/carritos': typeof AdminCarritosLazyRoute
-  '/admin/errores': typeof AdminErroesLazyRoute
   '/admin/clientes': typeof AdminClientesLazyRoute
   '/admin/dataio': typeof AdminDataioLazyRoute
   '/admin/diseno': typeof AdminDisenoLazyRoute
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
+  '/admin/errores': typeof AdminErroresLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
   '/admin/pagos': typeof AdminPagosLazyRoute
   '/admin/settings': typeof AdminSettingsLazyRoute
@@ -693,11 +691,11 @@ export interface FileRouteTypes {
     | '/talleres/$slug'
     | '/workshops/$slug'
     | '/admin/carritos'
-    | '/admin/errores'
     | '/admin/clientes'
     | '/admin/dataio'
     | '/admin/diseno'
     | '/admin/email-templates'
+    | '/admin/errores'
     | '/admin/estadisticas'
     | '/admin/pagos'
     | '/admin/settings'
@@ -749,11 +747,11 @@ export interface FileRouteTypes {
     | '/talleres/$slug'
     | '/workshops/$slug'
     | '/admin/carritos'
-    | '/admin/errores'
     | '/admin/clientes'
     | '/admin/dataio'
     | '/admin/diseno'
     | '/admin/email-templates'
+    | '/admin/errores'
     | '/admin/estadisticas'
     | '/admin/pagos'
     | '/admin/settings'
@@ -812,11 +810,11 @@ export interface FileRouteTypes {
     | '/talleres/$slug'
     | '/workshops/$slug'
     | '/admin/carritos'
-    | '/admin/errores'
     | '/admin/clientes'
     | '/admin/dataio'
     | '/admin/diseno'
     | '/admin/email-templates'
+    | '/admin/errores'
     | '/admin/estadisticas'
     | '/admin/pagos'
     | '/admin/settings'
@@ -1015,6 +1013,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEstadisticasLazyRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/errores': {
+      id: '/admin/errores'
+      path: '/errores'
+      fullPath: '/admin/errores'
+      preLoaderRoute: typeof AdminErroresLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/email-templates': {
       id: '/admin/email-templates'
       path: '/email-templates'
@@ -1048,13 +1053,6 @@ declare module '@tanstack/react-router' {
       path: '/carritos'
       fullPath: '/admin/carritos'
       preLoaderRoute: typeof AdminCarritosLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/errores': {
-      id: '/admin/errores'
-      path: '/errores'
-      fullPath: '/admin/errores'
-      preLoaderRoute: typeof AdminErroesLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/workshops/$slug': {
@@ -1353,11 +1351,11 @@ interface AdminRouteChildren {
   AdminNovedadesRoute: typeof AdminNovedadesRoute
   AdminTalleresRoute: typeof AdminTalleresRouteWithChildren
   AdminCarritosLazyRoute: typeof AdminCarritosLazyRoute
-  AdminErroesLazyRoute: typeof AdminErroesLazyRoute
   AdminClientesLazyRoute: typeof AdminClientesLazyRoute
   AdminDataioLazyRoute: typeof AdminDataioLazyRoute
   AdminDisenoLazyRoute: typeof AdminDisenoLazyRoute
   AdminEmailTemplatesLazyRoute: typeof AdminEmailTemplatesLazyRoute
+  AdminErroresLazyRoute: typeof AdminErroresLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
   AdminPagosLazyRoute: typeof AdminPagosLazyRoute
   AdminSettingsLazyRoute: typeof AdminSettingsLazyRoute
@@ -1384,11 +1382,11 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminNovedadesRoute: AdminNovedadesRoute,
   AdminTalleresRoute: AdminTalleresRouteWithChildren,
   AdminCarritosLazyRoute: AdminCarritosLazyRoute,
-  AdminErroesLazyRoute: AdminErroesLazyRoute,
   AdminClientesLazyRoute: AdminClientesLazyRoute,
   AdminDataioLazyRoute: AdminDataioLazyRoute,
   AdminDisenoLazyRoute: AdminDisenoLazyRoute,
   AdminEmailTemplatesLazyRoute: AdminEmailTemplatesLazyRoute,
+  AdminErroresLazyRoute: AdminErroresLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
   AdminPagosLazyRoute: AdminPagosLazyRoute,
   AdminSettingsLazyRoute: AdminSettingsLazyRoute,

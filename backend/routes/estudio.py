@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 
 from admin_guard import require_admin
@@ -22,7 +22,7 @@ from routes.alquileres import (
 )
 from services.media.security import _download_image_bytes, _validate_ssrf_only
 from services.media.storage import delete_object as _delete_from_r2
-from services.media import DISPLAY_KEEP_ASPECT, collect_asset_keys, purge_r2, store_upload
+from services.media import DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM, collect_asset_keys, purge_r2, store_upload
 from services.media_fastapi import media_http
 
 router = APIRouter()
@@ -53,7 +53,7 @@ def _require_cliente(request):
 
 def _get_fotos(conn) -> list:
     cur = conn.execute(
-        "SELECT id, url, path, orden, es_principal, created_at "
+        "SELECT id, url, url_sm, path, orden, es_principal, created_at "
         "FROM estudio_fotos WHERE estudio_id = 1 ORDER BY orden, id",
         (),
     )
@@ -62,6 +62,7 @@ def _get_fotos(conn) -> list:
         {
             "id": r["id"],
             "url": r["url"],
+            "url_sm": r["url_sm"],
             "path": r["path"],
             "orden": r["orden"],
             "es_principal": bool(r["es_principal"]),
@@ -111,7 +112,9 @@ def _build_response(row, fotos: list) -> dict:
     }
 
 
-def _insert_foto(conn, url: str, path: str, media_id: int | None = None) -> dict:
+def _insert_foto(
+    conn, url: str, path: str, media_id: int | None = None, url_sm: str | None = None
+) -> dict:
     cur = conn.execute(
         "SELECT COALESCE(MAX(orden), -1) + 1 AS next_orden FROM estudio_fotos WHERE estudio_id = 1",
         (),
@@ -122,14 +125,14 @@ def _insert_foto(conn, url: str, path: str, media_id: int | None = None) -> dict
     is_first = cur2.fetchone()["cnt"] == 0
 
     conn.execute(
-        "INSERT INTO estudio_fotos (estudio_id, url, path, orden, es_principal, media_id) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (1, url, path, orden, is_first, media_id),
+        "INSERT INTO estudio_fotos (estudio_id, url, url_sm, path, orden, es_principal, media_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (1, url, url_sm, path, orden, is_first, media_id),
     )
     conn.commit()
 
     cur3 = conn.execute(
-        "SELECT id, url, path, orden, es_principal, created_at FROM estudio_fotos "
+        "SELECT id, url, url_sm, path, orden, es_principal, created_at FROM estudio_fotos "
         "WHERE path = ? AND estudio_id = 1",
         (path,),
     )
@@ -137,6 +140,7 @@ def _insert_foto(conn, url: str, path: str, media_id: int | None = None) -> dict
     return {
         "id": r["id"],
         "url": r["url"],
+        "url_sm": r["url_sm"],
         "path": r["path"],
         "orden": r["orden"],
         "es_principal": bool(r["es_principal"]),
@@ -147,12 +151,13 @@ def _insert_foto(conn, url: str, path: str, media_id: int | None = None) -> dict
 # ── Endpoint público ─────────────────────────────────────────────────────────
 
 @router.get("/estudio")
-def get_estudio():
+def get_estudio(response: Response):
     """Devuelve la configuración pública del estudio + fotos + pack curado.
 
     `pack_equipos` es la lista curada del pack con cantidades (stock total) para
     mostrar "qué incluye" en la ficha — independiente de la franja. La
     disponibilidad real por franja sigue saliendo de /estudio/disponibilidad."""
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     with get_db() as conn:
         row = _get_estudio_row(conn)
         fotos = _get_fotos(conn)
@@ -254,10 +259,20 @@ async def upload_foto(request: Request):
         try:
             with media_http():
                 asset = store_upload(
-                    raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
+                    raw,
+                    kind="estudio",
+                    derive_specs=[DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM],
+                    conn=conn,
                 )
             display = asset.variant("display")
-            foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
+            display_sm = asset.variant("display-sm")
+            foto = _insert_foto(
+                conn,
+                url=display.url,
+                path=display.key,
+                media_id=asset.id,
+                url_sm=display_sm.url if display_sm else None,
+            )
         except Exception:
             conn.rollback()
             raise
@@ -295,10 +310,20 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
         try:
             with media_http():
                 asset = store_upload(
-                    raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
+                    raw,
+                    kind="estudio",
+                    derive_specs=[DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM],
+                    conn=conn,
                 )
             display = asset.variant("display")
-            foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
+            display_sm = asset.variant("display-sm")
+            foto = _insert_foto(
+                conn,
+                url=display.url,
+                path=display.key,
+                media_id=asset.id,
+                url_sm=display_sm.url if display_sm else None,
+            )
         except Exception:
             conn.rollback()
             raise
