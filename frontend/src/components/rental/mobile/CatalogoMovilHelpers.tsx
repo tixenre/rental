@@ -140,30 +140,32 @@ export function HeroBanner({
   return (
     <div ref={heroRef} className="bg-ink">
       {/* Foto rotante 16:9 full-bleed (banner cinematográfico). Crossfade con
-          divs de background-image (NO <img>): background-size:cover es a prueba
-          de balas en todos los browsers y recorta la foto para llenar el 16:9
-          (las fotos del estudio son apaisadas ~3:2 → se recorta arriba/abajo).
-          A todo el ancho, pegada al topbar arriba y a la sección amber abajo.
+          <img> object-fit:cover — equivalente a background-size:cover pero permite
+          srcset/sizes y fetchpriority, lo que habilita al browser a elegir la
+          variante 800px en mobile (vs 1600px antes → ~4× menos bytes).
           bg-ink tapa cualquier gap subpíxel. */}
       <div
         className="relative overflow-hidden bg-ink"
-        style={{
-          width: "100%",
-          aspectRatio: "16 / 9",
-        }}
-        role="img"
+        style={{ width: "100%", aspectRatio: "16 / 9" }}
         aria-label="El Estudio — Rambla Rental"
       >
-        {photos.map((src, i) => (
-          <div
-            key={src}
-            aria-hidden
+        {photos.map((photo, i) => (
+          <img
+            key={photo.url}
+            src={photo.url}
+            srcSet={photo.urlSm ? `${photo.urlSm} 800w, ${photo.url} 1600w` : undefined}
+            sizes="100vw"
+            alt="El Estudio — Rambla Rental"
+            loading={i === 0 ? "eager" : "lazy"}
+            fetchPriority={i === 0 ? "high" : undefined}
+            aria-hidden={i !== photoIdx}
             style={{
               position: "absolute",
               inset: 0,
-              backgroundImage: `url(${src})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center",
               opacity: i === photoIdx ? 1 : 0,
               transition: "opacity 900ms",
             }}
