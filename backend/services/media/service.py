@@ -22,27 +22,10 @@ import logging
 from .errors import MediaError
 from .models import MediaAsset, MediaVariant, DeriveSpec
 from .processing import _optimize_image, _ext_from_ctype
+from .validation import validate_and_detect
 from . import storage, repository
 
 logger = logging.getLogger(__name__)
-
-
-def _detect_original_format(raw: bytes) -> tuple[str, str]:
-    """Devuelve (content_type, ext) del raw bytes usando PIL. Fallback a jpeg/jpg."""
-    try:
-        from PIL import Image
-        from io import BytesIO
-        img = Image.open(BytesIO(raw))
-        fmt_map = {
-            "JPEG": ("image/jpeg", "jpg"),
-            "PNG":  ("image/png", "png"),
-            "WEBP": ("image/webp", "webp"),
-            "GIF":  ("image/gif", "gif"),
-            "AVIF": ("image/avif", "avif"),
-        }
-        return fmt_map.get(img.format or "", ("image/jpeg", "jpg"))
-    except Exception:
-        return "image/jpeg", "jpg"
 
 
 def store_upload(
@@ -56,8 +39,9 @@ def store_upload(
 
     No hace commit. El caller escribe su fila (ej. estudio_fotos) y commitea.
     """
-    if not raw:
-        raise MediaError(400, "Archivo vacío")
+    # Seguridad: valida magic-bytes + decompression-bomb ANTES de tocar la DB o R2.
+    # Rechaza no-imágenes con 400 (en vez del fallback silencioso a jpeg).
+    original_ct, ext = validate_and_detect(raw)
 
     # 1. INSERT asset (sin R2 aún — inofensivo si falla después)
     asset_id = repository.insert_asset(conn, kind)
@@ -65,7 +49,6 @@ def store_upload(
     uploaded_keys: list[str] = []
     try:
         # 2. PUT original (bytes intactos)
-        original_ct, ext = _detect_original_format(raw)
         original_key = f"media/{kind}/{asset_id}/original.{ext}"
         storage.put(original_key, raw, original_ct)
         uploaded_keys.append(original_key)
