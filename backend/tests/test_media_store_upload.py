@@ -43,16 +43,23 @@ class _FakeR2Client:
 
 
 class _FakeConn:
-    """Minimal fake DB connection + cursor que soporta INSERT RETURNING id."""
+    """Minimal fake DB connection + cursor.
+
+    - INSERT ... RETURNING id → devuelve {"id": next_id} (autoincrement).
+    - SELECT / UPDATE / CREATE → devuelve None (no rows found / not applicable).
+    """
 
     def __init__(self):
         self._next_id = 1
         self.executed: list[tuple] = []
-        self._rows: dict = {}  # key → value para fetchone mocks
 
     def execute(self, sql: str, params=()):
         self.executed.append((sql.strip(), params))
-        return _FakeCursor(self._consume_next_id())
+        sql_upper = sql.strip().upper()
+        is_insert_returning = sql_upper.startswith("INSERT") and "RETURNING" in sql_upper
+        if is_insert_returning:
+            return _FakeCursorWithRow({"id": self._consume_next_id()})
+        return _FakeCursorEmpty()
 
     def _consume_next_id(self) -> int:
         n = self._next_id
@@ -69,12 +76,20 @@ class _FakeConn:
         pass
 
 
-class _FakeCursor:
-    def __init__(self, row_id: int):
-        self._row_id = row_id
+class _FakeCursorWithRow:
+    def __init__(self, row: dict):
+        self._row = row
 
     def fetchone(self):
-        return {"id": self._row_id}
+        return self._row
+
+    def fetchall(self):
+        return [self._row]
+
+
+class _FakeCursorEmpty:
+    def fetchone(self):
+        return None
 
     def fetchall(self):
         return []
@@ -157,6 +172,72 @@ class TestStoreUploadHappyPath:
         # La key debe contener el asset_id
         assert f"/{asset.id}/" in asset.original_key
         assert f"/{asset.id}/" in asset.variants[0].key
+
+    def test_asset_tiene_content_hash(self, monkeypatch):
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+        conn = _FakeConn()
+        asset = store_upload(_png_bytes(), kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn)
+
+        assert asset.content_hash is not None
+        assert len(asset.content_hash) == 64  # SHA-256 hex
+
+
+# ── dedup por hash ────────────────────────────────────────────────────────────
+
+class TestDedup:
+    def test_dedup_devuelve_existente_sin_tocar_r2(self, monkeypatch):
+        """Si la misma imagen ya existe para ese kind, store_upload devuelve el asset
+        existente sin hacer ningún PUT a R2."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+        from services.media.models import MediaAsset
+
+        existing_asset = MediaAsset(
+            id=42, kind="estudio",
+            original_key="media/estudio/42/original.png",
+            original_ct="image/png", width=400, height=300, bytes=1234,
+            content_hash="abc123",
+            variants=[],
+        )
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        # Parchamos find_by_hash para simular un hit de dedup.
+        import services.media.repository as repo_mod
+        monkeypatch.setattr(repo_mod, "find_by_hash", lambda conn, kind, h: existing_asset)
+
+        conn = _FakeConn()
+        result = store_upload(_png_bytes(), kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn)
+
+        # Debe devolver el asset existente
+        assert result.id == 42
+        assert result.original_key == "media/estudio/42/original.png"
+        # Y NO hacer ningún PUT (0 subidas a R2)
+        assert fake.puts == []
+
+    def test_no_dedup_si_imagen_distinta(self, monkeypatch):
+        """Dos imágenes distintas → dos assets distintos."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+        import services.media.repository as repo_mod
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        # find_by_hash devuelve None (no hay dedup)
+        monkeypatch.setattr(repo_mod, "find_by_hash", lambda conn, kind, h: None)
+
+        conn = _FakeConn()
+        asset = store_upload(_png_bytes(w=100, h=80), kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn)
+
+        # Nuevo asset creado, PUT realizado
+        assert asset.id is not None
+        assert len(fake.puts) >= 1  # original + variante(s)
 
 
 # ── fallo parcial ─────────────────────────────────────────────────────────────

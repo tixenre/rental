@@ -36,6 +36,7 @@ class MediaAsset:
     width: Optional[int]
     height: Optional[int]
     bytes: Optional[int]
+    content_hash: Optional[str] = None
     variants: list[MediaVariant] = field(default_factory=list)
 
     def variant(self, name: str) -> Optional[MediaVariant]:

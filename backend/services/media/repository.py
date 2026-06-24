@@ -23,15 +23,16 @@ def update_asset_original(
     width: int,
     height: int,
     size_bytes: int,
+    content_hash: str | None = None,
 ) -> None:
     conn.execute(
         """
         UPDATE media_assets
         SET original_key = ?, original_ct = ?, width = ?, height = ?, bytes = ?,
-            updated_at = CURRENT_TIMESTAMP
+            content_hash = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
-        (original_key, original_ct, width, height, size_bytes, asset_id),
+        (original_key, original_ct, width, height, size_bytes, content_hash, asset_id),
     )
 
 
@@ -57,6 +58,19 @@ def insert_variant(
         (asset_id, name, key, url, content_type, width, height, size_bytes),
     )
     return cur.fetchone()["id"]
+
+
+def find_by_hash(conn, kind: str, content_hash: str) -> "MediaAsset | None":
+    """Busca un asset existente por (kind, content_hash). None si no existe.
+    Usado para dedup: si la misma imagen se sube dos veces, devuelve el asset previo.
+    """
+    row = conn.execute(
+        "SELECT * FROM media_assets WHERE kind = ? AND content_hash = ?",
+        (kind, content_hash),
+    ).fetchone()
+    if not row:
+        return None
+    return load_asset(conn, row["id"])
 
 
 def collect_asset_keys(conn, asset_id: int) -> list[str]:
@@ -95,5 +109,6 @@ def load_asset(conn, asset_id: int) -> "MediaAsset | None":
         id=row["id"], kind=row["kind"],
         original_key=row["original_key"], original_ct=row["original_ct"],
         width=row["width"], height=row["height"], bytes=row["bytes"],
+        content_hash=row["content_hash"] if "content_hash" in row.keys() else None,
         variants=variants,
     )

@@ -17,6 +17,7 @@ Borrado:
   - collect_asset_keys: carga keys sin tocar DB.
   - purge_r2: best-effort delete de R2 (llamar DESPUÉS del commit del caller).
 """
+import hashlib
 import logging
 import re
 
@@ -60,6 +61,14 @@ def store_upload(
     # orientation-correct sin exif_transpose adicional. Fallback safe al raw.
     original_bytes = strip_exif_for_storage(raw, original_ct)
 
+    # Dedup por hash: si la misma imagen (sin EXIF) ya existe para este kind,
+    # devolver el asset existente sin re-procesar ni re-subir a R2.
+    content_hash = hashlib.sha256(original_bytes).hexdigest()
+    existing = repository.find_by_hash(conn, kind, content_hash)
+    if existing is not None:
+        logger.info("store_upload: dedup hit para kind=%s hash=%s…", kind, content_hash[:8])
+        return existing
+
     # 1. INSERT asset (sin R2 aún — inofensivo si falla después)
     asset_id = repository.insert_asset(conn, kind)
 
@@ -81,10 +90,11 @@ def store_upload(
             uploaded_keys.append(v_key)
             variants_data.append((spec.name, v_key, v_url, v_ct, v_w, v_h, len(v_content)))
 
-        # 4. UPDATE asset_original + INSERT variants
+        # 4. UPDATE asset_original (con hash para dedup futuro) + INSERT variants
         first_w, first_h = (variants_data[0][4], variants_data[0][5]) if variants_data else (0, 0)
         repository.update_asset_original(
-            conn, asset_id, original_key, original_ct, first_w, first_h, len(original_bytes),
+            conn, asset_id, original_key, original_ct, first_w, first_h,
+            len(original_bytes), content_hash=content_hash,
         )
 
         variant_objects: list[MediaVariant] = []
@@ -99,6 +109,7 @@ def store_upload(
             id=asset_id, kind=kind,
             original_key=original_key, original_ct=original_ct,
             width=first_w, height=first_h, bytes=len(original_bytes),
+            content_hash=content_hash,
             variants=variant_objects,
         )
 
