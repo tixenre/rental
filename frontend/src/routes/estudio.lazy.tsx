@@ -323,6 +323,9 @@ function EstudioPage() {
               src={heroPhoto.src}
               alt="El Estudio — Rambla Rental"
               loading="eager"
+              fetchPriority="high"
+              decoding="async"
+              sizes="100vw"
               className="h-full w-full object-cover block"
             />
           )}

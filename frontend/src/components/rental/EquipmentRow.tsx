@@ -104,7 +104,7 @@ export function EquipmentRow({
             {item.fotoUrl && !imgFailed ? (
               <img
                 src={item.fotoUrl}
-                srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm)}
+                srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm, item.fotoUrlThumb)}
                 sizes="52px"
                 alt={nombrePublico}
                 className="h-full w-full object-contain p-1.5"

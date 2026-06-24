@@ -18,6 +18,10 @@ DISPLAY_SQUARE = DeriveSpec(name="display", square=True)
 # chicas y `display` en grandes → baja ~4× los bytes en mobile. Acompaña a DISPLAY_SQUARE.
 DISPLAY_SQUARE_SM = DeriveSpec(name="display-sm", square=True, max_width=600)
 
+# Miniatura para slots muy chicos del catálogo (~48px): cuadrada 160×160. El navegador
+# elige esta variante en slots de 48px, evitando bajar los 600px de display-sm.
+DISPLAY_SQUARE_THUMB = DeriveSpec(name="display-thumb", square=True, max_width=160)
+
 # Variante OG para previews de WhatsApp/redes: misma foto cuadrada que `display`
 # pero en JPEG (WhatsApp no renderiza webp de forma confiable). Se inyecta en
 # og:image. La web sigue usando `display` (webp) — esto es solo para crawlers.

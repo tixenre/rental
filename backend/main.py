@@ -206,10 +206,32 @@ CSP_REPORT_ONLY = "; ".join(
 )
 
 
+# Estáticos no-hasheados servidos por el catch-all (estudio/*.jpg, favicon, icons,
+# robots, manifests): cache de 1 día. Los bundles hasheados (/assets/*) van aparte
+# como `immutable` 1 año (el hash de Vite invalida solos). El HTML del SPA → no-cache.
+_STATIC_EXT_RE = re.compile(
+    r"\.(?:js|css|jpg|jpeg|png|webp|avif|gif|svg|ico|woff2?|ttf|txt|json|map)$", re.I
+)
+
+
 @app.middleware("http")
 async def security_headers(request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
+    # Cache-Control por path (no se toca /api/* ni respuestas que ya fijan el suyo —
+    # sitemap/calendar/doc-preview usan setdefault, así que su valor gana). Arregla
+    # el "Use efficient cache lifetimes" de Lighthouse: el backend servía todo sin TTL.
+    path = request.url.path
+    if not path.startswith("/api/"):
+        ctype = response.headers.get("content-type", "")
+        if path.startswith("/assets/"):
+            response.headers.setdefault(
+                "Cache-Control", "public, max-age=31536000, immutable"
+            )
+        elif ctype.startswith("text/html"):
+            response.headers.setdefault("Cache-Control", "no-cache")
+        elif response.status_code == 200 and _STATIC_EXT_RE.search(path):
+            response.headers.setdefault("Cache-Control", "public, max-age=86400")
     # DENY global por default (anti-clickjacking, #503). `setdefault` para que una
     # ruta pueda relajar a SAMEORIGIN cuando su HTML está hecho para embeberse en
     # un iframe del propio portal (preview de documentos) sin que el middleware lo
@@ -369,12 +391,22 @@ def root():
             row = conn.execute(
                 "SELECT value FROM app_settings WHERE key = ?", ("og_image_url",)
             ).fetchone()
+            # Foto principal del estudio = LCP del home (misma fuente y orden que
+            # `useHeroPhotos`: es_principal DESC, orden ASC). Se preloadea para que
+            # sea descubrible en el HTML inicial.
+            hero_row = conn.execute(
+                "SELECT url FROM estudio_fotos WHERE estudio_id = 1 "
+                "ORDER BY es_principal DESC, orden ASC, id ASC LIMIT 1"
+            ).fetchone()
         finally:
             conn.close()
+        html_text = index_file.read_text(encoding="utf-8")
+        hero = (hero_row["url"].strip() if hero_row and hero_row["url"] else "")
+        if hero.startswith("http"):
+            html_text = _inject_hero_preload(html_text, hero)
         image = (row["value"].strip() if row and row["value"] else "")
-        if not image.startswith("http"):
-            return _serve_frontend("index.html")
-        html_text = _set_og_image(index_file.read_text(encoding="utf-8"), image)
+        if image.startswith("http"):
+            html_text = _set_og_image(html_text, image)
         return HTMLResponse(content=html_text)
     except Exception:
         logger.warning("OG injection de la home falló — sirvo index plano", exc_info=True)
@@ -407,6 +439,16 @@ def _inject_og_meta(html_text: str, *, title: str, description: str, image: str,
         html_text = _set(html_text, attr, key, value)
     html_text = re.sub(r"<title>[^<]*</title>", "<title>" + _html.escape(title) + "</title>", html_text, count=1)
     return html_text
+
+
+def _inject_hero_preload(html_text: str, image: str) -> str:
+    """Inserta un `<link rel=preload as=image fetchpriority=high>` del hero del home
+    justo antes de `</head>`. La URL del hero sale de un query async (`useHeroPhotos`),
+    así que sin esto el LCP no es descubrible en el HTML inicial — el browser no puede
+    arrancar el fetch hasta correr el JS + responder la API (LCP ~21s en Lighthouse)."""
+    esc = _html.escape(image, quote=True)
+    tag = f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
+    return html_text.replace("</head>", tag + "</head>", 1)
 
 
 def _set_og_image(html_text: str, image: str) -> str:
