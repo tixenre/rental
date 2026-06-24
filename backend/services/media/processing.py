@@ -8,6 +8,47 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def strip_exif_for_storage(raw: bytes, content_type: str) -> bytes:
+    """Strip EXIF del original antes de guardarlo en R2 (privacidad: GPS, device info, timestamps).
+
+    - Aplica exif_transpose para bake la orientación en los píxeles (la orientación queda
+      correcta incluso sin EXIF) → las variantes derivadas del original almacenado son
+      orientation-correct sin necesidad de exif_transpose extra.
+    - Re-guarda sin metadata. Pérdida: JPEG q=95/WebP q=95 (imperceptible); PNG/GIF lossless.
+    - Fallback al raw original si algo falla (safe: el pipeline sigue aunque el strip falle).
+    """
+    try:
+        from PIL import Image, ImageOps
+        from io import BytesIO
+
+        img = Image.open(BytesIO(raw))
+        img = ImageOps.exif_transpose(img)
+
+        _FMT_MAP: dict[str, tuple[str, str | None]] = {
+            "image/jpeg": ("JPEG", "RGB"),
+            "image/png":  ("PNG",  None),
+            "image/webp": ("WEBP", None),
+            "image/gif":  ("GIF",  None),
+            "image/avif": ("AVIF", None),
+        }
+        fmt, force_mode = _FMT_MAP.get(content_type, ("JPEG", "RGB"))
+
+        if force_mode and img.mode != force_mode:
+            img = img.convert(force_mode)
+
+        out = BytesIO()
+        if fmt == "JPEG":
+            img.save(out, format="JPEG", quality=95, optimize=True)
+        elif fmt == "WEBP":
+            img.save(out, format="WEBP", quality=95)
+        else:
+            img.save(out, format=fmt)
+        return out.getvalue()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("strip_exif_for_storage: fallback al original (%s)", e)
+        return raw
+
+
 def _ext_from_ctype(ct: str) -> str:
     ct = (ct or "").lower()
     if "png" in ct:  return "png"

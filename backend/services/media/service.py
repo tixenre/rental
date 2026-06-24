@@ -21,7 +21,7 @@ import logging
 
 from .errors import MediaError
 from .models import MediaAsset, MediaVariant, DeriveSpec
-from .processing import _optimize_image, _ext_from_ctype
+from .processing import _optimize_image, _ext_from_ctype, strip_exif_for_storage
 from .validation import validate_and_detect
 from . import storage, repository
 
@@ -43,21 +43,26 @@ def store_upload(
     # Rechaza no-imágenes con 400 (en vez del fallback silencioso a jpeg).
     original_ct, ext = validate_and_detect(raw)
 
+    # Privacidad: strip EXIF (GPS, device info, timestamps) del original antes de
+    # guardarlo. Bake orientación en píxeles → derivaciones posteriores son
+    # orientation-correct sin exif_transpose adicional. Fallback safe al raw.
+    original_bytes = strip_exif_for_storage(raw, original_ct)
+
     # 1. INSERT asset (sin R2 aún — inofensivo si falla después)
     asset_id = repository.insert_asset(conn, kind)
 
     uploaded_keys: list[str] = []
     try:
-        # 2. PUT original (bytes intactos)
+        # 2. PUT original (sin EXIF)
         original_key = f"media/{kind}/{asset_id}/original.{ext}"
-        storage.put(original_key, raw, original_ct)
+        storage.put(original_key, original_bytes, original_ct)
         uploaded_keys.append(original_key)
 
-        # 3. Derivar variantes
+        # 3. Derivar variantes desde el original ya sin EXIF (consistente con re-derivación futura)
         variants_data: list[tuple[str, str, str, str, int, int, int]] = []
         for spec in derive_specs:
             v_content, v_ct, v_w, v_h = _optimize_image(
-                raw, square=spec.square, fmt=spec.fmt, max_width=spec.max_width
+                original_bytes, square=spec.square, fmt=spec.fmt, max_width=spec.max_width
             )
             v_key = f"media/{kind}/{asset_id}/{spec.name}.{_ext_from_ctype(v_ct)}"
             v_url = storage.put(v_key, v_content, v_ct)
@@ -67,7 +72,7 @@ def store_upload(
         # 4. UPDATE asset_original + INSERT variants
         first_w, first_h = (variants_data[0][4], variants_data[0][5]) if variants_data else (0, 0)
         repository.update_asset_original(
-            conn, asset_id, original_key, original_ct, first_w, first_h, len(raw),
+            conn, asset_id, original_key, original_ct, first_w, first_h, len(original_bytes),
         )
 
         variant_objects: list[MediaVariant] = []
@@ -81,7 +86,7 @@ def store_upload(
         return MediaAsset(
             id=asset_id, kind=kind,
             original_key=original_key, original_ct=original_ct,
-            width=first_w, height=first_h, bytes=len(raw),
+            width=first_w, height=first_h, bytes=len(original_bytes),
             variants=variant_objects,
         )
 
