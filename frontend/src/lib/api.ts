@@ -88,6 +88,7 @@ export type BackendEquipo = {
   precio_usd: number | null;
   foto_url: string | null;
   foto_url_sm?: string | null; // variante 600px de la principal para srcset (puede faltar)
+  foto_url_thumb?: string | null; // variante 160px para thumbnails de ~48px (puede faltar)
   estado: string;
   visible_catalogo: number;
   relevancia_manual?: number;

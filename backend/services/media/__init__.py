@@ -5,7 +5,7 @@ El adapter FastAPI vive en services/media_fastapi.py.
 """
 from .errors import MediaError
 from .models import MediaAsset, MediaVariant, DeriveSpec
-from .specs import DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM, DISPLAY_SQUARE, DISPLAY_SQUARE_SM, OG_SQUARE_JPEG
+from .specs import DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM, DISPLAY_SQUARE, DISPLAY_SQUARE_SM, DISPLAY_SQUARE_THUMB, OG_SQUARE_JPEG
 from .service import store_upload, collect_asset_keys, purge_r2
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     "DISPLAY_KEEP_ASPECT_SM",
     "DISPLAY_SQUARE",
     "DISPLAY_SQUARE_SM",
+    "DISPLAY_SQUARE_THUMB",
     "OG_SQUARE_JPEG",
     "store_upload",
     "collect_asset_keys",
