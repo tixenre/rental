@@ -66,6 +66,8 @@ export type Equipment = {
   /** Variante 600px de la foto principal para srcset (catálogo en mobile). Null si la
    *  foto no tiene la variante (legacy / sin backfill) → se usa fotoUrl sin srcset. */
   fotoUrlSm?: string | null;
+  /** Variante 160px para thumbnails de ~48px. Null si sin backfill → cae a fotoUrlSm. */
+  fotoUrlThumb?: string | null;
   /** Galería multi-foto (#125): fotos del equipo, principal primero. Solo en el detalle. */
   fotos?: { url: string; esPrincipal?: boolean }[];
   cantidad?: number; // stock total

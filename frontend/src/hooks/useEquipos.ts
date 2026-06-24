@@ -444,6 +444,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     pricePerDay: e.precio_jornada ?? 0,
     fotoUrl: e.foto_url ?? null,
     fotoUrlSm: e.foto_url_sm ?? null,
+    fotoUrlThumb: e.foto_url_thumb ?? null,
     fotos: (e.fotos ?? []).map((f) => ({ url: f.url, esPrincipal: !!f.es_principal })),
     cantidad: e.cantidad ?? 1,
     description: ficha?.descripcion ?? "",

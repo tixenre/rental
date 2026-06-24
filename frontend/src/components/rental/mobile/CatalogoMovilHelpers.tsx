@@ -266,7 +266,7 @@ function CartItem({
         {eq.fotoUrl && !imgFailed ? (
           <img
             src={eq.fotoUrl}
-            srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+            srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}
             sizes="44px"
             alt={eq.name}
             className="w-full h-full object-contain p-1"
@@ -937,7 +937,7 @@ export function EquipmentRow({
             {eq.fotoUrl && !imgFailed ? (
               <img
                 src={eq.fotoUrl}
-                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}
                 sizes="48px"
                 alt={nombrePublico}
                 className="h-full w-full object-contain p-1.5"

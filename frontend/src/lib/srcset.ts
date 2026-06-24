@@ -1,19 +1,24 @@
 /**
  * srcset de las fotos de equipo (catálogo).
  *
- * El backend deriva dos variantes WebP de cada foto principal: `display` (1200px)
- * y `display-sm` (600px). Para una card que en mobile se ve a ~300-400px, servir
- * la de 600 en vez de la de 1200 baja ~4× los bytes. El navegador elige según
- * `sizes` + DPR.
+ * El backend deriva tres variantes WebP de cada foto principal: `display` (1200px),
+ * `display-sm` (600px) y `display-thumb` (160px). El navegador elige según `sizes` + DPR:
+ * - slots de ~48px → thumb (160w); slots de ~300-400px → sm (600w); resto → display (1200w).
  *
- * Fallback seguro: si la foto no tiene la variante chica (legacy sin media_id, o
- * aún sin backfill), `fotoUrlSm` es null → devolvemos undefined y el `<img>` usa
- * solo `src` (cero rotura, sin srcset).
+ * Fallback seguro: si alguna variante falta (legacy sin media_id, o sin backfill),
+ * se omite del srcset — el `<img>` usa la más chica disponible o solo `src` (cero rotura).
  */
 export function buildFotoSrcSet(
   fotoUrl?: string | null,
   fotoUrlSm?: string | null,
+  fotoUrlThumb?: string | null,
 ): string | undefined {
-  if (!fotoUrl || !fotoUrlSm) return undefined;
-  return `${fotoUrlSm} 600w, ${fotoUrl} 1200w`;
+  if (!fotoUrl) return undefined;
+  const parts: string[] = [];
+  if (fotoUrlThumb) parts.push(`${fotoUrlThumb} 160w`);
+  if (fotoUrlSm) parts.push(`${fotoUrlSm} 600w`);
+  parts.push(`${fotoUrl} 1200w`);
+  // Si solo tenemos fotoUrl (sin variantes), no hay srcset útil.
+  if (parts.length === 1 && !fotoUrlSm && !fotoUrlThumb) return undefined;
+  return parts.join(", ");
 }

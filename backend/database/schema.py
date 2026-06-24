@@ -81,6 +81,7 @@ def _init_db_schema(conn):
             valor_reposicion FLOAT,
             foto_url         TEXT,
             foto_url_sm      TEXT,   -- variante 600px de la foto principal para srcset (NULL = sin variante → el front usa foto_url)
+            foto_url_thumb   TEXT,   -- variante 160px para thumbnails de ~48px (NULL = sin variante → el front usa foto_url_sm)
             fecha_compra     DATE,
             serie            TEXT,
             bh_url           TEXT,
