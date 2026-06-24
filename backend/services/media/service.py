@@ -18,6 +18,7 @@ Borrado:
   - purge_r2: best-effort delete de R2 (llamar DESPUÉS del commit del caller).
 """
 import logging
+import re
 
 from .errors import MediaError
 from .models import MediaAsset, MediaVariant, DeriveSpec
@@ -26,6 +27,14 @@ from .validation import validate_and_detect
 from . import storage, repository
 
 logger = logging.getLogger(__name__)
+
+_KIND_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+
+
+def _validate_kind(kind: str) -> None:
+    """Slug sanit del kind: solo [a-z0-9-], 1-64 chars. Previene path traversal en keys R2."""
+    if not _KIND_RE.match(kind or ""):
+        raise MediaError(400, f"kind inválido: {kind!r}. Solo [a-z0-9-], 1-64 chars.")
 
 
 def store_upload(
@@ -39,6 +48,9 @@ def store_upload(
 
     No hace commit. El caller escribe su fila (ej. estudio_fotos) y commitea.
     """
+    # Slug sanit: kind va directo a la R2 key → solo [a-z0-9-] (previene path traversal).
+    _validate_kind(kind)
+
     # Seguridad: valida magic-bytes + decompression-bomb ANTES de tocar la DB o R2.
     # Rechaza no-imágenes con 400 (en vez del fallback silencioso a jpeg).
     original_ct, ext = validate_and_detect(raw)

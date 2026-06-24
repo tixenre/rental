@@ -7,6 +7,7 @@ Cubre:
   sin fila committeada (rollback en el caller)
 - collect_asset_keys: carga keys sin modificar DB
 - purge_r2: best-effort deletes, nunca eleva aunque R2 falle
+- slug sanit del kind: path traversal y chars inválidos rechazados con 400
 """
 import pytest
 
@@ -258,3 +259,49 @@ class TestMediaFastapi:
         with media_http():
             result.append(1)
         assert result == [1]
+
+
+# ── slug sanit del kind ───────────────────────────────────────────────────────
+
+class TestKindSlugSanit:
+    """kind va directo a la R2 key — solo [a-z0-9-] permitidos."""
+
+    @pytest.mark.parametrize("bad_kind", [
+        "../admin",       # path traversal
+        "foo/bar",        # slash
+        "EQUIPO",         # mayúsculas
+        "equipo foto",    # espacio
+        "",               # vacío
+        "a" * 65,         # demasiado largo
+        ".hidden",        # empieza con punto
+        "-lead",          # empieza con guión
+    ])
+    def test_kind_invalido_eleva_400(self, bad_kind, monkeypatch):
+        from services.media.errors import MediaError
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        raw = _png_bytes()
+        with pytest.raises(MediaError) as exc:
+            store_upload(raw, kind=bad_kind, derive_specs=[DISPLAY_KEEP_ASPECT], conn=_FakeConn())
+        assert exc.value.status == 400
+
+    @pytest.mark.parametrize("good_kind", [
+        "equipo",
+        "estudio",
+        "marca",
+        "workshop-foto",
+        "instructor123",
+    ])
+    def test_kind_valido_pasa(self, good_kind, monkeypatch):
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        asset = store_upload(_png_bytes(), kind=good_kind, derive_specs=[DISPLAY_KEEP_ASPECT], conn=_FakeConn())
+        assert good_kind in asset.original_key
