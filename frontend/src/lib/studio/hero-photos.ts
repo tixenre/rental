@@ -22,12 +22,15 @@ export interface HeroPhoto {
 }
 
 // Fallback: archivos estáticos en public/estudio/. Solo se usan si R2 no
-// responde. La fuente real son las fotos del admin (R2).
+// responde. La fuente real son las fotos del admin (R2). WebP optimizados
+// (1600px, ~75KB c/u) en vez de los JPG crudos de ~2MB: el fallback se
+// renderiza eager mientras responde /api/estudio y, sin optimizar, saturaba
+// el ancho de banda en 4G lento demorando la imagen LCP real.
 const HERO_PHOTOS_FALLBACK: HeroPhoto[] = [
-  { url: "/estudio/Rambla_Estudio_S7V9470.jpg" },
-  { url: "/estudio/Rambla_Estudio_S7V9483.jpg" },
-  { url: "/estudio/Rambla_Estudio_S7V9510-HDR-Edit.jpg" },
-  { url: "/estudio/Rambla_Estudio_S7V9519-HDR.jpg" },
+  { url: "/estudio/Rambla_Estudio_S7V9470.webp" },
+  { url: "/estudio/Rambla_Estudio_S7V9483.webp" },
+  { url: "/estudio/Rambla_Estudio_S7V9510-HDR-Edit.webp" },
+  { url: "/estudio/Rambla_Estudio_S7V9519-HDR.webp" },
 ];
 
 // Cuántas fotos rota el hero como máximo (las primeras según `orden`).

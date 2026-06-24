@@ -396,7 +396,7 @@ def root():
             # sea descubrible en el HTML inicial.
             hero_row = conn.execute(
                 "SELECT url, url_sm FROM estudio_fotos WHERE estudio_id = 1 "
-                "ORDER BY orden ASC, id ASC LIMIT 1"
+                "ORDER BY es_principal DESC, orden ASC, id ASC LIMIT 1"
             ).fetchone()
         finally:
             conn.close()
@@ -443,22 +443,34 @@ def _inject_og_meta(html_text: str, *, title: str, description: str, image: str,
 
 
 def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None) -> str:
-    """Inserta un `<link rel=preload as=image fetchpriority=high>` del hero del home
-    justo antes de `</head>`. La URL del hero sale de un query async (`useHeroPhotos`),
-    así que sin esto el LCP no es descubrible en el HTML inicial — el browser no puede
-    arrancar el fetch hasta correr el JS + responder la API (LCP ~21s en Lighthouse).
-    Usa imagesrcset+imagesizes cuando hay variante sm para que el browser mobile elija
-    800w (el mismo srcset que renderiza el componente con sizes=100vw)."""
+    """Inserta `<link rel=preconnect>` al origen R2 + `<link rel=preload as=image
+    fetchpriority=high>` del hero del home justo antes de `</head>`. La URL del hero
+    sale de un query async (`useHeroPhotos`), así que sin esto el LCP no es descubrible
+    en el HTML inicial — el browser no puede arrancar el fetch hasta correr el JS +
+    responder la API (LCP ~21s en Lighthouse).
+
+    El `imagesrcset`+`imagesizes` matchea EXACTO el `srcSet`/`sizes` que renderiza el
+    carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=100vw`) y la query del hero usa el
+    MISMO orden que `useHeroPhotos` (es_principal DESC, orden ASC) → el browser deduplica
+    y usa el recurso preloadeado en vez de bajar la imagen dos veces. El preconnect
+    abre la conexión TLS al bucket R2 (origen de todas las fotos) antes del fetch."""
     esc = _html.escape(image, quote=True)
+    # Origen del bucket R2 (https://host) derivado de la URL del hero — sin hardcodear
+    # el bucket, robusto ante cambios de ambiente.
+    origin = "/".join(image.split("/")[:3])
+    tags = ""
+    if origin.startswith("http"):
+        esc_origin = _html.escape(origin, quote=True)
+        tags += f'<link rel="preconnect" href="{esc_origin}" crossorigin>'
     if image_sm:
         esc_sm = _html.escape(image_sm, quote=True)
-        tag = (
+        tags += (
             f'<link rel="preload" as="image" fetchpriority="high"'
             f' imagesrcset="{esc_sm} 800w, {esc} 1600w" imagesizes="100vw">'
         )
     else:
-        tag = f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
-    return html_text.replace("</head>", tag + "</head>", 1)
+        tags += f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
+    return html_text.replace("</head>", tags + "</head>", 1)
 
 
 def _set_og_image(html_text: str, image: str) -> str:
