@@ -395,15 +395,16 @@ def root():
             # `useHeroPhotos`: es_principal DESC, orden ASC). Se preloadea para que
             # sea descubrible en el HTML inicial.
             hero_row = conn.execute(
-                "SELECT url FROM estudio_fotos WHERE estudio_id = 1 "
-                "ORDER BY es_principal DESC, orden ASC, id ASC LIMIT 1"
+                "SELECT url, url_sm FROM estudio_fotos WHERE estudio_id = 1 "
+                "ORDER BY orden ASC, id ASC LIMIT 1"
             ).fetchone()
         finally:
             conn.close()
         html_text = index_file.read_text(encoding="utf-8")
-        hero = (hero_row["url"].strip() if hero_row and hero_row["url"] else "")
-        if hero.startswith("http"):
-            html_text = _inject_hero_preload(html_text, hero)
+        hero_url = (hero_row["url"].strip() if hero_row and hero_row["url"] else "")
+        hero_sm = (hero_row["url_sm"].strip() if hero_row and hero_row["url_sm"] else "")
+        if hero_url.startswith("http"):
+            html_text = _inject_hero_preload(html_text, hero_url, hero_sm or None)
         image = (row["value"].strip() if row and row["value"] else "")
         if image.startswith("http"):
             html_text = _set_og_image(html_text, image)
@@ -441,13 +442,22 @@ def _inject_og_meta(html_text: str, *, title: str, description: str, image: str,
     return html_text
 
 
-def _inject_hero_preload(html_text: str, image: str) -> str:
+def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None) -> str:
     """Inserta un `<link rel=preload as=image fetchpriority=high>` del hero del home
     justo antes de `</head>`. La URL del hero sale de un query async (`useHeroPhotos`),
     así que sin esto el LCP no es descubrible en el HTML inicial — el browser no puede
-    arrancar el fetch hasta correr el JS + responder la API (LCP ~21s en Lighthouse)."""
+    arrancar el fetch hasta correr el JS + responder la API (LCP ~21s en Lighthouse).
+    Usa imagesrcset+imagesizes cuando hay variante sm para que el browser mobile elija
+    800w (el mismo srcset que renderiza el componente con sizes=100vw)."""
     esc = _html.escape(image, quote=True)
-    tag = f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
+    if image_sm:
+        esc_sm = _html.escape(image_sm, quote=True)
+        tag = (
+            f'<link rel="preload" as="image" fetchpriority="high"'
+            f' imagesrcset="{esc_sm} 800w, {esc} 1600w" imagesizes="100vw">'
+        )
+    else:
+        tag = f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
     return html_text.replace("</head>", tag + "</head>", 1)
 
 
