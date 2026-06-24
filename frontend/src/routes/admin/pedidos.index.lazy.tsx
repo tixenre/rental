@@ -52,11 +52,17 @@ const todayYmd = () => new Date().toISOString().slice(0, 10);
 const esHoy = (s: string | null) => !!s && s.slice(0, 10) === todayYmd();
 
 const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
-/** "lun 1 jun" — día de semana + fecha corta (matchea el prototipo). */
+/** "lun 1 jun 10:00" — día de semana + fecha corta + hora si está presente. */
 function fechaDia(s: string | null): string {
   if (!s) return "—";
   const d = new Date(s.slice(0, 10) + "T12:00:00");
-  return `${DIAS[d.getDay()]} ${formatFechaCorta(s)}`;
+  const base = `${DIAS[d.getDay()]} ${formatFechaCorta(s)}`;
+  const tIdx = s.indexOf("T");
+  if (tIdx !== -1) {
+    const hora = s.slice(tIdx + 1, tIdx + 6);
+    if (hora && hora !== "00:00") return `${base} ${hora}`;
+  }
+  return base;
 }
 
 /** "creado hace 2 h" — relativo simple desde created_at. */

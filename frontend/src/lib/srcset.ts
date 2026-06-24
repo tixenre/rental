@@ -18,7 +18,7 @@ export function buildFotoSrcSet(
   if (fotoUrlThumb) parts.push(`${fotoUrlThumb} 160w`);
   if (fotoUrlSm) parts.push(`${fotoUrlSm} 600w`);
   parts.push(`${fotoUrl} 1200w`);
-  // Si solo tenemos fotoUrl (sin variantes), no hay srcset útil.
+  // Sin variantes, no hay srcset útil.
   if (parts.length === 1 && !fotoUrlSm && !fotoUrlThumb) return undefined;
   return parts.join(", ");
 }
