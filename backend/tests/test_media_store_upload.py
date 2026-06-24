@@ -33,7 +33,7 @@ class _FakeR2Client:
         self.deletes: list[str] = []
         self._fail_on_key = fail_on_key
 
-    def put_object(self, *, Bucket, Key, Body, ContentType, CacheControl):
+    def put_object(self, *, Bucket, Key, Body, ContentType, CacheControl, **_):
         if self._fail_on_key and Key == self._fail_on_key:
             raise RuntimeError(f"R2 PUT forzado a fallar para '{Key}'")
         self.puts.append(Key)
@@ -102,6 +102,7 @@ def _patch_r2(monkeypatch, fake_client: _FakeR2Client):
     monkeypatch.setattr(storage_mod, "_r2_config", lambda: {
         "account_id": "test", "access_key_id": "k", "secret_key": "s",
         "bucket": "test-bucket", "public_base": "https://cdn.example.com",
+        "private_bucket": "",  # sin bucket privado separado en tests
     })
     monkeypatch.setattr(storage_mod, "_get_r2_client", lambda cfg: fake_client)
 
@@ -244,33 +245,28 @@ class TestDedup:
 
 class TestStoreUploadFalloParcial:
     def test_fallo_en_put_variante_limpia_original_y_eleva(self, monkeypatch):
+        """put_private (original) OK, put (variante) falla → cleanup borra el original."""
         from services.media.errors import MediaError
         from services.media.service import store_upload
         from services.media.specs import DISPLAY_KEEP_ASPECT
 
-        # El cliente falla al subir la variante display (key contiene 'display')
-        # El asset_id será 1 (primer id del FakeConn)
         fake = _FakeR2Client(fail_on_key=None)
         _patch_r2(monkeypatch, fake)
 
-        # Interceptar put para fallar en el segundo PUT (variante)
+        # El original usa put_private (OK), la variante usa put (falla).
         import services.media.storage as storage_mod
-        call_count = {"n": 0}
         original_put = storage_mod.put
 
-        def _put_that_fails_second(key, content, content_type):
-            call_count["n"] += 1
-            if call_count["n"] == 2:
-                raise Exception("R2 falla en variante")
-            return original_put(key, content, content_type)
+        def _put_that_always_fails(key, content, content_type):
+            raise Exception("R2 falla en variante")
 
-        monkeypatch.setattr(storage_mod, "put", _put_that_fails_second)
+        monkeypatch.setattr(storage_mod, "put", _put_that_always_fails)
 
         conn = _FakeConn()
         with pytest.raises((MediaError, Exception)):
             store_upload(_png_bytes(), kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn)
 
-        # El original debe haberse limpiado (delete_object)
+        # El original (subido con put_private) debe haberse limpiado (delete_object)
         assert len(fake.deletes) >= 1
 
 

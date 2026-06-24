@@ -74,9 +74,10 @@ def store_upload(
 
     uploaded_keys: list[str] = []
     try:
-        # 2. PUT original (sin EXIF)
+        # 2. PUT original (sin EXIF) como privado — no se expone en la API ni en CDN.
+        # put_private: Cache-Control: no-store; bucket privado si R2_PRIVATE_BUCKET configurado.
         original_key = f"media/{kind}/{asset_id}/original.{ext}"
-        storage.put(original_key, original_bytes, original_ct)
+        storage.put_private(original_key, original_bytes, original_ct)
         uploaded_keys.append(original_key)
 
         # 3. Derivar variantes desde el original ya sin EXIF (consistente con re-derivación futura)
@@ -122,19 +123,28 @@ def store_upload(
 
 
 def _cleanup_r2(keys: list[str]) -> None:
-    """Best-effort delete de las keys R2 ya subidas (en caso de fallo parcial)."""
-    for key in keys:
-        storage.delete_object(key)
+    """Best-effort delete de las keys R2 ya subidas (en caso de fallo parcial).
+
+    El primer key siempre es el original (privado); el resto son variantes (públicas).
+    """
+    for i, key in enumerate(keys):
+        storage.delete_object(key, private=(i == 0))
 
 
 def collect_asset_keys(conn, asset_id: int) -> list[str]:
     """Devuelve las R2 keys del asset (original + variantes). Sin modificar DB.
     Llamar antes del DELETE para tener las keys disponibles para limpiar R2.
+    El primer elemento (si existe) es el original_key (bucket privado).
     """
     return repository.collect_asset_keys(conn, asset_id)
 
 
-def purge_r2(keys: list[str]) -> None:
-    """Best-effort delete de todas las R2 keys. Llamar DESPUÉS del commit."""
-    for key in keys:
-        storage.delete_object(key)
+def purge_r2(keys: list[str], *, original_key: str | None = None) -> None:
+    """Best-effort delete de todas las R2 keys. Llamar DESPUÉS del commit.
+
+    `original_key` se borra del bucket privado; el resto del bucket público.
+    Si no se especifica original_key, se asume que el primer key es el original.
+    """
+    for i, key in enumerate(keys):
+        is_original = key == original_key if original_key else i == 0
+        storage.delete_object(key, private=is_original)
