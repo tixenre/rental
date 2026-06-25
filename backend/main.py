@@ -74,6 +74,8 @@ from routes.didit            import router as didit_router
 from routes.talleres         import router as talleres_router
 from routes.carritos         import router as carritos_router
 from routes.errores_admin    import router as errores_admin_router
+from routes.media_api        import router as media_api_router
+from routes.media_admin      import router as media_admin_router
 from middleware          import auth_middleware
 
 logger = logging.getLogger(__name__)
@@ -286,6 +288,8 @@ app.include_router(didit_router,          prefix="/api")
 app.include_router(talleres_router,       prefix="/api")
 app.include_router(carritos_router,       prefix="/api")
 app.include_router(errores_admin_router,  prefix="/api")
+app.include_router(media_api_router,      prefix="/api")
+app.include_router(media_admin_router,    prefix="/api")
 app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
 app.include_router(calendar_router)  # /calendar/feed.ics (root) + /api/admin/calendar/*
 app.include_router(cliente_portal_router)

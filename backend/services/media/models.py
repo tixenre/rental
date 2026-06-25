@@ -36,6 +36,11 @@ class MediaAsset:
     width: Optional[int]
     height: Optional[int]
     bytes: Optional[int]
+    content_hash: Optional[str] = None
+    # LQIP (Low Quality Image Placeholder, F0e): data URI de 4×4px en base64.
+    # Se usa como fondo inmediato mientras carga la variante CDN (blur-up en CSS).
+    # None si no fue generado (assets pre-F0e o si PIL falló silenciosamente).
+    lqip: Optional[str] = None
     variants: list[MediaVariant] = field(default_factory=list)
 
     def variant(self, name: str) -> Optional[MediaVariant]:

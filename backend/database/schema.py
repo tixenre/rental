@@ -1494,10 +1494,21 @@ def _init_db_schema(conn):
             width        INTEGER,
             height       INTEGER,
             bytes        INTEGER,
+            content_hash TEXT,
             created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    conn.execute("""
+        ALTER TABLE media_assets
+        ADD COLUMN IF NOT EXISTS content_hash TEXT
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_media_assets_kind_hash
+        ON media_assets(kind, content_hash)
+        WHERE content_hash IS NOT NULL
+    """)
+    conn.execute("ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS lqip TEXT")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS media_variants (
             id           BIGSERIAL PRIMARY KEY,

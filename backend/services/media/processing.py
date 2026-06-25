@@ -8,6 +8,47 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def strip_exif_for_storage(raw: bytes, content_type: str) -> bytes:
+    """Strip EXIF del original antes de guardarlo en R2 (privacidad: GPS, device info, timestamps).
+
+    - Aplica exif_transpose para bake la orientación en los píxeles (la orientación queda
+      correcta incluso sin EXIF) → las variantes derivadas del original almacenado son
+      orientation-correct sin necesidad de exif_transpose extra.
+    - Re-guarda sin metadata. Pérdida: JPEG q=95/WebP q=95 (imperceptible); PNG/GIF lossless.
+    - Fallback al raw original si algo falla (safe: el pipeline sigue aunque el strip falle).
+    """
+    try:
+        from PIL import Image, ImageOps
+        from io import BytesIO
+
+        img = Image.open(BytesIO(raw))
+        img = ImageOps.exif_transpose(img)
+
+        _FMT_MAP: dict[str, tuple[str, str | None]] = {
+            "image/jpeg": ("JPEG", "RGB"),
+            "image/png":  ("PNG",  None),
+            "image/webp": ("WEBP", None),
+            "image/gif":  ("GIF",  None),
+            "image/avif": ("AVIF", None),
+        }
+        fmt, force_mode = _FMT_MAP.get(content_type, ("JPEG", "RGB"))
+
+        if force_mode and img.mode != force_mode:
+            img = img.convert(force_mode)
+
+        out = BytesIO()
+        if fmt == "JPEG":
+            img.save(out, format="JPEG", quality=95, optimize=True)
+        elif fmt == "WEBP":
+            img.save(out, format="WEBP", quality=95)
+        else:
+            img.save(out, format=fmt)
+        return out.getvalue()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("strip_exif_for_storage: fallback al original (%s)", e)
+        return raw
+
+
 def _ext_from_ctype(ct: str) -> str:
     ct = (ct or "").lower()
     if "png" in ct:  return "png"
@@ -119,6 +160,33 @@ def _optimize_image(
     except Exception as e:
         logger.warning("optimize_image: fallback (no se pudo optimizar): %s", e, exc_info=True)
         return content, "image/jpeg", 0, 0
+
+
+def generate_lqip(image_bytes: bytes) -> str | None:
+    """Genera un LQIP (Low Quality Image Placeholder) como data URI base64.
+
+    Redimensiona a 4×4px, guarda como JPEG q=20, codifica en base64.
+    Resultado: data:image/jpeg;base64,... (~80-120 bytes).
+    Se usa como fondo CSS mientras carga la variante CDN (blur-up).
+
+    Fallback: devuelve None si PIL falla (safe — el caller ignora None).
+    """
+    try:
+        from PIL import Image
+        from io import BytesIO
+        import base64
+
+        img = Image.open(BytesIO(image_bytes))
+        img = img.convert("RGB")
+        # 4×4 es suficiente para un blur-up — < 100 bytes en base64
+        img = img.resize((4, 4), Image.Resampling.LANCZOS)
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=20, optimize=True)
+        encoded = base64.b64encode(out.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{encoded}"
+    except Exception as e:  # noqa: BLE001
+        logger.warning("generate_lqip: fallback None (%s)", e)
+        return None
 
 
 def _optimize_og_image(raw_content: bytes) -> tuple[bytes, str, str]:
