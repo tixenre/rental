@@ -41,6 +41,9 @@ class MediaAsset:
     # Se usa como fondo inmediato mientras carga la variante CDN (blur-up en CSS).
     # None si no fue generado (assets pre-F0e o si PIL falló silenciosamente).
     lqip: Optional[str] = None
+    # Estado de derivación: 'ready' (variantes OK) | 'pending' (derivando en BG)
+    # | 'failed' (derivación falló). Default 'ready' para assets pre-F0g.
+    status: str = "ready"
     variants: list[MediaVariant] = field(default_factory=list)
 
     def variant(self, name: str) -> Optional[MediaVariant]:

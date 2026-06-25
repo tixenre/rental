@@ -149,12 +149,23 @@ def _optimize_image(
 
         out = __import__("io").BytesIO()
         if fmt == "jpeg":
-            # JPEG no soporta alpha: aplanar a RGB por las dudas (el path square ya
-            # devuelve RGB, pero si el trim falló podría quedar RGBA).
+            # JPEG no soporta alpha: aplanar a RGB.
             if img.mode != "RGB":
                 img = img.convert("RGB")
             img.save(out, format="JPEG", quality=82, optimize=True, progressive=True)
             return out.getvalue(), "image/jpeg", img.width, img.height
+        if fmt == "avif":
+            # AVIF: mejor compresión que WebP con calidad visual equivalente.
+            # Pillow 12.x incluye codec AVIF en las wheels de PyPI (statically linked).
+            # Fallback a WebP si el codec falla (ej. build sin libavif).
+            try:
+                img.save(out, format="AVIF", quality=72)
+                return out.getvalue(), "image/avif", img.width, img.height
+            except Exception as avif_err:
+                logger.warning("_optimize_image: AVIF no disponible, fallback WebP (%s)", avif_err)
+                out = __import__("io").BytesIO()
+                img.save(out, format="WEBP", quality=85, method=6)
+                return out.getvalue(), "image/webp", img.width, img.height
         img.save(out, format="WEBP", quality=85, method=6)
         return out.getvalue(), "image/webp", img.width, img.height
     except Exception as e:

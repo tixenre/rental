@@ -40,24 +40,29 @@ def _load_variants(conn, media_id: int) -> list[dict]:
     ]
 
 
-def _load_lqip(conn, media_id: int) -> str | None:
-    """Lee el lqip del asset (data URI del blur-up placeholder). Null si no existe."""
+def _load_asset_meta(conn, media_id: int) -> dict:
+    """Lee lqip y status del media_asset. Defaults seguros si faltan columnas."""
     row = conn.execute(
-        "SELECT lqip FROM media_assets WHERE id = ?", (media_id,)
+        "SELECT lqip, status FROM media_assets WHERE id = ?", (media_id,)
     ).fetchone()
-    if row:
-        try:
-            return row["lqip"]
-        except (KeyError, IndexError):
-            pass
-    return None
+    if not row:
+        return {"lqip": None, "status": "ready"}
+    try:
+        lqip = row["lqip"]
+    except (KeyError, IndexError):
+        lqip = None
+    try:
+        status = row["status"] or "ready"
+    except (KeyError, IndexError):
+        status = "ready"
+    return {"lqip": lqip, "status": status}
 
 
 def _build_asset(conn, row) -> dict:
-    """Construye un asset con variants y lqip. Fallback legible para fotos pre-F0a."""
+    """Construye un asset con variants, lqip y status. Fallback para fotos pre-F0a."""
     media_id = row["media_id"]
     variants = _load_variants(conn, media_id) if media_id else []
-    lqip = _load_lqip(conn, media_id) if media_id else None
+    meta = _load_asset_meta(conn, media_id) if media_id else {"lqip": None, "status": "ready"}
 
     if not variants and row["url"]:
         variants = [{
@@ -73,7 +78,8 @@ def _build_asset(conn, row) -> dict:
         "media_id": media_id,
         "orden": row["orden"],
         "es_principal": bool(row["es_principal"]),
-        "lqip": lqip,
+        "lqip": meta["lqip"],
+        "status": meta["status"],
         "variants": variants,
     }
 

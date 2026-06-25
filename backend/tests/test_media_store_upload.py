@@ -382,3 +382,120 @@ class TestKindSlugSanit:
 
         asset = store_upload(_png_bytes(), kind=good_kind, derive_specs=[DISPLAY_KEEP_ASPECT], conn=_FakeConn())
         assert good_kind in asset.original_key
+
+
+# ── AVIF + background derivation (F0g) ────────────────────────────────────────
+
+class TestAvifDerivation:
+    def test_avif_variante_con_content_type_avif(self, monkeypatch):
+        """store_upload con spec AVIF produce variante con content_type image/avif (o webp si fallback)."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE_AVIF
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        asset = store_upload(_png_bytes(), kind="equipo", derive_specs=[DISPLAY_SQUARE_AVIF], conn=_FakeConn())
+        assert len(asset.variants) == 1
+        v = asset.variants[0]
+        assert v.name == "display-avif"
+        assert v.content_type in ("image/avif", "image/webp"), f"inesperado: {v.content_type}"
+        # Extensión de la key debe coincidir con el content_type
+        if v.content_type == "image/avif":
+            assert v.key.endswith(".avif"), v.key
+        else:
+            assert v.key.endswith(".webp"), v.key
+
+    def test_avif_y_webp_juntos_produce_dos_variantes(self, monkeypatch):
+        """El par display + display-avif coexiste en el mismo asset."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE, DISPLAY_SQUARE_AVIF
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        asset = store_upload(
+            _png_bytes(), kind="equipo",
+            derive_specs=[DISPLAY_SQUARE, DISPLAY_SQUARE_AVIF], conn=_FakeConn()
+        )
+        names = {v.name for v in asset.variants}
+        assert "display" in names
+        assert "display-avif" in names
+
+    def test_avif_processing_fallback_a_webp_si_codec_no_disponible(self, monkeypatch):
+        """Si AVIF falla (codec no disponible), _optimize_image cae a WebP sin elevar."""
+        from services.media import processing
+
+        original_save = None
+
+        def patched_save(self, fp, format=None, **kwargs):
+            if format == "AVIF":
+                raise RuntimeError("AVIF codec not available")
+            return original_save(self, fp, format=format, **kwargs)
+
+        try:
+            from PIL import Image
+            original_save = Image.Image.save
+            monkeypatch.setattr(Image.Image, "save", patched_save)
+        except ImportError:
+            pytest.skip("PIL no disponible")
+
+        result = processing._optimize_image(_png_bytes(400, 300), square=True, fmt="avif")
+        content, ct, w, h = result
+        assert ct == "image/webp", f"esperaba webp fallback, got {ct}"
+        assert len(content) > 0
+
+
+class TestBackgroundDerivation:
+    def test_background_true_devuelve_status_pending_sin_variantes(self, monkeypatch):
+        """background=True → asset.status='pending', variants=[]."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        conn = _FakeConn()
+        asset = store_upload(
+            _png_bytes(), kind="equipo",
+            derive_specs=[DISPLAY_SQUARE], conn=conn, background=True,
+        )
+        assert asset.status == "pending"
+        assert asset.variants == []
+        # Original sí debe subirse
+        assert any("original" in k for k in fake.puts)
+        # Variantes NO deben subirse todavía
+        assert not any("display" in k for k in fake.puts), f"puts: {fake.puts}"
+
+    def test_background_false_devuelve_status_ready_con_variantes(self, monkeypatch):
+        """background=False (default) → status='ready', variantes presentes."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        asset = store_upload(
+            _png_bytes(), kind="equipo",
+            derive_specs=[DISPLAY_SQUARE], conn=_FakeConn(),
+        )
+        assert asset.status == "ready"
+        assert len(asset.variants) == 1
+
+    def test_insert_asset_usa_status_pending_en_modo_background(self, monkeypatch):
+        """En background=True, el INSERT a la DB incluye status='pending'."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        conn = _FakeConn()
+        store_upload(_png_bytes(), kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn, background=True)
+
+        # Buscar la query de INSERT con status
+        insert_sqls = [sql for sql, _ in conn.executed if "INSERT INTO MEDIA_ASSETS" in sql.upper()]
+        assert insert_sqls, f"No se encontró INSERT INTO media_assets. SQL ejecutados: {[s for s, _ in conn.executed]}"
+        # Los parámetros del INSERT incluyen 'pending'
+        insert_params = [params for sql, params in conn.executed if "INSERT INTO MEDIA_ASSETS" in sql.upper()]
+        assert any("pending" in str(p) for p in insert_params), f"params: {insert_params}"

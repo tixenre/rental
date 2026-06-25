@@ -1509,6 +1509,7 @@ def _init_db_schema(conn):
         WHERE content_hash IS NOT NULL
     """)
     conn.execute("ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS lqip TEXT")
+    conn.execute("ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ready'")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS media_variants (
             id           BIGSERIAL PRIMARY KEY,

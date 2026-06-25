@@ -6,13 +6,21 @@ Sin commits: el caller gestiona la transacción.
 from .models import MediaAsset, MediaVariant
 
 
-def insert_asset(conn, kind: str) -> int:
+def insert_asset(conn, kind: str, status: str = "ready") -> int:
     """Inserta una fila en media_assets y devuelve el id generado."""
     cur = conn.execute(
-        "INSERT INTO media_assets (kind) VALUES (?) RETURNING id",
-        (kind,),
+        "INSERT INTO media_assets (kind, status) VALUES (?, ?) RETURNING id",
+        (kind, status),
     )
     return cur.fetchone()["id"]
+
+
+def update_asset_status(conn, asset_id: int, status: str) -> None:
+    """Actualiza el campo status del asset (pending → ready | failed)."""
+    conn.execute(
+        "UPDATE media_assets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (status, asset_id),
+    )
 
 
 def update_asset_original(
@@ -120,5 +128,6 @@ def load_asset(conn, asset_id: int) -> "MediaAsset | None":
         width=row["width"], height=row["height"], bytes=row["bytes"],
         content_hash=_safe_get(row, "content_hash"),
         lqip=_safe_get(row, "lqip"),
+        status=_safe_get(row, "status") or "ready",
         variants=variants,
     )
