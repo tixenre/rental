@@ -19,7 +19,6 @@ from services.email.service import get_admin_to
 from services.media.models import DeriveSpec
 from services.media.errors import MediaError
 from services.media.service import store_upload, store_raw_document
-from services.media.storage import put as _r2_put
 
 logger = logging.getLogger(__name__)
 
