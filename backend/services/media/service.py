@@ -61,7 +61,7 @@ import unicodedata
 
 from .errors import MediaError
 from .models import MediaAsset, MediaVariant, DeriveSpec
-from .processing import _optimize_image, _ext_from_ctype, strip_exif_for_storage
+from .processing import _optimize_image, _ext_from_ctype, strip_exif_for_storage, generate_lqip
 from .validation import validate_and_detect
 from . import storage, repository
 
@@ -170,6 +170,11 @@ def store_upload(
     # orientation-correct sin exif_transpose adicional. Fallback safe al raw.
     original_bytes = strip_exif_for_storage(raw, original_ct)
 
+    # LQIP (blur-up placeholder, F0e): 4×4px JPEG → data URI inline.
+    # Se genera ANTES del dedup: si hay hit, el asset existente ya tiene su lqip.
+    # Fallback None si PIL falla (safe).
+    lqip = generate_lqip(original_bytes)
+
     # Dedup por hash: si la misma imagen (sin EXIF) ya existe para este kind,
     # devolver el asset existente sin re-procesar ni re-subir a R2.
     content_hash = hashlib.sha256(original_bytes).hexdigest()
@@ -213,7 +218,7 @@ def store_upload(
         first_w, first_h = (variants_data[0][4], variants_data[0][5]) if variants_data else (0, 0)
         repository.update_asset_original(
             conn, asset_id, original_key, original_ct, first_w, first_h,
-            len(original_bytes), content_hash=content_hash,
+            len(original_bytes), content_hash=content_hash, lqip=lqip,
         )
 
         variant_objects: list[MediaVariant] = []
@@ -229,6 +234,7 @@ def store_upload(
             original_key=original_key, original_ct=original_ct,
             width=first_w, height=first_h, bytes=len(original_bytes),
             content_hash=content_hash,
+            lqip=lqip,
             variants=variant_objects,
         )
 

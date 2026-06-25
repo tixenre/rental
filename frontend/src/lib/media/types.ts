@@ -22,6 +22,12 @@ export interface EntityMediaAsset {
   media_id: number | null;
   orden: number;
   es_principal: boolean;
+  /**
+   * LQIP (Low Quality Image Placeholder, F0e): data URI de un JPEG 4×4px.
+   * Usar como fondo CSS con `filter: blur(...)` mientras carga la variante CDN.
+   * Null para assets pre-F0e o si la generación falló silenciosamente.
+   */
+  lqip?: string | null;
   variants: MediaVariant[];
 }
 

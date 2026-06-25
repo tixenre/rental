@@ -16,6 +16,11 @@ interface ResponsiveImageProps
    * Override para usos donde el slot de imagen tiene otro tamaño.
    */
   sizes?: string;
+  /**
+   * LQIP data URI (F0e): se usa como fondo CSS blur-up mientras carga la imagen.
+   * Muestra el placeholder inmediatamente sin esperar la variante CDN.
+   */
+  lqip?: string | null;
 }
 
 /**
@@ -23,6 +28,7 @@ interface ResponsiveImageProps
  *
  * - srcset construido desde las variantes "display*" con sus anchos reales.
  * - width/height del atributo IMG vienen del backend → previene CLS sin JS.
+ * - blur-up: si hay lqip, se usa como fondo CSS mientras carga la imagen.
  * - Fallback seguro: si solo hay una variante o no hay ancho, renderiza
  *   un <img> simple sin srcset (legacy pre-F0a, cero rotura).
  */
@@ -31,12 +37,22 @@ export function ResponsiveImage({
   alt,
   preferName = DISPLAY_VARIANT,
   sizes = "(max-width: 600px) 600px, 1200px",
+  lqip,
+  style,
   ...imgProps
 }: ResponsiveImageProps) {
   const primary = findVariant(variants, preferName);
   if (!primary) return null;
 
   const srcSet = buildSrcSet(variants);
+
+  const blurStyle: React.CSSProperties = lqip
+    ? {
+        backgroundImage: `url("${lqip}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : {};
 
   return (
     <img
@@ -46,6 +62,7 @@ export function ResponsiveImage({
       width={primary.width > 0 ? primary.width : undefined}
       height={primary.height > 0 ? primary.height : undefined}
       alt={alt}
+      style={{ ...blurStyle, ...style }}
       {...imgProps}
     />
   );

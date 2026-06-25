@@ -162,6 +162,33 @@ def _optimize_image(
         return content, "image/jpeg", 0, 0
 
 
+def generate_lqip(image_bytes: bytes) -> str | None:
+    """Genera un LQIP (Low Quality Image Placeholder) como data URI base64.
+
+    Redimensiona a 4×4px, guarda como JPEG q=20, codifica en base64.
+    Resultado: data:image/jpeg;base64,... (~80-120 bytes).
+    Se usa como fondo CSS mientras carga la variante CDN (blur-up).
+
+    Fallback: devuelve None si PIL falla (safe — el caller ignora None).
+    """
+    try:
+        from PIL import Image
+        from io import BytesIO
+        import base64
+
+        img = Image.open(BytesIO(image_bytes))
+        img = img.convert("RGB")
+        # 4×4 es suficiente para un blur-up — < 100 bytes en base64
+        img = img.resize((4, 4), Image.Resampling.LANCZOS)
+        out = BytesIO()
+        img.save(out, format="JPEG", quality=20, optimize=True)
+        encoded = base64.b64encode(out.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{encoded}"
+    except Exception as e:  # noqa: BLE001
+        logger.warning("generate_lqip: fallback None (%s)", e)
+        return None
+
+
 def _optimize_og_image(raw_content: bytes) -> tuple[bytes, str, str]:
     """Optimiza imagen para preview Open Graph (WhatsApp / IG / Facebook).
 

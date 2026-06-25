@@ -24,15 +24,16 @@ def update_asset_original(
     height: int,
     size_bytes: int,
     content_hash: str | None = None,
+    lqip: str | None = None,
 ) -> None:
     conn.execute(
         """
         UPDATE media_assets
         SET original_key = ?, original_ct = ?, width = ?, height = ?, bytes = ?,
-            content_hash = ?, updated_at = CURRENT_TIMESTAMP
+            content_hash = ?, lqip = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
-        (original_key, original_ct, width, height, size_bytes, content_hash, asset_id),
+        (original_key, original_ct, width, height, size_bytes, content_hash, lqip, asset_id),
     )
 
 
@@ -88,6 +89,14 @@ def collect_asset_keys(conn, asset_id: int) -> list[str]:
     return keys
 
 
+def _safe_get(row, key: str):
+    """Lee una columna del row tolerando que no exista (assets pre-migración)."""
+    try:
+        return row[key]
+    except (KeyError, IndexError):
+        return None
+
+
 def load_asset(conn, asset_id: int) -> "MediaAsset | None":
     """Carga un MediaAsset completo (con variantes) desde la DB."""
     row = conn.execute("SELECT * FROM media_assets WHERE id = ?", (asset_id,)).fetchone()
@@ -109,6 +118,7 @@ def load_asset(conn, asset_id: int) -> "MediaAsset | None":
         id=row["id"], kind=row["kind"],
         original_key=row["original_key"], original_ct=row["original_ct"],
         width=row["width"], height=row["height"], bytes=row["bytes"],
-        content_hash=row["content_hash"] if "content_hash" in row.keys() else None,
+        content_hash=_safe_get(row, "content_hash"),
+        lqip=_safe_get(row, "lqip"),
         variants=variants,
     )

@@ -70,6 +70,7 @@ export function MediaGallery({
           variants={selected.variants}
           alt={alt}
           sizes={sizes}
+          lqip={selected.lqip}
           className="w-full h-full object-cover"
           draggable={false}
         />
