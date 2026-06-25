@@ -41,11 +41,11 @@ export default defineConfig(async ({ mode }) => {
       // Backup del CDN: si Cloudflare no está en el path, el origen igual sirve
       // comprimido. Excluir imágenes (ya comprimidas) y los propios .br/.gz.
       compression({
-        algorithm: "brotliCompress",
+        algorithms: ["brotliCompress"],
         exclude: [/\.(br|gz)$/, /\.(png|jpg|jpeg|webp|avif|gif|ico|svg|woff2)$/],
       }),
       compression({
-        algorithm: "gzip",
+        algorithms: ["gzip"],
         exclude: [/\.(br|gz)$/, /\.(png|jpg|jpeg|webp|avif|gif|ico|svg|woff2)$/],
       }),
     ],
@@ -70,6 +70,10 @@ export default defineConfig(async ({ mode }) => {
     },
     build: {
       outDir: "dist",
+      // Apuntar a ES2020+ (Chrome/FF/Safari ~2021) — evita polyfills innecesarios
+      // para async/await, optional chaining, nullish coalescing, etc. El 98%+
+      // de los browsers actuales soportan es2020; la diferencia en tamaño es ~2-5%.
+      target: "es2020",
       // No precargar los chunks que solo usa admin / DnD desde el HTML
       // inicial. Visitors del catálogo público no los necesitan hasta navegar
       // a /admin. Vite los seguirá cargando dinámicamente cuando hagan falta.

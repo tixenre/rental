@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, lazy, Suspense, useDeferredValue, type Dispatch, type SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
 import {
@@ -29,15 +29,26 @@ import { useClienteSession } from "@/lib/iva";
 import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
 import { EquipmentCard } from "@/components/rental/EquipmentCard";
 import { EquipmentRow } from "@/components/rental/EquipmentRow";
-import { CartDrawer } from "@/components/rental/CartDrawer";
 import { CartMiniBar } from "@/components/rental/CartMiniBar";
-import { FlyToCartLayer } from "@/components/rental/FlyToCartLayer";
 import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
-import { ViewIntroDialog } from "@/components/rental/ViewIntroDialog";
-import { PreviewPane } from "@/components/rental/PreviewPane";
+
+// Lazy: estos componentes solo son visibles tras interacción del usuario.
+// Sacarlos del bundle inicial reduce ~120KB de parse/exec en la carga.
+const CartDrawer = lazy(() =>
+  import("@/components/rental/CartDrawer").then((m) => ({ default: m.CartDrawer })),
+);
+const FlyToCartLayer = lazy(() =>
+  import("@/components/rental/FlyToCartLayer").then((m) => ({ default: m.FlyToCartLayer })),
+);
+const ViewIntroDialog = lazy(() =>
+  import("@/components/rental/ViewIntroDialog").then((m) => ({ default: m.ViewIntroDialog })),
+);
+const PreviewPane = lazy(() =>
+  import("@/components/rental/PreviewPane").then((m) => ({ default: m.PreviewPane })),
+);
 import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
 import { useFavoritos } from "@/hooks/useFavoritos";
 import type { BackendMarca, BackendCategoria } from "@/lib/api";
@@ -322,6 +333,9 @@ function Index() {
   );
   const [brand, setBrand] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  // Deferred: desacopla el tipeo (urgente) del re-filtrado de 127 cards (costoso).
+  // En mobile gama baja reduce el jank perceptible en INP.
+  const deferredQuery = useDeferredValue(query);
   // Filtro "Disponibles": esconde equipos con disponible === 0 (sin stock
   // para las fechas pickeadas). Solo tiene efecto cuando hay rango de fechas
   // — sin fechas, `disponible` queda undefined y todos pasan.
@@ -418,7 +432,7 @@ function Index() {
       // guiones, multi-palabra y ORDENADO por relevancia (mejor match primero).
       // `nombre` pondera el ranking; el resto (marca/categoría/specs/descripción)
       // entra al match como contexto.
-      list = filtrarOrdenar(list, query, (e) => ({
+      list = filtrarOrdenar(list, deferredQuery, (e) => ({
         nombre: e.name,
         extra: [
           e.brand,
@@ -476,7 +490,9 @@ function Index() {
 
   return (
     <PublicLayout topBar={{ variant: "rental" }}>
-      <ViewIntroDialog onPick={(m) => setMode(m)} />
+      <Suspense>
+        <ViewIntroDialog onPick={(m) => setMode(m)} />
+      </Suspense>
       {/* Hero amber hifi */}
       <div>
         <HeroSection
@@ -761,7 +777,9 @@ function Index() {
       <TalleresBand />
       <FaqTeaser />
 
-      <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
+      <Suspense>
+        <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
+      </Suspense>
     </PublicLayout>
   );
 }
@@ -1196,17 +1214,21 @@ function ListMode({
           )}
         </div>
 
-        <PreviewPane
-          item={previewItem}
-          open={previewOpen}
-          onClose={() => setPreviewOpen(false)}
-          onOpen={() => setPreviewOpen(true)}
-          disponible={previewItem ? getDisponible(previewItem) : undefined}
-        />
+        <Suspense>
+          <PreviewPane
+            item={previewItem}
+            open={previewOpen}
+            onClose={() => setPreviewOpen(false)}
+            onOpen={() => setPreviewOpen(true)}
+            disponible={previewItem ? getDisponible(previewItem) : undefined}
+          />
+        </Suspense>
       </div>
 
       <CartMiniBar allEquipos={allEquipos} />
-      <FlyToCartLayer />
+      <Suspense>
+        <FlyToCartLayer />
+      </Suspense>
     </>
   );
 }
