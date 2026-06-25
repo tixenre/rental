@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from "react";
+import { type MouseEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
@@ -8,7 +8,7 @@ import { type Equipment } from "@/data/equipment";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
-import { buildFotoSrcSet, buildAvifSrcSet } from "@/lib/srcset";
+import { EquipoFoto } from "./EquipoFoto";
 import { cn } from "@/lib/utils";
 import { Pill } from "@/design-system/kit/Pill";
 import { StepperPill } from "./equipment/shared/StepperPill";
@@ -47,7 +47,6 @@ export function EquipmentCard({
   const triggerFly = useFlyToCart((s) => s.triggerFly);
   const jornadas = useCart((s) => s.days());
   const hasDateRange = useCart((s) => !!s.startDate && !!s.endDate);
-  const [imgFailed, setImgFailed] = useState(false);
 
   const { data: clienteSession } = useClienteSession();
   const conIva = aplicaIva(clienteSession?.perfil_impuestos);
@@ -68,14 +67,6 @@ export function EquipmentCard({
   // fallback al nombre interno). No re-concatenar `item.brand` acá: duplicaba
   // la marca en los equipos con template configurado.
   const nombrePublico = item.name;
-  const avifSrcSet = buildAvifSrcSet(item.fotoUrlAvif, item.fotoUrlSmAvif, item.fotoUrlThumbAvif);
-  const blurStyle = item.fotoLqip
-    ? {
-        backgroundImage: `url("${item.fotoLqip}")`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-    : undefined;
 
   const handleAdd = (e: MouseEvent<HTMLButtonElement>) => {
     if (sinStock || reachedMax) return;
@@ -113,31 +104,16 @@ export function EquipmentCard({
           aria-label={`Ver ficha técnica de ${nombrePublico}`}
           className="block h-full w-full"
         >
-          {item.fotoUrl && !imgFailed ? (
-            <picture>
-              {avifSrcSet && (
-                <source
-                  type="image/avif"
-                  srcSet={avifSrcSet}
-                  sizes="(max-width: 640px) 45vw, 250px"
-                />
-              )}
-              <img
-                src={item.fotoUrl}
-                srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm, item.fotoUrlThumb)}
-                sizes="(max-width: 640px) 45vw, 250px"
-                alt={nombrePublico}
-                loading={index < 4 ? "eager" : "lazy"}
-                decoding="async"
-                fetchPriority={index < 4 ? "high" : "low"}
-                onError={() => setImgFailed(true)}
-                style={blurStyle}
-                className="h-full w-full object-contain p-3 transition group-hover:scale-[1.02]"
-              />
-            </picture>
-          ) : (
-            <EmptyImage category={item.category} brand={item.brand} />
-          )}
+          <EquipoFoto
+            foto={item}
+            alt={nombrePublico}
+            sizes="(max-width: 640px) 45vw, 250px"
+            loading={index < 4 ? "eager" : "lazy"}
+            decoding="async"
+            fetchPriority={index < 4 ? "high" : "low"}
+            className="h-full w-full object-contain p-3 transition group-hover:scale-[1.02]"
+            fallback={<EmptyImage category={item.category} brand={item.brand} />}
+          />
         </button>
 
         {/* Overlays top-left apilados: categoría + (destacado) */}
