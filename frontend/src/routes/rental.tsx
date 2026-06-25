@@ -30,10 +30,6 @@ import { logSearch } from "@/lib/search-log";
 import { filtrarOrdenar } from "@/lib/search/normalize";
 import { SITE_URL } from "@/lib/site";
 import { HeroSection } from "@/components/rental/HeroSection";
-import { ComoFunciona } from "@/components/rental/ComoFunciona";
-import { EstudioBand } from "@/components/rental/EstudioBand";
-import { TalleresBand } from "@/components/rental/TalleresBand";
-import { FaqTeaser } from "@/components/rental/FaqTeaser";
 import { RentalDateModal } from "@/components/rental/RentalDateModal";
 import { useClienteSession } from "@/lib/iva";
 import { MobileStickyBar } from "@/components/rental/MobileStickyBar";
@@ -67,6 +63,23 @@ const ViewIntroDialog = lazy(() =>
 );
 const PreviewPane = lazy(() =>
   import("@/components/rental/PreviewPane").then((m) => ({ default: m.PreviewPane })),
+);
+
+// Secciones below-the-fold (van debajo del grid de equipos). Solo se renderizan
+// en desktop, pero su código viajaba en el bundle inicial que también descarga
+// mobile sin usarlo. Lazy → fuera del critical path; como están bajo el fold, su
+// carga diferida no genera CLS.
+const ComoFunciona = lazy(() =>
+  import("@/components/rental/ComoFunciona").then((m) => ({ default: m.ComoFunciona })),
+);
+const EstudioBand = lazy(() =>
+  import("@/components/rental/EstudioBand").then((m) => ({ default: m.EstudioBand })),
+);
+const TalleresBand = lazy(() =>
+  import("@/components/rental/TalleresBand").then((m) => ({ default: m.TalleresBand })),
+);
+const FaqTeaser = lazy(() =>
+  import("@/components/rental/FaqTeaser").then((m) => ({ default: m.FaqTeaser })),
 );
 
 const POPULAR_CHIPS = [
@@ -698,7 +711,11 @@ function Index() {
       )}
 
       {/* Cómo funciona — bajo las barras, solo para usuarios no logueados */}
-      {!isLogged && <ComoFunciona onDateOpen={() => setDateModalOpen(true)} />}
+      {!isLogged && (
+        <Suspense>
+          <ComoFunciona onDateOpen={() => setDateModalOpen(true)} />
+        </Suspense>
+      )}
 
       {/* Loading / Error states */}
       {isLoading ? (
@@ -792,9 +809,11 @@ function Index() {
         />
       )}
 
-      <EstudioBand />
-      <TalleresBand />
-      <FaqTeaser />
+      <Suspense>
+        <EstudioBand />
+        <TalleresBand />
+        <FaqTeaser />
+      </Suspense>
 
       <Suspense>
         <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />

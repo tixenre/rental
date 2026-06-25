@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { SlidersHorizontal, Search, User, ChevronUp, X, Calendar } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useEquipos, useMarcas, useCategorias } from "@/hooks/useEquipos";
@@ -98,7 +98,12 @@ export function CatalogoMovil() {
 
   // Medir las alturas reales de topbar y search bar para calcular los tops
   // sticky correctos (no hardcodeados, que se desalinean con safe-area reales).
-  useLayoutEffect(() => {
+  // useEffect (no useLayoutEffect): leer offsetHeight en layout-effect fuerza un
+  // reflow síncrono ANTES del paint → retrasa el pintado del hero (el LCP mobile).
+  // Con useEffect el hero pinta con los defaults (53/118) y el ajuste corre después;
+  // como el `top` sticky solo importa al scrollear (no en el primer paint con
+  // scroll=0), el ajuste post-paint no genera salto visible.
+  useEffect(() => {
     const topbar = topbarRef.current;
     const searchBar = searchBarRef.current;
     if (!topbar || !searchBar) return;
