@@ -1155,3 +1155,47 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Consecuencias.** No hay cambio procedimental — el supervisor ya era obligatorio. El cambio es de
   framing: es una segunda revisión de código, no burocracia. Los bugs que encuentra son de la categoría
   "incomplete change" (cambié A pero no B que depende de A) e "import muerto" (residuos de iteración).
+
+### 2026-06-25 — Hero (LCP) = AVIF-directo + preload AVIF; el resto usa `picture`; SSR descartado
+
+- **Contexto.** Sesión de optimización de PageSpeed mobile de `rambla.house/rental` (partió en 67, terminó
+  en **80 mobile / 91 desktop**). El elemento LCP en mobile es la foto del hero (`HeroBanner` en
+  `CatalogoMovilHelpers.tsx`). Se intentó preloadear el AVIF del hero, pero el hero mobile era un `<img>`
+  crudo webp sin AVIF → el preload `type=image/avif` no matcheaba el elemento LCP → "Request not
+  discoverable" + el AVIF se descargaba dos veces → LCP saltó de 4.4s a 6.6s (score 80 → 60). Diagnóstico de
+  raíz: un preload AVIF solo matchea de forma determinista contra un `<img src=avif>` **directo**, no contra
+  un `<source type=image/avif>` dentro de `<picture>` (matching frágil en Chromium; la regresión a 6.6s fue
+  la evidencia empírica). En paralelo el dueño preguntó por ir AVIF-only / consistencia con el pipeline.
+- **Decisión.** (1) El **elemento LCP** (hero, mobile + desktop) se sirve con `<img src=avif>` **directo**
+  (sin `<picture>`) + `onError`→webp, centralizado en el helper único `heroImgProps(photo,{eager})` de
+  `frontend/src/lib/studio/hero-photos.ts`; el backend `_inject_hero_preload` (`backend/main.py`) preloadea
+  el AVIF con `type=image/avif` + `imagesizes=100vw` cuando la principal lo tiene, y cae a webp si es NULL.
+  (2) **Toda otra imagen** (catálogo, cards, fichas) sigue con el `<picture><source avif><img webp>`
+  canónico — fallback nativo del browser, sin JS, y no se preloadea (no lo necesita). (3) **webp NO se
+  elimina** del pipeline: es el fallback del `onError` (hero) y del `<picture>` (resto); el JPEG sigue
+  generándose para OG/crawlers de redes. (4) **SSR descartado** como vía a 90+ mobile.
+- **Why — la asimetría hero vs. resto.** El hero es la ÚNICA superficie que se preloadea (es el LCP, tiene
+  que ser descubrible en el HTML inicial). El preload exige `<img>` directo. El catálogo no se preloadea →
+  ahí el `<picture>` es estrictamente mejor (fallback nativo). No es inconsistencia arbitraria: la regla es
+  "todos usan el pipeline AVIF; el LCP usa `<img>` directo porque se preloadea, el resto `<picture>`".
+- **Why — SSR descartado.** (a) SSR completo (TanStack Start) requiere runtime Node para renderizar React
+  server-side; el backend es Python/FastAPI → implicaría reescribir el serving o mantener dos servidores en
+  paralelo. No se paga por un número de laboratorio. (b) SSG/prerender estático: el catálogo es dinámico
+  (equipos cambian), rutas paramétricas costosas → ROI bajo. (c) SSR parcial del hero (inyectar el markup en
+  el HTML servido): la app monta con `createRoot()` (no `hydrateRoot`), que **borra `#root` al montar** →
+  coordinar un overlay sin flash/CLS es intrincado y en la cara más visible del sitio, y **duplica el markup
+  del hero** (Python + React → drift, contra "fuente única"). Decisión del dueño: NO meter el hack; el LCP
+  mobile de una SPA con CPU 4× + Slow 4G emulado tiene techo ~80, y los usuarios reales (mejor red/CPU) ya
+  ven el sitio rápido. **80 mobile / 91 desktop es un techo sano para una SPA.**
+- **Gotcha.** El preload (backend, `_inject_hero_preload` + las queries en `root()`/`rental_page()`) y el
+  `<img>` (front, `useHeroPhotos`) deben elegir la MISMA foto principal, o vuelve la doble descarga. Ambos
+  ordenan **`es_principal DESC, orden ASC, id ASC`** (el `id` como desempate se agregó explícitamente en el
+  front para espejar el backend). Si se cambia el orden de fotos en el endpoint de estudio, revisar que sigan
+  coincidiendo.
+- **Consecuencias.** El supervisor marca: un `<picture>` en el elemento LCP (rompe el match del preload), o
+  un `<img src=avif>` sin `onError`→webp fuera del LCP (pierde el fallback de compatibilidad). Esta decisión
+  cierra la evaluación de SSR para no re-litigarla cada sesión. Sigue pendiente como ROI real (operacional,
+  no código) migrar las ~9 fotos externas (Tier C, incl. una de 437 KB) al motor de media vía
+  `backfill_ingest_legacy.py --solo-tier=c` — baja peso real, no un número de lab. Refina _Filosofía de
+  diseño del DS (2026-06-20)_ y la _Barra de calidad de ingeniería (2026-05-25)_ (fuente única / reusar no
+  recrear).

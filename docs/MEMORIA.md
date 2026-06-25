@@ -315,6 +315,21 @@ features de cara al usuario vive en **`docs/CAMPAÑA_FEATURES.md`** (no se dupli
 (`model: opus`, read-only) audita que las features reales de la app estén reflejadas en ambos docs, detecta
 features nuevas sin comunicar y selling points stale, y propone borradores de copy para aprobación del dueño.
 
+### 2026-06-25 — Hero (LCP) = AVIF-directo + preload AVIF; el resto usa `picture`; SSR descartado
+
+El **elemento LCP** (hero del catálogo, mobile `HeroBanner` + desktop `HeroSection`) se sirve con `<img
+src=avif>` **directo** (NO `<picture>`) + `onError`→webp, vía el helper único `heroImgProps`
+(`hero-photos.ts`); el backend (`_inject_hero_preload`) preloadea el AVIF con `type=image/avif`. Razón: un
+preload AVIF solo matchea un `<img>` directo, **no** un `<source>` de `<picture>` (matching frágil en
+Chromium) → si no, el AVIF se baja dos veces y el LCP empeora. **Toda otra imagen** (catálogo, fichas) usa el
+`<picture><source avif><img webp>` canónico (fallback nativo). **webp NO se elimina**: es el fallback del
+`onError` y del `<picture>`; el JPEG es para OG/crawlers. **Gotcha:** preload (backend) y `<img>` (front)
+deben elegir la MISMA foto principal — ambos ordenan `es_principal DESC, orden ASC, id ASC`; si se cambia el
+orden en el endpoint, revisar que coincidan. **SSR descartado** (completo: inviable con backend Python, no
+Node; parcial del hero: hack con drift porque `createRoot` borra `#root`); **techo SPA ~80 mobile / ~91
+desktop es sano** — no re-evaluar SSR. El supervisor marca un `<picture>` en el LCP, o un `<img src=avif>` sin
+`onError`→webp fuera del LCP.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
