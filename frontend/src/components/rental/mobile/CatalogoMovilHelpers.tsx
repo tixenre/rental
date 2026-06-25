@@ -39,7 +39,7 @@ import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
-import { buildFotoSrcSet } from "@/lib/srcset";
+import { buildFotoSrcSet, buildAvifSrcSet } from "@/lib/srcset";
 
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
@@ -260,19 +260,25 @@ function CartItem({
   jornadasEfectivas: number;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const cartAvifSrcSet = buildAvifSrcSet(eq.fotoUrlAvif, eq.fotoUrlSmAvif, eq.fotoUrlThumbAvif);
   return (
     <div className="flex items-center gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0">
       <div className="w-11 h-11 rounded-lg bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0 overflow-hidden">
         {eq.fotoUrl && !imgFailed ? (
-          <img
-            src={eq.fotoUrl}
-            srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}
-            sizes="44px"
-            alt={eq.name}
-            className="w-full h-full object-contain p-1"
-            loading="lazy"
-            onError={() => setImgFailed(true)}
-          />
+          <picture>
+            {cartAvifSrcSet && (
+              <source type="image/avif" srcSet={cartAvifSrcSet} sizes="44px" />
+            )}
+            <img
+              src={eq.fotoUrl}
+              srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}
+              sizes="44px"
+              alt={eq.name}
+              loading="lazy"
+              onError={() => setImgFailed(true)}
+              className="w-full h-full object-contain p-1"
+            />
+          </picture>
         ) : (
           <CatIcon cat={eq.category} size={18} />
         )}
@@ -707,6 +713,10 @@ export function FichaSheet({
   fechaDesde,
 }: FichaSheetProps) {
   const [imgFailed, setImgFailed] = useState(false);
+  const fichaAvifSrcSet = buildAvifSrcSet(eq.fotoUrlAvif, eq.fotoUrlSmAvif);
+  const fichaBlurStyle = eq.fotoLqip
+    ? { backgroundImage: `url("${eq.fotoLqip}")`, backgroundSize: "cover", backgroundPosition: "center" }
+    : undefined;
   const specsText = eq.specs.map((s) => `${s.label}: ${s.value}`).join(" · ");
 
   return (
@@ -746,15 +756,25 @@ export function FichaSheet({
             style={{ aspectRatio: "4/3" }}
           >
             {eq.fotoUrl && !imgFailed ? (
-              <img
-                src={eq.fotoUrl}
-                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
-                sizes="(max-width: 640px) 92vw, 400px"
-                alt={eq.name}
-                className="w-full h-full object-contain p-4"
-                loading="lazy"
-                onError={() => setImgFailed(true)}
-              />
+              <picture>
+                {fichaAvifSrcSet && (
+                  <source
+                    type="image/avif"
+                    srcSet={fichaAvifSrcSet}
+                    sizes="(max-width: 640px) 92vw, 400px"
+                  />
+                )}
+                <img
+                  src={eq.fotoUrl}
+                  srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
+                  sizes="(max-width: 640px) 92vw, 400px"
+                  alt={eq.name}
+                  loading="lazy"
+                  onError={() => setImgFailed(true)}
+                  style={fichaBlurStyle}
+                  className="w-full h-full object-contain p-4"
+                />
+              </picture>
             ) : (
               <CatIcon cat={eq.category} size={48} />
             )}
@@ -886,6 +906,7 @@ export function EquipmentRow({
   onFicha,
 }: EquipmentRowProps) {
   const [imgFailed, setImgFailed] = useState(false);
+  const rowAvifSrcSet = buildAvifSrcSet(eq.fotoUrlAvif, eq.fotoUrlSmAvif, eq.fotoUrlThumbAvif);
   const { data: clienteSession } = useClienteSession();
   const conIva = aplicaIva(clienteSession?.perfil_impuestos);
 
@@ -935,15 +956,20 @@ export function EquipmentRow({
         <div className="relative shrink-0">
           <div className="flex aspect-square w-12 items-center justify-center overflow-hidden rounded-md bg-white text-muted-foreground">
             {eq.fotoUrl && !imgFailed ? (
-              <img
-                src={eq.fotoUrl}
-                srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}
-                sizes="48px"
-                alt={nombrePublico}
-                className="h-full w-full object-contain p-1.5"
-                loading="lazy"
-                onError={() => setImgFailed(true)}
-              />
+              <picture>
+                {rowAvifSrcSet && (
+                  <source type="image/avif" srcSet={rowAvifSrcSet} sizes="48px" />
+                )}
+                <img
+                  src={eq.fotoUrl}
+                  srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}
+                  sizes="48px"
+                  alt={nombrePublico}
+                  loading="lazy"
+                  onError={() => setImgFailed(true)}
+                  className="h-full w-full object-contain p-1.5"
+                />
+              </picture>
             ) : (
               <CatIcon cat={eq.category} size={20} />
             )}
