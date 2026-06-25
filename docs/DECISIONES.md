@@ -1204,3 +1204,30 @@ cancel-in-progress` ya cancela corridas viejas.
   `backfill_ingest_legacy.py --solo-tier=c` — baja peso real, no un número de lab. Refina _Filosofía de
   diseño del DS (2026-06-20)_ y la _Barra de calidad de ingeniería (2026-05-25)_ (fuente única / reusar no
   recrear).
+
+### 2026-06-25 — Manuales técnicos por sistema (`SISTEMA_X.md`): fuente única del "cómo", linkea a MEMORIA el "porqué"
+
+- **Contexto.** El dueño preguntó dónde está la "fuente de la verdad" de cómo funciona cada sistema (fotos,
+  reservas, specs), para poder responder "cómo funciona X" con autoridad. Relevamiento: specs tiene su manual
+  (`SISTEMA_SPECS.md`), pedidos tiene `FLUJO_PEDIDOS.md`, diseño `DESIGN_SYSTEM.md`, reservas/plata están bien
+  cubiertos en MEMORIA + MANIFIESTO §6. Pero **fotos estaba disperso** en varias decisiones de MEMORIA, sin un
+  manual único — justo el sistema más tocado en la sesión (procesar + mostrar) y el más difícil de explicar.
+- **Decisión.** Convención de gobernanza: cada motor/sistema importante tiene un manual técnico
+  **`docs/SISTEMA_<X>.md`** (molde: `SISTEMA_SPECS.md`), **fuente única del cómo funciona** (arquitectura +
+  flujo + paths de entrada). El manual **describe, no decide**: las reglas de criterio y el porqué viven en
+  `MEMORIA.md`/`DECISIONES.md` y se **linkean**, no se copian. Índice maestro en **MANIFIESTO §8**. Piloto:
+  `SISTEMA_FOTOS.md`.
+- **Why — separar "cómo" de "porqué".** Si el manual copiara las reglas, habría dos verdades que se desfasan
+  (el manual envejece, MEMORIA cambia). Linkear mantiene una sola fuente de cada cosa: MEMORIA = decisión
+  enforceable (la hace cumplir el supervisor); el manual = el mapa técnico vivo. Extiende _Memoria en capas
+  (2026-05-25)_ con una capa más: el manual de sistema (el "cómo", on-demand), debajo de MANIFIESTO (arquitectura)
+  y MEMORIA (criterio).
+- **Why — NO un skill.** Un manual es un **documento** (fuente de verdad estática), no un **proceso** (lo que un
+  skill codifica). La capa de skills tiene su propia gobernanza anti-bloat (_Gobernanza Etapa 2 (2026-06-23)_);
+  meter un skill por cada manual la inflaría sin razón. El mantenimiento cae en el supervisor (marca un manual
+  stale cuando revisa un cambio a ese motor) + `check-docs.mjs` (verifica que los manuales referenciados existan,
+  links vivos).
+- **Consecuencias.** El manual se actualiza en el **mismo cambio** que toca su motor (como el código y los tests).
+  El supervisor marca: un manual desactualizado, o una regla de criterio copiada en el manual que debería ser un
+  link a MEMORIA. Próximos candidatos a manual propio: reservas (el core sagrado, hoy en MEMORIA + MANIFIESTO §6)
+  y contabilidad/plata. No todo sistema necesita uno: si MEMORIA + MANIFIESTO ya lo cubren claro, no se fuerza.

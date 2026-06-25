@@ -331,6 +331,19 @@ Node; parcial del hero: hack con drift porque `createRoot` borra `#root`); **tec
 desktop es sano** — no re-evaluar SSR. El supervisor marca un `<picture>` en el LCP, o un `<img src=avif>` sin
 `onError`→webp fuera del LCP.
 
+### 2026-06-25 — Manuales técnicos por sistema (`SISTEMA_X.md`): fuente única del "cómo", linkea a MEMORIA el "porqué"
+
+Cada motor/sistema importante tiene un manual técnico **`docs/SISTEMA_<X>.md`** (molde: `SISTEMA_SPECS.md`) =
+**fuente única del cómo funciona** (arquitectura + flujo + los paths como puntos de entrada). **Describe, no
+decide**: las reglas de criterio y el _porqué_ viven en `MEMORIA.md`/`DECISIONES.md` y se **linkean**, no se
+copian (dos verdades = drift). Índice maestro en **MANIFIESTO §8 "Dónde encontrar cosas"**. El manual se
+actualiza en el **mismo cambio** que toca su motor; el supervisor marca un manual stale o una regla duplicada
+que debería ser un link. `check-docs.mjs` verifica que los manuales referenciados existan (links vivos). **NO
+se crea un skill por esto** — un manual es un doc (fuente de verdad), no un proceso; su mantenimiento cae en el
+supervisor + `check-docs`, no en la capa de skills (que tiene su propia gobernanza anti-bloat). Piloto:
+**`SISTEMA_FOTOS.md`** (fotos = procesar + mostrar). Ya existen `SISTEMA_SPECS.md`, `FLUJO_PEDIDOS.md`,
+`DESIGN_SYSTEM.md`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
