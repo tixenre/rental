@@ -449,6 +449,7 @@ def _init_db_schema(conn):
         CREATE INDEX IF NOT EXISTS idx_cat_parent ON categorias(parent_id, prioridad, nombre)
     """)
     # Ranking automático de categorías (#131). Mismo concepto que equipos.
+    conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS total INT DEFAULT 0")
     conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS popularidad_score INT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS cant_pedidos INT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS ingreso_total_ars BIGINT NOT NULL DEFAULT 0")
