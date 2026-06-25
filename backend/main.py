@@ -66,7 +66,7 @@ from routes.cliente_portal   import router as cliente_portal_router
 from routes.marcas           import router as marcas_router
 from routes.specs            import router as specs_router
 from routes.unidades         import router as unidades_router
-from routes.seo              import router as seo_router
+from routes.seo              import router as seo_router, _build_categoria_slug as _cat_slug
 from routes.calendar         import router as calendar_router
 from routes.inventario       import router as inventario_router
 from routes.email_templates  import router as email_templates_router
@@ -560,6 +560,20 @@ def _set_og_image(html_text: str, image: str) -> str:
     return html_text
 
 
+def _inject_json_ld(html_text: str, *schemas: dict) -> str:
+    """Inserta uno o más bloques JSON-LD justo antes de </head>.
+
+    Los crawlers/agentes que no ejecutan JS (Googlebot light, LLM indexers)
+    ven el structured data directamente en el HTML inicial — sin esperar JS.
+    Cada schema se emite en un <script> separado para facilitar el debug.
+    """
+    tags = "".join(
+        f'<script type="application/ld+json">{json.dumps(s, ensure_ascii=False)}</script>'
+        for s in schemas
+    )
+    return html_text.replace("</head>", tags + "</head>", 1)
+
+
 def _get_initial_catalog(conn) -> dict:
     """Serializa equipos visibles + categorías para el script __INITIAL__ del catálogo.
 
@@ -670,6 +684,7 @@ def equipo_page(id_or_slug: str):
             row = conn.execute(
                 f"""
                 SELECT e.nombre, e.foto_url, e.nombre_publico,
+                       e.precio_jornada, e.cantidad,
                        {MARCA_SUBQUERY},
                        ef.descripcion
                 FROM equipos e
@@ -686,6 +701,16 @@ def equipo_page(id_or_slug: str):
                 WHERE ef.equipo_id = ? AND mv.name = 'og'
                 ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC
                 LIMIT 1
+                """,
+                (equipo_id,),
+            ).fetchone()
+            # Primera categoría del equipo (para BreadcrumbList).
+            cat_row = conn.execute(
+                """
+                SELECT c.nombre FROM categorias c
+                JOIN equipo_categorias ec ON ec.categoria_id = c.id
+                WHERE ec.equipo_id = ?
+                ORDER BY ec.id LIMIT 1
                 """,
                 (equipo_id,),
             ).fetchone()
@@ -718,6 +743,54 @@ def equipo_page(id_or_slug: str):
             index_file.read_text(encoding="utf-8"),
             title=title, description=desc, image=image, url=url,
         )
+        # JSON-LD server-side: Product + BreadcrumbList. Visible para crawlers
+        # que no ejecutan JS (Googlebot light, LLM indexers, bots de precios).
+        precio = d.get("precio_jornada")
+        cantidad = d.get("cantidad") or 0
+        marca_str = (d.get("marca") or "").strip()
+        cat_nombre = (cat_row["nombre"] if cat_row else "").strip()
+        product_schema: dict = {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": nombre,
+            "description": desc,
+            "url": url,
+            "image": image,
+        }
+        if marca_str:
+            product_schema["brand"] = {"@type": "Brand", "name": marca_str}
+        if cat_nombre:
+            product_schema["category"] = cat_nombre
+        if precio is not None:
+            product_schema["offers"] = {
+                "@type": "Offer",
+                "priceCurrency": "ARS",
+                "price": precio,
+                "availability": "https://schema.org/InStock" if cantidad > 0 else "https://schema.org/OutOfStock",
+                "priceSpecification": {
+                    "@type": "UnitPriceSpecification",
+                    "price": precio,
+                    "priceCurrency": "ARS",
+                    "unitText": "jornada",
+                },
+            }
+        breadcrumb_items = [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": f"{SITE_URL}/"}]
+        if cat_nombre:
+            breadcrumb_items.append({
+                "@type": "ListItem", "position": 2,
+                "name": cat_nombre,
+                "item": f"{SITE_URL}/categoria/{_cat_slug(cat_nombre)}",
+            })
+        breadcrumb_items.append({
+            "@type": "ListItem", "position": len(breadcrumb_items) + 1,
+            "name": nombre, "item": url,
+        })
+        breadcrumb_schema = {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": breadcrumb_items,
+        }
+        html_text = _inject_json_ld(html_text, product_schema, breadcrumb_schema)
         return HTMLResponse(content=html_text)
     except Exception:
         logger.warning("OG injection falló para /equipo/%s — sirvo index plano", id_or_slug, exc_info=True)
@@ -796,7 +869,8 @@ def workshop_page(slug: str):
         try:
             taller = conn.execute(
                 "SELECT nombre, descripcion, instructor_nombre, "
-                "instructor_foto_url, instructor_media_id "
+                "instructor_foto_url, instructor_media_id, "
+                "fecha_inicio, fecha_fin, precio_total "
                 "FROM talleres WHERE slug = %s AND activo = TRUE",
                 (slug,),
             ).fetchone()
@@ -835,11 +909,55 @@ def workshop_page(slug: str):
         title = f"{nombre} con {instructor} — Rambla" if instructor else f"{nombre} — Rambla"
         if not og_img.startswith("http"):
             og_img = f"{SITE_URL}/icon-512.png"
+        taller_url = f"{SITE_URL}/workshops/{slug}"
         html_text = _inject_og_meta(
             index_file.read_text(encoding="utf-8"),
-            title=title, description=desc_raw, image=og_img,
-            url=f"{SITE_URL}/workshops/{slug}",
+            title=title, description=desc_raw, image=og_img, url=taller_url,
         )
+        # JSON-LD Event schema — visible para crawlers/agentes sin JS.
+        event_schema: dict = {
+            "@context": "https://schema.org",
+            "@type": "Event",
+            "name": nombre,
+            "description": desc_raw,
+            "url": taller_url,
+            "image": og_img,
+            "location": {
+                "@type": "Place",
+                "name": "Rambla",
+                "address": {
+                    "@type": "PostalAddress",
+                    "addressLocality": "Mar del Plata",
+                    "addressRegion": "Buenos Aires",
+                    "addressCountry": "AR",
+                },
+            },
+            "organizer": {"@type": "Organization", "name": "Rambla", "url": SITE_URL},
+        }
+        if instructor:
+            event_schema["performer"] = {"@type": "Person", "name": instructor}
+        try:
+            fecha_inicio = taller["fecha_inicio"]
+            fecha_fin = taller["fecha_fin"]
+            if fecha_inicio:
+                event_schema["startDate"] = str(fecha_inicio)[:10]
+            if fecha_fin:
+                event_schema["endDate"] = str(fecha_fin)[:10]
+        except (KeyError, IndexError, TypeError):
+            pass
+        try:
+            precio = taller["precio_total"]
+            if precio is not None:
+                event_schema["offers"] = {
+                    "@type": "Offer",
+                    "price": precio,
+                    "priceCurrency": "ARS",
+                    "availability": "https://schema.org/InStock",
+                    "url": taller_url,
+                }
+        except (KeyError, IndexError, TypeError):
+            pass
+        html_text = _inject_json_ld(html_text, event_schema)
         return HTMLResponse(content=html_text)
     except Exception:
         logger.warning("OG injection falló para /workshops/%s — sirvo index plano", slug, exc_info=True)
