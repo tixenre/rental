@@ -4,6 +4,7 @@ Run: uvicorn main:app --reload --port 8000
 """
 
 import logging
+import mimetypes
 import os
 import threading
 import uuid
@@ -11,7 +12,7 @@ import html as _html
 import re
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -261,9 +262,42 @@ app.add_middleware(
 if FRONT.exists():
     app.mount("/static", StaticFiles(directory=str(FRONT)), name="static")
 
-# Nuevo frontend (Vite SPA — rental-refine)
+# Nuevo frontend (Vite SPA — rental-refine):
+# Content-negotiation: sirve .br / .gz pre-comprimidos si el cliente los acepta.
+# Reemplaza el StaticFiles mount porque StaticFiles no sirve FileResponse comprimidas
+# incluso con GZipMiddleware (limitación de Starlette).
 if FRONT_NEW.exists():
-    app.mount("/assets", StaticFiles(directory=str(FRONT_NEW / "assets")), name="assets")
+    _assets_dir = (FRONT_NEW / "assets").resolve()
+
+    @app.get("/assets/{path:path}", include_in_schema=False)
+    async def serve_asset(path: str, request: Request):
+        """Sirve assets estáticos con content-negotiation (Brotli > gzip > raw)."""
+        try:
+            candidate = (_assets_dir / path).resolve()
+        except Exception:
+            raise HTTPException(status_code=400)
+        if not candidate.is_file() or not candidate.is_relative_to(_assets_dir):
+            raise HTTPException(status_code=404)
+        ctype = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+        cache = "public, max-age=31536000, immutable"
+        accept_enc = request.headers.get("accept-encoding", "")
+        if "br" in accept_enc:
+            br = candidate.parent / (candidate.name + ".br")
+            if br.is_file():
+                return FileResponse(str(br), headers={
+                    "Content-Encoding": "br", "Content-Type": ctype,
+                    "Cache-Control": cache, "Vary": "Accept-Encoding",
+                })
+        if "gzip" in accept_enc:
+            gz = candidate.parent / (candidate.name + ".gz")
+            if gz.is_file():
+                return FileResponse(str(gz), headers={
+                    "Content-Encoding": "gzip", "Content-Type": ctype,
+                    "Cache-Control": cache, "Vary": "Accept-Encoding",
+                })
+        return FileResponse(str(candidate), headers={
+            "Cache-Control": cache, "Vary": "Accept-Encoding",
+        })
 
 # ── Routers ──────────────────────────────────────────────────────────────────
 

@@ -11,7 +11,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Query, HTTPException, Request
+from fastapi import APIRouter, Query, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from database import (
@@ -278,6 +278,7 @@ def _attach_disponibilidad(conn, equipos: list, desde: str, hasta: str) -> list:
 @router.get("/equipos")
 def list_equipos(
     request:       Request,
+    response:      Response,
     q:                Optional[str]  = Query(None),
     etiqueta:         Optional[str]  = Query(None),
     categoria:        Optional[str]  = Query(None),
@@ -505,6 +506,12 @@ def list_equipos(
         if desde and hasta:
             equipos = _attach_disponibilidad(conn, equipos, desde, hasta)
 
+        # Cache: la respuesta pública es estable para un set dado de params.
+        # Admin recibe no-store (ve equipos no-visibles y filtros extra).
+        response.headers["Cache-Control"] = (
+            "private, no-store" if is_admin
+            else "public, max-age=60, stale-while-revalidate=300"
+        )
         return {"total": total, "page": page, "per_page": per_page, "items": equipos}
 
 

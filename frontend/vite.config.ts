@@ -4,6 +4,7 @@ import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
 import { visualizer } from "rollup-plugin-visualizer";
+import { compression } from "vite-plugin-compression2";
 
 // ANALYZE=1 npm run build → genera dist/bundle-stats.html con el desglose
 // del bundle (qué deps pesan qué). Útil para auditar performance.
@@ -35,6 +36,18 @@ export default defineConfig(async ({ mode }) => {
             }),
           ]
         : []),
+      // Pre-compresión: emite .br y .gz junto a cada asset hasheado.
+      // El backend hace content-negotiation y sirve la variante comprimida.
+      // Backup del CDN: si Cloudflare no está en el path, el origen igual sirve
+      // comprimido. Excluir imágenes (ya comprimidas) y los propios .br/.gz.
+      compression({
+        algorithm: "brotliCompress",
+        exclude: [/\.(br|gz)$/, /\.(png|jpg|jpeg|webp|avif|gif|ico|svg|woff2)$/],
+      }),
+      compression({
+        algorithm: "gzip",
+        exclude: [/\.(br|gz)$/, /\.(png|jpg|jpeg|webp|avif|gif|ico|svg|woff2)$/],
+      }),
     ],
     server: {
       port: 3000,
