@@ -249,8 +249,9 @@ function SearchBody({
           />
           {query && (
             <button
+              type="button"
               onClick={() => setQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 grid h-6 w-6 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-muted-foreground/20"
+              className="absolute right-3 top-1/2 -translate-y-1/2 grid h-6 w-6 place-items-center rounded-full bg-muted text-muted-foreground hover:bg-muted-foreground/20 before:absolute before:inset-[-10px] before:content-['']"
               aria-label="Limpiar búsqueda"
             >
               <X className="h-3.5 w-3.5" />

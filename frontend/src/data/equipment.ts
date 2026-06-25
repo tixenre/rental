@@ -68,6 +68,14 @@ export type Equipment = {
   fotoUrlSm?: string | null;
   /** Variante 160px para thumbnails de ~48px. Null si sin backfill → cae a fotoUrlSm. */
   fotoUrlThumb?: string | null;
+  /** Variante AVIF 1200px. Null si sin backfill → browser usa WebP. */
+  fotoUrlAvif?: string | null;
+  /** Variante AVIF 600px. */
+  fotoUrlSmAvif?: string | null;
+  /** Variante AVIF 160px. */
+  fotoUrlThumbAvif?: string | null;
+  /** Data-URI 4×4 blur placeholder para blur-up. Null si sin backfill. */
+  fotoLqip?: string | null;
   /** Galería multi-foto (#125): fotos del equipo, principal primero. Solo en el detalle. */
   fotos?: { url: string; esPrincipal?: boolean }[];
   cantidad?: number; // stock total

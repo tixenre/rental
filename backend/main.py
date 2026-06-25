@@ -525,10 +525,11 @@ def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None
     responder la API (LCP ~21s en Lighthouse).
 
     El `imagesrcset`+`imagesizes` matchea EXACTO el `srcSet`/`sizes` que renderiza el
-    carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=100vw`) y la query del hero usa el
-    MISMO orden que `useHeroPhotos` (es_principal DESC, orden ASC) → el browser deduplica
-    y usa el recurso preloadeado en vez de bajar la imagen dos veces. El preconnect
-    abre la conexión TLS al bucket R2 (origen de todas las fotos) antes del fetch."""
+    carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=(max-width: 768px) 100vw, 42vw`) y la
+    query del hero usa el MISMO orden que `useHeroPhotos` (es_principal DESC, orden ASC) →
+    el browser deduplica y usa el recurso preloadeado en vez de bajar la imagen dos veces.
+    El preconnect abre la conexión TLS al bucket R2 (origen de todas las fotos) antes del
+    fetch."""
     esc = _html.escape(image, quote=True)
     # Origen del bucket R2 (https://host) derivado de la URL del hero — sin hardcodear
     # el bucket, robusto ante cambios de ambiente.
@@ -541,7 +542,8 @@ def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None
         esc_sm = _html.escape(image_sm, quote=True)
         tags += (
             f'<link rel="preload" as="image" fetchpriority="high"'
-            f' imagesrcset="{esc_sm} 800w, {esc} 1600w" imagesizes="100vw">'
+            f' imagesrcset="{esc_sm} 800w, {esc} 1600w"'
+            f' imagesizes="(max-width: 768px) 100vw, 42vw">'
         )
     else:
         tags += f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
@@ -570,6 +572,94 @@ def _inject_json_ld(html_text: str, *schemas: dict) -> str:
         for s in schemas
     )
     return html_text.replace("</head>", tags + "</head>", 1)
+
+
+def _get_initial_catalog(conn) -> dict:
+    """Serializa equipos visibles + categorías para el script __INITIAL__ del catálogo.
+
+    Subset de list_equipos sin filtros ni attach_*, suficiente para el primer
+    render de las cards sin round-trip. backendToEquipment tolera campos ausentes
+    (etiquetas/kit/specs → arrays vacíos o None).
+    """
+    rows = conn.execute(f"""
+        SELECT
+            e.id, e.nombre, e.nombre_publico, e.modelo,
+            e.foto_url, e.foto_url_sm, e.foto_url_thumb,
+            e.foto_url_avif, e.foto_url_sm_avif, e.foto_url_thumb_avif, e.foto_lqip,
+            e.precio_jornada, e.precio_usd, e.cantidad,
+            e.estado, e.visible_catalogo, e.relevancia_manual,
+            e.popularidad_score, e.destacado, e.tipo,
+            {MARCA_SUBQUERY}
+        FROM equipos e
+        WHERE e.visible_catalogo = 1
+          AND e.estado != 'fuera_servicio'
+          AND e.eliminado_at IS NULL
+          AND e.es_recurso_interno = FALSE
+        ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC
+        LIMIT 500
+    """).fetchall()
+
+    items = []
+    for row in rows:
+        item = dict(row)
+        item.setdefault("etiquetas", [])
+        item.setdefault("kit", [])
+        items.append(item)
+
+    cats = conn.execute(
+        "SELECT id, nombre, COALESCE(total, 0) AS total, prioridad, parent_id "
+        "FROM categorias ORDER BY COALESCE(prioridad, 999), nombre"
+    ).fetchall()
+
+    return {
+        "equipos": {"total": len(items), "items": items},
+        "categorias": [dict(c) for c in cats],
+    }
+
+
+def _inject_initial_data(html_text: str, data: dict) -> str:
+    """Inyecta <script id="__INITIAL__" type="application/json"> antes de </body>.
+
+    El frontend lo consume en main.tsx para pre-poblar React Query sin round-trip.
+    Se escapa </script> dentro del payload para no romper el parser HTML.
+    """
+    payload = json.dumps(data, ensure_ascii=False, default=str)
+    payload = payload.replace("</script>", r"<\/script>")
+    script_tag = f'<script id="__INITIAL__" type="application/json">{payload}</script>'
+    return html_text.replace("</body>", script_tag + "</body>", 1)
+
+
+@app.get("/rental", include_in_schema=False)
+def rental_page():
+    """Catálogo público. Inyecta:
+    - Hero preload (LCP del catálogo — misma fuente y orden que useHeroPhotos)
+    - __INITIAL__ con equipos + categorías para hydration de React Query (sin round-trip)
+
+    Ante cualquier error sirve el index.html plano — el SPA fetchea normalmente.
+    """
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            hero_row = conn.execute(
+                "SELECT url, url_sm FROM estudio_fotos WHERE estudio_id = 1 "
+                "ORDER BY es_principal DESC, orden ASC, id ASC LIMIT 1"
+            ).fetchone()
+            initial_data = _get_initial_catalog(conn)
+        finally:
+            conn.close()
+        html_text = index_file.read_text(encoding="utf-8")
+        hero_url = (hero_row["url"].strip() if hero_row and hero_row["url"] else "")
+        hero_sm = (hero_row["url_sm"].strip() if hero_row and hero_row["url_sm"] else "")
+        if hero_url.startswith("http"):
+            html_text = _inject_hero_preload(html_text, hero_url, hero_sm or None)
+        html_text = _inject_initial_data(html_text, initial_data)
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("rental_page: inyección falló — sirvo index plano", exc_info=True)
+        return _serve_frontend("index.html")
 
 
 @app.get("/equipo/{id_or_slug}", include_in_schema=False)

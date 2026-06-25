@@ -70,6 +70,10 @@ export default defineConfig(async ({ mode }) => {
     },
     build: {
       outDir: "dist",
+      // Apuntar a ES2020+ (Chrome/FF/Safari ~2021) — evita polyfills innecesarios
+      // para async/await, optional chaining, nullish coalescing, etc. El 98%+
+      // de los browsers actuales soportan es2020; la diferencia en tamaño es ~2-5%.
+      target: "es2020",
       // No precargar los chunks que solo usa admin / DnD desde el HTML
       // inicial. Visitors del catálogo público no los necesitan hasta navegar
       // a /admin. Vite los seguirá cargando dinámicamente cuando hagan falta.
