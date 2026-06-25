@@ -1217,6 +1217,7 @@ def _init_db_schema(conn):
     # A1 #635: tipo de producto (simple/kit/combo). DEFAULT 'simple'; el backfill
     # (kits con componentes → 'kit') y el CHECK viven en la migración a1c3b5f7e9d2.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'simple'")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS destacado BOOLEAN DEFAULT FALSE")
     conn.execute("""
         DO $$
         BEGIN
