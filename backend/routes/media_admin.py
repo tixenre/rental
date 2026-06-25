@@ -16,14 +16,21 @@ from services.media.gc import reconcile_media, rederive_variants, _find_orphan_i
 from services.media.specs import (
     DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM,
     DISPLAY_SQUARE, DISPLAY_SQUARE_SM, DISPLAY_SQUARE_THUMB,
+    DISPLAY_KEEP_ASPECT_AVIF, DISPLAY_KEEP_ASPECT_SM_AVIF,
+    DISPLAY_SQUARE_AVIF, DISPLAY_SQUARE_SM_AVIF, DISPLAY_SQUARE_THUMB_AVIF,
     OG_SQUARE_JPEG,
 )
 
 # Specs completos para re-derivar: el admin no sabe el kind, pide todos.
 # El pipeline es idempotente — si un spec no aplica por aspect ratio, no rompe.
+# INCLUYE las variantes AVIF (espeja EQUIPO_DERIVE_SPECS): sin ellas, re-derivar
+# un asset desde el back-office regeneraba solo webp y PERDÍA el AVIF → el catálogo
+# caía al fallback webp para ese equipo (#1054). No quitar las AVIF de esta lista.
 _ALL_DERIVE_SPECS = [
     DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM,
     DISPLAY_SQUARE, DISPLAY_SQUARE_SM, DISPLAY_SQUARE_THUMB,
+    DISPLAY_KEEP_ASPECT_AVIF, DISPLAY_KEEP_ASPECT_SM_AVIF,
+    DISPLAY_SQUARE_AVIF, DISPLAY_SQUARE_SM_AVIF, DISPLAY_SQUARE_THUMB_AVIF,
     OG_SQUARE_JPEG,
 ]
 
