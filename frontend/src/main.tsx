@@ -14,6 +14,8 @@ import { apiGetAnalyticsConfig } from "./lib/api";
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 if (SENTRY_DSN) {
   const initSentry = () => {
+    window.removeEventListener("pointerdown", initSentry);
+    window.removeEventListener("keydown", initSentry);
     import("@sentry/react").then(({ init, browserTracingIntegration }) => {
       init({
         dsn: SENTRY_DSN,

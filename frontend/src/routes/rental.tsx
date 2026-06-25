@@ -34,9 +34,18 @@ import { CarouselRow } from "@/components/rental/CarouselRow";
 import { CategoryMosaic } from "@/components/rental/CategoryMosaic";
 import { BrandCarousel } from "@/components/rental/BrandCarousel";
 import { ActiveFiltersChips } from "@/components/rental/ActiveFiltersChips";
+import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
+import { useFavoritos } from "@/hooks/useFavoritos";
+import type { BackendMarca, BackendCategoria } from "@/lib/api";
+import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
+import { useCart } from "@/lib/cart-store";
+import { toast } from "sonner";
+import { type Equipment } from "@/data/equipment";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/design-system/ui/skeleton";
 
 // Lazy: estos componentes solo son visibles tras interacción del usuario.
-// Sacarlos del bundle inicial reduce ~120KB de parse/exec en la carga.
+// Sacarlos del bundle inicial reduce ~24KB de parse/exec en la carga inicial.
 const CartDrawer = lazy(() =>
   import("@/components/rental/CartDrawer").then((m) => ({ default: m.CartDrawer })),
 );
@@ -49,15 +58,6 @@ const ViewIntroDialog = lazy(() =>
 const PreviewPane = lazy(() =>
   import("@/components/rental/PreviewPane").then((m) => ({ default: m.PreviewPane })),
 );
-import { useEquipos, useCategorias, useMarcas } from "@/hooks/useEquipos";
-import { useFavoritos } from "@/hooks/useFavoritos";
-import type { BackendMarca, BackendCategoria } from "@/lib/api";
-import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
-import { useCart } from "@/lib/cart-store";
-import { toast } from "sonner";
-import { type Equipment } from "@/data/equipment";
-import { cn } from "@/lib/utils";
-import { Skeleton } from "@/design-system/ui/skeleton";
 
 const POPULAR_CHIPS = [
   "Pack boda",
@@ -427,7 +427,7 @@ function Index() {
         });
       });
     }
-    if (query.trim()) {
+    if (deferredQuery.trim()) {
       // Motor de búsqueda compartido (espejo del backend): sin tildes, sin
       // guiones, multi-palabra y ORDENADO por relevancia (mejor match primero).
       // `nombre` pondera el ranking; el resto (marca/categoría/specs/descripción)
@@ -443,7 +443,7 @@ function Index() {
       }));
     }
     return list;
-  }, [selectedCats, brand, query, disponiblesOnly, favoritosOnly, fav, allEquipos, specFilters]);
+  }, [selectedCats, brand, deferredQuery, disponiblesOnly, favoritosOnly, fav, allEquipos, specFilters]);
 
   // Analítica interna: registra qué busca la gente (con cuántos resultados vio).
   // Debounce + dedupe viven en el módulo; acá solo avisamos en cada cambio.
