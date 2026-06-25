@@ -535,17 +535,21 @@ def _inject_hero_preload(
     en el HTML inicial — el browser no puede arrancar el fetch hasta correr el JS +
     responder la API (LCP ~21s en Lighthouse).
 
-    Si hay variante AVIF, preloadeamos esa con type="image/avif" — los browsers que
-    soportan AVIF la usan (Chrome/Safari/Firefox modernos), los que no la ignoran y
-    descubren el webp del <picture> normalmente. El preload AVIF matchea el <source
-    type="image/avif"> del componente HeroSection.
-
-    El `imagesrcset`+`imagesizes` matchea EXACTO el `srcSet`/`sizes` que renderiza el
+    El `imagesrcset`+`imagesizes` matchea EXACTO el `srcSet`/`sizes` del `<img>` del
     carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=(max-width: 768px) 100vw, 42vw`) y la
     query del hero usa el MISMO orden que `useHeroPhotos` (es_principal DESC, orden ASC) →
     el browser deduplica y usa el recurso preloadeado en vez de bajar la imagen dos veces.
     El preconnect abre la conexión TLS al bucket R2 (origen de todas las fotos) antes del
-    fetch."""
+    fetch.
+
+    NOTA: NO preloadeamos el AVIF aunque esté disponible. Un preload con
+    type="image/avif" no matchea el elemento `<img>` (que tiene srcset webp) que Chrome
+    reporta como LCP — el AVIF se descarga dos veces (una del preload sin match, otra del
+    `<source>` de la `<picture>`) y el LCP empeora. El preconnect calienta la conexión R2
+    para que el AVIF descargue rápido cuando React renderiza el `<picture>`.
+
+    Params `image_avif`/`image_sm_avif` reservados para cuando Chrome implemente
+    matching de preload AVIF con `<source type="image/avif">` de forma confiable."""
     esc = _html.escape(image, quote=True)
     # Origen del bucket R2 (https://host) derivado de la URL del hero — sin hardcodear
     # el bucket, robusto ante cambios de ambiente.
@@ -554,19 +558,12 @@ def _inject_hero_preload(
     if origin.startswith("http"):
         esc_origin = _html.escape(origin, quote=True)
         tags += f'<link rel="preconnect" href="{esc_origin}">'
-    if image_avif:
-        # Preload AVIF para browsers que lo soportan (Chrome, Safari, Firefox modernos).
-        esc_avif = _html.escape(image_avif, quote=True)
-        if image_sm_avif:
-            esc_sm_avif = _html.escape(image_sm_avif, quote=True)
-            tags += (
-                f'<link rel="preload" as="image" type="image/avif" fetchpriority="high"'
-                f' imagesrcset="{esc_sm_avif} 800w, {esc_avif} 1600w"'
-                f' imagesizes="(max-width: 768px) 100vw, 42vw">'
-            )
-        else:
-            tags += f'<link rel="preload" as="image" type="image/avif" fetchpriority="high" href="{esc_avif}">'
-    elif image_sm:
+    # Preloadeamos SIEMPRE la variante webp (el <img> srcset que matchea Lighthouse).
+    # Un preload type="image/avif" NO matchea el <img src="...webp"> que Chrome reporta
+    # como LCP → el AVIF se descarga dos veces (preload + desde <source>) y el LCP se
+    # dispara. El AVIF sigue siendo renderizado por Chrome via <picture><source>, con la
+    # conexión R2 ya pre-calentada por el preconnect.
+    if image_sm:
         esc_sm = _html.escape(image_sm, quote=True)
         tags += (
             f'<link rel="preload" as="image" fetchpriority="high"'
