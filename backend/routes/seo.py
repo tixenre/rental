@@ -163,3 +163,4 @@ def sitemap():
         media_type="application/xml",
         headers={"Cache-Control": "public, max-age=3600"},  # 1h cache
     )
+
