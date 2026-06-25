@@ -39,7 +39,7 @@ import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
-import { buildFotoSrcSet, buildAvifSrcSet } from "@/lib/srcset";
+import { EquipoFoto } from "@/components/rental/EquipoFoto";
 
 function fmtDate(d: Date | null): string {
   if (!d) return "—";
@@ -241,7 +241,7 @@ function SheetClose({ onClose }: { onClose: () => void }) {
   );
 }
 
-/* ── CartItem (subcomponent with per-item imgFailed state) ───────── */
+/* ── CartItem ────────────────────────────────────────────────────── */
 function CartItem({
   eq,
   qty,
@@ -255,27 +255,18 @@ function CartItem({
   jornadas: number;
   jornadasEfectivas: number;
 }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const cartAvifSrcSet = buildAvifSrcSet(eq.fotoUrlAvif, eq.fotoUrlSmAvif, eq.fotoUrlThumbAvif);
   return (
     <div className="flex items-center gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0">
       <div className="w-11 h-11 rounded-lg bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0 overflow-hidden">
-        {eq.fotoUrl && !imgFailed ? (
-          <picture>
-            {cartAvifSrcSet && <source type="image/avif" srcSet={cartAvifSrcSet} sizes="44px" />}
-            <img
-              src={eq.fotoUrl}
-              srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}
-              sizes="44px"
-              alt={eq.name}
-              loading="lazy"
-              onError={() => setImgFailed(true)}
-              className="w-full h-full object-contain p-1"
-            />
-          </picture>
-        ) : (
-          <CatIcon cat={eq.category} size={18} />
-        )}
+        <EquipoFoto
+          foto={eq}
+          alt={eq.name}
+          sizes="44px"
+          blur={false}
+          loading="lazy"
+          className="w-full h-full object-contain p-1"
+          fallback={<CatIcon cat={eq.category} size={18} />}
+        />
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-mono text-2xs tracking-[0.18em] uppercase text-muted-foreground">
@@ -706,15 +697,6 @@ export function FichaSheet({
   jornadas,
   fechaDesde,
 }: FichaSheetProps) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const fichaAvifSrcSet = buildAvifSrcSet(eq.fotoUrlAvif, eq.fotoUrlSmAvif);
-  const fichaBlurStyle = eq.fotoLqip
-    ? {
-        backgroundImage: `url("${eq.fotoLqip}")`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-    : undefined;
   const specsText = eq.specs.map((s) => `${s.label}: ${s.value}`).join(" · ");
 
   return (
@@ -753,29 +735,14 @@ export function FichaSheet({
             className="mx-5 mt-3.5 rounded-[var(--radius-lg)] border border-hairline bg-surface flex items-center justify-center text-muted-foreground overflow-hidden"
             style={{ aspectRatio: "4/3" }}
           >
-            {eq.fotoUrl && !imgFailed ? (
-              <picture>
-                {fichaAvifSrcSet && (
-                  <source
-                    type="image/avif"
-                    srcSet={fichaAvifSrcSet}
-                    sizes="(max-width: 640px) 92vw, 400px"
-                  />
-                )}
-                <img
-                  src={eq.fotoUrl}
-                  srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm)}
-                  sizes="(max-width: 640px) 92vw, 400px"
-                  alt={eq.name}
-                  loading="lazy"
-                  onError={() => setImgFailed(true)}
-                  style={fichaBlurStyle}
-                  className="w-full h-full object-contain p-4"
-                />
-              </picture>
-            ) : (
-              <CatIcon cat={eq.category} size={48} />
-            )}
+            <EquipoFoto
+              foto={eq}
+              alt={eq.name}
+              sizes="(max-width: 640px) 92vw, 400px"
+              loading="lazy"
+              className="w-full h-full object-contain p-4"
+              fallback={<CatIcon cat={eq.category} size={48} />}
+            />
           </div>
 
           {/* Price */}
@@ -903,8 +870,6 @@ export function EquipmentRow({
   onAdd,
   onFicha,
 }: EquipmentRowProps) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const rowAvifSrcSet = buildAvifSrcSet(eq.fotoUrlAvif, eq.fotoUrlSmAvif, eq.fotoUrlThumbAvif);
   const { data: clienteSession } = useClienteSession();
   const conIva = aplicaIva(clienteSession?.perfil_impuestos);
 
@@ -953,22 +918,15 @@ export function EquipmentRow({
         {/* Thumb cuadrado 1:1 + FavButton */}
         <div className="relative shrink-0">
           <div className="flex aspect-square w-12 items-center justify-center overflow-hidden rounded-md bg-white text-muted-foreground">
-            {eq.fotoUrl && !imgFailed ? (
-              <picture>
-                {rowAvifSrcSet && <source type="image/avif" srcSet={rowAvifSrcSet} sizes="48px" />}
-                <img
-                  src={eq.fotoUrl}
-                  srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}
-                  sizes="48px"
-                  alt={nombrePublico}
-                  loading="lazy"
-                  onError={() => setImgFailed(true)}
-                  className="h-full w-full object-contain p-1.5"
-                />
-              </picture>
-            ) : (
-              <CatIcon cat={eq.category} size={20} />
-            )}
+            <EquipoFoto
+              foto={eq}
+              alt={nombrePublico}
+              sizes="48px"
+              blur={false}
+              loading="lazy"
+              className="h-full w-full object-contain p-1.5"
+              fallback={<CatIcon cat={eq.category} size={20} />}
+            />
           </div>
           <FavButton itemId={String(eq.id)} size="sm" className="absolute -right-1.5 -top-1.5" />
         </div>
