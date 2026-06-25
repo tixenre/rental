@@ -153,6 +153,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         items = conn.execute(f"""
             SELECT pi.cantidad, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
                    {MARCA_SUBQUERY}, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
+                   e.foto_url_sm, e.foto_url_thumb,
                    e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
             FROM alquiler_items pi
             LEFT JOIN equipos e ON e.id = pi.equipo_id
