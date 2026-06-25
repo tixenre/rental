@@ -34,9 +34,6 @@ const ALLOWLIST = new Set([
 const ALLOWED_PREFIXES = [
   "docs/audit-ui-screenshots/",
   "frontend/src/design-system/", // si algún token tiene una img de referencia
-  // ⏰ LEGACY: fotos del estudio aún en el repo hasta que F7 (cleanup estáticos
-  // estudio) las migre a R2. Remover este prefijo cuando F7 mergee a dev.
-  "frontend/public/estudio/",
 ];
 
 function isAllowed(relPath) {
