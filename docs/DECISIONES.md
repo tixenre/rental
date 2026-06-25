@@ -1114,3 +1114,44 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Consecuencias.** 14 skills en disco. `CLAUDE.md` tiene 14 filas. El supervisor marca drift entre
   features en código y `docs/MARCA.md` o `docs/CAMPAÑA_FEATURES.md` como hallazgo de marca. Los TODOs
   de Estudio/Workshops en `MARCA.md` son intencionales — el dueño los completa cuando tenga el copy.
+
+---
+
+### 2026-06-25 — Guardrail con prefijo ⏰ LEGACY: coexistencia temporal en migraciones por fases
+
+- **Contexto.** La iniciativa #1029 (Sistema unificado de media) migró las fotos del estudio a R2 en
+  fases: F0 construyó el motor, las fases intermedias migraron datos, F7 eliminó los archivos estáticos
+  del repo. Entre F0 y F7, el guardrail CI `check-no-content-images.mjs` tenía que permitir los archivos
+  viejos temporalmente sin perder la capacidad de bloquear fotos nuevas. Se usó un prefijo de allowlist
+  con comentario `⏰ LEGACY: remover cuando F7 mergee a dev`.
+- **Decisión.** Cuando una feature y su cleanup viven en fases distintas: el guardrail incluye el estado
+  legado con el comentario explícito `⏰ LEGACY: remover cuando <fase> mergee a dev`. La fase de cleanup
+  quita el prefijo y borra el estado legado en el mismo commit, con referencia explícita al comentario.
+- **Why.** Permite coexistencia temporal sin romper nada. La señal `⏰ LEGACY` es visible (no se pierde
+  en comentarios ambiguos) y la recoge el supervisor en cada revisión: si el disparador ya se cumplió,
+  lo propone como candidato a retirar. Refuerza la entrada existente de `⏰` en `MEMORIA.md`
+  (_Minutos de GitHub Actions, 2026-05-25_) que ya establece el patrón de disparador temporal.
+- **Consecuencias.** El supervisor tiene instrucción explícita de buscar prefijos `⏰ LEGACY` con
+  disparador cumplido y proponerlos. El commit de cleanup referencia el comentario (`"remover el prefijo
+  ⏰ LEGACY de F7"`), lo que hace la historia de git más legible.
+
+### 2026-06-25 — El supervisor atrapa bugs de implementación, no solo drift de scope/forma
+
+- **Contexto.** Durante la iniciativa #1029 (Sistema unificado de media), el supervisor encontró en las
+  revisiones de F5, F6, F7, F8 los siguientes bugs reales: (a) `import pytest` sin usar en
+  `test_f5_og_estudio_talleres.py` — causa rechazado; (b) `_add_componentes()` en `documentos.py` sin
+  las columnas `foto_url_sm`/`foto_url_thumb` — bug de incomplete change; (c) `ESTUDIO_IMG` en
+  `estudio.tsx` apuntando a un archivo recién borrado; (d) `test_auth_guards.py` parametrizado con
+  paths de fotos que ya no existen en el repo. Ninguno de estos bugs los habría atrapado CI (compilación,
+  lint, tests no ejercitaban esos paths en ese contexto).
+- **Decisión.** El supervisor es una segunda revisión de código, no solo un gate de scope/drift.
+  **No skippearlo aunque el cambio parezca mecánico.** La instrucción "Antes de abrir/mergear una PR:
+  despachar el agente supervisor" (CLAUDE.md) se refuerza con esta evidencia: el valor concreto es que
+  caza bugs en la intersección de cambio nuevo + código existente que CI no ejercita.
+- **Why.** CI verifica: tipos, lint, tests que ya existían. El supervisor verifica: coherencia semántica
+  del cambio (¿todos los lugares que debían cambiar cambiaron?, ¿no quedaron referencias rotas?). Son
+  capas complementarias, no redundantes. El costo de skippearlo es bajo en energía pero puede hacer
+  llegar a staging un bug que no tira error pero sí comportamiento silenciosamente roto.
+- **Consecuencias.** No hay cambio procedimental — el supervisor ya era obligatorio. El cambio es de
+  framing: es una segunda revisión de código, no burocracia. Los bugs que encuentra son de la categoría
+  "incomplete change" (cambié A pero no B que depende de A) e "import muerto" (residuos de iteración).

@@ -57,6 +57,10 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
    en silencio.
    - Atención especial a **decisiones con disparador ⏰** (ej. la regla de minutos de Actions que se
      activa si el repo vuelve a privado): si el contexto sugiere que el disparador se cumplió, avisalo.
+   - **Migraciones Alembic**: si el PR incluye una migración nueva, verificar que su `down_revision`
+     apunte a la última migración presente en `dev` (no a otra del mismo branch ni a una más vieja).
+     Una cadena rota produce "Multiple heads" y bloquea el CI. Correr `git log origin/dev --oneline
+     -- backend/migrations/versions/` para ver cuál es la última migración en dev.
 4. **Preferencias** — ¿respeta las preferencias del dueño registradas en `docs/MEMORIA.md`?
 5. **Curación de la memoria** — la memoria (digest `MEMORIA.md` + log `DECISIONES.md`) es la verdad
    curada del presente, no un append-only (el log inmutable es git). Toda propuesta de curación toca

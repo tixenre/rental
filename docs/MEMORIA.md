@@ -386,3 +386,19 @@ Antes de codear algo, **verificar si ya existe** en el repo —con prioridad tra
 avanzó allá puede ya cubrir el pedido (caso: el staging-login de cliente ya estaba hecho, #961). Vale para
 features, helpers, endpoints y patrones. Refuerza la _Barra de calidad de ingeniería (2026-05-25)_ (no
 duplicar, fuente única); el supervisor marca reimplementaciones de algo ya presente.
+
+### 2026-06-25 — Guardrail con prefijo ⏰ LEGACY: coexistencia temporal en migraciones por fases
+
+Cuando una feature nueva y el cleanup del estado viejo se hacen en fases distintas, el guardrail (CI,
+allowlist, o cualquier regla de calidad) incluye el estado legado con un comentario explícito `⏰ LEGACY:
+remover cuando <fase> mergee a dev`. El paso de limpieza lo quita en el mismo commit que borra el estado
+viejo. Permite coexistencia temporal sin romper nada y deja una señal visible de la deuda pendiente (no
+se pierde en un comentario ambiguo). El supervisor busca activamente prefijos `⏰ LEGACY` cuyo disparador
+ya se cumplió y los propone como candidatos a retirar.
+
+### 2026-06-25 — El supervisor atrapa bugs de implementación, no solo drift de scope/forma
+
+En la práctica (iniciativa #1029, F5–F7): `import pytest` sin usar, columnas faltantes en queries SQL,
+URL apuntando a un archivo borrado, test con paths eliminados — todos encontrados por el supervisor.
+**No skippearlo aunque el cambio parezca mecánico**: es una segunda revisión de código, no solo un gate
+de scope. Los bugs concretos que encuentra son distintos a los que caza CI (tipos, lint, tests unitarios).
