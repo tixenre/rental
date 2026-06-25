@@ -41,11 +41,11 @@ export default defineConfig(async ({ mode }) => {
       // Backup del CDN: si Cloudflare no está en el path, el origen igual sirve
       // comprimido. Excluir imágenes (ya comprimidas) y los propios .br/.gz.
       compression({
-        algorithm: "brotliCompress",
+        algorithms: ["brotliCompress"],
         exclude: [/\.(br|gz)$/, /\.(png|jpg|jpeg|webp|avif|gif|ico|svg|woff2)$/],
       }),
       compression({
-        algorithm: "gzip",
+        algorithms: ["gzip"],
         exclude: [/\.(br|gz)$/, /\.(png|jpg|jpeg|webp|avif|gif|ico|svg|woff2)$/],
       }),
     ],

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ReactDOM from "react-dom/client";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
-import { initGA, trackPageView } from "./lib/analytics";
+import { initGA, trackPageView, initWebVitals } from "./lib/analytics";
 import { apiGetAnalyticsConfig } from "./lib/api";
 
 // Solo activo si VITE_SENTRY_DSN está seteado — dev/CI no lo necesitan.
@@ -46,6 +46,9 @@ const router = createRouter({
   // Sin esto, back vuelve al top — UX horrible en mobile listando muchos
   // equipos. Default scroll-to-top en navegaciones forward.
   scrollRestoration: true,
+  // Precarga los datos + chunks de la ruta en hover/intent → navegaciones
+  // percibidas como casi instantáneas (catálogo → ficha, etc.).
+  defaultPreload: "intent",
 });
 
 // Google Analytics 4.
@@ -57,6 +60,7 @@ const router = createRouter({
 // (área privada). El pageview SPA se manda en cada navegación resuelta.
 function startAnalytics(measurementId: string) {
   initGA(measurementId);
+  initWebVitals(); // RUM: LCP/CLS/INP/FCP/TTFB → GA4 evento "web_vitals"
   const sendPageView = () => {
     const path = router.state.location.pathname;
     if (path.startsWith("/admin") || path.startsWith("/cliente")) return;
