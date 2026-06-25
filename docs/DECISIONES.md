@@ -88,7 +88,7 @@
   `docs/ISSUE_LABELS.md`) → se filtran de la vista "qué hago ahora". La cola accionable queda chica; lo
   diferido queda **asentado pero separado** — no es deuda sin cerrar, es backlog. El brain-dump del
   dueño va a issue igual (no se pierde), con `someday` si es "algún día".
-- **Triage liviano y seguido**, no masivo: el método es el skill `cola` — **verificar
+- **Triage liviano y seguido**, no masivo: el método es el skill `pendientes` — **verificar
   que shippeó antes de cerrar** (las tools y la intuición mienten), con evidencia. Hacerlo en cada
   promoción, no dejar acumular meses.
 - **Una iniciativa multi-sesión = un issue de tracking** (decisión _Modus operandi durable_), que
@@ -960,7 +960,7 @@ cancel-in-progress` ya cancela corridas viejas.
     cae a defaults.
   - **Routing de modelo** = materializa _Eficiencia de sesión (2026-05-26)_ en el `model:` de cada skill:
     `mantenimiento`/`auditoria-profunda`/`pulido-frontend` → **opus** (su corazón es criterio/diagnóstico);
-    `cola`/`importar-diseno`/`gear-compatibility` → **sonnet** (ejecución / loop frecuente). Los de criterio
+    `pendientes`/`importar-diseno`/`gear-compatibility` → **sonnet** (ejecución / loop frecuente). Los de criterio
     **delegan la ejecución mecánica a subagentes `model: sonnet`**.
   - **Blueprint = el Curator de Hermes Agent, nativo.** Se copia el *mecanismo* (reportar sin mutar, archivar
     sin borrar, curación gateada) **sin** adoptar Hermes como segundo agente — sería un segundo store de
@@ -968,13 +968,13 @@ cancel-in-progress` ya cancela corridas viejas.
   - **Loop de aprendizaje (Etapa 1B).** Buzón durable `docs/PROPUESTAS_SKILLS.md` (append-only, curado por el
     dueño como la memoria) donde la **Auto-mejora** de cada skill deposita propuestas (propone, no aplica);
     **telemetría de uso** vía hook PostToolUse(`Skill`) → `.claude/skill-ledger.jsonl` (gitignored); **check-in
-    proactivo** de la cola (SessionStart avisa si `cola-state.json` está stale).
+    proactivo** de la cola (SessionStart avisa si `pendientes-state.json` está stale).
   - **Plantilla** `.claude/skill-template.md` (skeleton canónico) — vive **fuera de `skillsDir`** a propósito,
     así Claude Code no la descubre y los Bloques 4/5 no la cuentan.
 - **Modo: propone y el dueño aprueba.** El loop de auto-mejora NO reescribe skills/memoria solo — redacta la
   propuesta y el dueño la aprueba (igual que la curación de memoria; el supervisor puede validar). Es el
   `curator --dry-run` de Hermes.
-- **Consecuencias.** Etapa 1A implementada en este PR: skill `cola`, `mantenimiento` Frente D → puntero,
+- **Consecuencias.** Etapa 1A implementada en este PR: skill `pendientes`, `mantenimiento` Frente D → puntero,
   `gear-compatibility` normalizado a dir+`SKILL.md`, tabla de skills + columna Modelo, `model:`/metadata en los
   6 skills, `governance.config.mjs` + `check-docs.mjs` config-driven con Bloques 4/5, plantilla. Etapa 1B (buzón
   + auto-mejora + telemetría + check-in) y Etapa 2 (propagar Auto-mejora a todos + meta-skill `gobernanza` que
@@ -983,13 +983,18 @@ cancel-in-progress` ya cancela corridas viejas.
   de mes de la plata) quedan para PRs siguientes. El supervisor marca un skill en disco sin fila en `CLAUDE.md`,
   un frontmatter mal formado, o un `model:` que no pegue con el task.
 
-### 2026-06-23 — cola = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
+### 2026-06-23 — pendientes (ex-`cola`) = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
+
+> **Nota 2026-06-25 — rename.** El skill se renombró de `cola` a **`pendientes`** (nombre poco descriptivo y
+> colisión conceptual con "GitHub Issues"). El método y el rol no cambian; solo el nombre, el dir
+> (`.claude/skills/pendientes/`), el hook (`check-pendientes.sh`), el state file (`pendientes-state.json`) y el
+> slash-command (`/pendientes`). Abajo se conserva la narración original con el nombre nuevo.
 
 - **Contexto.** La administración de issues era el "Frente D" de `mantenimiento` — enterrado en un skill de
   ~490 líneas que solo se invoca al "auditar el repo". Pero la cola necesita atención **continua y liviana**
   (reconciliar seguido es lo que evita que se desfase), no una pasada esporádica. Por eso el dueño sentía que
   "los issues se desfasan y se pierde el hilo".
-- **Decisión.** Se extrae a un skill propio, **`cola`** (`.claude/skills/cola/SKILL.md`), **fuente única** de
+- **Decisión.** Se extrae a un skill propio, **`pendientes`** (`.claude/skills/pendientes/SKILL.md`), **fuente única** de
   toda la administración de la cola: (1) **reconciliar** —la cola espeja el código (_2026-06-08_): cruzar issues
   abiertos contra commits/PRs shippeados para cazar **hecho-pero-abierto**—; (2) **triage con evidencia**
   (cerrar solo con PR/commit + comentario + `state_reason`; parciales = abiertos); (3) **deduplicar/consolidar**
@@ -999,7 +1004,7 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Why.** Un skill liviano de uso frecuente mata el desfasaje mejor que un método sepultado en un mega-skill.
   Fuente única → el `mantenimiento` Frente D **apunta acá** en vez de duplicar (mismo principio que el workflow
   es fuente única). El modelo del skill es **sonnet** (es ejecución/loop frecuente, no diagnóstico arquitectónico).
-- **Consecuencias.** `cola` es descubrible por sus disparadores ("ordená los issues", "¿cómo está la cola?",
+- **Consecuencias.** `pendientes` es descubrible por sus disparadores ("ordená los issues", "¿cómo están los pendientes?",
   "cerrá lo hecho", brain-dumps); está en la tabla de skills de `CLAUDE.md`; el Frente D de `mantenimiento` quedó
   como puntero. Refina _Issues: la cola espeja el código (2026-06-08)_ y _Protocolo de brain-dumps (2026-05-25)_.
   La Auto-mejora del skill (Etapa 1B) lo hace recursivo. Regla de oro heredada: **cerrar es afirmar "esto está
@@ -1010,7 +1015,7 @@ cancel-in-progress` ya cancela corridas viejas.
 ### 2026-06-23 — Gobernanza Etapa 2: Auto-mejora universal + meta-skill gobernanza (dashboard, auditoría, dry-run)
 
 - **Contexto.** Etapa 1A + 1B establecieron el registro verificado y el loop de aprendizaje en el skill
-  `cola`. Etapa 2 propaga el ritual de auto-mejora a todos los skills y crea el meta-skill que cierra el
+  `pendientes`. Etapa 2 propaga el ritual de auto-mejora a todos los skills y crea el meta-skill que cierra el
   ciclo: el sistema puede auditarse a sí mismo.
 - **Decisión.**
   1. **Auto-mejora universal** — la sección `## Auto-mejora` se propagó a los 5 skills que existían
@@ -1053,7 +1058,7 @@ cancel-in-progress` ya cancela corridas viejas.
      y propone issues con drafts — el dueño aprueba, la sesión los crea. **Read-only: nunca edita
      código.** `pulido-frontend` aplica los fixes en pantalla.
   3. **Actualizar `CLAUDE.md`** y la entrada de MEMORIA 2026-06-06 para reflejar el nuevo cuadro.
-- **Why.** El mismo ciclo propone-aprobás que `gobernanza` y `cola` — detecta antes de que acumule
+- **Why.** El mismo ciclo propone-aprobás que `gobernanza` y `pendientes` — detecta antes de que acumule
   deuda. La separación gobernador/ejecutor evita que el skill de auditoría mezcle diagnosis con
   escritura (honestidad > movimiento). `importar-diseno` era un skill sin uso: archivarlo limpia el
   mapa y el linter.
@@ -1086,7 +1091,7 @@ cancel-in-progress` ya cancela corridas viejas.
   generan incidentes en producción. La calidad de código y tests son la deuda técnica silenciosa. Specs
   y catálogo son la calidad del producto (lo que el cliente ve). Todos siguen el mismo blueprint
   propone-aprobás para mantener la consistencia de la capa.
-- **Consecuencias.** 13 skills en disco (6 activos previos + 6 nuevos + `cola` = 13 total).
+- **Consecuencias.** 13 skills en disco (6 activos previos + 6 nuevos + `pendientes` = 13 total).
   `CLAUDE.md` tiene 13 filas en la tabla de skills. `scripts/check-docs.mjs` los verifica todos.
   El supervisor marca cualquier skill en disco sin fila, o un skill que aplique sin aprobación.
 

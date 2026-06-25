@@ -1,6 +1,6 @@
 ---
 name: gobernanza
-description: El go-to para AUDITAR Y CURAR la capa de skills y docs de gobernanza — el meta-nivel del sistema de trabajo. Dashboard "/skills" (qué hay, último uso, staleness, propuestas), auditoría de drift/overlap/bloat/routing, consumo del buzón de propuestas y el ledger de uso, consolidación en modo dry-run (propone, archiva-no-borra), y cierre periódico mensual. Úsalo cuando el dueño pida "cómo están los skills", "qué skills tenemos", "revisá la gobernanza", "hay skills solapados?", "qué se usó", "propuestas pendientes", "cierre mensual de gobernanza", o cuando el sistema mismo proponga una revisión. El corazón es el ciclo LEER-PROPONER-APROBAR: el skill lee (ledger + buzón + check-docs), razona, propone cambios en lenguaje claro — el dueño aprueba, la sesión aplica. NO aplica cambios sin aprobación, NO toca código de la app, NO administra issues de GitHub (eso es `cola`), NO decide la memoria (la propone).
+description: El go-to para AUDITAR Y CURAR la capa de skills y docs de gobernanza — el meta-nivel del sistema de trabajo. Dashboard "/skills" (qué hay, último uso, staleness, propuestas), auditoría de drift/overlap/bloat/routing, consumo del buzón de propuestas y el ledger de uso, consolidación en modo dry-run (propone, archiva-no-borra), y cierre periódico mensual. Úsalo cuando el dueño pida "cómo están los skills", "qué skills tenemos", "revisá la gobernanza", "hay skills solapados?", "qué se usó", "propuestas pendientes", "cierre mensual de gobernanza", o cuando el sistema mismo proponga una revisión. El corazón es el ciclo LEER-PROPONER-APROBAR: el skill lee (ledger + buzón + check-docs), razona, propone cambios en lenguaje claro — el dueño aprueba, la sesión aplica. NO aplica cambios sin aprobación, NO toca código de la app, NO administra issues de GitHub (eso es `pendientes`), NO decide la memoria (la propone).
 model: opus
 last-reviewed: 2026-06-23
 version: 1.0
@@ -22,7 +22,7 @@ decisión _Capa de skills auto-gobernada (MEMORIA 2026-06-23)_.
 | Skill | Pregunta que responde | Entrada → Salida |
 |---|---|---|
 | **`gobernanza`** (este) | "¿cómo está el sistema de skills? ¿qué hay, qué se usa, qué driftea?" | ledger + buzón + skills en disco → propuestas de curación aprobables |
-| `cola` | "¿cómo está la cola de issues?" | issues abiertos + commits → cola reconciliada |
+| `pendientes` | "¿cómo están los pendientes / la cola de issues?" | issues abiertos + commits → cola reconciliada |
 | `mantenimiento` | "¿cómo está el código?" | el repo → código sano (5 frentes) |
 | `auditoria-profunda` | "¿tiene fallas / bugs?" | flujo de reserva + UI → hallazgos |
 
@@ -146,7 +146,7 @@ mismo: ¿el método sigue siendo válido? ¿el overlap con el supervisor está b
 
 ## Anti-objetivos (cuándo NO es este skill)
 
-- **Administrar la cola de issues** → `cola`.
+- **Administrar la cola de issues** → `pendientes`.
 - **Auditar fallas de seguridad / UI del repo** → `auditoria-profunda` / `pulido-frontend`.
 - **Hacer trabajo del repo** (código, frontend, backend) → cualquier otro skill.
 - **Escribir memoria** → solo con aprobación del dueño, en paridad. Este skill propone; no edita.
