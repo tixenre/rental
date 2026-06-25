@@ -355,6 +355,61 @@ def derive_and_finalize(
         conn.close()
 
 
+_RAW_KIND_RE = _KIND_RE  # mismo patrón: [a-z0-9-], 1-64 chars
+
+
+def store_raw_document(
+    raw: bytes,
+    *,
+    kind: str,
+    ref: str,
+    content_type: str,
+    presign_expires: int = 86400,
+) -> tuple[str, str]:
+    """Almacena un documento crudo (PDF / imagen) en el bucket privado.
+
+    A diferencia de store_upload, NO procesa ni deriva variantes — solo guarda
+    el archivo tal cual en R2 privado con Cache-Control: no-store.
+
+    Args:
+        raw:              bytes del archivo
+        kind:             contexto semántico (ej. "comprobante-taller", "comprobante-movimiento")
+        ref:              referencia opaca al objeto dueño (ej. slug del taller, id del movimiento)
+        content_type:     MIME type del archivo (ej. "application/pdf", "image/jpeg")
+        presign_expires:  validez de la URL prefirmada en segundos (default 24h)
+
+    Returns:
+        (key, presigned_url)
+            key:            R2 key del documento (guardarlo en la BD para acceso futuro)
+            presigned_url:  URL de acceso inmediato (válida por presign_expires segundos)
+
+    Eleva:
+        MediaError(400) si kind o ref son inválidos
+        MediaError(413) si el archivo está vacío
+        MediaError(502) si R2 falla
+    """
+    validate_kind(kind)
+    ref_slug = _slugify(ref, max_len=60)
+    if not ref_slug:
+        raise MediaError(400, "ref no puede quedar vacío tras normalizar")
+    if not raw:
+        raise MediaError(413, "El documento está vacío")
+
+    ext_map = {
+        "application/pdf": "pdf",
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/heic": "heic",
+    }
+    ext = ext_map.get(content_type, "bin")
+    key = f"docs/{kind}/{ref_slug}.{ext}"
+
+    storage.put_private(key, raw, content_type)
+    signed = storage.presigned_url(key, presign_expires, private=True)
+    return key, signed
+
+
 def _cleanup_r2(keys: list[str]) -> None:
     """Best-effort delete de las keys R2 ya subidas (en caso de fallo parcial).
 

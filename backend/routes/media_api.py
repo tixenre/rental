@@ -12,11 +12,13 @@ GET /api/media/entity/{kind}/{entity_id}
   El frontend usa este endpoint en `useEntityMedia(kind, entityId)` para
   construir srcset con width/height reales (anti-CLS) vía `<ResponsiveImage>`.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
+from admin_guard import require_admin
 from database import get_db
 from services.media.service import validate_kind
 from services.media.errors import MediaError
+from services.media.storage import presigned_url as _presigned_url
 
 router = APIRouter()
 
@@ -156,3 +158,19 @@ def get_entity_media(kind: str, entity_id: int):
         assets = handler(conn, entity_id)
 
     return {"assets": assets}
+
+
+@router.get("/admin/media/document/presigned")
+def get_document_presigned(key: str, request: Request, expires: int = 3600):
+    """Genera una URL prefirmada de acceso a un documento privado (comprobante, etc.).
+
+    Solo admins. La key viene de comprobante_key en la BD.
+    expires: segundos de validez (default 1h, máx 7 días = 604800).
+    """
+    require_admin(request)
+    expires = max(60, min(expires, 604800))
+    try:
+        url = _presigned_url(key, expires, private=True)
+    except MediaError as e:
+        raise HTTPException(e.status, e.detail)
+    return {"url": url, "expires_in": expires}

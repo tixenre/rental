@@ -18,8 +18,7 @@ from services.email import send_email
 from services.email.service import get_admin_to
 from services.media.models import DeriveSpec
 from services.media.errors import MediaError
-from services.media.service import store_upload
-from services.media.storage import put as _r2_put
+from services.media.service import store_upload, store_raw_document
 
 logger = logging.getLogger(__name__)
 
@@ -149,9 +148,8 @@ def get_taller(slug: str):
 
 @router.post("/talleres/{slug}/upload-comprobante")
 async def upload_comprobante(slug: str, request: Request):
-    """Recibe el comprobante de pago (multipart, campo 'file') y lo sube a R2.
-    Devuelve la URL pública. No requiere auth — es parte del flujo de inscripción."""
-    # Verificar que el taller existe
+    """Recibe el comprobante de pago (multipart, campo 'file') y lo sube a R2 privado.
+    Devuelve URL prefirmada (24h) + key. No requiere auth — parte del flujo de inscripción."""
     with get_db() as conn:
         _get_taller(conn, slug)
 
@@ -167,24 +165,16 @@ async def upload_comprobante(slug: str, request: Request):
         raise HTTPException(413, f"Archivo muy grande (máx {COMPROBANTE_MAX_MB} MB)")
 
     content_type = getattr(file, "content_type", None) or "application/octet-stream"
-    # Determinar extensión según content type
-    ext_map = {
-        "image/jpeg": "jpg",
-        "image/png": "png",
-        "image/webp": "webp",
-        "image/heic": "heic",
-        "application/pdf": "pdf",
-    }
-    ext = ext_map.get(content_type, "bin")
-
     ts = int(time.time() * 1000)
     uid = uuid.uuid4().hex[:8]
-    key = f"talleres/{slug}/comprobante-{ts}-{uid}.{ext}"
+    ref = f"{slug}-{ts}-{uid}"
 
     try:
-        url = _r2_put(key, raw, content_type)
+        key, url = store_raw_document(raw, kind="comprobante-taller", ref=ref, content_type=content_type)
+    except MediaError as e:
+        raise HTTPException(e.status, e.detail)
     except Exception as e:
-        logger.error("upload_comprobante: R2 error: %s", e)
+        logger.error("upload_comprobante: error inesperado: %s", e, exc_info=True)
         raise HTTPException(502, "No se pudo subir el archivo. Intentá de nuevo.")
 
     return {"url": url, "key": key}
@@ -196,6 +186,19 @@ class InscripcionBody(BaseModel):
     telefono: str
     experiencia: str | None = None
     comprobante_url: str | None = None
+    comprobante_key: str | None = None
+
+
+def _comprobante_url_para_email(key: str | None, fallback_url: str | None) -> str:
+    """Genera URL de acceso al comprobante para incluir en el email del admin.
+    Si hay key (privado), genera presigned URL de 24h. Si solo hay url legacy, la usa."""
+    if key:
+        try:
+            from services.media.storage import presigned_url as _presigned
+            return _presigned(key, expires_seconds=86400, private=True)
+        except Exception as e:
+            logger.warning("_comprobante_url_para_email: no se pudo generar presigned: %s", e)
+    return fallback_url or ""
 
 
 @router.post("/talleres/{slug}/inscripcion")
@@ -216,8 +219,9 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
         cur = conn.execute(
             """
             INSERT INTO taller_inscripciones
-                (taller_id, nombre, email, telefono, experiencia, comprobante_url, en_lista_espera)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (taller_id, nombre, email, telefono, experiencia,
+                 comprobante_url, comprobante_key, en_lista_espera)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, created_at
             """,
             (
@@ -227,6 +231,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
                 telefono,
                 body.experiencia or None,
                 body.comprobante_url or None,
+                body.comprobante_key or None,
                 en_lista,
             ),
         )
@@ -250,7 +255,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
         "email": email,
         "telefono": telefono,
         "experiencia": body.experiencia or "",
-        "comprobante_url": body.comprobante_url or "",
+        "comprobante_url": _comprobante_url_para_email(body.comprobante_key, body.comprobante_url),
         "en_lista_espera": en_lista,
         "fecha": fecha_str,
     }
@@ -386,7 +391,7 @@ async def admin_upload_foto_instructor(taller_id: int, request: Request):
             )
             conn.commit()
     except MediaError as e:
-        raise HTTPException(e.status_code, e.detail)
+        raise HTTPException(e.status, e.detail)
     except Exception as e:
         logger.error("upload_foto_instructor: error inesperado: %s", e, exc_info=True)
         raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")

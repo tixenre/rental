@@ -17,7 +17,7 @@ type Props = {
 type UploadState =
   | { status: "idle" }
   | { status: "uploading" }
-  | { status: "done"; url: string; fileName: string }
+  | { status: "done"; url: string; key: string; fileName: string }
   | { status: "error"; message: string };
 
 type SubmitState = "idle" | "submitting" | "success_normal" | "success_espera" | "error";
@@ -45,8 +45,8 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
     }
     setUpload({ status: "uploading" });
     try {
-      const url = await apiUploadComprobante(taller.slug, file);
-      setUpload({ status: "done", url, fileName: file.name });
+      const { url, key } = await apiUploadComprobante(taller.slug, file);
+      setUpload({ status: "done", url, key, fileName: file.name });
     } catch (err) {
       setUpload({
         status: "error",
@@ -89,6 +89,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
         telefono: telefono.trim(),
         experiencia: experiencia.trim() || undefined,
         comprobante_url: upload.status === "done" ? upload.url : undefined,
+        comprobante_key: upload.status === "done" ? upload.key : undefined,
       });
       setSubmitState(result.en_lista_espera ? "success_espera" : "success_normal");
       onSuccess?.(result.en_lista_espera);
