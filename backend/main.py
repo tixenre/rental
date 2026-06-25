@@ -574,6 +574,117 @@ def cliente_portal_page():
 def cliente_registro_page():
     return _serve_frontend("cliente/registro.html")
 
+
+@app.get("/estudio", include_in_schema=False)
+def estudio_page():
+    """Sirve el SPA del estudio con OG tags dinámicos (foto principal del estudio).
+    Ante cualquier error sirve el index.html plano — nunca rompe la página."""
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            cfg = conn.execute(
+                "SELECT nombre, tagline, descripcion FROM estudio WHERE id = 1"
+            ).fetchone()
+            # Foto principal del estudio — preferir variante OG (jpg); fallback a url
+            foto_row = conn.execute(
+                """
+                SELECT COALESCE(mv.url, ef.url) AS img_url
+                FROM estudio_fotos ef
+                LEFT JOIN media_variants mv ON mv.asset_id = ef.media_id AND mv.name = 'og'
+                WHERE ef.estudio_id = 1
+                ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC
+                LIMIT 1
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+        nombre = (cfg["nombre"] if cfg else "") or "El Estudio"
+        tagline = (cfg["tagline"] if cfg else "") or ""
+        desc_raw = (cfg["descripcion"] if cfg else "") or tagline
+        desc = desc_raw.strip()
+        if len(desc) > 200:
+            desc = desc[:197].rstrip() + "…"
+        if not desc:
+            desc = "Estudio de foto y video en Mar del Plata. Reservá por hora con todo el equipo incluido."
+        title = f"{nombre} — Rambla Rental"
+        img = (foto_row["img_url"] if foto_row else "") or ""
+        if not img.startswith("http"):
+            img = f"{SITE_URL}/icon-512.png"
+        html_text = _inject_og_meta(
+            index_file.read_text(encoding="utf-8"),
+            title=title, description=desc, image=img, url=f"{SITE_URL}/estudio",
+        )
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("OG injection falló para /estudio — sirvo index plano", exc_info=True)
+        return _serve_frontend("index.html")
+
+
+@app.get("/workshops/{slug}", include_in_schema=False)
+def workshop_page(slug: str):
+    """Sirve el SPA del taller con OG tags dinámicos (foto del instructor).
+    Ante cualquier error sirve el index.html plano — nunca rompe la página."""
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            taller = conn.execute(
+                "SELECT nombre, descripcion, instructor_nombre, "
+                "instructor_foto_url, instructor_media_id "
+                "FROM talleres WHERE slug = %s AND activo = TRUE",
+                (slug,),
+            ).fetchone()
+            if not taller:
+                return _serve_frontend("index.html")
+            # Foto OG: preferir variante 'og' del media; fallback a 'display'
+            # o instructor_foto_url (foto subida antes del motor).
+            media_id = None
+            try:
+                media_id = taller["instructor_media_id"]
+            except (KeyError, IndexError):
+                pass
+            og_img = ""
+            if media_id:
+                mv = conn.execute(
+                    "SELECT url FROM media_variants "
+                    "WHERE asset_id = %s AND name IN ('og', 'display') "
+                    "ORDER BY CASE name WHEN 'og' THEN 0 ELSE 1 END LIMIT 1",
+                    (media_id,),
+                ).fetchone()
+                og_img = (mv["url"] if mv else "") or ""
+            if not og_img:
+                try:
+                    og_img = taller["instructor_foto_url"] or ""
+                except (KeyError, IndexError):
+                    og_img = ""
+        finally:
+            conn.close()
+        nombre = (taller["nombre"] or "").strip()
+        instructor = (taller["instructor_nombre"] or "").strip()
+        desc_raw = (taller["descripcion"] or "").strip()
+        if len(desc_raw) > 200:
+            desc_raw = desc_raw[:197].rstrip() + "…"
+        if not desc_raw:
+            desc_raw = f"Workshop con {instructor} en Rambla, Mar del Plata." if instructor else "Workshops audiovisuales en Mar del Plata."
+        title = f"{nombre} con {instructor} — Rambla" if instructor else f"{nombre} — Rambla"
+        if not og_img.startswith("http"):
+            og_img = f"{SITE_URL}/icon-512.png"
+        html_text = _inject_og_meta(
+            index_file.read_text(encoding="utf-8"),
+            title=title, description=desc_raw, image=og_img,
+            url=f"{SITE_URL}/workshops/{slug}",
+        )
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("OG injection falló para /workshops/%s — sirvo index plano", slug, exc_info=True)
+        return _serve_frontend("index.html")
+
+
 # ── SPA catch-all: rutas del nuevo frontend (TanStack Router) ────────────────
 # Debe ir AL FINAL para no interceptar rutas de API ni páginas de admin.
 
