@@ -21,6 +21,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  no-content-images:
+    name: Guardrail — cero fotos de contenido en el repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # Bloquea imágenes de contenido (equipos/marcas/etc.) fuera del allowlist.
+      # Fotos de contenido van a R2, no al repo. Allowlist en el propio script.
+      - run: node scripts/check-no-content-images.mjs
+
   typecheck:
     name: TypeScript typecheck
     runs-on: ubuntu-latest
