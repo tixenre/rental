@@ -35,5 +35,20 @@ OG_SQUARE_JPEG = DeriveSpec(name="og", square=True, fmt="jpeg")
 
 DISPLAY_SQUARE_AVIF = DeriveSpec(name="display-avif", square=True, fmt="avif")
 DISPLAY_SQUARE_SM_AVIF = DeriveSpec(name="display-sm-avif", square=True, fmt="avif", max_width=600)
+DISPLAY_SQUARE_THUMB_AVIF = DeriveSpec(name="display-thumb-avif", square=True, fmt="avif", max_width=160)
 DISPLAY_KEEP_ASPECT_AVIF = DeriveSpec(name="display-avif", square=False, fmt="avif")
 DISPLAY_KEEP_ASPECT_SM_AVIF = DeriveSpec(name="display-sm-avif", square=False, fmt="avif", max_width=800)
+
+# ── Conjunto canónico de variantes de una foto de equipo ─────────────────────
+# Fuente única que usan TODOS los uploads de equipo (admin multipart + from-url +
+# galería) y la reingesta de fotos legacy (Tier B/C). Incluye webp (display/sm/thumb),
+# AVIF (display/sm/thumb) y la variante OG en JPEG para crawlers.
+EQUIPO_DERIVE_SPECS = [
+    DISPLAY_SQUARE,
+    DISPLAY_SQUARE_SM,
+    DISPLAY_SQUARE_THUMB,
+    DISPLAY_SQUARE_AVIF,
+    DISPLAY_SQUARE_SM_AVIF,
+    DISPLAY_SQUARE_THUMB_AVIF,
+    OG_SQUARE_JPEG,
+]

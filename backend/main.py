@@ -3,7 +3,9 @@ Rambla Rental API — FastAPI + PostgreSQL
 Run: uvicorn main:app --reload --port 8000
 """
 
+import json
 import logging
+import mimetypes
 import os
 import threading
 import uuid
@@ -11,7 +13,7 @@ import html as _html
 import re
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -64,7 +66,7 @@ from routes.cliente_portal   import router as cliente_portal_router
 from routes.marcas           import router as marcas_router
 from routes.specs            import router as specs_router
 from routes.unidades         import router as unidades_router
-from routes.seo              import router as seo_router
+from routes.seo              import router as seo_router, _build_categoria_slug as _cat_slug
 from routes.calendar         import router as calendar_router
 from routes.inventario       import router as inventario_router
 from routes.email_templates  import router as email_templates_router
@@ -261,9 +263,42 @@ app.add_middleware(
 if FRONT.exists():
     app.mount("/static", StaticFiles(directory=str(FRONT)), name="static")
 
-# Nuevo frontend (Vite SPA — rental-refine)
+# Nuevo frontend (Vite SPA — rental-refine):
+# Content-negotiation: sirve .br / .gz pre-comprimidos si el cliente los acepta.
+# Reemplaza el StaticFiles mount porque StaticFiles no sirve FileResponse comprimidas
+# incluso con GZipMiddleware (limitación de Starlette).
 if FRONT_NEW.exists():
-    app.mount("/assets", StaticFiles(directory=str(FRONT_NEW / "assets")), name="assets")
+    _assets_dir = (FRONT_NEW / "assets").resolve()
+
+    @app.get("/assets/{path:path}", include_in_schema=False)
+    async def serve_asset(path: str, request: Request):
+        """Sirve assets estáticos con content-negotiation (Brotli > gzip > raw)."""
+        try:
+            candidate = (_assets_dir / path).resolve()
+        except Exception:
+            raise HTTPException(status_code=400)
+        if not candidate.is_file() or not candidate.is_relative_to(_assets_dir):
+            raise HTTPException(status_code=404)
+        ctype = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+        cache = "public, max-age=31536000, immutable"
+        accept_enc = request.headers.get("accept-encoding", "")
+        if "br" in accept_enc:
+            br = candidate.parent / (candidate.name + ".br")
+            if br.is_file():
+                return FileResponse(str(br), headers={
+                    "Content-Encoding": "br", "Content-Type": ctype,
+                    "Cache-Control": cache, "Vary": "Accept-Encoding",
+                })
+        if "gzip" in accept_enc:
+            gz = candidate.parent / (candidate.name + ".gz")
+            if gz.is_file():
+                return FileResponse(str(gz), headers={
+                    "Content-Encoding": "gzip", "Content-Type": ctype,
+                    "Cache-Control": cache, "Vary": "Accept-Encoding",
+                })
+        return FileResponse(str(candidate), headers={
+            "Cache-Control": cache, "Vary": "Accept-Encoding",
+        })
 
 # ── Routers ──────────────────────────────────────────────────────────────────
 
@@ -490,10 +525,11 @@ def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None
     responder la API (LCP ~21s en Lighthouse).
 
     El `imagesrcset`+`imagesizes` matchea EXACTO el `srcSet`/`sizes` que renderiza el
-    carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=100vw`) y la query del hero usa el
-    MISMO orden que `useHeroPhotos` (es_principal DESC, orden ASC) → el browser deduplica
-    y usa el recurso preloadeado en vez de bajar la imagen dos veces. El preconnect
-    abre la conexión TLS al bucket R2 (origen de todas las fotos) antes del fetch."""
+    carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=(max-width: 768px) 100vw, 42vw`) y la
+    query del hero usa el MISMO orden que `useHeroPhotos` (es_principal DESC, orden ASC) →
+    el browser deduplica y usa el recurso preloadeado en vez de bajar la imagen dos veces.
+    El preconnect abre la conexión TLS al bucket R2 (origen de todas las fotos) antes del
+    fetch."""
     esc = _html.escape(image, quote=True)
     # Origen del bucket R2 (https://host) derivado de la URL del hero — sin hardcodear
     # el bucket, robusto ante cambios de ambiente.
@@ -501,12 +537,13 @@ def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None
     tags = ""
     if origin.startswith("http"):
         esc_origin = _html.escape(origin, quote=True)
-        tags += f'<link rel="preconnect" href="{esc_origin}" crossorigin>'
+        tags += f'<link rel="preconnect" href="{esc_origin}">'
     if image_sm:
         esc_sm = _html.escape(image_sm, quote=True)
         tags += (
             f'<link rel="preload" as="image" fetchpriority="high"'
-            f' imagesrcset="{esc_sm} 800w, {esc} 1600w" imagesizes="100vw">'
+            f' imagesrcset="{esc_sm} 800w, {esc} 1600w"'
+            f' imagesizes="(max-width: 768px) 100vw, 42vw">'
         )
     else:
         tags += f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
@@ -521,6 +558,108 @@ def _set_og_image(html_text: str, image: str) -> str:
         pat = re.compile(r'(<meta\s+' + attr + r'="' + re.escape(key) + r'"\s+content=")[^"]*(")')
         html_text = pat.sub(lambda m: m.group(1) + esc + m.group(2), html_text, count=1)
     return html_text
+
+
+def _inject_json_ld(html_text: str, *schemas: dict) -> str:
+    """Inserta uno o más bloques JSON-LD justo antes de </head>.
+
+    Los crawlers/agentes que no ejecutan JS (Googlebot light, LLM indexers)
+    ven el structured data directamente en el HTML inicial — sin esperar JS.
+    Cada schema se emite en un <script> separado para facilitar el debug.
+    """
+    tags = "".join(
+        f'<script type="application/ld+json">{json.dumps(s, ensure_ascii=False)}</script>'
+        for s in schemas
+    )
+    return html_text.replace("</head>", tags + "</head>", 1)
+
+
+def _get_initial_catalog(conn) -> dict:
+    """Serializa equipos visibles + categorías para el script __INITIAL__ del catálogo.
+
+    Subset de list_equipos sin filtros ni attach_*, suficiente para el primer
+    render de las cards sin round-trip. backendToEquipment tolera campos ausentes
+    (etiquetas/kit/specs → arrays vacíos o None).
+    """
+    rows = conn.execute(f"""
+        SELECT
+            e.id, e.nombre, e.nombre_publico, e.modelo,
+            e.foto_url, e.foto_url_sm, e.foto_url_thumb,
+            e.foto_url_avif, e.foto_url_sm_avif, e.foto_url_thumb_avif, e.foto_lqip,
+            e.precio_jornada, e.precio_usd, e.cantidad,
+            e.estado, e.visible_catalogo, e.relevancia_manual,
+            e.popularidad_score, e.destacado, e.tipo,
+            {MARCA_SUBQUERY}
+        FROM equipos e
+        WHERE e.visible_catalogo = 1
+          AND e.estado != 'fuera_servicio'
+          AND e.eliminado_at IS NULL
+          AND e.es_recurso_interno = FALSE
+        ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC
+        LIMIT 500
+    """).fetchall()
+
+    items = []
+    for row in rows:
+        item = dict(row)
+        item.setdefault("etiquetas", [])
+        item.setdefault("kit", [])
+        items.append(item)
+
+    cats = conn.execute(
+        "SELECT id, nombre, COALESCE(total, 0) AS total, prioridad, parent_id "
+        "FROM categorias ORDER BY COALESCE(prioridad, 999), nombre"
+    ).fetchall()
+
+    return {
+        "equipos": {"total": len(items), "items": items},
+        "categorias": [dict(c) for c in cats],
+    }
+
+
+def _inject_initial_data(html_text: str, data: dict) -> str:
+    """Inyecta <script id="__INITIAL__" type="application/json"> antes de </body>.
+
+    El frontend lo consume en main.tsx para pre-poblar React Query sin round-trip.
+    Se escapa </script> dentro del payload para no romper el parser HTML.
+    """
+    payload = json.dumps(data, ensure_ascii=False, default=str)
+    payload = payload.replace("</script>", r"<\/script>")
+    script_tag = f'<script id="__INITIAL__" type="application/json">{payload}</script>'
+    return html_text.replace("</body>", script_tag + "</body>", 1)
+
+
+@app.get("/rental", include_in_schema=False)
+def rental_page():
+    """Catálogo público. Inyecta:
+    - Hero preload (LCP del catálogo — misma fuente y orden que useHeroPhotos)
+    - __INITIAL__ con equipos + categorías para hydration de React Query (sin round-trip)
+
+    Ante cualquier error sirve el index.html plano — el SPA fetchea normalmente.
+    """
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            hero_row = conn.execute(
+                "SELECT url, url_sm FROM estudio_fotos WHERE estudio_id = 1 "
+                "ORDER BY es_principal DESC, orden ASC, id ASC LIMIT 1"
+            ).fetchone()
+            initial_data = _get_initial_catalog(conn)
+        finally:
+            conn.close()
+        html_text = index_file.read_text(encoding="utf-8")
+        hero_url = (hero_row["url"].strip() if hero_row and hero_row["url"] else "")
+        hero_sm = (hero_row["url_sm"].strip() if hero_row and hero_row["url_sm"] else "")
+        if hero_url.startswith("http"):
+            html_text = _inject_hero_preload(html_text, hero_url, hero_sm or None)
+        html_text = _inject_initial_data(html_text, initial_data)
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("rental_page: inyección falló — sirvo index plano", exc_info=True)
+        return _serve_frontend("index.html")
 
 
 @app.get("/equipo/{id_or_slug}", include_in_schema=False)
@@ -545,6 +684,7 @@ def equipo_page(id_or_slug: str):
             row = conn.execute(
                 f"""
                 SELECT e.nombre, e.foto_url, e.nombre_publico,
+                       e.precio_jornada, e.cantidad,
                        {MARCA_SUBQUERY},
                        ef.descripcion
                 FROM equipos e
@@ -561,6 +701,16 @@ def equipo_page(id_or_slug: str):
                 WHERE ef.equipo_id = ? AND mv.name = 'og'
                 ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC
                 LIMIT 1
+                """,
+                (equipo_id,),
+            ).fetchone()
+            # Primera categoría del equipo (para BreadcrumbList).
+            cat_row = conn.execute(
+                """
+                SELECT c.nombre FROM categorias c
+                JOIN equipo_categorias ec ON ec.categoria_id = c.id
+                WHERE ec.equipo_id = ?
+                ORDER BY ec.id LIMIT 1
                 """,
                 (equipo_id,),
             ).fetchone()
@@ -593,6 +743,54 @@ def equipo_page(id_or_slug: str):
             index_file.read_text(encoding="utf-8"),
             title=title, description=desc, image=image, url=url,
         )
+        # JSON-LD server-side: Product + BreadcrumbList. Visible para crawlers
+        # que no ejecutan JS (Googlebot light, LLM indexers, bots de precios).
+        precio = d.get("precio_jornada")
+        cantidad = d.get("cantidad") or 0
+        marca_str = (d.get("marca") or "").strip()
+        cat_nombre = (cat_row["nombre"] if cat_row else "").strip()
+        product_schema: dict = {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": nombre,
+            "description": desc,
+            "url": url,
+            "image": image,
+        }
+        if marca_str:
+            product_schema["brand"] = {"@type": "Brand", "name": marca_str}
+        if cat_nombre:
+            product_schema["category"] = cat_nombre
+        if precio is not None:
+            product_schema["offers"] = {
+                "@type": "Offer",
+                "priceCurrency": "ARS",
+                "price": precio,
+                "availability": "https://schema.org/InStock" if cantidad > 0 else "https://schema.org/OutOfStock",
+                "priceSpecification": {
+                    "@type": "UnitPriceSpecification",
+                    "price": precio,
+                    "priceCurrency": "ARS",
+                    "unitText": "jornada",
+                },
+            }
+        breadcrumb_items = [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": f"{SITE_URL}/"}]
+        if cat_nombre:
+            breadcrumb_items.append({
+                "@type": "ListItem", "position": 2,
+                "name": cat_nombre,
+                "item": f"{SITE_URL}/categoria/{_cat_slug(cat_nombre)}",
+            })
+        breadcrumb_items.append({
+            "@type": "ListItem", "position": len(breadcrumb_items) + 1,
+            "name": nombre, "item": url,
+        })
+        breadcrumb_schema = {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": breadcrumb_items,
+        }
+        html_text = _inject_json_ld(html_text, product_schema, breadcrumb_schema)
         return HTMLResponse(content=html_text)
     except Exception:
         logger.warning("OG injection falló para /equipo/%s — sirvo index plano", id_or_slug, exc_info=True)
@@ -671,7 +869,8 @@ def workshop_page(slug: str):
         try:
             taller = conn.execute(
                 "SELECT nombre, descripcion, instructor_nombre, "
-                "instructor_foto_url, instructor_media_id "
+                "instructor_foto_url, instructor_media_id, "
+                "fecha_inicio, fecha_fin, precio_total "
                 "FROM talleres WHERE slug = %s AND activo = TRUE",
                 (slug,),
             ).fetchone()
@@ -710,11 +909,55 @@ def workshop_page(slug: str):
         title = f"{nombre} con {instructor} — Rambla" if instructor else f"{nombre} — Rambla"
         if not og_img.startswith("http"):
             og_img = f"{SITE_URL}/icon-512.png"
+        taller_url = f"{SITE_URL}/workshops/{slug}"
         html_text = _inject_og_meta(
             index_file.read_text(encoding="utf-8"),
-            title=title, description=desc_raw, image=og_img,
-            url=f"{SITE_URL}/workshops/{slug}",
+            title=title, description=desc_raw, image=og_img, url=taller_url,
         )
+        # JSON-LD Event schema — visible para crawlers/agentes sin JS.
+        event_schema: dict = {
+            "@context": "https://schema.org",
+            "@type": "Event",
+            "name": nombre,
+            "description": desc_raw,
+            "url": taller_url,
+            "image": og_img,
+            "location": {
+                "@type": "Place",
+                "name": "Rambla",
+                "address": {
+                    "@type": "PostalAddress",
+                    "addressLocality": "Mar del Plata",
+                    "addressRegion": "Buenos Aires",
+                    "addressCountry": "AR",
+                },
+            },
+            "organizer": {"@type": "Organization", "name": "Rambla", "url": SITE_URL},
+        }
+        if instructor:
+            event_schema["performer"] = {"@type": "Person", "name": instructor}
+        try:
+            fecha_inicio = taller["fecha_inicio"]
+            fecha_fin = taller["fecha_fin"]
+            if fecha_inicio:
+                event_schema["startDate"] = str(fecha_inicio)[:10]
+            if fecha_fin:
+                event_schema["endDate"] = str(fecha_fin)[:10]
+        except (KeyError, IndexError, TypeError):
+            pass
+        try:
+            precio = taller["precio_total"]
+            if precio is not None:
+                event_schema["offers"] = {
+                    "@type": "Offer",
+                    "price": precio,
+                    "priceCurrency": "ARS",
+                    "availability": "https://schema.org/InStock",
+                    "url": taller_url,
+                }
+        except (KeyError, IndexError, TypeError):
+            pass
+        html_text = _inject_json_ld(html_text, event_schema)
         return HTMLResponse(content=html_text)
     except Exception:
         logger.warning("OG injection falló para /workshops/%s — sirvo index plano", slug, exc_info=True)

@@ -91,6 +91,10 @@ export type BackendEquipo = {
   foto_url: string | null;
   foto_url_sm?: string | null; // variante 600px de la principal para srcset (puede faltar)
   foto_url_thumb?: string | null; // variante 160px para thumbnails de ~48px (puede faltar)
+  foto_url_avif?: string | null; // variante AVIF 1200px (puede faltar si sin backfill)
+  foto_url_sm_avif?: string | null; // variante AVIF 600px (puede faltar)
+  foto_url_thumb_avif?: string | null; // variante AVIF 160px (puede faltar)
+  foto_lqip?: string | null; // data-URI 4×4 blur placeholder (puede faltar)
   estado: string;
   visible_catalogo: number;
   relevancia_manual?: number;
@@ -202,6 +206,8 @@ export type EstudioFoto = {
   id: number;
   url: string;
   url_sm?: string | null; // variante 800px (keep-aspect) para srcset; null = sin backfill aún
+  url_avif?: string | null; // variante AVIF full-size; null = foto anterior al backfill
+  url_sm_avif?: string | null; // variante AVIF 800px; null = foto anterior al backfill
   path: string | null;
   orden: number;
   es_principal: boolean;

@@ -114,3 +114,31 @@ export function trackReservarEstudio(args: { horas: number; conPack: boolean }):
     con_pack: args.conPack,
   });
 }
+
+/* ── RUM: Core Web Vitals → GA4 ─────────────────────────────────────────────
+   Cierra el loop de "optimizamos en lab, ¿funciona en campo?".
+   Se llama desde main.tsx (una sola vez, post-init de GA).
+   Envía LCP/CLS/INP/FCP/TTFB como eventos `web_vitals` con:
+     - metric_name: "LCP" | "CLS" | "INP" | "FCP" | "TTFB"
+     - metric_value: valor en ms (o unitless para CLS)
+     - metric_rating: "good" | "needs-improvement" | "poor"
+   Los datos aparecen en GA4 → Explorar → Eventos → "web_vitals".
+   Sin consent banner: misma política que el resto del tracking (GA solo en prod).
+   ─────────────────────────────────────────────────────────────────────────── */
+export function initWebVitals(): void {
+  if (!enabled) return;
+  import("web-vitals").then(({ onLCP, onCLS, onINP, onFCP, onTTFB }) => {
+    const report = ({ name, value, rating }: { name: string; value: number; rating: string }) => {
+      trackEvent("web_vitals", {
+        metric_name: name,
+        metric_value: Math.round(name === "CLS" ? value * 1000 : value),
+        metric_rating: rating,
+      });
+    };
+    onLCP(report);
+    onCLS(report);
+    onINP(report);
+    onFCP(report);
+    onTTFB(report);
+  });
+}

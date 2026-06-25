@@ -85,9 +85,13 @@ function LandingHub() {
             {studioPic && (
               <img
                 src={studioPic.url}
+                srcSet={
+                  studioPic.urlSm ? `${studioPic.urlSm} 800w, ${studioPic.url} 1600w` : undefined
+                }
+                sizes="(max-width: 768px) 100vw, 33vw"
                 alt="Rambla Estudio"
                 className="absolute inset-0 w-full h-full object-cover opacity-[0.12] transition-transform duration-700 group-hover:scale-[1.04]"
-                loading="lazy"
+                fetchPriority="high"
               />
             )}
             <div className="relative">

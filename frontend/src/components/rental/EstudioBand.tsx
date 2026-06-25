@@ -22,7 +22,7 @@ export function EstudioBand() {
             sizes="(max-width: 768px) 100vw, 46vw"
             alt="El Estudio — Rambla Rental"
             className="w-full h-full object-cover block transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
-            loading="lazy"
+            loading="eager"
           />
         )}
       </Link>

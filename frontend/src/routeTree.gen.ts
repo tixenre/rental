@@ -46,12 +46,12 @@ const AdminUnidadesLazyRouteImport = createFileRoute('/admin/unidades')()
 const AdminSolicitudesLazyRouteImport = createFileRoute('/admin/solicitudes')()
 const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
 const AdminPagosLazyRouteImport = createFileRoute('/admin/pagos')()
+const AdminMediaLazyRouteImport = createFileRoute('/admin/media')()
 const AdminMarcaLazyRouteImport = createFileRoute('/admin/marca')()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
 const AdminErroresLazyRouteImport = createFileRoute('/admin/errores')()
-const AdminMediaLazyRouteImport = createFileRoute('/admin/media')()
 const AdminEmailTemplatesLazyRouteImport = createFileRoute(
   '/admin/email-templates',
 )()
@@ -216,6 +216,11 @@ const AdminPagosLazyRoute = AdminPagosLazyRouteImport.update({
   path: '/pagos',
   getParentRoute: () => AdminRoute,
 } as any).lazy(() => import('./routes/admin/pagos.lazy').then((d) => d.Route))
+const AdminMediaLazyRoute = AdminMediaLazyRouteImport.update({
+  id: '/media',
+  path: '/media',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() => import('./routes/admin/media.lazy').then((d) => d.Route))
 const AdminMarcaLazyRoute = AdminMarcaLazyRouteImport.update({
   id: '/marca',
   path: '/marca',
@@ -233,11 +238,6 @@ const AdminErroresLazyRoute = AdminErroresLazyRouteImport.update({
   path: '/errores',
   getParentRoute: () => AdminRoute,
 } as any).lazy(() => import('./routes/admin/errores.lazy').then((d) => d.Route))
-const AdminMediaLazyRoute = AdminMediaLazyRouteImport.update({
-  id: '/media',
-  path: '/media',
-  getParentRoute: () => AdminRoute,
-} as any).lazy(() => import('./routes/admin/media.lazy').then((d) => d.Route))
 const AdminEmailTemplatesLazyRoute = AdminEmailTemplatesLazyRouteImport.update({
   id: '/email-templates',
   path: '/email-templates',
@@ -716,6 +716,7 @@ export interface FileRouteTypes {
     | '/admin/errores'
     | '/admin/estadisticas'
     | '/admin/marca'
+    | '/admin/media'
     | '/admin/pagos'
     | '/admin/settings'
     | '/admin/solicitudes'
@@ -773,6 +774,7 @@ export interface FileRouteTypes {
     | '/admin/errores'
     | '/admin/estadisticas'
     | '/admin/marca'
+    | '/admin/media'
     | '/admin/pagos'
     | '/admin/settings'
     | '/admin/solicitudes'
@@ -837,6 +839,7 @@ export interface FileRouteTypes {
     | '/admin/errores'
     | '/admin/estadisticas'
     | '/admin/marca'
+    | '/admin/media'
     | '/admin/pagos'
     | '/admin/settings'
     | '/admin/solicitudes'
@@ -1027,6 +1030,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPagosLazyRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/media': {
+      id: '/admin/media'
+      path: '/media'
+      fullPath: '/admin/media'
+      preLoaderRoute: typeof AdminMediaLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/marca': {
       id: '/admin/marca'
       path: '/marca'
@@ -1046,13 +1056,6 @@ declare module '@tanstack/react-router' {
       path: '/errores'
       fullPath: '/admin/errores'
       preLoaderRoute: typeof AdminErroresLazyRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/media': {
-      id: '/admin/media'
-      path: '/media'
-      fullPath: '/admin/media'
-      preLoaderRoute: typeof AdminMediaLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/email-templates': {

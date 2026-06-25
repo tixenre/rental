@@ -1,7 +1,9 @@
 User-agent: *
 Allow: /
 Allow: /equipo/
+Allow: /categoria/
 Allow: /estudio
+Allow: /workshops/
 Allow: /preguntas-frecuentes
 
 # Bloquear back-office y portal cliente (info privada).

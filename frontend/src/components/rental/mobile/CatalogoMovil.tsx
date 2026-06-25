@@ -315,7 +315,7 @@ export function CatalogoMovil() {
                 type="button"
                 onClick={() => setQuery("")}
                 aria-label="Limpiar búsqueda"
-                className="absolute right-2 top-1/2 -translate-y-1/2 grid h-6 w-6 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 grid h-6 w-6 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-ink transition-colors before:absolute before:inset-[-10px] before:content-['']"
               >
                 <X size={14} />
               </button>
@@ -472,11 +472,10 @@ export function CatalogoMovil() {
         {/* CartMiniBar — paddingBottom respeta env(safe-area-inset-bottom)
             para que el home indicator de iPhone no tape el contenido. */}
         {totalItems > 0 && (
-          <div
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             aria-label={`Ver tu rental: ${totalItems} ${totalItems === 1 ? "ítem" : "ítems"}, total ${formatARS(cartTotal)}`}
-            className="sticky bottom-0 z-40 flex items-center gap-2.5 px-4 cursor-pointer border-t-[1.5px] border-amber backdrop-blur-lg transition-colors hover:bg-amber/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber focus-visible:ring-inset"
+            className="sticky bottom-0 z-40 w-full flex items-center gap-2.5 px-4 cursor-pointer border-t-[1.5px] border-amber backdrop-blur-lg transition-colors hover:bg-amber/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber focus-visible:ring-inset"
             style={{
               background: CARTBAR_BG,
               boxShadow: "0 -8px 24px -8px rgba(0,0,0,0.12)",
@@ -486,12 +485,6 @@ export function CatalogoMovil() {
               WebkitTapHighlightColor: "transparent",
             }}
             onClick={() => setShowCartSheet(true)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setShowCartSheet(true);
-              }
-            }}
           >
             <div className="flex-1">
               <div className="font-sans text-sm font-bold text-ink leading-tight">
@@ -520,7 +513,7 @@ export function CatalogoMovil() {
               size={16}
               className="text-muted-foreground hover:text-ink transition-colors shrink-0"
             />
-          </div>
+          </button>
         )}
       </div>
 
