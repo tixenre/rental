@@ -85,21 +85,38 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
             aria-label="Conocé el estudio"
           >
             {photos.map((photo, i) => (
-              <img
+              <div
                 key={photo.url}
-                src={photo.url}
-                srcSet={photo.urlSm ? `${photo.urlSm} 800w, ${photo.url} 1600w` : undefined}
-                sizes="(max-width: 768px) 100vw, 42vw"
-                alt="El Estudio — Rambla Rental"
                 className={cn(
-                  "absolute inset-0 w-full h-full object-cover transition-[opacity] group-hover:scale-[1.04]",
+                  "absolute inset-0 transition-[opacity] group-hover:scale-[1.04]",
                   i === photoIdx ? "opacity-100" : "opacity-0",
                 )}
                 style={{ transitionDuration: "900ms" }}
-                loading={i === 0 ? "eager" : "lazy"}
-                fetchPriority={i === 0 ? "high" : undefined}
-                decoding="async"
-              />
+              >
+                <picture>
+                  {(photo.urlSmAvif || photo.urlAvif) && (
+                    <source
+                      type="image/avif"
+                      srcSet={
+                        photo.urlSmAvif
+                          ? `${photo.urlSmAvif} 800w, ${photo.urlAvif ?? photo.url} 1600w`
+                          : photo.urlAvif!
+                      }
+                      sizes="(max-width: 768px) 100vw, 42vw"
+                    />
+                  )}
+                  <img
+                    src={photo.url}
+                    srcSet={photo.urlSm ? `${photo.urlSm} 800w, ${photo.url} 1600w` : undefined}
+                    sizes="(max-width: 768px) 100vw, 42vw"
+                    alt="El Estudio — Rambla Rental"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loading={i === 0 ? "eager" : "lazy"}
+                    fetchPriority={i === 0 ? "high" : undefined}
+                    decoding="async"
+                  />
+                </picture>
+              </div>
             ))}
 
             {/* Gradient overlay */}

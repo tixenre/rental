@@ -1544,6 +1544,8 @@ def _init_db_schema(conn):
     """)
     conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
     conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS url_sm TEXT")
+    conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS url_avif TEXT")
+    conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS url_sm_avif TEXT")
 
     # ── Galería multi-foto de equipos (F2 — k1l2m3n4o5p6) ───────────────────────
     conn.execute("""

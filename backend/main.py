@@ -525,10 +525,11 @@ def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None
     responder la API (LCP ~21s en Lighthouse).
 
     El `imagesrcset`+`imagesizes` matchea EXACTO el `srcSet`/`sizes` que renderiza el
-    carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=100vw`) y la query del hero usa el
-    MISMO orden que `useHeroPhotos` (es_principal DESC, orden ASC) → el browser deduplica
-    y usa el recurso preloadeado en vez de bajar la imagen dos veces. El preconnect
-    abre la conexión TLS al bucket R2 (origen de todas las fotos) antes del fetch."""
+    carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=(max-width: 768px) 100vw, 42vw`) y la
+    query del hero usa el MISMO orden que `useHeroPhotos` (es_principal DESC, orden ASC) →
+    el browser deduplica y usa el recurso preloadeado en vez de bajar la imagen dos veces.
+    El preconnect abre la conexión TLS al bucket R2 (origen de todas las fotos) antes del
+    fetch."""
     esc = _html.escape(image, quote=True)
     # Origen del bucket R2 (https://host) derivado de la URL del hero — sin hardcodear
     # el bucket, robusto ante cambios de ambiente.
@@ -541,7 +542,8 @@ def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None
         esc_sm = _html.escape(image_sm, quote=True)
         tags += (
             f'<link rel="preload" as="image" fetchpriority="high"'
-            f' imagesrcset="{esc_sm} 800w, {esc} 1600w" imagesizes="100vw">'
+            f' imagesrcset="{esc_sm} 800w, {esc} 1600w"'
+            f' imagesizes="(max-width: 768px) 100vw, 42vw">'
         )
     else:
         tags += f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
