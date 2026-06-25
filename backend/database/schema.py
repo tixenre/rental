@@ -116,6 +116,17 @@ def _init_db_schema(conn):
     # front-office. NULL = sin specs asignadas.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS categoria_specs TEXT")
 
+    # Migration: variantes AVIF + LQIP denormalizadas de la foto principal (perf
+    # del catálogo). Acompañan a foto_url/foto_url_sm/foto_url_thumb: el front sirve
+    # <picture> con AVIF (~20-30% menos bytes que webp) + blur-up LQIP sin inflar el
+    # payload del listado (127 equipos × ~250 bytes). Todas nullable: legacy = NULL
+    # → fallback seguro a la variante webp. Por ahora quedan vacías: las puebla un
+    # PR posterior (ingesta/sync de la foto principal); mientras tanto la web usa webp.
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS foto_url_avif TEXT")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS foto_url_sm_avif TEXT")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS foto_url_thumb_avif TEXT")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS foto_lqip TEXT")
+
     # Migration: URL pública del HTML de producto guardado (B&H Webpage Complete).
     # Permite re-extraer specs en el futuro sin volver a pedir el HTML al dueño.
     # Mismo patrón que foto_url — almacena URL pública R2, blob en equipos/{id}/source.html.

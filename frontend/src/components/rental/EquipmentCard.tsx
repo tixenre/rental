@@ -104,7 +104,7 @@ export function EquipmentCard({
           {item.fotoUrl && !imgFailed ? (
             <img
               src={item.fotoUrl}
-              srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm)}
+              srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm, item.fotoUrlThumb)}
               sizes="(max-width: 640px) 45vw, 250px"
               alt={nombrePublico}
               loading={index < 4 ? "eager" : "lazy"}
