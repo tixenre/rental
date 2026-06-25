@@ -25,7 +25,7 @@ const HERO_MAX = 5;
 /** Devuelve las fotos del hero desde R2 (admin). Vacío mientras carga. */
 export function useHeroPhotos(): HeroPhoto[] {
   const { data } = useQuery({
-    queryKey: ["estudio"],
+    queryKey: ["estudio-fotos"],
     queryFn: apiGetEstudio,
     staleTime: 5 * 60 * 1000,
   });

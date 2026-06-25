@@ -74,7 +74,7 @@ try {
       queryClient.setQueryData(["categorias"], seed.categorias);
     }
     if (seed.estudio) {
-      queryClient.setQueryData(["estudio"], seed.estudio);
+      queryClient.setQueryData(["estudio-fotos"], seed.estudio);
     }
   }
 } catch {
