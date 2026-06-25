@@ -102,9 +102,29 @@ def _get_estudio_media(conn, entity_id: int) -> list[dict]:
     return [_build_asset(conn, r) for r in rows]
 
 
+def _get_instructor_media(conn, entity_id: int) -> list[dict]:
+    """Foto del instructor de un taller. entity_id = taller_id."""
+    row = conn.execute(
+        "SELECT id, instructor_foto_url, instructor_media_id FROM talleres WHERE id = ?",
+        (entity_id,),
+    ).fetchone()
+    if not row:
+        return []
+    media_id = None
+    url = ""
+    try:
+        media_id = row["instructor_media_id"]
+        url = row["instructor_foto_url"] or ""
+    except (KeyError, IndexError):
+        pass
+    adapted = {"id": row["id"], "media_id": media_id, "orden": 0, "es_principal": True, "url": url}
+    return [_build_asset(conn, adapted)]
+
+
 _KIND_HANDLERS = {
     "equipo": _get_equipo_media,
     "estudio": _get_estudio_media,
+    "instructor": _get_instructor_media,
 }
 
 

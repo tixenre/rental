@@ -1604,6 +1604,7 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_foto_url TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS numero_edicion INTEGER NOT NULL DEFAULT 1")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS proxima_edicion_slug TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
     import json as _json_t
     _programa_teorica = _json_t.dumps([
         "Qué es la dirección de arte y cuál es su función dentro de un proyecto",

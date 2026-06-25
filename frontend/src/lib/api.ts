@@ -353,6 +353,7 @@ export type Taller = {
   pago_banco: string;
   direccion: string;
   instructor_foto_url?: string;
+  instructor_media_id?: number | null;
   numero_edicion: number;
   proxima_edicion_slug: string;
   proxima_edicion?: EdicionLite | null;
