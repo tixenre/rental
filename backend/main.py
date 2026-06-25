@@ -434,7 +434,7 @@ def root():
             # `useHeroPhotos`: es_principal DESC, orden ASC). Se preloadea para que
             # sea descubrible en el HTML inicial.
             hero_row = conn.execute(
-                "SELECT url, url_sm FROM estudio_fotos WHERE estudio_id = 1 "
+                "SELECT url, url_sm, url_avif, url_sm_avif FROM estudio_fotos WHERE estudio_id = 1 "
                 "ORDER BY es_principal DESC, orden ASC, id ASC LIMIT 1"
             ).fetchone()
         finally:
@@ -442,8 +442,13 @@ def root():
         html_text = index_file.read_text(encoding="utf-8")
         hero_url = (hero_row["url"].strip() if hero_row and hero_row["url"] else "")
         hero_sm = (hero_row["url_sm"].strip() if hero_row and hero_row["url_sm"] else "")
+        hero_avif = (hero_row["url_avif"].strip() if hero_row and hero_row["url_avif"] else "")
+        hero_sm_avif = (hero_row["url_sm_avif"].strip() if hero_row and hero_row["url_sm_avif"] else "")
         if hero_url.startswith("http"):
-            html_text = _inject_hero_preload(html_text, hero_url, hero_sm or None)
+            html_text = _inject_hero_preload(
+                html_text, hero_url, hero_sm or None,
+                hero_avif or None, hero_sm_avif or None,
+            )
         image = (row["value"].strip() if row and row["value"] else "")
         if image.startswith("http"):
             html_text = _set_og_image(html_text, image)
@@ -517,12 +522,23 @@ def _inject_og_meta(html_text: str, *, title: str, description: str, image: str,
     return html_text
 
 
-def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None) -> str:
+def _inject_hero_preload(
+    html_text: str,
+    image: str,
+    image_sm: str | None = None,
+    image_avif: str | None = None,
+    image_sm_avif: str | None = None,
+) -> str:
     """Inserta `<link rel=preconnect>` al origen R2 + `<link rel=preload as=image
     fetchpriority=high>` del hero del home justo antes de `</head>`. La URL del hero
     sale de un query async (`useHeroPhotos`), así que sin esto el LCP no es descubrible
     en el HTML inicial — el browser no puede arrancar el fetch hasta correr el JS +
     responder la API (LCP ~21s en Lighthouse).
+
+    Si hay variante AVIF, preloadeamos esa con type="image/avif" — los browsers que
+    soportan AVIF la usan (Chrome/Safari/Firefox modernos), los que no la ignoran y
+    descubren el webp del <picture> normalmente. El preload AVIF matchea el <source
+    type="image/avif"> del componente HeroSection.
 
     El `imagesrcset`+`imagesizes` matchea EXACTO el `srcSet`/`sizes` que renderiza el
     carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=(max-width: 768px) 100vw, 42vw`) y la
@@ -538,7 +554,19 @@ def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None
     if origin.startswith("http"):
         esc_origin = _html.escape(origin, quote=True)
         tags += f'<link rel="preconnect" href="{esc_origin}">'
-    if image_sm:
+    if image_avif:
+        # Preload AVIF para browsers que lo soportan (Chrome, Safari, Firefox modernos).
+        esc_avif = _html.escape(image_avif, quote=True)
+        if image_sm_avif:
+            esc_sm_avif = _html.escape(image_sm_avif, quote=True)
+            tags += (
+                f'<link rel="preload" as="image" type="image/avif" fetchpriority="high"'
+                f' imagesrcset="{esc_sm_avif} 800w, {esc_avif} 1600w"'
+                f' imagesizes="(max-width: 768px) 100vw, 42vw">'
+            )
+        else:
+            tags += f'<link rel="preload" as="image" type="image/avif" fetchpriority="high" href="{esc_avif}">'
+    elif image_sm:
         esc_sm = _html.escape(image_sm, quote=True)
         tags += (
             f'<link rel="preload" as="image" fetchpriority="high"'
@@ -651,7 +679,7 @@ def rental_page():
         conn = get_db()
         try:
             hero_row = conn.execute(
-                "SELECT url, url_sm FROM estudio_fotos WHERE estudio_id = 1 "
+                "SELECT url, url_sm, url_avif, url_sm_avif FROM estudio_fotos WHERE estudio_id = 1 "
                 "ORDER BY es_principal DESC, orden ASC, id ASC LIMIT 1"
             ).fetchone()
             initial_data = _get_initial_catalog(conn)
@@ -660,8 +688,13 @@ def rental_page():
         html_text = index_file.read_text(encoding="utf-8")
         hero_url = (hero_row["url"].strip() if hero_row and hero_row["url"] else "")
         hero_sm = (hero_row["url_sm"].strip() if hero_row and hero_row["url_sm"] else "")
+        hero_avif = (hero_row["url_avif"].strip() if hero_row and hero_row["url_avif"] else "")
+        hero_sm_avif = (hero_row["url_sm_avif"].strip() if hero_row and hero_row["url_sm_avif"] else "")
         if hero_url.startswith("http"):
-            html_text = _inject_hero_preload(html_text, hero_url, hero_sm or None)
+            html_text = _inject_hero_preload(
+                html_text, hero_url, hero_sm or None,
+                hero_avif or None, hero_sm_avif or None,
+            )
         html_text = _inject_initial_data(html_text, initial_data)
         return HTMLResponse(content=html_text)
     except Exception:
