@@ -187,6 +187,19 @@ def get_estudio(response: Response):
 
 # ── Endpoints admin ──────────────────────────────────────────────────────────
 
+@router.get("/admin/estudio")
+def get_estudio_admin(request: Request):
+    """Versión admin del GET /estudio — sin Cache-Control público (el endpoint
+    público está cacheado 5min en Cloudflare, lo que causaba que subir/borrar
+    fotos no se reflejara hasta que el caché expirara)."""
+    require_admin(request)
+    with get_db() as conn:
+        row = _get_estudio_row(conn)
+        fotos = _get_fotos(conn)
+        resp = _build_response(row, fotos)
+        resp["pack_equipos"] = _pack_curado(conn)
+        return resp
+
 class EstudioUpdate(BaseModel):
     nombre: Optional[str] = None
     tagline: Optional[str] = None

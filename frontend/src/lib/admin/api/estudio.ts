@@ -13,7 +13,7 @@ import type {
 // ── Estudio (singleton E1) ───────────────────────────────────────────────────
 
 export const estudioAdminApi = {
-  get: () => authedJson<EstudioConfig>("/api/estudio"),
+  get: () => authedJson<EstudioConfig>("/api/admin/estudio"),
   listPack: () => authedJson<{ pack: EstudioPackEquipoCurado[] }>("/api/admin/estudio/pack"),
   addPackEquipo: (equipo_id: number) =>
     authedPostJson<{ pack: EstudioPackEquipoCurado[] }>("/api/admin/estudio/pack", { equipo_id }),
