@@ -417,6 +417,42 @@ def root():
         logger.warning("OG injection de la home falló — sirvo index plano", exc_info=True)
         return _serve_frontend("index.html")
 
+def _branding_redirect(setting_key: str, static_path: str):
+    """Redirige a la URL de R2 del asset de branding si está configurada.
+    Si no, el catch-all sirve el archivo estático del repo como fallback."""
+    try:
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = %s", (setting_key,)
+            ).fetchone()
+        finally:
+            conn.close()
+        if row and row["value"] and row["value"].strip().startswith("http"):
+            return RedirectResponse(row["value"].strip(), status_code=302)
+    except Exception:
+        pass
+    return _serve_frontend(static_path)
+
+
+@app.get("/favicon.png", include_in_schema=False)
+def favicon_png():
+    """Favicon — redirige al PNG derivado del motor de branding (R2) si existe."""
+    return _branding_redirect("favicon_url", "favicon.png")
+
+
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+def apple_touch_icon():
+    """Apple touch icon — redirige al PNG derivado del motor de branding (R2) si existe."""
+    return _branding_redirect("apple_touch_icon_url", "apple-touch-icon.png")
+
+
+@app.get("/icon-512.png", include_in_schema=False)
+def icon_512():
+    """Ícono 512×512 — redirige al PNG derivado del motor de branding (R2) si existe."""
+    return _branding_redirect("icon_512_url", "icon-512.png")
+
+
 @app.get("/login", include_in_schema=False)
 def login_page():
     # El login del admin vive en el SPA en /admin/login.
