@@ -7,7 +7,6 @@ Cobertura:
 - media_api.get_entity_media("instructor", taller_id) devuelve el asset
 - Fallback: foto_url legacy cuando no hay media_id
 """
-import io
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -196,9 +195,6 @@ def test_upload_ruta_requiere_autenticacion():
 @pytest.mark.asyncio
 async def test_upload_logica_llama_store_upload():
     """La lógica de upload llama store_upload y actualiza media_id en la BD."""
-    from fastapi import Request
-    from unittest.mock import AsyncMock
-
     asset = _fake_asset(asset_id=99, media_id_url="https://cdn.test/display.webp")
 
     tiny_jpeg = b"\xff\xd8\xff\xd9"  # JPEG mínimo para el form
