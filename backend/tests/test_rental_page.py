@@ -94,11 +94,26 @@ class TestGetInitialCatalog:
                 total INTEGER DEFAULT 0, prioridad INTEGER, parent_id INTEGER
             )
         """)
+        conn.execute("""
+            CREATE TABLE estudio_fotos (
+                id INTEGER PRIMARY KEY,
+                estudio_id INTEGER DEFAULT 1,
+                url TEXT,
+                url_sm TEXT,
+                url_avif TEXT,
+                url_sm_avif TEXT,
+                es_principal INTEGER DEFAULT 0,
+                orden INTEGER DEFAULT 0
+            )
+        """)
         conn.execute(
             "INSERT INTO equipos (id, nombre, visible_catalogo, estado, precio_jornada) VALUES (1, 'Canon R5', 1, 'disponible', 5000)"
         )
         conn.execute(
             "INSERT INTO categorias (id, nombre, total, prioridad) VALUES (1, 'Cámaras', 1, 1)"
+        )
+        conn.execute(
+            "INSERT INTO estudio_fotos (id, estudio_id, url, es_principal, orden) VALUES (1, 1, 'https://r2.dev/foto.webp', 1, 0)"
         )
         conn.commit()
 
@@ -107,9 +122,11 @@ class TestGetInitialCatalog:
 
         assert "equipos" in result
         assert "categorias" in result
+        assert "estudio" in result
         assert result["equipos"]["total"] == 1
         assert result["equipos"]["items"][0]["nombre"] == "Canon R5"
         assert result["equipos"]["items"][0]["etiquetas"] == []
+        assert result["estudio"]["fotos"][0]["url"] == "https://r2.dev/foto.webp"
         assert result["equipos"]["items"][0]["kit"] == []
         assert result["categorias"][0]["nombre"] == "Cámaras"
 
