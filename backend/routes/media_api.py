@@ -15,7 +15,7 @@ GET /api/media/entity/{kind}/{entity_id}
 from fastapi import APIRouter, HTTPException
 
 from database import get_db
-from services.media.service import _validate_kind
+from services.media.service import validate_kind
 from services.media.errors import MediaError
 
 router = APIRouter()
@@ -112,7 +112,7 @@ def get_entity_media(kind: str, entity_id: int):
     Fallback: fotos sin media_id (pre-F0a) devuelven variant sintética con url directa.
     """
     try:
-        _validate_kind(kind)
+        validate_kind(kind)
     except MediaError:
         raise HTTPException(400, f"kind inválido: {kind!r}")
 

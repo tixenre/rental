@@ -71,7 +71,7 @@ _KIND_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 _SLUG_SAFE_RE = re.compile(r"[^a-z0-9]+")
 
 
-def _validate_kind(kind: str) -> None:
+def validate_kind(kind: str) -> None:
     """Slug sanit del kind: solo [a-z0-9-], 1-64 chars. Previene path traversal en keys R2."""
     if not _KIND_RE.match(kind or ""):
         raise MediaError(400, f"kind inválido: {kind!r}. Solo [a-z0-9-], 1-64 chars.")
@@ -159,7 +159,7 @@ def store_upload(
     Sin estos params → usa el esquema legacy con asset_id.
     """
     # Slug sanit: kind va directo a la R2 key → solo [a-z0-9-] (previene path traversal).
-    _validate_kind(kind)
+    validate_kind(kind)
 
     # Seguridad: valida magic-bytes + decompression-bomb ANTES de tocar la DB o R2.
     # Rechaza no-imágenes con 400 (en vez del fallback silencioso a jpeg).
