@@ -611,9 +611,16 @@ def _get_initial_catalog(conn) -> dict:
         "FROM categorias ORDER BY COALESCE(prioridad, 999), nombre"
     ).fetchall()
 
+    estudio_fotos = conn.execute(
+        "SELECT url, url_sm, url_avif, url_sm_avif, es_principal, orden "
+        "FROM estudio_fotos WHERE estudio_id = 1 "
+        "ORDER BY es_principal DESC, orden ASC LIMIT 5"
+    ).fetchall()
+
     return {
         "equipos": {"total": len(items), "items": items},
         "categorias": [dict(c) for c in cats],
+        "estudio": {"fotos": [dict(f) for f in estudio_fotos]},
     }
 
 

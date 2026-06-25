@@ -61,6 +61,7 @@ try {
     const seed = JSON.parse(el.textContent) as {
       equipos?: { total: number; items: BackendEquipo[] };
       categorias?: unknown[];
+      estudio?: unknown;
     };
     if (Array.isArray(seed.equipos?.items)) {
       const items = seed.equipos.items.map(backendToEquipment);
@@ -71,6 +72,9 @@ try {
     }
     if (Array.isArray(seed.categorias)) {
       queryClient.setQueryData(["categorias"], seed.categorias);
+    }
+    if (seed.estudio) {
+      queryClient.setQueryData(["estudio"], seed.estudio);
     }
   }
 } catch {
