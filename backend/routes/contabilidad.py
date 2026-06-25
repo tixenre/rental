@@ -338,22 +338,28 @@ async def subir_comprobante(request: Request, mov_id: int, file: UploadFile = Fi
         if not mov:
             raise HTTPException(404, "El movimiento no existe.")
         try:
+            from services.media.service import store_raw_document
             from services.media import storage
 
-            ext = {"application/pdf": "pdf", "image/jpeg": "jpg",
-                   "image/png": "png", "image/webp": "webp"}.get(ctype, "bin")
-            key = f"contabilidad/comprobantes/{mov_id}/comprobante.{ext}"
-            url = storage.put(key, content, ctype)
-            # Borrado best-effort del comprobante anterior si cambia la key.
+            # Borrado best-effort del comprobante anterior.
             vieja = mov.get("comprobante_key")
-            if vieja and vieja != key:
-                storage.delete_object(vieja)
+            if vieja:
+                storage.delete_object(vieja, private=True)
+
+            key, presigned = store_raw_document(
+                content,
+                kind="comprobante-contabilidad",
+                ref=str(mov_id),
+                content_type=ctype,
+                presign_expires=3600,
+            )
             conn.execute(
-                "UPDATE movimientos SET comprobante_url = ?, comprobante_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (url, key, mov_id),
+                "UPDATE movimientos SET comprobante_url = NULL, comprobante_key = ?, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (key, mov_id),
             )
             conn.commit()
-            return {"comprobante_url": url}
+            return {"comprobante_url": presigned, "comprobante_key": key}
         except HTTPException:
             conn.rollback()
             raise

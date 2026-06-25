@@ -366,6 +366,7 @@ export type InscripcionBody = {
   telefono: string;
   experiencia?: string;
   comprobante_url?: string;
+  comprobante_key?: string;
 };
 
 export type InscripcionResult = {
@@ -382,7 +383,10 @@ export function apiGetTaller(slug: string) {
   return get<Taller>(`/api/talleres/${slug}`);
 }
 
-export async function apiUploadComprobante(slug: string, file: File): Promise<string> {
+export async function apiUploadComprobante(
+  slug: string,
+  file: File,
+): Promise<{ url: string; key: string }> {
   const formData = new FormData();
   formData.append("file", file);
   const res = await fetch(`${API_BASE}/api/talleres/${slug}/upload-comprobante`, {
@@ -393,8 +397,7 @@ export async function apiUploadComprobante(slug: string, file: File): Promise<st
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.detail ?? `No se pudo subir el comprobante (${res.status})`);
   }
-  const data = (await res.json()) as { url: string };
-  return data.url;
+  return res.json() as Promise<{ url: string; key: string }>;
 }
 
 export function apiCrearInscripcion(slug: string, body: InscripcionBody) {

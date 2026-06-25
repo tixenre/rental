@@ -139,6 +139,26 @@ def get(key: str) -> bytes:
         raise MediaError(502, f"R2 get falló para '{key}': {e}")
 
 
+def presigned_url(key: str, expires_seconds: int = 3600, *, private: bool = False) -> str:
+    """Genera una URL prefirmada (S3-compatible) para acceder a un objeto de R2.
+
+    Para objetos privados (originales, comprobantes) usa el bucket privado si existe.
+    `expires_seconds` máximo útil en Cloudflare R2: 604800 (7 días).
+    Eleva MediaError(502) si el cliente falla; MediaError(500) si no hay boto3.
+    """
+    cfg = _r2_config()
+    client = _get_r2_client(cfg)
+    bucket = (cfg["private_bucket"] or cfg["bucket"]) if private else cfg["bucket"]
+    try:
+        return client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": key},
+            ExpiresIn=expires_seconds,
+        )
+    except Exception as e:
+        raise MediaError(502, f"R2 presigned_url falló para '{key}': {e}")
+
+
 def delete_object(key: str, *, private: bool = False) -> bool:
     """Borra un objeto de R2 (best-effort). Devuelve True si se borró, False si no.
     Nunca eleva: el borrado de la DB es la fuente de verdad.
