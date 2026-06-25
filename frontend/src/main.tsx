@@ -6,7 +6,8 @@ import ReactDOM from "react-dom/client";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { initGA, trackPageView } from "./lib/analytics";
-import { apiGetAnalyticsConfig } from "./lib/api";
+import { apiGetAnalyticsConfig, type BackendEquipo } from "./lib/api";
+import { backendToEquipment } from "./hooks/useEquipos";
 
 // Solo activo si VITE_SENTRY_DSN está seteado — dev/CI no lo necesitan.
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
@@ -37,6 +38,34 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Hydrate React Query desde el catálogo inlineado por el backend en /rental.
+// El handler Python inyecta <script id="__INITIAL__" type="application/json">
+// con {equipos, categorias} → primer render sin round-trip a Miami.
+// Mismo queryKey que useEquipos/useCategorias → RQ usa este dato y lo revalida
+// con staleTime normal (30s). Si el elemento no existe o el parse falla, RQ
+// fetchea normalmente (sin degradación).
+try {
+  const el = document.getElementById("__INITIAL__");
+  if (el?.textContent) {
+    const seed = JSON.parse(el.textContent) as {
+      equipos?: { total: number; items: BackendEquipo[] };
+      categorias?: unknown[];
+    };
+    if (Array.isArray(seed.equipos?.items)) {
+      const items = seed.equipos.items.map(backendToEquipment);
+      queryClient.setQueryData(["equipos", undefined, undefined], {
+        items,
+        usingFallback: false,
+      });
+    }
+    if (Array.isArray(seed.categorias)) {
+      queryClient.setQueryData(["categorias"], seed.categorias);
+    }
+  }
+} catch {
+  // no-op: React Query fetchea normalmente
+}
 
 const router = createRouter({
   routeTree,
