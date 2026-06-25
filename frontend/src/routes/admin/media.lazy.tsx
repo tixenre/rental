@@ -32,7 +32,7 @@ function StatCard({
     <div
       className={cn(
         "rounded-lg border hairline p-4",
-        warn ? "border-amber-300 bg-amber-50 dark:bg-amber-950/20" : "bg-card",
+        warn ? "border-amber/50 bg-amber/10" : "bg-card",
       )}
     >
       <div className="text-2xl font-mono font-semibold text-ink">{value}</div>
@@ -49,7 +49,7 @@ function GcResultView({ result }: { result: GcResult }) {
         result.dry_run
           ? "border-hairline bg-muted/30"
           : result.orphans_purged > 0
-            ? "border-green-300 bg-green-50 dark:bg-green-950/20"
+            ? "border-muted bg-muted/40"
             : "border-hairline bg-muted/30",
       )}
     >
@@ -86,7 +86,11 @@ function MediaDashboardPage() {
   const qc = useQueryClient();
   const [gcResult, setGcResult] = useState<GcResult | null>(null);
 
-  const { data: stats, isLoading, refetch } = useQuery({
+  const {
+    data: stats,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["admin", "media", "stats"],
     queryFn: () => adminApi.getStats(),
     staleTime: 60_000,
@@ -133,11 +137,7 @@ function MediaDashboardPage() {
           <StatCard label="Variantes" value={stats.total_variants} />
           <StatCard label="Almacenamiento" value={formatBytes(stats.total_bytes)} />
           <StatCard label="Con LQIP" value={stats.assets_with_lqip} />
-          <StatCard
-            label="Huérfanos"
-            value={stats.orphans}
-            warn={stats.orphans > 0}
-          />
+          <StatCard label="Huérfanos" value={stats.orphans} warn={stats.orphans > 0} />
           <StatCard
             label="Sin variantes"
             value={stats.assets_no_variants}
@@ -153,8 +153,8 @@ function MediaDashboardPage() {
           Garbage collection
         </h2>
         <p className="text-xs text-muted-foreground">
-          Detecta y purga assets de media que no están referenciados por ninguna entidad
-          (equipos, estudio, marcas).
+          Detecta y purga assets de media que no están referenciados por ninguna entidad (equipos,
+          estudio, marcas).
         </p>
         <div className="flex flex-wrap gap-2">
           <button
@@ -204,8 +204,8 @@ function MediaDashboardPage() {
           Re-derivar variantes
         </h2>
         <p className="text-xs text-muted-foreground">
-          Regenera las variantes de un asset desde su original privado en R2.
-          Útil si los derive specs cambiaron o una variante quedó corrupta.
+          Regenera las variantes de un asset desde su original privado en R2. Útil si los derive
+          specs cambiaron o una variante quedó corrupta.
         </p>
         <RederiveForm />
       </section>
@@ -229,7 +229,10 @@ function RederiveForm() {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label htmlFor="asset-id" className="text-2xs font-mono uppercase tracking-widest text-muted-foreground">
+        <label
+          htmlFor="asset-id"
+          className="text-2xs font-mono uppercase tracking-widest text-muted-foreground"
+        >
           Asset ID
         </label>
         <input
@@ -253,7 +256,11 @@ function RederiveForm() {
           "hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
         )}
       >
-        {isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+        {isPending ? (
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <RotateCcw className="h-3.5 w-3.5" />
+        )}
         Re-derivar
       </button>
       {result && <span className="text-xs text-muted-foreground">{result}</span>}

@@ -38,9 +38,11 @@ export function YouTubeEmbed({
 
   const posterSrc =
     posterVariants && posterVariants.length > 0
-      ? (findVariant(posterVariants, DISPLAY_VARIANT) ??
+      ? (
+          findVariant(posterVariants, DISPLAY_VARIANT) ??
           findVariant(posterVariants, SM_VARIANT) ??
-          posterVariants[0])?.url
+          posterVariants[0]
+        )?.url
       : youtubeThumbnailUrl(videoId);
 
   return (

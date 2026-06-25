@@ -1,8 +1,10 @@
 import type { MediaVariant } from "@/lib/media/types";
 import { buildSrcSet, findVariant, DISPLAY_VARIANT } from "@/lib/media/types";
 
-interface ResponsiveImageProps
-  extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src" | "srcSet"> {
+interface ResponsiveImageProps extends Omit<
+  React.ImgHTMLAttributes<HTMLImageElement>,
+  "src" | "srcSet"
+> {
   /** Variantes del asset (display, display-sm, display-thumb…). */
   variants: MediaVariant[];
   alt: string;

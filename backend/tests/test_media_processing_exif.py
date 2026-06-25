@@ -127,7 +127,6 @@ class TestStripExifForStorage:
 
     def test_fallback_devuelve_original_en_error(self, monkeypatch):
         """Si PIL falla por cualquier razón, devuelve el raw original (nunca eleva)."""
-        import services.media.processing as proc
         def _fail(_raw, _ct):
             raise RuntimeError("PIL roto")
 

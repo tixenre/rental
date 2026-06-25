@@ -43,10 +43,7 @@ export const THUMB_VARIANT = "display-thumb";
 export const SM_VARIANT = "display-sm";
 
 /** Devuelve la variante por nombre; si no existe, la primera disponible. */
-export function findVariant(
-  variants: MediaVariant[],
-  name: string,
-): MediaVariant | undefined {
+export function findVariant(variants: MediaVariant[], name: string): MediaVariant | undefined {
   return variants.find((v) => v.name === name) ?? variants[0];
 }
 

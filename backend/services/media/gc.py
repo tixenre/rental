@@ -21,7 +21,7 @@ import logging
 from dataclasses import dataclass, field
 
 from .errors import MediaError
-from .models import MediaAsset, MediaVariant, DeriveSpec
+from .models import MediaVariant, DeriveSpec
 
 logger = logging.getLogger(__name__)
 

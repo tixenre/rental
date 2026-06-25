@@ -97,9 +97,7 @@ export function MediaGallery({
                 aria-pressed={isSelected}
                 className={cn(
                   "shrink-0 w-16 h-16 rounded overflow-hidden border-2 transition-colors",
-                  isSelected
-                    ? "border-amber-400"
-                    : "border-transparent hover:border-amber-200",
+                  isSelected ? "border-amber" : "border-transparent hover:border-amber/40",
                 )}
               >
                 <img

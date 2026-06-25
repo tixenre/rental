@@ -18,7 +18,6 @@ def client(monkeypatch):
     _app = FastAPI()
     _app.include_router(router, prefix="/api")
 
-    from database import get_db as _orig_get_db
     monkeypatch.setattr("routes.media_api.get_db", _fake_get_db)
 
     return TestClient(_app)
