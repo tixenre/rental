@@ -142,7 +142,9 @@ function TallerLandingPage() {
   const tallerId = taller?.id ?? null;
   const { data: instructorMedia } = useEntityMedia("instructor", tallerId);
   const instructorAsset = instructorMedia[0] ?? null;
-  const instructorVariant = instructorAsset ? findVariant(instructorAsset.variants, "display") : null;
+  const instructorVariant = instructorAsset
+    ? findVariant(instructorAsset.variants, "display")
+    : null;
 
   if (isLoading) {
     return (
@@ -321,8 +323,8 @@ function TallerLandingPage() {
                     Sobre
                   </p>
                   <div className="flex items-start gap-5 mb-5">
-                    {(instructorVariant || taller.instructor_foto_url) && (
-                      instructorAsset && instructorAsset.variants.length > 0 ? (
+                    {(instructorVariant || taller.instructor_foto_url) &&
+                      (instructorAsset && instructorAsset.variants.length > 0 ? (
                         <ResponsiveImage
                           variants={instructorAsset.variants}
                           alt={taller.instructor_nombre}
@@ -336,8 +338,7 @@ function TallerLandingPage() {
                           alt={taller.instructor_nombre}
                           className="shrink-0 w-20 h-20 rounded-full object-cover object-top border border-border/40"
                         />
-                      )
-                    )}
+                      ))}
                     <h2
                       className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink self-center"
                       style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
