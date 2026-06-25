@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { PriceBlock } from "./equipment/shared/PriceBlock";
 import { FavButton } from "./equipment/shared/FavButton";
-import { buildFotoSrcSet, buildAvifSrcSet } from "@/lib/srcset";
+import { EquipoFoto } from "./EquipoFoto";
 
 /**
  * EquipmentRow — vista de lista del catálogo (desktop + mobile responsive).
@@ -49,7 +49,6 @@ export function EquipmentRow({
     navigate({ to: "/equipo/$slug", params: { slug: buildEquipoSlug(item) } });
 
   const [expanded, setExpanded] = useState(false);
-  const [imgFailed, setImgFailed] = useState(false);
 
   const cap = disponible ?? item.cantidad ?? Infinity;
   const sinStock = cap <= 0;
@@ -62,14 +61,6 @@ export function EquipmentRow({
   // fallback al nombre interno). No re-concatenar `item.brand` acá: duplicaba
   // la marca en los equipos con template configurado.
   const nombrePublico = item.name;
-  const avifSrcSet = buildAvifSrcSet(item.fotoUrlAvif, item.fotoUrlSmAvif, item.fotoUrlThumbAvif);
-  const blurStyle = item.fotoLqip
-    ? {
-        backgroundImage: `url("${item.fotoLqip}")`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }
-    : undefined;
 
   // Quick facts para el expand: specs_destacados del template si las hay, si no
   // cae al conjunto fijo legacy.
@@ -110,24 +101,15 @@ export function EquipmentRow({
             aria-label={`${expanded ? "Cerrar" : "Ver"} info de ${nombrePublico}`}
             className="relative block aspect-square w-12 overflow-hidden rounded-md bg-white sm:w-[52px]"
           >
-            {item.fotoUrl && !imgFailed ? (
-              <picture>
-                {avifSrcSet && <source type="image/avif" srcSet={avifSrcSet} sizes="52px" />}
-                <img
-                  src={item.fotoUrl}
-                  srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm, item.fotoUrlThumb)}
-                  sizes="52px"
-                  alt={nombrePublico}
-                  loading={index < 4 ? "eager" : "lazy"}
-                  decoding="async"
-                  onError={() => setImgFailed(true)}
-                  style={blurStyle}
-                  className="h-full w-full object-contain p-1.5"
-                />
-              </picture>
-            ) : (
-              <EmptyImage category={item.category} brand={item.brand} />
-            )}
+            <EquipoFoto
+              foto={item}
+              alt={nombrePublico}
+              sizes="52px"
+              loading={index < 4 ? "eager" : "lazy"}
+              decoding="async"
+              className="h-full w-full object-contain p-1.5"
+              fallback={<EmptyImage category={item.category} brand={item.brand} />}
+            />
           </button>
           <FavButton itemId={item.id} size="sm" className="absolute -right-1.5 -top-1.5" />
         </div>
