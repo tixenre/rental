@@ -449,6 +449,7 @@ def _init_db_schema(conn):
         CREATE INDEX IF NOT EXISTS idx_cat_parent ON categorias(parent_id, prioridad, nombre)
     """)
     # Ranking automático de categorías (#131). Mismo concepto que equipos.
+    conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS total INT DEFAULT 0")
     conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS popularidad_score INT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS cant_pedidos INT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS ingreso_total_ars BIGINT NOT NULL DEFAULT 0")
@@ -1217,6 +1218,7 @@ def _init_db_schema(conn):
     # A1 #635: tipo de producto (simple/kit/combo). DEFAULT 'simple'; el backfill
     # (kits con componentes → 'kit') y el CHECK viven en la migración a1c3b5f7e9d2.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'simple'")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS destacado BOOLEAN DEFAULT FALSE")
     conn.execute("""
         DO $$
         BEGIN
