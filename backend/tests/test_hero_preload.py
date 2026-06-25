@@ -30,7 +30,7 @@ def test_preload_con_variante_sm_usa_imagesrcset_y_preconnect():
     assert '<link rel="preconnect" href="https://pub-abc123.r2.dev" crossorigin>' in head
     # preload con el MISMO srcset + sizes que renderiza el carrusel
     assert f'imagesrcset="{_SM} 800w, {_URL} 1600w"' in head
-    assert 'imagesizes="100vw"' in head
+    assert 'imagesizes="(max-width: 768px) 100vw, 42vw"' in head
     assert 'fetchpriority="high"' in head
 
 

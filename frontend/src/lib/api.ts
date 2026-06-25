@@ -202,6 +202,8 @@ export type EstudioFoto = {
   id: number;
   url: string;
   url_sm?: string | null; // variante 800px (keep-aspect) para srcset; null = sin backfill aún
+  url_avif?: string | null; // variante AVIF full-size; null = foto anterior al backfill
+  url_sm_avif?: string | null; // variante AVIF 800px; null = foto anterior al backfill
   path: string | null;
   orden: number;
   es_principal: boolean;

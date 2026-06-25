@@ -15,6 +15,8 @@ import { apiGetEstudio } from "@/lib/api";
 export interface HeroPhoto {
   url: string;
   urlSm?: string;
+  urlAvif?: string;
+  urlSmAvif?: string;
 }
 
 // Cuántas fotos rota el hero como máximo (las primeras según `orden`).
@@ -34,5 +36,10 @@ export function useHeroPhotos(): HeroPhoto[] {
   return [...fotos]
     .sort((a, b) => Number(b.es_principal) - Number(a.es_principal) || a.orden - b.orden)
     .slice(0, HERO_MAX)
-    .map((f) => ({ url: f.url, urlSm: f.url_sm ?? undefined }));
+    .map((f) => ({
+      url: f.url,
+      urlSm: f.url_sm ?? undefined,
+      urlAvif: f.url_avif ?? undefined,
+      urlSmAvif: f.url_sm_avif ?? undefined,
+    }));
 }
