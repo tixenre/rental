@@ -117,11 +117,7 @@ export function BrandCard({
               loading="lazy"
               decoding="async"
               src={logoUrl!}
-              srcSet={
-                brand.logo_url_sm
-                  ? `${brand.logo_url_sm} 800w, ${logoUrl} 1600w`
-                  : undefined
-              }
+              srcSet={brand.logo_url_sm ? `${brand.logo_url_sm} 800w, ${logoUrl} 1600w` : undefined}
               sizes="80px"
               alt={brand.nombre}
               onError={() => setImgFailed(true)}
