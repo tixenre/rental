@@ -4,6 +4,7 @@ import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
 import { visualizer } from "rollup-plugin-visualizer";
+import { compression } from "vite-plugin-compression2";
 
 // ANALYZE=1 npm run build → genera dist/bundle-stats.html con el desglose
 // del bundle (qué deps pesan qué). Útil para auditar performance.
@@ -35,6 +36,18 @@ export default defineConfig(async ({ mode }) => {
             }),
           ]
         : []),
+      // Pre-compresión: emite .br y .gz junto a cada asset hasheado.
+      // El backend hace content-negotiation y sirve la variante comprimida.
+      // Backup del CDN: si Cloudflare no está en el path, el origen igual sirve
+      // comprimido. Excluir imágenes (ya comprimidas) y los propios .br/.gz.
+      compression({
+        algorithms: ["brotliCompress"],
+        exclude: [/\.(br|gz)$/, /\.(png|jpg|jpeg|webp|avif|gif|ico|svg|woff2)$/],
+      }),
+      compression({
+        algorithms: ["gzip"],
+        exclude: [/\.(br|gz)$/, /\.(png|jpg|jpeg|webp|avif|gif|ico|svg|woff2)$/],
+      }),
     ],
     server: {
       port: 3000,
@@ -57,6 +70,10 @@ export default defineConfig(async ({ mode }) => {
     },
     build: {
       outDir: "dist",
+      // Apuntar a ES2020+ (Chrome/FF/Safari ~2021) — evita polyfills innecesarios
+      // para async/await, optional chaining, nullish coalescing, etc. El 98%+
+      // de los browsers actuales soportan es2020; la diferencia en tamaño es ~2-5%.
+      target: "es2020",
       // No precargar los chunks que solo usa admin / DnD desde el HTML
       // inicial. Visitors del catálogo público no los necesitan hasta navegar
       // a /admin. Vite los seguirá cargando dinámicamente cuando hagan falta.

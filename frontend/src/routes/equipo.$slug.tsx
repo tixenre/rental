@@ -32,6 +32,10 @@ import { Pill } from "@/design-system/kit/Pill";
 import { SpecsGrid } from "@/components/rental/equipment/shared/SpecsGrid";
 import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { Lightbox } from "@/components/rental/Lightbox";
+import { MediaGallery } from "@/components/common/MediaGallery";
+import { YouTubeEmbed } from "@/components/common/YouTubeEmbed";
+import { useEntityMedia } from "@/hooks/useEntityMedia";
+import { extractYoutubeId } from "@/lib/media/youtube";
 import { backendToEquipment } from "@/hooks/useEquipos";
 import { useCart } from "@/lib/cart-store";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
@@ -40,6 +44,7 @@ import { buildCategoriaSlug } from "@/lib/categoria-slug";
 import { SITE_URL } from "@/lib/site";
 import { shareEquipo } from "@/lib/share";
 import { type Equipment } from "@/data/equipment";
+import { buildAvifSrcSet, buildFotoSrcSet } from "@/lib/srcset";
 
 async function fetchEquipo(id: string): Promise<Equipment | null> {
   const res = await fetch(`/api/equipos/${id}`);
@@ -297,6 +302,22 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const heroUrl =
     lightboxPhotos[selectedPhoto]?.url ?? lightboxPhotos[0]?.url ?? item.fotoUrl ?? null;
 
+  // AVIF + blur-up solo cuando el hero muestra la foto principal (la única que
+  // tiene columnas denormalizadas AVIF/LQIP en el payload).
+  const isMainHero = heroUrl === item.fotoUrl;
+  const heroAvifSrcSet = isMainHero
+    ? buildAvifSrcSet(item.fotoUrlAvif, item.fotoUrlSmAvif)
+    : undefined;
+  const heroWebpSrcSet = isMainHero ? buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm) : undefined;
+  const heroBlurStyle =
+    isMainHero && item.fotoLqip
+      ? {
+          backgroundImage: `url("${item.fotoLqip}")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }
+      : undefined;
+
   const DESC_LIMIT = 320;
   const desc = item.description ?? "";
   const isLongDesc = desc.length > DESC_LIMIT;
@@ -338,6 +359,12 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
       return avail <= 0;
     });
   }, [disponibilidadQ.data, bestEffortComponents]);
+
+  // Assets del nuevo sistema de media (F1). Cuando haya fotos subidas via R2
+  // se muestra <MediaGallery> con srcset + LQIP. Mientras no haya, la galería
+  // legacy (fotos de equipo_fotos) sigue funcionando sin cambios.
+  const { data: mediaAssets = [] } = useEntityMedia("equipo", parseInt(item.id, 10));
+  const hasMediaAssets = mediaAssets.length > 0;
 
   const handleShare = async () => {
     // URL canónica (dominio oficial + slug-id), no window.location.origin.
@@ -432,66 +459,88 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
       <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-10 md:items-start">
         {/* ── Columna izquierda: foto + kit + descripción ── */}
         <div className="space-y-6">
-          {/* Foto hero */}
-          <button
-            type="button"
-            onClick={() => setLightboxOpen(true)}
-            disabled={!heroUrl}
-            className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-white border hairline group cursor-zoom-in disabled:cursor-default"
-            aria-label={heroUrl ? `Ver foto ampliada de ${item.name}` : item.name}
-          >
-            {heroUrl ? (
-              <>
-                <img
-                  src={heroUrl}
-                  alt={item.name}
-                  loading="eager"
-                  decoding="async"
-                  fetchPriority="high"
-                  className="h-full w-full object-contain p-4 transition group-hover:scale-[1.01]"
-                />
-                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-2xs font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                  <Maximize2 className="h-3 w-3" /> Ampliar
-                </span>
-              </>
-            ) : (
-              <EmptyImage category={item.category} brand={item.brand} />
-            )}
-          </button>
+          {/* Galería: nuevo sistema (MediaGallery con srcset + LQIP) cuando
+              haya assets subidos via R2; galería legacy mientras no. */}
+          {hasMediaAssets ? (
+            <MediaGallery
+              assets={mediaAssets}
+              alt={item.name}
+              mainClassName="aspect-[4/3] rounded-xl border hairline overflow-hidden bg-white"
+            />
+          ) : (
+            <>
+              {/* Foto hero (legacy) */}
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(true)}
+                disabled={!heroUrl}
+                className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-white border hairline group cursor-zoom-in disabled:cursor-default"
+                aria-label={heroUrl ? `Ver foto ampliada de ${item.name}` : item.name}
+              >
+                {heroUrl ? (
+                  <>
+                    <picture>
+                      {heroAvifSrcSet && (
+                        <source
+                          type="image/avif"
+                          srcSet={heroAvifSrcSet}
+                          sizes="(max-width: 768px) 100vw, 600px"
+                        />
+                      )}
+                      <img
+                        src={heroUrl}
+                        srcSet={heroWebpSrcSet}
+                        sizes={heroWebpSrcSet ? "(max-width: 768px) 100vw, 600px" : undefined}
+                        alt={item.name}
+                        loading="eager"
+                        decoding="async"
+                        fetchPriority="high"
+                        style={heroBlurStyle}
+                        className="h-full w-full object-contain p-4 transition group-hover:scale-[1.01]"
+                      />
+                    </picture>
+                    <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-2xs font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
+                      <Maximize2 className="h-3 w-3" /> Ampliar
+                    </span>
+                  </>
+                ) : (
+                  <EmptyImage category={item.category} brand={item.brand} />
+                )}
+              </button>
 
-          {/* Galería multi-foto (#125): miniaturas si hay más de una foto.
-              Cada una se muestra en el preview grande al clickearla; la foto
-              grande abre el lightbox (con swipe entre todas). */}
-          {lightboxPhotos.length > 1 && (
-            <div
-              className="flex gap-2 overflow-x-auto pb-1"
-              role="list"
-              aria-label={`Más fotos de ${item.name}`}
-            >
-              {lightboxPhotos.map((p, i) => (
-                <button
-                  key={p.url}
-                  type="button"
-                  role="listitem"
-                  onClick={() => setSelectedPhoto(i)}
-                  aria-pressed={i === selectedPhoto}
-                  className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-white cursor-pointer transition ${
-                    i === selectedPhoto
-                      ? "border-ink ring-1 ring-ink"
-                      : "hairline hover:border-ink/30"
-                  }`}
-                  aria-label={`Mostrar foto ${i + 1} de ${lightboxPhotos.length}`}
+              {/* Miniaturas legacy (multi-foto #125) */}
+              {lightboxPhotos.length > 1 && (
+                <div
+                  className="flex gap-2 overflow-x-auto pb-1"
+                  role="list"
+                  aria-label={`Más fotos de ${item.name}`}
                 >
-                  <img
-                    src={p.url}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-contain p-1"
-                  />
-                </button>
-              ))}
-            </div>
+                  {lightboxPhotos.map((p, i) => (
+                    <button
+                      key={p.url}
+                      type="button"
+                      role="listitem"
+                      onClick={() => setSelectedPhoto(i)}
+                      aria-pressed={i === selectedPhoto}
+                      className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-white cursor-pointer transition ${
+                        i === selectedPhoto
+                          ? "border-ink ring-1 ring-ink"
+                          : "hairline hover:border-ink/30"
+                      }`}
+                      aria-label={`Mostrar foto ${i + 1} de ${lightboxPhotos.length}`}
+                    >
+                      <img
+                        src={p.url}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-contain p-1"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {/* Precio + agregar (desktop — en la col visual) */}
@@ -552,7 +601,9 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             </section>
           )}
 
-          {item.videoUrl && <YouTubeEmbed url={item.videoUrl} />}
+          {extractYoutubeId(item.videoUrl) && (
+            <YouTubeEmbed videoId={extractYoutubeId(item.videoUrl)!} />
+          )}
 
           {/* Keywords — al final, son SEO más que UX */}
           {item.keywords && item.keywords.length > 0 && (
@@ -616,13 +667,15 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
         </div>
       </div>
 
-      <Lightbox
-        open={lightboxOpen}
-        onClose={() => setLightboxOpen(false)}
-        photos={lightboxPhotos}
-        index={selectedPhoto}
-        onIndexChange={setSelectedPhoto}
-      />
+      {!hasMediaAssets && (
+        <Lightbox
+          open={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          photos={lightboxPhotos}
+          index={selectedPhoto}
+          onIndexChange={setSelectedPhoto}
+        />
+      )}
     </article>
   );
 }
@@ -679,45 +732,6 @@ function FichaPillSection({ title, items }: { title: string; items: string[] }) 
             {it}
           </span>
         ))}
-      </div>
-    </section>
-  );
-}
-
-function YouTubeEmbed({ url }: { url: string }) {
-  const id = (() => {
-    try {
-      const u = new URL(url);
-      if (u.hostname === "youtu.be") return u.pathname.slice(1);
-      if (u.hostname.includes("youtube.com")) {
-        const v = u.searchParams.get("v");
-        if (v) return v;
-        const m = u.pathname.match(/\/(?:embed|shorts)\/([\w-]+)/);
-        if (m) return m[1];
-      }
-    } catch {
-      /* invalid url */
-    }
-    return null;
-  })();
-  if (!id) return null;
-  return (
-    <section className="space-y-2">
-      <h2 className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        Video demo
-      </h2>
-      <div
-        className="relative w-full overflow-hidden rounded-md border hairline"
-        style={{ aspectRatio: "16 / 9" }}
-      >
-        <iframe
-          src={`https://www.youtube.com/embed/${id}`}
-          title="Video demo"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          loading="lazy"
-          className="absolute inset-0 h-full w-full"
-        />
       </div>
     </section>
   );

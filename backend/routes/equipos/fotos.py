@@ -458,10 +458,7 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
 from services.media.security import _download_image_bytes, _validate_external_image_url
 from services.media.storage import delete_object as _delete_from_r2, put as _put_r2
 from services.media import (
-    DISPLAY_SQUARE,
-    DISPLAY_SQUARE_SM,
-    DISPLAY_SQUARE_THUMB,
-    OG_SQUARE_JPEG,
+    EQUIPO_DERIVE_SPECS,
     collect_asset_keys,
     purge_r2,
     store_upload,
@@ -533,7 +530,7 @@ def admin_upload_foto_from_url(
     with get_db() as conn:
         try:
             with media_http():
-                asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE, DISPLAY_SQUARE_SM, DISPLAY_SQUARE_THUMB, OG_SQUARE_JPEG], conn=conn)
+                asset = store_upload(raw_content, kind="equipo", derive_specs=EQUIPO_DERIVE_SPECS, conn=conn)
             display = asset.variant("display")
             _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
         except Exception:
@@ -578,7 +575,7 @@ async def admin_upload_foto_file(
     with get_db() as conn:
         try:
             with media_http():
-                asset = store_upload(raw_content, kind="equipo", derive_specs=[DISPLAY_SQUARE, DISPLAY_SQUARE_SM, DISPLAY_SQUARE_THUMB, OG_SQUARE_JPEG], conn=conn)
+                asset = store_upload(raw_content, kind="equipo", derive_specs=EQUIPO_DERIVE_SPECS, conn=conn)
             display = asset.variant("display")
             _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
         except Exception:
@@ -653,6 +650,58 @@ def _principal_thumb_url(conn, equipo_id: int) -> str | None:
     return v["url"] if v else None
 
 
+def _sync_principal_denorm(conn, equipo_id: int) -> None:
+    """Sincroniza TODAS las columnas denormalizadas de la foto principal del equipo.
+
+    Una sola UPDATE reemplaza los 3 sitios que antes actualizaban (url/sm/thumb) por separado.
+    No commitea — el caller lo hace.
+    """
+    row = conn.execute(
+        "SELECT url, media_id FROM equipo_fotos WHERE equipo_id = ? AND es_principal = TRUE LIMIT 1",
+        (equipo_id,),
+    ).fetchone()
+    if not row:
+        conn.execute(
+            "UPDATE equipos SET foto_url = NULL, foto_url_sm = NULL, foto_url_thumb = NULL, "
+            "foto_url_avif = NULL, foto_url_sm_avif = NULL, foto_url_thumb_avif = NULL, "
+            "foto_lqip = NULL WHERE id = ?",
+            (equipo_id,),
+        )
+        return
+
+    principal_url = row["url"]
+    media_id = row["media_id"]
+    sm = thumb = avif = sm_avif = thumb_avif = lqip = None
+
+    if media_id:
+        for v in conn.execute(
+            "SELECT name, url FROM media_variants WHERE asset_id = ? "
+            "AND name IN ('display-sm','display-thumb','display-avif','display-sm-avif','display-thumb-avif')",
+            (media_id,),
+        ).fetchall():
+            if v["name"] == "display-sm":
+                sm = v["url"]
+            elif v["name"] == "display-thumb":
+                thumb = v["url"]
+            elif v["name"] == "display-avif":
+                avif = v["url"]
+            elif v["name"] == "display-sm-avif":
+                sm_avif = v["url"]
+            elif v["name"] == "display-thumb-avif":
+                thumb_avif = v["url"]
+        lqip_row = conn.execute(
+            "SELECT lqip FROM media_assets WHERE id = ?", (media_id,)
+        ).fetchone()
+        lqip = lqip_row["lqip"] if lqip_row else None
+
+    conn.execute(
+        "UPDATE equipos SET foto_url = ?, foto_url_sm = ?, foto_url_thumb = ?, "
+        "foto_url_avif = ?, foto_url_sm_avif = ?, foto_url_thumb_avif = ?, foto_lqip = ? "
+        "WHERE id = ?",
+        (principal_url, sm, thumb, avif, sm_avif, thumb_avif, lqip, equipo_id),
+    )
+
+
 def _insert_equipo_foto(conn, equipo_id: int, url: str, path: str, media_id: int | None = None) -> dict:
     """Inserta una fila en equipo_fotos y sincroniza equipos.foto_url con la principal.
     La primera foto del equipo se marca como principal automáticamente.
@@ -673,12 +722,7 @@ def _insert_equipo_foto(conn, equipo_id: int, url: str, path: str, media_id: int
     )
 
     if is_first:
-        sm = _principal_sm_url(conn, equipo_id)
-        thumb = _principal_thumb_url(conn, equipo_id)
-        conn.execute(
-            "UPDATE equipos SET foto_url = ?, foto_url_sm = ?, foto_url_thumb = ? WHERE id = ?",
-            (url, sm, thumb, equipo_id),
-        )
+        _sync_principal_denorm(conn, equipo_id)
 
     conn.commit()
 
@@ -731,7 +775,7 @@ async def upload_equipo_foto(equipo_id: int, request: Request):
             if not eq:
                 raise HTTPException(404, "Equipo no encontrado")
             with media_http():
-                asset = store_upload(raw, kind="equipo", derive_specs=[DISPLAY_SQUARE, DISPLAY_SQUARE_SM, DISPLAY_SQUARE_THUMB, OG_SQUARE_JPEG], conn=conn)
+                asset = store_upload(raw, kind="equipo", derive_specs=EQUIPO_DERIVE_SPECS, conn=conn)
             display = asset.variant("display")
             foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
         except Exception:
@@ -768,7 +812,7 @@ def upload_equipo_foto_from_url(equipo_id: int, body: EquipoFotoFromUrlBody, req
             if not eq:
                 raise HTTPException(404, "Equipo no encontrado")
             with media_http():
-                asset = store_upload(raw, kind="equipo", derive_specs=[DISPLAY_SQUARE, DISPLAY_SQUARE_SM, DISPLAY_SQUARE_THUMB, OG_SQUARE_JPEG], conn=conn)
+                asset = store_upload(raw, kind="equipo", derive_specs=EQUIPO_DERIVE_SPECS, conn=conn)
             display = asset.variant("display")
             foto = _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
         except Exception:
@@ -814,17 +858,7 @@ def delete_equipo_foto(equipo_id: int, foto_id: int, request: Request):
                 conn.execute(
                     "UPDATE equipo_fotos SET es_principal = TRUE WHERE id = ?", (next_foto["id"],)
                 )
-                sm = _principal_sm_url(conn, equipo_id)
-                thumb = _principal_thumb_url(conn, equipo_id)
-                conn.execute(
-                    "UPDATE equipos SET foto_url = ?, foto_url_sm = ?, foto_url_thumb = ? WHERE id = ?",
-                    (next_foto["url"], sm, thumb, equipo_id),
-                )
-            else:
-                conn.execute(
-                    "UPDATE equipos SET foto_url = NULL, foto_url_sm = NULL, foto_url_thumb = NULL WHERE id = ?",
-                    (equipo_id,),
-                )
+            _sync_principal_denorm(conn, equipo_id)
 
         conn.commit()
 
@@ -866,12 +900,7 @@ def reorder_equipo_fotos(equipo_id: int, body: EquipoFotoReorderBody, request: R
                     principal_url = row["url"]
 
         if principal_url is not None:
-            sm = _principal_sm_url(conn, equipo_id)
-            thumb = _principal_thumb_url(conn, equipo_id)
-            conn.execute(
-                "UPDATE equipos SET foto_url = ?, foto_url_sm = ?, foto_url_thumb = ? WHERE id = ?",
-                (principal_url, sm, thumb, equipo_id),
-            )
+            _sync_principal_denorm(conn, equipo_id)
 
         conn.commit()
         fotos = _get_equipo_fotos(conn, equipo_id)

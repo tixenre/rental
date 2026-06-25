@@ -103,6 +103,7 @@ const items: NavItem[] = [
   { title: "Marca", url: "/admin/marca", icon: Megaphone },
   { title: "Novedades", url: "/admin/novedades", icon: Sparkles },
   { title: "Datos y backups", url: "/admin/dataio", icon: HardDriveDownload },
+  { title: "Media", url: "/admin/media", icon: Database },
   { title: "Settings", url: "/admin/settings", icon: Settings },
   { title: "Errores del servidor", url: "/admin/errores", icon: AlertTriangle },
 ];

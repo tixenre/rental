@@ -71,7 +71,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
         SELECT pi.*, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
                {MARCA_SUBQUERY},
                e.modelo, e.serie, e.valor_reposicion,
-               e.foto_url, e.cantidad AS stock_total,
+               e.foto_url, e.foto_url_sm, e.foto_url_thumb, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo,
                ef.contenido_incluido_json
         FROM alquiler_items pi
@@ -95,7 +95,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
         return items
     placeholders = ",".join("?" for _ in equipo_ids)
     comp_rows = conn.execute(f"""
-        SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.cantidad AS stock_total,
+        SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.foto_url_sm, ec.foto_url_thumb, ec.cantidad AS stock_total,
                ec.modelo, ec.serie, ec.valor_reposicion,
                ec.nombre_publico, ec.nombre_publico_largo
         FROM kit_componentes kc
@@ -162,7 +162,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
         SELECT pi.*, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
                {MARCA_SUBQUERY},
                e.modelo, e.serie, e.valor_reposicion,
-               e.foto_url, e.cantidad AS stock_total,
+               e.foto_url, e.foto_url_sm, e.foto_url_thumb, e.cantidad AS stock_total,
                e.nombre_publico, e.nombre_publico_largo
         FROM alquiler_items pi
         LEFT JOIN equipos e ON e.id = pi.equipo_id
@@ -178,7 +178,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     if equipo_ids:
         cph = ",".join(["?"] * len(equipo_ids))
         comp_rows = conn.execute(f"""
-            SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.cantidad AS stock_total,
+            SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.foto_url_sm, ec.foto_url_thumb, ec.cantidad AS stock_total,
                    ec.modelo, ec.serie, ec.valor_reposicion,
                    ec.nombre_publico, ec.nombre_publico_largo
             FROM kit_componentes kc

@@ -26,3 +26,29 @@ DISPLAY_SQUARE_THUMB = DeriveSpec(name="display-thumb", square=True, max_width=1
 # pero en JPEG (WhatsApp no renderiza webp de forma confiable). Se inyecta en
 # og:image. La web sigue usando `display` (webp) — esto es solo para crawlers.
 OG_SQUARE_JPEG = DeriveSpec(name="og", square=True, fmt="jpeg")
+
+# ── Variantes AVIF (F0g) ────────────────────────────────────────────────────
+# AVIF: ~20-30% menos bytes que WebP a igual calidad visual.
+# Se derivan junto con sus contrapartes WebP; el browser elige vía
+# <picture><source type="image/avif">. Si el codec falla en runtime,
+# _optimize_image hace fallback a WebP silenciosamente.
+
+DISPLAY_SQUARE_AVIF = DeriveSpec(name="display-avif", square=True, fmt="avif")
+DISPLAY_SQUARE_SM_AVIF = DeriveSpec(name="display-sm-avif", square=True, fmt="avif", max_width=600)
+DISPLAY_SQUARE_THUMB_AVIF = DeriveSpec(name="display-thumb-avif", square=True, fmt="avif", max_width=160)
+DISPLAY_KEEP_ASPECT_AVIF = DeriveSpec(name="display-avif", square=False, fmt="avif")
+DISPLAY_KEEP_ASPECT_SM_AVIF = DeriveSpec(name="display-sm-avif", square=False, fmt="avif", max_width=800)
+
+# ── Conjunto canónico de variantes de una foto de equipo ─────────────────────
+# Fuente única que usan TODOS los uploads de equipo (admin multipart + from-url +
+# galería) y la reingesta de fotos legacy (Tier B/C). Incluye webp (display/sm/thumb),
+# AVIF (display/sm/thumb) y la variante OG en JPEG para crawlers.
+EQUIPO_DERIVE_SPECS = [
+    DISPLAY_SQUARE,
+    DISPLAY_SQUARE_SM,
+    DISPLAY_SQUARE_THUMB,
+    DISPLAY_SQUARE_AVIF,
+    DISPLAY_SQUARE_SM_AVIF,
+    DISPLAY_SQUARE_THUMB_AVIF,
+    OG_SQUARE_JPEG,
+]

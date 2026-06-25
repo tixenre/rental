@@ -1,23 +1,34 @@
 import "./styles.css";
-import * as Sentry from "@sentry/react";
 import { RouterProvider } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ReactDOM from "react-dom/client";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
-import { initGA, trackPageView } from "./lib/analytics";
-import { apiGetAnalyticsConfig } from "./lib/api";
+import { initGA, trackPageView, initWebVitals } from "./lib/analytics";
+import { apiGetAnalyticsConfig, type BackendEquipo } from "./lib/api";
+import { backendToEquipment } from "./hooks/useEquipos";
 
-// Solo activo si VITE_SENTRY_DSN está seteado — dev/CI no lo necesitan.
+// Sentry diferido: se carga tras la primera interacción del usuario, no en el
+// bundle inicial. Sentry no envuelve el router, por lo que diferirlo es seguro
+// (solo pierde errores que ocurren antes del primer click/tecla, un caso raro
+// y preferible al costo de parsear ~100KB extra en el critical path).
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 if (SENTRY_DSN) {
-  Sentry.init({
-    dsn: SENTRY_DSN,
-    environment: import.meta.env.MODE,
-    integrations: [Sentry.browserTracingIntegration()],
-    tracesSampleRate: 0.1,
-    sendDefaultPii: false,
-  });
+  const initSentry = () => {
+    window.removeEventListener("pointerdown", initSentry);
+    window.removeEventListener("keydown", initSentry);
+    import("@sentry/react").then(({ init, browserTracingIntegration }) => {
+      init({
+        dsn: SENTRY_DSN,
+        environment: import.meta.env.MODE,
+        integrations: [browserTracingIntegration()],
+        tracesSampleRate: 0.1,
+        sendDefaultPii: false,
+      });
+    });
+  };
+  window.addEventListener("pointerdown", initSentry, { once: true });
+  window.addEventListener("keydown", initSentry, { once: true });
 }
 
 const queryClient = new QueryClient({
@@ -38,6 +49,38 @@ const queryClient = new QueryClient({
   },
 });
 
+// Hydrate React Query desde el catálogo inlineado por el backend en /rental.
+// El handler Python inyecta <script id="__INITIAL__" type="application/json">
+// con {equipos, categorias} → primer render sin round-trip a Miami.
+// Mismo queryKey que useEquipos/useCategorias → RQ usa este dato y lo revalida
+// con staleTime normal (30s). Si el elemento no existe o el parse falla, RQ
+// fetchea normalmente (sin degradación).
+try {
+  const el = document.getElementById("__INITIAL__");
+  if (el?.textContent) {
+    const seed = JSON.parse(el.textContent) as {
+      equipos?: { total: number; items: BackendEquipo[] };
+      categorias?: unknown[];
+      estudio?: unknown;
+    };
+    if (Array.isArray(seed.equipos?.items)) {
+      const items = seed.equipos.items.map(backendToEquipment);
+      queryClient.setQueryData(["equipos", undefined, undefined], {
+        items,
+        usingFallback: false,
+      });
+    }
+    if (Array.isArray(seed.categorias)) {
+      queryClient.setQueryData(["categorias"], seed.categorias);
+    }
+    if (seed.estudio) {
+      queryClient.setQueryData(["estudio-fotos"], seed.estudio);
+    }
+  }
+} catch {
+  // no-op: React Query fetchea normalmente
+}
+
 const router = createRouter({
   routeTree,
   context: { queryClient },
@@ -46,6 +89,9 @@ const router = createRouter({
   // Sin esto, back vuelve al top — UX horrible en mobile listando muchos
   // equipos. Default scroll-to-top en navegaciones forward.
   scrollRestoration: true,
+  // Precarga los datos + chunks de la ruta en hover/intent → navegaciones
+  // percibidas como casi instantáneas (catálogo → ficha, etc.).
+  defaultPreload: "intent",
 });
 
 // Google Analytics 4.
@@ -57,6 +103,7 @@ const router = createRouter({
 // (área privada). El pageview SPA se manda en cada navegación resuelta.
 function startAnalytics(measurementId: string) {
   initGA(measurementId);
+  initWebVitals(); // RUM: LCP/CLS/INP/FCP/TTFB → GA4 evento "web_vitals"
   const sendPageView = () => {
     const path = router.state.location.pathname;
     if (path.startsWith("/admin") || path.startsWith("/cliente")) return;

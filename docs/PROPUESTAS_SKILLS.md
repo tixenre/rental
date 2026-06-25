@@ -16,4 +16,8 @@ sin actividad que bloquean la vista real de la cola activa; el criterio es claro
 del dueño.
 -->
 
-_(Por ahora vacío — las propuestas se irán acumulando acá con el uso del skill `cola` y los demás.)_
+2026-06-24 · cola · La nota de "Herramientas" dice "acá **no hay `gh` CLI** → todo por `mcp__github__*`",
+pero en la app de Mac (esta sesión) el `gh` CLI **sí está disponible y funciona** (creé el tracker #1029,
+listé labels, todo con `gh`). Proponer: cambiar la nota a "usá `gh` CLI cuando esté disponible (app de
+Mac/terminal); caé a `mcp__github__*` solo si no lo está" · Por qué: la nota actual desorienta — manda a
+usar MCP cuando `gh` es más directo y ya funciona; primer uso real del skill lo destapó.

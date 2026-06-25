@@ -116,6 +116,17 @@ def _init_db_schema(conn):
     # front-office. NULL = sin specs asignadas.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS categoria_specs TEXT")
 
+    # Migration: variantes AVIF + LQIP denormalizadas de la foto principal (perf
+    # del catálogo). Acompañan a foto_url/foto_url_sm/foto_url_thumb: el front sirve
+    # <picture> con AVIF (~20-30% menos bytes que webp) + blur-up LQIP sin inflar el
+    # payload del listado (127 equipos × ~250 bytes). Todas nullable: legacy = NULL
+    # → fallback seguro a la variante webp. Por ahora quedan vacías: las puebla un
+    # PR posterior (ingesta/sync de la foto principal); mientras tanto la web usa webp.
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS foto_url_avif TEXT")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS foto_url_sm_avif TEXT")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS foto_url_thumb_avif TEXT")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS foto_lqip TEXT")
+
     # Migration: URL pública del HTML de producto guardado (B&H Webpage Complete).
     # Permite re-extraer specs en el futuro sin volver a pedir el HTML al dueño.
     # Mismo patrón que foto_url — almacena URL pública R2, blob en equipos/{id}/source.html.
@@ -159,6 +170,7 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ingreso_total_ars BIGINT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ranking_actualizado TIMESTAMP")
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS destacada BOOLEAN NOT NULL DEFAULT FALSE")
+    conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS logo_url_sm TEXT")
 
     # FK a marcas. brand_id es la fuente única del nombre de marca
     # (vía marcas.nombre). El backfill desde la columna legacy `marca` y su
@@ -437,6 +449,7 @@ def _init_db_schema(conn):
         CREATE INDEX IF NOT EXISTS idx_cat_parent ON categorias(parent_id, prioridad, nombre)
     """)
     # Ranking automático de categorías (#131). Mismo concepto que equipos.
+    conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS total INT DEFAULT 0")
     conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS popularidad_score INT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS cant_pedidos INT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE categorias ADD COLUMN IF NOT EXISTS ingreso_total_ars BIGINT NOT NULL DEFAULT 0")
@@ -1205,6 +1218,7 @@ def _init_db_schema(conn):
     # A1 #635: tipo de producto (simple/kit/combo). DEFAULT 'simple'; el backfill
     # (kits con componentes → 'kit') y el CHECK viven en la migración a1c3b5f7e9d2.
     conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'simple'")
+    conn.execute("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS destacado BOOLEAN DEFAULT FALSE")
     conn.execute("""
         DO $$
         BEGIN
@@ -1494,10 +1508,22 @@ def _init_db_schema(conn):
             width        INTEGER,
             height       INTEGER,
             bytes        INTEGER,
+            content_hash TEXT,
             created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    conn.execute("""
+        ALTER TABLE media_assets
+        ADD COLUMN IF NOT EXISTS content_hash TEXT
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_media_assets_kind_hash
+        ON media_assets(kind, content_hash)
+        WHERE content_hash IS NOT NULL
+    """)
+    conn.execute("ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS lqip TEXT")
+    conn.execute("ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ready'")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS media_variants (
             id           BIGSERIAL PRIMARY KEY,
@@ -1520,6 +1546,8 @@ def _init_db_schema(conn):
     """)
     conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
     conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS url_sm TEXT")
+    conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS url_avif TEXT")
+    conn.execute("ALTER TABLE estudio_fotos ADD COLUMN IF NOT EXISTS url_sm_avif TEXT")
 
     # ── Galería multi-foto de equipos (F2 — k1l2m3n4o5p6) ───────────────────────
     conn.execute("""
@@ -1592,6 +1620,8 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_foto_url TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS numero_edicion INTEGER NOT NULL DEFAULT 1")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS proxima_edicion_slug TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS comprobante_key TEXT")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
     import json as _json_t
     _programa_teorica = _json_t.dumps([
         "Qué es la dirección de arte y cuál es su función dentro de un proyecto",

@@ -6,8 +6,11 @@ import { Calendar, MapPin, Users, CheckCircle2, Clock, X } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { Logo } from "@/components/rental/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
+import { ResponsiveImage } from "@/components/common/ResponsiveImage";
 import { apiGetTaller, type EdicionLite, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
+import { useEntityMedia } from "@/hooks/useEntityMedia";
+import { findVariant } from "@/lib/media/types";
 
 export const Route = createLazyFileRoute("/workshops/$slug")({
   component: TallerLandingPage,
@@ -134,8 +137,14 @@ function TallerLandingPage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Hook antes del early-return (regla de hooks de React)
+  // Hooks antes del early-return (regla de hooks de React)
   const [soldOutModalDismissed, setSoldOutModalDismissed] = useState(false);
+  const tallerId = taller?.id ?? null;
+  const { data: instructorMedia } = useEntityMedia("instructor", tallerId);
+  const instructorAsset = instructorMedia[0] ?? null;
+  const instructorVariant = instructorAsset
+    ? findVariant(instructorAsset.variants, "display")
+    : null;
 
   if (isLoading) {
     return (
@@ -314,13 +323,22 @@ function TallerLandingPage() {
                     Sobre
                   </p>
                   <div className="flex items-start gap-5 mb-5">
-                    {taller.instructor_foto_url && (
-                      <img
-                        src={taller.instructor_foto_url}
-                        alt={taller.instructor_nombre}
-                        className="shrink-0 w-20 h-20 rounded-full object-cover object-top border border-border/40"
-                      />
-                    )}
+                    {(instructorVariant || taller.instructor_foto_url) &&
+                      (instructorAsset && instructorAsset.variants.length > 0 ? (
+                        <ResponsiveImage
+                          variants={instructorAsset.variants}
+                          alt={taller.instructor_nombre}
+                          lqip={instructorAsset.lqip}
+                          className="shrink-0 w-20 h-20 rounded-full object-cover object-top border border-border/40"
+                          sizes="80px"
+                        />
+                      ) : (
+                        <img
+                          src={taller.instructor_foto_url}
+                          alt={taller.instructor_nombre}
+                          className="shrink-0 w-20 h-20 rounded-full object-cover object-top border border-border/40"
+                        />
+                      ))}
                     <h2
                       className="font-display font-black lowercase leading-[0.9] tracking-[-0.02em] text-ink self-center"
                       style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}

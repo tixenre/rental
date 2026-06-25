@@ -6,10 +6,6 @@
  * `estudio_fotos`, servidas por `/api/estudio`). Misma fuente que la página
  * `/estudio` y que las fotos de equipos: nada de paths estáticos paralelos.
  *
- * Las fotos llegan ordenadas por `orden` (la principal primero). Si la API no
- * devuelve nada todavía (carga inicial / error de red), cae al fallback
- * estático commiteado en el repo, así el hero nunca queda en negro.
- *
  * `urlSm` es la variante 800px (keep-aspect) para srcset. NULL = foto subida
  * antes del backfill → el componente cae a `url` sin srcset (cero rotura).
  */
@@ -19,36 +15,31 @@ import { apiGetEstudio } from "@/lib/api";
 export interface HeroPhoto {
   url: string;
   urlSm?: string;
+  urlAvif?: string;
+  urlSmAvif?: string;
 }
-
-// Fallback: archivos estáticos en public/estudio/. Solo se usan si R2 no
-// responde. La fuente real son las fotos del admin (R2). WebP optimizados
-// (1600px, ~75KB c/u) en vez de los JPG crudos de ~2MB: el fallback se
-// renderiza eager mientras responde /api/estudio y, sin optimizar, saturaba
-// el ancho de banda en 4G lento demorando la imagen LCP real.
-const HERO_PHOTOS_FALLBACK: HeroPhoto[] = [
-  { url: "/estudio/Rambla_Estudio_S7V9470.webp" },
-  { url: "/estudio/Rambla_Estudio_S7V9483.webp" },
-  { url: "/estudio/Rambla_Estudio_S7V9510-HDR-Edit.webp" },
-  { url: "/estudio/Rambla_Estudio_S7V9519-HDR.webp" },
-];
 
 // Cuántas fotos rota el hero como máximo (las primeras según `orden`).
 const HERO_MAX = 5;
 
-/** Devuelve las fotos del hero: R2 (admin) si hay, fallback si no. */
+/** Devuelve las fotos del hero desde R2 (admin). Vacío mientras carga. */
 export function useHeroPhotos(): HeroPhoto[] {
   const { data } = useQuery({
-    queryKey: ["estudio"],
+    queryKey: ["estudio-fotos"],
     queryFn: apiGetEstudio,
     staleTime: 5 * 60 * 1000,
   });
 
   const fotos = data?.fotos ?? [];
-  if (fotos.length === 0) return HERO_PHOTOS_FALLBACK;
+  if (fotos.length === 0) return [];
 
   return [...fotos]
     .sort((a, b) => Number(b.es_principal) - Number(a.es_principal) || a.orden - b.orden)
     .slice(0, HERO_MAX)
-    .map((f) => ({ url: f.url, urlSm: f.url_sm ?? undefined }));
+    .map((f) => ({
+      url: f.url,
+      urlSm: f.url_sm ?? undefined,
+      urlAvif: f.url_avif ?? undefined,
+      urlSmAvif: f.url_sm_avif ?? undefined,
+    }));
 }
