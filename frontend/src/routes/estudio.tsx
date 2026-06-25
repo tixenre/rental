@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { SITE_URL } from "@/lib/site";
 
-const ESTUDIO_IMG = `${SITE_URL}/estudio/Rambla_Estudio_S7V9519-HDR.jpg`;
+// Fallback para clientes JS — los crawlers reciben el OG real de R2 vía F5 (backend).
+const ESTUDIO_IMG = `${SITE_URL}/og-image.png`;
 
 export const Route = createFileRoute("/estudio")({
   head: () => ({
