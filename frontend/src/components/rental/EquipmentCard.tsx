@@ -70,7 +70,11 @@ export function EquipmentCard({
   const nombrePublico = item.name;
   const avifSrcSet = buildAvifSrcSet(item.fotoUrlAvif, item.fotoUrlSmAvif, item.fotoUrlThumbAvif);
   const blurStyle = item.fotoLqip
-    ? { backgroundImage: `url("${item.fotoLqip}")`, backgroundSize: "cover", backgroundPosition: "center" }
+    ? {
+        backgroundImage: `url("${item.fotoLqip}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
     : undefined;
 
   const handleAdd = (e: MouseEvent<HTMLButtonElement>) => {

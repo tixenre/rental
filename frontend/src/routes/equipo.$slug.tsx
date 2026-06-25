@@ -308,12 +308,14 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const heroAvifSrcSet = isMainHero
     ? buildAvifSrcSet(item.fotoUrlAvif, item.fotoUrlSmAvif)
     : undefined;
-  const heroWebpSrcSet = isMainHero
-    ? buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm)
-    : undefined;
+  const heroWebpSrcSet = isMainHero ? buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm) : undefined;
   const heroBlurStyle =
     isMainHero && item.fotoLqip
-      ? { backgroundImage: `url("${item.fotoLqip}")`, backgroundSize: "cover", backgroundPosition: "center" }
+      ? {
+          backgroundImage: `url("${item.fotoLqip}")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }
       : undefined;
 
   const DESC_LIMIT = 320;

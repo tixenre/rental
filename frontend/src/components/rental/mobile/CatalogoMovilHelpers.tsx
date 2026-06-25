@@ -266,9 +266,7 @@ function CartItem({
       <div className="w-11 h-11 rounded-lg bg-surface border border-hairline flex items-center justify-center text-muted-foreground shrink-0 overflow-hidden">
         {eq.fotoUrl && !imgFailed ? (
           <picture>
-            {cartAvifSrcSet && (
-              <source type="image/avif" srcSet={cartAvifSrcSet} sizes="44px" />
-            )}
+            {cartAvifSrcSet && <source type="image/avif" srcSet={cartAvifSrcSet} sizes="44px" />}
             <img
               src={eq.fotoUrl}
               srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}
@@ -715,7 +713,11 @@ export function FichaSheet({
   const [imgFailed, setImgFailed] = useState(false);
   const fichaAvifSrcSet = buildAvifSrcSet(eq.fotoUrlAvif, eq.fotoUrlSmAvif);
   const fichaBlurStyle = eq.fotoLqip
-    ? { backgroundImage: `url("${eq.fotoLqip}")`, backgroundSize: "cover", backgroundPosition: "center" }
+    ? {
+        backgroundImage: `url("${eq.fotoLqip}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
     : undefined;
   const specsText = eq.specs.map((s) => `${s.label}: ${s.value}`).join(" · ");
 
@@ -957,9 +959,7 @@ export function EquipmentRow({
           <div className="flex aspect-square w-12 items-center justify-center overflow-hidden rounded-md bg-white text-muted-foreground">
             {eq.fotoUrl && !imgFailed ? (
               <picture>
-                {rowAvifSrcSet && (
-                  <source type="image/avif" srcSet={rowAvifSrcSet} sizes="48px" />
-                )}
+                {rowAvifSrcSet && <source type="image/avif" srcSet={rowAvifSrcSet} sizes="48px" />}
                 <img
                   src={eq.fotoUrl}
                   srcSet={buildFotoSrcSet(eq.fotoUrl, eq.fotoUrlSm, eq.fotoUrlThumb)}

@@ -64,7 +64,11 @@ export function EquipmentRow({
   const nombrePublico = item.name;
   const avifSrcSet = buildAvifSrcSet(item.fotoUrlAvif, item.fotoUrlSmAvif, item.fotoUrlThumbAvif);
   const blurStyle = item.fotoLqip
-    ? { backgroundImage: `url("${item.fotoLqip}")`, backgroundSize: "cover", backgroundPosition: "center" }
+    ? {
+        backgroundImage: `url("${item.fotoLqip}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
     : undefined;
 
   // Quick facts para el expand: specs_destacados del template si las hay, si no
@@ -107,13 +111,7 @@ export function EquipmentRow({
           >
             {item.fotoUrl && !imgFailed ? (
               <picture>
-                {avifSrcSet && (
-                  <source
-                    type="image/avif"
-                    srcSet={avifSrcSet}
-                    sizes="52px"
-                  />
-                )}
+                {avifSrcSet && <source type="image/avif" srcSet={avifSrcSet} sizes="52px" />}
                 <img
                   src={item.fotoUrl}
                   srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm, item.fotoUrlThumb)}
