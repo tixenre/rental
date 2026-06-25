@@ -537,7 +537,7 @@ def _inject_hero_preload(html_text: str, image: str, image_sm: str | None = None
     tags = ""
     if origin.startswith("http"):
         esc_origin = _html.escape(origin, quote=True)
-        tags += f'<link rel="preconnect" href="{esc_origin}" crossorigin>'
+        tags += f'<link rel="preconnect" href="{esc_origin}">'
     if image_sm:
         esc_sm = _html.escape(image_sm, quote=True)
         tags += (
