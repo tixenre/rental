@@ -44,7 +44,7 @@ import { buildCategoriaSlug } from "@/lib/categoria-slug";
 import { SITE_URL } from "@/lib/site";
 import { shareEquipo } from "@/lib/share";
 import { type Equipment } from "@/data/equipment";
-import { buildAvifSrcSet, buildFotoSrcSet } from "@/lib/srcset";
+import { EquipoFoto } from "@/components/rental/EquipoFoto";
 
 async function fetchEquipo(id: string): Promise<Equipment | null> {
   const res = await fetch(`/api/equipos/${id}`);
@@ -302,21 +302,11 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
   const heroUrl =
     lightboxPhotos[selectedPhoto]?.url ?? lightboxPhotos[0]?.url ?? item.fotoUrl ?? null;
 
-  // AVIF + blur-up solo cuando el hero muestra la foto principal (la única que
-  // tiene columnas denormalizadas AVIF/LQIP en el payload).
+  // AVIF + blur-up solo cuando el hero muestra la foto principal (la única con
+  // columnas denorm AVIF/LQIP en el payload). Para una foto secundaria de la galería
+  // pasamos solo {fotoUrl} → EquipoFoto cae a <img> plano sin srcset ni blur, igual
+  // que antes. (Las secundarias se resuelven en #1056 vía MediaGallery/backfill.)
   const isMainHero = heroUrl === item.fotoUrl;
-  const heroAvifSrcSet = isMainHero
-    ? buildAvifSrcSet(item.fotoUrlAvif, item.fotoUrlSmAvif)
-    : undefined;
-  const heroWebpSrcSet = isMainHero ? buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm) : undefined;
-  const heroBlurStyle =
-    isMainHero && item.fotoLqip
-      ? {
-          backgroundImage: `url("${item.fotoLqip}")`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }
-      : undefined;
 
   const DESC_LIMIT = 320;
   const desc = item.description ?? "";
@@ -479,26 +469,17 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
               >
                 {heroUrl ? (
                   <>
-                    <picture>
-                      {heroAvifSrcSet && (
-                        <source
-                          type="image/avif"
-                          srcSet={heroAvifSrcSet}
-                          sizes="(max-width: 768px) 100vw, 600px"
-                        />
-                      )}
-                      <img
-                        src={heroUrl}
-                        srcSet={heroWebpSrcSet}
-                        sizes={heroWebpSrcSet ? "(max-width: 768px) 100vw, 600px" : undefined}
-                        alt={item.name}
-                        loading="eager"
-                        decoding="async"
-                        fetchPriority="high"
-                        style={heroBlurStyle}
-                        className="h-full w-full object-contain p-4 transition group-hover:scale-[1.01]"
-                      />
-                    </picture>
+                    <EquipoFoto
+                      foto={isMainHero ? item : { fotoUrl: heroUrl }}
+                      blur={isMainHero}
+                      alt={item.name}
+                      sizes="(max-width: 768px) 100vw, 600px"
+                      loading="eager"
+                      decoding="async"
+                      fetchPriority="high"
+                      className="h-full w-full object-contain p-4 transition group-hover:scale-[1.01]"
+                      fallback={<EmptyImage category={item.category} brand={item.brand} />}
+                    />
                     <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-ink/70 text-white text-2xs font-medium px-2 py-1 opacity-0 group-hover:opacity-100 transition pointer-events-none">
                       <Maximize2 className="h-3 w-3" /> Ampliar
                     </span>
