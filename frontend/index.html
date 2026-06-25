@@ -66,11 +66,12 @@
     <!-- Color del tema para barra del navegador en mobile. -->
     <meta name="theme-color" content="#fbbf24" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- JetBrains Mono asíncrona: no bloquea el render (est. -320ms en slow 4G). -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" /></noscript>
+    <!-- Fuentes críticas: Champ Black (H1/display) + TT Commons 400 (body) + JetBrains Mono 400 (precios).
+         Self-hosted woff2 subseteados (~16-18KB c/u), servidos desde /public/fonts/ (URL estable, sin
+         hash de Vite → el browser deduplica preload + @font-face). `crossorigin` obligatorio para CORS. -->
+    <link rel="preload" href="/fonts/woff2/champ-black-900.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/woff2/tt-commons-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/woff2/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>
