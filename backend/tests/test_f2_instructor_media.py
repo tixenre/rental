@@ -163,6 +163,15 @@ def test_instructor_handler_fallback_sin_media_id():
     assert assets[0]["variants"][0]["url"] == "https://cdn/legacy.jpg"
 
 
+def test_instructor_handler_sin_foto_devuelve_vacio():
+    """_get_instructor_media devuelve [] cuando no hay media_id ni url."""
+    from routes.media_api import _get_instructor_media
+
+    conn = _make_conn_instructor(4, "", None)
+    result = _get_instructor_media(conn, 4)
+    assert result == []
+
+
 def test_kind_instructor_en_handler_map():
     """'instructor' debe estar en _KIND_HANDLERS de media_api."""
     from routes.media_api import _KIND_HANDLERS

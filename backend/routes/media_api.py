@@ -103,7 +103,11 @@ def _get_estudio_media(conn, entity_id: int) -> list[dict]:
 
 
 def _get_instructor_media(conn, entity_id: int) -> list[dict]:
-    """Foto del instructor de un taller. entity_id = taller_id."""
+    """Foto del instructor de un taller. entity_id = taller_id.
+
+    Nota: el campo 'id' del asset devuelto es el taller_id (no un id de tabla de
+    fotos como en equipo/estudio). El frontend no opera sobre ese campo.
+    """
     row = conn.execute(
         "SELECT id, instructor_foto_url, instructor_media_id FROM talleres WHERE id = ?",
         (entity_id,),
@@ -117,6 +121,8 @@ def _get_instructor_media(conn, entity_id: int) -> list[dict]:
         url = row["instructor_foto_url"] or ""
     except (KeyError, IndexError):
         pass
+    if not media_id and not url:
+        return []
     adapted = {"id": row["id"], "media_id": media_id, "orden": 0, "es_principal": True, "url": url}
     return [_build_asset(conn, adapted)]
 
