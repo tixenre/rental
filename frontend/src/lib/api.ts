@@ -69,6 +69,8 @@ export type BackendMarca = {
   id: number;
   nombre: string;
   logo_url?: string | null;
+  /** Variante display-sm (800px max) para srcset. Solo en logos raster del motor. */
+  logo_url_sm?: string | null;
   /** Curación manual del admin para BrandCarousel del home. #288 */
   destacada?: boolean;
   /** Orden manual del admin (drag-drop en /admin/equipos/marcas). */

@@ -2,6 +2,8 @@ export interface Brand {
   id: number;
   nombre: string;
   logo_url?: string | null;
+  /** Variante display-sm (800px max) para srcset. Solo presente en logos raster subidos al motor. */
+  logo_url_sm?: string | null;
   /** Si true, el frontend público destaca esta marca en el BrandCarousel del home. #288 */
   destacada?: boolean;
   /** Orden manual del admin (ASC). Determina el orden del BrandCarousel
