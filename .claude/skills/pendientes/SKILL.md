@@ -1,12 +1,12 @@
 ---
-name: cola
-description: El go-to para ADMINISTRAR LA COLA — issues, feature-requests, backlog y brain-dumps del dueño — sin que se desfase ni se pierda el hilo. Es el loop liviano y frecuente que mantiene la cola espejando el código real. Úsalo cuando el dueño diga "ordená los issues", "cómo está la cola", "qué hay pendiente", "triageá", "cerrá lo que ya está hecho", "etiquetá los issues", "consolidá los trackers", "metelo a la cola", "anotá esto", o cuando le pases un brain-dump de ideas/pedidos. El corazón es la RECONCILIACIÓN analítica (cruzar issues abiertos contra commits/PRs shippeados para cazar "hecho-pero-abierto") + el TRIAGE con evidencia + el reporte de salud "¿cómo está la cola?". NO es para auditar/limpiar el código (eso es `mantenimiento`), ni para cazar fallas a fondo (`auditoria-profunda`), ni para pulir el front (`pulido-frontend`). Este skill SOLO administra la cola: reconcilia, triagea, etiqueta, deduplica y reporta — el dueño dirige, la sesión recomienda.
+name: pendientes
+description: El go-to para ADMINISTRAR LA COLA DE PENDIENTES — issues, feature-requests, backlog y brain-dumps del dueño — sin que se desfase ni se pierda el hilo. Es el loop liviano y frecuente que mantiene la cola espejando el código real. Úsalo cuando el dueño diga "ordená los issues", "cómo están los pendientes / la cola", "qué hay pendiente", "triageá", "cerrá lo que ya está hecho", "etiquetá los issues", "consolidá los trackers", "metelo a la cola", "anotá esto", o cuando le pases un brain-dump de ideas/pedidos. El corazón es la RECONCILIACIÓN analítica (cruzar issues abiertos contra commits/PRs shippeados para cazar "hecho-pero-abierto") + el TRIAGE con evidencia + el reporte de salud "¿cómo están los pendientes?". NO es para auditar/limpiar el código (eso es `mantenimiento`), ni para cazar fallas a fondo (`auditoria-profunda`), ni para pulir el front (`pulido-frontend`). Este skill SOLO administra la cola de pendientes: reconcilia, triagea, etiqueta, deduplica y reporta — el dueño dirige, la sesión recomienda.
 model: sonnet
-last-reviewed: 2026-06-23
-version: 1.0
+last-reviewed: 2026-06-25
+version: 1.1
 ---
 
-# cola — administrar la cola sin que se desfase
+# pendientes — administrar la cola de trabajo sin que se desfase
 
 Codifica **cómo** se mantiene la cola de trabajo (issues / feature-requests / backlog) sana y al día,
 para que el dueño **no pierda el hilo** ni la cola se desfase del código. No es la lista de lo pendiente
@@ -20,7 +20,7 @@ vale doble acá: **cerrar es afirmar "esto está hecho"** → no se cierra sin e
 
 | Skill | Pregunta que responde | Entrada → Salida |
 |---|---|---|
-| **`cola`** (este) | "¿cómo está la cola? ordenala / triagéala / metelo a la cola" | issues abiertos + commits/PRs → cola reconciliada (cerrada lo hecho, etiquetada, deduplicada) + reporte de salud |
+| **`pendientes`** (este) | "¿cómo están los pendientes? ordenalos / triagéalos / metelo a la cola" | issues abiertos + commits/PRs → cola reconciliada (cerrada lo hecho, etiquetada, deduplicada) + reporte de salud |
 | `mantenimiento` | "auditá/limpiá el repo sin romper" | el repo → código sano (muerto/seguridad/ramas/split). Su **Frente D apunta acá** (esta es la fuente única de la cola). |
 | `auditoria-profunda` | "cazá fallas a fondo, abrí issues" | el flujo de reserva + UI → hallazgos → issues nuevos (que después triagea ESTE skill) |
 
@@ -159,7 +159,7 @@ cola está sana, la respuesta correcta es decirlo, no fabricar cierres para most
 6. "¿CÓMO ESTÁ LA COLA?": reporte de salud (abiertos / probablemente-hechos / duplicados /
    viejos / gaps de label / someday) — propone, NO cierra solo. El loop liviano y frecuente.
 
-Al cerrar cada uso: escribir {"last-run": "<ISO UTC>"} en .claude/cola-state.json
+Al cerrar cada uso: escribir {"last-run": "<ISO UTC>"} en .claude/pendientes-state.json
 (el hook SessionStart lo lee → avisa si lleva > 7 días sin revisar).
 ```
 

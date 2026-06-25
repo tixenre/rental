@@ -41,7 +41,7 @@ branch default es **`main`**, se **auto-cierra al promover `dev → main`** (cua
 citar la issue, no solo el `#PR`. La **promoción `dev → main` reconcilia**: su PR lista las issues que
 cierra el lote → cierre en bloque con evidencia. Features grandes diferidas con label **`someday`**
 (separa lo diferido de la cola activa; no es deuda sin cerrar). Triage **liviano y seguido** vía skill
-`cola`: verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
+`pendientes`: verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
 tracking (no uno por fase).
 
 ### 2026-05-25 — Modus operandi durable, sesión efímera
@@ -277,11 +277,12 @@ bloat/routing de modelo, consumo del buzón + ledger, consolidación en modo **d
 archiva a `.claude/skills/.archive/`), y cierre periódico mensual. Modo propone-aprobás en todos los pasos.
 El supervisor marca skills sin `## Auto-mejora` o un `gobernanza` que aplique cambios sin aprobación.
 
-### 2026-06-23 — cola = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
+### 2026-06-23 — pendientes (ex-`cola`) = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
 
 Toda administración de la cola (reconciliar issues abiertos contra commits/PRs shippeados para cazar
 **hecho-pero-abierto**, triagear con evidencia, deduplicar trackers, etiquetar, intake de brain-dumps, reporte
-"¿cómo está la cola?") vive en el skill **`cola`** (`.claude/skills/cola/SKILL.md`), **fuente única**, para que
+"¿cómo están los pendientes?") vive en el skill **`pendientes`** (`.claude/skills/pendientes/SKILL.md`; renombrado
+2026-06-25 desde `cola` por nombre poco descriptivo + colisión con "GitHub Issues"), **fuente única**, para que
 tenga la atención continua y liviana que necesita. El **Frente D de `mantenimiento` apunta acá** (ya no duplica
 el método). Refina _Issues: la cola espeja el código (2026-06-08)_ y _Protocolo de brain-dumps (2026-05-25)_.
 Regla de oro: **cerrar es afirmar** → solo con evidencia (PR/commit) o la orden del dueño; el dueño dirige, la
@@ -329,6 +330,19 @@ orden en el endpoint, revisar que coincidan. **SSR descartado** (completo: invia
 Node; parcial del hero: hack con drift porque `createRoot` borra `#root`); **techo SPA ~80 mobile / ~91
 desktop es sano** — no re-evaluar SSR. El supervisor marca un `<picture>` en el LCP, o un `<img src=avif>` sin
 `onError`→webp fuera del LCP.
+
+### 2026-06-25 — Manuales técnicos por sistema (`SISTEMA_X.md`): fuente única del "cómo", linkea a MEMORIA el "porqué"
+
+Cada motor/sistema importante tiene un manual técnico **`docs/SISTEMA_<X>.md`** (molde: `SISTEMA_SPECS.md`) =
+**fuente única del cómo funciona** (arquitectura + flujo + los paths como puntos de entrada). **Describe, no
+decide**: las reglas de criterio y el _porqué_ viven en `MEMORIA.md`/`DECISIONES.md` y se **linkean**, no se
+copian (dos verdades = drift). Índice maestro en **MANIFIESTO §8 "Dónde encontrar cosas"**. El manual se
+actualiza en el **mismo cambio** que toca su motor; el supervisor marca un manual stale o una regla duplicada
+que debería ser un link. `check-docs.mjs` verifica que los manuales referenciados existan (links vivos). **NO
+se crea un skill por esto** — un manual es un doc (fuente de verdad), no un proceso; su mantenimiento cae en el
+supervisor + `check-docs`, no en la capa de skills (que tiene su propia gobernanza anti-bloat). Piloto:
+**`SISTEMA_FOTOS.md`** (fotos = procesar + mostrar). Ya existen `SISTEMA_SPECS.md`, `FLUJO_PEDIDOS.md`,
+`DESIGN_SYSTEM.md`.
 
 ---
 

@@ -36,8 +36,9 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 - **Trabajo pendiente** → GitHub Issues (la cola). Iniciativa multi-sesión → 1 issue de tracking
   por iniciativa, auto-mantenido por la sesión.
 - **Registro de cambios** → commit history.
-- **Contexto / arquitectura** → `MANIFIESTO.md` (§6 decisiones fundacionales). El manual técnico del
-  sistema de specs / catálogo → `docs/SISTEMA_SPECS.md`. Se lee on-demand.
+- **Contexto / arquitectura** → `MANIFIESTO.md` (§6 decisiones fundacionales). Los **manuales técnicos por
+  sistema** (fuente única del "cómo funciona X", índice en MANIFIESTO §8) → `docs/SISTEMA_SPECS.md`
+  (specs/catálogo), `docs/SISTEMA_FOTOS.md` (fotos/media). Se leen on-demand.
 
 ## Punteros
 
@@ -63,8 +64,8 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 
 | Skill | Cuándo lo uso (disparador) | Modelo |
 | --- | --- | --- |
-| [`cola`](.claude/skills/cola/SKILL.md) | "ordená/triageá los issues", "¿cómo está la cola?", "cerrá lo hecho", brain-dumps → administrar la cola sin que se desfase | `sonnet` |
-| [`mantenimiento`](.claude/skills/mantenimiento/SKILL.md) | "auditá/limpiá el repo", "¿hay deuda/legacy?", "modularizá ese god-module" → salud del repo en 5 frentes (muerto/seguridad/ramas/issues→`cola`/split) | `opus` |
+| [`pendientes`](.claude/skills/pendientes/SKILL.md) | "ordená/triageá los issues", "¿cómo están los pendientes / la cola?", "cerrá lo hecho", brain-dumps → administrar la cola de pendientes sin que se desfase | `sonnet` |
+| [`mantenimiento`](.claude/skills/mantenimiento/SKILL.md) | "auditá/limpiá el repo", "¿hay deuda/legacy?", "modularizá ese god-module" → salud del repo en 5 frentes (muerto/seguridad/ramas/issues→`pendientes`/split) | `opus` |
 | [`auditoria-profunda`](.claude/skills/auditoria-profunda/SKILL.md) | "auditá a fondo", "buscá fallas/bugs", "probá si es seguro / con mucha demanda", "screenshots en varios tamaños" → cazar fallas repetible (solo encuentra y documenta) | `opus` |
 | [`pulido-frontend`](.claude/skills/pulido-frontend/SKILL.md) | "esta pantalla está rara / pulí la UX-UI" → diagnosticar y mejorar una pantalla que **ya existe** | `opus` |
 | [`design-system`](.claude/skills/design-system/SKILL.md) | "auditá el DS", "el DS está drifting", "cómo está el DS", "buscá reimplementaciones/colores hardcodeados/violaciones a los 11 principios", "mantenimiento del DS" → gobernador del DS: auditoría sistémica + dashboard `/ds` + propone issues; `pulido-frontend` aplica | `opus` |
