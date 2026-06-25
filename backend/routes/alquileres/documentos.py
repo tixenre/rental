@@ -50,6 +50,7 @@ def _add_componentes(conn, items: list[dict]) -> None:
         comp_rows = conn.execute(f"""
             SELECT ec.nombre, {marca_subquery('ec')},
                    ec.modelo, ec.serie, ec.valor_reposicion,
+                   ec.foto_url, ec.foto_url_sm, ec.foto_url_thumb,
                    ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
@@ -153,6 +154,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         items = conn.execute(f"""
             SELECT pi.cantidad, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
                    {MARCA_SUBQUERY}, e.modelo, e.serie, e.valor_reposicion, e.foto_url,
+                   e.foto_url_sm, e.foto_url_thumb,
                    e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
             FROM alquiler_items pi
             LEFT JOIN equipos e ON e.id = pi.equipo_id
