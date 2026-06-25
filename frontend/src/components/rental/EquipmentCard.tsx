@@ -82,7 +82,11 @@ export function EquipmentCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: Math.min(index * 0.012, 0.25) }}
-      style={width ? { width, contentVisibility: "auto", containIntrinsicSize: "auto 280px" } : { contentVisibility: "auto", containIntrinsicSize: "auto 280px" }}
+      style={
+        width
+          ? { width, contentVisibility: "auto", containIntrinsicSize: "auto 280px" }
+          : { contentVisibility: "auto", containIntrinsicSize: "auto 280px" }
+      }
       className={cn(
         "group relative flex shrink-0 flex-col overflow-hidden rounded-lg border bg-surface-elevated shadow-[var(--shadow-sm)] transition-all snap-start",
         selected

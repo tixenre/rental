@@ -1,5 +1,15 @@
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, lazy, Suspense, useDeferredValue, type Dispatch, type SetStateAction } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  lazy,
+  Suspense,
+  useDeferredValue,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
 import {
@@ -443,7 +453,16 @@ function Index() {
       }));
     }
     return list;
-  }, [selectedCats, brand, deferredQuery, disponiblesOnly, favoritosOnly, fav, allEquipos, specFilters]);
+  }, [
+    selectedCats,
+    brand,
+    deferredQuery,
+    disponiblesOnly,
+    favoritosOnly,
+    fav,
+    allEquipos,
+    specFilters,
+  ]);
 
   // Analítica interna: registra qué busca la gente (con cuántos resultados vio).
   // Debounce + dedupe viven en el módulo; acá solo avisamos en cada cambio.
