@@ -1,5 +1,4 @@
 import "./styles.css";
-import * as Sentry from "@sentry/react";
 import { RouterProvider } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ReactDOM from "react-dom/client";
@@ -9,16 +8,27 @@ import { initGA, trackPageView } from "./lib/analytics";
 import { apiGetAnalyticsConfig, type BackendEquipo } from "./lib/api";
 import { backendToEquipment } from "./hooks/useEquipos";
 
-// Solo activo si VITE_SENTRY_DSN está seteado — dev/CI no lo necesitan.
+// Sentry diferido: se carga tras la primera interacción del usuario, no en el
+// bundle inicial. Sentry no envuelve el router, por lo que diferirlo es seguro
+// (solo pierde errores que ocurren antes del primer click/tecla, un caso raro
+// y preferible al costo de parsear ~100KB extra en el critical path).
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 if (SENTRY_DSN) {
-  Sentry.init({
-    dsn: SENTRY_DSN,
-    environment: import.meta.env.MODE,
-    integrations: [Sentry.browserTracingIntegration()],
-    tracesSampleRate: 0.1,
-    sendDefaultPii: false,
-  });
+  const initSentry = () => {
+    window.removeEventListener("pointerdown", initSentry);
+    window.removeEventListener("keydown", initSentry);
+    import("@sentry/react").then(({ init, browserTracingIntegration }) => {
+      init({
+        dsn: SENTRY_DSN,
+        environment: import.meta.env.MODE,
+        integrations: [browserTracingIntegration()],
+        tracesSampleRate: 0.1,
+        sendDefaultPii: false,
+      });
+    });
+  };
+  window.addEventListener("pointerdown", initSentry, { once: true });
+  window.addEventListener("keydown", initSentry, { once: true });
 }
 
 const queryClient = new QueryClient({

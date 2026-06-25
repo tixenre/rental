@@ -88,6 +88,7 @@ export function EquipmentRow({
   return (
     <div
       id={`eq-${item.id}`}
+      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 72px" }}
       className={cn(
         "rounded-lg border bg-surface transition-all",
         expanded
