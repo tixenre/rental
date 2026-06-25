@@ -16,6 +16,9 @@ from admin_guard import require_admin
 from database import get_db, now_ar
 from services.email import send_email
 from services.email.service import get_admin_to
+from services.media.models import DeriveSpec
+from services.media.errors import MediaError
+from services.media.service import store_upload
 from services.media.storage import put as _r2_put
 
 logger = logging.getLogger(__name__)
@@ -102,6 +105,7 @@ def _taller_to_dict(row) -> dict:
         "pago_banco": row["pago_banco"],
         "direccion": row["direccion"],
         "instructor_foto_url": row["instructor_foto_url"] if "instructor_foto_url" in keys else "",
+        "instructor_media_id": row["instructor_media_id"] if "instructor_media_id" in keys else None,
         "numero_edicion": row["numero_edicion"] if "numero_edicion" in keys else 1,
         "proxima_edicion_slug": row["proxima_edicion_slug"] if "proxima_edicion_slug" in keys else "",
     }
@@ -342,13 +346,19 @@ def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request
     return _taller_to_dict(row)
 
 
+_INSTRUCTOR_SPECS = [
+    DeriveSpec(name="display", square=False, max_width=400),
+    DeriveSpec(name="display-sm", square=False, max_width=200),
+]
+
+
 @router.post("/admin/talleres/{taller_id}/upload-foto-instructor")
 async def admin_upload_foto_instructor(taller_id: int, request: Request):
-    """Sube la foto de la instructora a R2 y actualiza instructor_foto_url."""
+    """Sube la foto del instructor a R2 vía el motor de media y actualiza talleres."""
     require_admin(request)
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id FROM talleres WHERE id = %s", (taller_id,)
+            "SELECT id FROM talleres WHERE id = ?", (taller_id,)
         ).fetchone()
         if row is None:
             raise HTTPException(404, "Taller no encontrado")
@@ -364,28 +374,24 @@ async def admin_upload_foto_instructor(taller_id: int, request: Request):
     if len(raw) > FOTO_MAX_MB * 1024 * 1024:
         raise HTTPException(413, f"Archivo muy grande (máx {FOTO_MAX_MB} MB)")
 
-    content_type = getattr(file, "content_type", None) or "application/octet-stream"
-    ext_map = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
-    ext = ext_map.get(content_type, "jpg")
-
-    ts = int(time.time() * 1000)
-    uid = uuid.uuid4().hex[:8]
-    key = f"talleres/{taller_id}/instructor-{ts}-{uid}.{ext}"
-
     try:
-        url = _r2_put(key, raw, content_type)
+        with get_db() as conn:
+            asset = store_upload(raw, kind="instructor", derive_specs=_INSTRUCTOR_SPECS, conn=conn)
+            display = asset.variant("display") or (asset.variants[0] if asset.variants else None)
+            url = display.url if display else ""
+            conn.execute(
+                "UPDATE talleres SET instructor_media_id = ?, instructor_foto_url = ?, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (asset.id, url, taller_id),
+            )
+            conn.commit()
+    except MediaError as e:
+        raise HTTPException(e.status_code, e.detail)
     except Exception as e:
-        logger.error("upload_foto_instructor: R2 error: %s", e)
+        logger.error("upload_foto_instructor: error inesperado: %s", e, exc_info=True)
         raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")
 
-    with get_db() as conn:
-        conn.execute(
-            "UPDATE talleres SET instructor_foto_url = %s, updated_at = NOW() WHERE id = %s",
-            (url, taller_id),
-        )
-        conn.commit()
-
-    return {"ok": True, "url": url}
+    return {"ok": True, "url": url, "media_id": asset.id}
 
 
 @router.get("/admin/talleres/{taller_id}/inscripciones")
