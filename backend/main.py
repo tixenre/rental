@@ -535,22 +535,17 @@ def _inject_hero_preload(
     en el HTML inicial — el browser no puede arrancar el fetch hasta correr el JS +
     responder la API (LCP ~21s en Lighthouse).
 
-    El `imagesrcset`+`imagesizes` matchea EXACTO el `srcSet`/`sizes` del `<img>` del
-    carrusel (`{urlSm} 800w, {url} 1600w` + `sizes=(max-width: 768px) 100vw, 42vw`) y la
-    query del hero usa el MISMO orden que `useHeroPhotos` (es_principal DESC, orden ASC) →
-    el browser deduplica y usa el recurso preloadeado en vez de bajar la imagen dos veces.
-    El preconnect abre la conexión TLS al bucket R2 (origen de todas las fotos) antes del
-    fetch.
+    Preloadeamos el AVIF cuando la foto principal lo tiene (`type=image/avif`): el hero
+    se renderiza con `<img src=avif>` directo (NO `<picture>`), así que el preload AVIF
+    matchea el elemento LCP de forma determinista — los browsers sin soporte AVIF ignoran
+    el preload y caen a webp vía `onError` (helper `heroImgProps` en el front). Esto
+    espeja la decisión del front sobre la MISMA foto (mismo orden es_principal DESC,
+    orden ASC, id ASC) → preload y `<img>` apuntan al mismo recurso, una sola descarga.
 
-    NOTA: NO preloadeamos el AVIF aunque esté disponible. Un preload con
-    type="image/avif" no matchea el elemento `<img>` (que tiene srcset webp) que Chrome
-    reporta como LCP — el AVIF se descarga dos veces (una del preload sin match, otra del
-    `<source>` de la `<picture>`) y el LCP empeora. El preconnect calienta la conexión R2
-    para que el AVIF descargue rápido cuando React renderiza el `<picture>`.
-
-    Params `image_avif`/`image_sm_avif` reservados para cuando Chrome implemente
-    matching de preload AVIF con `<source type="image/avif">` de forma confiable."""
-    esc = _html.escape(image, quote=True)
+    Si la principal NO tiene AVIF (NULL: subida pre-backfill o codec falló), caemos al
+    preload webp. El `imagesizes="100vw"` matchea EXACTO el `sizes` del `<img>` del hero
+    (mobile y desktop unificados) — Lighthouse mide el LCP mobile, que usa 100vw. El
+    preconnect abre la conexión TLS al bucket R2 antes del fetch."""
     # Origen del bucket R2 (https://host) derivado de la URL del hero — sin hardcodear
     # el bucket, robusto ante cambios de ambiente.
     origin = "/".join(image.split("/")[:3])
@@ -558,20 +553,36 @@ def _inject_hero_preload(
     if origin.startswith("http"):
         esc_origin = _html.escape(origin, quote=True)
         tags += f'<link rel="preconnect" href="{esc_origin}">'
-    # Preloadeamos SIEMPRE la variante webp (el <img> srcset que matchea Lighthouse).
-    # Un preload type="image/avif" NO matchea el <img src="...webp"> que Chrome reporta
-    # como LCP → el AVIF se descarga dos veces (preload + desde <source>) y el LCP se
-    # dispara. El AVIF sigue siendo renderizado por Chrome via <picture><source>, con la
-    # conexión R2 ya pre-calentada por el preconnect.
-    if image_sm:
-        esc_sm = _html.escape(image_sm, quote=True)
-        tags += (
-            f'<link rel="preload" as="image" fetchpriority="high"'
-            f' imagesrcset="{esc_sm} 800w, {esc} 1600w"'
-            f' imagesizes="(max-width: 768px) 100vw, 42vw">'
-        )
+
+    if image_avif:
+        # AVIF-directo: el hero renderiza `<img src=avif>`, así que el preload AVIF
+        # matchea el LCP. `type=image/avif` es obligatorio para que el browser lo trate
+        # como AVIF y los que no lo soportan lo ignoren (caen a webp vía onError).
+        esc_avif = _html.escape(image_avif, quote=True)
+        if image_sm_avif:
+            esc_sm_avif = _html.escape(image_sm_avif, quote=True)
+            tags += (
+                f'<link rel="preload" as="image" type="image/avif" fetchpriority="high"'
+                f' imagesrcset="{esc_sm_avif} 800w, {esc_avif} 1600w"'
+                f' imagesizes="100vw">'
+            )
+        else:
+            tags += (
+                f'<link rel="preload" as="image" type="image/avif"'
+                f' fetchpriority="high" href="{esc_avif}">'
+            )
     else:
-        tags += f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
+        # Sin AVIF → preload webp (el front también renderiza webp en este caso).
+        esc = _html.escape(image, quote=True)
+        if image_sm:
+            esc_sm = _html.escape(image_sm, quote=True)
+            tags += (
+                f'<link rel="preload" as="image" fetchpriority="high"'
+                f' imagesrcset="{esc_sm} 800w, {esc} 1600w"'
+                f' imagesizes="100vw">'
+            )
+        else:
+            tags += f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
     return html_text.replace("</head>", tags + "</head>", 1)
 
 

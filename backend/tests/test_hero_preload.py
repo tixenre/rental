@@ -1,22 +1,19 @@
 """El helper `_inject_hero_preload` inyecta preconnect + preload del hero LCP.
 
 Regresión del LCP mobile clavado en ~21s: el preload del hero tiene que apuntar
-EXACTO a la imagen que renderiza el carrusel (misma foto + misma variante srcset),
-si no el navegador no la descubre en el HTML inicial ("LCP discoverable in initial
-document" falla) y el LCP se dispara. El orden de la query del hero en `root()` ya
-espeja `useHeroPhotos` (es_principal DESC, orden ASC); acá fijamos el contrato del
-tag inyectado:
-- preconnect al ORIGEN del bucket R2 (derivado de la URL, SIN crossorigin),
-  porque las imágenes no usan CORS — crossorigin genera "Unused preconnect" en
-  PageSpeed y desperdicia la conexión (310ms de ahorro al quitarlo).
-- preload SIEMPRE webp (el <img> srcset que Lighthouse chequea para "discoverable").
-  NO preloadeamos AVIF aunque esté disponible: un preload type="image/avif" no
-  matchea el <img src=webp> que Chrome reporta como LCP → descarga doble + LCP peor.
-  El preconnect pre-calienta la conexión R2 para que el AVIF descargue rápido cuando
-  React renderiza el <picture>.
-- preload con imagesrcset/imagesizes que matchea `srcSet="{sm} 800w, {url} 1600w"`
-  + `sizes=(max-width: 768px) 100vw, 42vw` del carrusel cuando hay variante sm.
-- fallback a href simple cuando no hay variante sm (legacy / sin backfill).
+EXACTO a la imagen que renderiza el hero, si no el navegador no la descubre en el
+HTML inicial ("LCP discoverable in initial document" falla) y el LCP se dispara.
+
+El hero se renderiza con `<img src=avif>` DIRECTO (no `<picture>`), porque un
+preload `type=image/avif` matchea de forma determinista solo contra un `<img>`
+directo. Contrato fijado acá:
+- preconnect al ORIGEN del bucket R2 (derivado de la URL, SIN crossorigin) —
+  crossorigin genera "Unused preconnect" porque las imágenes no usan CORS.
+- con AVIF: preload `type=image/avif` + `imagesrcset` de URLs .avif + `imagesizes=100vw`
+  (matchea el `sizes=100vw` del `<img>` del hero; Lighthouse mide el LCP mobile).
+- sin AVIF (NULL): preload webp (el front también cae a webp en ese caso).
+- el orden de la query del hero espeja `useHeroPhotos` (es_principal DESC, orden ASC)
+  → preload y `<img>` apuntan al mismo recurso, una sola descarga.
 """
 
 import main
@@ -33,31 +30,40 @@ def _head(html: str) -> str:
     return html[html.index("<head>") + 6 : html.index("</head>")]
 
 
-def test_preload_con_variante_sm_usa_imagesrcset_y_preconnect():
+def test_con_avif_preloadea_avif_con_type_y_100vw():
+    head = _head(main._inject_hero_preload(_HTML, _URL, _SM, _AVIF, _SM_AVIF))
+    assert '<link rel="preconnect" href="https://pub-abc123.r2.dev">' in head
+    # preload AVIF: type obligatorio + srcset de URLs .avif + imagesizes 100vw
+    assert 'type="image/avif"' in head
+    assert f'imagesrcset="{_SM_AVIF} 800w, {_AVIF} 1600w"' in head
+    assert 'imagesizes="100vw"' in head
+    assert 'fetchpriority="high"' in head
+    # NO debe preloadear el webp (una sola descarga del LCP)
+    assert _URL not in head
+    assert _SM not in head
+
+
+def test_avif_sin_sm_cae_a_href_simple_con_type():
+    head = _head(main._inject_hero_preload(_HTML, _URL, _SM, _AVIF, None))
+    assert 'type="image/avif"' in head
+    assert f'href="{_AVIF}"' in head
+    assert "imagesrcset" not in head
+
+
+def test_sin_avif_preloadea_webp_con_100vw():
     head = _head(main._inject_hero_preload(_HTML, _URL, _SM))
     assert '<link rel="preconnect" href="https://pub-abc123.r2.dev">' in head
     assert f'imagesrcset="{_SM} 800w, {_URL} 1600w"' in head
-    assert 'imagesizes="(max-width: 768px) 100vw, 42vw"' in head
+    assert 'imagesizes="100vw"' in head
     assert 'fetchpriority="high"' in head
-    # Siempre webp — sin AVIF preload
+    # sin AVIF no hay type avif
     assert 'type="image/avif"' not in head
 
 
-def test_preload_sin_variante_sm_cae_a_href_simple():
+def test_sin_avif_ni_sm_cae_a_href_webp_simple():
     head = _head(main._inject_hero_preload(_HTML, _URL, None))
     assert f'<link rel="preload" as="image" fetchpriority="high" href="{_URL}">' in head
     assert "imagesrcset" not in head
-    assert '<link rel="preconnect" href="https://pub-abc123.r2.dev">' in head
-
-
-def test_avif_disponible_igual_preloadea_webp():
-    # Aunque haya variantes AVIF, preloadeamos webp (el <img> srcset que Chrome reporta
-    # como LCP). Un preload type="image/avif" no matchea y causa doble descarga.
-    head = _head(main._inject_hero_preload(_HTML, _URL, _SM, _AVIF, _SM_AVIF))
-    # Preload webp (no avif)
-    assert f'imagesrcset="{_SM} 800w, {_URL} 1600w"' in head
-    assert 'type="image/avif"' not in head
-    # Preconnect sigue presente (pre-calienta R2 para que AVIF descargue rápido después)
     assert '<link rel="preconnect" href="https://pub-abc123.r2.dev">' in head
 
 
@@ -68,7 +74,7 @@ def test_origen_se_deriva_de_la_url_no_se_hardcodea():
     assert '<link rel="preconnect" href="https://cdn.rambla.house">' in head
 
 
-def test_inyecta_una_sola_vez_antes_de_head_cierre():
+def test_inyecta_un_solo_preload_y_preconnect():
     out = main._inject_hero_preload(_HTML, _URL, _SM, _AVIF, _SM_AVIF)
     assert out.count("</head>") == 1
     assert out.count('rel="preload"') == 1

@@ -33,7 +33,7 @@ import { createOrder, OrderVerificationError } from "@/lib/orders";
 import { chequearEstadoCuenta, iniciarVerificacionIdentidad } from "@/lib/verificacion";
 import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
-import { useHeroPhotos } from "@/lib/studio/hero-photos";
+import { useHeroPhotos, heroImgProps } from "@/lib/studio/hero-photos";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
@@ -152,12 +152,8 @@ export function HeroBanner({
         {photos.map((photo, i) => (
           <img
             key={photo.url}
-            src={photo.url}
-            srcSet={photo.urlSm ? `${photo.urlSm} 800w, ${photo.url} 1600w` : undefined}
-            sizes="100vw"
+            {...heroImgProps(photo, { eager: i === 0 })}
             alt="El Estudio — Rambla Rental"
-            loading={i === 0 ? "eager" : "lazy"}
-            fetchPriority={i === 0 ? "high" : undefined}
             aria-hidden={i !== photoIdx}
             style={{
               position: "absolute",

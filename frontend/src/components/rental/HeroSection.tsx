@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Calendar, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useHeroPhotos } from "@/lib/studio/hero-photos";
+import { useHeroPhotos, heroImgProps } from "@/lib/studio/hero-photos";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 interface HeroSectionProps {
@@ -93,29 +93,15 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
                 )}
                 style={{ transitionDuration: "900ms" }}
               >
-                <picture>
-                  {(photo.urlSmAvif || photo.urlAvif) && (
-                    <source
-                      type="image/avif"
-                      srcSet={
-                        photo.urlSmAvif
-                          ? `${photo.urlSmAvif} 800w, ${photo.urlAvif ?? photo.url} 1600w`
-                          : photo.urlAvif!
-                      }
-                      sizes="(max-width: 768px) 100vw, 42vw"
-                    />
-                  )}
-                  <img
-                    src={photo.url}
-                    srcSet={photo.urlSm ? `${photo.urlSm} 800w, ${photo.url} 1600w` : undefined}
-                    sizes="(max-width: 768px) 100vw, 42vw"
-                    alt="El Estudio — Rambla Rental"
-                    className="absolute inset-0 w-full h-full object-cover"
-                    loading={i === 0 ? "eager" : "lazy"}
-                    fetchPriority={i === 0 ? "high" : undefined}
-                    decoding="async"
-                  />
-                </picture>
+                {/* `<img src=avif>` directo (no `<picture>`): el hero es el LCP y se
+                    preloadea desde el backend — el preload AVIF matchea de forma
+                    determinista contra un `<img>` directo, no contra un `<source>`.
+                    Fallback a webp vía onError (helper único `heroImgProps`). */}
+                <img
+                  {...heroImgProps(photo, { eager: i === 0 })}
+                  alt="El Estudio — Rambla Rental"
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
               </div>
             ))}
 
