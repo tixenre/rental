@@ -10,13 +10,13 @@
 ---
 
 <!-- Ejemplo de entrada:
-2026-06-23 · cola · Agregar paso de "cerrar stale issues automáticamente si > 90 días sin actividad y
+2026-06-23 · pendientes · Agregar paso de "cerrar stale issues automáticamente si > 90 días sin actividad y
 etiquetados como `someday`" al paso 2 (Triage con evidencia) · Detecté que hay 8 issues con >90 días
 sin actividad que bloquean la vista real de la cola activa; el criterio es claro y no requiere criterio
 del dueño.
 -->
 
-2026-06-24 · cola · La nota de "Herramientas" dice "acá **no hay `gh` CLI** → todo por `mcp__github__*`",
+2026-06-24 · pendientes · La nota de "Herramientas" dice "acá **no hay `gh` CLI** → todo por `mcp__github__*`",
 pero en la app de Mac (esta sesión) el `gh` CLI **sí está disponible y funciona** (creé el tracker #1029,
 listé labels, todo con `gh`). Proponer: cambiar la nota a "usá `gh` CLI cuando esté disponible (app de
 Mac/terminal); caé a `mcp__github__*` solo si no lo está" · Por qué: la nota actual desorienta — manda a

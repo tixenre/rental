@@ -9,7 +9,7 @@
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-cola.sh"
+            "command": "bash .claude/hooks/check-pendientes.sh"
           }
         ]
       }

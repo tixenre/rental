@@ -41,7 +41,7 @@ branch default es **`main`**, se **auto-cierra al promover `dev → main`** (cua
 citar la issue, no solo el `#PR`. La **promoción `dev → main` reconcilia**: su PR lista las issues que
 cierra el lote → cierre en bloque con evidencia. Features grandes diferidas con label **`someday`**
 (separa lo diferido de la cola activa; no es deuda sin cerrar). Triage **liviano y seguido** vía skill
-`cola`: verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
+`pendientes`: verificar que shippeó antes de cerrar. Iniciativa multi-sesión = **un** issue de
 tracking (no uno por fase).
 
 ### 2026-05-25 — Modus operandi durable, sesión efímera
@@ -277,11 +277,12 @@ bloat/routing de modelo, consumo del buzón + ledger, consolidación en modo **d
 archiva a `.claude/skills/.archive/`), y cierre periódico mensual. Modo propone-aprobás en todos los pasos.
 El supervisor marca skills sin `## Auto-mejora` o un `gobernanza` que aplique cambios sin aprobación.
 
-### 2026-06-23 — cola = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
+### 2026-06-23 — pendientes (ex-`cola`) = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
 
 Toda administración de la cola (reconciliar issues abiertos contra commits/PRs shippeados para cazar
 **hecho-pero-abierto**, triagear con evidencia, deduplicar trackers, etiquetar, intake de brain-dumps, reporte
-"¿cómo está la cola?") vive en el skill **`cola`** (`.claude/skills/cola/SKILL.md`), **fuente única**, para que
+"¿cómo están los pendientes?") vive en el skill **`pendientes`** (`.claude/skills/pendientes/SKILL.md`; renombrado
+2026-06-25 desde `cola` por nombre poco descriptivo + colisión con "GitHub Issues"), **fuente única**, para que
 tenga la atención continua y liviana que necesita. El **Frente D de `mantenimiento` apunta acá** (ya no duplica
 el método). Refina _Issues: la cola espeja el código (2026-06-08)_ y _Protocolo de brain-dumps (2026-05-25)_.
 Regla de oro: **cerrar es afirmar** → solo con evidencia (PR/commit) o la orden del dueño; el dueño dirige, la

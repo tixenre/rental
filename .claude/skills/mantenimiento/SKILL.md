@@ -422,15 +422,15 @@ sin auditar es la mentira más cara — tranquiliza al dueño sobre un agujero r
    **"Automatically delete head branches"** en Settings del repo (las borra solas al mergear, de ahí
    en más). Nunca afirmar "borré las ramas" si el entorno no lo permitió.
 
-## Frente D — Issues → skill `cola` (fuente única)
+## Frente D — Issues → skill `pendientes` (fuente única)
 
 La administración de la cola (reconciliar issues contra el código, triagear con evidencia, deduplicar
-trackers, etiquetar, intake de brain-dumps, reporte "¿cómo está la cola?") **vive en su propio skill**,
-[`cola`](../cola/SKILL.md) — para que tenga la atención **continua y liviana** que necesita, en vez de
+trackers, etiquetar, intake de brain-dumps, reporte "¿cómo están los pendientes?") **vive en su propio skill**,
+[`pendientes`](../pendientes/SKILL.md) — para que tenga la atención **continua y liviana** que necesita, en vez de
 correr solo cuando se audita el repo entero. Es la **fuente única**.
 
 Cuando una pasada de mantenimiento toque issues (cerrar lo que el barrido shippeó, abrir issues de los
-hallazgos), **delegá en `cola`**. La regla de oro vale igual: **cerrar es afirmar "esto está hecho"** →
+hallazgos), **delegá en `pendientes`**. La regla de oro vale igual: **cerrar es afirmar "esto está hecho"** →
 solo con evidencia (PR/commit) o la orden del dueño; parciales = abiertos; no enterrar backlog real.
 
 ---
@@ -473,9 +473,9 @@ E · MODULARIZACIÓN (split, 1 PR/corte)    C · RAMAS
 2. extraer concern → submódulo            2. borrable solo si PR=MERGED (squash ≠ git branch --merged)
 3. __init__ re-exporta superficie         3. sandbox no borra (403) → reportar lista + auto-delete
 4. VERIFICAR: set de rutas idéntico +
-   ruff + suite + gate test + byte-AST    D · ISSUES → skill `cola` (fuente única)
+   ruff + suite + gate test + byte-AST    D · ISSUES → skill `pendientes` (fuente única)
 5. el INSERT/gate de reservas NO se mueve    reconciliar / triagear / deduplicar / etiquetar /
-   (queda en el spine)                       reporte de salud → delegá en `cola` (regla de oro:
+   (queda en el spine)                       reporte de salud → delegá en `pendientes` (regla de oro:
                                              cerrar solo con evidencia)
 
 CIERRE (todos los frentes): commits atómicos + body con "lo que se dejó" → supervisor → plan de prueba

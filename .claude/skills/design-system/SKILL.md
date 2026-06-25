@@ -13,7 +13,7 @@ guardrails ESLint), pero la **adopción es continua** y el drift entra en cada P
 que **detecta el drift antes de que acumule deuda**, propone los fixes en issues, y deja que
 `pulido-frontend` los aplique.
 
-Blueprint: el mismo ciclo propone-aprobás que `gobernanza` y `cola` — **lee, razona, propone; nunca
+Blueprint: el mismo ciclo propone-aprobás que `gobernanza` y `pendientes` — **lee, razona, propone; nunca
 edita código**.
 
 ## Dónde encaja (no dupliques: delegá)

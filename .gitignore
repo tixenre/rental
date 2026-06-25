@@ -57,7 +57,7 @@ blob-report
 .claude/worktrees/
 .vite/
 .claude/skill-ledger.jsonl
-.claude/cola-state.json
+.claude/pendientes-state.json
 
 # Screenshots de auditoría UI (regenerables con .claude/skills/auditoria-profunda/ui-audit.mjs)
 docs/audit-ui-screenshots/
