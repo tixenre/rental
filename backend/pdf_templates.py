@@ -429,11 +429,16 @@ def _nombre_con_incluye(item, formal=False, mark=False):
 
 def _thumb(item, sm=False):
     cls = "eq-thumb sm" if sm else "eq-thumb"
-    # Resolvé foto_url con el helper canónico de pdf.py (absolutiza paths
-    # relativos para Playwright, que renderiza con base about:blank). Import
+    # Usa la variante más liviana disponible (thumb > sm > original) para
+    # evitar cargar imágenes full-size en thumbnails de 36-46px. Import
     # perezoso: rompe el ciclo (pdf.py importa este módulo).
     from pdf import _abs_image_url
-    url = _abs_image_url((item.get("foto_url") or "").strip())
+    raw = (
+        (item.get("foto_url_thumb") or "").strip()
+        or (item.get("foto_url_sm") or "").strip()
+        or (item.get("foto_url") or "").strip()
+    )
+    url = _abs_image_url(raw)
     if url:
         return f'<img class="{cls}" src="{html.escape(url)}" alt="">'
     cam = ('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" '

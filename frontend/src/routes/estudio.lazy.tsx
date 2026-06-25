@@ -230,8 +230,7 @@ function EstudioPage() {
 
   const priceLabel = `${formatARS(precioHora)} / hora · mín ${minHours}h`;
 
-  // Fotos: admin primero, fallback a las fotos estáticas reales
-  const apiPhotos = useMemo(
+  const photos = useMemo(
     () =>
       (data?.fotos ?? []).map((f) => ({
         src: f.url,
@@ -241,7 +240,6 @@ function EstudioPage() {
       })),
     [data?.fotos],
   );
-  const photos = apiPhotos.length > 0 ? apiPhotos : STUDIO.photos;
   const heroPhoto = photos.find((p) => p.hero) ?? photos[0];
   const galleryPhotos = photos.filter((p) => !p.hero);
   const cicloramaPhoto =

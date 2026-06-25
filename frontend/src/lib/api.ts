@@ -69,6 +69,8 @@ export type BackendMarca = {
   id: number;
   nombre: string;
   logo_url?: string | null;
+  /** Variante display-sm (800px max) para srcset. Solo en logos raster del motor. */
+  logo_url_sm?: string | null;
   /** Curación manual del admin para BrandCarousel del home. #288 */
   destacada?: boolean;
   /** Orden manual del admin (drag-drop en /admin/equipos/marcas). */
@@ -353,6 +355,7 @@ export type Taller = {
   pago_banco: string;
   direccion: string;
   instructor_foto_url?: string;
+  instructor_media_id?: number | null;
   numero_edicion: number;
   proxima_edicion_slug: string;
   proxima_edicion?: EdicionLite | null;
@@ -365,6 +368,7 @@ export type InscripcionBody = {
   telefono: string;
   experiencia?: string;
   comprobante_url?: string;
+  comprobante_key?: string;
 };
 
 export type InscripcionResult = {
@@ -381,7 +385,10 @@ export function apiGetTaller(slug: string) {
   return get<Taller>(`/api/talleres/${slug}`);
 }
 
-export async function apiUploadComprobante(slug: string, file: File): Promise<string> {
+export async function apiUploadComprobante(
+  slug: string,
+  file: File,
+): Promise<{ url: string; key: string }> {
   const formData = new FormData();
   formData.append("file", file);
   const res = await fetch(`${API_BASE}/api/talleres/${slug}/upload-comprobante`, {
@@ -392,8 +399,7 @@ export async function apiUploadComprobante(slug: string, file: File): Promise<st
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.detail ?? `No se pudo subir el comprobante (${res.status})`);
   }
-  const data = (await res.json()) as { url: string };
-  return data.url;
+  return res.json() as Promise<{ url: string; key: string }>;
 }
 
 export function apiCrearInscripcion(slug: string, body: InscripcionBody) {

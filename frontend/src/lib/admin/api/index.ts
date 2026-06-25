@@ -38,6 +38,8 @@ import { contabilidadMethods } from "./contabilidad";
 import { brandingMethods } from "./branding";
 import { carritosMethods } from "./carritos";
 import { erroresMethods } from "./errores";
+import { mediaMethods } from "./media";
+export type { MediaStats, GcResult, RederiveResult } from "./media";
 
 export const adminApi = {
   ...equiposMethods,
@@ -47,4 +49,5 @@ export const adminApi = {
   ...brandingMethods,
   ...carritosMethods,
   ...erroresMethods,
+  ...mediaMethods,
 };

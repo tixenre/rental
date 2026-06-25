@@ -16,7 +16,9 @@ from admin_guard import require_admin
 from database import get_db, now_ar
 from services.email import send_email
 from services.email.service import get_admin_to
-from services.media.storage import put as _r2_put
+from services.media.models import DeriveSpec
+from services.media.errors import MediaError
+from services.media.service import store_upload, store_raw_document
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +104,7 @@ def _taller_to_dict(row) -> dict:
         "pago_banco": row["pago_banco"],
         "direccion": row["direccion"],
         "instructor_foto_url": row["instructor_foto_url"] if "instructor_foto_url" in keys else "",
+        "instructor_media_id": row["instructor_media_id"] if "instructor_media_id" in keys else None,
         "numero_edicion": row["numero_edicion"] if "numero_edicion" in keys else 1,
         "proxima_edicion_slug": row["proxima_edicion_slug"] if "proxima_edicion_slug" in keys else "",
     }
@@ -145,9 +148,8 @@ def get_taller(slug: str):
 
 @router.post("/talleres/{slug}/upload-comprobante")
 async def upload_comprobante(slug: str, request: Request):
-    """Recibe el comprobante de pago (multipart, campo 'file') y lo sube a R2.
-    Devuelve la URL pública. No requiere auth — es parte del flujo de inscripción."""
-    # Verificar que el taller existe
+    """Recibe el comprobante de pago (multipart, campo 'file') y lo sube a R2 privado.
+    Devuelve URL prefirmada (24h) + key. No requiere auth — parte del flujo de inscripción."""
     with get_db() as conn:
         _get_taller(conn, slug)
 
@@ -163,24 +165,16 @@ async def upload_comprobante(slug: str, request: Request):
         raise HTTPException(413, f"Archivo muy grande (máx {COMPROBANTE_MAX_MB} MB)")
 
     content_type = getattr(file, "content_type", None) or "application/octet-stream"
-    # Determinar extensión según content type
-    ext_map = {
-        "image/jpeg": "jpg",
-        "image/png": "png",
-        "image/webp": "webp",
-        "image/heic": "heic",
-        "application/pdf": "pdf",
-    }
-    ext = ext_map.get(content_type, "bin")
-
     ts = int(time.time() * 1000)
     uid = uuid.uuid4().hex[:8]
-    key = f"talleres/{slug}/comprobante-{ts}-{uid}.{ext}"
+    ref = f"{slug}-{ts}-{uid}"
 
     try:
-        url = _r2_put(key, raw, content_type)
+        key, url = store_raw_document(raw, kind="comprobante-taller", ref=ref, content_type=content_type)
+    except MediaError as e:
+        raise HTTPException(e.status, e.detail)
     except Exception as e:
-        logger.error("upload_comprobante: R2 error: %s", e)
+        logger.error("upload_comprobante: error inesperado: %s", e, exc_info=True)
         raise HTTPException(502, "No se pudo subir el archivo. Intentá de nuevo.")
 
     return {"url": url, "key": key}
@@ -192,6 +186,19 @@ class InscripcionBody(BaseModel):
     telefono: str
     experiencia: str | None = None
     comprobante_url: str | None = None
+    comprobante_key: str | None = None
+
+
+def _comprobante_url_para_email(key: str | None, fallback_url: str | None) -> str:
+    """Genera URL de acceso al comprobante para incluir en el email del admin.
+    Si hay key (privado), genera presigned URL de 24h. Si solo hay url legacy, la usa."""
+    if key:
+        try:
+            from services.media.storage import presigned_url as _presigned
+            return _presigned(key, expires_seconds=86400, private=True)
+        except Exception as e:
+            logger.warning("_comprobante_url_para_email: no se pudo generar presigned: %s", e)
+    return fallback_url or ""
 
 
 @router.post("/talleres/{slug}/inscripcion")
@@ -212,8 +219,9 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
         cur = conn.execute(
             """
             INSERT INTO taller_inscripciones
-                (taller_id, nombre, email, telefono, experiencia, comprobante_url, en_lista_espera)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (taller_id, nombre, email, telefono, experiencia,
+                 comprobante_url, comprobante_key, en_lista_espera)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id, created_at
             """,
             (
@@ -223,6 +231,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
                 telefono,
                 body.experiencia or None,
                 body.comprobante_url or None,
+                body.comprobante_key or None,
                 en_lista,
             ),
         )
@@ -246,7 +255,7 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
         "email": email,
         "telefono": telefono,
         "experiencia": body.experiencia or "",
-        "comprobante_url": body.comprobante_url or "",
+        "comprobante_url": _comprobante_url_para_email(body.comprobante_key, body.comprobante_url),
         "en_lista_espera": en_lista,
         "fecha": fecha_str,
     }
@@ -342,13 +351,19 @@ def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request
     return _taller_to_dict(row)
 
 
+_INSTRUCTOR_SPECS = [
+    DeriveSpec(name="display", square=False, max_width=400),
+    DeriveSpec(name="display-sm", square=False, max_width=200),
+]
+
+
 @router.post("/admin/talleres/{taller_id}/upload-foto-instructor")
 async def admin_upload_foto_instructor(taller_id: int, request: Request):
-    """Sube la foto de la instructora a R2 y actualiza instructor_foto_url."""
+    """Sube la foto del instructor a R2 vía el motor de media y actualiza talleres."""
     require_admin(request)
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id FROM talleres WHERE id = %s", (taller_id,)
+            "SELECT id FROM talleres WHERE id = ?", (taller_id,)
         ).fetchone()
         if row is None:
             raise HTTPException(404, "Taller no encontrado")
@@ -364,28 +379,24 @@ async def admin_upload_foto_instructor(taller_id: int, request: Request):
     if len(raw) > FOTO_MAX_MB * 1024 * 1024:
         raise HTTPException(413, f"Archivo muy grande (máx {FOTO_MAX_MB} MB)")
 
-    content_type = getattr(file, "content_type", None) or "application/octet-stream"
-    ext_map = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
-    ext = ext_map.get(content_type, "jpg")
-
-    ts = int(time.time() * 1000)
-    uid = uuid.uuid4().hex[:8]
-    key = f"talleres/{taller_id}/instructor-{ts}-{uid}.{ext}"
-
     try:
-        url = _r2_put(key, raw, content_type)
+        with get_db() as conn:
+            asset = store_upload(raw, kind="instructor", derive_specs=_INSTRUCTOR_SPECS, conn=conn)
+            display = asset.variant("display") or (asset.variants[0] if asset.variants else None)
+            url = display.url if display else ""
+            conn.execute(
+                "UPDATE talleres SET instructor_media_id = ?, instructor_foto_url = ?, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (asset.id, url, taller_id),
+            )
+            conn.commit()
+    except MediaError as e:
+        raise HTTPException(e.status, e.detail)
     except Exception as e:
-        logger.error("upload_foto_instructor: R2 error: %s", e)
+        logger.error("upload_foto_instructor: error inesperado: %s", e, exc_info=True)
         raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")
 
-    with get_db() as conn:
-        conn.execute(
-            "UPDATE talleres SET instructor_foto_url = %s, updated_at = NOW() WHERE id = %s",
-            (url, taller_id),
-        )
-        conn.commit()
-
-    return {"ok": True, "url": url}
+    return {"ok": True, "url": url, "media_id": asset.id}
 
 
 @router.get("/admin/talleres/{taller_id}/inscripciones")

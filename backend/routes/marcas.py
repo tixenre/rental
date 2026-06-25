@@ -78,7 +78,7 @@ def list_marcas():
     sino fallback al algoritmo automático de top N por count."""
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT id, nombre, logo_url, destacada, orden,
+            SELECT id, nombre, logo_url, logo_url_sm, destacada, orden,
                    popularidad_score, created_at, updated_at
             FROM marcas
             WHERE visible = TRUE
@@ -347,20 +347,25 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
                     "height": None,
                 }
             else:
-                from services.media import DISPLAY_KEEP_ASPECT, store_upload
+                from services.media import DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM, store_upload
                 from services.media_fastapi import media_http
                 with media_http():
                     asset = store_upload(
-                        raw_content, kind="marca", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn
+                        raw_content, kind="marca",
+                        derive_specs=[DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM],
+                        conn=conn,
                     )
                 display = asset.variant("display")
+                display_sm = asset.variant("display-sm")
                 conn.execute(
-                    "UPDATE marcas SET logo_url = ?, media_id = ?, updated_at = NOW() WHERE id = ?",
-                    (display.url, asset.id, marca_id),
+                    "UPDATE marcas SET logo_url = ?, logo_url_sm = ?, media_id = ?, "
+                    "updated_at = NOW() WHERE id = ?",
+                    (display.url, display_sm.url if display_sm else None, asset.id, marca_id),
                 )
                 conn.commit()
                 return {
                     "public_url": display.url,
+                    "public_url_sm": display_sm.url if display_sm else None,
                     "path": display.key,
                     "size": display.bytes,
                     "size_original": len(raw_content),

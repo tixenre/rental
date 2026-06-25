@@ -301,11 +301,10 @@ class TestAuthMiddlewareStaticAssets:
         assert await self._classify("/api/equipos", method="GET") == "PASS"
 
     @pytest.mark.parametrize("path", [
-        "/estudio/Rambla_Estudio_S7V9470.jpg",
-        "/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
         "/favicon.png",
         "/apple-touch-icon.png",
         "/icon-512.png",
+        "/og-image.png",
         "/manifest-admin.json",
         "/robots.txt",
         "/wordmark.svg",

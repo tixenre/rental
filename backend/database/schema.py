@@ -159,6 +159,7 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ingreso_total_ars BIGINT NOT NULL DEFAULT 0")
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS ranking_actualizado TIMESTAMP")
     conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS destacada BOOLEAN NOT NULL DEFAULT FALSE")
+    conn.execute("ALTER TABLE marcas ADD COLUMN IF NOT EXISTS logo_url_sm TEXT")
 
     # FK a marcas. brand_id es la fuente única del nombre de marca
     # (vía marcas.nombre). El backfill desde la columna legacy `marca` y su
@@ -1494,10 +1495,22 @@ def _init_db_schema(conn):
             width        INTEGER,
             height       INTEGER,
             bytes        INTEGER,
+            content_hash TEXT,
             created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    conn.execute("""
+        ALTER TABLE media_assets
+        ADD COLUMN IF NOT EXISTS content_hash TEXT
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_media_assets_kind_hash
+        ON media_assets(kind, content_hash)
+        WHERE content_hash IS NOT NULL
+    """)
+    conn.execute("ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS lqip TEXT")
+    conn.execute("ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ready'")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS media_variants (
             id           BIGSERIAL PRIMARY KEY,
@@ -1592,6 +1605,8 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_foto_url TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS numero_edicion INTEGER NOT NULL DEFAULT 1")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS proxima_edicion_slug TEXT NOT NULL DEFAULT ''")
+    conn.execute("ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS comprobante_key TEXT")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
     import json as _json_t
     _programa_teorica = _json_t.dumps([
         "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
