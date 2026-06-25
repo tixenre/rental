@@ -28,6 +28,13 @@ export interface EntityMediaAsset {
    * Null para assets pre-F0e o si la generación falló silenciosamente.
    */
   lqip?: string | null;
+  /**
+   * Estado de derivación (F0g): 'ready' | 'pending' | 'failed'.
+   * 'pending' = el upload terminó pero las variantes se están generando en
+   * background. El frontend hace polling cada 2s hasta que cambie a 'ready'.
+   * Omitido o null = 'ready' (assets pre-F0g).
+   */
+  status?: string | null;
   variants: MediaVariant[];
 }
 

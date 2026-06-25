@@ -15,6 +15,14 @@ export function useEntityMedia(
     queryFn: () => fetchEntityMedia(kind, entityId!).then((r) => r.assets),
     enabled: !!entityId,
     staleTime: 5 * 60 * 1000,
+    // Polling: si hay assets con derivación en curso, refetch cada 2s hasta que
+    // todos estén ready. Se auto-desactiva cuando no hay ninguno pending.
+    refetchInterval: (query) => {
+      const assets = query.state.data;
+      if (!assets) return false;
+      const hasPending = assets.some((a) => a.status && a.status !== "ready");
+      return hasPending ? 2000 : false;
+    },
   });
 
   return {

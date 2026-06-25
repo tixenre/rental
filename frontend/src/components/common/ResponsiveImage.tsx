@@ -1,6 +1,15 @@
 import type { MediaVariant } from "@/lib/media/types";
 import { buildSrcSet, findVariant, DISPLAY_VARIANT } from "@/lib/media/types";
 
+/** Construye el srcset de variantes de un content_type dado (ej. "image/avif"). */
+function buildSrcSetForType(variants: MediaVariant[], contentType: string): string | undefined {
+  const filtered = variants
+    .filter((v) => v.name.startsWith("display") && v.content_type === contentType && v.width > 0)
+    .sort((a, b) => a.width - b.width);
+  if (filtered.length < 1) return undefined;
+  return filtered.map((v) => `${v.url} ${v.width}w`).join(", ");
+}
+
 interface ResponsiveImageProps extends Omit<
   React.ImgHTMLAttributes<HTMLImageElement>,
   "src" | "srcSet"
@@ -46,7 +55,8 @@ export function ResponsiveImage({
   const primary = findVariant(variants, preferName);
   if (!primary) return null;
 
-  const srcSet = buildSrcSet(variants);
+  const webpSrcSet = buildSrcSet(variants);
+  const avifSrcSet = buildSrcSetForType(variants, "image/avif");
 
   const blurStyle: React.CSSProperties = lqip
     ? {
@@ -56,16 +66,25 @@ export function ResponsiveImage({
       }
     : {};
 
-  return (
+  const imgEl = (
     <img
       src={primary.url}
-      srcSet={srcSet}
-      sizes={srcSet ? sizes : undefined}
+      srcSet={webpSrcSet}
+      sizes={webpSrcSet ? sizes : undefined}
       width={primary.width > 0 ? primary.width : undefined}
       height={primary.height > 0 ? primary.height : undefined}
       alt={alt}
       style={{ ...blurStyle, ...style }}
       {...imgProps}
     />
+  );
+
+  if (!avifSrcSet) return imgEl;
+
+  return (
+    <picture>
+      <source type="image/avif" srcSet={avifSrcSet} sizes={sizes} />
+      {imgEl}
+    </picture>
   );
 }
