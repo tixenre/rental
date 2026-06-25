@@ -173,7 +173,7 @@ async def upload_comprobante(slug: str, request: Request):
     try:
         key, url = store_raw_document(raw, kind="comprobante-taller", ref=ref, content_type=content_type)
     except MediaError as e:
-        raise HTTPException(e.status_code, e.detail)
+        raise HTTPException(e.status, e.detail)
     except Exception as e:
         logger.error("upload_comprobante: error inesperado: %s", e, exc_info=True)
         raise HTTPException(502, "No se pudo subir el archivo. Intentá de nuevo.")
@@ -392,7 +392,7 @@ async def admin_upload_foto_instructor(taller_id: int, request: Request):
             )
             conn.commit()
     except MediaError as e:
-        raise HTTPException(e.status_code, e.detail)
+        raise HTTPException(e.status, e.detail)
     except Exception as e:
         logger.error("upload_foto_instructor: error inesperado: %s", e, exc_info=True)
         raise HTTPException(502, "No se pudo subir la foto. Intentá de nuevo.")
