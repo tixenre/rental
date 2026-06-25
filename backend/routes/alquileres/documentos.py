@@ -50,6 +50,7 @@ def _add_componentes(conn, items: list[dict]) -> None:
         comp_rows = conn.execute(f"""
             SELECT ec.nombre, {marca_subquery('ec')},
                    ec.modelo, ec.serie, ec.valor_reposicion,
+                   ec.foto_url, ec.foto_url_sm, ec.foto_url_thumb,
                    ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
