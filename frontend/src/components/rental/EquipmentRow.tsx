@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { PriceBlock } from "./equipment/shared/PriceBlock";
 import { FavButton } from "./equipment/shared/FavButton";
-import { buildFotoSrcSet } from "@/lib/srcset";
+import { buildFotoSrcSet, buildAvifSrcSet } from "@/lib/srcset";
 
 /**
  * EquipmentRow — vista de lista del catálogo (desktop + mobile responsive).
@@ -62,6 +62,14 @@ export function EquipmentRow({
   // fallback al nombre interno). No re-concatenar `item.brand` acá: duplicaba
   // la marca en los equipos con template configurado.
   const nombrePublico = item.name;
+  const avifSrcSet = buildAvifSrcSet(item.fotoUrlAvif, item.fotoUrlSmAvif, item.fotoUrlThumbAvif);
+  const blurStyle = item.fotoLqip
+    ? {
+        backgroundImage: `url("${item.fotoLqip}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : undefined;
 
   // Quick facts para el expand: specs_destacados del template si las hay, si no
   // cae al conjunto fijo legacy.
@@ -102,16 +110,20 @@ export function EquipmentRow({
             className="relative block aspect-square w-12 overflow-hidden rounded-md bg-white sm:w-[52px]"
           >
             {item.fotoUrl && !imgFailed ? (
-              <img
-                src={item.fotoUrl}
-                srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm, item.fotoUrlThumb)}
-                sizes="52px"
-                alt={nombrePublico}
-                className="h-full w-full object-contain p-1.5"
-                loading={index < 4 ? "eager" : "lazy"}
-                decoding="async"
-                onError={() => setImgFailed(true)}
-              />
+              <picture>
+                {avifSrcSet && <source type="image/avif" srcSet={avifSrcSet} sizes="52px" />}
+                <img
+                  src={item.fotoUrl}
+                  srcSet={buildFotoSrcSet(item.fotoUrl, item.fotoUrlSm, item.fotoUrlThumb)}
+                  sizes="52px"
+                  alt={nombrePublico}
+                  loading={index < 4 ? "eager" : "lazy"}
+                  decoding="async"
+                  onError={() => setImgFailed(true)}
+                  style={blurStyle}
+                  className="h-full w-full object-contain p-1.5"
+                />
+              </picture>
             ) : (
               <EmptyImage category={item.category} brand={item.brand} />
             )}
