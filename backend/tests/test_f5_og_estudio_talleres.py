@@ -4,7 +4,6 @@
 - /workshops/{slug} inyecta OG con nombre + instructor + foto
 - Fallback a index plano ante errores de BD o taller inexistente
 """
-import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
