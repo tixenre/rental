@@ -172,8 +172,9 @@ def _insert_foto(
 
 def _get_trabajos(conn, solo_activos: bool = True) -> list:
     q = (
-        "SELECT id, titulo, realizador, realizador_logo_url, tipo, youtube_url, "
-        "fotos_json, orden, activo, created_at, updated_at "
+        "SELECT id, titulo, realizador, realizador_logo_url, "
+        "realizador_instagram, realizador_web, "
+        "tipo, youtube_url, fotos_json, orden, activo, created_at, updated_at "
         "FROM estudio_trabajos "
     )
     q += "WHERE activo = TRUE " if solo_activos else ""
@@ -186,6 +187,8 @@ def _get_trabajos(conn, solo_activos: bool = True) -> list:
             "titulo": r["titulo"],
             "realizador": r["realizador"],
             "realizador_logo_url": r["realizador_logo_url"],
+            "realizador_instagram": r["realizador_instagram"],
+            "realizador_web": r["realizador_web"],
             "tipo": r["tipo"],
             "youtube_url": r["youtube_url"],
             "fotos": _parse_json_field(r["fotos_json"]) or [],
@@ -495,6 +498,8 @@ def admin_list_trabajos(request: Request):
 class TrabajoCreate(BaseModel):
     titulo: str = ""
     realizador: str = ""
+    realizador_instagram: Optional[str] = None
+    realizador_web: Optional[str] = None
     tipo: str = "fotos"
     youtube_url: Optional[str] = None
     activo: bool = True
@@ -509,9 +514,11 @@ def admin_create_trabajo(body: TrabajoCreate, request: Request):
         )
         orden = cur.fetchone()["next"]
         cur2 = conn.execute(
-            "INSERT INTO estudio_trabajos (titulo, realizador, tipo, youtube_url, orden, activo) "
-            "VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-            (body.titulo, body.realizador, body.tipo, body.youtube_url, orden, body.activo),
+            "INSERT INTO estudio_trabajos "
+            "(titulo, realizador, realizador_instagram, realizador_web, tipo, youtube_url, orden, activo) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (body.titulo, body.realizador, body.realizador_instagram, body.realizador_web,
+             body.tipo, body.youtube_url, orden, body.activo),
         )
         new_id = cur2.fetchone()["id"]
         conn.commit()
@@ -522,6 +529,8 @@ def admin_create_trabajo(body: TrabajoCreate, request: Request):
 class TrabajoUpdate(BaseModel):
     titulo: Optional[str] = None
     realizador: Optional[str] = None
+    realizador_instagram: Optional[str] = None
+    realizador_web: Optional[str] = None
     tipo: Optional[str] = None
     youtube_url: Optional[str] = None
     activo: Optional[bool] = None

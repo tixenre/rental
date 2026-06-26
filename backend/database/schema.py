@@ -1864,5 +1864,11 @@ def _init_db_schema(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_estudio_trabajos_orden ON estudio_trabajos(orden)"
     )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS realizador_instagram TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS realizador_web TEXT"
+    )
 
     conn.commit()

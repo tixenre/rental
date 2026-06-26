@@ -869,6 +869,8 @@ function TrabajoDialog({
 
   const [titulo, setTitulo] = useState(existing?.titulo ?? "");
   const [realizador, setRealizador] = useState(existing?.realizador ?? "");
+  const [instagram, setInstagram] = useState(existing?.realizador_instagram ?? "");
+  const [web, setWeb] = useState(existing?.realizador_web ?? "");
   const [tipo, setTipo] = useState<"fotos" | "video">(existing?.tipo ?? "fotos");
   const [youtubeUrl, setYoutubeUrl] = useState(existing?.youtube_url ?? "");
   const [activo, setActivo] = useState(existing?.activo ?? true);
@@ -888,6 +890,8 @@ function TrabajoDialog({
     const t = isEdit ? existing : null;
     setTitulo(t?.titulo ?? "");
     setRealizador(t?.realizador ?? "");
+    setInstagram(t?.realizador_instagram ?? "");
+    setWeb(t?.realizador_web ?? "");
     setTipo(t?.tipo ?? "fotos");
     setYoutubeUrl(t?.youtube_url ?? "");
     setActivo(t?.activo ?? true);
@@ -898,7 +902,14 @@ function TrabajoDialog({
 
   async function ensureCreated(): Promise<number> {
     if (trabajoId) return trabajoId;
-    const data: EstudioTrabajoInput = { titulo, realizador, tipo, activo };
+    const data: EstudioTrabajoInput = {
+      titulo,
+      realizador,
+      realizador_instagram: instagram || null,
+      realizador_web: web || null,
+      tipo,
+      activo,
+    };
     if (tipo === "video" && youtubeUrl) data.youtube_url = youtubeUrl;
     const created = await trabajosAdminApi.create(data);
     setTrabajoId(created.id);
@@ -908,7 +919,14 @@ function TrabajoDialog({
   async function handleSave() {
     setSaving(true);
     try {
-      const data: EstudioTrabajoInput = { titulo, realizador, tipo, activo };
+      const data: EstudioTrabajoInput = {
+        titulo,
+        realizador,
+        realizador_instagram: instagram || null,
+        realizador_web: web || null,
+        tipo,
+        activo,
+      };
       if (tipo === "video" && youtubeUrl) data.youtube_url = youtubeUrl;
       if (tipo !== "video") data.youtube_url = null;
       let result: EstudioTrabajo;
@@ -1015,6 +1033,30 @@ function TrabajoDialog({
               onChange={(e) => setRealizador(e.target.value)}
               placeholder="Nombre del realizador o productora"
             />
+          </div>
+
+          {/* Sociales del realizador */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                Instagram
+              </label>
+              <Input
+                value={instagram}
+                onChange={(e) => setInstagram(e.target.value)}
+                placeholder="@usuario"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                Web
+              </label>
+              <Input
+                value={web}
+                onChange={(e) => setWeb(e.target.value)}
+                placeholder="https://..."
+              />
+            </div>
           </div>
 
           {/* Logo del realizador */}
