@@ -1,11 +1,11 @@
 # Design System — Rambla Rental
 
 > **Esta es la referencia canónica del design system del repo.** Lo que
-> está acá vale para cualquier código en `src/`. Si una pantalla nueva
+> está acá vale para cualquier código en `frontend/src/`. Si una pantalla nueva
 > tiene que decidir un color, un tamaño tipográfico, un radio, una
 > animación o un texto — empezás acá.
 >
-> La fuente canónica del design system es este doc + `src/design-system/` (tokens/tipografía/utilities/
+> La fuente canónica del design system es este doc + `frontend/src/design-system/` (tokens/tipografía/utilities/
 > fuentes en `styles/`; entry `ds-styles.css`; primitivos en `ui/` y `kit/`).
 
 ---
@@ -78,16 +78,16 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
   shadcn/Radix UI + lucide-react. **NO Next.js.**
 - **Backend:** FastAPI + PostgreSQL en Railway.
 - **Fonts:** TT Commons (primary, full axis) + Champ Black (display only)
-  vendoreadas en `src/assets/fonts/`. JetBrains Mono desde Google Fonts.
+  vendoreadas en `frontend/src/assets/fonts/`. JetBrains Mono desde Google Fonts.
 - **Iconos:** lucide-react, import individual, `strokeWidth` por default
   (no forzamos 1.5 — el kit lo recomienda; en producción mezclamos 2 que
   shadcn usa con 1.5 en piezas branded).
 - **Locale:** Spanish (Argentina). Currency: ARS via `formatARS()` de
-  `src/lib/format.ts`.
+  `frontend/src/lib/format.ts`.
 
 ---
 
-## Tokens en `src/design-system/styles/`
+## Tokens en `frontend/src/design-system/styles/`
 
 ### Colores (lo que hay hoy)
 
@@ -133,11 +133,11 @@ tier-4 a propósito** (identidad de marca) — no se "arregla". Decisión: 2026-
 
 Las utilities Tailwind correspondientes (`bg-amber`, `text-ink`,
 `border-hairline`, `bg-rosa/10`, etc.) las genera Tailwind v4 directo de
-estos tokens vía el bloque `@theme` de `src/design-system/styles/tokens/colors.css`.
+estos tokens vía el bloque `@theme` de `frontend/src/design-system/styles/tokens/colors.css`.
 
 #### Tiers de color (de dónde puede salir un color)
 
-Todo color en `src/` tiene que venir de uno de estos cuatro tiers. Nada de
+Todo color en `frontend/src/` tiene que venir de uno de estos cuatro tiers. Nada de
 Tailwind genérico (`bg-slate-100`, `text-blue-700`, …) ni hex crudo
 ad-hoc por pantalla — esa es la deuda que se barrió en
 [#584](https://github.com/tixenre/rental/issues/584). **El guardrail de
@@ -341,7 +341,7 @@ intuición de devs que conocen Tailwind. Referencia rápida:
 
 ## Recipes tipográficas
 
-Defined as utility classes en `src/design-system/styles/utilities.css`:
+Defined as utility classes en `frontend/src/design-system/styles/utilities.css`:
 
 ```
 .t-display-1   /* Champ Black, clamp(3.5rem, 9vw, 8.5rem), lh 0.9, lowercase */
@@ -360,7 +360,7 @@ Defined as utility classes en `src/design-system/styles/utilities.css`:
 
 ## Hit-area / tap targets (≥44px, HIG)
 
-Utilidades canónicas en `src/design-system/styles/utilities.css` para llevar el área **tocable** a 44px
+Utilidades canónicas en `frontend/src/design-system/styles/utilities.css` para llevar el área **tocable** a 44px
 **sin agrandar el visual** (generalizan el `::before` que vivía en StepperPill — fuente única):
 
 ```
@@ -382,12 +382,12 @@ Utilidades canónicas en `src/design-system/styles/utilities.css` para llevar el
 
 | Categoría                                          | Dónde vive                | Notas                                                                                                                                  |
 | -------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Primitivas UI** (Button, Input, Card, Dialog, …) | `src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
-| **Componentes de aplicación (`rental/`)**          | `src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar integrados con queries + estado.                                                            |
-| **Componentes admin**                              | `src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
-| **Kit de marca** (`kit/`)                          | `src/design-system/kit/*`    | **SOLO 4 piezas**: `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar` (+ `types.ts`). Presentacionales, con paleta de marca; `EstadoBadge` es la única fuente del repo. Otras piezas presentacionales (AddonPills/EmptyState/PriceBlock/ViewToggle/StatCard) viven en `components/rental/`. |
+| **Primitivas UI** (Button, Input, Card, Dialog, …) | `frontend/src/design-system/ui/*`     | shadcn/Radix base + variants de marca (`primary`, `amber`). Naming shadcn: `default` no se renombra (ver Button abajo).                |
+| **Componentes de aplicación (`rental/`)**          | `frontend/src/components/rental/*` | EquipmentCard, TopBar, Footer, CartMiniBar integrados con queries + estado.                                                            |
+| **Componentes admin**                              | `frontend/src/components/admin/*`  | Tablas, modales, sidebar del back-office.                                                                                              |
+| **Kit de marca** (`kit/`)                          | `frontend/src/design-system/kit/*`    | **SOLO 4 piezas**: `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar` (+ `types.ts`). Presentacionales, con paleta de marca; `EstadoBadge` es la única fuente del repo. Otras piezas presentacionales (AddonPills/EmptyState/PriceBlock/ViewToggle/StatCard) viven en `components/rental/`. |
 
-### Button (`src/design-system/ui/button.tsx`)
+### Button (`frontend/src/design-system/ui/button.tsx`)
 
 ```tsx
 import { Button } from "@/design-system/ui/button";
@@ -420,7 +420,7 @@ import { Button } from "@/design-system/ui/button";
 
 ### EstadoBadge
 
-**Fuente única**: `src/design-system/kit/EstadoBadge.tsx`, con la paleta
+**Fuente única**: `frontend/src/design-system/kit/EstadoBadge.tsx`, con la paleta
 secundaria oficial de marca (`bg-azul/10`, `bg-verde/10`, …).
 
 Usado por `/cliente/portal` (PR E1) **y por el admin** (`/admin/pedidos`
@@ -438,7 +438,7 @@ de pedido).
 
 ### PagoBadge
 
-**Fuente única**: `src/design-system/kit/PagoBadge.tsx`. Hermano de `EstadoBadge`:
+**Fuente única**: `frontend/src/design-system/kit/PagoBadge.tsx`. Hermano de `EstadoBadge`:
 mientras ese muestra el **estado del pedido**, este muestra la **cobranza con el
 monto** — `Pagado` (verde) · `Debe $X` (rojo si urgente = retirado/entregado,
 ámbar si no) · `Seña $X` (cotización con seña). Idea tomada de cómo Booqable hace
@@ -450,14 +450,14 @@ inline, usar este chip.
 
 ### ClienteAvatar
 
-**Fuente única**: `src/design-system/kit/ClienteAvatar.tsx`. Círculo con iniciales y
+**Fuente única**: `frontend/src/design-system/kit/ClienteAvatar.tsx`. Círculo con iniciales y
 color **determinístico por nombre** (hash sobre paleta acotada de tokens, todos
 con buen contraste) → el mismo nombre siempre cae en el mismo color, para
 reconocimiento visual rápido en listas/headers (idea de Booqable). Tamaño/typo por
 `className`. Reusable en admin y portal. No crear avatares ad-hoc con `bg-ink`
 inline.
 
-### Spinner / loading (`src/design-system/ui/spinner.tsx`)
+### Spinner / loading (`frontend/src/design-system/ui/spinner.tsx`)
 
 Primitivo canónico de carga. Consolida los 34 `<Loader2 className="animate-spin …" />` del repo.
 
@@ -481,11 +481,11 @@ import { Button } from "@/design-system/ui/button";
 
 No crear spinners con `Loader2` suelto — siempre `<Spinner>`.
 
-### Componentes presentacionales (`src/components/rental/`)
+### Componentes presentacionales (`frontend/src/components/rental/`)
 
 > **OJO — ubicación.** Estas piezas **NO viven en `kit/`** (el `kit/` solo tiene
 > `Pill`, `EstadoBadge`, `PagoBadge`, `ClienteAvatar`). Viven en
-> `src/components/rental/` (una, en `equipment/shared/`):
+> `frontend/src/components/rental/` (una, en `equipment/shared/`):
 
 - `AddonPills` (`rental/AddonPills.tsx`) — items "incluye" sobre rows de equipo.
 - `EmptyState` (`rental/EmptyState.tsx`) — pattern "nada para mostrar".
@@ -493,7 +493,7 @@ No crear spinners con `Loader2` suelto — siempre `<Spinner>`.
 - `ViewToggle` (`rental/ViewToggle.tsx`) — segmented control con pill deslizante.
 - `StatCard` (`rental/StatCard.tsx`) — número grande para dashboards.
 
-El primitivo `Input` vive en **`src/design-system/ui/input.tsx`** (no en `kit/`).
+El primitivo `Input` vive en **`frontend/src/design-system/ui/input.tsx`** (no en `kit/`).
 **No existe** un `SearchInput` en el repo. **`FieldLabel` no es una pieza única**:
 está duplicado inline en 3 lugares (`StudioBookingForm`, `PedidoPageHelpers`,
 `pagos.lazy`) → es un **patrón pendiente de extraer** a una pieza compartida, no un
@@ -509,7 +509,7 @@ ambiente** — hoy accesible por URL directa en cualquier ambiente, prod incluid
 si se quiere restringir a staging es trabajo de código) muestra los componentes
 del `kit/` (`Pill`, `EstadoBadge`, `PagoBadge`, `Button`, `Spinner`) para QA visual.
 
-### TopBar — navegación modular por área (`src/components/rental/TopBar.tsx`)
+### TopBar — navegación modular por área (`frontend/src/components/rental/TopBar.tsx`)
 
 La web tiene áreas con identidad propia (rental · estudio · workshops · portal cliente)
 + el hub (`/`). **Todas las barras salen de un único shell**, no de topbars ad-hoc por
@@ -519,7 +519,7 @@ reusar no recrear.
 - **`TopBarShell`** — el shell único: `<header>` sticky con **mismo alto, padding y logo**
   para todas las variantes. Recibe `section`, slots (`center`, `right`), y opcionales
   (`headerRef`, `labelOverride`). De acá salen rental / estudio / workshops / cliente.
-- **Color de marca por área** — el topbar usa el `bg`/`accent` declarado en **`src/data/areas.ts`**
+- **Color de marca por área** — el topbar usa el `bg`/`accent` declarado en **`frontend/src/data/areas.ts`**
   (`label/desc/href/color`), consumida por el topbar **y** el menú. El resto de la página recibe
   el accent via `--area-accent` (cascade `[data-area]`, ver §Accent por área). No duplicar la
   lista de áreas en otro lado.
@@ -656,10 +656,10 @@ fondo y texto en hover. _"Pasa el mouse y se prende."_
 
 **Cart count bump:** cuando se agrega un equipo al carrito, el badge del
 contador hace `scale [1, 1.25, 0.95, 1]` (ease bounce, ~200ms). Spec
-real en `src/components/rental/CartMiniBar.tsx`.
+real en `frontend/src/components/rental/CartMiniBar.tsx`.
 
 **+1 fly to cart:** específico de Rambla. Componente
-implementado: `src/components/rental/FlyToCartLayer.tsx`. Curva canónica
+implementado: `frontend/src/components/rental/FlyToCartLayer.tsx`. Curva canónica
 `cubic-bezier(0.22, 1, 0.36, 1)`, duración 550ms.
 
 **TopBar amber-on-scroll:** específico de Rambla.
@@ -693,7 +693,7 @@ del progreso del hero invierte logo + date pill + user button.
 
 ## Skeleton / loading
 
-Componente canónico `<Skeleton>` (`src/design-system/ui/skeleton.tsx`) — un `div`
+Componente canónico `<Skeleton>` (`frontend/src/design-system/ui/skeleton.tsx`) — un `div`
 con `animate-pulse rounded-md bg-primary/10`. No hay clase `.skeleton` ni
 `@keyframes shimmer` propios: el pulse sale de `animate-pulse` de Tailwind.
 
@@ -754,7 +754,7 @@ ocasionalmente.
 ## Patterns que nunca se rompen
 
 1. **Nunca un substitute de Google Fonts para TT Commons o Champ Black.**
-   Las fuentes vendoreadas en `src/assets/fonts/` son las del manual oficial
+   Las fuentes vendoreadas en `frontend/src/assets/fonts/` son las del manual oficial
    de marca.
 2. **Champ Black sólo para display.** No para headings de UI, no para
    labels, no para body, no para botones.
@@ -778,13 +778,13 @@ ocasionalmente.
 
 ## Source-of-truth ladder (cuando algo está en varios lados)
 
-1. **`src/design-system/styles/tokens/*.css`** — los tokens que el build de
+1. **`frontend/src/design-system/styles/tokens/*.css`** — los tokens que el build de
    producción usa (`colors.css`, `typography.css`, `shadows.css`, `motion.css`,
    `z-index.css`). Si Tailwind v4 genera `bg-amber` es porque `--color-amber`
    vive en `tokens/colors.css`. El entry que los cablea es
-   `src/design-system/ds-styles.css`, consumido por `src/styles.css` (que solo
+   `frontend/src/design-system/ds-styles.css`, consumido por `frontend/src/styles.css` (que solo
    importa el DS + define vars de runtime y alias planos transicionales).
-2. **`src/design-system/{ui,kit}/*`** y **`src/components/{rental,admin}/*`** —
+2. **`frontend/src/design-system/{ui,kit}/*`** y **`frontend/src/components/{rental,admin}/*`** —
    los componentes que renderean en producción (primitivos + piezas de marca en
    `design-system/`, componentes de negocio en `components/`).
 3. **Este doc (`docs/DESIGN_SYSTEM.md`)** — explica el por qué.
@@ -804,6 +804,6 @@ corresponde. El supervisor cuida que no quede drift silencioso.
 - **Sos sesión de Claude Code arrancando**: leé "Stack real", "Tokens",
   "Patterns que nunca se rompen", y `docs/MEMORIA.md` para criterio.
 
-Si dudás cómo aplicar algo, leé el código real en `src/design-system/{ui,kit}/*`
-(primitivos + piezas de marca) o `src/components/{rental,admin}/*` (componentes de
+Si dudás cómo aplicar algo, leé el código real en `frontend/src/design-system/{ui,kit}/*`
+(primitivos + piezas de marca) o `frontend/src/components/{rental,admin}/*` (componentes de
 negocio) — casi siempre hay un ejemplo vivo.
