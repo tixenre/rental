@@ -378,8 +378,6 @@ export function EquipoFormDialogV2({
   // categoría de specs".
   const specsTouchedRef = useRef(false);
   const htmlInputRef = useRef<HTMLInputElement | null>(null);
-  const htmlEnrichInputRef = useRef<HTMLInputElement | null>(null);
-  const [enrichingHtml, setEnrichingHtml] = useState(false);
   useEffect(() => {
     setCategoriaSpecs(initial?.categoria_specs ?? "");
     specsTouchedRef.current = false;
@@ -698,83 +696,6 @@ export function EquipoFormDialogV2({
       toast.error(`Error al subir HTML: ${e instanceof Error ? e.message : ""}`);
     } finally {
       setUploadingHtml(false);
-    }
-  };
-
-  // ════════════════════════════════════════════════════════════════════
-  // Enriquecer desde HTML pegado (JSON, no guarda en R2)
-  // ════════════════════════════════════════════════════════════════════
-  const handleEnriquecerFromHtml = async (file: File) => {
-    if (!initial?.id) return;
-    setEnrichingHtml(true);
-    try {
-      const html = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
-        reader.readAsText(file, "utf-8");
-      });
-      const r = await authedJson<{
-        specs?: { label: string; value: string; spec_key?: string }[];
-      }>(`/api/admin/equipos/${initial.id}/enriquecer-from-html`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          html,
-          bh_url: form.getValues("bh_url") || undefined,
-          categoria_hint: categoriaRoot ?? undefined,
-        }),
-      });
-
-      const propuestos: Spec[] = withIds(r.specs ?? []);
-      if (propuestos.length > 0) {
-        const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        for (const t of templateItems ?? []) {
-          if (t.spec_key) tmplByKey.set(t.spec_key, t);
-          if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
-        }
-        const findTmpl = (p: Spec) =>
-          (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
-          tmplByLabel.get(p.label.trim().toLowerCase());
-
-        const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
-        const requierenRevision = propuestos.filter((p) => !findTmpl(p));
-
-        if (autoAplicables.length > 0) {
-          setSpecs((prev) => {
-            const next = [...prev];
-            for (const p of autoAplicables) {
-              const tmpl = findTmpl(p)!;
-              const targetId = `spec-${tmpl.spec_def_id}`;
-              const idx = next.findIndex(
-                (x) =>
-                  x.id === targetId ||
-                  x.id === `tmpl-${tmpl.spec_def_id}` ||
-                  sameLabel(x.label, tmpl.label),
-              );
-              if (idx >= 0) {
-                next[idx] = { ...next[idx], value: p.value };
-              } else {
-                next.push({ id: targetId, label: tmpl.label, value: p.value, spec_key: p.spec_key });
-              }
-            }
-            return next;
-          });
-        }
-        if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
-
-        const parts: string[] = [];
-        if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados`);
-        if (requierenRevision.length) parts.push(`${requierenRevision.length} a revisar`);
-        toast.success("HTML procesado", { description: parts.join(" · ") });
-      } else {
-        toast.success("HTML procesado", { description: "No se extrajeron specs" });
-      }
-    } catch (e) {
-      toast.error(`Error al procesar HTML: ${e instanceof Error ? e.message : ""}`);
-    } finally {
-      setEnrichingHtml(false);
     }
   };
 
@@ -1195,31 +1116,6 @@ export function EquipoFormDialogV2({
                   <FileCode className="h-3 w-3" /> HTML guardado
                 </span>
               )}
-              <input
-                ref={htmlEnrichInputRef}
-                type="file"
-                accept=".html,.htm"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f) void handleEnriquecerFromHtml(f);
-                }}
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => htmlEnrichInputRef.current?.click()}
-                disabled={uploadingHtml || enrichingHtml}
-                title="Guardá la página de B&H como 'Página web completa' y elegí el archivo .html acá"
-              >
-                {enrichingHtml ? (
-                  <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Extrayendo…</>
-                ) : (
-                  <><FileCode className="h-3.5 w-3.5 mr-1" /> HTML sin guardar</>
-                )}
-              </Button>
             </>
           )}
         </div>
