@@ -169,7 +169,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
   const [filtro, setFiltro] = useState<string | null>(null);
   const [selected, setSelected] = useState<EstudioTrabajo | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const drag = useRef({ active: false, startX: 0, startScroll: 0 });
+  const drag = useRef({ active: false, startX: 0, startScroll: 0, moved: false });
 
   const categorias = useMemo(() => {
     const set = new Set<string>();
@@ -182,15 +182,17 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (!el) return;
-    drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft };
-    el.setPointerCapture(e.pointerId);
+    drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft, moved: false };
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!drag.current.active || !ref.current) return;
-    ref.current.scrollLeft = drag.current.startScroll - (e.clientX - drag.current.startX);
+    const dx = e.clientX - drag.current.startX;
+    if (Math.abs(dx) > 4) {
+      drag.current.moved = true;
+      ref.current.scrollLeft = drag.current.startScroll - dx;
+    }
   };
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    ref.current?.releasePointerCapture(e.pointerId);
+  const onPointerUp = () => {
     drag.current.active = false;
   };
 
@@ -240,7 +242,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerLeave={onPointerUp}
         className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none"
       >
         {visibles.map((trabajo) => {
@@ -253,7 +255,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
           return (
             <button
               key={trabajo.id}
-              onClick={() => setSelected(trabajo)}
+              onClick={() => { if (!drag.current.moved) setSelected(trabajo); }}
               className="snap-start shrink-0 basis-[78%] sm:basis-[48%] lg:basis-[30%] rounded-xl overflow-hidden border border-background/10 bg-background/5 text-left group"
               draggable={false}
             >
