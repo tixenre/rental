@@ -1139,7 +1139,40 @@ export type EstudioConfig = {
   mapa_embed_url: string;
   updated_at: string | null;
   fotos: EstudioFoto[];
+  trabajos: EstudioTrabajo[];
 };
+
+export type EstudioTrabajoFoto = {
+  url: string;
+  url_sm: string | null;
+  url_avif: string | null;
+  url_sm_avif: string | null;
+  path: string | null;
+};
+
+export type EstudioTrabajo = {
+  id: number;
+  titulo: string;
+  realizador: string;
+  realizador_logo_url: string | null;
+  tipo: "fotos" | "video";
+  youtube_url: string | null;
+  fotos: EstudioTrabajoFoto[];
+  orden: number;
+  activo: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type EstudioTrabajoInput = {
+  titulo?: string;
+  realizador?: string;
+  tipo?: "fotos" | "video";
+  youtube_url?: string | null;
+  activo?: boolean;
+};
+
+export type TrabajoOrdenItem = { id: number; orden: number };
 
 export type EstudioInput = {
   nombre?: string;

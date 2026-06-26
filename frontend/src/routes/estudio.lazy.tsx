@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, MessageCircle, MapPin } from "lucide-react";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
 import { StudioPackKit } from "@/components/studio/StudioPackKit";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
-import { apiGetEstudio } from "@/lib/api";
+import { apiGetEstudio, type EstudioTrabajo } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -33,6 +33,89 @@ const Grain = ({ opacity = 12 }: { opacity?: number }) => (
 type Photo = { src: string; alt: string; hero?: boolean; ciclorama?: boolean };
 
 // ── Galería horizontal arrastrable ─────────────────────────────────────────
+// ── Trabajo card (sección "en acción") ───────────────────────────────────────
+
+function extractYtId(url: string): string | null {
+  const m = url.match(/(?:v=|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m?.[1] ?? null;
+}
+
+function TrabajoCard({ trabajo }: { trabajo: EstudioTrabajo }) {
+  const [playing, setPlaying] = useState(false);
+  const ytId = trabajo.tipo === "video" && trabajo.youtube_url ? extractYtId(trabajo.youtube_url) : null;
+  const thumb =
+    trabajo.tipo === "fotos"
+      ? (trabajo.fotos[0]?.url_sm ?? trabajo.fotos[0]?.url ?? null)
+      : ytId
+        ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+        : null;
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-background/8 bg-background/5">
+      {/* Media */}
+      <div className="aspect-[3/2] overflow-hidden relative bg-background/5">
+        {trabajo.tipo === "video" && playing && ytId ? (
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
+            title={trabajo.titulo}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full"
+          />
+        ) : thumb ? (
+          <>
+            <img
+              src={thumb}
+              alt={trabajo.titulo}
+              loading="lazy"
+              className="h-full w-full object-cover block transition-transform duration-300 hover:scale-[1.04]"
+            />
+            {trabajo.tipo === "video" && ytId && (
+              <button
+                onClick={() => setPlaying(true)}
+                className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors group"
+                aria-label="Reproducir video"
+              >
+                <div className="h-12 w-12 rounded-full bg-background/90 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                  <svg viewBox="0 0 24 24" className="h-5 w-5 text-ink ml-0.5" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </button>
+            )}
+          </>
+        ) : (
+          <div className="h-full w-full flex items-center justify-center">
+            <span className="text-background/20 text-sm">sin imagen</span>
+          </div>
+        )}
+      </div>
+
+      {/* Meta */}
+      <div className="px-3.5 py-3">
+        <div className="flex items-center gap-2 mb-1.5">
+          {trabajo.realizador_logo_url && (
+            <img
+              src={trabajo.realizador_logo_url}
+              alt={trabajo.realizador}
+              className="h-5 w-5 rounded object-contain shrink-0"
+            />
+          )}
+          <span className="text-sm text-background/65 truncate">
+            {trabajo.realizador || trabajo.titulo}
+          </span>
+          <span className="ml-auto rounded-full bg-amber/18 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber whitespace-nowrap shrink-0">
+            {trabajo.tipo === "video" ? "Video" : "Fotografía"}
+          </span>
+        </div>
+        {trabajo.realizador && trabajo.titulo && (
+          <p className="text-xs text-background/40 truncate">{trabajo.titulo}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DragGallery({ photos }: { photos: Photo[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
@@ -199,6 +282,7 @@ function EstudioPage() {
   const minHours = data?.min_horas ?? STUDIO.minHours;
   const packActivo = data?.pack_activo ?? true;
   const packEquipos = useMemo(() => data?.pack_equipos ?? [], [data?.pack_equipos]);
+  const trabajos = useMemo(() => data?.trabajos ?? [], [data?.trabajos]);
   const faq = data?.faq ?? STUDIO.faq;
   const features = data?.features ?? STUDIO.features;
 
@@ -482,9 +566,9 @@ function EstudioPage() {
         </section>
 
         {/* ── En acción — trabajos ──────────────────────────────────── */}
-        <section className="bg-ink px-4 lg:px-12 py-14">
-          <div className="flex flex-wrap items-end justify-between gap-3 mb-8">
-            <div>
+        {trabajos.length > 0 && (
+          <section className="bg-ink px-4 lg:px-12 py-14">
+            <div className="mb-8">
               <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/50 mb-2.5">
                 Producciones
               </p>
@@ -495,31 +579,13 @@ function EstudioPage() {
                 Trabajos hechos por gente copada que pasó por el estudio.
               </p>
             </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {photos.slice(3, 9).map((photo, i) => (
-              <div
-                key={photo.src}
-                className="rounded-xl overflow-hidden border border-background/8 bg-background/5"
-              >
-                <div className="aspect-[3/2] overflow-hidden">
-                  <img
-                    src={photo.src}
-                    alt={photo.alt}
-                    loading="lazy"
-                    className="h-full w-full object-cover block transition-transform duration-300 hover:scale-[1.04]"
-                  />
-                </div>
-                <div className="px-3.5 py-3 flex items-center gap-2">
-                  <span className="rounded-full bg-amber/18 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber whitespace-nowrap">
-                    {i % 2 === 0 ? "Fotografía" : "Video"}
-                  </span>
-                  <span className="text-sm text-background/65 truncate">{photo.alt}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {trabajos.map((trabajo) => (
+                <TrabajoCard key={trabajo.id} trabajo={trabajo} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── Dónde estamos ─────────────────────────────────────────── */}
         <section className="border-t hairline bg-surface px-4 lg:px-12 py-14">

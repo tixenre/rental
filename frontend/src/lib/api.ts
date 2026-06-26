@@ -244,6 +244,25 @@ export type EstudioConfig = {
   fotos: EstudioFoto[];
   // Lista curada del pack con cantidades (stock total) para la ficha pública.
   pack_equipos?: EstudioPackEquipo[];
+  trabajos?: EstudioTrabajo[];
+};
+
+export type EstudioTrabajo = {
+  id: number;
+  titulo: string;
+  realizador: string;
+  realizador_logo_url: string | null;
+  tipo: "fotos" | "video";
+  youtube_url: string | null;
+  fotos: Array<{
+    url: string;
+    url_sm: string | null;
+    url_avif: string | null;
+    url_sm_avif: string | null;
+    path: string | null;
+  }>;
+  orden: number;
+  activo: boolean;
 };
 
 export function apiGetEstudio() {

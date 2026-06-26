@@ -7,7 +7,7 @@
  */
 
 export * from "./types";
-export { estudioAdminApi } from "./estudio";
+export { estudioAdminApi, trabajosAdminApi } from "./estudio";
 export { descuentosJornadaApi } from "./estudio";
 
 // URL absoluta para abrir PDFs en nueva pestaña

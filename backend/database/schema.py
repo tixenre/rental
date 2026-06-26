@@ -1844,4 +1844,25 @@ def _init_db_schema(conn):
     except Exception as ex:
         logger.warning("No se pudieron regenerar etiquetas auto: %s", ex)
 
+    # ── Estudio: trabajos / producciones (galería "en acción") ───────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS estudio_trabajos (
+            id                  SERIAL PRIMARY KEY,
+            titulo              TEXT NOT NULL DEFAULT '',
+            realizador          TEXT NOT NULL DEFAULT '',
+            realizador_logo_url TEXT,
+            tipo                TEXT NOT NULL DEFAULT 'fotos'
+                                CHECK (tipo IN ('fotos', 'video')),
+            youtube_url         TEXT,
+            fotos_json          TEXT NOT NULL DEFAULT '[]',
+            orden               INTEGER NOT NULL DEFAULT 0,
+            activo              BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_estudio_trabajos_orden ON estudio_trabajos(orden)"
+    )
+
     conn.commit()

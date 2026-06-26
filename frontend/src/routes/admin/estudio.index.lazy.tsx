@@ -1,11 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Trash2, Save, Loader2, Package, Search } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Save,
+  Loader2,
+  Package,
+  Search,
+  GripVertical,
+  Pencil,
+  Eye,
+  EyeOff,
+  Film,
+  Image,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
@@ -16,7 +46,10 @@ import { PhotoGallery, type GalleryFoto } from "@/components/common/PhotoGallery
 import {
   adminApi,
   estudioAdminApi,
+  trabajosAdminApi,
   type EstudioConfig,
+  type EstudioTrabajo,
+  type EstudioTrabajoInput,
   type FotoOrdenItem,
   type EstudioSlotFijo,
 } from "@/lib/admin/api";
@@ -149,6 +182,11 @@ function EstudioAdminPage() {
 
       <GaleriaSection
         fotos={data.fotos}
+        onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
+      />
+
+      <TrabajosSection
+        trabajos={data.trabajos ?? []}
         onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
       />
 
@@ -810,6 +848,587 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
 }
 
 // ── Galería ───────────────────────────────────────────────────────────────────
+
+// ── Trabajos (galería "en acción") ────────────────────────────────────────────
+
+type TrabajoDialogMode = { mode: "create" } | { mode: "edit"; trabajo: EstudioTrabajo };
+
+function TrabajoDialog({
+  open,
+  dialogMode,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  dialogMode: TrabajoDialogMode;
+  onClose: () => void;
+  onSaved: (t: EstudioTrabajo) => void;
+}) {
+  const isEdit = dialogMode.mode === "edit";
+  const existing = isEdit ? dialogMode.trabajo : null;
+
+  const [titulo, setTitulo] = useState(existing?.titulo ?? "");
+  const [realizador, setRealizador] = useState(existing?.realizador ?? "");
+  const [tipo, setTipo] = useState<"fotos" | "video">(existing?.tipo ?? "fotos");
+  const [youtubeUrl, setYoutubeUrl] = useState(existing?.youtube_url ?? "");
+  const [activo, setActivo] = useState(existing?.activo ?? true);
+  const [trabajoId, setTrabajoId] = useState<number | null>(existing?.id ?? null);
+  const [fotos, setFotos] = useState(existing?.fotos ?? []);
+  const [logoUrl, setLogoUrl] = useState(existing?.realizador_logo_url ?? null);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const fotoInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset cuando cambia el diálogo
+  useEffect(() => {
+    if (!open) return;
+    const t = isEdit ? existing : null;
+    setTitulo(t?.titulo ?? "");
+    setRealizador(t?.realizador ?? "");
+    setTipo(t?.tipo ?? "fotos");
+    setYoutubeUrl(t?.youtube_url ?? "");
+    setActivo(t?.activo ?? true);
+    setTrabajoId(t?.id ?? null);
+    setFotos(t?.fotos ?? []);
+    setLogoUrl(t?.realizador_logo_url ?? null);
+  }, [open, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function ensureCreated(): Promise<number> {
+    if (trabajoId) return trabajoId;
+    const data: EstudioTrabajoInput = { titulo, realizador, tipo, activo };
+    if (tipo === "video" && youtubeUrl) data.youtube_url = youtubeUrl;
+    const created = await trabajosAdminApi.create(data);
+    setTrabajoId(created.id);
+    return created.id;
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const data: EstudioTrabajoInput = { titulo, realizador, tipo, activo };
+      if (tipo === "video" && youtubeUrl) data.youtube_url = youtubeUrl;
+      if (tipo !== "video") data.youtube_url = null;
+      let result: EstudioTrabajo;
+      if (trabajoId) {
+        result = await trabajosAdminApi.update(trabajoId, data);
+      } else {
+        result = await trabajosAdminApi.create(data);
+        setTrabajoId(result.id);
+      }
+      onSaved(result);
+      toast.success(isEdit ? "Trabajo actualizado" : "Trabajo creado");
+    } catch (e) {
+      toast.error("Error guardando", { description: (e as Error).message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleFotoUpload(files: FileList) {
+    if (!files.length) return;
+    setUploadingFoto(true);
+    try {
+      const id = await ensureCreated();
+      let result: EstudioTrabajo = {} as EstudioTrabajo;
+      for (const f of Array.from(files)) {
+        result = await trabajosAdminApi.uploadFoto(id, f);
+      }
+      setFotos(result.fotos ?? []);
+      toast.success("Foto subida");
+    } catch (e) {
+      toast.error("Error subiendo foto", { description: (e as Error).message });
+    } finally {
+      setUploadingFoto(false);
+    }
+  }
+
+  async function handleDeleteFoto(idx: number) {
+    if (!trabajoId) return;
+    try {
+      const result = await trabajosAdminApi.deleteFoto(trabajoId, idx);
+      setFotos(result.fotos ?? []);
+    } catch (e) {
+      toast.error("Error eliminando foto", { description: (e as Error).message });
+    }
+  }
+
+  async function handleLogoUpload(file: File) {
+    setUploadingLogo(true);
+    try {
+      const id = await ensureCreated();
+      const result = await trabajosAdminApi.uploadLogo(id, file);
+      setLogoUrl(result.realizador_logo_url);
+      toast.success("Logo subido");
+    } catch (e) {
+      toast.error("Error subiendo logo", { description: (e as Error).message });
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="relative bg-surface rounded-2xl border hairline shadow-xl w-full max-w-lg max-h-[90dvh] overflow-y-auto">
+        <div className="sticky top-0 bg-surface border-b hairline px-5 py-4 flex items-center justify-between">
+          <h2 className="font-display text-lg text-ink">
+            {isEdit ? "Editar trabajo" : "Nuevo trabajo"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded-full p-1.5 hover:bg-muted transition-colors"
+            aria-label="Cerrar"
+          >
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Título */}
+          <div className="space-y-1">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Título
+            </label>
+            <Input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Nombre del trabajo"
+            />
+          </div>
+
+          {/* Realizador */}
+          <div className="space-y-1">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Realizador / Productora
+            </label>
+            <Input
+              value={realizador}
+              onChange={(e) => setRealizador(e.target.value)}
+              placeholder="Nombre del realizador o productora"
+            />
+          </div>
+
+          {/* Logo del realizador */}
+          <div className="space-y-2">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Logo del realizador
+            </label>
+            <div className="flex items-center gap-3">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="logo"
+                  className="h-12 w-12 rounded-lg object-contain border hairline bg-muted/30"
+                />
+              ) : (
+                <div className="h-12 w-12 rounded-lg border-dashed border-2 border-muted-foreground/30 flex items-center justify-center">
+                  <Image className="h-5 w-5 text-muted-foreground/40" />
+                </div>
+              )}
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleLogoUpload(f);
+                }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploadingLogo}
+              >
+                {uploadingLogo ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : null}
+                {logoUrl ? "Cambiar logo" : "Subir logo"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Tipo */}
+          <div className="space-y-2">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Tipo de contenido
+            </label>
+            <div className="flex gap-2">
+              {(["fotos", "video"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTipo(t)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors",
+                    tipo === t
+                      ? "bg-ink text-background border-ink"
+                      : "border-hairline text-muted-foreground hover:border-ink/40",
+                  )}
+                >
+                  {t === "fotos" ? (
+                    <Image className="h-3.5 w-3.5" />
+                  ) : (
+                    <Film className="h-3.5 w-3.5" />
+                  )}
+                  {t === "fotos" ? "Galería de fotos" : "Video YouTube"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* YouTube URL */}
+          {tipo === "video" && (
+            <div className="space-y-1">
+              <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                URL de YouTube
+              </label>
+              <Input
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
+            </div>
+          )}
+
+          {/* Fotos */}
+          {tipo === "fotos" && (
+            <div className="space-y-2">
+              <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                Galería ({fotos.length} foto{fotos.length !== 1 ? "s" : ""})
+              </label>
+              {fotos.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {fotos.map((f, idx) => (
+                    <div
+                      key={idx}
+                      className="relative aspect-square rounded-lg overflow-hidden border hairline group"
+                    >
+                      <img
+                        src={f.url_sm ?? f.url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        onClick={() => handleDeleteFoto(idx)}
+                        className="absolute top-1 right-1 rounded-full bg-black/70 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="h-3 w-3 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <input
+                ref={fotoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.length) handleFotoUpload(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fotoInputRef.current?.click()}
+                disabled={uploadingFoto}
+              >
+                {uploadingFoto ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Agregar foto{fotos.length === 0 ? "s" : " más"}
+              </Button>
+            </div>
+          )}
+
+          {/* Activo */}
+          <div className="flex items-center gap-2">
+            <button
+              role="switch"
+              aria-checked={activo}
+              onClick={() => setActivo(!activo)}
+              className={cn(
+                "relative h-5 w-9 rounded-full transition-colors",
+                activo ? "bg-ink" : "bg-muted",
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background transition-transform",
+                  activo ? "translate-x-4" : "translate-x-0",
+                )}
+              />
+            </button>
+            <span className="text-sm text-muted-foreground">Visible en la página pública</span>
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 bg-surface border-t hairline px-5 py-4 flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={saving || !titulo.trim()}>
+            {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+            {isEdit ? "Guardar cambios" : "Crear trabajo"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SortableTrabajoCard({
+  trabajo,
+  onEdit,
+  onDelete,
+  onToggleActivo,
+}: {
+  trabajo: EstudioTrabajo;
+  onEdit: (t: EstudioTrabajo) => void;
+  onDelete: (id: number) => void;
+  onToggleActivo: (id: number, activo: boolean) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: trabajo.id,
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  const thumb =
+    trabajo.tipo === "fotos"
+      ? (trabajo.fotos[0]?.url_sm ?? trabajo.fotos[0]?.url ?? null)
+      : trabajo.youtube_url
+        ? `https://img.youtube.com/vi/${extractYoutubeId(trabajo.youtube_url)}/mqdefault.jpg`
+        : null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-3 rounded-xl border hairline bg-background p-3 transition-shadow",
+        isDragging ? "shadow-lg opacity-80" : "",
+      )}
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab text-muted-foreground hover:text-ink p-1 touch-none"
+        aria-label="Arrastrar"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
+      {/* Thumbnail */}
+      <div className="h-12 w-16 rounded-lg overflow-hidden border hairline bg-muted/30 shrink-0">
+        {thumb ? (
+          <img src={thumb} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center">
+            {trabajo.tipo === "video" ? (
+              <Film className="h-5 w-5 text-muted-foreground/40" />
+            ) : (
+              <Image className="h-5 w-5 text-muted-foreground/40" />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-ink truncate">
+          {trabajo.titulo || <span className="text-muted-foreground italic">Sin título</span>}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">{trabajo.realizador || "—"}</p>
+      </div>
+
+      {/* Tipo badge */}
+      <span
+        className={cn(
+          "shrink-0 rounded-full px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em]",
+          trabajo.tipo === "video"
+            ? "bg-violet-100 text-violet-700"
+            : "bg-amber-100 text-amber-700",
+        )}
+      >
+        {trabajo.tipo}
+      </span>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          onClick={() => onToggleActivo(trabajo.id, !trabajo.activo)}
+          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+          title={trabajo.activo ? "Ocultar" : "Publicar"}
+        >
+          {trabajo.activo ? (
+            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+          ) : (
+            <EyeOff className="h-3.5 w-3.5 text-muted-foreground/40" />
+          )}
+        </button>
+        <button
+          onClick={() => onEdit(trabajo)}
+          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+          title="Editar"
+        >
+          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+        <button
+          onClick={() => onDelete(trabajo.id)}
+          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+          title="Eliminar"
+        >
+          <Trash2 className="h-3.5 w-3.5 text-destructive/70" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function extractYoutubeId(url: string): string {
+  const m = url.match(/(?:v=|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m?.[1] ?? "";
+}
+
+function TrabajosSection({
+  trabajos: initialTrabajos,
+  onChanged,
+}: {
+  trabajos: EstudioTrabajo[];
+  onChanged: () => void;
+}) {
+  const [trabajos, setTrabajos] = useState(initialTrabajos);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<TrabajoDialogMode>({ mode: "create" });
+
+  useEffect(() => {
+    setTrabajos(initialTrabajos);
+  }, [initialTrabajos]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => trabajosAdminApi.delete(id),
+    onSuccess: () => {
+      toast.success("Trabajo eliminado");
+      onChanged();
+    },
+    onError: (e) => toast.error("Error eliminando", { description: (e as Error).message }),
+  });
+
+  const toggleMut = useMutation({
+    mutationFn: ({ id, activo }: { id: number; activo: boolean }) =>
+      trabajosAdminApi.update(id, { activo }),
+    onSuccess: (updated) => {
+      setTrabajos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    },
+    onError: (e) => toast.error("Error", { description: (e as Error).message }),
+  });
+
+  const reorderMut = useMutation({
+    mutationFn: (items: { id: number; orden: number }[]) => trabajosAdminApi.reorder(items),
+    onError: (e) => toast.error("Error reordenando", { description: (e as Error).message }),
+  });
+
+  function handleDragEnd(event: { active: { id: number | string }; over: { id: number | string } | null }) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setTrabajos((prev) => {
+      const oldIdx = prev.findIndex((t) => t.id === active.id);
+      const newIdx = prev.findIndex((t) => t.id === over.id);
+      const reordered = arrayMove(prev, oldIdx, newIdx).map((t, i) => ({ ...t, orden: i }));
+      reorderMut.mutate(reordered.map((t) => ({ id: t.id, orden: t.orden })));
+      return reordered;
+    });
+  }
+
+  function openCreate() {
+    setDialogMode({ mode: "create" });
+    setDialogOpen(true);
+  }
+
+  function openEdit(t: EstudioTrabajo) {
+    setDialogMode({ mode: "edit", trabajo: t });
+    setDialogOpen(true);
+  }
+
+  function handleSaved(t: EstudioTrabajo) {
+    setTrabajos((prev) => {
+      const idx = prev.findIndex((x) => x.id === t.id);
+      return idx >= 0 ? prev.map((x) => (x.id === t.id ? t : x)) : [...prev, t];
+    });
+    onChanged();
+  }
+
+  return (
+    <>
+      <Section title="Trabajos">
+        <p className="text-xs text-muted-foreground">
+          Producciones que aparecen en la sección "en acción" del estudio. Arrastrá para reordenar.
+        </p>
+
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={trabajos.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {trabajos.map((t) => (
+                <SortableTrabajoCard
+                  key={t.id}
+                  trabajo={t}
+                  onEdit={openEdit}
+                  onDelete={(id) => deleteMut.mutate(id)}
+                  onToggleActivo={(id, activo) => toggleMut.mutate({ id, activo })}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+
+        {trabajos.length === 0 && (
+          <p className="text-sm text-center text-muted-foreground py-4">
+            No hay trabajos cargados todavía.
+          </p>
+        )}
+
+        <Button variant="outline" size="sm" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          Agregar trabajo
+        </Button>
+      </Section>
+
+      <TrabajoDialog
+        open={dialogOpen}
+        dialogMode={dialogMode}
+        onClose={() => setDialogOpen(false)}
+        onSaved={(t) => {
+          handleSaved(t);
+          setDialogOpen(false);
+        }}
+      />
+    </>
+  );
+}
 
 function GaleriaSection({
   fotos,

@@ -1,5 +1,6 @@
 """
-routes/estudio.py — CRUD del Estudio (singleton) + galería de fotos (E1).
+routes/estudio.py — CRUD del Estudio (singleton) + galería de fotos (E1)
+                    + trabajos/producciones (galería "en acción").
 """
 
 import json
@@ -169,19 +170,44 @@ def _insert_foto(
 
 # ── Endpoint público ─────────────────────────────────────────────────────────
 
+def _get_trabajos(conn, solo_activos: bool = True) -> list:
+    q = (
+        "SELECT id, titulo, realizador, realizador_logo_url, tipo, youtube_url, "
+        "fotos_json, orden, activo, created_at, updated_at "
+        "FROM estudio_trabajos "
+    )
+    q += "WHERE activo = TRUE " if solo_activos else ""
+    q += "ORDER BY orden, id"
+    cur = conn.execute(q)
+    rows = cur.fetchall()
+    return [
+        {
+            "id": r["id"],
+            "titulo": r["titulo"],
+            "realizador": r["realizador"],
+            "realizador_logo_url": r["realizador_logo_url"],
+            "tipo": r["tipo"],
+            "youtube_url": r["youtube_url"],
+            "fotos": _parse_json_field(r["fotos_json"]) or [],
+            "orden": r["orden"],
+            "activo": bool(r["activo"]),
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+        }
+        for r in rows
+    ]
+
+
 @router.get("/estudio")
 def get_estudio(response: Response):
-    """Devuelve la configuración pública del estudio + fotos + pack curado.
-
-    `pack_equipos` es la lista curada del pack con cantidades (stock total) para
-    mostrar "qué incluye" en la ficha — independiente de la franja. La
-    disponibilidad real por franja sigue saliendo de /estudio/disponibilidad."""
+    """Devuelve la configuración pública del estudio + fotos + pack curado + trabajos."""
     response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
     with get_db() as conn:
         row = _get_estudio_row(conn)
         fotos = _get_fotos(conn)
         resp = _build_response(row, fotos)
         resp["pack_equipos"] = _pack_curado(conn)
+        resp["trabajos"] = _get_trabajos(conn, solo_activos=True)
         return resp
 
 
@@ -198,6 +224,7 @@ def get_estudio_admin(request: Request):
         fotos = _get_fotos(conn)
         resp = _build_response(row, fotos)
         resp["pack_equipos"] = _pack_curado(conn)
+        resp["trabajos"] = _get_trabajos(conn, solo_activos=False)
         return resp
 
 class EstudioUpdate(BaseModel):
@@ -449,6 +476,199 @@ def reorder_fotos(body: ReorderBody, request: Request):
         fotos = _get_fotos(conn)
 
     return {"fotos": fotos}
+
+
+# ── Trabajos / producciones (galería "en acción") ────────────────────────────
+
+def _trabajo_path(suffix: str) -> str:
+    ts = int(time.time() * 1000)
+    return f"estudio/trabajos/{ts}_{suffix}.webp"
+
+
+@router.get("/admin/estudio/trabajos")
+def admin_list_trabajos(request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        return {"trabajos": _get_trabajos(conn, solo_activos=False)}
+
+
+class TrabajoCreate(BaseModel):
+    titulo: str = ""
+    realizador: str = ""
+    tipo: str = "fotos"
+    youtube_url: Optional[str] = None
+    activo: bool = True
+
+
+@router.post("/admin/estudio/trabajos")
+def admin_create_trabajo(body: TrabajoCreate, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        cur = conn.execute(
+            "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_trabajos"
+        )
+        orden = cur.fetchone()["next"]
+        cur2 = conn.execute(
+            "INSERT INTO estudio_trabajos (titulo, realizador, tipo, youtube_url, orden, activo) "
+            "VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+            (body.titulo, body.realizador, body.tipo, body.youtube_url, orden, body.activo),
+        )
+        new_id = cur2.fetchone()["id"]
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        return next(r for r in rows if r["id"] == new_id)
+
+
+class TrabajoUpdate(BaseModel):
+    titulo: Optional[str] = None
+    realizador: Optional[str] = None
+    tipo: Optional[str] = None
+    youtube_url: Optional[str] = None
+    activo: Optional[bool] = None
+
+
+@router.patch("/admin/estudio/trabajos/{trabajo_id}")
+def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request):
+    require_admin(request)
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    if not updates:
+        raise HTTPException(400, "Nada que actualizar")
+    with get_db() as conn:
+        set_parts = [f"{k} = ?" for k in updates]
+        set_parts.append("updated_at = ?")
+        vals = list(updates.values()) + [datetime.now(tz=timezone.utc), trabajo_id]
+        conn.execute(
+            f"UPDATE estudio_trabajos SET {', '.join(set_parts)} WHERE id = ?",
+            vals,
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        match = next((r for r in rows if r["id"] == trabajo_id), None)
+        if not match:
+            raise HTTPException(404, "Trabajo no encontrado")
+        return match
+
+
+@router.delete("/admin/estudio/trabajos/{trabajo_id}")
+def admin_delete_trabajo(trabajo_id: int, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        conn.execute("DELETE FROM estudio_trabajos WHERE id = ?", (trabajo_id,))
+        conn.commit()
+    return {"ok": True}
+
+
+class TrabajoOrdenItem(BaseModel):
+    id: int
+    orden: int
+
+
+class TrabajoReorderBody(BaseModel):
+    trabajos: list[TrabajoOrdenItem]
+
+
+@router.patch("/admin/estudio/trabajos/orden")
+def admin_reorder_trabajos(body: TrabajoReorderBody, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        for t in body.trabajos:
+            conn.execute(
+                "UPDATE estudio_trabajos SET orden = ? WHERE id = ?",
+                (t.orden, t.id),
+            )
+        conn.commit()
+        return {"trabajos": _get_trabajos(conn, solo_activos=False)}
+
+
+@router.post("/admin/estudio/trabajos/{trabajo_id}/upload-foto")
+async def admin_upload_trabajo_foto(
+    trabajo_id: int, request: Request, background_tasks: BackgroundTasks
+):
+    require_admin(request)
+    path = _trabajo_path(f"foto_{trabajo_id}")
+    result = await media_http(
+        request,
+        background_tasks,
+        path=path,
+        presets=[
+            DISPLAY_KEEP_ASPECT,
+            DISPLAY_KEEP_ASPECT_SM,
+            DISPLAY_KEEP_ASPECT_AVIF,
+            DISPLAY_KEEP_ASPECT_SM_AVIF,
+        ],
+    )
+    nueva_foto = {
+        "url": result[DISPLAY_KEEP_ASPECT]["url"],
+        "url_sm": result[DISPLAY_KEEP_ASPECT_SM]["url"],
+        "url_avif": result[DISPLAY_KEEP_ASPECT_AVIF]["url"],
+        "url_sm_avif": result[DISPLAY_KEEP_ASPECT_SM_AVIF]["url"],
+        "path": path,
+    }
+    with get_db() as conn:
+        cur = conn.execute(
+            "SELECT fotos_json FROM estudio_trabajos WHERE id = ?", (trabajo_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Trabajo no encontrado")
+        fotos = _parse_json_field(row["fotos_json"]) or []
+        fotos.append(nueva_foto)
+        conn.execute(
+            "UPDATE estudio_trabajos SET fotos_json = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(fotos), datetime.now(tz=timezone.utc), trabajo_id),
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        return next(r for r in rows if r["id"] == trabajo_id)
+
+
+@router.delete("/admin/estudio/trabajos/{trabajo_id}/fotos/{foto_idx}")
+def admin_delete_trabajo_foto(trabajo_id: int, foto_idx: int, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        cur = conn.execute(
+            "SELECT fotos_json FROM estudio_trabajos WHERE id = ?", (trabajo_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Trabajo no encontrado")
+        fotos = _parse_json_field(row["fotos_json"]) or []
+        if foto_idx < 0 or foto_idx >= len(fotos):
+            raise HTTPException(400, f"Índice de foto inválido: {foto_idx}")
+        fotos.pop(foto_idx)
+        conn.execute(
+            "UPDATE estudio_trabajos SET fotos_json = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(fotos), datetime.now(tz=timezone.utc), trabajo_id),
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        return next(r for r in rows if r["id"] == trabajo_id)
+
+
+@router.post("/admin/estudio/trabajos/{trabajo_id}/upload-logo")
+async def admin_upload_trabajo_logo(
+    trabajo_id: int, request: Request, background_tasks: BackgroundTasks
+):
+    require_admin(request)
+    path = _trabajo_path(f"logo_{trabajo_id}")
+    result = await media_http(
+        request,
+        background_tasks,
+        path=path,
+        presets=[DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM],
+    )
+    logo_url = result[DISPLAY_KEEP_ASPECT]["url"]
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE estudio_trabajos SET realizador_logo_url = ?, updated_at = ? WHERE id = ?",
+            (logo_url, datetime.now(tz=timezone.utc), trabajo_id),
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        match = next((r for r in rows if r["id"] == trabajo_id), None)
+        if not match:
+            raise HTTPException(404, "Trabajo no encontrado")
+        return match
 
 
 # ── Reserva del estudio por horas (E2 / E2.1) ─────────────────────────────────
