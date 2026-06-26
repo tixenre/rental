@@ -137,7 +137,7 @@ function badgeEstado(taller: TallerAdmin): { label: string; className: string } 
   const today = new Date().toISOString().slice(0, 10);
   if (!taller.activo) return { label: "INACTIVO", className: "bg-muted/40 text-muted-foreground" };
   if (taller.fecha_inicio > today)
-    return { label: "PRÓXIMAMENTE", className: "bg-amber/20 text-amber-700" };
+    return { label: "PRÓXIMAMENTE", className: "bg-amber/20 text-amber" };
   if (taller.fecha_fin >= today)
     return { label: "EN CURSO", className: "bg-verde/20 text-verde-800" };
   return { label: "FINALIZADO", className: "bg-muted/40 text-muted-foreground" };
@@ -851,7 +851,7 @@ function PreciosSection({ taller }: { taller: TallerAdmin }) {
     <AdminSection storageKey="talleres:precios" title="Precios y cupos">
       <div className="flex flex-col gap-4">
         {taller.cupos_confirmados >= taller.cupos_total && (
-          <div className="rounded-lg bg-amber/10 border border-amber/30 px-4 py-3 text-sm text-amber-800">
+          <div className="rounded-lg bg-amber/10 border border-amber/30 px-4 py-3 text-sm text-amber">
             ⚠ Taller completo — {taller.cupos_confirmados}/{taller.cupos_total} cupos ocupados
           </div>
         )}
@@ -1580,7 +1580,7 @@ function TalleresAdminPage() {
               >
                 {/* Badge */}
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold font-mono uppercase tracking-wider ${badge.className}`}
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold font-mono uppercase tracking-wider ${badge.className}`}
                 >
                   {badge.label}
                 </span>

@@ -80,43 +80,61 @@ function mediaThumb(m: EstudioMedia): { src: string; fallback?: string } | null 
     if (id) return { src: ytThumb(id), fallback: ytThumbFallback(id) };
   }
   return null;
-}
-
-// Embed nativo de Instagram vía el script oficial: renderiza el post en su
-// tamaño real (vertical/cuadrado/horizontal según el post, no forzado). El
-// script auto-dimensiona el iframe por postMessage — lo que un iframe directo
-// no puede hacer cross-origin.
+} // El embed oficial de IG muestra el post completo (foto/video + descripción +
+// likes + comentarios). Usamos CSS clipping para mostrar header + media + chrome
+// (dots, "View more", action bar, likes, input de comentario) pero NO el texto de
+// la descripción ni los hilos de comentarios que vienen después:
+// height = min(94vw,480px) * (h/w) + 260px
+//   ≈ imagen + 72px (header) + 44px (View more) + 52px (bar) + 24px (likes) + 54px (input) + margen
 declare global {
   interface Window {
     instgrm?: { Embeds: { process: () => void } };
   }
 }
-
 const IG_EMBED_SCRIPT = "https://www.instagram.com/embed.js";
 
+function loadIgScript(onLoad: () => void) {
+  const existing = document.querySelector<HTMLScriptElement>(`script[src="${IG_EMBED_SCRIPT}"]`);
+  if (existing) {
+    existing.addEventListener("load", onLoad, { once: true });
+    return;
+  }
+  const s = document.createElement("script");
+  s.src = IG_EMBED_SCRIPT;
+  s.async = true;
+  s.addEventListener("load", onLoad, { once: true });
+  document.body.appendChild(s);
+}
+
 function IgEmbed({ url }: { url: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
     const process = () => window.instgrm?.Embeds?.process();
+
+    // Cargar el script de IG solo cuando el embed entre al viewport (lazy).
+    // Protege el LCP: la sección Trabajos está bajo el fold.
     if (window.instgrm) {
       process();
       return;
     }
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${IG_EMBED_SCRIPT}"]`);
-    if (existing) {
-      existing.addEventListener("load", process, { once: true });
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = IG_EMBED_SCRIPT;
-    s.async = true;
-    s.addEventListener("load", process, { once: true });
-    document.body.appendChild(s);
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          obs.disconnect();
+          loadIgScript(process);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    obs.observe(container);
+    return () => obs.disconnect();
   }, [url]);
 
-  // key={url} fuerza un blockquote fresco al cambiar de slide (el script muta el
-  // nodo al procesarlo; remontar evita que React reconcilie un nodo ya mutado).
   return (
-    <div key={url} className="flex w-full justify-center">
+    <div key={url} ref={containerRef} className="flex w-full justify-center">
       <blockquote
         className="instagram-media"
         data-instgrm-permalink={url}
@@ -127,7 +145,197 @@ function IgEmbed({ url }: { url: string }) {
   );
 }
 
-function TrabajoModal({
+// Slide individual dentro del lightbox. Activo → embed completo + info.
+// Inactivo → thumbnail 4:5 con overlay, clickeable para ir a ese trabajo.
+function LightboxSlide({
+  idx,
+  trabajo,
+  isActive,
+  onActivate,
+}: {
+  idx: number;
+  trabajo: EstudioTrabajo;
+  isActive: boolean;
+  onActivate: () => void;
+}) {
+  const first = trabajo.media[0] ?? null;
+  const t = first ? mediaThumb(first) : null;
+  const isShort = first?.kind === "youtube" && /\/shorts\//.test(first.url);
+  const isLandscapeYt = first?.kind === "youtube" && !isShort;
+
+  const igAr = first?.kind === "instagram" && first.w && first.h ? first.h / first.w : null;
+  // Clip IG: altura natural capped a 80dvh para no rebasar la pantalla.
+  const igClipH = igAr
+    ? `min(calc(min(88vw, 520px) * ${igAr.toFixed(4)} + 260px), 80dvh)`
+    : "min(70dvh, 80dvh)";
+
+  return (
+    <div
+      data-slide-idx={idx}
+      className={cn(
+        "snap-center shrink-0 flex flex-col rounded-2xl overflow-hidden transition-[opacity,transform] duration-300",
+        // Mobile: portrait para todo. Desktop (md+): landscape YouTube → 70vw.
+        isLandscapeYt ? "w-[min(88vw,520px)] md:w-[70vw]" : "w-[min(88vw,520px)]",
+        isActive
+          ? "opacity-100 scale-[1.08] z-10"
+          : "opacity-40 scale-[0.88] cursor-pointer hover:opacity-60",
+      )}
+      onClick={!isActive ? onActivate : undefined}
+    >
+      {isActive ? (
+        // ── Slide activo: embed real ──────────────────────────────────────────
+        <div className="shrink-0">
+          {first?.kind === "youtube" &&
+            (() => {
+              const ytId = extractYtId(first.url);
+              if (!ytId) return null;
+              return (
+                <div className="w-full" style={{ aspectRatio: isShort ? "9/16" : "16/9" }}>
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
+                    title={trabajo.titulo}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full"
+                  />
+                </div>
+              );
+            })()}
+
+          {first?.kind === "instagram" && (
+            <div
+              className="relative w-full"
+              style={{ height: igClipH, overflow: "hidden", backgroundColor: "rgb(244 244 245)" }}
+            >
+              <IgEmbed key={first.url} url={first.url} />
+              <a
+                href={first.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs text-background/80 hover:text-background transition-colors"
+                aria-label="Ver en Instagram"
+              >
+                <IgIcon />
+                Ver en Instagram
+              </a>
+            </div>
+          )}
+
+          {first?.kind === "foto" && (
+            <img
+              src={
+                (first as EstudioMedia & { url_avif?: string }).url_avif ??
+                first.url_sm ??
+                first.url
+              }
+              alt={trabajo.titulo}
+              className="w-full object-contain max-h-[70dvh]"
+            />
+          )}
+        </div>
+      ) : (
+        // ── Slide inactivo: thumbnail 4:5 ─────────────────────────────────────
+        <div className="relative overflow-hidden" style={{ aspectRatio: "4/5" }}>
+          {t?.src ? (
+            <img
+              src={t.src}
+              alt={trabajo.titulo}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              onError={
+                t.fallback
+                  ? (e) => {
+                      e.currentTarget.src = t.fallback!;
+                      e.currentTarget.onerror = null;
+                    }
+                  : undefined
+              }
+            />
+          ) : (
+            <div className="w-full h-full bg-background/5" />
+          )}
+          <div className="absolute inset-0 bg-black/25" />
+          {trabajo.titulo && (
+            <div className="absolute bottom-0 inset-x-0 p-3">
+              <p className="text-xs text-background/70 font-medium truncate">{trabajo.titulo}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Info */}
+      <div className="px-5 py-4 space-y-2 overflow-y-auto">
+        {trabajo.categorias.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {trabajo.categorias.map((cat) => (
+              <span
+                key={cat}
+                className="rounded-full border border-[color-mix(in_oklch,var(--area-accent)_40%,transparent)] px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-[var(--area-accent)]"
+              >
+                {cat}
+              </span>
+            ))}
+          </div>
+        )}
+        {trabajo.titulo && (
+          <h3 className="font-display font-bold text-background text-lg leading-tight">
+            {trabajo.titulo}
+          </h3>
+        )}
+        {trabajo.descripcion && (
+          <p className="text-sm text-background/55 leading-relaxed line-clamp-3">
+            {trabajo.descripcion}
+          </p>
+        )}
+        {trabajo.realizador && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {trabajo.realizador_logo_url && (
+              <img
+                src={trabajo.realizador_logo_url}
+                alt={trabajo.realizador}
+                className="h-5 w-5 rounded object-contain border border-background/10 shrink-0"
+              />
+            )}
+            <span className="text-sm font-medium text-background/65">{trabajo.realizador}</span>
+            {trabajo.realizador_instagram && (
+              <a
+                href={`https://instagram.com/${trabajo.realizador_instagram.replace(/^@/, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-[var(--area-accent)] transition-colors"
+              >
+                <IgIcon />
+                {trabajo.realizador_instagram.startsWith("@")
+                  ? trabajo.realizador_instagram
+                  : `@${trabajo.realizador_instagram}`}
+              </a>
+            )}
+            {trabajo.realizador_web && (
+              <a
+                href={
+                  trabajo.realizador_web.startsWith("http")
+                    ? trabajo.realizador_web
+                    : `https://${trabajo.realizador_web}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-[var(--area-accent)] transition-colors"
+              >
+                <WebIcon />
+                {trabajo.realizador_web.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Lightbox de carrusel: todos los trabajos en un snap-scroll horizontal.
+// El slide centrado muestra el embed; los de los costados muestran el thumbnail
+// con opacidad reducida (asoman desde los bordes).
+function TrabajoLightbox({
   trabajos,
   initialIdx,
   onClose,
@@ -136,258 +344,141 @@ function TrabajoModal({
   initialIdx: number;
   onClose: () => void;
 }) {
-  const tCount = trabajos.length;
-  const [tIdx, setTIdx] = useState(initialIdx);
-  const [mIdx, setMIdx] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIdx, setActiveIdx] = useState(initialIdx);
 
-  const trabajo = trabajos[tIdx];
-  const media = trabajo?.media ?? [];
-  const mCount = media.length;
-  const current = media[Math.min(mIdx, Math.max(mCount - 1, 0))] ?? null;
-
-  // Navegar entre medios; al llegar al borde fluye al trabajo anterior/siguiente.
-  const goMedia = useCallback(
-    (d: number) => {
-      const next = mIdx + d;
-      if (next < 0) {
-        const prevT = (tIdx - 1 + tCount) % tCount;
-        setTIdx(prevT);
-        setMIdx(Math.max((trabajos[prevT]?.media?.length ?? 1) - 1, 0));
-      } else if (next >= mCount) {
-        setTIdx((tIdx + 1) % tCount);
-        setMIdx(0);
-      } else {
-        setMIdx(next);
-      }
-    },
-    [mIdx, mCount, tIdx, tCount, trabajos],
-  );
-
-  // Saltar directamente al trabajo anterior/siguiente (botones del footer).
-  const goTrabajo = useCallback(
-    (d: number) => {
-      setTIdx((i) => (i + d + tCount) % tCount);
-      setMIdx(0);
-    },
-    [tCount],
-  );
-
+  // Scroll al slide inicial (sin animación) tras el primer render.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight") goMedia(1);
-      else if (e.key === "ArrowLeft") goMedia(-1);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, goMedia]);
+    const el = scrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      const target = el.querySelector<HTMLElement>(`[data-slide-idx="${initialIdx}"]`);
+      if (!target) return;
+      const targetCenter = target.offsetLeft + target.offsetWidth / 2;
+      el.scrollLeft = targetCenter - el.clientWidth / 2;
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // El modal se ajusta al medio. YouTube = 16:9/9:16; IG = 480px (embed nativo);
-  // Foto = w-fit (proporción real de la imagen, sin asumir nada).
-  const isShort = current?.kind === "youtube" && /\/shorts\//.test(current.url);
-  const modalWidth =
-    current?.kind === "instagram"
-      ? "min(94vw, 480px)"
-      : current?.kind === "youtube"
-        ? isShort
-          ? "min(94vw, calc(82vh * 9 / 16))"
-          : "min(94vw, calc(82vh * 16 / 9))"
-        : undefined; // foto → w-fit (proporción nativa de la imagen)
+  // Trackear qué slide está centrado mientras el usuario scrollea.
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const cx = el.scrollLeft + el.clientWidth / 2;
+    const slides = el.querySelectorAll<HTMLElement>("[data-slide-idx]");
+    let best = activeIdx;
+    let bestDist = Infinity;
+    slides.forEach((s) => {
+      const i = Number(s.dataset.slideIdx);
+      const d = Math.abs(s.offsetLeft + s.offsetWidth / 2 - cx);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    if (best !== activeIdx) setActiveIdx(best);
+  }, [activeIdx]);
+
+  // Helper: scroll suave a un slide por índice.
+  const scrollToIdx = useCallback((idx: number) => {
+    const el = scrollRef.current;
+    const target = el?.querySelector<HTMLElement>(`[data-slide-idx="${idx}"]`);
+    if (!target || !el) return;
+    const targetCenter = target.offsetLeft + target.offsetWidth / 2;
+    el.scrollTo({ left: targetCenter - el.clientWidth / 2, behavior: "smooth" });
+  }, []);
+
+  // Teclado: Escape cierra, flechas navegan.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") scrollToIdx(Math.max(0, activeIdx - 1));
+      else if (e.key === "ArrowRight") scrollToIdx(Math.min(trabajos.length - 1, activeIdx + 1));
+    };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose, activeIdx, trabajos.length, scrollToIdx]);
+
+  // Bloquear scroll del body mientras el lightbox está abierto.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  // Spacers al inicio/fin para que el primer y último slide puedan centrarse.
+  // spacerW = (100vw - slideW) / 2 - gap/2  (gap = 12px → mitad = 6px)
+  // En mobile todos los slides son portrait; en desktop los landscape usan 70vw.
+  const firstMedia = trabajos[0]?.media[0];
+  const lastMedia = trabajos[trabajos.length - 1]?.media[0];
+  const firstIsLandscape = firstMedia?.kind === "youtube" && !/\/shorts\//.test(firstMedia.url);
+  const lastIsLandscape = lastMedia?.kind === "youtube" && !/\/shorts\//.test(lastMedia.url);
+  // Clase base: portrait (mobile + portrait content). Extensión md: landscape desktop.
+  const SPACER_BASE = "shrink-0 w-[max(0px,calc((100vw-min(88vw,520px))/2-6px))]";
+  const SPACER_LG_MD = "md:w-[max(0px,calc(15vw-6px))]";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-2 sm:p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="relative bg-ink rounded-2xl overflow-hidden max-h-[96dvh] w-fit max-w-[94vw] flex flex-col"
-        style={{ width: modalWidth }}
+    <div className="fixed inset-0 z-50 bg-black/95">
+      {/* Cerrar */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-20 h-11 w-11 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+        aria-label="Cerrar"
       >
-        {/* Cerrar */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-20 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-background/70 hover:text-background transition-colors"
-          aria-label="Cerrar"
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
         >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+
+      {/* Flechas de navegación (desktop) */}
+      {activeIdx > 0 && (
+        <button
+          onClick={() => scrollToIdx(activeIdx - 1)}
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/10 items-center justify-center text-white/70 hover:text-white transition-colors hidden md:flex"
+          aria-label="Anterior"
+        >
+          <ArrowLeft className="h-5 w-5" />
         </button>
+      )}
+      {activeIdx < trabajos.length - 1 && (
+        <button
+          onClick={() => scrollToIdx(activeIdx + 1)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/10 items-center justify-center text-white/70 hover:text-white transition-colors hidden md:flex"
+          aria-label="Siguiente"
+        >
+          <ArrowRight className="h-5 w-5" />
+        </button>
+      )}
 
-        {/* Escenario de medios (carrusel). El modal ya tiene la proporción del
-            medio actual, así que cada medio llena el ancho. */}
-        <div className="relative bg-black shrink-0 flex items-center justify-center overflow-hidden">
-          {current?.kind === "youtube" &&
-            (() => {
-              const ytId = extractYtId(current.url);
-              if (!ytId) return null;
-              return (
-                <div
-                  className="relative w-full"
-                  style={{ aspectRatio: isShort ? "9 / 16" : "16 / 9" }}
-                >
-                  <iframe
-                    src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
-                    title={trabajo.titulo}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    className="absolute inset-0 h-full w-full"
-                  />
-                </div>
-              );
-            })()}
+      {/* Carrusel */}
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="h-full flex items-center overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden"
+        style={{ gap: "12px" }}
+      >
+        {/* Spacer inicial: permite centrar el primer slide */}
+        <div className={cn(SPACER_BASE, firstIsLandscape && SPACER_LG_MD)} />
 
-          {current?.kind === "instagram" && (
-            <div className="max-h-[86vh] min-h-[420px] w-full overflow-y-auto bg-background">
-              <IgEmbed key={current.url} url={current.url} />
-            </div>
-          )}
+        {trabajos.map((trabajo, i) => (
+          <LightboxSlide
+            key={trabajo.id}
+            idx={i}
+            trabajo={trabajo}
+            isActive={i === activeIdx}
+            onActivate={() => scrollToIdx(i)}
+          />
+        ))}
 
-          {current?.kind === "foto" && (
-            <img
-              src={current.url_avif ?? current.url}
-              alt={trabajo.titulo}
-              className="block max-h-[82vh] max-w-[94vw]"
-            />
-          )}
-
-          {/* Flechas dentro del medio (fluyen al trabajo anterior/siguiente al llegar al borde) */}
-          {mCount > 1 && (
-            <>
-              <button
-                onClick={() => goMedia(-1)}
-                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
-                aria-label="Anterior"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => goMedia(1)}
-                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
-                aria-label="Siguiente"
-              >
-                <ArrowRight className="h-5 w-5" />
-              </button>
-              <div className="absolute top-3 left-3 z-10 rounded-full bg-black/55 px-2.5 py-1 font-mono text-2xs text-background/80">
-                {mIdx + 1} / {mCount}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Puntos del carrusel de medios */}
-        {mCount > 1 && (
-          <div className="flex items-center justify-center gap-1.5 py-3 bg-ink shrink-0">
-            {media.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setMIdx(i)}
-                aria-label={`Ir al medio ${i + 1}`}
-                className={cn(
-                  "h-1.5 rounded-full transition-all",
-                  i === mIdx ? "w-5 bg-amber" : "w-1.5 bg-background/25 hover:bg-background/45",
-                )}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Info */}
-        <div className="px-5 py-4 space-y-2 overflow-y-auto">
-          {trabajo.categorias.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {trabajo.categorias.map((cat) => (
-                <span
-                  key={cat}
-                  className="rounded-full border border-amber/40 px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber"
-                >
-                  {cat}
-                </span>
-              ))}
-            </div>
-          )}
-          {trabajo.titulo && (
-            <h3 className="font-display font-bold text-background text-xl leading-tight">
-              {trabajo.titulo}
-            </h3>
-          )}
-          {trabajo.descripcion && (
-            <p className="text-sm text-background/55 leading-relaxed">{trabajo.descripcion}</p>
-          )}
-          {trabajo.realizador && (
-            <div className="flex items-center gap-2 pt-1">
-              {trabajo.realizador_logo_url && (
-                <img
-                  src={trabajo.realizador_logo_url}
-                  alt={trabajo.realizador}
-                  className="h-6 w-6 rounded object-contain border border-background/10 shrink-0"
-                />
-              )}
-              <span className="text-sm font-medium text-background/65">{trabajo.realizador}</span>
-              {trabajo.realizador_instagram && (
-                <a
-                  href={`https://instagram.com/${trabajo.realizador_instagram.replace(/^@/, "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
-                >
-                  <IgIcon />
-                  {trabajo.realizador_instagram.startsWith("@")
-                    ? trabajo.realizador_instagram
-                    : `@${trabajo.realizador_instagram}`}
-                </a>
-              )}
-              {trabajo.realizador_web && (
-                <a
-                  href={
-                    trabajo.realizador_web.startsWith("http")
-                      ? trabajo.realizador_web
-                      : `https://${trabajo.realizador_web}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
-                >
-                  <WebIcon />
-                  {trabajo.realizador_web.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-                </a>
-              )}
-            </div>
-          )}
-
-          {/* Navegación entre trabajos */}
-          {tCount > 1 && (
-            <div className="flex items-center justify-between pt-3 mt-1 border-t border-background/10">
-              <button
-                onClick={() => goTrabajo(-1)}
-                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
-                aria-label="Trabajo anterior"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                anterior
-              </button>
-              <span className="font-mono text-2xs text-background/25 tabular-nums">
-                {tIdx + 1} / {tCount}
-              </span>
-              <button
-                onClick={() => goTrabajo(1)}
-                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
-                aria-label="Trabajo siguiente"
-              >
-                siguiente
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Spacer final: permite centrar el último slide */}
+        <div className={cn(SPACER_BASE, lastIsLandscape && SPACER_LG_MD)} />
       </div>
     </div>
   );
@@ -404,7 +495,10 @@ function TrabajoCard({ trabajo, onOpen }: { trabajo: EstudioTrabajo; onOpen: () 
 
   const initial = first && first.w && first.h ? first.w / first.h : null;
   const [aspect, setAspect] = useState<number | null>(initial);
-  const ar = aspect ?? 4 / 5;
+  const rawAr = aspect ?? 4 / 5;
+  // Para IG, la og:image puede tener proporciones extremas (9:16 Reels, crops)
+  // que no representan el display real. Clampear a [4:5, 16:9] — rango nativo de IG.
+  const ar = first?.kind === "instagram" ? Math.min(Math.max(rawAr, 4 / 5), 16 / 9) : rawAr;
   // El ancho de la card sale del alto base × la proporción real, topado a 86vw.
   // El thumbnail usa `aspect-ratio` (no alto fijo) → si el ancho topa en mobile,
   // baja el alto y la proporción se mantiene (un video horizontal no se recorta).
@@ -487,7 +581,7 @@ function TrabajoCard({ trabajo, onOpen }: { trabajo: EstudioTrabajo; onOpen: () 
             )}
           </div>
           {trabajo.categoria && (
-            <span className="shrink-0 rounded-full bg-amber/15 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-amber/80 whitespace-nowrap">
+            <span className="shrink-0 rounded-full bg-[color-mix(in_oklch,var(--area-accent)_15%,transparent)] px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] whitespace-nowrap">
               {trabajo.categoria}
             </span>
           )}
@@ -531,10 +625,10 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
   return (
     <section className="bg-ink py-14">
       <div className="px-4 lg:px-12 mb-8">
-        <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/50 mb-2.5">
+        <p className="font-mono text-2xs uppercase tracking-[0.3em] text-[var(--area-accent)] mb-2.5">
           Producciones
         </p>
-        <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,3.5rem)]">
+        <h2 className="font-display font-black lowercase leading-[0.9] text-[var(--area-accent)] text-[clamp(2rem,6vw,3.5rem)]">
           en acción.
         </h2>
         <p className="mt-3 text-15 text-background/55 max-w-md">
@@ -548,7 +642,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
               className={cn(
                 "rounded-full px-3.5 py-1.5 font-mono text-2xs uppercase tracking-[0.15em] transition-colors",
                 filtro === null
-                  ? "bg-amber text-ink"
+                  ? "bg-[var(--area-accent)] text-ink"
                   : "border border-background/20 text-background/50 hover:border-background/40 hover:text-background/80",
               )}
             >
@@ -593,7 +687,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
       </div>
 
       {selectedIdx !== null && (
-        <TrabajoModal
+        <TrabajoLightbox
           trabajos={visibles}
           initialIdx={selectedIdx}
           onClose={() => setSelectedIdx(null)}
@@ -603,7 +697,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
   );
 }
 
-function DragGallery({ photos }: { photos: Photo[] }) {
+function DragGallery({ photos, compact = false }: { photos: Photo[]; compact?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(true);
@@ -653,8 +747,9 @@ function DragGallery({ photos }: { photos: Photo[] }) {
     drag.current.active = false;
   };
 
-  const arrowCls =
-    "absolute top-1/2 -translate-y-1/2 hidden lg:grid h-10 w-10 place-items-center rounded-full bg-background/90 border hairline backdrop-blur shadow-sm transition";
+  const arrowCls = compact
+    ? "absolute top-1/2 -translate-y-1/2 hidden lg:grid h-9 w-9 place-items-center rounded-full bg-black/55 hover:bg-black/75 text-background transition"
+    : "absolute top-1/2 -translate-y-1/2 hidden lg:grid h-10 w-10 place-items-center rounded-full bg-background/90 border hairline backdrop-blur shadow-sm transition";
 
   return (
     <div className="relative">
@@ -664,12 +759,18 @@ function DragGallery({ photos }: { photos: Photo[] }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none touch-pan-x"
+        className={cn(
+          "flex gap-3 overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none touch-pan-x",
+          compact ? "px-4 pb-4 pt-5 scroll-pl-4" : "px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12",
+        )}
       >
         {photos.map((photo, i) => (
           <div
             key={photo.src}
-            className="snap-start shrink-0 basis-[86%] sm:basis-[56%] lg:basis-[36%] aspect-[4/3] overflow-hidden rounded-xl bg-surface"
+            className={cn(
+              "snap-start shrink-0 aspect-[4/3] overflow-hidden rounded-xl bg-surface",
+              compact ? "basis-[82%] sm:basis-[60%]" : "basis-[86%] sm:basis-[56%] lg:basis-[36%]",
+            )}
           >
             <img
               src={photo.src}
@@ -690,7 +791,7 @@ function DragGallery({ photos }: { photos: Photo[] }) {
           arrowCls,
           "left-3",
           canPrev
-            ? "hover:bg-ink hover:text-amber hover:border-ink"
+            ? "hover:bg-ink hover:text-[var(--area-accent)] hover:border-ink"
             : "opacity-0 pointer-events-none",
         )}
       >
@@ -705,7 +806,7 @@ function DragGallery({ photos }: { photos: Photo[] }) {
           arrowCls,
           "right-3",
           canNext
-            ? "hover:bg-ink hover:text-amber hover:border-ink"
+            ? "hover:bg-ink hover:text-[var(--area-accent)] hover:border-ink"
             : "opacity-0 pointer-events-none",
         )}
       >
@@ -761,7 +862,6 @@ function EstudioPage() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["estudio"],
     queryFn: apiGetEstudio,
-    staleTime: 1000 * 60 * 5,
     retry: 2,
   });
 
@@ -801,11 +901,6 @@ function EstudioPage() {
     [data?.fotos],
   );
   const heroPhoto = photos.find((p) => p.hero) ?? photos[0];
-  const galleryPhotos = photos.filter((p) => !p.hero);
-  const cicloramaPhoto =
-    photos.find((p) => p.ciclorama) ??
-    photos.find((p) => p.alt?.toLowerCase().includes("ciclo")) ??
-    photos[2];
 
   const [withPack, setWithPack] = useState(false);
 
@@ -853,10 +948,10 @@ function EstudioPage() {
         <section className="relative overflow-hidden bg-ink px-4 lg:px-12 py-[clamp(2.5rem,5vw,4.5rem)] pb-[clamp(3rem,6vw,5rem)]">
           <Grain />
           <div className="relative">
-            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/60 mb-4">
+            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] mb-4">
               Estudio fotográfico y de video · Mar del Plata
             </p>
-            <h1 className="font-display font-black text-amber leading-[0.88] tracking-[-0.02em] lowercase text-[clamp(5rem,22vw,13rem)]">
+            <h1 className="font-display font-black text-[var(--area-accent)] leading-[0.88] tracking-[-0.02em] lowercase text-[clamp(5rem,22vw,13rem)]">
               el estudio.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-relaxed text-background/65">
@@ -889,42 +984,24 @@ function EstudioPage() {
           )}
         </div>
 
-        {/* ── Galería arrastrable ───────────────────────────────────── */}
-        <section className="border-t hairline pt-10 pb-12">
-          <div className="mb-5 flex items-end justify-between gap-3 px-4 lg:px-12">
-            <div>
-              <h2 className="font-display font-black lowercase text-[clamp(1.75rem,4vw,2.5rem)] leading-[0.92]">
-                el espacio.
-              </h2>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                Deslizá para ver el estudio completo.
-              </p>
-            </div>
-            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums shrink-0">
-              {photos.length} fotos
-            </span>
-          </div>
-          <DragGallery photos={galleryPhotos.length > 0 ? galleryPhotos : photos} />
-        </section>
-
-        {/* ── Ciclorama — split editorial ink ──────────────────────── */}
+        {/* ── Ciclorama + galería — split editorial ink ────────────── */}
         <section className="grid lg:grid-cols-2">
           {/* Texto — ink */}
           <div className="relative overflow-hidden bg-ink px-[clamp(1.5rem,4vw,3.5rem)] py-[clamp(2.5rem,5vw,4.5rem)] flex flex-col justify-center">
             <Grain opacity={10} />
             <div className="relative">
-              <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/55 mb-5">
+              <p className="font-mono text-2xs uppercase tracking-[0.3em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] mb-5">
                 La pieza central
               </p>
               <div className="flex items-baseline gap-1 leading-none">
-                <span className="font-display font-black text-amber leading-[0.88] tracking-[-0.02em] text-[clamp(5rem,14vw,9rem)]">
+                <span className="font-display font-black text-[var(--area-accent)] leading-[0.88] tracking-[-0.02em] text-[clamp(5rem,14vw,9rem)]">
                   6×6
                 </span>
-                <span className="font-mono text-amber/55 text-[clamp(1.25rem,3vw,2rem)] mb-1">
+                <span className="font-mono text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] text-[clamp(1.25rem,3vw,2rem)] mb-1">
                   m
                 </span>
               </div>
-              <h2 className="font-display font-black text-amber lowercase leading-[0.9] tracking-[-0.02em] text-[clamp(2.25rem,6vw,4rem)] mt-1">
+              <h2 className="font-display font-black text-[var(--area-accent)] lowercase leading-[0.9] tracking-[-0.02em] text-[clamp(2.25rem,6vw,4rem)] mt-1">
                 ciclorama.
               </h2>
               <p className="mt-5 max-w-sm text-15 leading-relaxed text-background/65">
@@ -938,7 +1015,7 @@ function EstudioPage() {
                 {["Curva continua", "Sin sombras", "Potencia extra", "Fondos de papel"].map((t) => (
                   <span
                     key={t}
-                    className="inline-flex items-center rounded-full border border-amber/30 px-3.5 py-1 font-mono text-2xs uppercase tracking-[0.2em] text-amber/70 whitespace-nowrap"
+                    className="inline-flex items-center rounded-full border border-[color-mix(in_oklch,var(--area-accent)_30%,transparent)] px-3.5 py-1 font-mono text-2xs uppercase tracking-[0.2em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] whitespace-nowrap"
                   >
                     {t}
                   </span>
@@ -957,15 +1034,12 @@ function EstudioPage() {
               </Button>
             </div>
           </div>
-          {/* Foto ciclorama */}
-          <div className="min-h-72 lg:min-h-0 overflow-hidden">
-            {cicloramaPhoto && (
-              <img
-                src={cicloramaPhoto.src}
-                alt="Ciclorama 6×6 m"
-                loading="lazy"
-                className="h-full w-full object-cover block"
-              />
+          {/* Galería del espacio */}
+          <div className="min-h-72 lg:min-h-0 flex flex-col justify-center overflow-hidden bg-ink border-t lg:border-t-0 lg:border-l border-background/10">
+            {photos.length > 0 ? (
+              <DragGallery photos={photos} compact />
+            ) : (
+              <div className="flex-1" />
             )}
           </div>
         </section>
@@ -996,23 +1070,23 @@ function EstudioPage() {
         {/* ── Reservar ─────────────────────────────────────────────── */}
         <section
           id="reservar"
-          className="relative overflow-hidden bg-amber px-4 lg:px-12 py-14 scroll-mt-16"
+          className="relative overflow-hidden bg-[var(--area-accent)] px-4 lg:px-12 py-14 scroll-mt-16"
         >
           <Grain opacity={14} />
           <div className="relative">
             <div className="flex flex-wrap items-end justify-between gap-3 mb-7">
               <div>
-                <p className="font-mono text-2xs uppercase tracking-[0.3em] text-ink/55 mb-2.5">
+                <p className="font-mono text-2xs uppercase tracking-[0.3em] text-ink mb-2.5">
                   Reservas
                 </p>
                 <h2 className="font-display font-black lowercase leading-[0.95] text-ink text-[clamp(1.75rem,4vw,2.75rem)]">
                   reservá tu sesión.
                 </h2>
-                <p className="mt-2.5 max-w-md text-15 text-ink/65 leading-relaxed">
+                <p className="mt-2.5 max-w-md text-15 text-ink leading-relaxed">
                   Mínimo {minHours} horas. Elegí día y horario — te contactamos para confirmar.
                 </p>
               </div>
-              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-ink/50 tabular-nums whitespace-nowrap shrink-0">
+              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-ink tabular-nums whitespace-nowrap shrink-0">
                 {priceLabel}
               </span>
             </div>
@@ -1024,7 +1098,7 @@ function EstudioPage() {
               />
               {packActivo && (
                 <aside className="rounded-2xl border border-ink/20 bg-ink/8 p-5 lg:sticky lg:top-20 lg:self-start">
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-ink/55 mb-3.5">
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-ink mb-3.5">
                     Estudio + equipos · qué incluye
                   </div>
                   {withPack ? (
@@ -1041,7 +1115,7 @@ function EstudioPage() {
                       </div>
                     )
                   ) : (
-                    <p className="text-sm text-ink/60 leading-relaxed">
+                    <p className="text-sm text-ink leading-relaxed">
                       Seleccioná "Estudio + equipos" para ver qué incluye el pack de luces y
                       griperías.
                     </p>
@@ -1061,7 +1135,7 @@ function EstudioPage() {
             dónde estamos.
           </h2>
           <div className="flex items-start gap-3 mb-6">
-            <MapPin className="h-4 w-4 text-amber mt-0.5 shrink-0" />
+            <MapPin className="h-4 w-4 text-[var(--area-accent)] mt-0.5 shrink-0" />
             <p className="text-base font-semibold leading-snug">{direccion}</p>
           </div>
           <div className="w-full aspect-[16/7] overflow-hidden rounded-2xl border hairline bg-surface min-h-60">
@@ -1107,13 +1181,13 @@ function EstudioPage() {
         {/* ── CTA "hablemos." ───────────────────────────────────────── */}
         <section className="bg-ink px-4 lg:px-12 py-16">
           <div className="max-w-xl">
-            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/60 mb-3">
+            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] mb-3">
               ¿Tenés dudas?
             </p>
-            <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,4rem)]">
+            <h2 className="font-display font-black lowercase leading-[0.9] text-[var(--area-accent)] text-[clamp(2rem,6vw,4rem)]">
               hablemos.
             </h2>
-            <p className="mt-4 text-15 leading-relaxed text-amber/65 max-w-sm">
+            <p className="mt-4 text-15 leading-relaxed text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] max-w-sm">
               Te respondemos en el día. Contanos qué necesitás y armamos un presupuesto a medida.
             </p>
             <Button
