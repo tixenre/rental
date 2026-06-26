@@ -508,7 +508,6 @@ function SesionesSection({ taller }: { taller: TallerAdmin }) {
 function PagosSection({ taller }: { taller: TallerAdmin }) {
   const qc = useQueryClient();
   const [form, setForm] = useState({
-    horario: taller.horario ?? "",
     pago_alias: taller.pago_alias ?? "",
     pago_cbu: taller.pago_cbu ?? "",
     pago_banco: taller.pago_banco ?? "",
@@ -518,7 +517,6 @@ function PagosSection({ taller }: { taller: TallerAdmin }) {
 
   useEffect(() => {
     setForm({
-      horario: taller.horario ?? "",
       pago_alias: taller.pago_alias ?? "",
       pago_cbu: taller.pago_cbu ?? "",
       pago_banco: taller.pago_banco ?? "",
@@ -558,10 +556,7 @@ function PagosSection({ taller }: { taller: TallerAdmin }) {
   return (
     <AdminSection storageKey="talleres:pagos" title="Lugar y pagos">
       <div className="flex flex-col gap-4">
-        <div className="grid sm:grid-cols-2 gap-4">
-          {tf("Horario (texto libre)", "horario")}
-          {tf("Dirección", "direccion")}
-        </div>
+        <div className="grid sm:grid-cols-2 gap-4">{tf("Dirección", "direccion")}</div>
         <div className="grid sm:grid-cols-3 gap-4">
           {tf("Alias de pago", "pago_alias")}
           {tf("CBU", "pago_cbu")}
