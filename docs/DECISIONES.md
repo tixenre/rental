@@ -1218,4 +1218,25 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Consecuencias.** El manual se actualiza en el **mismo cambio** que toca su motor (como el código y los tests).
   El supervisor marca: un manual desactualizado, o una regla de criterio copiada en el manual que debería ser un
   link a MEMORIA. Próximos candidatos a manual propio: reservas (el core sagrado, hoy en MEMORIA + MANIFIESTO §6)
+
+### 2026-06-26 — skill `consejo`: juicio crítico de propuestas como fuente única, rigor escalable, memoria separada
+
+- **Contexto.** El proceso de trabajo no tenía un gate deliberativo aguas arriba: las propuestas se evaluaban
+  ad-hoc en la sesión, con el sesgo de complacencia no estructurado. El supervisor juzga lo ya hecho; faltaba
+  el equivalente para lo que se va a hacer. En conversación, preguntar "¿qué te parece?" activa la cooperación,
+  no la crítica — el análisis queda distorsionado hacia el acuerdo.
+- **Decisión.** El juicio crítico de propuestas/ideas/planes antes de construir vive en el skill **`consejo`**
+  (`.claude/skills/consejo/SKILL.md`) — fuente única, no ad-hoc en la sesión. El valor no es "más cabezas" (mismo
+  modelo, mismos sesgos) sino el **mandato adversarial** y el **rigor escalable**: default pase crítico eficiente
+  (~10-15k, sin subagentes); escala a voces aisladas paralelas (Contrario + Investigador, ~120k) o consejo completo
+  de 5 lentes (~300k) solo si la decisión lo justifica. El consejo **no escribe** en `MEMORIA.md`/`DECISIONES.md`
+  — tiene su propia `BITACORA.md` con autoridad separada (lo que juzgó el consejo ≠ lo que decidió el dueño).
+- **Why.** Un mandato de matar la idea sobre una proposición encuadrada en neutral suelta la crítica que el modo-charla
+  reprime. La separación de memorias es necesaria por la independencia crítica: si el consejo obedeciera `MEMORIA.md`
+  como autoridad, pierde su razón de existir (validaría lo ya decidido en vez de juzgarlo). La escalabilidad de
+  rigor materializa _Eficiencia de sesión (2026-05-26)_: los recursos son finitos, el rigor se asigna donde rinde.
+- **Consecuencias.** El supervisor marca: (a) propuesta mediana/grande juzgada sin invocar el skill; (b) veredicto
+  del consejo promovido a `MEMORIA.md` sin autorización explícita del dueño. El consejo calibra su propio acierto
+  via `BITACORA.md` (registra qué juzgó vs. qué decidió el dueño — campo "¿coincidieron?"). Condición de retiro
+  (anti-bloat): si el ledger de `gobernanza` lo muestra con uso <1/mes y veredictos tibios, se retira.
   y contabilidad/plata. No todo sistema necesita uno: si MEMORIA + MANIFIESTO ya lo cubren claro, no se fuerza.

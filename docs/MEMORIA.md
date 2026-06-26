@@ -341,6 +341,15 @@ supervisor + `check-docs`, no en la capa de skills (que tiene su propia gobernan
 **`SISTEMA_FOTOS.md`** (fotos = procesar + mostrar). Ya existen `SISTEMA_SPECS.md`, `FLUJO_PEDIDOS.md`,
 `DESIGN_SYSTEM.md`.
 
+### 2026-06-26 — skill `consejo`: juicio crítico de propuestas como fuente única, rigor escalable, memoria separada
+
+El juicio de propuestas/ideas/planes antes de construir vive en el skill **`consejo`** (fuente única — no
+ad-hoc en la sesión general). El consejo **no escribe** en `MEMORIA.md`/`DECISIONES.md` del repo: tiene su
+propia `BITACORA.md` con autoridad separada (lo que juzgó el consejo ≠ lo que decidió el dueño). Default:
+pase crítico eficiente (~10-15k, sin subagentes); escala a voces aisladas solo si la decisión justifica el
+gasto. El supervisor marca: (a) propuesta mediana/grande juzgada sin invocar el skill; (b) veredicto del
+consejo promovido a `MEMORIA.md` sin autorización del dueño.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
