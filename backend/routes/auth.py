@@ -351,6 +351,31 @@ def auth_dev_login():
     )
 
 
+@router.get("/auth/dev-login-cliente")
+def auth_dev_login_cliente():
+    """Login de cliente sin OAuth — solo en dev (ADMIN_BYPASS_AUTH=1, nunca en prod).
+    Impersona al primer cliente del DB (por STAGING_CLIENTE_EMAIL o el primero que exista)."""
+    if not dev_bypass_enabled():
+        raise HTTPException(404, "No encontrado.")
+    cli = _resolve_staging_cliente(None)
+    if cli is None:
+        from database import get_db
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT id, email, nombre, apellido FROM clientes ORDER BY id LIMIT 1"
+            ).fetchone()
+        if row is None:
+            raise HTTPException(503, "No hay clientes en la base de datos.")
+        cli = {"id": row["id"], "email": row["email"],
+               "name": f"{row['nombre']} {row['apellido']}".strip()}
+    return _make_session_response(
+        email=cli["email"],
+        name=cli["name"],
+        redirect="/cliente",
+        extra={"role": "cliente", "cliente_id": cli["id"]},
+    )
+
+
 def _resolve_staging_cliente(cliente_id: int | None) -> dict | None:
     """Resuelve el cliente a impersonar en staging (target="cliente"). READ-ONLY:
     solo lee `clientes`, nunca muta staging. Por `cliente_id` si se pasa; si no,

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { TopBar } from "@/components/rental/TopBar";
 import { useBusinessPhone } from "@/lib/business";
 import { whatsappLink } from "@/lib/whatsapp";
+import { authedFetch } from "@/lib/authedFetch";
 
 export const Route = createFileRoute("/cliente/login")({
   head: () => ({
@@ -26,6 +27,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 function ClienteLoginPage() {
   const [error, setError] = useState<string | null>(null);
+  const [devMode, setDevMode] = useState(false);
   const businessPhone = useBusinessPhone();
   const waHref = whatsappLink({
     phone: businessPhone,
@@ -36,6 +38,13 @@ function ClienteLoginPage() {
     const params = new URLSearchParams(window.location.search);
     const errCode = params.get("error");
     if (errCode) setError(ERROR_MESSAGES[errCode] ?? `Error: ${errCode}`);
+
+    authedFetch("/auth/config").then(async (r) => {
+      if (r.ok) {
+        const data = await r.json();
+        setDevMode(data.dev_mode ?? false);
+      }
+    });
   }, []);
 
   function handleGoogleLogin() {
@@ -45,6 +54,10 @@ function ClienteLoginPage() {
     window.location.href = next
       ? `/cliente/auth/google?next=${encodeURIComponent(next)}`
       : "/cliente/auth/google";
+  }
+
+  function handleDevLogin() {
+    window.location.href = "/auth/dev-login-cliente";
   }
 
   return (
@@ -71,6 +84,15 @@ function ClienteLoginPage() {
             <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               {error}
             </div>
+          )}
+
+          {devMode && (
+            <button
+              onClick={handleDevLogin}
+              className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-amber/10 border-amber/30 py-[13px] text-sm font-medium text-ink transition hover:bg-amber/15 active:scale-[0.98]"
+            >
+              Entrar en modo desarrollo
+            </button>
           )}
 
           <button
