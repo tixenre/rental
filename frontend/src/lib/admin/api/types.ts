@@ -1203,8 +1203,9 @@ export type EstudioTrabajoInput = {
   /** Tags del trabajo. El backend deduplica y deriva la columna legacy. */
   categorias?: string[];
   descripcion?: string;
-  /** Lista ordenada de links externos. El backend deriva el tipo y el thumbnail. */
-  links?: Array<{ url: string; tipo?: string | null }>;
+  /** Lista ordenada de links externos. El backend deriva el tipo y el thumbnail.
+   *  `thumbnail_url` es un override manual: el backend lo descarga y reemplaza el og:image. */
+  links?: Array<{ url: string; tipo?: string | null; thumbnail_url?: string | null }>;
   activo?: boolean;
 };
 

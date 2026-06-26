@@ -898,6 +898,9 @@ function TrabajoDialog({
   const [links, setLinks] = useState<string[]>(
     existing?.links?.length ? existing.links.map((l) => l.url) : [""],
   );
+  const [thumbOverrides, setThumbOverrides] = useState<string[]>(
+    existing?.links?.length ? existing.links.map(() => "") : [""],
+  );
   const [activo, setActivo] = useState(existing?.activo ?? true);
   const [trabajoId, setTrabajoId] = useState<number | null>(existing?.id ?? null);
   const [fotos, setFotos] = useState(existing?.fotos ?? []);
@@ -914,15 +917,24 @@ function TrabajoDialog({
 
   function setLinkAt(idx: number, url: string) {
     setLinks((prev) => prev.map((l, i) => (i === idx ? url : l)));
+    setThumbOverrides((prev) => prev.map((t, i) => (i === idx ? "" : t)));
   }
   function addLinkRow() {
     setLinks((prev) => [...prev, ""]);
+    setThumbOverrides((prev) => [...prev, ""]);
   }
   function removeLinkRow(idx: number) {
     setLinks((prev) => {
       const next = prev.filter((_, i) => i !== idx);
       return next.length ? next : [""];
     });
+    setThumbOverrides((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      return next.length ? next : [""];
+    });
+  }
+  function setThumbOverrideAt(idx: number, val: string) {
+    setThumbOverrides((prev) => prev.map((t, i) => (i === idx ? val : t)));
   }
 
   function toggleCategoria(cat: string) {
@@ -973,6 +985,7 @@ function TrabajoDialog({
     setNewTag("");
     setDescripcion(t?.descripcion ?? "");
     setLinks(t?.links?.length ? t.links.map((l) => l.url) : [""]);
+    setThumbOverrides(t?.links?.length ? t.links.map(() => "") : [""]);
     setActivo(t?.activo ?? true);
     setTrabajoId(t?.id ?? null);
     setFotos(t?.fotos ?? []);
@@ -980,8 +993,13 @@ function TrabajoDialog({
     setShowExtra(false);
   }, [open, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cleanLinks = links.map((l) => l.trim()).filter((l) => linkTipo(l));
-  const linksPayload = cleanLinks.map((url) => ({ url, tipo: linkTipo(url) }));
+  const linksPayload = links
+    .map((url, i) => ({
+      url: url.trim(),
+      tipo: linkTipo(url.trim()),
+      thumbnail_url: (thumbOverrides[i] ?? "").trim() || undefined,
+    }))
+    .filter((l) => l.tipo !== null);
 
   function buildData(): EstudioTrabajoInput {
     return {
@@ -1095,33 +1113,48 @@ function TrabajoDialog({
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground block">
               Links (YouTube / Instagram)
             </label>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {links.map((url, idx) => {
                 const tipo = linkTipo(url);
                 return (
-                  <div key={idx} className="flex items-center gap-2">
-                    {tipo === "youtube" ? (
-                      <Film className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    ) : tipo === "instagram" ? (
-                      <IgGlyph className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    ) : (
-                      <Film className="h-4 w-4 shrink-0 text-muted-foreground/30" />
-                    )}
-                    <Input
-                      value={url}
-                      onChange={(e) => handleLinkChange(idx, e.target.value)}
-                      placeholder="Pegá un link de YouTube o Instagram…"
-                      autoFocus={!isEdit && idx === 0}
-                    />
-                    {(links.length > 1 || url) && (
-                      <button
-                        type="button"
-                        onClick={() => removeLinkRow(idx)}
-                        className="shrink-0 rounded-full p-1.5 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
-                        aria-label="Quitar link"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      {tipo === "youtube" ? (
+                        <Film className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      ) : tipo === "instagram" ? (
+                        <IgGlyph className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <Film className="h-4 w-4 shrink-0 text-muted-foreground/30" />
+                      )}
+                      <Input
+                        value={url}
+                        onChange={(e) => handleLinkChange(idx, e.target.value)}
+                        placeholder="Pegá un link de YouTube o Instagram…"
+                        autoFocus={!isEdit && idx === 0}
+                      />
+                      {(links.length > 1 || url) && (
+                        <button
+                          type="button"
+                          onClick={() => removeLinkRow(idx)}
+                          className="shrink-0 rounded-full p-1.5 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
+                          aria-label="Quitar link"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    {tipo && (
+                      <details className="ml-6">
+                        <summary className="cursor-pointer text-2xs text-muted-foreground/40 hover:text-muted-foreground/70 select-none list-none">
+                          miniatura alternativa
+                        </summary>
+                        <Input
+                          className="mt-1 text-xs"
+                          value={thumbOverrides[idx] ?? ""}
+                          onChange={(e) => setThumbOverrideAt(idx, e.target.value)}
+                          placeholder="URL de imagen (reemplaza la miniatura auto-detectada)"
+                        />
+                      </details>
                     )}
                   </div>
                 );
@@ -1437,7 +1470,7 @@ function TrabajoDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={saving || (!cleanLinks.length && !titulo.trim() && !fotos.length)}
+            disabled={saving || (!linksPayload.length && !titulo.trim() && !fotos.length)}
           >
             {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
             {isEdit ? "Guardar cambios" : "Crear trabajo"}
