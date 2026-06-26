@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, MessageCircle, MapPin, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageCircle, MapPin } from "lucide-react";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
 import { StudioPackKit } from "@/components/studio/StudioPackKit";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
-import { apiGetEstudio } from "@/lib/api";
+import { apiGetEstudio, type EstudioTrabajo, type EstudioMedia } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -15,11 +15,8 @@ export const Route = createLazyFileRoute("/estudio")({
   component: EstudioPage,
 });
 
-// Coordenadas del estudio (Mar del Plata) — reemplazar con dirección real del admin
 const MAPA_EMBED_DEFAULT =
-  "https://maps.google.com/maps?q=-38.0028,-57.5578&z=15&hl=es&output=embed";
-const MAPA_URL_DEFAULT =
-  "https://www.google.com/maps/search/?api=1&query=Mar+del+Plata+Buenos+Aires+Argentina";
+  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d5418.432520284455!2d-57.56597107511356!3d-37.98649647543215!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x9584db0050a8b0bf%3A0x3860608ed96f47f1!2sRambla%20Estudio%20y%20Rental!5e0!3m2!1ses-419!2sar!4v1782432663360!5m2!1ses-419!2sar";
 
 // ── Grain overlay (reutilizado en secciones ink/amber) ─────────────────────
 const Grain = ({ opacity = 12 }: { opacity?: number }) => (
@@ -36,6 +33,576 @@ const Grain = ({ opacity = 12 }: { opacity?: number }) => (
 type Photo = { src: string; alt: string; hero?: boolean; ciclorama?: boolean };
 
 // ── Galería horizontal arrastrable ─────────────────────────────────────────
+// ── Trabajos: carrusel + modal ────────────────────────────────────────────────
+
+function extractYtId(url: string): string | null {
+  const m = url.match(/(?:v=|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m?.[1] ?? null;
+}
+
+const IgIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="currentColor">
+    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
+  </svg>
+);
+
+const WebIcon = () => (
+  <svg
+    viewBox="0 0 24 24"
+    className="h-3.5 w-3.5 shrink-0"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+function ytThumb(ytId: string) {
+  return `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
+}
+function ytThumbFallback(ytId: string) {
+  return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+}
+
+// Thumbnail de un medio para la card. Los links traen un thumbnail permanente
+// procesado por el backend; si falta (best-effort falló), YouTube cae a su
+// thumbnail en vivo.
+function mediaThumb(m: EstudioMedia): { src: string; fallback?: string } | null {
+  if (m.kind === "foto") {
+    const src = m.url_sm ?? m.url;
+    return src ? { src } : null;
+  }
+  if (m.thumbnail) return { src: m.thumbnail };
+  if (m.kind === "youtube") {
+    const id = extractYtId(m.url);
+    if (id) return { src: ytThumb(id), fallback: ytThumbFallback(id) };
+  }
+  return null;
+}
+
+// Embed nativo de Instagram vía el script oficial: renderiza el post en su
+// tamaño real (vertical/cuadrado/horizontal según el post, no forzado). El
+// script auto-dimensiona el iframe por postMessage — lo que un iframe directo
+// no puede hacer cross-origin.
+declare global {
+  interface Window {
+    instgrm?: { Embeds: { process: () => void } };
+  }
+}
+
+const IG_EMBED_SCRIPT = "https://www.instagram.com/embed.js";
+
+function IgEmbed({ url }: { url: string }) {
+  useEffect(() => {
+    const process = () => window.instgrm?.Embeds?.process();
+    if (window.instgrm) {
+      process();
+      return;
+    }
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${IG_EMBED_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener("load", process, { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = IG_EMBED_SCRIPT;
+    s.async = true;
+    s.addEventListener("load", process, { once: true });
+    document.body.appendChild(s);
+  }, [url]);
+
+  // key={url} fuerza un blockquote fresco al cambiar de slide (el script muta el
+  // nodo al procesarlo; remontar evita que React reconcilie un nodo ya mutado).
+  return (
+    <div key={url} className="flex w-full justify-center">
+      <blockquote
+        className="instagram-media"
+        data-instgrm-permalink={url}
+        data-instgrm-version="14"
+        style={{ width: "100%", maxWidth: "100%", minWidth: 0, margin: 0 }}
+      />
+    </div>
+  );
+}
+
+function TrabajoModal({
+  trabajos,
+  initialIdx,
+  onClose,
+}: {
+  trabajos: EstudioTrabajo[];
+  initialIdx: number;
+  onClose: () => void;
+}) {
+  const tCount = trabajos.length;
+  const [tIdx, setTIdx] = useState(initialIdx);
+  const [mIdx, setMIdx] = useState(0);
+
+  const trabajo = trabajos[tIdx];
+  const media = trabajo?.media ?? [];
+  const mCount = media.length;
+  const current = media[Math.min(mIdx, Math.max(mCount - 1, 0))] ?? null;
+
+  // Navegar entre medios; al llegar al borde fluye al trabajo anterior/siguiente.
+  const goMedia = useCallback(
+    (d: number) => {
+      const next = mIdx + d;
+      if (next < 0) {
+        const prevT = (tIdx - 1 + tCount) % tCount;
+        setTIdx(prevT);
+        setMIdx(Math.max((trabajos[prevT]?.media?.length ?? 1) - 1, 0));
+      } else if (next >= mCount) {
+        setTIdx((tIdx + 1) % tCount);
+        setMIdx(0);
+      } else {
+        setMIdx(next);
+      }
+    },
+    [mIdx, mCount, tIdx, tCount, trabajos],
+  );
+
+  // Saltar directamente al trabajo anterior/siguiente (botones del footer).
+  const goTrabajo = useCallback(
+    (d: number) => {
+      setTIdx((i) => (i + d + tCount) % tCount);
+      setMIdx(0);
+    },
+    [tCount],
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") goMedia(1);
+      else if (e.key === "ArrowLeft") goMedia(-1);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose, goMedia]);
+
+  // El modal se ajusta al medio. YouTube = 16:9/9:16; IG = 480px (embed nativo);
+  // Foto = w-fit (proporción real de la imagen, sin asumir nada).
+  const isShort = current?.kind === "youtube" && /\/shorts\//.test(current.url);
+  const modalWidth =
+    current?.kind === "instagram"
+      ? "min(94vw, 480px)"
+      : current?.kind === "youtube"
+        ? isShort
+          ? "min(94vw, calc(82vh * 9 / 16))"
+          : "min(94vw, calc(82vh * 16 / 9))"
+        : undefined; // foto → w-fit (proporción nativa de la imagen)
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-2 sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="relative bg-ink rounded-2xl overflow-hidden max-h-[96dvh] w-fit max-w-[94vw] flex flex-col"
+        style={{ width: modalWidth }}
+      >
+        {/* Cerrar */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-20 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-background/70 hover:text-background transition-colors"
+          aria-label="Cerrar"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+
+        {/* Escenario de medios (carrusel). El modal ya tiene la proporción del
+            medio actual, así que cada medio llena el ancho. */}
+        <div className="relative bg-black shrink-0 flex items-center justify-center overflow-hidden">
+          {current?.kind === "youtube" &&
+            (() => {
+              const ytId = extractYtId(current.url);
+              if (!ytId) return null;
+              return (
+                <div
+                  className="relative w-full"
+                  style={{ aspectRatio: isShort ? "9 / 16" : "16 / 9" }}
+                >
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
+                    title={trabajo.titulo}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="absolute inset-0 h-full w-full"
+                  />
+                </div>
+              );
+            })()}
+
+          {current?.kind === "instagram" && (
+            <div className="max-h-[86vh] min-h-[420px] w-full overflow-y-auto bg-background">
+              <IgEmbed key={current.url} url={current.url} />
+            </div>
+          )}
+
+          {current?.kind === "foto" && (
+            <img
+              src={current.url_avif ?? current.url}
+              alt={trabajo.titulo}
+              className="block max-h-[82vh] max-w-[94vw]"
+            />
+          )}
+
+          {/* Flechas dentro del medio (fluyen al trabajo anterior/siguiente al llegar al borde) */}
+          {mCount > 1 && (
+            <>
+              <button
+                onClick={() => goMedia(-1)}
+                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
+                aria-label="Anterior"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => goMedia(1)}
+                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
+                aria-label="Siguiente"
+              >
+                <ArrowRight className="h-5 w-5" />
+              </button>
+              <div className="absolute top-3 left-3 z-10 rounded-full bg-black/55 px-2.5 py-1 font-mono text-2xs text-background/80">
+                {mIdx + 1} / {mCount}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Puntos del carrusel de medios */}
+        {mCount > 1 && (
+          <div className="flex items-center justify-center gap-1.5 py-3 bg-ink shrink-0">
+            {media.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setMIdx(i)}
+                aria-label={`Ir al medio ${i + 1}`}
+                className={cn(
+                  "h-1.5 rounded-full transition-all",
+                  i === mIdx ? "w-5 bg-amber" : "w-1.5 bg-background/25 hover:bg-background/45",
+                )}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Info */}
+        <div className="px-5 py-4 space-y-2 overflow-y-auto">
+          {trabajo.categorias.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {trabajo.categorias.map((cat) => (
+                <span
+                  key={cat}
+                  className="rounded-full border border-amber/40 px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber"
+                >
+                  {cat}
+                </span>
+              ))}
+            </div>
+          )}
+          {trabajo.titulo && (
+            <h3 className="font-display font-bold text-background text-xl leading-tight">
+              {trabajo.titulo}
+            </h3>
+          )}
+          {trabajo.descripcion && (
+            <p className="text-sm text-background/55 leading-relaxed">{trabajo.descripcion}</p>
+          )}
+          {trabajo.realizador && (
+            <div className="flex items-center gap-2 pt-1">
+              {trabajo.realizador_logo_url && (
+                <img
+                  src={trabajo.realizador_logo_url}
+                  alt={trabajo.realizador}
+                  className="h-6 w-6 rounded object-contain border border-background/10 shrink-0"
+                />
+              )}
+              <span className="text-sm font-medium text-background/65">{trabajo.realizador}</span>
+              {trabajo.realizador_instagram && (
+                <a
+                  href={`https://instagram.com/${trabajo.realizador_instagram.replace(/^@/, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
+                >
+                  <IgIcon />
+                  {trabajo.realizador_instagram.startsWith("@")
+                    ? trabajo.realizador_instagram
+                    : `@${trabajo.realizador_instagram}`}
+                </a>
+              )}
+              {trabajo.realizador_web && (
+                <a
+                  href={
+                    trabajo.realizador_web.startsWith("http")
+                      ? trabajo.realizador_web
+                      : `https://${trabajo.realizador_web}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
+                >
+                  <WebIcon />
+                  {trabajo.realizador_web.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Navegación entre trabajos */}
+          {tCount > 1 && (
+            <div className="flex items-center justify-between pt-3 mt-1 border-t border-background/10">
+              <button
+                onClick={() => goTrabajo(-1)}
+                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
+                aria-label="Trabajo anterior"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                anterior
+              </button>
+              <span className="font-mono text-2xs text-background/25 tabular-nums">
+                {tIdx + 1} / {tCount}
+              </span>
+              <button
+                onClick={() => goTrabajo(1)}
+                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
+                aria-label="Trabajo siguiente"
+              >
+                siguiente
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Card del carrusel. Alto fijo, ancho según la proporción REAL del thumbnail
+// (vertical/cuadrado/horizontal) — sin recortar. Las dimensiones vienen del
+// backend (links) o se miden al cargar la imagen (fotos); default 4/5 vertical.
+function TrabajoCard({ trabajo, onOpen }: { trabajo: EstudioTrabajo; onOpen: () => void }) {
+  const first = trabajo.media[0];
+  const hasVideo = trabajo.media.some((m) => m.kind !== "foto");
+  const t = first ? mediaThumb(first) : null;
+  const multi = trabajo.media.length > 1;
+
+  const initial = first && first.w && first.h ? first.w / first.h : null;
+  const [aspect, setAspect] = useState<number | null>(initial);
+  const ar = aspect ?? 4 / 5;
+  // El ancho de la card sale del alto base × la proporción real, topado a 86vw.
+  // El thumbnail usa `aspect-ratio` (no alto fijo) → si el ancho topa en mobile,
+  // baja el alto y la proporción se mantiene (un video horizontal no se recorta).
+  const CARD_H = "clamp(12rem, 40vh, 22rem)";
+
+  return (
+    <button
+      onClick={onOpen}
+      className="snap-start shrink-0 rounded-xl overflow-hidden border border-background/10 bg-background/5 text-left group"
+      style={{ width: `min(calc(${CARD_H} * ${ar}), 86vw)` }}
+      draggable={false}
+    >
+      {/* Thumbnail — proporción real del medio (sin recortar) */}
+      <div className="relative w-full overflow-hidden bg-background/5" style={{ aspectRatio: ar }}>
+        {t?.src ? (
+          <img
+            src={t.src}
+            alt={trabajo.titulo}
+            loading="lazy"
+            draggable={false}
+            onLoad={(e) => {
+              const w = e.currentTarget.naturalWidth;
+              const h = e.currentTarget.naturalHeight;
+              if (w && h) setAspect(w / h);
+            }}
+            onError={
+              t.fallback
+                ? (e) => {
+                    e.currentTarget.src = t.fallback!;
+                    e.currentTarget.onerror = null;
+                  }
+                : undefined
+            }
+            className="h-full w-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-[1.04]"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-background/15 text-xs">sin imagen</span>
+          </div>
+        )}
+        {/* Play badge */}
+        {hasVideo && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+            <div className="h-10 w-10 rounded-full bg-background/85 flex items-center justify-center shadow group-hover:scale-110 transition-transform">
+              <svg viewBox="0 0 24 24" className="h-4 w-4 text-ink ml-0.5" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </div>
+        )}
+        {/* Indicador de varios medios (estilo carrusel IG) */}
+        {multi && (
+          <div className="absolute top-2 right-2 rounded-full bg-black/55 px-2 py-0.5 flex items-center gap-1 text-background/90">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <rect x="8" y="8" width="12" height="12" rx="2" />
+              <path d="M4 16V6a2 2 0 0 1 2-2h10" />
+            </svg>
+            <span className="font-mono text-2xs">{trabajo.media.length}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Footer compacto */}
+      <div className="px-3 py-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            {trabajo.titulo && (
+              <p className="text-sm font-semibold text-background leading-snug truncate">
+                {trabajo.titulo}
+              </p>
+            )}
+            {trabajo.realizador && (
+              <p className="text-xs text-background/45 truncate mt-0.5">{trabajo.realizador}</p>
+            )}
+          </div>
+          {trabajo.categoria && (
+            <span className="shrink-0 rounded-full bg-amber/15 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-amber/80 whitespace-nowrap">
+              {trabajo.categoria}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
+  const [filtro, setFiltro] = useState<string | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const drag = useRef({ active: false, startX: 0, startScroll: 0, moved: false });
+
+  const categorias = useMemo(() => {
+    const set = new Set<string>();
+    trabajos.forEach((t) => t.categorias.forEach((c) => set.add(c)));
+    return [...set];
+  }, [trabajos]);
+
+  const visibles = filtro ? trabajos.filter((t) => t.categorias.includes(filtro)) : trabajos;
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    drag.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft, moved: false };
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current.active || !ref.current) return;
+    const dx = e.clientX - drag.current.startX;
+    if (Math.abs(dx) > 4) {
+      drag.current.moved = true;
+      ref.current.scrollLeft = drag.current.startScroll - dx;
+    }
+  };
+  const onPointerUp = () => {
+    drag.current.active = false;
+  };
+
+  return (
+    <section className="bg-ink py-14">
+      <div className="px-4 lg:px-12 mb-8">
+        <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/50 mb-2.5">
+          Producciones
+        </p>
+        <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,3.5rem)]">
+          en acción.
+        </h2>
+        <p className="mt-3 text-15 text-background/55 max-w-md">
+          Trabajos hechos por gente copada que pasó por el estudio.
+        </p>
+        {/* Filtros */}
+        {categorias.length > 1 && (
+          <div className="flex flex-wrap gap-2 mt-6">
+            <button
+              onClick={() => setFiltro(null)}
+              className={cn(
+                "rounded-full px-3.5 py-1.5 font-mono text-2xs uppercase tracking-[0.15em] transition-colors",
+                filtro === null
+                  ? "bg-amber text-ink"
+                  : "border border-background/20 text-background/50 hover:border-background/40 hover:text-background/80",
+              )}
+            >
+              Todo
+            </button>
+            {categorias.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setFiltro(filtro === cat ? null : cat)}
+                className={cn(
+                  "rounded-full px-3.5 py-1.5 font-mono text-2xs uppercase tracking-[0.15em] transition-colors",
+                  filtro === cat
+                    ? "bg-amber text-ink"
+                    : "border border-background/20 text-background/50 hover:border-background/40 hover:text-background/80",
+                )}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Carrusel */}
+      <div
+        ref={ref}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+        className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none"
+      >
+        {visibles.map((trabajo, i) => (
+          <TrabajoCard
+            key={trabajo.id}
+            trabajo={trabajo}
+            onOpen={() => {
+              if (!drag.current.moved) setSelectedIdx(i);
+            }}
+          />
+        ))}
+      </div>
+
+      {selectedIdx !== null && (
+        <TrabajoModal
+          trabajos={visibles}
+          initialIdx={selectedIdx}
+          onClose={() => setSelectedIdx(null)}
+        />
+      )}
+    </section>
+  );
+}
+
 function DragGallery({ photos }: { photos: Photo[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
@@ -202,20 +769,13 @@ function EstudioPage() {
   const minHours = data?.min_horas ?? STUDIO.minHours;
   const packActivo = data?.pack_activo ?? true;
   const packEquipos = useMemo(() => data?.pack_equipos ?? [], [data?.pack_equipos]);
+  const trabajos = useMemo(() => data?.trabajos ?? [], [data?.trabajos]);
   const faq = data?.faq ?? STUDIO.faq;
   const features = data?.features ?? STUDIO.features;
 
   // Ubicación — admin primero, fallback a coordenadas fijas MDQ
   const direccion = data?.direccion ?? "Mar del Plata, Buenos Aires, Argentina";
-  const comoLlegar =
-    data?.como_llegar ??
-    "Acceso directo para descarga de equipos. Estacionamiento en la calle (zona azul gratuita los fines de semana).";
-  const iframeSrc = data?.mapa_embed_url ?? MAPA_EMBED_DEFAULT;
-  const verMapaHref =
-    data?.mapa_url ??
-    (data?.direccion
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.direccion)}`
-      : MAPA_URL_DEFAULT);
+  const iframeSrc = data?.mapa_embed_url || MAPA_EMBED_DEFAULT;
 
   const bookingConfig = data
     ? {
@@ -493,77 +1053,25 @@ function EstudioPage() {
         </section>
 
         {/* ── En acción — trabajos ──────────────────────────────────── */}
-        <section className="bg-ink px-4 lg:px-12 py-14">
-          <div className="flex flex-wrap items-end justify-between gap-3 mb-8">
-            <div>
-              <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/50 mb-2.5">
-                Producciones
-              </p>
-              <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,3.5rem)]">
-                en acción.
-              </h2>
-              <p className="mt-3 text-15 text-background/55 max-w-md">
-                Trabajos hechos por gente copada que pasó por el estudio.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {photos.slice(3, 9).map((photo, i) => (
-              <div
-                key={photo.src}
-                className="rounded-xl overflow-hidden border border-background/8 bg-background/5"
-              >
-                <div className="aspect-[3/2] overflow-hidden">
-                  <img
-                    src={photo.src}
-                    alt={photo.alt}
-                    loading="lazy"
-                    className="h-full w-full object-cover block transition-transform duration-300 hover:scale-[1.04]"
-                  />
-                </div>
-                <div className="px-3.5 py-3 flex items-center gap-2">
-                  <span className="rounded-full bg-amber/18 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber whitespace-nowrap">
-                    {i % 2 === 0 ? "Fotografía" : "Video"}
-                  </span>
-                  <span className="text-sm text-background/65 truncate">{photo.alt}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        {trabajos.length > 0 && <TrabajosSection trabajos={trabajos} />}
 
         {/* ── Dónde estamos ─────────────────────────────────────────── */}
         <section className="border-t hairline bg-surface px-4 lg:px-12 py-14">
           <h2 className="font-display font-black lowercase leading-[0.92] text-[clamp(1.75rem,4vw,2.5rem)] mb-8">
             dónde estamos.
           </h2>
-          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-            <div className="flex flex-col gap-4 pt-1">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-4 w-4 text-amber mt-0.5 shrink-0" />
-                <p className="text-base font-semibold leading-snug">{direccion}</p>
-              </div>
-              <p className="text-15 text-muted-foreground leading-relaxed pl-7">{comoLlegar}</p>
-              <div className="pl-7">
-                <a
-                  href={verMapaHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full border hairline bg-background px-4 py-2 text-sm text-ink hover:border-ink transition"
-                >
-                  Ver en Google Maps <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
-            </div>
-            <div className="aspect-[4/3] overflow-hidden rounded-2xl border hairline bg-surface min-h-60">
-              <iframe
-                title="Mapa del estudio"
-                src={iframeSrc}
-                className="h-full w-full border-0 block"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
+          <div className="flex items-start gap-3 mb-6">
+            <MapPin className="h-4 w-4 text-amber mt-0.5 shrink-0" />
+            <p className="text-base font-semibold leading-snug">{direccion}</p>
+          </div>
+          <div className="w-full aspect-[16/7] overflow-hidden rounded-2xl border hairline bg-surface min-h-60">
+            <iframe
+              title="Mapa del estudio"
+              src={iframeSrc}
+              className="h-full w-full border-0 block"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
         </section>
 

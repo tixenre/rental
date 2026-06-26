@@ -244,6 +244,61 @@ export type EstudioConfig = {
   fotos: EstudioFoto[];
   // Lista curada del pack con cantidades (stock total) para la ficha pública.
   pack_equipos?: EstudioPackEquipo[];
+  trabajos?: EstudioTrabajo[];
+};
+
+/** Un medio del carrusel de un trabajo: link externo (YouTube/Instagram) o foto
+ *  subida. El backend une links_json + fotos_json en esta lista ordenada. */
+export type EstudioMedia =
+  | {
+      kind: "youtube" | "instagram";
+      url: string;
+      thumbnail: string | null;
+      /** Dimensiones del thumbnail (para mostrar la card en su proporción real). */
+      w: number | null;
+      h: number | null;
+    }
+  | {
+      kind: "foto";
+      url: string;
+      url_sm: string | null;
+      url_avif: string | null;
+      url_sm_avif: string | null;
+      w: number | null;
+      h: number | null;
+    };
+
+export type EstudioTrabajoLink = {
+  tipo: "youtube" | "instagram";
+  url: string;
+  thumbnail_url: string | null;
+};
+
+export type EstudioTrabajo = {
+  id: number;
+  titulo: string;
+  realizador: string;
+  realizador_logo_url: string | null;
+  realizador_instagram: string | null;
+  realizador_web: string | null;
+  /** Primer tag (legacy/compat). Para filtrar/mostrar usar `categorias`. */
+  categoria: string;
+  categorias: string[];
+  descripcion: string;
+  tipo: "fotos" | "video";
+  /** Fuente única para mostrar: lista ordenada de medios (links + fotos). */
+  media: EstudioMedia[];
+  /** Links crudos (para el admin). */
+  links: EstudioTrabajoLink[];
+  fotos: Array<{
+    url: string;
+    url_sm: string | null;
+    url_avif: string | null;
+    url_sm_avif: string | null;
+    path: string | null;
+  }>;
+  orden: number;
+  activo: boolean;
 };
 
 export function apiGetEstudio() {

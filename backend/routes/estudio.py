@@ -1,5 +1,6 @@
 """
-routes/estudio.py — CRUD del Estudio (singleton) + galería de fotos (E1).
+routes/estudio.py — CRUD del Estudio (singleton) + galería de fotos (E1)
+                    + trabajos/producciones (galería "en acción").
 """
 
 import json
@@ -169,19 +170,301 @@ def _insert_foto(
 
 # ── Endpoint público ─────────────────────────────────────────────────────────
 
+import re as _re
+
+
+def _extract_ig_shortcode(url_or_code: str) -> tuple[str, str] | None:
+    """Retorna (shortcode, post_type) donde post_type es 'reel', 'p' o 'tv'."""
+    if not url_or_code:
+        return None
+    m = _re.search(r"instagram\.com/(reel|p|tv)/([A-Za-z0-9_-]+)", url_or_code)
+    if m:
+        return (m.group(2), m.group(1))
+    if _re.match(r"^[A-Za-z0-9_-]{8,}$", url_or_code):
+        return (url_or_code, "reel")
+    return None
+
+
+def _extract_og_tag(html_text: str, prop: str) -> str | None:
+    """Extrae el content de un og:meta tag, tolerando orden de atributos."""
+    for pat in (
+        rf'<meta[^>]+property="{_re.escape(prop)}"[^>]+content="([^"]+)"',
+        rf'<meta[^>]+content="([^"]+)"[^>]+property="{_re.escape(prop)}"',
+    ):
+        m = _re.search(pat, html_text)
+        if m:
+            return m.group(1).replace("\\u0026", "&").replace("&amp;", "&")
+    return None
+
+
+def _fetch_og_meta(url: str) -> dict:
+    """Descarga una URL y extrae og:title/image/description (best-effort)."""
+    import httpx
+    try:
+        headers = {
+            "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+            "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
+        }
+        resp = httpx.get(url, headers=headers, timeout=8.0, follow_redirects=True)
+        if resp.status_code != 200:
+            return {}
+        html = resp.text
+        return {
+            "title": _extract_og_tag(html, "og:title"),
+            "image": _extract_og_tag(html, "og:image"),
+            "description": _extract_og_tag(html, "og:description"),
+        }
+    except Exception:
+        return {}
+
+
+# ── Medios externos (links YouTube/Instagram) ─────────────────────────────────
+#
+# Un trabajo es una lista ordenada de medios: links externos (YouTube/Instagram)
+# + fotos subidas. Los thumbnails de los links NO se hotlinkean crudos — las URLs
+# del CDN de Instagram expiran y se bloquean por referrer; las de YouTube son
+# estables pero igual las pasamos por el motor para tener una copia permanente +
+# AVIF. `_process_remote_thumbnail` baja la imagen y la guarda en R2 vía el motor
+# (dedup por hash → no reprocesa la misma imagen).
+
+
+def _detect_link_tipo(url: str) -> str | None:
+    """Clasifica una URL externa. None si no es un proveedor soportado."""
+    if not url:
+        return None
+    if "youtu" in url:
+        return "youtube"
+    if "instagram.com" in url:
+        return "instagram"
+    return None
+
+
+def _extract_yt_id(url: str) -> str | None:
+    m = _re.search(
+        r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|live/))([A-Za-z0-9_-]{11})",
+        url,
+    )
+    return m.group(1) if m else None
+
+
+def _process_remote_thumbnail(url: str | None) -> str | None:
+    """Baja una imagen remota (og:image de IG, thumb de YT) y la guarda permanente
+    en R2 vía el motor de medios. Devuelve la URL de display (webp). Best-effort:
+    None ante cualquier fallo (la card cae a un placeholder)."""
+    if not url:
+        return None
+    try:
+        with media_http():
+            _validate_ssrf_only(url)
+            raw, _ct = _download_image_bytes(url)
+        with get_db() as conn:
+            with media_http():
+                asset = store_upload(
+                    raw,
+                    kind="estudio",
+                    derive_specs=[
+                        DISPLAY_KEEP_ASPECT,
+                        DISPLAY_KEEP_ASPECT_SM,
+                        DISPLAY_KEEP_ASPECT_AVIF,
+                        DISPLAY_KEEP_ASPECT_SM_AVIF,
+                    ],
+                    conn=conn,
+                )
+            conn.commit()
+        v = asset.variant("display")
+        return {"url": v.url, "w": v.width or None, "h": v.height or None}
+    except Exception:
+        return None
+
+
+def _resolve_link_thumbnail(tipo: str, url: str) -> dict | None:
+    """Obtiene un thumbnail permanente {url, w, h} para un link, según el proveedor."""
+    if tipo == "youtube":
+        vid = _extract_yt_id(url)
+        if not vid:
+            return None
+        for quality in ("maxresdefault", "hqdefault"):
+            thumb = _process_remote_thumbnail(
+                f"https://img.youtube.com/vi/{vid}/{quality}.jpg"
+            )
+            if thumb:
+                return thumb
+        return None
+    if tipo == "instagram":
+        ig = _extract_ig_shortcode(url)
+        if not ig:
+            return None
+        og = _fetch_og_meta(f"https://www.instagram.com/{ig[1]}/{ig[0]}/")
+        return _process_remote_thumbnail(og.get("image"))
+    return None
+
+
+def _resolve_links(incoming: list, existing: list | None) -> list:
+    """Normaliza la lista de links entrante a [{tipo, url, thumbnail_url, w, h}].
+
+    Reusa el thumbnail ya procesado (url + dimensiones) de un link cuya URL no
+    cambió (evita re-bajar y re-procesar en cada edición). El `tipo` lo decide el
+    server (ignora lo que mande el front)."""
+    existing_by_url = {l.get("url"): l for l in (existing or []) if l.get("url")}
+    out: list = []
+    seen: set = set()
+    for link in incoming:
+        url = (link.get("url") or "").strip()
+        if not url or url in seen:
+            continue
+        tipo = _detect_link_tipo(url)
+        if not tipo:
+            continue
+        seen.add(url)
+        prev = existing_by_url.get(url)
+        if prev and prev.get("thumbnail_url"):
+            out.append({
+                "tipo": tipo, "url": url,
+                "thumbnail_url": prev.get("thumbnail_url"),
+                "thumbnail_w": prev.get("thumbnail_w"),
+                "thumbnail_h": prev.get("thumbnail_h"),
+            })
+            continue
+        thumb = _resolve_link_thumbnail(tipo, url)
+        out.append({
+            "tipo": tipo, "url": url,
+            "thumbnail_url": thumb["url"] if thumb else None,
+            "thumbnail_w": thumb["w"] if thumb else None,
+            "thumbnail_h": thumb["h"] if thumb else None,
+        })
+    return out
+
+
+def _build_media(links: list, fotos: list) -> list:
+    """Une links + fotos en la lista `media` ordenada que consume el carrusel del
+    front. Links primero (el medio 'titular'), después las fotos subidas. `w`/`h`
+    = dimensiones del thumbnail, para que la card use la proporción real."""
+    media: list = []
+    for link in links or []:
+        media.append({
+            "kind": link.get("tipo"),
+            "url": link.get("url"),
+            "thumbnail": link.get("thumbnail_url"),
+            "w": link.get("thumbnail_w"),
+            "h": link.get("thumbnail_h"),
+        })
+    for foto in fotos or []:
+        media.append({
+            "kind": "foto",
+            "url": foto.get("url"),
+            "url_sm": foto.get("url_sm"),
+            "url_avif": foto.get("url_avif"),
+            "url_sm_avif": foto.get("url_sm_avif"),
+            "w": foto.get("w"),
+            "h": foto.get("h"),
+        })
+    return media
+
+
+def _trabajo_links(row) -> list:
+    """Lee los links de un trabajo: links_json, con fallback a las columnas
+    sueltas legacy (youtube_url/instagram_reel_url) para filas no migradas.
+
+    ⏰ LEGACY: el fallback a youtube_url/instagram_reel_url/thumbnail_url (acá +
+    en el UPDATE que las vacía) se remueve cuando todos los trabajos existentes
+    pasaron por links_json (editar y guardar cada uno migra on-write). Una vez
+    que no quede ninguna fila con esas columnas pobladas, dropear las 3 columnas
+    y este bloque."""
+    links = _parse_json_field(row["links_json"]) or []
+    if links:
+        return links
+    legacy: list = []
+    if row["youtube_url"]:
+        legacy.append({
+            "tipo": "youtube", "url": row["youtube_url"],
+            "thumbnail_url": row["thumbnail_url"],
+        })
+    if row["instagram_reel_url"]:
+        legacy.append({
+            "tipo": "instagram", "url": row["instagram_reel_url"],
+            "thumbnail_url": row["thumbnail_url"],
+        })
+    return legacy
+
+
+def _clean_categorias(cats: list | None) -> list:
+    """Normaliza tags: trim, descarta vacíos, deduplica case-insensitive
+    preservando el orden y la capitalización de la primera aparición."""
+    out: list = []
+    seen: set = set()
+    for c in cats or []:
+        c = (c or "").strip()
+        if not c:
+            continue
+        key = c.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(c)
+    return out
+
+
+def _trabajo_categorias(row) -> list:
+    """Lee los tags de un trabajo: categorias_json, con fallback legacy a la
+    columna `categoria` (singular) para filas no migradas."""
+    cats = _parse_json_field(row["categorias_json"]) or []
+    if cats:
+        return cats
+    return [row["categoria"]] if row["categoria"] else []
+
+
+def _get_trabajos(conn, solo_activos: bool = True) -> list:
+    q = (
+        "SELECT id, titulo, realizador, realizador_logo_url, "
+        "realizador_instagram, realizador_web, categoria, categorias_json, descripcion, "
+        "tipo, youtube_url, instagram_reel_url, thumbnail_url, "
+        "links_json, fotos_json, orden, activo, created_at, updated_at "
+        "FROM estudio_trabajos "
+    )
+    q += "WHERE activo = TRUE " if solo_activos else ""
+    q += "ORDER BY orden, id"
+    cur = conn.execute(q)
+    rows = cur.fetchall()
+    out = []
+    for r in rows:
+        links = _trabajo_links(r)
+        fotos = _parse_json_field(r["fotos_json"]) or []
+        cats = _trabajo_categorias(r)
+        out.append({
+            "id": r["id"],
+            "titulo": r["titulo"],
+            "realizador": r["realizador"],
+            "realizador_logo_url": r["realizador_logo_url"],
+            "realizador_instagram": r["realizador_instagram"],
+            "realizador_web": r["realizador_web"],
+            # `categoria` (singular) = primer tag, legacy; `categorias` = fuente única.
+            "categoria": cats[0] if cats else "",
+            "categorias": cats,
+            "descripcion": r["descripcion"] or "",
+            "tipo": r["tipo"],
+            # Fuente única para el front: lista ordenada de medios (links + fotos).
+            "media": _build_media(links, fotos),
+            # Links crudos para que el admin pueda editarlos.
+            "links": links,
+            "fotos": fotos,
+            "orden": r["orden"],
+            "activo": bool(r["activo"]),
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+        })
+    return out
+
+
 @router.get("/estudio")
 def get_estudio(response: Response):
-    """Devuelve la configuración pública del estudio + fotos + pack curado.
-
-    `pack_equipos` es la lista curada del pack con cantidades (stock total) para
-    mostrar "qué incluye" en la ficha — independiente de la franja. La
-    disponibilidad real por franja sigue saliendo de /estudio/disponibilidad."""
-    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    """Devuelve la configuración pública del estudio + fotos + pack curado + trabajos."""
+    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=30"
     with get_db() as conn:
         row = _get_estudio_row(conn)
         fotos = _get_fotos(conn)
         resp = _build_response(row, fotos)
         resp["pack_equipos"] = _pack_curado(conn)
+        resp["trabajos"] = _get_trabajos(conn, solo_activos=True)
         return resp
 
 
@@ -198,6 +481,7 @@ def get_estudio_admin(request: Request):
         fotos = _get_fotos(conn)
         resp = _build_response(row, fotos)
         resp["pack_equipos"] = _pack_curado(conn)
+        resp["trabajos"] = _get_trabajos(conn, solo_activos=False)
         return resp
 
 class EstudioUpdate(BaseModel):
@@ -449,6 +733,303 @@ def reorder_fotos(body: ReorderBody, request: Request):
         fotos = _get_fotos(conn)
 
     return {"fotos": fotos}
+
+
+# ── Trabajos / producciones (galería "en acción") ────────────────────────────
+
+def _trabajo_path(suffix: str) -> str:
+    ts = int(time.time() * 1000)
+    return f"estudio/trabajos/{ts}_{suffix}.webp"
+
+
+@router.get("/admin/estudio/trabajos")
+def admin_list_trabajos(request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        return {"trabajos": _get_trabajos(conn, solo_activos=False)}
+
+
+@router.post("/admin/estudio/trabajos/fetch-meta")
+async def fetch_trabajo_meta(request: Request):
+    """Dado un link de YouTube o Instagram, retorna metadata (titulo, realizador, thumbnail).
+    YouTube usa oEmbed oficial. Instagram usa og:tags (best-effort)."""
+    require_admin(request)
+    import httpx
+    body = await request.json()
+    url = (body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "url requerida")
+
+    # YouTube — oEmbed oficial, muy confiable
+    if "youtu" in url:
+        try:
+            resp = httpx.get(
+                "https://www.youtube.com/oembed",
+                params={"url": url, "format": "json"},
+                timeout=8.0,
+            )
+            if resp.status_code == 200:
+                d = resp.json()
+                return {
+                    "titulo": d.get("title"),
+                    "realizador": d.get("author_name"),
+                    "thumbnail_url": d.get("thumbnail_url"),
+                    "fuente": "youtube",
+                }
+        except Exception:
+            pass
+
+    # Instagram / cualquier otro — og:tags (best-effort)
+    meta = _fetch_og_meta(url)
+    if meta:
+        # og:title de IG: "Nombre (@handle) • Fotos y videos de Instagram"
+        raw_title = meta.get("title") or ""
+        realizador = None
+        m = _re.match(r"^(.+?)\s*[•·(@]", raw_title)
+        if m:
+            realizador = m.group(1).strip()
+        return {
+            "titulo": None,
+            "realizador": realizador,
+            "thumbnail_url": meta.get("image"),
+            "descripcion": meta.get("description"),
+            "fuente": "og",
+        }
+
+    return {"fuente": "desconocido"}
+
+
+class TrabajoLinkInput(BaseModel):
+    url: str
+    # `tipo` lo decide el server (`_resolve_links`); se acepta pero se ignora.
+    tipo: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+
+
+class TrabajoCreate(BaseModel):
+    titulo: str = ""
+    realizador: str = ""
+    realizador_instagram: Optional[str] = None
+    realizador_web: Optional[str] = None
+    categorias: list[str] = []
+    descripcion: str = ""
+    links: list[TrabajoLinkInput] = []
+    activo: bool = True
+
+
+@router.post("/admin/estudio/trabajos")
+def admin_create_trabajo(body: TrabajoCreate, request: Request):
+    require_admin(request)
+    # Resolver links (baja + procesa thumbnails) ANTES de abrir la conexión del
+    # insert — `_process_remote_thumbnail` usa su propia conexión corta.
+    links = _resolve_links([l.dict() for l in body.links], existing=[])
+    tipo = "video" if links else "fotos"
+    cats = _clean_categorias(body.categorias)
+    with get_db() as conn:
+        cur = conn.execute(
+            "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_trabajos"
+        )
+        orden = cur.fetchone()["next"]
+        cur2 = conn.execute(
+            "INSERT INTO estudio_trabajos "
+            "(titulo, realizador, realizador_instagram, realizador_web, "
+            "categoria, categorias_json, descripcion, tipo, links_json, orden, activo) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (body.titulo, body.realizador, body.realizador_instagram, body.realizador_web,
+             cats[0] if cats else "", json.dumps(cats), body.descripcion, tipo,
+             json.dumps(links), orden, body.activo),
+        )
+        new_id = cur2.fetchone()["id"]
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        return next(r for r in rows if r["id"] == new_id)
+
+
+class TrabajoUpdate(BaseModel):
+    titulo: Optional[str] = None
+    realizador: Optional[str] = None
+    realizador_instagram: Optional[str] = None
+    realizador_web: Optional[str] = None
+    categorias: Optional[list[str]] = None
+    descripcion: Optional[str] = None
+    links: Optional[list[TrabajoLinkInput]] = None
+    activo: Optional[bool] = None
+
+
+class TrabajoOrdenItem(BaseModel):
+    id: int
+    orden: int
+
+
+class TrabajoReorderBody(BaseModel):
+    trabajos: list[TrabajoOrdenItem]
+
+
+# OJO: la ruta literal `/orden` va ANTES que la dinámica `/{trabajo_id}` — si no,
+# FastAPI matchea `PATCH /trabajos/orden` contra `{trabajo_id}` con "orden" y
+# falla la conversión a int (422). Static-before-dynamic.
+@router.patch("/admin/estudio/trabajos/orden")
+def admin_reorder_trabajos(body: TrabajoReorderBody, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        for t in body.trabajos:
+            conn.execute(
+                "UPDATE estudio_trabajos SET orden = ? WHERE id = ?",
+                (t.orden, t.id),
+            )
+        conn.commit()
+        return {"trabajos": _get_trabajos(conn, solo_activos=False)}
+
+
+@router.patch("/admin/estudio/trabajos/{trabajo_id}")
+def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request):
+    require_admin(request)
+    updates = {
+        k: v for k, v in body.dict(exclude={"links", "categorias"}).items() if v is not None
+    }
+    # Tags: `categorias is not None` distingue "no tocar" de "vaciar". Escribe la
+    # fuente única (categorias_json) + la columna legacy `categoria` (primer tag).
+    if body.categorias is not None:
+        cats = _clean_categorias(body.categorias)
+        updates["categorias_json"] = json.dumps(cats)
+        updates["categoria"] = cats[0] if cats else ""
+    # Los links se manejan aparte: `links is not None` distingue "no tocar"
+    # (None) de "vaciar" ([]). Se resuelven antes de abrir la conexión del UPDATE.
+    if body.links is not None:
+        with get_db() as conn:
+            cur = conn.execute(
+                "SELECT links_json, youtube_url, instagram_reel_url, thumbnail_url "
+                "FROM estudio_trabajos WHERE id = ?",
+                (trabajo_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(404, "Trabajo no encontrado")
+            existing = _trabajo_links(row)
+        resolved = _resolve_links([l.dict() for l in body.links], existing=existing)
+        updates["links_json"] = json.dumps(resolved)
+        updates["tipo"] = "video" if resolved else "fotos"
+        # Migración on-write: las columnas legacy quedan vacías una vez que la
+        # fila pasó por links_json.
+        updates["youtube_url"] = None
+        updates["instagram_reel_url"] = None
+        updates["thumbnail_url"] = None
+    if not updates:
+        raise HTTPException(400, "Nada que actualizar")
+    with get_db() as conn:
+        set_parts = [f"{k} = ?" for k in updates]
+        set_parts.append("updated_at = ?")
+        vals = list(updates.values()) + [datetime.now(tz=timezone.utc), trabajo_id]
+        conn.execute(
+            f"UPDATE estudio_trabajos SET {', '.join(set_parts)} WHERE id = ?",
+            vals,
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        match = next((r for r in rows if r["id"] == trabajo_id), None)
+        if not match:
+            raise HTTPException(404, "Trabajo no encontrado")
+        return match
+
+
+@router.delete("/admin/estudio/trabajos/{trabajo_id}")
+def admin_delete_trabajo(trabajo_id: int, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        conn.execute("DELETE FROM estudio_trabajos WHERE id = ?", (trabajo_id,))
+        conn.commit()
+    return {"ok": True}
+
+
+@router.post("/admin/estudio/trabajos/{trabajo_id}/upload-foto")
+async def admin_upload_trabajo_foto(
+    trabajo_id: int, request: Request, background_tasks: BackgroundTasks
+):
+    require_admin(request)
+    path = _trabajo_path(f"foto_{trabajo_id}")
+    result = await media_http(
+        request,
+        background_tasks,
+        path=path,
+        presets=[
+            DISPLAY_KEEP_ASPECT,
+            DISPLAY_KEEP_ASPECT_SM,
+            DISPLAY_KEEP_ASPECT_AVIF,
+            DISPLAY_KEEP_ASPECT_SM_AVIF,
+        ],
+    )
+    nueva_foto = {
+        "url": result[DISPLAY_KEEP_ASPECT]["url"],
+        "url_sm": result[DISPLAY_KEEP_ASPECT_SM]["url"],
+        "url_avif": result[DISPLAY_KEEP_ASPECT_AVIF]["url"],
+        "url_sm_avif": result[DISPLAY_KEEP_ASPECT_SM_AVIF]["url"],
+        "path": path,
+    }
+    with get_db() as conn:
+        cur = conn.execute(
+            "SELECT fotos_json FROM estudio_trabajos WHERE id = ?", (trabajo_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Trabajo no encontrado")
+        fotos = _parse_json_field(row["fotos_json"]) or []
+        fotos.append(nueva_foto)
+        conn.execute(
+            "UPDATE estudio_trabajos SET fotos_json = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(fotos), datetime.now(tz=timezone.utc), trabajo_id),
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        return next(r for r in rows if r["id"] == trabajo_id)
+
+
+@router.delete("/admin/estudio/trabajos/{trabajo_id}/fotos/{foto_idx}")
+def admin_delete_trabajo_foto(trabajo_id: int, foto_idx: int, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        cur = conn.execute(
+            "SELECT fotos_json FROM estudio_trabajos WHERE id = ?", (trabajo_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Trabajo no encontrado")
+        fotos = _parse_json_field(row["fotos_json"]) or []
+        if foto_idx < 0 or foto_idx >= len(fotos):
+            raise HTTPException(400, f"Índice de foto inválido: {foto_idx}")
+        fotos.pop(foto_idx)
+        conn.execute(
+            "UPDATE estudio_trabajos SET fotos_json = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(fotos), datetime.now(tz=timezone.utc), trabajo_id),
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        return next(r for r in rows if r["id"] == trabajo_id)
+
+
+@router.post("/admin/estudio/trabajos/{trabajo_id}/upload-logo")
+async def admin_upload_trabajo_logo(
+    trabajo_id: int, request: Request, background_tasks: BackgroundTasks
+):
+    require_admin(request)
+    path = _trabajo_path(f"logo_{trabajo_id}")
+    result = await media_http(
+        request,
+        background_tasks,
+        path=path,
+        presets=[DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM],
+    )
+    logo_url = result[DISPLAY_KEEP_ASPECT]["url"]
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE estudio_trabajos SET realizador_logo_url = ?, updated_at = ? WHERE id = ?",
+            (logo_url, datetime.now(tz=timezone.utc), trabajo_id),
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        match = next((r for r in rows if r["id"] == trabajo_id), None)
+        if not match:
+            raise HTTPException(404, "Trabajo no encontrado")
+        return match
 
 
 # ── Reserva del estudio por horas (E2 / E2.1) ─────────────────────────────────

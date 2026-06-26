@@ -1139,7 +1139,76 @@ export type EstudioConfig = {
   mapa_embed_url: string;
   updated_at: string | null;
   fotos: EstudioFoto[];
+  trabajos: EstudioTrabajo[];
 };
+
+export type EstudioTrabajoFoto = {
+  url: string;
+  url_sm: string | null;
+  url_avif: string | null;
+  url_sm_avif: string | null;
+  path: string | null;
+};
+
+/** Un medio del carrusel: link externo (YouTube/Instagram) o foto subida. */
+export type EstudioMedia =
+  | {
+      kind: "youtube" | "instagram";
+      url: string;
+      thumbnail: string | null;
+      w: number | null;
+      h: number | null;
+    }
+  | {
+      kind: "foto";
+      url: string;
+      url_sm: string | null;
+      url_avif: string | null;
+      url_sm_avif: string | null;
+      w: number | null;
+      h: number | null;
+    };
+
+export type EstudioTrabajoLink = {
+  tipo: "youtube" | "instagram";
+  url: string;
+  thumbnail_url: string | null;
+};
+
+export type EstudioTrabajo = {
+  id: number;
+  titulo: string;
+  realizador: string;
+  realizador_logo_url: string | null;
+  realizador_instagram: string | null;
+  realizador_web: string | null;
+  categoria: string;
+  categorias: string[];
+  descripcion: string;
+  tipo: "fotos" | "video";
+  media: EstudioMedia[];
+  links: EstudioTrabajoLink[];
+  fotos: EstudioTrabajoFoto[];
+  orden: number;
+  activo: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type EstudioTrabajoInput = {
+  titulo?: string;
+  realizador?: string;
+  realizador_instagram?: string | null;
+  realizador_web?: string | null;
+  /** Tags del trabajo. El backend deduplica y deriva la columna legacy. */
+  categorias?: string[];
+  descripcion?: string;
+  /** Lista ordenada de links externos. El backend deriva el tipo y el thumbnail. */
+  links?: Array<{ url: string; tipo?: string | null }>;
+  activo?: boolean;
+};
+
+export type TrabajoOrdenItem = { id: number; orden: number };
 
 export type EstudioInput = {
   nombre?: string;

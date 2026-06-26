@@ -13,12 +13,10 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 ## Cómo trabajamos (esencial)
 
 - **El workflow de cambios tiene _fuente única_:** la decisión _2026-06-08 — Workflow de cambios_ del
-  digest (auto-cargada abajo). En una línea: **routing por riesgo** (trivial/normal → push directo a
-  `dev` = staging; grande / sensible / core de reservas o plata / lo que ve el cliente → rama
-  (`claude/<desc>`) + PR), **la sesión mergea a `dev` y avisa con plan de prueba**, los **gates del
-  dueño** son probar en staging + aprobar `dev → main`. **Nunca a `main` directo; no mergear con CI en
-  rojo.** El detalle y el _por qué_ no se repiten acá — viven en esa decisión.
-- **Antes de abrir/mergear una PR: despachar el agente `supervisor`** — revisión read-only de
+  digest (auto-cargada abajo). En una línea: **push directo a `dev` siempre** (staging; si se rompe se
+  pushea el fix); **PR solo para `dev → main`** (la puerta a prod). **Nunca a `main` directo; no pushear
+  con CI en rojo.** El detalle y el _por qué_ no se repiten acá — viven en esa decisión.
+- **Antes de abrir el PR `dev → main`: despachar el agente `supervisor`** — revisión read-only de
   scope / forma / drift, que resume en lenguaje claro y deja el plan de prueba. (Instrucción, no
   gate de sistema: en las apps de Mac/iPhone no hay hooks.)
 - **La conversación es para decisiones y la forma de hacer las cosas — no para el ruido de cada
@@ -78,5 +76,6 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 | [`catalogo`](.claude/skills/catalogo/SKILL.md) | "los equipos están completos?", "qué equipos les faltan fotos?", "hay equipos sin descripción?", "auditá el catálogo", "qué está incompleto?", "los equipos están bien cargados?" → completitud del catálogo: fotos, descripciones, specs, precios | `opus` |
 | [`calidad-tests`](.claude/skills/calidad-tests/SKILL.md) | "cómo están los tests?", "hay paths sin tests?", "qué falta testear?", "auditá la cobertura", "los tests son buenos?", "qué casos borde no están testeados?" → cobertura de módulos críticos, calidad de assertions, edge cases sin tests | `opus` |
 | [`marca`](.claude/skills/marca/SKILL.md) | "actualizá el marketing", "qué features no están comunicadas?", "el marketing está al día?", "auditá la marca", "qué hay de nuevo desde la última campaña?", "qué features tiene la web?" → gobernador de marca: cruza features reales vs. docs/MARCA.md + CAMPAÑA_FEATURES.md, propone updates y borradores de copy | `opus` |
+| [`consejo`](.claude/skills/consejo/SKILL.md) | "pasá esto por el consejo", "criticá esto sin suavizar", "vale la pena esta idea?", "¿cuál camino conviene?", "antes de implementar X juzguémoslo" → juzgar una **propuesta/idea/plan** (no código ya escrito) con rigor **escalable**: default = pase crítico de 1 prompt (~10-15k tokens); escala a 2 voces aisladas (contrario+investigador) o 5 lentes solo si pesa → veredicto avanzar/con-cambios/no/falta-info | `opus` |
 
 @docs/MEMORIA.md

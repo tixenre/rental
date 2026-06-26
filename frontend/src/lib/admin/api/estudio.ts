@@ -6,6 +6,9 @@ import type {
   EstudioSlotFijo,
   EstudioSlotInput,
   EstudioPackEquipoCurado,
+  EstudioTrabajo,
+  EstudioTrabajoInput,
+  TrabajoOrdenItem,
   FotoOrdenItem,
   DescuentoJornada,
 } from "./types";
@@ -80,6 +83,80 @@ export const estudioAdminApi = {
       }
       return r.json() as Promise<{ fotos: EstudioFoto[] }>;
     }),
+};
+
+// ── Trabajos / producciones ──────────────────────────────────────────────────
+
+async function _ok<T>(r: Response): Promise<T> {
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error((d as { detail?: string }).detail ?? `Error ${r.status}`);
+  }
+  return r.json() as Promise<T>;
+}
+
+export const trabajosAdminApi = {
+  list: () => authedJson<{ trabajos: EstudioTrabajo[] }>("/api/admin/estudio/trabajos"),
+
+  fetchMeta: (url: string) =>
+    authedFetch("/api/admin/estudio/trabajos/fetch-meta", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }).then((r) =>
+      _ok<{
+        titulo?: string | null;
+        realizador?: string | null;
+        thumbnail_url?: string | null;
+        descripcion?: string | null;
+        fuente?: string;
+      }>(r),
+    ),
+
+  create: (data: EstudioTrabajoInput) =>
+    authedPostJson<EstudioTrabajo>("/api/admin/estudio/trabajos", data),
+
+  update: (id: number, data: EstudioTrabajoInput) =>
+    authedFetch(`/api/admin/estudio/trabajos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).then((r) => _ok<EstudioTrabajo>(r)),
+
+  delete: (id: number) =>
+    authedFetch(`/api/admin/estudio/trabajos/${id}`, { method: "DELETE" }).then((r) =>
+      _ok<{ ok: boolean }>(r),
+    ),
+
+  reorder: (trabajos: TrabajoOrdenItem[]) =>
+    authedFetch("/api/admin/estudio/trabajos/orden", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trabajos }),
+    }).then((r) => _ok<{ trabajos: EstudioTrabajo[] }>(r)),
+
+  uploadFoto: (id: number, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return authedFetch(`/api/admin/estudio/trabajos/${id}/upload-foto`, {
+      method: "POST",
+      body: fd,
+    }).then((r) => _ok<EstudioTrabajo>(r));
+  },
+
+  deleteFoto: (id: number, fotoIdx: number) =>
+    authedFetch(`/api/admin/estudio/trabajos/${id}/fotos/${fotoIdx}`, {
+      method: "DELETE",
+    }).then((r) => _ok<EstudioTrabajo>(r)),
+
+  uploadLogo: (id: number, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return authedFetch(`/api/admin/estudio/trabajos/${id}/upload-logo`, {
+      method: "POST",
+      body: fd,
+    }).then((r) => _ok<EstudioTrabajo>(r));
+  },
 };
 
 // ── Descuentos por jornadas ──────────────────────────────────────────────────

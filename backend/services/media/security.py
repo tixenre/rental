@@ -35,6 +35,11 @@ _ALLOWED_PHOTO_HOSTS = frozenset([
     # CDNs comunes que sirven assets de los hosts de arriba
     "cloudfront.net", "akamaized.net", "akamaihd.net",
     "shopifycdn.com", "wp.com", "googleusercontent.com",
+    # Thumbnails de redes sociales: el dueño linkea posteos de YouTube/Instagram
+    # en los trabajos del Estudio y el backend baja el og:image/thumbnail para
+    # guardar una copia permanente (las URLs del CDN de IG expiran). Sólo se
+    # bajan imágenes; la protección anti-SSRF (resolución a IP pública) sigue.
+    "ytimg.com", "youtube.com", "cdninstagram.com", "fbcdn.net",
 ])
 
 

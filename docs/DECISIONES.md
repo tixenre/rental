@@ -29,40 +29,28 @@
 
 ## Decisiones (ADR-lite)
 
-### 2026-06-08 — Workflow de cambios (fuente única): dev = staging, routing por riesgo, gates del dueño
+### 2026-06-08 — Workflow de cambios (fuente única): dev = staging, push directo siempre, PR solo para prod
 
-> **Fuente única del workflow.** Consolida y reemplaza las 6 decisiones de flujo previas (Branch+PR
-> siempre, Merge según tamaño, Staging→Prod, Método de merge por etapa, Bugfixes chicos, Quién clickea
-> el merge). No restatear el workflow en otros docs: CLAUDE.md y MANIFIESTO apuntan acá.
+> **Fuente única del workflow.** Consolida y reemplaza las 6 decisiones de flujo previas. Refinado
+> 2026-06-25: se elimina el "routing por riesgo" (rama+PR antes de dev para cambios grandes) — el
+> dueño prefiere push directo a dev siempre, PR solo para dev→main. No restatear en otros docs.
 
-- **Contexto:** las reglas de flujo estaban dispersas en 6 entradas que se solapaban + repetidas en
-  CLAUDE.md y MANIFIESTO §3 → drift y fricción (la sesión preguntaba "¿lo ves en staging o hago el PR?"
-  como si fueran alternativas). La aclaración que ordenó todo: **`dev` y "staging" son lo mismo** — el
-  environment Railway `dev` (atado a la rama `dev`) ES el staging; su base es una **copia de prod**
-  (2026-06-01), sin clientes reales. Railway **auto-deploya en cada push** a `dev` (staging) y a `main`
-  (prod). Por eso lo que muestra algo en staging es el **push a `dev`**, no el PR.
-- **Ambientes:** `dev` (rama `dev`) = **staging**; `main` = **prod**. **Prod es sagrado: no se prueba ahí.**
-- **Routing por RIESGO (no por trámite):**
-  - **Trivial / normal** (typo, copy, fix acotado, feature chica, UI puntual) → **push directo a `dev`**;
-    la sesión **verifica local antes** (typecheck/tests) para no romper el staging compartido.
-  - **Grande / sensible / core de reservas o plata / lo que ve el cliente** → **rama (`claude/<desc>`) +
-    PR**: el PR es el portón donde **CI + supervisor gatean ANTES** de tocar `dev`. **Ante la duda → PR.**
-  - **`main` nunca** recibe push/commit directo.
-- **Red de seguridad:** el **CI corre en cada push** a `dev` y `main` (lint/typecheck/tests/build/
-  migraciones/mobile-smoke), haya PR o no. Con PR gatea **antes** de entrar a `dev`; con push directo es
-  la **red de abajo** (te enterás aunque ya esté en staging). **No mergear/pushear con CI en rojo.**
-- **Quién mueve qué:** **la sesión mergea/pushea a `dev` sola** (supervisor OK en lo que pasó por PR + CI
-  verde) y **avisa al dueño con plan de prueba** ("andá a /X, probá Y, tenés que ver Z") — **no pide
-  permiso**. El **supervisor** se despacha antes de abrir/mergear un PR.
-- **Gates del dueño (los únicos dos):** (1) **probar en staging** lo que la sesión avisa; (2) **aprobar
-  la promoción `dev → main`** (la puerta a prod). El dueño no clickea merges a `dev` ya verificados.
-- **Métodos de merge:** `rama → dev` = **squash** (título `tipo: desc (#PR)`, 1 commit limpio). `dev →
-  main` = **merge commit** (NO squash → revert quirúrgico por PR en prod). Commits directos a `dev` no
-  llevan squash. Commits atómicos, Conventional Commits en español (`feat(scope):`, `fix`, `chore`, ...).
-- **Why:** `dev` es seguro (copia, sin clientes) → lo peor de un push roto es molestar el testeo del
-  dueño, nunca tocar prod. Reservar el PR para lo riesgoso baja la fricción sin perder red: el CI siempre
-  corre, el supervisor gatea lo grande, y prod sigue blindado por el PR `dev → main` + la aprobación del
-  dueño. El gate humano del dueño es **probar la conducta en staging**, no revisar código.
+- **Ambientes:** `dev` (rama `dev`) = **staging** en Railway (auto-deploy en cada push; copia de prod,
+  sin clientes reales); `main` = **prod** (sagrado, no se prueba ahí).
+- **Flujo único: push directo a `dev` siempre.** No hay ramas intermedias ni PR antes de staging.
+  Si algo se rompe en staging se pushea el fix — no hay clientes ahí, el costo es bajo. `main` nunca
+  recibe push directo.
+- **PR solo para `dev → main`** (la puerta a prod). Ese PR es donde el supervisor revisa, el CI corre
+  como gate, y el dueño aprueba antes de que llegue a producción.
+- **Red de seguridad:** el **CI corre en cada push** a `dev` y `main`. No pushear con CI en rojo.
+- **Quién mueve qué:** la sesión pushea a `dev` sola y avisa al dueño con plan de prueba — no pide
+  permiso. El dueño prueba en staging y aprueba el PR `dev → main`.
+- **Gates del dueño:** (1) probar en staging; (2) aprobar `dev → main`.
+- **Merge `dev → main`** = merge commit (NO squash → revert quirúrgico por PR si hace falta en prod).
+  Commits atómicos, Conventional Commits en español.
+- **Why:** `dev` es seguro (sin clientes) → el PR antes de staging era overhead sin beneficio real.
+  El único gate que importa es `dev → main`: ahí está el supervisor, el CI en modo gate, y el dueño.
+  Menos fricción, misma red de seguridad para prod.
 
 ### 2026-06-08 — Issues: la cola espeja el código (Closes #N → auto-cierre en dev→main; diferido aparte)
 
@@ -1230,4 +1218,25 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Consecuencias.** El manual se actualiza en el **mismo cambio** que toca su motor (como el código y los tests).
   El supervisor marca: un manual desactualizado, o una regla de criterio copiada en el manual que debería ser un
   link a MEMORIA. Próximos candidatos a manual propio: reservas (el core sagrado, hoy en MEMORIA + MANIFIESTO §6)
+
+### 2026-06-26 — skill `consejo`: juicio crítico de propuestas como fuente única, rigor escalable, memoria separada
+
+- **Contexto.** El proceso de trabajo no tenía un gate deliberativo aguas arriba: las propuestas se evaluaban
+  ad-hoc en la sesión, con el sesgo de complacencia no estructurado. El supervisor juzga lo ya hecho; faltaba
+  el equivalente para lo que se va a hacer. En conversación, preguntar "¿qué te parece?" activa la cooperación,
+  no la crítica — el análisis queda distorsionado hacia el acuerdo.
+- **Decisión.** El juicio crítico de propuestas/ideas/planes antes de construir vive en el skill **`consejo`**
+  (`.claude/skills/consejo/SKILL.md`) — fuente única, no ad-hoc en la sesión. El valor no es "más cabezas" (mismo
+  modelo, mismos sesgos) sino el **mandato adversarial** y el **rigor escalable**: default pase crítico eficiente
+  (~10-15k, sin subagentes); escala a voces aisladas paralelas (Contrario + Investigador, ~120k) o consejo completo
+  de 5 lentes (~300k) solo si la decisión lo justifica. El consejo **no escribe** en `MEMORIA.md`/`DECISIONES.md`
+  — tiene su propia `BITACORA.md` con autoridad separada (lo que juzgó el consejo ≠ lo que decidió el dueño).
+- **Why.** Un mandato de matar la idea sobre una proposición encuadrada en neutral suelta la crítica que el modo-charla
+  reprime. La separación de memorias es necesaria por la independencia crítica: si el consejo obedeciera `MEMORIA.md`
+  como autoridad, pierde su razón de existir (validaría lo ya decidido en vez de juzgarlo). La escalabilidad de
+  rigor materializa _Eficiencia de sesión (2026-05-26)_: los recursos son finitos, el rigor se asigna donde rinde.
+- **Consecuencias.** El supervisor marca: (a) propuesta mediana/grande juzgada sin invocar el skill; (b) veredicto
+  del consejo promovido a `MEMORIA.md` sin autorización explícita del dueño. El consejo calibra su propio acierto
+  via `BITACORA.md` (registra qué juzgó vs. qué decidió el dueño — campo "¿coincidieron?"). Condición de retiro
+  (anti-bloat): si el ledger de `gobernanza` lo muestra con uso <1/mes y veredictos tibios, se retira.
   y contabilidad/plata. No todo sistema necesita uno: si MEMORIA + MANIFIESTO ya lo cubren claro, no se fuerza.

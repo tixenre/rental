@@ -1844,4 +1844,56 @@ def _init_db_schema(conn):
     except Exception as ex:
         logger.warning("No se pudieron regenerar etiquetas auto: %s", ex)
 
+    # ── Estudio: trabajos / producciones (galería "en acción") ───────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS estudio_trabajos (
+            id                  SERIAL PRIMARY KEY,
+            titulo              TEXT NOT NULL DEFAULT '',
+            realizador          TEXT NOT NULL DEFAULT '',
+            realizador_logo_url TEXT,
+            tipo                TEXT NOT NULL DEFAULT 'fotos'
+                                CHECK (tipo IN ('fotos', 'video')),
+            youtube_url         TEXT,
+            fotos_json          TEXT NOT NULL DEFAULT '[]',
+            orden               INTEGER NOT NULL DEFAULT 0,
+            activo              BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_estudio_trabajos_orden ON estudio_trabajos(orden)"
+    )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS realizador_instagram TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS realizador_web TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS categoria TEXT NOT NULL DEFAULT ''"
+    )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS descripcion TEXT NOT NULL DEFAULT ''"
+    )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS instagram_reel_url TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS thumbnail_url TEXT"
+    )
+    # Lista ordenada de links externos (YouTube/Instagram) por trabajo:
+    # [{tipo, url, thumbnail_url}]. Fuente única de medios externos; las
+    # columnas youtube_url/instagram_reel_url quedan como fallback legacy de
+    # lectura (migración on-write). El motor une links_json + fotos_json en el
+    # carrusel `media` que consume el front.
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS links_json TEXT NOT NULL DEFAULT '[]'"
+    )
+    # Un trabajo puede tener varios tags. categorias_json es la fuente única; la
+    # columna `categoria` (singular) queda como legacy de lectura (= primer tag).
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS categorias_json TEXT NOT NULL DEFAULT '[]'"
+    )
+
     conn.commit()

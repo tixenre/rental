@@ -186,7 +186,8 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
 # para mapear las fuentes reales en prod antes de pasar a enforcing. Fuentes
 # relevadas del código: self · Google Fonts (googleapis/gstatic) · GA4
 # (googletagmanager/google-analytics) · R2 (imágenes, *.r2.dev) · embeds (Google
-# Maps, YouTube) · simpleicons (logos de marca). 'unsafe-inline' en style-src es
+# Maps, YouTube, Instagram embed.js + cdninstagram/fbcdn) · simpleicons (logos de
+# marca). 'unsafe-inline' en style-src es
 # inevitable por los `style={}` de React + el <style> que inyecta Google Fonts.
 # Solo se aplica al HTML del SPA (no a /api ni assets, que no ejecutan nada).
 CSP_REPORT_ONLY = "; ".join(
@@ -196,15 +197,16 @@ CSP_REPORT_ONLY = "; ".join(
         "object-src 'none'",
         "frame-ancestors 'self'",
         "form-action 'self'",
-        "script-src 'self' https://www.googletagmanager.com",
+        "script-src 'self' https://www.googletagmanager.com https://www.instagram.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: https://*.r2.dev https://www.googletagmanager.com "
-        "https://*.google-analytics.com https://cdn.simpleicons.org",
+        "https://*.google-analytics.com https://cdn.simpleicons.org "
+        "https://*.cdninstagram.com https://*.fbcdn.net",
         "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com "
-        "https://*.r2.dev",
+        "https://*.r2.dev https://www.instagram.com",
         "frame-src 'self' blob: https://www.google.com https://maps.google.com "
-        "https://www.youtube.com https://*.r2.dev",
+        "https://www.youtube.com https://*.r2.dev https://www.instagram.com",
         "report-uri /csp-report",
     ]
 )
