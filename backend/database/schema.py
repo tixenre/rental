@@ -1787,43 +1787,9 @@ def _init_db_schema(conn):
     conn.execute(
         "UPDATE talleres SET numero_edicion = 2, proxima_edicion_slug = '' WHERE slug = 'direccion-de-arte-jime-troncoso-2'",
     )
-    # Seed sesiones para los talleres existentes (idempotente: solo si no tienen sesiones aún).
-    conn.execute(
-        """
-        INSERT INTO taller_sesiones (taller_id, fecha, hora_inicio, hora_fin)
-        SELECT t.id, '2026-07-11', 9, 13
-        FROM talleres t
-        WHERE t.slug = 'direccion-de-arte-jime-troncoso'
-          AND NOT EXISTS (SELECT 1 FROM taller_sesiones WHERE taller_id = t.id)
-        """
-    )
-    conn.execute(
-        """
-        INSERT INTO taller_sesiones (taller_id, fecha, hora_inicio, hora_fin)
-        SELECT t.id, '2026-07-18', 9, 13
-        FROM talleres t
-        WHERE t.slug = 'direccion-de-arte-jime-troncoso'
-          AND NOT EXISTS (SELECT 1 FROM taller_sesiones WHERE taller_id = t.id AND fecha = '2026-07-18')
-        """
-    )
-    conn.execute(
-        """
-        INSERT INTO taller_sesiones (taller_id, fecha, hora_inicio, hora_fin)
-        SELECT t.id, '2026-08-15', 9, 13
-        FROM talleres t
-        WHERE t.slug = 'direccion-de-arte-jime-troncoso-2'
-          AND NOT EXISTS (SELECT 1 FROM taller_sesiones WHERE taller_id = t.id)
-        """
-    )
-    conn.execute(
-        """
-        INSERT INTO taller_sesiones (taller_id, fecha, hora_inicio, hora_fin)
-        SELECT t.id, '2026-08-22', 9, 13
-        FROM talleres t
-        WHERE t.slug = 'direccion-de-arte-jime-troncoso-2'
-          AND NOT EXISTS (SELECT 1 FROM taller_sesiones WHERE taller_id = t.id AND fecha = '2026-08-22')
-        """
-    )
+    # Las sesiones de talleres existentes no se seedean con fechas hardcodeadas:
+    # el admin las carga desde el back-office post-deploy con los datos reales.
+    # Mientras no haya sesiones, la página pública muestra el campo `horario` de texto.
 
     # ── Carritos activos (#280 Fase 1): persistencia server-side ──────────────
     # Cada heartbeat del frontend hace upsert por session_id (UUID v4 generado

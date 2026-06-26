@@ -63,36 +63,12 @@ def upgrade() -> None:
         "TEXT NOT NULL DEFAULT 'intensivo'"
     )
 
-    # ── Seed sesiones Jime Troncoso (idempotente) ──────────────────────────────
-    for slug, fecha in [
-        ("direccion-de-arte-jime-troncoso", "2026-07-11"),
-        ("direccion-de-arte-jime-troncoso", "2026-07-18"),
-    ]:
-        op.execute(f"""
-            INSERT INTO taller_sesiones (taller_id, fecha, hora_inicio, hora_fin)
-            SELECT t.id, '{fecha}', 9, 13
-            FROM talleres t
-            WHERE t.slug = {_q(slug)}
-              AND NOT EXISTS (
-                SELECT 1 FROM taller_sesiones
-                WHERE taller_id = t.id AND fecha = '{fecha}'
-              )
-        """)
-
-    for slug, fecha in [
-        ("direccion-de-arte-jime-troncoso-2", "2026-08-15"),
-        ("direccion-de-arte-jime-troncoso-2", "2026-08-22"),
-    ]:
-        op.execute(f"""
-            INSERT INTO taller_sesiones (taller_id, fecha, hora_inicio, hora_fin)
-            SELECT t.id, '{fecha}', 9, 13
-            FROM talleres t
-            WHERE t.slug = {_q(slug)}
-              AND NOT EXISTS (
-                SELECT 1 FROM taller_sesiones
-                WHERE taller_id = t.id AND fecha = '{fecha}'
-              )
-        """)
+    # Nota: el seed de sesiones de los talleres Jime Troncoso se omite aquí
+    # intencionalmente. Las fechas/horarios reales los carga el admin desde
+    # el back-office después del deploy (el taller puede haber sido modificado
+    # en prod y las fechas hardcodeadas podrían no ser correctas). Mientras no
+    # haya sesiones, la página pública muestra el campo `horario` de texto,
+    # igual que antes.
 
     # ── Template taller_cambio_datos ───────────────────────────────────────────
     cambio_html = (
