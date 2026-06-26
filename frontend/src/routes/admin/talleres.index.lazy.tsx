@@ -20,7 +20,6 @@ import { toast } from "sonner";
 
 import { authedFetch, authedJson } from "@/lib/authedFetch";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { AdminSection } from "@/components/admin/AdminSection";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { Switch } from "@/design-system/ui/switch";
@@ -472,55 +471,51 @@ function SesionesSection({ taller }: { taller: TallerAdmin }) {
     setEditing(false);
   }
 
-  return (
-    <AdminSection storageKey="talleres:sesiones" title="Sesiones">
-      {!editing ? (
-        <div className="flex flex-col gap-4">
-          {taller.sesiones && taller.sesiones.length > 0 ? (
-            <TallerCalendario sesiones={taller.sesiones} horario={taller.horario} />
-          ) : (
-            <p className="text-sm text-muted-foreground italic">Sin sesiones cargadas.</p>
-          )}
-          <div className="flex justify-end">
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              Editar sesiones
-            </Button>
-          </div>
-        </div>
+  return !editing ? (
+    <div className="flex flex-col gap-4">
+      {taller.sesiones && taller.sesiones.length > 0 ? (
+        <TallerCalendario sesiones={taller.sesiones} horario={taller.horario} />
       ) : (
-        <div className="flex flex-col gap-5">
-          <SesionAsistente
-            tipo={tipo}
-            onTipoChange={setTipo}
-            sesiones={sesiones}
-            onChange={setSesiones}
-          />
+        <p className="text-sm text-muted-foreground italic">Sin sesiones cargadas.</p>
+      )}
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+          Editar sesiones
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <div className="flex flex-col gap-5">
+      <SesionAsistente
+        tipo={tipo}
+        onTipoChange={setTipo}
+        sesiones={sesiones}
+        onChange={setSesiones}
+      />
 
-          {sesiones.length > 0 && (
-            <div className="pointer-events-none select-none">
-              <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
-                Preview
-              </p>
-              <TallerCalendario sesiones={sesiones} />
-            </div>
-          )}
-
-          <div className="flex gap-2 justify-end pt-2">
-            <Button variant="ghost" size="sm" onClick={handleCancel}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={mut.isPending} size="sm" className="gap-2">
-              {mut.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Save className="h-3.5 w-3.5" />
-              )}
-              Guardar sesiones
-            </Button>
-          </div>
+      {sesiones.length > 0 && (
+        <div className="pointer-events-none select-none">
+          <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
+            Preview
+          </p>
+          <TallerCalendario sesiones={sesiones} />
         </div>
       )}
-    </AdminSection>
+
+      <div className="flex gap-2 justify-end pt-2">
+        <Button variant="ghost" size="sm" onClick={handleCancel}>
+          Cancelar
+        </Button>
+        <Button onClick={handleSave} disabled={mut.isPending} size="sm" className="gap-2">
+          {mut.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Save className="h-3.5 w-3.5" />
+          )}
+          Guardar sesiones
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -575,39 +570,33 @@ function PagosSection({ taller }: { taller: TallerAdmin }) {
   );
 
   return (
-    <AdminSection storageKey="talleres:pagos" title="Lugar y pagos">
-      <div className="flex flex-col gap-4">
-        <div className="grid sm:grid-cols-2 gap-4">{tf("Dirección", "direccion")}</div>
-        <div className="grid sm:grid-cols-3 gap-4">
-          {tf("Alias de pago", "pago_alias")}
-          {tf("CBU", "pago_cbu")}
-          {tf("Banco", "pago_banco")}
-        </div>
-        <div className="flex items-center gap-3">
-          <Switch
-            checked={form.notif_email}
-            onCheckedChange={(v) => setForm((f) => ({ ...f, notif_email: v }))}
-          />
-          <span className="text-sm text-muted-foreground">
-            Enviar email de confirmación al inscribirse
-          </span>
-        </div>
-        <div className="flex justify-end">
-          <Button
-            onClick={() => mut.mutate({ ...form })}
-            disabled={mut.isPending}
-            className="gap-2"
-          >
-            {mut.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Guardar
-          </Button>
-        </div>
+    <div className="flex flex-col gap-4">
+      <div className="grid sm:grid-cols-2 gap-4">{tf("Dirección", "direccion")}</div>
+      <div className="grid sm:grid-cols-3 gap-4">
+        {tf("Alias de pago", "pago_alias")}
+        {tf("CBU", "pago_cbu")}
+        {tf("Banco", "pago_banco")}
       </div>
-    </AdminSection>
+      <div className="flex items-center gap-3">
+        <Switch
+          checked={form.notif_email}
+          onCheckedChange={(v) => setForm((f) => ({ ...f, notif_email: v }))}
+        />
+        <span className="text-sm text-muted-foreground">
+          Enviar email de confirmación al inscribirse
+        </span>
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={() => mut.mutate({ ...form })} disabled={mut.isPending} className="gap-2">
+          {mut.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          Guardar
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -640,53 +629,50 @@ function FotoSection({ taller }: { taller: TallerAdmin }) {
   }
 
   return (
-    <AdminSection storageKey="talleres:foto" title="Foto de instructora">
-      <div className="flex items-start gap-6">
-        {taller.instructor_foto_url ? (
-          <img
-            src={taller.instructor_foto_url}
-            alt={taller.instructor_nombre}
-            className="w-24 h-24 rounded-full object-cover object-top border border-border/40 shrink-0"
+    <div className="flex items-start gap-6">
+      {taller.instructor_foto_url ? (
+        <img
+          src={taller.instructor_foto_url}
+          alt={taller.instructor_nombre}
+          className="w-24 h-24 rounded-full object-cover object-top border border-border/40 shrink-0"
+        />
+      ) : (
+        <div className="w-24 h-24 rounded-full bg-muted/40 border border-dashed border-border/60 flex items-center justify-center shrink-0">
+          <span className="text-xs text-muted-foreground text-center px-2">Sin foto</span>
+        </div>
+      )}
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-muted-foreground">
+          JPG, PNG o WebP · máx. 8 MB. Se muestra en la sección "Sobre" de la landing del workshop.
+        </p>
+        <div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUpload(f);
+            }}
           />
-        ) : (
-          <div className="w-24 h-24 rounded-full bg-muted/40 border border-dashed border-border/60 flex items-center justify-center shrink-0">
-            <span className="text-xs text-muted-foreground text-center px-2">Sin foto</span>
-          </div>
-        )}
-        <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground">
-            JPG, PNG o WebP · máx. 8 MB. Se muestra en la sección "Sobre" de la landing del
-            workshop.
-          </p>
-          <div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleUpload(f);
-              }}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={uploading}
-              onClick={() => fileRef.current?.click()}
-              className="gap-2"
-            >
-              {uploading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Upload className="h-3.5 w-3.5" />
-              )}
-              {taller.instructor_foto_url ? "Cambiar foto" : "Subir foto"}
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+            className="gap-2"
+          >
+            {uploading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" />
+            )}
+            {taller.instructor_foto_url ? "Cambiar foto" : "Subir foto"}
+          </Button>
         </div>
       </div>
-    </AdminSection>
+    </div>
   );
 }
 
@@ -784,37 +770,35 @@ function ContenidoSection({ taller }: { taller: TallerAdmin }) {
   );
 
   return (
-    <AdminSection storageKey="talleres:contenido" title="Contenido del workshop">
-      <div className="flex flex-col gap-5">
-        <div className="grid sm:grid-cols-2 gap-4">
-          {field("Nombre", "nombre")}
-          {field("Subtítulo", "subtitulo")}
-        </div>
-        {field("Instructor/a", "instructor_nombre")}
-        {field("Descripción", "descripcion", { rows: 4 })}
-        {field("¿Para quiénes?", "publico_objetivo", {
-          rows: 3,
-          hint: "Texto que aparece en el box 'Orientado a'",
-        })}
-        {field("Bio del/la instructor/a", "instructor_bio", { rows: 4 })}
-        {field("Proyectos (separados por coma)", "instructor_proyectos", {
-          rows: 2,
-          hint: "Se muestran como pills.",
-        })}
-        {field("Programa clase teórica (1 ítem por línea)", "programa_teorica", { rows: 6 })}
-        {field("Programa clase práctica (1 ítem por línea)", "programa_practica", { rows: 6 })}
-        <div className="flex justify-end pt-2">
-          <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
-            {mut.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Guardar cambios
-          </Button>
-        </div>
+    <div className="flex flex-col gap-5">
+      <div className="grid sm:grid-cols-2 gap-4">
+        {field("Nombre", "nombre")}
+        {field("Subtítulo", "subtitulo")}
       </div>
-    </AdminSection>
+      {field("Instructor/a", "instructor_nombre")}
+      {field("Descripción", "descripcion", { rows: 4 })}
+      {field("¿Para quiénes?", "publico_objetivo", {
+        rows: 3,
+        hint: "Texto que aparece en el box 'Orientado a'",
+      })}
+      {field("Bio del/la instructor/a", "instructor_bio", { rows: 4 })}
+      {field("Proyectos (separados por coma)", "instructor_proyectos", {
+        rows: 2,
+        hint: "Se muestran como pills.",
+      })}
+      {field("Programa clase teórica (1 ítem por línea)", "programa_teorica", { rows: 6 })}
+      {field("Programa clase práctica (1 ítem por línea)", "programa_practica", { rows: 6 })}
+      <div className="flex justify-end pt-2">
+        <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
+          {mut.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          Guardar cambios
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -864,60 +848,58 @@ function PreciosSection({ taller }: { taller: TallerAdmin }) {
   }
 
   return (
-    <AdminSection storageKey="talleres:precios" title="Precios y cupos">
-      <div className="flex flex-col gap-4">
-        {taller.cupos_confirmados >= taller.cupos_total && (
-          <div className="rounded-lg bg-amber/10 border border-amber/30 px-4 py-3 text-sm text-amber">
-            ⚠ Taller completo — {taller.cupos_confirmados}/{taller.cupos_total} cupos ocupados
-          </div>
-        )}
-        <div className="grid sm:grid-cols-3 gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-              Precio total (ARS)
-            </label>
-            <Input
-              type="number"
-              min={0}
-              value={precioTotal}
-              onChange={(e) => setPrecioTotal(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-              Seña (ARS)
-            </label>
-            <Input
-              type="number"
-              min={0}
-              value={precioSena}
-              onChange={(e) => setPrecioSena(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-              Cupos totales
-            </label>
-            <Input
-              type="number"
-              min={1}
-              value={cuposTotal}
-              onChange={(e) => setCuposTotal(e.target.value)}
-            />
-          </div>
+    <div className="flex flex-col gap-4">
+      {taller.cupos_confirmados >= taller.cupos_total && (
+        <div className="rounded-lg bg-amber/10 border border-amber/30 px-4 py-3 text-sm text-amber">
+          ⚠ Taller completo — {taller.cupos_confirmados}/{taller.cupos_total} cupos ocupados
         </div>
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
-            {mut.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Guardar
-          </Button>
+      )}
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            Precio total (ARS)
+          </label>
+          <Input
+            type="number"
+            min={0}
+            value={precioTotal}
+            onChange={(e) => setPrecioTotal(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            Seña (ARS)
+          </label>
+          <Input
+            type="number"
+            min={0}
+            value={precioSena}
+            onChange={(e) => setPrecioSena(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            Cupos totales
+          </label>
+          <Input
+            type="number"
+            min={1}
+            value={cuposTotal}
+            onChange={(e) => setCuposTotal(e.target.value)}
+          />
         </div>
       </div>
-    </AdminSection>
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
+          {mut.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          Guardar
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1101,11 +1083,11 @@ function InscripcionesSection({
   return (
     <>
       {confirmadas.length > 0 && (
-        <AdminSection
-          storageKey="talleres:confirmadas"
-          title={`Inscripciones confirmadas (${confirmadas.length})`}
-        >
-          <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Confirmadas ({confirmadas.length})
+            </p>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -1126,15 +1108,20 @@ function InscripcionesSection({
                 Notificar cambios
               </Button>
             </div>
-            {insTable(confirmadas, false)}
           </div>
-        </AdminSection>
+          {insTable(confirmadas, false)}
+        </div>
       )}
 
       {espera.length > 0 && (
-        <AdminSection storageKey="talleres:espera" title={`Lista de espera (${espera.length})`}>
+        <div
+          className={`flex flex-col gap-3${confirmadas.length > 0 ? " border-t border-border/40 pt-5 mt-2" : ""}`}
+        >
+          <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+            Lista de espera ({espera.length})
+          </p>
           {insTable(espera, true)}
-        </AdminSection>
+        </div>
       )}
 
       {/* Notificar cambios dialog */}
@@ -1216,55 +1203,53 @@ function EdicionesSection({
   });
 
   return (
-    <AdminSection storageKey="talleres:ediciones" title="Ediciones">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-muted-foreground">
-            Edición actual: <strong className="text-ink">#{taller.numero_edicion}</strong>
-          </span>
-          <Link
-            to="/workshops/$slug"
-            params={{ slug: taller.slug }}
-            target="_blank"
-            className="inline-flex items-center gap-1 text-muted-foreground hover:text-ink transition text-xs"
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-4 text-sm">
+        <span className="text-muted-foreground">
+          Edición actual: <strong className="text-ink">#{taller.numero_edicion}</strong>
+        </span>
+        <Link
+          to="/workshops/$slug"
+          params={{ slug: taller.slug }}
+          target="_blank"
+          className="inline-flex items-center gap-1 text-muted-foreground hover:text-ink transition text-xs"
+        >
+          ver en web <ExternalLink className="h-3 w-3" />
+        </Link>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+          Slug de próxima edición
+        </label>
+        <p className="text-xs text-muted-foreground/70 -mt-1">
+          Cuando esta edición está sold out, los visitantes verán un link a la próxima.
+        </p>
+        <div className="flex gap-2">
+          <Input
+            value={proximaSlug}
+            onChange={(e) => setProximaSlug(e.target.value)}
+            placeholder="Ej: direccion-de-arte-jime-troncoso-2"
+            className="flex-1"
+          />
+          <Button
+            variant="outline"
+            onClick={() => mut.mutate(proximaSlug)}
+            disabled={mut.isPending}
+            size="sm"
           >
-            ver en web <ExternalLink className="h-3 w-3" />
-          </Link>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-            Slug de próxima edición
-          </label>
-          <p className="text-xs text-muted-foreground/70 -mt-1">
-            Cuando esta edición está sold out, los visitantes verán un link a la próxima.
-          </p>
-          <div className="flex gap-2">
-            <Input
-              value={proximaSlug}
-              onChange={(e) => setProximaSlug(e.target.value)}
-              placeholder="Ej: direccion-de-arte-jime-troncoso-2"
-              className="flex-1"
-            />
-            <Button
-              variant="outline"
-              onClick={() => mut.mutate(proximaSlug)}
-              disabled={mut.isPending}
-              size="sm"
-            >
-              {mut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Guardar"}
-            </Button>
-          </div>
-        </div>
-
-        <div className="pt-1">
-          <Button variant="outline" size="sm" onClick={onNuevaDuplica} className="gap-2">
-            <Plus className="h-3.5 w-3.5" />
-            Nueva edición (duplicar este taller)
+            {mut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Guardar"}
           </Button>
         </div>
       </div>
-    </AdminSection>
+
+      <div className="pt-1">
+        <Button variant="outline" size="sm" onClick={onNuevaDuplica} className="gap-2">
+          <Plus className="h-3.5 w-3.5" />
+          Nueva edición (duplicar este taller)
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1478,11 +1463,14 @@ function TallerAccordionRow({
   togglePending: boolean;
 }) {
   const badge = badgeEstado(taller);
+  const [activeTab, setActiveTab] = useState<"sesiones" | "datos" | "contenido" | "inscripciones">(
+    "sesiones",
+  );
 
   const { data: inscripciones = [], isLoading: loadingIns } = useQuery({
     queryKey: ["admin", "talleres", taller.id, "inscripciones"],
     queryFn: () => authedJson<Inscripcion[]>(`/api/admin/talleres/${taller.id}/inscripciones`),
-    enabled: expanded,
+    enabled: expanded && activeTab === "inscripciones",
     staleTime: 1000 * 30,
   });
 
@@ -1575,20 +1563,72 @@ function TallerAccordionRow({
         </svg>
       </div>
 
-      {/* Detail — visible when expanded */}
+      {/* Detail — tabs */}
       {expanded && (
-        <div className="border-t border-border/40 px-4 pb-4 pt-2 flex flex-col gap-4">
-          <SesionesSection taller={taller} />
-          <PagosSection taller={taller} />
-          <FotoSection taller={taller} />
-          <ContenidoSection taller={taller} />
-          <PreciosSection taller={taller} />
-          <InscripcionesSection
-            taller={taller}
-            inscripciones={inscripciones}
-            loading={loadingIns}
-          />
-          <EdicionesSection taller={taller} onNuevaDuplica={() => onNuevaDuplica(taller)} />
+        <div className="border-t border-border/40">
+          {/* Tab bar */}
+          <div className="flex border-b border-border/60">
+            {(
+              [
+                { id: "sesiones", label: "Sesiones" },
+                { id: "datos", label: "Datos" },
+                { id: "contenido", label: "Contenido" },
+                {
+                  id: "inscripciones",
+                  label: `Inscripciones${taller.cupos_confirmados > 0 ? ` (${taller.cupos_confirmados})` : ""}`,
+                },
+              ] as {
+                id: "sesiones" | "datos" | "contenido" | "inscripciones";
+                label: string;
+              }[]
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2.5 text-sm border-b-2 -mb-[1px] transition-colors ${
+                  activeTab === tab.id
+                    ? "border-ink text-ink font-medium"
+                    : "border-transparent text-muted-foreground hover:text-ink"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab panels */}
+          <div className="px-4 pb-6 pt-5">
+            {activeTab === "sesiones" && <SesionesSection taller={taller} />}
+
+            {activeTab === "datos" && (
+              <div className="flex flex-col gap-0">
+                <PagosSection taller={taller} />
+                <div className="border-t border-border/40 mt-6 pt-6">
+                  <PreciosSection taller={taller} />
+                </div>
+                <div className="border-t border-border/40 mt-6 pt-6">
+                  <EdicionesSection taller={taller} onNuevaDuplica={() => onNuevaDuplica(taller)} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "contenido" && (
+              <div className="flex flex-col gap-0">
+                <FotoSection taller={taller} />
+                <div className="border-t border-border/40 mt-6 pt-6">
+                  <ContenidoSection taller={taller} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "inscripciones" && (
+              <InscripcionesSection
+                taller={taller}
+                inscripciones={inscripciones}
+                loading={loadingIns}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>
