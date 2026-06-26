@@ -233,6 +233,21 @@ Teléfono: {{ telefono }}
 
 Fecha: {{ fecha }}""",
     },
+    "taller_cambio_datos": {
+        "subject": "Actualización sobre {{ taller_nombre }}",
+        "body_html": f"""<p {b.H}>Actualización: {{{{ taller_nombre }}}}</p>
+<p style="margin:0 0 8px;">Hola <strong>{{{{ nombre_pila }}}}</strong>, hay una novedad sobre el workshop al que te inscribiste:</p>
+{{% if mensaje %}}<p style="margin:12px 0;padding:12px 16px;background:#f5f3f0;border-left:3px solid #c8a96e;border-radius:4px;">{{{{ mensaje }}}}</p>{{% endif %}}
+<p {b.MUTED_P}>¿Preguntas? Respondé este mail o escribínos por WhatsApp.</p>
+<p style="margin:18px 0 0;">— El equipo de Rambla</p>""",
+        "body_text": """Hola {{ nombre_pila }}, hay una novedad sobre {{ taller_nombre }}.
+
+{% if mensaje %}{{ mensaje }}
+
+{% endif %}¿Preguntas? Respondé este mail.
+
+— El equipo de Rambla""",
+    },
     "taller_inscripcion_cliente": {
         "subject": "{% if en_lista_espera %}Quedaste en lista de espera{% else %}¡Tu lugar está reservado!{% endif %} — {{ taller_nombre }}",
         "body_html": f"""<p {b.H}>{{% if en_lista_espera %}}Quedaste en lista de espera{{% else %}}¡Tu lugar está reservado!{{% endif %}}</p>
