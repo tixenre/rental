@@ -81,9 +81,11 @@ function mediaThumb(m: EstudioMedia): { src: string; fallback?: string } | null 
   }
   return null;
 }// El embed oficial de IG muestra el post completo (foto/video + descripción +
-// likes + comentarios). Usamos CSS clipping para mostrar solo el media:
-// height = 60px (header con avatar/usuario) + min(94vw,480px) * (h/w).
-// El overflow:hidden del contenedor corta lo que queda debajo del media.
+// likes + comentarios). Usamos CSS clipping para mostrar header + media + chrome
+// (dots, "View more", action bar, likes, input de comentario) pero NO el texto de
+// la descripción ni los hilos de comentarios que vienen después:
+// height = min(94vw,480px) * (h/w) + 260px
+//   ≈ imagen + 72px (header) + 44px (View more) + 52px (bar) + 24px (likes) + 54px (input) + margen
 declare global {
   interface Window {
     instgrm?: { Embeds: { process: () => void } };
@@ -246,7 +248,7 @@ function TrabajoModal({
             // del overflow:hidden y no aparecen.
             const ar = current.w && current.h ? current.h / current.w : null;
             const clipH = ar
-              ? `calc(min(94vw, 480px) * ${ar.toFixed(4)} + 60px)`
+              ? `calc(min(94vw, 480px) * ${ar.toFixed(4)} + 260px)`
               : "82vh";
             return (
               <div
