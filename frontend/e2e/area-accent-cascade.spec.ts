@@ -28,26 +28,42 @@ test("cascada [data-area] — estudio y rental tienen atributo correcto", async 
 test("cascada [data-area] — --area-accent resuelve diferente en estudio vs rental", async ({
   page,
 }) => {
-  // Medimos el --area-accent declarado en el elemento [data-area].
-  // En estudio: debe contener "estudio" (referencia a --color-estudio).
+  // Medimos el --area-accent resuelto en el elemento [data-area].
+  // Chromium resuelve var() al valor final; comparamos contra el token fuente,
+  // no contra el texto crudo "var(--color-estudio)".
+
+  // En estudio: --area-accent debe resolver al mismo valor que --color-estudio.
   await page.goto("/estudio");
   await page.waitForLoadState("networkidle");
 
-  const estudioProp = await page.evaluate(() => {
+  const [estudioAccent, estudioColor] = await page.evaluate(() => {
     const el = document.querySelector("[data-area='estudio']");
     if (!el) throw new Error("data-area='estudio' no encontrado");
-    return getComputedStyle(el).getPropertyValue("--area-accent").trim();
+    const cs = getComputedStyle(el);
+    return [
+      cs.getPropertyValue("--area-accent").trim(),
+      cs.getPropertyValue("--color-estudio").trim(),
+    ];
   });
-  expect(estudioProp).toContain("estudio");
+  // --area-accent debe resolver al mismo color que --color-estudio (no a amber ni rosa).
+  expect(estudioAccent).toBe(estudioColor);
 
-  // En rental: debe contener "amber".
+  // En rental: --area-accent debe resolver al mismo valor que --color-amber (el default).
   await page.goto("/rental");
   await page.waitForLoadState("networkidle");
 
-  const rentalProp = await page.evaluate(() => {
+  const [rentalAccent, rentalColor] = await page.evaluate(() => {
     const el = document.querySelector("[data-area='rental']");
     if (!el) throw new Error("data-area='rental' no encontrado");
-    return getComputedStyle(el).getPropertyValue("--area-accent").trim();
+    const cs = getComputedStyle(el);
+    return [
+      cs.getPropertyValue("--area-accent").trim(),
+      cs.getPropertyValue("--color-amber").trim(),
+    ];
   });
-  expect(rentalProp).toContain("amber");
+  // --area-accent en rental debe resolver al mismo color que --color-amber.
+  expect(rentalAccent).toBe(rentalColor);
+
+  // Las dos áreas deben usar colores distintos.
+  expect(estudioAccent).not.toBe(rentalAccent);
 });
