@@ -304,7 +304,11 @@ def _resolve_links(incoming: list, existing: list | None) -> list:
 
     Reusa el thumbnail ya procesado (url + dimensiones) de un link cuya URL no
     cambió (evita re-bajar y re-procesar en cada edición). El `tipo` lo decide el
-    server (ignora lo que mande el front)."""
+    server (ignora lo que mande el front).
+
+    Si el link trae `thumbnail_url` (override del admin), lo descarga y lo usa
+    en lugar del og:image auto-detectado — permite corregir la miniatura de
+    carruseles de IG donde og:image no es el primer slide."""
     existing_by_url = {l.get("url"): l for l in (existing or []) if l.get("url")}
     out: list = []
     seen: set = set()
@@ -317,6 +321,17 @@ def _resolve_links(incoming: list, existing: list | None) -> list:
             continue
         seen.add(url)
         prev = existing_by_url.get(url)
+        # Override: el admin mandó una URL de miniatura personalizada.
+        override = (link.get("thumbnail_url") or "").strip()
+        if override:
+            thumb = _process_remote_thumbnail(override)
+            out.append({
+                "tipo": tipo, "url": url,
+                "thumbnail_url": thumb["url"] if thumb else (prev or {}).get("thumbnail_url"),
+                "thumbnail_w": thumb["w"] if thumb else (prev or {}).get("thumbnail_w"),
+                "thumbnail_h": thumb["h"] if thumb else (prev or {}).get("thumbnail_h"),
+            })
+            continue
         if prev and prev.get("thumbnail_url"):
             out.append({
                 "tipo": tipo, "url": url,
