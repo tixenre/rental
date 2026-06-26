@@ -60,17 +60,17 @@ function ytThumbFallback(ytId: string) {
   return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
 }
 
-function extractIgShortcode(url: string): string | null {
+function igEmbedUrl(url: string): string | null {
   if (!url) return null;
-  const m = url.match(/instagram\.com\/(?:reel|p|tv)\/([A-Za-z0-9_-]+)/);
-  if (m) return m[1];
-  if (/^[A-Za-z0-9_-]{8,}$/.test(url)) return url;
+  const m = url.match(/instagram\.com\/(reel|p|tv)\/([A-Za-z0-9_-]+)/);
+  if (m) return `https://www.instagram.com/${m[1]}/${m[2]}/embed/`;
+  if (/^[A-Za-z0-9_-]{8,}$/.test(url)) return `https://www.instagram.com/reel/${url}/embed/`;
   return null;
 }
 
 function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: () => void }) {
   const ytId = trabajo.youtube_url ? extractYtId(trabajo.youtube_url) : null;
-  const igCode = trabajo.instagram_reel_url ? extractIgShortcode(trabajo.instagram_reel_url) : null;
+  const igEmbed = trabajo.instagram_reel_url ? igEmbedUrl(trabajo.instagram_reel_url) : null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -105,9 +105,9 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
               allowFullScreen
               className="h-full w-full"
             />
-          ) : igCode ? (
+          ) : igEmbed ? (
             <iframe
-              src={`https://www.instagram.com/reel/${igCode}/embed/`}
+              src={igEmbed}
               title={trabajo.titulo}
               allowFullScreen
               scrolling="no"
