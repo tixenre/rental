@@ -66,11 +66,15 @@ SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
 def dev_bypass_enabled() -> bool:
     """¿Está activo el bypass de auth de dev (ADMIN_BYPASS_AUTH)?
 
-    Seguridad (#503): NUNCA en producción. Aunque `ADMIN_BYPASS_AUTH` quede
-    seteada por error en Railway, en un entorno Railway se ignora — el bypass
-    es imposible de cara al público (no depende de verificar la config a mano).
-    Fuente única usada por `require_admin`, `/auth/dev-login` y `/auth/config`.
+    Seguridad (#503): NUNCA en producción. Bloquea cuando RAILWAY_ENVIRONMENT
+    es explícitamente 'production'; en Railway dev/staging y en local se
+    permite si ADMIN_BYPASS_AUTH=1. Falla-cerrada: si alguien pone la var en
+    prod, RAILWAY_ENVIRONMENT=production la anula.
+    Fuente única usada por `require_admin`, `/auth/dev-login`, `/auth/me`
+    y `/auth/config`.
     """
+    if os.getenv("RAILWAY_ENVIRONMENT", "").strip().lower() == "production":
+        return False
     return os.getenv("ADMIN_BYPASS_AUTH", "").strip().lower() in ("1", "true", "yes")
 
 
