@@ -112,6 +112,12 @@
   --area-accent-hot: var(--color-estudio-hot);
 }
 
+[data-area="workshops"] {
+  --area-accent: var(--color-rosa);
+  --area-accent-soft: color-mix(in oklch, var(--color-rosa) 18%, transparent);
+  --area-accent-hot: color-mix(in oklch, var(--color-rosa) 85%, white);
+}
+
 /* ── Dark mode ─────────────────────────────────────────────
    Tokens semánticos auto-switchean con .dark en <html>.
    Amber permanece como acento en ambos modos.
