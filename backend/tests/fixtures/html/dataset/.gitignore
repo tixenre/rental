@@ -1,0 +1,7 @@
+# Dataset local de HTMLs reales (B&H / eBay / etc.) para iterar el extractor.
+# NO se commitea: copyright de terceros + peso (cada HTML 0.3-2.5 MB) + repo público.
+# Poné acá los .html que quieras usar con tools/diagnose_extractor.py.
+*.html
+*.htm
+!.gitignore
+!README.md
