@@ -148,18 +148,19 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, go]);
 
-  // El modal se ajusta al medio actual (no al revés): IG = tarjeta angosta,
-  // YouTube = 16:9 (9:16 si es Short), foto = 3:2. Así no queda un marco negro
-  // gigante alrededor de un post chico.
+  // El modal se ajusta al medio (no al revés). YouTube = 16:9 / 9:16 (el frame
+  // real del reproductor); IG = tarjeta de 480px y el embed se auto-dimensiona a
+  // la altura real del post. La FOTO no asume nada: el modal envuelve la imagen
+  // en su proporción nativa (w-fit), mostrándola lo más grande que entre.
   const isShort = current?.kind === "youtube" && /\/shorts\//.test(current.url);
   const modalWidth =
     current?.kind === "instagram"
       ? "min(94vw, 480px)"
       : current?.kind === "youtube"
         ? isShort
-          ? "min(94vw, calc(74vh * 9 / 16))"
-          : "min(94vw, calc(74vh * 16 / 9))"
-        : "min(94vw, calc(74vh * 3 / 2))"; // foto
+          ? "min(94vw, calc(82vh * 9 / 16))"
+          : "min(94vw, calc(82vh * 16 / 9))"
+        : undefined; // foto → w-fit (proporción nativa de la imagen)
 
   return (
     <div
@@ -169,7 +170,7 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
       }}
     >
       <div
-        className="relative bg-ink rounded-2xl overflow-hidden max-h-[96dvh] flex flex-col"
+        className="relative bg-ink rounded-2xl overflow-hidden max-h-[96dvh] w-fit max-w-[94vw] flex flex-col"
         style={{ width: modalWidth }}
       >
         {/* Cerrar */}
@@ -213,7 +214,7 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
             })()}
 
           {current?.kind === "instagram" && (
-            <div className="max-h-[74vh] min-h-[420px] w-full overflow-y-auto bg-background">
+            <div className="max-h-[86vh] min-h-[420px] w-full overflow-y-auto bg-background">
               <IgEmbed url={current.url} />
             </div>
           )}
@@ -222,7 +223,7 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
             <img
               src={current.url_avif ?? current.url}
               alt={trabajo.titulo}
-              className="max-h-[74vh] w-full object-contain"
+              className="block max-h-[82vh] max-w-[94vw]"
             />
           )}
 
