@@ -603,7 +603,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
   );
 }
 
-function DragGallery({ photos }: { photos: Photo[] }) {
+function DragGallery({ photos, compact = false }: { photos: Photo[]; compact?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(true);
@@ -653,8 +653,9 @@ function DragGallery({ photos }: { photos: Photo[] }) {
     drag.current.active = false;
   };
 
-  const arrowCls =
-    "absolute top-1/2 -translate-y-1/2 hidden lg:grid h-10 w-10 place-items-center rounded-full bg-background/90 border hairline backdrop-blur shadow-sm transition";
+  const arrowCls = compact
+    ? "absolute top-1/2 -translate-y-1/2 hidden lg:grid h-9 w-9 place-items-center rounded-full bg-black/55 hover:bg-black/75 text-background transition"
+    : "absolute top-1/2 -translate-y-1/2 hidden lg:grid h-10 w-10 place-items-center rounded-full bg-background/90 border hairline backdrop-blur shadow-sm transition";
 
   return (
     <div className="relative">
@@ -664,12 +665,20 @@ function DragGallery({ photos }: { photos: Photo[] }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none touch-pan-x"
+        className={cn(
+          "flex gap-3 overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none touch-pan-x",
+          compact
+            ? "px-4 pb-4 pt-5 scroll-pl-4"
+            : "px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12",
+        )}
       >
         {photos.map((photo, i) => (
           <div
             key={photo.src}
-            className="snap-start shrink-0 basis-[86%] sm:basis-[56%] lg:basis-[36%] aspect-[4/3] overflow-hidden rounded-xl bg-surface"
+            className={cn(
+              "snap-start shrink-0 aspect-[4/3] overflow-hidden rounded-xl bg-surface",
+              compact ? "basis-[82%] sm:basis-[60%]" : "basis-[86%] sm:basis-[56%] lg:basis-[36%]",
+            )}
           >
             <img
               src={photo.src}
@@ -686,13 +695,7 @@ function DragGallery({ photos }: { photos: Photo[] }) {
         onClick={() => scrollBy(-1)}
         disabled={!canPrev}
         aria-label="Foto anterior"
-        className={cn(
-          arrowCls,
-          "left-3",
-          canPrev
-            ? "hover:bg-ink hover:text-amber hover:border-ink"
-            : "opacity-0 pointer-events-none",
-        )}
+        className={cn(arrowCls, "left-3", !canPrev && "opacity-0 pointer-events-none")}
       >
         <ArrowLeft className="h-4 w-4" />
       </button>
@@ -701,13 +704,7 @@ function DragGallery({ photos }: { photos: Photo[] }) {
         onClick={() => scrollBy(1)}
         disabled={!canNext}
         aria-label="Foto siguiente"
-        className={cn(
-          arrowCls,
-          "right-3",
-          canNext
-            ? "hover:bg-ink hover:text-amber hover:border-ink"
-            : "opacity-0 pointer-events-none",
-        )}
+        className={cn(arrowCls, "right-3", !canNext && "opacity-0 pointer-events-none")}
       >
         <ArrowRight className="h-4 w-4" />
       </button>
@@ -801,11 +798,6 @@ function EstudioPage() {
     [data?.fotos],
   );
   const heroPhoto = photos.find((p) => p.hero) ?? photos[0];
-  const galleryPhotos = photos.filter((p) => !p.hero);
-  const cicloramaPhoto =
-    photos.find((p) => p.ciclorama) ??
-    photos.find((p) => p.alt?.toLowerCase().includes("ciclo")) ??
-    photos[2];
 
   const [withPack, setWithPack] = useState(false);
 
@@ -889,25 +881,7 @@ function EstudioPage() {
           )}
         </div>
 
-        {/* ── Galería arrastrable ───────────────────────────────────── */}
-        <section className="border-t hairline pt-10 pb-12">
-          <div className="mb-5 flex items-end justify-between gap-3 px-4 lg:px-12">
-            <div>
-              <h2 className="font-display font-black lowercase text-[clamp(1.75rem,4vw,2.5rem)] leading-[0.92]">
-                el espacio.
-              </h2>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                Deslizá para ver el estudio completo.
-              </p>
-            </div>
-            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums shrink-0">
-              {photos.length} fotos
-            </span>
-          </div>
-          <DragGallery photos={galleryPhotos.length > 0 ? galleryPhotos : photos} />
-        </section>
-
-        {/* ── Ciclorama — split editorial ink ──────────────────────── */}
+        {/* ── Ciclorama + galería — split editorial ink ────────────── */}
         <section className="grid lg:grid-cols-2">
           {/* Texto — ink */}
           <div className="relative overflow-hidden bg-ink px-[clamp(1.5rem,4vw,3.5rem)] py-[clamp(2.5rem,5vw,4.5rem)] flex flex-col justify-center">
@@ -957,15 +931,12 @@ function EstudioPage() {
               </Button>
             </div>
           </div>
-          {/* Foto ciclorama */}
-          <div className="min-h-72 lg:min-h-0 overflow-hidden">
-            {cicloramaPhoto && (
-              <img
-                src={cicloramaPhoto.src}
-                alt="Ciclorama 6×6 m"
-                loading="lazy"
-                className="h-full w-full object-cover block"
-              />
+          {/* Galería del espacio */}
+          <div className="min-h-72 lg:min-h-0 flex flex-col justify-center overflow-hidden bg-ink border-t lg:border-t-0 lg:border-l border-background/10">
+            {photos.length > 0 ? (
+              <DragGallery photos={photos} compact />
+            ) : (
+              <div className="flex-1" />
             )}
           </div>
         </section>
