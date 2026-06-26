@@ -1311,7 +1311,37 @@ def _primer_dia_semana(year: int, month: int, dia_semana: int) -> datetime:
     return base + timedelta(days=offset)
 
 
-def _slot_bloqueante(conn, fecha_desde, fecha_hasta) -> Optional[str]:
+# Namespace del advisory lock para operaciones que validan+escriben en el estudio
+# (slots y talleres). Privado de este flujo; evita colisión con el NS de pedidos.
+_ADVISORY_NS_ESTUDIO = 5390413
+
+
+def _sesiones_de_slot(slot: dict) -> list:
+    """Genera todas las fechas con `dia_semana` en el rango de meses del slot,
+    como lista de dicts {fecha, hora_inicio, hora_fin}. Usada para validar
+    disponibilidad antes de crear o editar un slot."""
+    y0, m0 = int(slot["mes_desde"][:4]), int(slot["mes_desde"][5:7])
+    y1, m1 = int(slot["mes_hasta"][:4]), int(slot["mes_hasta"][5:7])
+    import calendar as _cal
+    sesiones = []
+    cur = (y0, m0)
+    while cur <= (y1, m1):
+        y, m = cur
+        _, last_day = _cal.monthrange(y, m)
+        d = _primer_dia_semana(y, m, slot["dia_semana"]).date()
+        while d.month == m:
+            sesiones.append({
+                "fecha": d,
+                "hora_inicio": slot["hora_desde"],
+                "hora_fin": slot["hora_hasta"],
+            })
+            d = d + timedelta(weeks=1)
+        cur = (y + 1, 1) if m == 12 else (y, m + 1)
+    return sesiones
+
+
+def _slot_bloqueante(conn, fecha_desde, fecha_hasta,
+                     exclude_slot_id: Optional[int] = None) -> Optional[str]:
     """Si la franja cae en un slot fijo activo (mismo día de semana, dentro del
     rango de meses y con solape horario), devuelve el `cliente` del slot. Regla
     del slot — NO usa el motor de reservas."""
@@ -1325,17 +1355,89 @@ def _slot_bloqueante(conn, fecha_desde, fecha_hasta) -> Optional[str]:
     fin = int((fecha_hasta - dia_base).total_seconds() // 60)
     rows = conn.execute(
         """
-        SELECT cliente, hora_desde, hora_hasta
+        SELECT id, cliente, hora_desde, hora_hasta
         FROM estudio_slots_fijos
         WHERE activo = TRUE AND dia_semana = ?
           AND mes_desde <= ? AND mes_hasta >= ?
+          AND (? IS NULL OR id != ?)
         """,
-        (dia, mes, mes),
+        (dia, mes, mes, exclude_slot_id, exclude_slot_id),
     ).fetchall()
     for r in rows:
         if ini < r["hora_hasta"] * 60 and fin > r["hora_desde"] * 60:
             return r["cliente"]
     return None
+
+
+def _taller_bloqueante(conn, fecha_desde, fecha_hasta,
+                       exclude_taller_id: Optional[int] = None) -> Optional[str]:
+    """Si la franja solapa una sesión de un taller activo, devuelve el nombre del
+    taller. Compara contra la fecha literal — no deriva weekday ni rango.
+    Minutos desde medianoche (igual que _slot_bloqueante; hora_fin=24 OK)."""
+    dia = fecha_desde.date()
+    dia_base = fecha_desde.replace(hour=0, minute=0, second=0, microsecond=0)
+    ini = int((fecha_desde - dia_base).total_seconds() // 60)
+    fin = int((fecha_hasta - dia_base).total_seconds() // 60)
+    rows = conn.execute(
+        """
+        SELECT t.nombre, s.hora_inicio, s.hora_fin
+        FROM taller_sesiones s
+        JOIN talleres t ON t.id = s.taller_id
+        WHERE t.activo = TRUE
+          AND s.fecha = ?
+          AND (? IS NULL OR t.id != ?)
+        """,
+        (dia, exclude_taller_id, exclude_taller_id),
+    ).fetchall()
+    for r in rows:
+        if ini < r["hora_fin"] * 60 and fin > r["hora_inicio"] * 60:
+            return r["nombre"]
+    return None
+
+
+def _estudio_disponible(conn, estudio, fecha_desde, fecha_hasta,
+                        exclude_pedido_id: Optional[int] = None,
+                        exclude_taller_id: Optional[int] = None,
+                        exclude_slot_id: Optional[int] = None) -> tuple:
+    """Engine de lectura unificada. Orden: slot → taller → centinela.
+    Devuelve (True, None) si libre; (False, motivo) si ocupado."""
+    s = _slot_bloqueante(conn, fecha_desde, fecha_hasta, exclude_slot_id=exclude_slot_id)
+    if s:
+        return False, f"slot fijo «{s}»"
+    t = _taller_bloqueante(conn, fecha_desde, fecha_hasta, exclude_taller_id=exclude_taller_id)
+    if t:
+        return False, f"taller «{t}»"
+    if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
+                            estudio["buffer_horas"], exclude_pedido_id=exclude_pedido_id):
+        return False, "ya reservado en esa franja"
+    return True, None
+
+
+def verificar_sesiones_disponibles(conn, estudio, sesiones: list,
+                                   exclude_pedido_id: Optional[int] = None,
+                                   exclude_taller_id: Optional[int] = None,
+                                   exclude_slot_id: Optional[int] = None) -> None:
+    """Valida cada sesión futura contra _estudio_disponible. Lanza 409 al primer
+    conflicto. Usada por talleres (sesiones explícitas) y slots (sesiones generadas)."""
+    hoy = now_ar().date()
+    for s in sesiones:
+        if s["fecha"] < hoy:
+            continue
+        base = datetime(s["fecha"].year, s["fecha"].month, s["fecha"].day)
+        desde = base + timedelta(hours=s["hora_inicio"])
+        hasta = base + timedelta(hours=s["hora_fin"])
+        libre, motivo = _estudio_disponible(
+            conn, estudio, desde, hasta,
+            exclude_pedido_id=exclude_pedido_id,
+            exclude_taller_id=exclude_taller_id,
+            exclude_slot_id=exclude_slot_id,
+        )
+        if not libre:
+            raise HTTPException(
+                409,
+                f"El estudio no está libre el "
+                f"{s['fecha'].strftime('%d/%m/%Y')} de {s['hora_inicio']} a {s['hora_fin']} hs: {motivo}",
+            )
 
 
 def _regenerar_pedidos_slot(conn, slot: dict) -> None:
@@ -1427,6 +1529,10 @@ def estudio_disponibilidad(
         slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
         if slot_cliente:
             return {"libre": False, "motivo": f"Reservado: {slot_cliente}", "pack": []}
+
+        taller_nombre = _taller_bloqueante(conn, fecha_desde, fecha_hasta)
+        if taller_nombre:
+            return {"libre": False, "motivo": f"Taller: {taller_nombre}", "pack": []}
 
         if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
                                 estudio["buffer_horas"]):
@@ -1522,6 +1628,10 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
             slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
             if slot_cliente:
                 raise HTTPException(409, f"Esa franja está reservada de forma fija ({slot_cliente})")
+
+            taller_nombre = _taller_bloqueante(conn, fecha_desde, fecha_hasta)
+            if taller_nombre:
+                raise HTTPException(409, f"Esa franja está reservada para el taller «{taller_nombre}»")
 
             con_pack = bool(body.con_pack) and bool(estudio["pack_activo"])
             monto_total = (estudio["precio_hora"] or 0) * body.horas
@@ -1658,6 +1768,12 @@ def crear_slot(body: SlotFijoCreate, request: Request):
     _validar_slot(data)
     with get_db() as conn:
         try:
+            estudio = _get_estudio_row(conn)
+            if not estudio["equipo_id"]:
+                raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+            conn.execute("SELECT pg_advisory_xact_lock(?, ?)", (_ADVISORY_NS_ESTUDIO, 1))
+            if data.get("activo", True):
+                verificar_sesiones_disponibles(conn, estudio, _sesiones_de_slot(data))
             cur = conn.execute(
                 """
                 INSERT INTO estudio_slots_fijos
@@ -1686,6 +1802,15 @@ def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
             actual = _get_slot(conn, slot_id)
             merged = {**actual, **updates}
             _validar_slot(merged)
+            estudio = _get_estudio_row(conn)
+            if not estudio["equipo_id"]:
+                raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+            conn.execute("SELECT pg_advisory_xact_lock(?, ?)", (_ADVISORY_NS_ESTUDIO, 1))
+            if merged.get("activo", True):
+                verificar_sesiones_disponibles(
+                    conn, estudio, _sesiones_de_slot(merged),
+                    exclude_slot_id=slot_id,
+                )
             if updates:
                 updates["updated_at"] = now_ar()
                 set_parts = ", ".join(f"{k} = ?" for k in updates)

@@ -3,17 +3,22 @@ routes/talleres.py — Workshops públicos: listing, detalle, upload comprobante
 inscripción + notificaciones por email. Vista admin: inscripciones + edición de contenido.
 """
 
+import csv
+import io
 import logging
 import time
 import uuid
+from datetime import date as _date
 
 import json as _json
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr
 
 from admin_guard import require_admin
 from database import get_db, now_ar
+from dataio.slug import slugify, slug_unico
 from services.email import send_email
 from services.email.service import get_admin_to
 from services.media.models import DeriveSpec
@@ -77,7 +82,19 @@ def _edicion_lite(row) -> dict:
     }
 
 
-def _taller_to_dict(row) -> dict:
+def _get_sesiones(conn, taller_id: int) -> list:
+    rows = conn.execute(
+        "SELECT fecha, hora_inicio, hora_fin FROM taller_sesiones "
+        "WHERE taller_id = %s ORDER BY fecha, hora_inicio",
+        (taller_id,),
+    ).fetchall()
+    return [
+        {"fecha": str(r["fecha"]), "hora_inicio": r["hora_inicio"], "hora_fin": r["hora_fin"]}
+        for r in rows
+    ]
+
+
+def _taller_to_dict(row, sesiones=None) -> dict:
     keys = row.keys()
     return {
         "id": row["id"],
@@ -103,10 +120,14 @@ def _taller_to_dict(row) -> dict:
         "pago_cbu": row["pago_cbu"],
         "pago_banco": row["pago_banco"],
         "direccion": row["direccion"],
+        "activo": bool(row["activo"]) if "activo" in keys else True,
+        "tipo_taller": row["tipo_taller"] if "tipo_taller" in keys else "intensivo",
+        "notif_email": row["notif_email"] if "notif_email" in keys else "",
         "instructor_foto_url": row["instructor_foto_url"] if "instructor_foto_url" in keys else "",
         "instructor_media_id": row["instructor_media_id"] if "instructor_media_id" in keys else None,
         "numero_edicion": row["numero_edicion"] if "numero_edicion" in keys else 1,
         "proxima_edicion_slug": row["proxima_edicion_slug"] if "proxima_edicion_slug" in keys else "",
+        "sesiones": sesiones if sesiones is not None else [],
     }
 
 
@@ -119,7 +140,7 @@ def list_talleres():
         rows = conn.execute(
             "SELECT * FROM talleres WHERE activo = TRUE ORDER BY fecha_inicio"
         ).fetchall()
-    return [_taller_to_dict(r) for r in rows]
+        return [_taller_to_dict(r, _get_sesiones(conn, r["id"])) for r in rows]
 
 
 @router.get("/talleres/{slug}")
@@ -127,7 +148,7 @@ def get_taller(slug: str):
     """Detalle de un taller. Incluye proxima_edicion y edicion_anterior si existen."""
     with get_db() as conn:
         row = _get_taller(conn, slug)
-        d = _taller_to_dict(row)
+        d = _taller_to_dict(row, _get_sesiones(conn, row["id"]))
         # Proxima edicion
         if d["proxima_edicion_slug"]:
             pr = conn.execute(
@@ -212,38 +233,47 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
         raise HTTPException(400, "Nombre, email y teléfono son obligatorios")
 
     with get_db() as conn:
-        taller = _get_taller(conn, slug)
+        try:
+            taller = _get_taller(conn, slug)
+            taller_id = taller["id"]
+            # FOR UPDATE serializa el conteo de cupos (evita sobreventa en inscripciones concurrentes).
+            locked = conn.execute(
+                "SELECT cupos_total, cupos_confirmados FROM talleres WHERE id = %s FOR UPDATE",
+                (taller_id,),
+            ).fetchone()
+            en_lista = locked["cupos_confirmados"] >= locked["cupos_total"]
 
-        en_lista = taller["cupos_confirmados"] >= taller["cupos_total"]
-
-        cur = conn.execute(
-            """
-            INSERT INTO taller_inscripciones
-                (taller_id, nombre, email, telefono, experiencia,
-                 comprobante_url, comprobante_key, en_lista_espera)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, created_at
-            """,
-            (
-                taller["id"],
-                nombre,
-                email,
-                telefono,
-                body.experiencia or None,
-                body.comprobante_url or None,
-                body.comprobante_key or None,
-                en_lista,
-            ),
-        )
-        row = cur.fetchone()
-        inscripcion_id = row["id"]
-
-        if not en_lista:
-            conn.execute(
-                "UPDATE talleres SET cupos_confirmados = cupos_confirmados + 1 WHERE id = %s",
-                (taller["id"],),
+            cur = conn.execute(
+                """
+                INSERT INTO taller_inscripciones
+                    (taller_id, nombre, email, telefono, experiencia,
+                     comprobante_url, comprobante_key, en_lista_espera)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, created_at
+                """,
+                (
+                    taller_id,
+                    nombre,
+                    email,
+                    telefono,
+                    body.experiencia or None,
+                    body.comprobante_url or None,
+                    body.comprobante_key or None,
+                    en_lista,
+                ),
             )
-        conn.commit()
+            row = cur.fetchone()
+            inscripcion_id = row["id"]
+
+            if not en_lista:
+                conn.execute(
+                    "UPDATE talleres SET cupos_confirmados = cupos_confirmados + 1 WHERE id = %s",
+                    (taller_id,),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
     nombre_pila = nombre.split()[0]
     fecha_str = now_ar().strftime("%-d de %B de %Y, %H:%M hs")
@@ -289,35 +319,180 @@ def crear_inscripcion(slug: str, body: InscripcionBody):
 FOTO_MAX_MB = 8
 
 
+class SesionBody(BaseModel):
+    fecha: str  # YYYY-MM-DD
+    hora_inicio: int
+    hora_fin: int
+
+
+class TallerCreateBody(BaseModel):
+    nombre: str
+    tipo_taller: str = "intensivo"
+    instructor_nombre: str
+    sesiones: list[SesionBody]
+    cupos_total: int = 12
+    precio_total: int = 0
+    precio_sena: int = 0
+    subtitulo: str = ""
+    descripcion: str = ""
+    publico_objetivo: str = ""
+    instructor_bio: str = ""
+    instructor_proyectos: str = ""
+    horario: str = ""
+    pago_alias: str = ""
+    pago_cbu: str = ""
+    pago_banco: str = ""
+    direccion: str = ""
+    notif_email: str = ""
+    activo: bool = True
+
+
 class TallerUpdateBody(BaseModel):
     nombre: str | None = None
     subtitulo: str | None = None
     descripcion: str | None = None
     publico_objetivo: str | None = None
+    instructor_nombre: str | None = None
     instructor_bio: str | None = None
     instructor_proyectos: str | None = None
     programa_teorica: list[str] | None = None
     programa_practica: list[str] | None = None
+    tipo_taller: str | None = None
+    horario: str | None = None
     precio_total: int | None = None
     precio_sena: int | None = None
     cupos_total: int | None = None
+    pago_alias: str | None = None
+    pago_cbu: str | None = None
+    pago_banco: str | None = None
+    direccion: str | None = None
+    notif_email: str | None = None
+    activo: bool | None = None
+    proxima_edicion_slug: str | None = None
+    sesiones: list[SesionBody] | None = None
+
+
+def _validar_sesiones(sesiones: list) -> list[dict]:
+    """Valida y normaliza una lista de SesionBody/dicts. Devuelve lista de dicts con
+    `fecha` como date object. Lanza 400 si hay errores."""
+    if not sesiones:
+        raise HTTPException(400, "Debe tener al menos una sesión")
+    from datetime import date as _dt_date
+    result = []
+    seen = set()
+    for s in sesiones:
+        fecha_str = s.fecha if hasattr(s, "fecha") else s["fecha"]
+        h_ini = s.hora_inicio if hasattr(s, "hora_inicio") else s["hora_inicio"]
+        h_fin = s.hora_fin if hasattr(s, "hora_fin") else s["hora_fin"]
+        try:
+            fecha = _dt_date.fromisoformat(fecha_str)
+        except (ValueError, TypeError):
+            raise HTTPException(400, f"Fecha inválida: {fecha_str}")
+        if not (0 <= h_ini < h_fin <= 24):
+            raise HTTPException(400, f"Horas inválidas en {fecha_str}: {h_ini}-{h_fin}")
+        key = (fecha, h_ini, h_fin)
+        if key in seen:
+            raise HTTPException(400, f"Sesión duplicada: {fecha_str} {h_ini}-{h_fin}")
+        seen.add(key)
+        result.append({"fecha": fecha, "hora_inicio": h_ini, "hora_fin": h_fin})
+    return result
 
 
 @router.get("/admin/talleres")
 def admin_list_talleres(request: Request):
-    """Lista todos los talleres (admin)."""
+    """Lista todos los talleres (admin), incluyendo inactivos y sesiones."""
     require_admin(request)
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM talleres ORDER BY fecha_inicio DESC"
         ).fetchall()
-    return [_taller_to_dict(r) for r in rows]
+        return [_taller_to_dict(r, _get_sesiones(conn, r["id"])) for r in rows]
+
+
+@router.post("/admin/talleres", status_code=201)
+def admin_create_taller(body: TallerCreateBody, request: Request):
+    """Crea un nuevo taller con sus sesiones. Valida disponibilidad del estudio."""
+    require_admin(request)
+    sesiones = _validar_sesiones(body.sesiones)
+    if body.precio_sena > body.precio_total:
+        raise HTTPException(400, "La seña no puede superar el precio total")
+    if body.cupos_total < 1:
+        raise HTTPException(400, "cupos_total debe ser al menos 1")
+    if body.tipo_taller not in ("intensivo", "semanal"):
+        raise HTTPException(400, "tipo_taller debe ser 'intensivo' o 'semanal'")
+
+    from routes.estudio import verificar_sesiones_disponibles, _get_estudio_row, _ADVISORY_NS_ESTUDIO
+
+    with get_db() as conn:
+        try:
+            # Slug único
+            base_slug = slugify(body.nombre)
+            ocupados = {r["slug"] for r in conn.execute("SELECT slug FROM talleres").fetchall()}
+            slug = slug_unico(base_slug, ocupados)
+
+            estudio = _get_estudio_row(conn)
+            if estudio["equipo_id"]:
+                conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
+                verificar_sesiones_disponibles(conn, estudio, sesiones)
+
+            fechas = [s["fecha"] for s in sesiones]
+            fecha_inicio = min(fechas)
+            fecha_fin = max(fechas)
+
+            cur = conn.execute(
+                """
+                INSERT INTO talleres (
+                    slug, nombre, subtitulo, tipo_taller,
+                    instructor_nombre, instructor_bio, instructor_proyectos,
+                    descripcion, publico_objetivo,
+                    programa_teorica, programa_practica,
+                    fecha_inicio, fecha_fin, horario,
+                    cupos_total, precio_total, precio_sena,
+                    pago_alias, pago_cbu, pago_banco,
+                    direccion, notif_email, activo
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s::jsonb, %s::jsonb,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                ) RETURNING id
+                """,
+                (
+                    slug, body.nombre.strip(), body.subtitulo.strip(), body.tipo_taller,
+                    body.instructor_nombre.strip(), body.instructor_bio.strip(),
+                    body.instructor_proyectos.strip(),
+                    body.descripcion.strip(), body.publico_objetivo.strip(),
+                    _json.dumps([], ensure_ascii=False), _json.dumps([], ensure_ascii=False),
+                    fecha_inicio, fecha_fin, body.horario.strip(),
+                    body.cupos_total, body.precio_total, body.precio_sena,
+                    body.pago_alias.strip(), body.pago_cbu.strip(), body.pago_banco.strip(),
+                    body.direccion.strip(), body.notif_email.strip(), body.activo,
+                ),
+            )
+            taller_id = cur.fetchone()["id"]
+
+            for s in sesiones:
+                conn.execute(
+                    "INSERT INTO taller_sesiones (taller_id, fecha, hora_inicio, hora_fin) "
+                    "VALUES (%s, %s, %s, %s)",
+                    (taller_id, s["fecha"], s["hora_inicio"], s["hora_fin"]),
+                )
+            conn.commit()
+            row = conn.execute("SELECT * FROM talleres WHERE id = %s", (taller_id,)).fetchone()
+        except Exception:
+            conn.rollback()
+            raise
+    return _taller_to_dict(row, [
+        {"fecha": str(s["fecha"]), "hora_inicio": s["hora_inicio"], "hora_fin": s["hora_fin"]}
+        for s in sesiones
+    ])
 
 
 @router.patch("/admin/talleres/{taller_id}")
 def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request):
-    """Actualiza campos editables del taller (descripción, textos, programa)."""
+    """Actualiza campos del taller. Si vienen sesiones, reemplaza todas y revalida disponibilidad."""
     require_admin(request)
+    from routes.estudio import verificar_sesiones_disponibles, _get_estudio_row, _ADVISORY_NS_ESTUDIO
+
     sets = []
     params: list = []
     if body.nombre is not None:
@@ -328,6 +503,8 @@ def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request
         sets.append("descripcion = %s"); params.append(body.descripcion.strip())
     if body.publico_objetivo is not None:
         sets.append("publico_objetivo = %s"); params.append(body.publico_objetivo.strip())
+    if body.instructor_nombre is not None:
+        sets.append("instructor_nombre = %s"); params.append(body.instructor_nombre.strip())
     if body.instructor_bio is not None:
         sets.append("instructor_bio = %s"); params.append(body.instructor_bio.strip())
     if body.instructor_proyectos is not None:
@@ -338,26 +515,131 @@ def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request
     if body.programa_practica is not None:
         sets.append("programa_practica = %s::jsonb")
         params.append(_json.dumps(body.programa_practica, ensure_ascii=False))
+    if body.tipo_taller is not None:
+        if body.tipo_taller not in ("intensivo", "semanal"):
+            raise HTTPException(400, "tipo_taller debe ser 'intensivo' o 'semanal'")
+        sets.append("tipo_taller = %s"); params.append(body.tipo_taller)
+    if body.horario is not None:
+        sets.append("horario = %s"); params.append(body.horario.strip())
     if body.precio_total is not None:
         sets.append("precio_total = %s"); params.append(body.precio_total)
     if body.precio_sena is not None:
         sets.append("precio_sena = %s"); params.append(body.precio_sena)
     if body.cupos_total is not None:
         sets.append("cupos_total = %s"); params.append(body.cupos_total)
-    if not sets:
+    if body.pago_alias is not None:
+        sets.append("pago_alias = %s"); params.append(body.pago_alias.strip())
+    if body.pago_cbu is not None:
+        sets.append("pago_cbu = %s"); params.append(body.pago_cbu.strip())
+    if body.pago_banco is not None:
+        sets.append("pago_banco = %s"); params.append(body.pago_banco.strip())
+    if body.direccion is not None:
+        sets.append("direccion = %s"); params.append(body.direccion.strip())
+    if body.notif_email is not None:
+        sets.append("notif_email = %s"); params.append(body.notif_email.strip())
+    if body.activo is not None:
+        sets.append("activo = %s"); params.append(body.activo)
+    if body.proxima_edicion_slug is not None:
+        val = body.proxima_edicion_slug.strip()
+        if val:
+            # Validar que exista y no sea autoreferencia
+            row_check = conn_check = None
+            with get_db() as _c:
+                me = _c.execute("SELECT slug FROM talleres WHERE id = %s", (taller_id,)).fetchone()
+                if me and me["slug"] == val:
+                    raise HTTPException(400, "proxima_edicion_slug no puede apuntar al mismo taller")
+                ref = _c.execute("SELECT id FROM talleres WHERE slug = %s", (val,)).fetchone()
+                if not ref:
+                    raise HTTPException(400, f"El taller '{val}' no existe")
+        sets.append("proxima_edicion_slug = %s"); params.append(val)
+
+    new_sesiones = None
+    if body.sesiones is not None:
+        new_sesiones = _validar_sesiones(body.sesiones)
+
+    if not sets and new_sesiones is None:
         raise HTTPException(400, "No hay campos para actualizar")
-    sets.append("updated_at = NOW()")
-    params.append(taller_id)
+
     with get_db() as conn:
-        cur = conn.execute(
-            f"UPDATE talleres SET {', '.join(sets)} WHERE id = %s RETURNING id",
-            params,
-        )
-        if cur.fetchone() is None:
-            raise HTTPException(404, "Taller no encontrado")
-        conn.commit()
-        row = conn.execute("SELECT * FROM talleres WHERE id = %s", (taller_id,)).fetchone()
-    return _taller_to_dict(row)
+        try:
+            existing = conn.execute(
+                "SELECT cupos_total, cupos_confirmados FROM talleres WHERE id = %s FOR UPDATE",
+                (taller_id,),
+            ).fetchone()
+            if existing is None:
+                raise HTTPException(404, "Taller no encontrado")
+
+            # Validar cupos si se baja
+            new_cupos = body.cupos_total if body.cupos_total is not None else existing["cupos_total"]
+            if new_cupos < existing["cupos_confirmados"]:
+                raise HTTPException(
+                    400,
+                    f"No se puede bajar cupos a {new_cupos}: hay {existing['cupos_confirmados']} confirmados",
+                )
+
+            if new_sesiones is not None:
+                estudio = _get_estudio_row(conn)
+                if estudio["equipo_id"]:
+                    conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
+                    verificar_sesiones_disponibles(
+                        conn, estudio, new_sesiones, exclude_taller_id=taller_id
+                    )
+                conn.execute("DELETE FROM taller_sesiones WHERE taller_id = %s", (taller_id,))
+                fechas = [s["fecha"] for s in new_sesiones]
+                sets.append("fecha_inicio = %s"); params.append(min(fechas))
+                sets.append("fecha_fin = %s"); params.append(max(fechas))
+                for s in new_sesiones:
+                    conn.execute(
+                        "INSERT INTO taller_sesiones (taller_id, fecha, hora_inicio, hora_fin) "
+                        "VALUES (%s, %s, %s, %s)",
+                        (taller_id, s["fecha"], s["hora_inicio"], s["hora_fin"]),
+                    )
+
+            if sets:
+                sets.append("updated_at = NOW()")
+                params.append(taller_id)
+                conn.execute(
+                    f"UPDATE talleres SET {', '.join(sets)} WHERE id = %s",
+                    params,
+                )
+
+            conn.commit()
+            row = conn.execute("SELECT * FROM talleres WHERE id = %s", (taller_id,)).fetchone()
+        except Exception:
+            conn.rollback()
+            raise
+    return _taller_to_dict(row, _get_sesiones(conn, taller_id))
+
+
+@router.delete("/admin/talleres/{taller_id}", status_code=200)
+def admin_delete_taller(taller_id: int, request: Request):
+    """Elimina un taller. Falla con 409 si hay inscriptos confirmados."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            row = conn.execute(
+                "SELECT slug, cupos_confirmados FROM talleres WHERE id = %s", (taller_id,)
+            ).fetchone()
+            if row is None:
+                raise HTTPException(404, "Taller no encontrado")
+            if row["cupos_confirmados"] > 0:
+                raise HTTPException(
+                    409,
+                    f"No se puede eliminar: hay {row['cupos_confirmados']} inscripto(s) confirmado(s)",
+                )
+            slug = row["slug"]
+            conn.execute("DELETE FROM talleres WHERE id = %s", (taller_id,))
+            # Limpiar referencias de proxima_edicion_slug que apuntaban a este taller
+            conn.execute(
+                "UPDATE talleres SET proxima_edicion_slug = '' "
+                "WHERE proxima_edicion_slug = %s",
+                (slug,),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return {"ok": True}
 
 
 _INSTRUCTOR_SPECS = [
@@ -434,3 +716,146 @@ def admin_list_inscripciones(taller_id: int, request: Request):
         }
         for r in rows
     ]
+
+
+@router.get("/admin/talleres/{taller_id}/inscripciones/export-csv")
+def admin_export_inscripciones_csv(taller_id: int, request: Request):
+    """Descarga CSV de inscriptos de un taller."""
+    require_admin(request)
+    with get_db() as conn:
+        taller_row = conn.execute(
+            "SELECT nombre, slug FROM talleres WHERE id = %s", (taller_id,)
+        ).fetchone()
+        if taller_row is None:
+            raise HTTPException(404, "Taller no encontrado")
+        rows = conn.execute(
+            """
+            SELECT nombre, email, telefono, experiencia,
+                   en_lista_espera, created_at
+            FROM taller_inscripciones
+            WHERE taller_id = %s
+            ORDER BY en_lista_espera, created_at
+            """,
+            (taller_id,),
+        ).fetchall()
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["nombre", "email", "telefono", "experiencia", "estado", "inscripto_at"])
+    for r in rows:
+        estado = "lista espera" if r["en_lista_espera"] else "confirmado"
+        w.writerow([
+            r["nombre"], r["email"], r["telefono"],
+            r["experiencia"] or "",
+            estado,
+            r["created_at"].isoformat() if r["created_at"] else "",
+        ])
+    csv_bytes = buf.getvalue().encode("utf-8-sig")
+    filename = f"inscriptos-{taller_row['slug']}.csv"
+    return StreamingResponse(
+        iter([csv_bytes]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.delete("/admin/talleres/{taller_id}/inscripciones/{ins_id}", status_code=200)
+def admin_delete_inscripcion(taller_id: int, ins_id: int, request: Request):
+    """Elimina una inscripción. Si era confirmada, decrementa cupos_confirmados."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            ins = conn.execute(
+                "SELECT id, en_lista_espera FROM taller_inscripciones "
+                "WHERE id = %s AND taller_id = %s",
+                (ins_id, taller_id),
+            ).fetchone()
+            if ins is None:
+                raise HTTPException(404, "Inscripción no encontrada")
+            conn.execute("DELETE FROM taller_inscripciones WHERE id = %s", (ins_id,))
+            if not ins["en_lista_espera"]:
+                conn.execute(
+                    "UPDATE talleres SET cupos_confirmados = GREATEST(0, cupos_confirmados - 1) "
+                    "WHERE id = %s",
+                    (taller_id,),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return {"ok": True}
+
+
+@router.post("/admin/talleres/{taller_id}/inscripciones/{ins_id}/confirmar", status_code=200)
+def admin_confirmar_inscripcion(taller_id: int, ins_id: int, request: Request):
+    """Pasa una inscripción de lista de espera a confirmada. Falla con 400 si no hay cupo."""
+    require_admin(request)
+    with get_db() as conn:
+        try:
+            taller = conn.execute(
+                "SELECT cupos_total, cupos_confirmados FROM talleres WHERE id = %s FOR UPDATE",
+                (taller_id,),
+            ).fetchone()
+            if taller is None:
+                raise HTTPException(404, "Taller no encontrado")
+            if taller["cupos_confirmados"] >= taller["cupos_total"]:
+                raise HTTPException(400, "No hay cupos disponibles para confirmar")
+            ins = conn.execute(
+                "SELECT id, en_lista_espera FROM taller_inscripciones "
+                "WHERE id = %s AND taller_id = %s",
+                (ins_id, taller_id),
+            ).fetchone()
+            if ins is None:
+                raise HTTPException(404, "Inscripción no encontrada")
+            if not ins["en_lista_espera"]:
+                raise HTTPException(400, "La inscripción ya está confirmada")
+            conn.execute(
+                "UPDATE taller_inscripciones SET en_lista_espera = FALSE WHERE id = %s",
+                (ins_id,),
+            )
+            conn.execute(
+                "UPDATE talleres SET cupos_confirmados = cupos_confirmados + 1 WHERE id = %s",
+                (taller_id,),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return {"ok": True}
+
+
+class NotificarCambiosBody(BaseModel):
+    mensaje: str | None = None
+
+
+@router.post("/admin/talleres/{taller_id}/notificar-cambios", status_code=200)
+def admin_notificar_cambios(taller_id: int, body: NotificarCambiosBody, request: Request):
+    """Envía email de cambios a todos los inscriptos confirmados del taller."""
+    require_admin(request)
+    with get_db() as conn:
+        taller = conn.execute(
+            "SELECT nombre FROM talleres WHERE id = %s", (taller_id,)
+        ).fetchone()
+        if taller is None:
+            raise HTTPException(404, "Taller no encontrado")
+        inscriptos = conn.execute(
+            "SELECT nombre, email FROM taller_inscripciones "
+            "WHERE taller_id = %s AND en_lista_espera = FALSE",
+            (taller_id,),
+        ).fetchall()
+
+    enviados, fallidos = [], []
+    for ins in inscriptos:
+        nombre_pila = ins["nombre"].split()[0]
+        ctx = {
+            "taller_nombre": taller["nombre"],
+            "nombre_pila": nombre_pila,
+            "mensaje": body.mensaje or "",
+        }
+        try:
+            send_email("taller_cambio_datos", ins["email"], ctx)
+            enviados.append(ins["email"])
+        except Exception as e:
+            logger.warning("notificar_cambios: error enviando a %s: %s", ins["email"], e)
+            fallidos.append(ins["email"])
+
+    return {"enviados": len(enviados), "fallidos": len(fallidos)}
