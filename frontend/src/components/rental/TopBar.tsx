@@ -29,7 +29,6 @@ const SECTION_CONFIG = {
     label: "portal.",
     href: "/cliente/portal",
     bg: "bg-verde",
-    fg: "text-ink",
     ctaColor: "bg-white text-ink hover:bg-white/90",
   },
 } as const;
@@ -119,21 +118,20 @@ export function SectionLogo({
   /** Reemplaza el label por defecto del área (ej. nombre del cliente). */
   labelOverride?: string;
 }) {
-  const { label: defaultLabel, href, fg } = SECTION_CONFIG[section];
+  const { label: defaultLabel, href } = SECTION_CONFIG[section];
   const label = labelOverride ?? defaultLabel;
   return (
     <Link
       to={href}
       className="inline-flex items-center sm:items-end gap-2 sm:gap-2.5 group shrink-0"
     >
-      {/* Mobile: isologo (R) mono — color del área via currentColor */}
-      <LogoMark className={cn("sm:hidden h-10 w-10", fg)} />
+      {/* Mobile: isologo (R) mono — blanco sobre el color del área */}
+      <LogoMark className="sm:hidden text-white h-10 w-10" />
       {/* Desktop: wordmark completo */}
-      <Logo linkTo={null} size="sm" color={fg} className="max-sm:hidden" />
+      <Logo linkTo={null} size="sm" color="text-white" className="max-sm:hidden" />
       <span
         className={cn(
-          "font-display font-black lowercase leading-none text-base",
-          fg,
+          "font-display font-black lowercase leading-none text-white text-base",
           !labelMobile && "max-sm:hidden",
         )}
       >
