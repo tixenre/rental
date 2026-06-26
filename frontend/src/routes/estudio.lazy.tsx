@@ -127,31 +127,63 @@ function IgEmbed({ url }: { url: string }) {
   );
 }
 
-function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: () => void }) {
-  const media = trabajo.media ?? [];
-  const count = media.length;
-  const [idx, setIdx] = useState(0);
-  const current = media[Math.min(idx, Math.max(count - 1, 0))] ?? null;
+function TrabajoModal({
+  trabajos,
+  initialIdx,
+  onClose,
+}: {
+  trabajos: EstudioTrabajo[];
+  initialIdx: number;
+  onClose: () => void;
+}) {
+  const tCount = trabajos.length;
+  const [tIdx, setTIdx] = useState(initialIdx);
+  const [mIdx, setMIdx] = useState(0);
 
-  const go = useCallback(
-    (d: number) => setIdx((i) => (count ? (i + d + count) % count : 0)),
-    [count],
+  const trabajo = trabajos[tIdx];
+  const media = trabajo?.media ?? [];
+  const mCount = media.length;
+  const current = media[Math.min(mIdx, Math.max(mCount - 1, 0))] ?? null;
+
+  // Navegar entre medios; al llegar al borde fluye al trabajo anterior/siguiente.
+  const goMedia = useCallback(
+    (d: number) => {
+      const next = mIdx + d;
+      if (next < 0) {
+        const prevT = (tIdx - 1 + tCount) % tCount;
+        setTIdx(prevT);
+        setMIdx(Math.max((trabajos[prevT]?.media?.length ?? 1) - 1, 0));
+      } else if (next >= mCount) {
+        setTIdx((tIdx + 1) % tCount);
+        setMIdx(0);
+      } else {
+        setMIdx(next);
+      }
+    },
+    [mIdx, mCount, tIdx, tCount, trabajos],
+  );
+
+  // Saltar directamente al trabajo anterior/siguiente (botones del footer).
+  const goTrabajo = useCallback(
+    (d: number) => {
+      setTIdx((i) => (i + d + tCount) % tCount);
+      setMIdx(0);
+    },
+    [tCount],
   );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight") go(1);
-      else if (e.key === "ArrowLeft") go(-1);
+      else if (e.key === "ArrowRight") goMedia(1);
+      else if (e.key === "ArrowLeft") goMedia(-1);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, go]);
+  }, [onClose, goMedia]);
 
-  // El modal se ajusta al medio (no al revés). YouTube = 16:9 / 9:16 (el frame
-  // real del reproductor); IG = tarjeta de 480px y el embed se auto-dimensiona a
-  // la altura real del post. La FOTO no asume nada: el modal envuelve la imagen
-  // en su proporción nativa (w-fit), mostrándola lo más grande que entre.
+  // El modal se ajusta al medio. YouTube = 16:9/9:16; IG = 480px (embed nativo);
+  // Foto = w-fit (proporción real de la imagen, sin asumir nada).
   const isShort = current?.kind === "youtube" && /\/shorts\//.test(current.url);
   const modalWidth =
     current?.kind === "instagram"
@@ -215,7 +247,7 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
 
           {current?.kind === "instagram" && (
             <div className="max-h-[86vh] min-h-[420px] w-full overflow-y-auto bg-background">
-              <IgEmbed url={current.url} />
+              <IgEmbed key={current.url} url={current.url} />
             </div>
           )}
 
@@ -227,41 +259,41 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
             />
           )}
 
-          {/* Flechas */}
-          {count > 1 && (
+          {/* Flechas dentro del medio (fluyen al trabajo anterior/siguiente al llegar al borde) */}
+          {mCount > 1 && (
             <>
               <button
-                onClick={() => go(-1)}
+                onClick={() => goMedia(-1)}
                 className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
                 aria-label="Anterior"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <button
-                onClick={() => go(1)}
+                onClick={() => goMedia(1)}
                 className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
                 aria-label="Siguiente"
               >
                 <ArrowRight className="h-5 w-5" />
               </button>
               <div className="absolute top-3 left-3 z-10 rounded-full bg-black/55 px-2.5 py-1 font-mono text-2xs text-background/80">
-                {idx + 1} / {count}
+                {mIdx + 1} / {mCount}
               </div>
             </>
           )}
         </div>
 
-        {/* Puntos del carrusel */}
-        {count > 1 && (
+        {/* Puntos del carrusel de medios */}
+        {mCount > 1 && (
           <div className="flex items-center justify-center gap-1.5 py-3 bg-ink shrink-0">
             {media.map((_, i) => (
               <button
                 key={i}
-                onClick={() => setIdx(i)}
+                onClick={() => setMIdx(i)}
                 aria-label={`Ir al medio ${i + 1}`}
                 className={cn(
                   "h-1.5 rounded-full transition-all",
-                  i === idx ? "w-5 bg-amber" : "w-1.5 bg-background/25 hover:bg-background/45",
+                  i === mIdx ? "w-5 bg-amber" : "w-1.5 bg-background/25 hover:bg-background/45",
                 )}
               />
             ))}
@@ -328,6 +360,31 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
                   {trabajo.realizador_web.replace(/^https?:\/\//, "").replace(/\/$/, "")}
                 </a>
               )}
+            </div>
+          )}
+
+          {/* Navegación entre trabajos */}
+          {tCount > 1 && (
+            <div className="flex items-center justify-between pt-3 mt-1 border-t border-background/10">
+              <button
+                onClick={() => goTrabajo(-1)}
+                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
+                aria-label="Trabajo anterior"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                anterior
+              </button>
+              <span className="font-mono text-2xs text-background/25 tabular-nums">
+                {tIdx + 1} / {tCount}
+              </span>
+              <button
+                onClick={() => goTrabajo(1)}
+                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
+                aria-label="Trabajo siguiente"
+              >
+                siguiente
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           )}
         </div>
@@ -442,7 +499,7 @@ function TrabajoCard({ trabajo, onOpen }: { trabajo: EstudioTrabajo; onOpen: () 
 
 function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
   const [filtro, setFiltro] = useState<string | null>(null);
-  const [selected, setSelected] = useState<EstudioTrabajo | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef({ active: false, startX: 0, startScroll: 0, moved: false });
 
@@ -524,18 +581,24 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
         onPointerLeave={onPointerUp}
         className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none"
       >
-        {visibles.map((trabajo) => (
+        {visibles.map((trabajo, i) => (
           <TrabajoCard
             key={trabajo.id}
             trabajo={trabajo}
             onOpen={() => {
-              if (!drag.current.moved) setSelected(trabajo);
+              if (!drag.current.moved) setSelectedIdx(i);
             }}
           />
         ))}
       </div>
 
-      {selected && <TrabajoModal trabajo={selected} onClose={() => setSelected(null)} />}
+      {selectedIdx !== null && (
+        <TrabajoModal
+          trabajos={visibles}
+          initialIdx={selectedIdx}
+          onClose={() => setSelectedIdx(null)}
+        />
+      )}
     </section>
   );
 }
