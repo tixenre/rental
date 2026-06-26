@@ -950,3 +950,132 @@ def admin_storage_diag(request: Request):
         return {"ok": False, "vars": vars_status, "tested": True, "error": e.detail}
     except Exception as e:
         return {"ok": False, "vars": vars_status, "tested": True, "error": str(e)}
+
+
+# ── Stream B: enriquecer-from-html (hermano JSON de upload-html-source) ──────
+#
+# Acepta el HTML crudo como string en el body (JSON). No guarda nada en R2
+# ni en la BD — solo corre el extractor y devuelve AutocompletarResult.
+# El admin pega la URL de B&H en el form, Chrome MCP obtiene el rawHTML
+# y lo envía acá; el form muestra las specs para aplicar.
+
+class EnriquecerFromHtmlBody(BaseModel):
+    html: str
+    categoria_hint: Optional[str] = None
+    bh_url: Optional[str] = None  # si se pasa, se guarda en equipos.bh_url
+
+
+@router.post("/admin/equipos/{id}/enriquecer-from-html")
+def admin_enriquecer_from_html(
+    id: int,
+    body: EnriquecerFromHtmlBody,
+    request: Request,
+) -> dict:
+    """Extrae specs + foto de un HTML de B&H sin guardar nada en R2.
+
+    Hermano JSON de `upload-html-source` (mismo extractor, sin file upload).
+    El frontend pasa el rawHTML obtenido por Chrome MCP o fetch del admin;
+    el servidor corre extract_from_html y devuelve AutocompletarResult.
+
+    Si `bh_url` está presente, actualiza `equipos.bh_url` como efecto
+    secundario (datos de seguro/inventario).
+    """
+    require_admin(request)
+
+    html_content = (body.html or "").strip()
+    if not html_content:
+        raise HTTPException(400, "HTML vacío")
+    if len(html_content) > 5_000_000:
+        raise HTTPException(400, "HTML demasiado grande (máx 5MB)")
+
+    with get_db() as conn:
+        if not conn.execute("SELECT id FROM equipos WHERE id = %s", (id,)).fetchone():
+            raise HTTPException(404, "Equipo no encontrado")
+
+        if body.bh_url:
+            try:
+                conn.execute(
+                    "UPDATE equipos SET bh_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (body.bh_url.strip(), id),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+    try:
+        from services.equipo_html_extractor import extract_from_html
+        result = extract_from_html(html_content, categoria_hint=body.categoria_hint)
+    except Exception:
+        logger.exception("Error extrayendo specs del HTML (equipo %d)", id)
+        raise HTTPException(500, "No se pudo procesar el HTML")
+
+    return result
+
+
+# ── Stream B: fotos/from-urls (batch) ────────────────────────────────────────
+#
+# Permite subir múltiples fotos desde URLs en un solo call. Reutiliza
+# toda la lógica de admin_upload_foto_from_url (validate + download + store).
+
+class FotosFromUrlsBody(BaseModel):
+    urls: list[str]
+
+
+@router.post("/admin/equipos/{equipo_id}/fotos/from-urls")
+def admin_fotos_from_urls(
+    equipo_id: int,
+    body: FotosFromUrlsBody,
+    request: Request,
+) -> dict:
+    """Descarga y sube a R2 varias fotos desde URLs en batch.
+
+    Cada URL se procesa independientemente: un fallo individual no cancela
+    el resto. Devuelve {ok: [...], errors: [...]}.
+    """
+    require_admin(request)
+
+    urls = [u.strip() for u in (body.urls or []) if u.strip()]
+    if not urls:
+        raise HTTPException(400, "Lista de URLs vacía")
+    if len(urls) > 20:
+        raise HTTPException(400, "Máximo 20 URLs por llamada")
+
+    cfg_pub = (os.getenv("R2_PUBLIC_BASE") or "").rstrip("/")
+
+    ok_results: list[dict] = []
+    error_results: list[dict] = []
+
+    for url in urls:
+        # Foto ya en R2 → saltear sin error
+        if cfg_pub and url.startswith(cfg_pub + "/"):
+            ok_results.append({"url": url, "public_url": url, "skipped": True})
+            continue
+        try:
+            with media_http():
+                _validate_external_image_url(url)
+                raw_content, _raw_ctype = _download_image_bytes(url)
+
+            with get_db() as conn:
+                try:
+                    with media_http():
+                        asset = store_upload(
+                            raw_content, kind="equipo",
+                            derive_specs=EQUIPO_DERIVE_SPECS, conn=conn,
+                        )
+                    display = asset.variant("display")
+                    _insert_equipo_foto(conn, equipo_id, display.url, display.key, asset.id)
+                except Exception:
+                    conn.rollback()
+                    raise
+
+            ok_results.append({
+                "url": url,
+                "public_url": display.url,
+                "path": display.key,
+                "size": display.bytes,
+            })
+        except Exception as exc:
+            error_results.append({"url": url, "error": str(exc)})
+
+    return {"ok": ok_results, "errors": error_results}

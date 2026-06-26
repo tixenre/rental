@@ -40,6 +40,7 @@ def test_equipos_csv_header_y_specs_colapsadas():
         "categorias": "Cámaras", "cantidad": 2, "precio_jornada": 30000,
         "precio_usd": 6000.0, "dueno": "Rambla", "estado": "operativo",
         "visible_catalogo": 1, "serie": None,
+        "valor_reposicion": 1500.0, "bh_url": None,
         "fecha_compra": datetime.date(2024, 3, 15),
         "specs": "Sensor: Full-frame; Montura: E",
     }]
@@ -47,13 +48,15 @@ def test_equipos_csv_header_y_specs_colapsadas():
     assert out[0] == [
         "id", "nombre", "marca", "modelo", "categorias", "cantidad",
         "precio_jornada", "precio_usd", "dueno", "estado", "visible_catalogo",
-        "serie", "fecha_compra", "specs",
+        "serie", "valor_reposicion", "bh_url", "fecha_compra", "specs",
     ]
     fila = out[1]
     assert fila[1] == "Sony FX3"
     assert fila[11] == ""  # serie None → ''
-    assert fila[12] == "2024-03-15"  # date → ISO
-    assert fila[13] == "Sensor: Full-frame; Montura: E"
+    assert fila[12] == "1500.0"  # valor_reposicion
+    assert fila[13] == ""  # bh_url None → ''
+    assert fila[14] == "2024-03-15"  # date → ISO
+    assert fila[15] == "Sensor: Full-frame; Montura: E"
 
 
 def test_alquileres_csv_fechas_iso_y_items():

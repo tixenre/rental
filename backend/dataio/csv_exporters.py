@@ -41,7 +41,7 @@ def export_equipos_csv(conn) -> str:
     columns = [
         "id", "nombre", "marca", "modelo", "categorias", "cantidad",
         "precio_jornada", "precio_usd", "dueno", "estado", "visible_catalogo",
-        "serie", "fecha_compra", "specs",
+        "serie", "valor_reposicion", "bh_url", "fecha_compra", "specs",
     ]
     rows = conn.execute(f"""
         SELECT
@@ -53,12 +53,32 @@ def export_equipos_csv(conn) -> str:
                JOIN categorias c ON c.id = ec.categoria_id
                WHERE ec.equipo_id = e.id) AS categorias,
             e.cantidad, e.precio_jornada, e.precio_usd, e.dueno, e.estado,
-            e.visible_catalogo, e.serie, e.fecha_compra,
+            e.visible_catalogo, e.serie, e.valor_reposicion, e.bh_url, e.fecha_compra,
             (SELECT string_agg(sd.label || ': ' || es.value, '; '
                                 ORDER BY sd.prioridad, sd.label)
                FROM equipo_specs es
                JOIN spec_definitions sd ON sd.id = es.spec_def_id
                WHERE es.equipo_id = e.id) AS specs
+        FROM equipos e
+        WHERE e.eliminado_at IS NULL
+        ORDER BY e.nombre
+    """).fetchall()
+    return _csv_from_rows(columns, rows)
+
+
+def export_inventario_csv(conn) -> str:
+    """Planilla liviana para completar datos de inventario/seguro en bulk.
+
+    Solo los campos editables vía import: id (read-only, key de match),
+    nombre+marca (read-only, orientación visual), y los 4 campos editables:
+    serie, valor_reposicion, bh_url, fecha_compra.
+    """
+    columns = ["id", "nombre", "marca", "serie", "valor_reposicion", "bh_url", "fecha_compra"]
+    rows = conn.execute(f"""
+        SELECT
+            e.id, e.nombre,
+            {MARCA_SUBQUERY},
+            e.serie, e.valor_reposicion, e.bh_url, e.fecha_compra
         FROM equipos e
         WHERE e.eliminado_at IS NULL
         ORDER BY e.nombre
@@ -107,6 +127,7 @@ def export_clientes_csv(conn) -> str:
 
 CSV_EXPORTERS = {
     "equipos": export_equipos_csv,
+    "inventario": export_inventario_csv,
     "alquileres": export_alquileres_csv,
     "clientes": export_clientes_csv,
 }

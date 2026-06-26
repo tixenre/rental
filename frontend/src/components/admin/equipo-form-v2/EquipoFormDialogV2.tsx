@@ -378,6 +378,9 @@ export function EquipoFormDialogV2({
   // categoría de specs".
   const specsTouchedRef = useRef(false);
   const htmlInputRef = useRef<HTMLInputElement | null>(null);
+  const [pasteHtmlOpen, setPasteHtmlOpen] = useState(false);
+  const [pasteHtmlText, setPasteHtmlText] = useState("");
+  const [enrichingHtml, setEnrichingHtml] = useState(false);
   useEffect(() => {
     setCategoriaSpecs(initial?.categoria_specs ?? "");
     specsTouchedRef.current = false;
@@ -696,6 +699,79 @@ export function EquipoFormDialogV2({
       toast.error(`Error al subir HTML: ${e instanceof Error ? e.message : ""}`);
     } finally {
       setUploadingHtml(false);
+    }
+  };
+
+  // ════════════════════════════════════════════════════════════════════
+  // Enriquecer desde HTML pegado (JSON, no guarda en R2)
+  // ════════════════════════════════════════════════════════════════════
+  const handleEnriquecerFromHtml = async () => {
+    if (!initial?.id || !pasteHtmlText.trim()) return;
+    setEnrichingHtml(true);
+    try {
+      const r = await authedJson<{
+        specs?: { label: string; value: string; spec_key?: string }[];
+      }>(`/api/admin/equipos/${initial.id}/enriquecer-from-html`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          html: pasteHtmlText,
+          bh_url: form.getValues("bh_url") || undefined,
+          categoria_hint: categoriaRoot ?? undefined,
+        }),
+      });
+
+      const propuestos: Spec[] = withIds(r.specs ?? []);
+      if (propuestos.length > 0) {
+        const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+        const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+        for (const t of templateItems ?? []) {
+          if (t.spec_key) tmplByKey.set(t.spec_key, t);
+          if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
+        }
+        const findTmpl = (p: Spec) =>
+          (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
+          tmplByLabel.get(p.label.trim().toLowerCase());
+
+        const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
+        const requierenRevision = propuestos.filter((p) => !findTmpl(p));
+
+        if (autoAplicables.length > 0) {
+          setSpecs((prev) => {
+            const next = [...prev];
+            for (const p of autoAplicables) {
+              const tmpl = findTmpl(p)!;
+              const targetId = `spec-${tmpl.spec_def_id}`;
+              const idx = next.findIndex(
+                (x) =>
+                  x.id === targetId ||
+                  x.id === `tmpl-${tmpl.spec_def_id}` ||
+                  sameLabel(x.label, tmpl.label),
+              );
+              if (idx >= 0) {
+                next[idx] = { ...next[idx], value: p.value };
+              } else {
+                next.push({ id: targetId, label: tmpl.label, value: p.value, spec_key: p.spec_key });
+              }
+            }
+            return next;
+          });
+        }
+        if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
+
+        const parts: string[] = [];
+        if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados`);
+        if (requierenRevision.length) parts.push(`${requierenRevision.length} a revisar`);
+        toast.success("HTML procesado", { description: parts.join(" · ") });
+      } else {
+        toast.success("HTML procesado", { description: "No se extrajeron specs" });
+      }
+      setPasteHtmlOpen(false);
+      setPasteHtmlText("");
+    } catch (e) {
+      toast.error(`Error al procesar HTML: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setEnrichingHtml(false);
     }
   };
 
@@ -1116,8 +1192,51 @@ export function EquipoFormDialogV2({
                   <FileCode className="h-3 w-3" /> HTML guardado
                 </span>
               )}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setPasteHtmlOpen(true)}
+                disabled={uploadingHtml || enrichingHtml}
+              >
+                <FileCode className="h-3.5 w-3.5 mr-1" />
+                Pegar HTML
+              </Button>
             </>
           )}
+
+          {/* Modal para pegar HTML de B&H */}
+          <Dialog open={pasteHtmlOpen} onOpenChange={(v) => { setPasteHtmlOpen(v); if (!v) setPasteHtmlText(""); }}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Pegar HTML de B&H</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                Abrí la página del producto en B&H, seleccioná todo (Ctrl+A), copiá (Ctrl+C) y pegá acá.
+                Se van a extraer las specs técnicas automáticamente, sin guardar el HTML.
+              </p>
+              <Textarea
+                value={pasteHtmlText}
+                onChange={(e) => setPasteHtmlText(e.target.value)}
+                placeholder="Pegá el HTML acá…"
+                className="font-mono text-xs min-h-[200px] resize-y"
+                autoFocus
+              />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setPasteHtmlOpen(false); setPasteHtmlText(""); }}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  disabled={!pasteHtmlText.trim() || enrichingHtml}
+                  onClick={handleEnriquecerFromHtml}
+                >
+                  {enrichingHtml ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode className="h-4 w-4" />}
+                  Extraer specs
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </section>
 
@@ -1702,6 +1821,75 @@ ${fotoTag}
           <Field label="Notas internas (no se muestran al cliente)">
             <Textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} />
           </Field>
+
+          {isEdit && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const nombre = form.getValues("nombre") || initial?.nombre || "";
+                  const modelo = form.getValues("modelo") || "";
+                  const serieVal = form.getValues("serie") || "";
+                  const valorRep = form.getValues("valor_reposicion");
+                  const fotoUrl = form.getValues("foto_url") || initial?.foto_url || "";
+                  const fotoTag = fotoUrl
+                    ? `<img src="${fotoUrl.replace(/"/g, "&quot;")}" style="max-height:160px;max-width:200px;object-fit:contain;float:right;margin:0 0 8px 16px;">`
+                    : "";
+                  const specsRows = specs
+                    .filter((s) => s.value?.trim())
+                    .map(
+                      (s) =>
+                        `<tr><td class="spec-label">${s.label.replace(/</g, "&lt;")}</td><td>${s.value.replace(/</g, "&lt;")}</td></tr>`,
+                    )
+                    .join("");
+                  const contenidoRows = contenidoIncluido
+                    .map(
+                      (c) =>
+                        `<tr><td>${c.nombre.replace(/</g, "&lt;")}</td><td style="text-align:center">${c.cantidad}</td><td style="text-align:center;width:32px">☐</td></tr>`,
+                    )
+                    .join("");
+                  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<title>Inventario: ${nombre.replace(/</g, "&lt;")}</title>
+<style>
+  body { font-family: -apple-system, Helvetica, sans-serif; color: #111; padding: 24px 32px; max-width: 680px; margin: 0 auto; font-size: 13px; }
+  h2 { margin: 0 0 2px; font-size: 20px; }
+  .sub { color: #555; font-size: 12px; margin-bottom: 12px; }
+  .clearfix::after { content:""; display:table; clear:both; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #666; padding: 6px 8px; border-bottom: 2px solid #111; }
+  td { padding: 5px 8px; border-bottom: 1px solid #eee; vertical-align: middle; }
+  .spec-label { color: #555; width: 45%; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; background: #f6f6f6; border-radius: 6px; padding: 10px 14px; margin-top: 12px; }
+  .meta dt { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+  .meta dd { font-weight: 600; margin: 0; }
+  h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin: 16px 0 2px; }
+  @media print { @page { margin: 14mm; } }
+</style>
+</head><body>
+<div class="clearfix">
+${fotoTag}
+<h2>${nombre.replace(/</g, "&lt;")}</h2>
+<div class="sub">${modelo ? `Modelo: ${modelo.replace(/</g, "&lt;")}` : ""}</div>
+</div>
+<dl class="meta">
+  <div><dt>N° de serie</dt><dd>${serieVal ? serieVal.replace(/</g, "&lt;") : "—"}</dd></div>
+  <div><dt>Valor de reposición</dt><dd>${valorRep != null ? `USD ${valorRep}` : "—"}</dd></div>
+</dl>
+${specsRows ? `<h3>Specs técnicas</h3><table><tbody>${specsRows}</tbody></table>` : ""}
+${contenidoRows ? `<h3>Contenido incluido</h3><table><thead><tr><th>Ítem</th><th style="text-align:center">Cant.</th><th style="text-align:center">✓</th></tr></thead><tbody>${contenidoRows}</tbody></table>` : ""}
+<script>window.onload=function(){window.print();};</script>
+</body></html>`;
+                  const w = window.open("", "_blank", "width=760,height=700");
+                  if (w) { w.document.write(html); w.document.close(); }
+                }}
+                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground border hairline hover:text-ink hover:bg-muted/50 transition"
+              >
+                <Printer className="h-3 w-3" />
+                Ficha de inventario
+              </button>
+            </div>
+          )}
         </div>
       </CollapsibleSection>
     </>

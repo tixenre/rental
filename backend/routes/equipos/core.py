@@ -339,6 +339,10 @@ def list_equipos(
                 " AND NOT EXISTS ("
                 " SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id)"
             ),
+            "specs": (
+                " AND NOT EXISTS ("
+                " SELECT 1 FROM equipo_specs es WHERE es.equipo_id = e.id)"
+            ),
         }
         if falta in FALTA_SQL:
             base_sql += FALTA_SQL[falta]
