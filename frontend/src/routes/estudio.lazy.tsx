@@ -80,8 +80,47 @@ function mediaThumb(m: EstudioMedia): { src: string; fallback?: string } | null 
     if (id) return { src: ytThumb(id), fallback: ytThumbFallback(id) };
   }
   return null;
+}// El embed oficial de IG muestra el post completo (foto/video + descripción +
+// likes + comentarios). Usamos CSS clipping para mostrar solo el media:
+// height = 60px (header con avatar/usuario) + min(94vw,480px) * (h/w).
+// El overflow:hidden del contenedor corta lo que queda debajo del media.
+declare global {
+  interface Window {
+    instgrm?: { Embeds: { process: () => void } };
+  }
 }
+const IG_EMBED_SCRIPT = "https://www.instagram.com/embed.js";
 
+function IgEmbed({ url }: { url: string }) {
+  useEffect(() => {
+    const process = () => window.instgrm?.Embeds?.process();
+    if (window.instgrm) {
+      process();
+      return;
+    }
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${IG_EMBED_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener("load", process, { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = IG_EMBED_SCRIPT;
+    s.async = true;
+    s.addEventListener("load", process, { once: true });
+    document.body.appendChild(s);
+  }, [url]);
+
+  return (
+    <div key={url} className="w-full">
+      <blockquote
+        className="instagram-media"
+        data-instgrm-permalink={url}
+        data-instgrm-version="14"
+        style={{ width: "100%", maxWidth: "100%", minWidth: 0, margin: 0 }}
+      />
+    </div>
+  );
+}
 
 function TrabajoModal({
   trabajos,
@@ -201,46 +240,33 @@ function TrabajoModal({
               );
             })()}
 
-          {current?.kind === "instagram" && (
-            <div className="relative w-full bg-black flex items-center justify-center">
-              {current.thumbnail ? (
-                <>
-                  <img
-                    src={current.thumbnail}
-                    alt={trabajo.titulo}
-                    className="block w-full max-h-[82vh] object-contain"
-                    style={
-                      current.w && current.h
-                        ? { aspectRatio: `${current.w} / ${current.h}` }
-                        : undefined
-                    }
-                  />
-                  <a
-                    href={current.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs text-background/70 hover:text-background transition-colors"
-                    aria-label="Ver en Instagram"
-                  >
-                    <IgIcon />
-                    Ver en Instagram
-                  </a>
-                </>
-              ) : (
-                <div className="flex min-h-48 items-center justify-center">
-                  <a
-                    href={current.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-background/50 hover:text-amber transition-colors"
-                  >
-                    <IgIcon />
-                    Ver en Instagram
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
+          {current?.kind === "instagram" && (() => {
+            // Clipear a: 60px (header avatar/usuario) + ancho × relación alto/ancho.
+            // Así solo se ve el media; descripción, likes y comentarios quedan debajo
+            // del overflow:hidden y no aparecen.
+            const ar = current.w && current.h ? current.h / current.w : null;
+            const clipH = ar
+              ? `calc(min(94vw, 480px) * ${ar.toFixed(4)} + 60px)`
+              : "82vh";
+            return (
+              <div
+                className="relative w-full bg-background"
+                style={{ height: clipH, overflow: "hidden" }}
+              >
+                <IgEmbed key={current.url} url={current.url} />
+                <a
+                  href={current.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs text-background/80 hover:text-background transition-colors"
+                  aria-label="Ver en Instagram"
+                >
+                  <IgIcon />
+                  Ver en Instagram
+                </a>
+              </div>
+            );
+          })()}
 
           {current?.kind === "foto" && (
             <img

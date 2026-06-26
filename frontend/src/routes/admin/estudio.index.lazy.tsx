@@ -951,7 +951,8 @@ function TrabajoDialog({
         const meta = await trabajosAdminApi.fetchMeta(url);
         if (meta.titulo && !titulo) setTitulo(meta.titulo);
         if (meta.realizador && !realizador) setRealizador(meta.realizador);
-        if (meta.descripcion && !descripcion) setDescripcion(meta.descripcion);
+        // descripcion no se auto-rellena: el og:description de IG trae el caption
+        // con likes/menciones/hashtags que no son útiles como descripción del trabajo.
       } catch {
         /* best-effort */
       } finally {
