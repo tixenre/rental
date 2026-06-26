@@ -144,17 +144,19 @@ function LightboxSlide({
   const igAr = first?.kind === "instagram" && first.w && first.h ? first.h / first.w : null;
   // Clip IG: altura natural capped a 80dvh para no rebasar la pantalla.
   const igClipH = igAr
-    ? `min(calc(min(92vw, 520px) * ${igAr.toFixed(4)} + 260px), 80dvh)`
+    ? `min(calc(min(90vw, 640px) * ${igAr.toFixed(4)} + 260px), 80dvh)`
     : "min(70dvh, 80dvh)";
 
   return (
     <div
       data-slide-idx={idx}
       className={cn(
-        "snap-center shrink-0 flex flex-col rounded-2xl overflow-hidden transition-opacity duration-300",
-        isActive ? "opacity-100" : "opacity-40 cursor-pointer hover:opacity-60",
+        "snap-center shrink-0 flex flex-col rounded-2xl overflow-hidden transition-[opacity,transform] duration-300",
+        isActive
+          ? "opacity-100 scale-[1.08] z-10"
+          : "opacity-40 scale-[0.88] cursor-pointer hover:opacity-60",
       )}
-      style={{ width: "min(92vw, 520px)" }}
+      style={{ width: "min(90vw, 640px)" }}
       onClick={!isActive ? onActivate : undefined}
     >
       {isActive ? (
@@ -388,7 +390,7 @@ function TrabajoLightbox({
   // Los spacers al inicio/fin permiten que el primero y el último puedan
   // quedar centrados en la pantalla.
   // spacerW = (100vw - slideW) / 2 - gap/2  (gap = 12px entre items)
-  const SPACER_W = "max(0px, calc((100vw - min(92vw, 520px)) / 2 - 6px))";
+  const SPACER_W = "max(0px, calc((100vw - min(90vw, 640px)) / 2 - 6px))";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95">
