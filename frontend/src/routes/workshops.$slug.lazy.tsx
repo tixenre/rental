@@ -57,7 +57,7 @@ function EdicionBadge({
   const className = activa
     ? "inline-flex items-center gap-1.5 rounded-full border border-background/40 bg-background/15 px-3 py-1.5 text-xs font-semibold text-background"
     : soldOut
-      ? "inline-flex items-center gap-1.5 rounded-full border border-background/20 px-3 py-1.5 text-xs text-background/40 line-through-status"
+      ? "inline-flex items-center gap-1.5 rounded-full border border-background/20 px-3 py-1.5 text-xs text-background/40 line-through"
       : "inline-flex items-center gap-1.5 rounded-full border border-background/25 px-3 py-1.5 text-xs text-background/60";
 
   if (activa) {

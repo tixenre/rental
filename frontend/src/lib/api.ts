@@ -425,7 +425,7 @@ export type Taller = {
   edicion_anterior?: EdicionLite | null;
   activo: boolean;
   tipo_taller: string;
-  notif_email: boolean;
+  notif_email: string;
   sesiones: Sesion[];
 };
 

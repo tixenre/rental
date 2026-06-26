@@ -16,6 +16,7 @@ from pydantic import BaseModel, EmailStr
 
 from admin_guard import require_admin
 from database import get_db, now_ar
+from rate_limit import limiter
 from dataio.slug import slugify, slug_unico
 from services.email import send_email
 from services.email.service import get_admin_to
@@ -92,9 +93,9 @@ def _get_sesiones(conn, taller_id: int) -> list:
     ]
 
 
-def _taller_to_dict(row, sesiones=None) -> dict:
+def _taller_to_dict(row, sesiones=None, admin=False) -> dict:
     keys = row.keys()
-    return {
+    d = {
         "id": row["id"],
         "slug": row["slug"],
         "nombre": row["nombre"],
@@ -120,13 +121,15 @@ def _taller_to_dict(row, sesiones=None) -> dict:
         "direccion": row["direccion"],
         "activo": bool(row["activo"]) if "activo" in keys else True,
         "tipo_taller": row["tipo_taller"] if "tipo_taller" in keys else "intensivo",
-        "notif_email": row["notif_email"] if "notif_email" in keys else "",
         "instructor_foto_url": row["instructor_foto_url"] if "instructor_foto_url" in keys else "",
         "instructor_media_id": row["instructor_media_id"] if "instructor_media_id" in keys else None,
         "numero_edicion": row["numero_edicion"] if "numero_edicion" in keys else 1,
         "proxima_edicion_slug": row["proxima_edicion_slug"] if "proxima_edicion_slug" in keys else "",
         "sesiones": sesiones if sesiones is not None else [],
     }
+    if admin:
+        d["notif_email"] = row["notif_email"] if "notif_email" in keys else ""
+    return d
 
 
 # ── Endpoints públicos ────────────────────────────────────────────────────────
@@ -166,6 +169,7 @@ def get_taller(slug: str):
 
 
 @router.post("/talleres/{slug}/upload-comprobante")
+@limiter.limit("20/minute")
 async def upload_comprobante(slug: str, request: Request):
     """Recibe el comprobante de pago (multipart, campo 'file') y lo sube a R2 privado.
     Devuelve URL prefirmada (24h) + key. No requiere auth — parte del flujo de inscripción."""
@@ -221,7 +225,8 @@ def _comprobante_url_para_email(key: str | None, fallback_url: str | None) -> st
 
 
 @router.post("/talleres/{slug}/inscripcion")
-def crear_inscripcion(slug: str, body: InscripcionBody):
+@limiter.limit("10/minute")
+def crear_inscripcion(slug: str, body: InscripcionBody, request: Request):
     """Crea una inscripción al taller. Si los cupos están completos, queda en lista de espera.
     Envía email al admin y al inscripto."""
     nombre = body.nombre.strip()
@@ -404,7 +409,7 @@ def admin_list_talleres(request: Request):
         rows = conn.execute(
             "SELECT * FROM talleres ORDER BY fecha_inicio DESC"
         ).fetchall()
-        return [_taller_to_dict(r, _get_sesiones(conn, r["id"])) for r in rows]
+        return [_taller_to_dict(r, _get_sesiones(conn, r["id"]), admin=True) for r in rows]
 
 
 @router.post("/admin/talleres", status_code=201)
@@ -482,7 +487,7 @@ def admin_create_taller(body: TallerCreateBody, request: Request):
     return _taller_to_dict(row, [
         {"fecha": str(s["fecha"]), "hora_inicio": s["hora_inicio"], "hora_fin": s["hora_fin"]}
         for s in sesiones
-    ])
+    ], admin=True)
 
 
 @router.patch("/admin/talleres/{taller_id}")
@@ -541,7 +546,6 @@ def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request
         val = body.proxima_edicion_slug.strip()
         if val:
             # Validar que exista y no sea autoreferencia
-            row_check = conn_check = None
             with get_db() as _c:
                 me = _c.execute("SELECT slug FROM talleres WHERE id = %s", (taller_id,)).fetchone()
                 if me and me["slug"] == val:
@@ -606,7 +610,7 @@ def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request
         except Exception:
             conn.rollback()
             raise
-    return _taller_to_dict(row, _get_sesiones(conn, taller_id))
+    return _taller_to_dict(row, _get_sesiones(conn, taller_id), admin=True)
 
 
 @router.delete("/admin/talleres/{taller_id}", status_code=200)
@@ -652,7 +656,7 @@ async def admin_upload_foto_instructor(taller_id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id FROM talleres WHERE id = ?", (taller_id,)
+            "SELECT id FROM talleres WHERE id = %s", (taller_id,)
         ).fetchone()
         if row is None:
             raise HTTPException(404, "Taller no encontrado")
@@ -674,8 +678,8 @@ async def admin_upload_foto_instructor(taller_id: int, request: Request):
             display = asset.variant("display") or (asset.variants[0] if asset.variants else None)
             url = display.url if display else ""
             conn.execute(
-                "UPDATE talleres SET instructor_media_id = ?, instructor_foto_url = ?, "
-                "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE talleres SET instructor_media_id = %s, instructor_foto_url = %s, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                 (asset.id, url, taller_id),
             )
             conn.commit()

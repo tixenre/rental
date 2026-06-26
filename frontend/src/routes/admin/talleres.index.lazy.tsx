@@ -7,7 +7,6 @@ import {
   Clock,
   CheckCircle2,
   Upload,
-  Loader2,
   Save,
   Plus,
   Trash2,
@@ -22,6 +21,7 @@ import { authedFetch, authedJson } from "@/lib/authedFetch";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Spinner } from "@/design-system/ui/spinner";
 import { Switch } from "@/design-system/ui/switch";
 import {
   Select,
@@ -76,7 +76,7 @@ type TallerAdmin = {
   direccion: string;
   activo: boolean;
   tipo_taller: string;
-  notif_email: boolean;
+  notif_email: string;
   proxima_edicion_slug: string;
   numero_edicion: number;
   sesiones: SesionBody[];
@@ -113,7 +113,7 @@ type UpdateBody = {
   direccion?: string;
   activo?: boolean;
   tipo_taller?: string;
-  notif_email?: boolean;
+  notif_email?: string;
   proxima_edicion_slug?: string;
   sesiones?: SesionBody[];
 };
@@ -138,7 +138,7 @@ function badgeEstado(taller: TallerAdmin): { label: string; className: string } 
   if (taller.fecha_inicio > today)
     return { label: "PRÓXIMAMENTE", className: "bg-amber/20 text-amber" };
   if (taller.fecha_fin >= today)
-    return { label: "EN CURSO", className: "bg-verde/20 text-verde-800" };
+    return { label: "EN CURSO", className: "bg-verde/20 text-verde-ink" };
   return { label: "FINALIZADO", className: "bg-muted/40 text-muted-foreground" };
 }
 
@@ -149,7 +149,7 @@ function CuposPill({ confirmados, total }: { confirmados: number; total: number 
       ? "bg-destructive/10 text-destructive border-destructive/20"
       : ratio >= 0.8
         ? "bg-amber/15 text-amber border-amber/20"
-        : "bg-verde/10 text-verde-800 border-verde/20";
+        : "bg-verde/10 text-verde-ink border-verde/20";
   return (
     <span
       className={`shrink-0 rounded-full border px-2 py-0.5 text-2xs font-semibold font-mono tabular-nums ${cls}`}
@@ -409,7 +409,7 @@ function SesionAsistente({
                 </span>
                 <button
                   onClick={() => remove(s.fecha)}
-                  className="ml-0.5 text-muted-foreground/60 hover:text-destructive transition"
+                  className="ml-0.5 h-6 w-6 flex items-center justify-center text-muted-foreground/60 hover:text-destructive transition rounded"
                   aria-label="Quitar"
                 >
                   ×
@@ -508,7 +508,7 @@ function SesionesSection({ taller }: { taller: TallerAdmin }) {
         </Button>
         <Button onClick={handleSave} disabled={mut.isPending} size="sm" className="gap-2">
           {mut.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Spinner size="xs" />
           ) : (
             <Save className="h-3.5 w-3.5" />
           )}
@@ -528,7 +528,7 @@ function PagosSection({ taller }: { taller: TallerAdmin }) {
     pago_cbu: taller.pago_cbu ?? "",
     pago_banco: taller.pago_banco ?? "",
     direccion: taller.direccion ?? "",
-    notif_email: taller.notif_email ?? false,
+    notif_email: taller.notif_email ?? "",
   });
 
   useEffect(() => {
@@ -537,7 +537,7 @@ function PagosSection({ taller }: { taller: TallerAdmin }) {
       pago_cbu: taller.pago_cbu ?? "",
       pago_banco: taller.pago_banco ?? "",
       direccion: taller.direccion ?? "",
-      notif_email: taller.notif_email ?? false,
+      notif_email: taller.notif_email ?? "",
     });
   }, [taller.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -577,19 +577,21 @@ function PagosSection({ taller }: { taller: TallerAdmin }) {
         {tf("CBU", "pago_cbu")}
         {tf("Banco", "pago_banco")}
       </div>
-      <div className="flex items-center gap-3">
-        <Switch
-          checked={form.notif_email}
-          onCheckedChange={(v) => setForm((f) => ({ ...f, notif_email: v }))}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+          Email de notificaciones
+        </label>
+        <Input
+          type="email"
+          placeholder="admin@ejemplo.com (vacío = email admin por defecto)"
+          value={form.notif_email}
+          onChange={(e) => setForm((f) => ({ ...f, notif_email: e.target.value }))}
         />
-        <span className="text-sm text-muted-foreground">
-          Enviar email de confirmación al inscribirse
-        </span>
       </div>
       <div className="flex justify-end">
         <Button onClick={() => mut.mutate({ ...form })} disabled={mut.isPending} className="gap-2">
           {mut.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner size="sm" />
           ) : (
             <Save className="h-4 w-4" />
           )}
@@ -664,7 +666,7 @@ function FotoSection({ taller }: { taller: TallerAdmin }) {
             className="gap-2"
           >
             {uploading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Spinner size="xs" />
             ) : (
               <Upload className="h-3.5 w-3.5" />
             )}
@@ -791,7 +793,7 @@ function ContenidoSection({ taller }: { taller: TallerAdmin }) {
       <div className="flex justify-end pt-2">
         <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
           {mut.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner size="sm" />
           ) : (
             <Save className="h-4 w-4" />
           )}
@@ -892,7 +894,7 @@ function PreciosSection({ taller }: { taller: TallerAdmin }) {
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
           {mut.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner size="sm" />
           ) : (
             <Save className="h-4 w-4" />
           )}
@@ -1157,7 +1159,7 @@ function InscripcionesSection({
               className="gap-2"
             >
               {notificarMut.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Spinner size="sm" />
               ) : (
                 <Bell className="h-4 w-4" />
               )}
@@ -1238,7 +1240,7 @@ function EdicionesSection({
             disabled={mut.isPending}
             size="sm"
           >
-            {mut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Guardar"}
+            {mut.isPending ? <Spinner size="xs" /> : "Guardar"}
           </Button>
         </div>
       </div>
@@ -1433,7 +1435,7 @@ function NuevoTallerDialog({
           </DialogClose>
           <Button onClick={handleSubmit} disabled={mut.isPending} className="gap-2">
             {mut.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner size="sm" />
             ) : (
               <Plus className="h-4 w-4" />
             )}
