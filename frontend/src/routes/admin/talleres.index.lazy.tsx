@@ -135,8 +135,7 @@ const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "
 
 function badgeEstado(taller: TallerAdmin): { label: string; className: string } {
   const today = new Date().toISOString().slice(0, 10);
-  if (!taller.activo)
-    return { label: "INACTIVO", className: "bg-muted/40 text-muted-foreground" };
+  if (!taller.activo) return { label: "INACTIVO", className: "bg-muted/40 text-muted-foreground" };
   if (taller.fecha_inicio > today)
     return { label: "PRÓXIMAMENTE", className: "bg-amber/20 text-amber-700" };
   if (taller.fecha_fin >= today)
@@ -490,7 +489,11 @@ function SesionesSection({ taller }: { taller: TallerAdmin }) {
               Cancelar
             </Button>
             <Button onClick={handleSave} disabled={mut.isPending} size="sm" className="gap-2">
-              {mut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {mut.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
               Guardar sesiones
             </Button>
           </div>
@@ -838,9 +841,7 @@ function PreciosSection({ taller }: { taller: TallerAdmin }) {
       return;
     }
     if (cupos < taller.cupos_confirmados) {
-      toast.error(
-        `No podés bajar cupos a ${cupos}: hay ${taller.cupos_confirmados} confirmados`,
-      );
+      toast.error(`No podés bajar cupos a ${cupos}: hay ${taller.cupos_confirmados} confirmados`);
       return;
     }
     mut.mutate({ precio_total: total, precio_sena: sena, cupos_total: cupos });
@@ -939,10 +940,9 @@ function InscripcionesSection({
 
   const confirmarMut = useMutation({
     mutationFn: (insId: number) =>
-      authedJson<TallerAdmin>(
-        `/api/admin/talleres/${taller.id}/inscripciones/${insId}/confirmar`,
-        { method: "POST" },
-      ),
+      authedJson<TallerAdmin>(`/api/admin/talleres/${taller.id}/inscripciones/${insId}/confirmar`, {
+        method: "POST",
+      }),
     onSuccess: (updated) => {
       toast.success("Inscripción confirmada");
       qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
@@ -973,9 +973,7 @@ function InscripcionesSection({
 
   async function handleCsvDownload() {
     try {
-      const res = await authedFetch(
-        `/api/admin/talleres/${taller.id}/inscripciones/export-csv`,
-      );
+      const res = await authedFetch(`/api/admin/talleres/${taller.id}/inscripciones/export-csv`);
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -1206,8 +1204,7 @@ function EdicionesSection({
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-4 text-sm">
           <span className="text-muted-foreground">
-            Edición actual:{" "}
-            <strong className="text-ink">#{taller.numero_edicion}</strong>
+            Edición actual: <strong className="text-ink">#{taller.numero_edicion}</strong>
           </span>
           <Link
             to="/workshops/$slug"
@@ -1269,9 +1266,7 @@ function NuevoTallerDialog({
   template?: { nombre: string; instructor_nombre: string; tipo_taller: string };
 }) {
   const [nombre, setNombre] = useState(template?.nombre ?? "");
-  const [instructorNombre, setInstructorNombre] = useState(
-    template?.instructor_nombre ?? "",
-  );
+  const [instructorNombre, setInstructorNombre] = useState(template?.instructor_nombre ?? "");
   const [tipo, setTipo] = useState(template?.tipo_taller ?? "intensivo");
   const [sesiones, setSesiones] = useState<SesionBody[]>([]);
   const [cupos, setCupos] = useState("12");
@@ -1343,16 +1338,14 @@ function NuevoTallerDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {template ? "Nueva edición (duplicar taller)" : "Nuevo taller"}
-          </DialogTitle>
+          <DialogTitle>{template ? "Nueva edición (duplicar taller)" : "Nuevo taller"}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-5 py-2">
           {template && (
             <div className="rounded-lg bg-muted/30 border border-border/50 px-4 py-3 text-sm text-muted-foreground">
-              Copiando datos de <strong className="text-ink">{template.nombre}</strong>. Cambiá
-              las sesiones para la nueva edición.
+              Copiando datos de <strong className="text-ink">{template.nombre}</strong>. Cambiá las
+              sesiones para la nueva edición.
             </div>
           )}
 
