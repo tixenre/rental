@@ -244,10 +244,11 @@ de implementar (2026-06-20)_; el detalle de método vive en el skill `auditoria-
 ### 2026-06-22 — CTA primario = ink + texto hueso (no dorado); el dorado es la jugada del hover
 
 El `variant="primary"` del `Button` es **fondo ink + texto hueso/bone** en reposo (`bg-ink text-background`) e
-invierte a **amber + ink** en hover. El texto hueso en reposo es **decisión de marca del dueño, NO un bug**:
-no "corregir" a dorado (el dorado es la jugada del hover, la _reverse signature_ ink↔amber). Materializa la
-_Filosofía de diseño del DS (2026-06-20)_ (una sola forma del CTA). El supervisor marca un CTA primario que
-vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente el gesto en vez de usar `<Button>`.
+invierte a **`--area-accent` + ink** en hover (`hover:bg-[var(--area-accent)] hover:text-ink`): amber en rental,
+naranja en estudio, rosa en workshops. El texto hueso en reposo es **decisión de marca del dueño, NO un bug**:
+no "corregir" a dorado — el accent del hover es la jugada de la _reverse signature_ ink↔área. Materializa la
+_Filosofía de diseño del DS (2026-06-20)_ (una sola forma del CTA). El supervisor marca un CTA primario cuyo
+hover invierta a un color fijo en vez de `--area-accent`, o un `<button>` crudo que reimplemente el gesto.
 
 ### 2026-06-23 — Capa de skills auto-gobernada y portable: registro verificado + routing de modelo + loop de aprendizaje
 

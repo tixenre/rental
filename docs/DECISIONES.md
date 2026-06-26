@@ -905,17 +905,18 @@ cancel-in-progress` ya cancela corridas viejas.
   (texto **dorado** en reposo), y el `variant="primary"` del DS con `bg-ink text-background` (texto
   **hueso**). Unificar a "una sola forma" exigía elegir el canon. El dueño pidió ver el botón antes de decidir.
 - **Decisión.** El dueño comparó ambas en vivo (render real, fuentes y colores de marca, reposo + hover) y
-  eligió **hueso**: `variant="primary"` = **fondo ink + texto hueso/bone** en reposo, invierte a **amber +
-  ink** en hover. El texto hueso en reposo es **decisión de marca, NO un bug**: no "corregir" a dorado.
-  El dorado es la jugada del **hover** (la _reverse signature_ ink↔amber).
+  eligió **hueso**: `variant="primary"` = **fondo ink + texto hueso/bone** en reposo, invierte a
+  **`--area-accent` + ink** en hover (`hover:bg-[var(--area-accent)] hover:text-ink`): amber en rental,
+  naranja en estudio, rosa en workshops. El texto hueso en reposo es **decisión de marca, NO un bug**:
+  no "corregir" a dorado. El accent del hover (la _reverse signature_ ink↔área) es la jugada de identidad.
 - **Why.** Dos formas del mismo CTA violan "una sola forma de hacer cada cosa" (_Filosofía de diseño del DS,
   2026-06-20_). Hueso da más contraste sobre ink (19:1 vs 11:1 del dorado — ambos AA holgado) y un look más
-  limpio; el dorado queda reservado al gesto del hover, más fuerte que un simple aclarado. Anclar la decisión
-  evita el churn de que un futuro cambio la "corrija" creyéndola un bug.
-- **Consecuencias.** Los ~14 CTAs migraron a `variant="primary"` (texto dorado → hueso) en PR #990. El
-  supervisor marca un CTA primario que vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente
-  el gesto en vez de usar `<Button>`. Documentado en `DESIGN_SYSTEM.md` (sección Button). Espeja las decisiones
-  tipo "no lo arregles, es del dueño" (_Presupuesto muestra IVA aparte (2026-06-06)_, verde WhatsApp tier-4).
+  limpio; el accent queda reservado al gesto del hover, más fuerte que un simple aclarado. Usar `--area-accent`
+  (no amber fijo) extiende la decisión a todas las áreas sin necesitar un override por área en el botón.
+- **Consecuencias.** Los ~14 CTAs migraron a `variant="primary"` (texto dorado → hueso) en PR #990.
+  Hover actualizado a `--area-accent` en #1063 (theming por área). El supervisor marca un CTA primario
+  cuyo hover invierta a un color fijo en vez de `--area-accent`, o un `<button>` crudo que reimplemente
+  el gesto. Documentado en `DESIGN_SYSTEM.md` (sección Button).
 
 ### 2026-06-23 — Capa de skills auto-gobernada y portable: registro verificado + routing de modelo + loop de aprendizaje
 
