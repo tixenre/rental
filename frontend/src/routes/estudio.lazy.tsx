@@ -404,7 +404,7 @@ function TrabajoLightbox({
       {/* Cerrar */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+        className="absolute top-4 right-4 z-20 h-11 w-11 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
         aria-label="Cerrar"
       >
         <svg
