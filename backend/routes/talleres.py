@@ -300,6 +300,7 @@ class TallerUpdateBody(BaseModel):
     programa_practica: list[str] | None = None
     precio_total: int | None = None
     precio_sena: int | None = None
+    cupos_total: int | None = None
 
 
 @router.get("/admin/talleres")
@@ -341,6 +342,8 @@ def admin_update_taller(taller_id: int, body: TallerUpdateBody, request: Request
         sets.append("precio_total = %s"); params.append(body.precio_total)
     if body.precio_sena is not None:
         sets.append("precio_sena = %s"); params.append(body.precio_sena)
+    if body.cupos_total is not None:
+        sets.append("cupos_total = %s"); params.append(body.cupos_total)
     if not sets:
         raise HTTPException(400, "No hay campos para actualizar")
     sets.append("updated_at = NOW()")
