@@ -142,10 +142,6 @@ function LightboxSlide({
   const isShort = first?.kind === "youtube" && /\/shorts\//.test(first.url);
   const isLandscapeYt = first?.kind === "youtube" && !isShort;
 
-  // Landscape YouTube: 70 % del viewport para video grande con peeks laterales de ~15 %.
-  // Todo lo demás (IG, Shorts, fotos portrait): ancho fijo portrait.
-  const slideWidth = isLandscapeYt ? "70vw" : "min(88vw, 520px)";
-
   const igAr = first?.kind === "instagram" && first.w && first.h ? first.h / first.w : null;
   // Clip IG: altura natural capped a 80dvh para no rebasar la pantalla.
   const igClipH = igAr
@@ -157,11 +153,12 @@ function LightboxSlide({
       data-slide-idx={idx}
       className={cn(
         "snap-center shrink-0 flex flex-col rounded-2xl overflow-hidden transition-[opacity,transform] duration-300",
+        // Mobile: portrait para todo. Desktop (md+): landscape YouTube → 70vw.
+        isLandscapeYt ? "w-[min(88vw,520px)] md:w-[70vw]" : "w-[min(88vw,520px)]",
         isActive
           ? "opacity-100 scale-[1.08] z-10"
           : "opacity-40 scale-[0.88] cursor-pointer hover:opacity-60",
       )}
-      style={{ width: slideWidth }}
       onClick={!isActive ? onActivate : undefined}
     >
       {isActive ? (
@@ -393,19 +390,14 @@ function TrabajoLightbox({
 
   // Spacers al inicio/fin para que el primer y último slide puedan centrarse.
   // spacerW = (100vw - slideW) / 2 - gap/2  (gap = 12px → mitad = 6px)
-  // Cada spacer se calcula según el tipo del slide que necesita centrar.
+  // En mobile todos los slides son portrait; en desktop los landscape usan 70vw.
   const firstMedia = trabajos[0]?.media[0];
   const lastMedia = trabajos[trabajos.length - 1]?.media[0];
-  const SPACER_LANDSCAPE = "max(0px, calc(15vw - 6px))"; // (100vw - 70vw) / 2 - 6px
-  const SPACER_PORTRAIT = "max(0px, calc((100vw - min(88vw, 520px)) / 2 - 6px))";
-  const SPACER_START =
-    firstMedia?.kind === "youtube" && !/\/shorts\//.test(firstMedia.url)
-      ? SPACER_LANDSCAPE
-      : SPACER_PORTRAIT;
-  const SPACER_END =
-    lastMedia?.kind === "youtube" && !/\/shorts\//.test(lastMedia.url)
-      ? SPACER_LANDSCAPE
-      : SPACER_PORTRAIT;
+  const firstIsLandscape = firstMedia?.kind === "youtube" && !/\/shorts\//.test(firstMedia.url);
+  const lastIsLandscape = lastMedia?.kind === "youtube" && !/\/shorts\//.test(lastMedia.url);
+  // Clase base: portrait (mobile + portrait content). Extensión md: landscape desktop.
+  const SPACER_BASE = "shrink-0 w-[max(0px,calc((100vw-min(88vw,520px))/2-6px))]";
+  const SPACER_LG_MD = "md:w-[max(0px,calc(15vw-6px))]";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95">
@@ -454,7 +446,7 @@ function TrabajoLightbox({
         style={{ gap: "12px" }}
       >
         {/* Spacer inicial: permite centrar el primer slide */}
-        <div className="shrink-0" style={{ width: SPACER_START }} />
+        <div className={cn(SPACER_BASE, firstIsLandscape && SPACER_LG_MD)} />
 
         {trabajos.map((trabajo, i) => (
           <LightboxSlide
@@ -467,7 +459,7 @@ function TrabajoLightbox({
         ))}
 
         {/* Spacer final: permite centrar el último slide */}
-        <div className="shrink-0" style={{ width: SPACER_END }} />
+        <div className={cn(SPACER_BASE, lastIsLandscape && SPACER_LG_MD)} />
       </div>
     </div>
   );
