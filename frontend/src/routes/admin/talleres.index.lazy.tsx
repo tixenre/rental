@@ -1444,12 +1444,122 @@ function NuevoTallerDialog({
   );
 }
 
+// ── TallerAccordionRow ────────────────────────────────────────────────────────
+
+function TallerAccordionRow({
+  taller,
+  expanded,
+  onToggle,
+  onNuevaDuplica,
+  onToggleActivo,
+  togglePending,
+}: {
+  taller: TallerAdmin;
+  expanded: boolean;
+  onToggle: () => void;
+  onNuevaDuplica: (t: TallerAdmin) => void;
+  onToggleActivo: (t: TallerAdmin, v: boolean) => void;
+  togglePending: boolean;
+}) {
+  const badge = badgeEstado(taller);
+
+  const { data: inscripciones = [], isLoading: loadingIns } = useQuery({
+    queryKey: ["admin", "talleres", taller.id, "inscripciones"],
+    queryFn: () => authedJson<Inscripcion[]>(`/api/admin/talleres/${taller.id}/inscripciones`),
+    enabled: expanded,
+    staleTime: 1000 * 30,
+  });
+
+  return (
+    <div
+      className={`rounded-xl border transition-colors ${
+        expanded ? "border-ink/30 bg-ink/5" : "border-border/60"
+      }`}
+    >
+      {/* Header row — clickable */}
+      <div className="flex items-center gap-3 px-4 py-3 cursor-pointer" onClick={onToggle}>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold font-mono uppercase tracking-wider ${badge.className}`}
+        >
+          {badge.label}
+        </span>
+
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-ink text-sm truncate">{taller.nombre}</p>
+          <p className="text-xs text-muted-foreground truncate">{taller.instructor_nombre}</p>
+        </div>
+
+        {taller.fecha_inicio && (
+          <span className="hidden sm:block text-xs text-muted-foreground shrink-0">
+            {new Date(taller.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", {
+              day: "numeric",
+              month: "short",
+            })}
+          </span>
+        )}
+
+        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5">
+            {taller.activo ? (
+              <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <EyeOff className="h-3.5 w-3.5 text-muted-foreground/50" />
+            )}
+            <Switch
+              checked={taller.activo}
+              onCheckedChange={(v) => onToggleActivo(taller, v)}
+              disabled={togglePending}
+            />
+          </div>
+          <a
+            href={`/workshops/${taller.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1 rounded text-muted-foreground hover:text-ink transition"
+            title="Ver en web"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        </div>
+
+        {/* Chevron */}
+        <svg
+          className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+
+      {/* Detail — visible when expanded */}
+      {expanded && (
+        <div className="border-t border-border/40 px-4 pb-4 pt-2 flex flex-col gap-4">
+          <SesionesSection taller={taller} />
+          <PagosSection taller={taller} />
+          <FotoSection taller={taller} />
+          <ContenidoSection taller={taller} />
+          <PreciosSection taller={taller} />
+          <InscripcionesSection
+            taller={taller}
+            inscripciones={inscripciones}
+            loading={loadingIns}
+          />
+          <EdicionesSection taller={taller} onNuevaDuplica={() => onNuevaDuplica(taller)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── TalleresAdminPage ─────────────────────────────────────────────────────────
 
 function TalleresAdminPage() {
   useDocumentTitle("Talleres — Admin");
   const qc = useQueryClient();
-  const [tallerSeleccionado, setTallerSeleccionado] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [duplicaTemplate, setDuplicaTemplate] = useState<
     { nombre: string; instructor_nombre: string; tipo_taller: string } | undefined
@@ -1460,18 +1570,6 @@ function TalleresAdminPage() {
     queryKey: ["admin", "talleres"],
     queryFn: () => authedJson<TallerAdmin[]>("/api/admin/talleres"),
     staleTime: 1000 * 60,
-  });
-
-  const tallerActivo = tallerSeleccionado ?? talleres[0]?.id ?? null;
-
-  const { data: inscripciones = [], isLoading: loadingIns } = useQuery({
-    queryKey: ["admin", "talleres", tallerActivo, "inscripciones"],
-    queryFn: () =>
-      tallerActivo
-        ? authedJson<Inscripcion[]>(`/api/admin/talleres/${tallerActivo}/inscripciones`)
-        : Promise.resolve([] as Inscripcion[]),
-    enabled: !!tallerActivo,
-    staleTime: 1000 * 30,
   });
 
   const toggleActivoMut = useMutation({
@@ -1519,7 +1617,6 @@ function TalleresAdminPage() {
     setNuevoOpen(false);
     setDuplicaTemplate(undefined);
 
-    // Auto-link proxima_edicion_slug if duplicating and original has none
     if (duplicaFromId !== null) {
       const original = talleres.find((t) => t.id === duplicaFromId);
       if (original && !original.proxima_edicion_slug) {
@@ -1545,10 +1642,8 @@ function TalleresAdminPage() {
     setDuplicaFromId(null);
   }
 
-  const taller = talleres.find((t) => t.id === tallerActivo);
-
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -1563,74 +1658,20 @@ function TalleresAdminPage() {
 
       {loadingTalleres && <p className="text-sm text-muted-foreground">Cargando talleres…</p>}
 
-      {/* Lista de talleres */}
+      {/* Lista accordion */}
       {talleres.length > 0 && (
         <div className="flex flex-col gap-2">
-          {talleres.map((t) => {
-            const badge = badgeEstado(t);
-            return (
-              <div
-                key={t.id}
-                className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition cursor-pointer ${
-                  t.id === tallerActivo
-                    ? "border-ink/30 bg-ink/5"
-                    : "border-border/60 hover:border-border hover:bg-muted/10"
-                }`}
-                onClick={() => setTallerSeleccionado(t.id)}
-              >
-                {/* Badge */}
-                <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold font-mono uppercase tracking-wider ${badge.className}`}
-                >
-                  {badge.label}
-                </span>
-
-                {/* Nombre */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-ink text-sm truncate">{t.nombre}</p>
-                  <p className="text-xs text-muted-foreground truncate">{t.instructor_nombre}</p>
-                </div>
-
-                {/* Fechas */}
-                {t.fecha_inicio && (
-                  <span className="hidden sm:block text-xs text-muted-foreground shrink-0">
-                    {new Date(t.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </span>
-                )}
-
-                {/* Actions */}
-                <div
-                  className="flex items-center gap-2 shrink-0"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center gap-1.5">
-                    {t.activo ? (
-                      <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                    ) : (
-                      <EyeOff className="h-3.5 w-3.5 text-muted-foreground/50" />
-                    )}
-                    <Switch
-                      checked={t.activo}
-                      onCheckedChange={(v) => handleToggleActivo(t, v)}
-                      disabled={toggleActivoMut.isPending}
-                    />
-                  </div>
-                  <a
-                    href={`/workshops/${t.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1 rounded text-muted-foreground hover:text-ink transition"
-                    title="Ver en web"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </div>
-              </div>
-            );
-          })}
+          {talleres.map((t) => (
+            <TallerAccordionRow
+              key={t.id}
+              taller={t}
+              expanded={expandedId === t.id}
+              onToggle={() => setExpandedId(expandedId === t.id ? null : t.id)}
+              onNuevaDuplica={handleNuevaDuplica}
+              onToggleActivo={handleToggleActivo}
+              togglePending={toggleActivoMut.isPending}
+            />
+          ))}
         </div>
       )}
 
@@ -1644,24 +1685,6 @@ function TalleresAdminPage() {
         </div>
       )}
 
-      {/* Detalle del taller seleccionado */}
-      {taller && (
-        <>
-          <SesionesSection taller={taller} />
-          <PagosSection taller={taller} />
-          <FotoSection taller={taller} />
-          <ContenidoSection taller={taller} />
-          <PreciosSection taller={taller} />
-          <InscripcionesSection
-            taller={taller}
-            inscripciones={inscripciones}
-            loading={loadingIns}
-          />
-          <EdicionesSection taller={taller} onNuevaDuplica={() => handleNuevaDuplica(taller)} />
-        </>
-      )}
-
-      {/* Dialogs */}
       <NuevoTallerDialog
         open={nuevoOpen}
         onClose={() => {
