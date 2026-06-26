@@ -94,29 +94,50 @@ declare global {
 
 const IG_EMBED_SCRIPT = "https://www.instagram.com/embed.js";
 
+function loadIgScript(onLoad: () => void) {
+  const existing = document.querySelector<HTMLScriptElement>(`script[src="${IG_EMBED_SCRIPT}"]`);
+  if (existing) {
+    existing.addEventListener("load", onLoad, { once: true });
+    return;
+  }
+  const s = document.createElement("script");
+  s.src = IG_EMBED_SCRIPT;
+  s.async = true;
+  s.addEventListener("load", onLoad, { once: true });
+  document.body.appendChild(s);
+}
+
 function IgEmbed({ url }: { url: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
     const process = () => window.instgrm?.Embeds?.process();
+
+    // Cargar el script de IG solo cuando el embed entre al viewport (lazy).
+    // Protege el LCP: la sección Trabajos está bajo el fold.
     if (window.instgrm) {
       process();
       return;
     }
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${IG_EMBED_SCRIPT}"]`);
-    if (existing) {
-      existing.addEventListener("load", process, { once: true });
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = IG_EMBED_SCRIPT;
-    s.async = true;
-    s.addEventListener("load", process, { once: true });
-    document.body.appendChild(s);
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          obs.disconnect();
+          loadIgScript(process);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    obs.observe(container);
+    return () => obs.disconnect();
   }, [url]);
 
   // key={url} fuerza un blockquote fresco al cambiar de slide (el script muta el
   // nodo al procesarlo; remontar evita que React reconcilie un nodo ya mutado).
   return (
-    <div key={url} className="flex w-full justify-center">
+    <div key={url} ref={containerRef} className="flex w-full justify-center">
       <blockquote
         className="instagram-media"
         data-instgrm-permalink={url}
@@ -293,7 +314,9 @@ function TrabajoModal({
                 aria-label={`Ir al medio ${i + 1}`}
                 className={cn(
                   "h-1.5 rounded-full transition-all",
-                  i === mIdx ? "w-5 bg-amber" : "w-1.5 bg-background/25 hover:bg-background/45",
+                  i === mIdx
+                    ? "w-5 bg-[var(--area-accent)]"
+                    : "w-1.5 bg-background/25 hover:bg-background/45",
                 )}
               />
             ))}
@@ -307,7 +330,7 @@ function TrabajoModal({
               {trabajo.categorias.map((cat) => (
                 <span
                   key={cat}
-                  className="rounded-full border border-amber/40 px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber"
+                  className="rounded-full border border-[color-mix(in_oklch,var(--area-accent)_40%,transparent)] px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-[var(--area-accent)]"
                 >
                   {cat}
                 </span>
@@ -337,7 +360,7 @@ function TrabajoModal({
                   href={`https://instagram.com/${trabajo.realizador_instagram.replace(/^@/, "")}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
+                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-[var(--area-accent)] transition-colors"
                 >
                   <IgIcon />
                   {trabajo.realizador_instagram.startsWith("@")
@@ -354,7 +377,7 @@ function TrabajoModal({
                   }
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
+                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-[var(--area-accent)] transition-colors"
                 >
                   <WebIcon />
                   {trabajo.realizador_web.replace(/^https?:\/\//, "").replace(/\/$/, "")}
@@ -368,7 +391,7 @@ function TrabajoModal({
             <div className="flex items-center justify-between pt-3 mt-1 border-t border-background/10">
               <button
                 onClick={() => goTrabajo(-1)}
-                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
+                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-[var(--area-accent)] transition-colors"
                 aria-label="Trabajo anterior"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
@@ -379,7 +402,7 @@ function TrabajoModal({
               </span>
               <button
                 onClick={() => goTrabajo(1)}
-                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
+                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-[var(--area-accent)] transition-colors"
                 aria-label="Trabajo siguiente"
               >
                 siguiente
@@ -487,7 +510,7 @@ function TrabajoCard({ trabajo, onOpen }: { trabajo: EstudioTrabajo; onOpen: () 
             )}
           </div>
           {trabajo.categoria && (
-            <span className="shrink-0 rounded-full bg-amber/15 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-amber/80 whitespace-nowrap">
+            <span className="shrink-0 rounded-full bg-[color-mix(in_oklch,var(--area-accent)_15%,transparent)] px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] whitespace-nowrap">
               {trabajo.categoria}
             </span>
           )}
@@ -531,10 +554,10 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
   return (
     <section className="bg-ink py-14">
       <div className="px-4 lg:px-12 mb-8">
-        <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/50 mb-2.5">
+        <p className="font-mono text-2xs uppercase tracking-[0.3em] text-[var(--area-accent)] mb-2.5">
           Producciones
         </p>
-        <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,3.5rem)]">
+        <h2 className="font-display font-black lowercase leading-[0.9] text-[var(--area-accent)] text-[clamp(2rem,6vw,3.5rem)]">
           en acción.
         </h2>
         <p className="mt-3 text-15 text-background/55 max-w-md">
@@ -548,7 +571,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
               className={cn(
                 "rounded-full px-3.5 py-1.5 font-mono text-2xs uppercase tracking-[0.15em] transition-colors",
                 filtro === null
-                  ? "bg-amber text-ink"
+                  ? "bg-[var(--area-accent)] text-ink"
                   : "border border-background/20 text-background/50 hover:border-background/40 hover:text-background/80",
               )}
             >
@@ -690,7 +713,7 @@ function DragGallery({ photos }: { photos: Photo[] }) {
           arrowCls,
           "left-3",
           canPrev
-            ? "hover:bg-ink hover:text-amber hover:border-ink"
+            ? "hover:bg-ink hover:text-[var(--area-accent)] hover:border-ink"
             : "opacity-0 pointer-events-none",
         )}
       >
@@ -705,7 +728,7 @@ function DragGallery({ photos }: { photos: Photo[] }) {
           arrowCls,
           "right-3",
           canNext
-            ? "hover:bg-ink hover:text-amber hover:border-ink"
+            ? "hover:bg-ink hover:text-[var(--area-accent)] hover:border-ink"
             : "opacity-0 pointer-events-none",
         )}
       >
@@ -853,10 +876,10 @@ function EstudioPage() {
         <section className="relative overflow-hidden bg-ink px-4 lg:px-12 py-[clamp(2.5rem,5vw,4.5rem)] pb-[clamp(3rem,6vw,5rem)]">
           <Grain />
           <div className="relative">
-            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/60 mb-4">
+            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] mb-4">
               Estudio fotográfico y de video · Mar del Plata
             </p>
-            <h1 className="font-display font-black text-amber leading-[0.88] tracking-[-0.02em] lowercase text-[clamp(5rem,22vw,13rem)]">
+            <h1 className="font-display font-black text-[var(--area-accent)] leading-[0.88] tracking-[-0.02em] lowercase text-[clamp(5rem,22vw,13rem)]">
               el estudio.
             </h1>
             <p className="mt-5 max-w-lg text-base leading-relaxed text-background/65">
@@ -913,18 +936,18 @@ function EstudioPage() {
           <div className="relative overflow-hidden bg-ink px-[clamp(1.5rem,4vw,3.5rem)] py-[clamp(2.5rem,5vw,4.5rem)] flex flex-col justify-center">
             <Grain opacity={10} />
             <div className="relative">
-              <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/55 mb-5">
+              <p className="font-mono text-2xs uppercase tracking-[0.3em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] mb-5">
                 La pieza central
               </p>
               <div className="flex items-baseline gap-1 leading-none">
-                <span className="font-display font-black text-amber leading-[0.88] tracking-[-0.02em] text-[clamp(5rem,14vw,9rem)]">
+                <span className="font-display font-black text-[var(--area-accent)] leading-[0.88] tracking-[-0.02em] text-[clamp(5rem,14vw,9rem)]">
                   6×6
                 </span>
-                <span className="font-mono text-amber/55 text-[clamp(1.25rem,3vw,2rem)] mb-1">
+                <span className="font-mono text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] text-[clamp(1.25rem,3vw,2rem)] mb-1">
                   m
                 </span>
               </div>
-              <h2 className="font-display font-black text-amber lowercase leading-[0.9] tracking-[-0.02em] text-[clamp(2.25rem,6vw,4rem)] mt-1">
+              <h2 className="font-display font-black text-[var(--area-accent)] lowercase leading-[0.9] tracking-[-0.02em] text-[clamp(2.25rem,6vw,4rem)] mt-1">
                 ciclorama.
               </h2>
               <p className="mt-5 max-w-sm text-15 leading-relaxed text-background/65">
@@ -938,7 +961,7 @@ function EstudioPage() {
                 {["Curva continua", "Sin sombras", "Potencia extra", "Fondos de papel"].map((t) => (
                   <span
                     key={t}
-                    className="inline-flex items-center rounded-full border border-amber/30 px-3.5 py-1 font-mono text-2xs uppercase tracking-[0.2em] text-amber/70 whitespace-nowrap"
+                    className="inline-flex items-center rounded-full border border-[color-mix(in_oklch,var(--area-accent)_30%,transparent)] px-3.5 py-1 font-mono text-2xs uppercase tracking-[0.2em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] whitespace-nowrap"
                   >
                     {t}
                   </span>
@@ -996,23 +1019,23 @@ function EstudioPage() {
         {/* ── Reservar ─────────────────────────────────────────────── */}
         <section
           id="reservar"
-          className="relative overflow-hidden bg-amber px-4 lg:px-12 py-14 scroll-mt-16"
+          className="relative overflow-hidden bg-[var(--area-accent)] px-4 lg:px-12 py-14 scroll-mt-16"
         >
           <Grain opacity={14} />
           <div className="relative">
             <div className="flex flex-wrap items-end justify-between gap-3 mb-7">
               <div>
-                <p className="font-mono text-2xs uppercase tracking-[0.3em] text-ink/55 mb-2.5">
+                <p className="font-mono text-2xs uppercase tracking-[0.3em] text-ink mb-2.5">
                   Reservas
                 </p>
                 <h2 className="font-display font-black lowercase leading-[0.95] text-ink text-[clamp(1.75rem,4vw,2.75rem)]">
                   reservá tu sesión.
                 </h2>
-                <p className="mt-2.5 max-w-md text-15 text-ink/65 leading-relaxed">
+                <p className="mt-2.5 max-w-md text-15 text-ink leading-relaxed">
                   Mínimo {minHours} horas. Elegí día y horario — te contactamos para confirmar.
                 </p>
               </div>
-              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-ink/50 tabular-nums whitespace-nowrap shrink-0">
+              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-ink tabular-nums whitespace-nowrap shrink-0">
                 {priceLabel}
               </span>
             </div>
@@ -1024,7 +1047,7 @@ function EstudioPage() {
               />
               {packActivo && (
                 <aside className="rounded-2xl border border-ink/20 bg-ink/8 p-5 lg:sticky lg:top-20 lg:self-start">
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-ink/55 mb-3.5">
+                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-ink mb-3.5">
                     Estudio + equipos · qué incluye
                   </div>
                   {withPack ? (
@@ -1041,7 +1064,7 @@ function EstudioPage() {
                       </div>
                     )
                   ) : (
-                    <p className="text-sm text-ink/60 leading-relaxed">
+                    <p className="text-sm text-ink leading-relaxed">
                       Seleccioná "Estudio + equipos" para ver qué incluye el pack de luces y
                       griperías.
                     </p>
@@ -1061,7 +1084,7 @@ function EstudioPage() {
             dónde estamos.
           </h2>
           <div className="flex items-start gap-3 mb-6">
-            <MapPin className="h-4 w-4 text-amber mt-0.5 shrink-0" />
+            <MapPin className="h-4 w-4 text-[var(--area-accent)] mt-0.5 shrink-0" />
             <p className="text-base font-semibold leading-snug">{direccion}</p>
           </div>
           <div className="w-full aspect-[16/7] overflow-hidden rounded-2xl border hairline bg-surface min-h-60">
@@ -1107,13 +1130,13 @@ function EstudioPage() {
         {/* ── CTA "hablemos." ───────────────────────────────────────── */}
         <section className="bg-ink px-4 lg:px-12 py-16">
           <div className="max-w-xl">
-            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-amber/60 mb-3">
+            <p className="font-mono text-2xs uppercase tracking-[0.3em] text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] mb-3">
               ¿Tenés dudas?
             </p>
-            <h2 className="font-display font-black lowercase leading-[0.9] text-amber text-[clamp(2rem,6vw,4rem)]">
+            <h2 className="font-display font-black lowercase leading-[0.9] text-[var(--area-accent)] text-[clamp(2rem,6vw,4rem)]">
               hablemos.
             </h2>
-            <p className="mt-4 text-15 leading-relaxed text-amber/65 max-w-sm">
+            <p className="mt-4 text-15 leading-relaxed text-[color-mix(in_oklch,var(--area-accent)_80%,transparent)] max-w-sm">
               Te respondemos en el día. Contanos qué necesitás y armamos un presupuesto a medida.
             </p>
             <Button

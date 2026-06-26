@@ -457,7 +457,9 @@ export function StudioBookingForm({
             <label
               className={cn(
                 "flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition",
-                !withPack ? "border-amber bg-amber/10" : "hairline hover:border-ink/40",
+                !withPack
+                  ? "border-[var(--area-accent)] bg-[color-mix(in_oklch,var(--area-accent)_10%,transparent)]"
+                  : "hairline hover:border-ink/40",
               )}
             >
               <input
@@ -477,7 +479,9 @@ export function StudioBookingForm({
             <label
               className={cn(
                 "flex cursor-pointer flex-col gap-1 rounded-xl border p-4 transition",
-                withPack ? "border-amber bg-amber/10" : "hairline hover:border-ink/40",
+                withPack
+                  ? "border-[var(--area-accent)] bg-[color-mix(in_oklch,var(--area-accent)_10%,transparent)]"
+                  : "hairline hover:border-ink/40",
               )}
             >
               <input
@@ -575,7 +579,7 @@ export function StudioBookingForm({
           <Button
             onClick={handleReservarClick}
             disabled={!canSubmit}
-            className="w-full bg-ink text-amber hover:bg-[color-mix(in_oklch,var(--ink)_82%,var(--amber))]"
+            className="w-full bg-ink text-[var(--area-accent)] hover:bg-[color-mix(in_oklch,var(--color-ink)_82%,var(--area-accent))]"
             size="lg"
           >
             {submitting ? (
@@ -652,7 +656,7 @@ export function StudioBookingForm({
           </div>
           <Button
             onClick={handleContinuarConGoogle}
-            className="w-full bg-amber text-ink hover:bg-amber/90"
+            className="w-full bg-[var(--area-accent)] text-ink hover:bg-[var(--area-accent-hot)]"
             size="lg"
           >
             <GoogleIcon size={16} /> <span className="ml-2">Continuar con Google</span>

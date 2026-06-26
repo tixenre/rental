@@ -9,6 +9,7 @@ export const Route = createFileRoute("/estudio")({
   head: () => ({
     meta: [
       { title: "El Estudio — Rambla Rental" },
+      { name: "theme-color", content: "#e9552f" },
       {
         name: "description",
         content:
