@@ -23,4 +23,8 @@
 
 ---
 
-_(Sin veredictos registrados todavía — la primera corrida real la estrena.)_
+### 2026-06-26 — ¿Debería el skill consejo tener entradas en MEMORIA.md + DECISIONES.md?
+- Veredicto del consejo: AVANZAR CON CAMBIOS — sí, pero con las 3 reglas durables concretas (fuente única, separación de memorias, gradiente de rigor); una entrada meramente descriptiva sería ruido sin enforcement.
+- Qué se decidió: se escribieron las entradas con las 3 reglas; luego se mergeó el PR.
+- ¿Coincidieron?: sí · validación independiente — el dueño acordó con el veredicto y las condiciones.
+- Calibrar: en la práctica, ¿el supervisor usa las reglas de la entrada para marcar violaciones? Revisar en el próximo uso real del consejo.
