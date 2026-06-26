@@ -83,7 +83,6 @@ export function useHeroPhotos(): HeroPhoto[] {
   const { data } = useQuery({
     queryKey: ["estudio-fotos"],
     queryFn: apiGetEstudio,
-    staleTime: 5 * 60 * 1000,
   });
 
   const fotos = data?.fotos ?? [];

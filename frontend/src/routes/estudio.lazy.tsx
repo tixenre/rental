@@ -779,7 +779,6 @@ function EstudioPage() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["estudio"],
     queryFn: apiGetEstudio,
-    staleTime: 1000 * 60 * 5,
     retry: 2,
   });
 
