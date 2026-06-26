@@ -13,11 +13,7 @@ Create Date: 2026-06-26
 from typing import Sequence, Union
 
 revision: str = "m3rg3h34ds03"
-down_revision: Union[str, Sequence[str], None] = (
-    "mrgestudmain",
-    "u2v3w4x5y6z7",
-    "t3ll4r1nst4x1",
-)
+down_revision: Union[str, Sequence[str], None] = ("mrgestudmain", "u2v3w4x5y6z7", "t3ll4r1nst4x1")
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

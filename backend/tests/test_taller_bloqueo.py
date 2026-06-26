@@ -10,7 +10,7 @@ Todos usan FakeConn — sin Postgres, sin fixtures de DB.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 import pytest
 
@@ -239,7 +239,6 @@ def test_estudio_disponible_orden_slot_primero():
 
 def test_verificar_sesiones_libres():
     """Todas las sesiones libres → no lanza excepción."""
-    from fastapi import HTTPException
     from routes.estudio import verificar_sesiones_disponibles
     sesiones = [
         {"fecha": date(2026, 8, 15), "hora_inicio": 9, "hora_fin": 13},
@@ -311,7 +310,6 @@ def test_verificar_sesiones_segunda_conflicto():
 
 def test_taller_vs_slot_bloquea():
     """Un taller no puede ocupar un horario donde ya hay un slot fijo."""
-    from fastapi import HTTPException
     from routes.estudio import verificar_sesiones_disponibles
     # Slot fijo lunes 10-18
     sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio": 10, "hora_fin": 18}]
@@ -326,7 +324,6 @@ def test_taller_vs_slot_bloquea():
 
 def test_taller_vs_reserva_web_bloquea():
     """Un taller no puede ocupar un horario donde ya hay una reserva web (centinela)."""
-    from fastapi import HTTPException
     from routes.estudio import verificar_sesiones_disponibles
     sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio": 10, "hora_fin": 14}]
     conn = FakeConn([[], [], FakeRow(cnt=1)])  # slot vacío, taller vacío, centinela ocupado
@@ -338,7 +335,6 @@ def test_taller_vs_reserva_web_bloquea():
 
 def test_taller_vs_taller_bloquea():
     """Dos talleres que solapan en la misma fecha son detectados."""
-    from fastapi import HTTPException
     from routes.estudio import verificar_sesiones_disponibles
     sesiones = [{"fecha": date(2026, 9, 7), "hora_inicio": 10, "hora_fin": 14}]
     # El taller existente (excluído con exclude_taller_id) no bloquea, pero hay otro

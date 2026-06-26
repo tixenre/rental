@@ -8,8 +8,6 @@ import io
 import logging
 import time
 import uuid
-from datetime import date as _date
-
 import json as _json
 
 from fastapi import APIRouter, HTTPException, Request
