@@ -423,7 +423,11 @@ function TrabajoCard({ trabajo, onOpen }: { trabajo: EstudioTrabajo; onOpen: () 
 
   const initial = first && first.w && first.h ? first.w / first.h : null;
   const [aspect, setAspect] = useState<number | null>(initial);
-  const ar = aspect ?? 4 / 5;
+  const rawAr = aspect ?? 4 / 5;
+  // Para IG, la og:image puede tener proporciones extremas (9:16 Reels, crops)
+  // que no representan el display real. Clampear a [4:5, 16:9] — rango nativo de IG.
+  const ar =
+    first?.kind === "instagram" ? Math.min(Math.max(rawAr, 4 / 5), 16 / 9) : rawAr;
   // El ancho de la card sale del alto base × la proporción real, topado a 86vw.
   // El thumbnail usa `aspect-ratio` (no alto fijo) → si el ancho topa en mobile,
   // baja el alto y la proporción se mantiene (un video horizontal no se recorta).
