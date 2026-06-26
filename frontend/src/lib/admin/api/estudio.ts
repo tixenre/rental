@@ -104,7 +104,13 @@ export const trabajosAdminApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     }).then((r) =>
-      _ok<{ titulo?: string | null; realizador?: string | null; thumbnail_url?: string | null; descripcion?: string | null; fuente?: string }>(r),
+      _ok<{
+        titulo?: string | null;
+        realizador?: string | null;
+        thumbnail_url?: string | null;
+        descripcion?: string | null;
+        fuente?: string;
+      }>(r),
     ),
 
   create: (data: EstudioTrabajoInput) =>

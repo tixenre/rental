@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, MessageCircle, MapPin } from "lucide-react";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
 import { StudioPackKit } from "@/components/studio/StudioPackKit";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
-import { apiGetEstudio, type EstudioTrabajo } from "@/lib/api";
+import { apiGetEstudio, type EstudioTrabajo, type EstudioMedia } from "@/lib/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PublicLayout } from "@/components/rental/PublicLayout";
@@ -47,7 +47,13 @@ const IgIcon = () => (
 );
 
 const WebIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    viewBox="0 0 24 24"
+    className="h-3.5 w-3.5 shrink-0"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <circle cx="12" cy="12" r="10" />
     <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
   </svg>
@@ -60,80 +66,169 @@ function ytThumbFallback(ytId: string) {
   return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
 }
 
+// Embed oficial de IG. `/embed/captioned/` incluye el pie de foto y soporta
+// reels, fotos y carruseles (preserva el tipo de post: /reel/ /p/ /tv/).
 function igEmbedUrl(url: string): string | null {
   if (!url) return null;
   const m = url.match(/instagram\.com\/(reel|p|tv)\/([A-Za-z0-9_-]+)/);
-  if (m) return `https://www.instagram.com/${m[1]}/${m[2]}/embed/`;
-  if (/^[A-Za-z0-9_-]{8,}$/.test(url)) return `https://www.instagram.com/reel/${url}/embed/`;
+  if (m) return `https://www.instagram.com/${m[1]}/${m[2]}/embed/captioned/`;
+  if (/^[A-Za-z0-9_-]{8,}$/.test(url))
+    return `https://www.instagram.com/reel/${url}/embed/captioned/`;
+  return null;
+}
+
+// Thumbnail de un medio para la card. Los links traen un thumbnail permanente
+// procesado por el backend; si falta (best-effort falló), YouTube cae a su
+// thumbnail en vivo.
+function mediaThumb(m: EstudioMedia): { src: string; fallback?: string } | null {
+  if (m.kind === "foto") {
+    const src = m.url_sm ?? m.url;
+    return src ? { src } : null;
+  }
+  if (m.thumbnail) return { src: m.thumbnail };
+  if (m.kind === "youtube") {
+    const id = extractYtId(m.url);
+    if (id) return { src: ytThumb(id), fallback: ytThumbFallback(id) };
+  }
   return null;
 }
 
 function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: () => void }) {
-  const ytId = trabajo.youtube_url ? extractYtId(trabajo.youtube_url) : null;
-  const igEmbed = trabajo.instagram_reel_url ? igEmbedUrl(trabajo.instagram_reel_url) : null;
+  const media = trabajo.media ?? [];
+  const count = media.length;
+  const [idx, setIdx] = useState(0);
+  const current = media[Math.min(idx, Math.max(count - 1, 0))] ?? null;
+
+  const go = useCallback(
+    (d: number) => setIdx((i) => (count ? (i + d + count) % count : 0)),
+    [count],
+  );
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") go(1);
+      else if (e.key === "ArrowLeft") go(-1);
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, go]);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/90 p-0 sm:p-4 lg:p-8"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/90 p-0 sm:p-4 lg:p-6"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="relative w-full sm:w-[92vw] lg:w-[85vw] bg-ink rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[96dvh] flex flex-col">
+      <div className="relative w-full sm:w-[94vw] lg:w-[82vw] max-w-5xl bg-ink rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[96dvh] flex flex-col">
         {/* Cerrar */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-background/70 hover:text-background transition-colors"
+          className="absolute top-3 right-3 z-20 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-background/70 hover:text-background transition-colors"
           aria-label="Cerrar"
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+          >
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
         </button>
 
-        {/* Media */}
-        <div className="aspect-video w-full bg-black shrink-0">
-          {ytId ? (
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
-              title={trabajo.titulo}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="h-full w-full"
-            />
-          ) : igEmbed ? (
-            <iframe
-              src={igEmbed}
-              title={trabajo.titulo}
-              allowFullScreen
-              scrolling="no"
-              className="h-full w-full border-0"
-            />
-          ) : trabajo.fotos[0] ? (
+        {/* Escenario de medios (carrusel) */}
+        <div className="relative bg-black shrink-0 h-[56vh] sm:h-[62vh] flex items-center justify-center">
+          {current?.kind === "youtube" &&
+            (() => {
+              const ytId = extractYtId(current.url);
+              return ytId ? (
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
+                  title={trabajo.titulo}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute inset-0 h-full w-full"
+                />
+              ) : null;
+            })()}
+
+          {current?.kind === "instagram" &&
+            (() => {
+              const embed = igEmbedUrl(current.url);
+              return embed ? (
+                <div className="h-full w-full flex justify-center overflow-y-auto bg-black py-2">
+                  <iframe
+                    src={embed}
+                    title={trabajo.titulo}
+                    allowFullScreen
+                    scrolling="no"
+                    className="h-full w-full max-w-[460px] border-0"
+                  />
+                </div>
+              ) : null;
+            })()}
+
+          {current?.kind === "foto" && (
             <img
-              src={trabajo.fotos[0].url_avif ?? trabajo.fotos[0].url}
+              src={current.url_avif ?? current.url}
               alt={trabajo.titulo}
-              className="h-full w-full object-contain"
+              className="max-h-full max-w-full object-contain"
             />
-          ) : null}
+          )}
+
+          {/* Flechas */}
+          {count > 1 && (
+            <>
+              <button
+                onClick={() => go(-1)}
+                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
+                aria-label="Anterior"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => go(1)}
+                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
+                aria-label="Siguiente"
+              >
+                <ArrowRight className="h-5 w-5" />
+              </button>
+              <div className="absolute top-3 left-3 z-10 rounded-full bg-black/55 px-2.5 py-1 font-mono text-2xs text-background/80">
+                {idx + 1} / {count}
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Puntos del carrusel */}
+        {count > 1 && (
+          <div className="flex items-center justify-center gap-1.5 py-3 bg-ink shrink-0">
+            {media.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIdx(i)}
+                aria-label={`Ir al medio ${i + 1}`}
+                className={cn(
+                  "h-1.5 rounded-full transition-all",
+                  i === idx ? "w-5 bg-amber" : "w-1.5 bg-background/25 hover:bg-background/45",
+                )}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Info */}
         <div className="px-5 py-4 space-y-2 overflow-y-auto">
-          <div className="flex items-center gap-2 flex-wrap">
-            {trabajo.categoria && (
+          {trabajo.categoria && (
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="rounded-full border border-amber/40 px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber">
                 {trabajo.categoria}
               </span>
-            )}
-            <span className="rounded-full bg-background/8 px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.12em] text-background/40">
-              {trabajo.tipo === "video" ? "Video" : "Fotografía"}
-            </span>
-          </div>
+            </div>
+          )}
           {trabajo.titulo && (
             <h3 className="font-display font-bold text-background text-xl leading-tight">
               {trabajo.titulo}
@@ -160,12 +255,18 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
                   className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
                 >
                   <IgIcon />
-                  {trabajo.realizador_instagram.startsWith("@") ? trabajo.realizador_instagram : `@${trabajo.realizador_instagram}`}
+                  {trabajo.realizador_instagram.startsWith("@")
+                    ? trabajo.realizador_instagram
+                    : `@${trabajo.realizador_instagram}`}
                 </a>
               )}
               {trabajo.realizador_web && (
                 <a
-                  href={trabajo.realizador_web.startsWith("http") ? trabajo.realizador_web : `https://${trabajo.realizador_web}`}
+                  href={
+                    trabajo.realizador_web.startsWith("http")
+                      ? trabajo.realizador_web
+                      : `https://${trabajo.realizador_web}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
@@ -190,7 +291,9 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
 
   const categorias = useMemo(() => {
     const set = new Set<string>();
-    trabajos.forEach((t) => { if (t.categoria) set.add(t.categoria); });
+    trabajos.forEach((t) => {
+      if (t.categoria) set.add(t.categoria);
+    });
     return [...set];
   }, [trabajos]);
 
@@ -232,7 +335,9 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
               onClick={() => setFiltro(null)}
               className={cn(
                 "rounded-full px-3.5 py-1.5 font-mono text-2xs uppercase tracking-[0.15em] transition-colors",
-                filtro === null ? "bg-amber text-ink" : "border border-background/20 text-background/50 hover:border-background/40 hover:text-background/80",
+                filtro === null
+                  ? "bg-amber text-ink"
+                  : "border border-background/20 text-background/50 hover:border-background/40 hover:text-background/80",
               )}
             >
               Todo
@@ -243,7 +348,9 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
                 onClick={() => setFiltro(filtro === cat ? null : cat)}
                 className={cn(
                   "rounded-full px-3.5 py-1.5 font-mono text-2xs uppercase tracking-[0.15em] transition-colors",
-                  filtro === cat ? "bg-amber text-ink" : "border border-background/20 text-background/50 hover:border-background/40 hover:text-background/80",
+                  filtro === cat
+                    ? "bg-amber text-ink"
+                    : "border border-background/20 text-background/50 hover:border-background/40 hover:text-background/80",
                 )}
               >
                 {cat}
@@ -263,17 +370,19 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
         className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none"
       >
         {visibles.map((trabajo) => {
-          const ytId = trabajo.youtube_url ? extractYtId(trabajo.youtube_url) : null;
-          const hasVideo = !!(ytId || trabajo.instagram_reel_url);
-          const thumb = ytId
-            ? ytThumb(ytId)
-            : (trabajo.thumbnail_url ?? trabajo.fotos[0]?.url_avif ?? trabajo.fotos[0]?.url_sm ?? trabajo.fotos[0]?.url ?? null);
-          const fallback = ytId ? ytThumbFallback(ytId) : undefined;
+          const first = trabajo.media[0];
+          const hasVideo = trabajo.media.some((m) => m.kind !== "foto");
+          const t = first ? mediaThumb(first) : null;
+          const thumb = t?.src ?? null;
+          const fallback = t?.fallback;
+          const multi = trabajo.media.length > 1;
 
           return (
             <button
               key={trabajo.id}
-              onClick={() => { if (!drag.current.moved) setSelected(trabajo); }}
+              onClick={() => {
+                if (!drag.current.moved) setSelected(trabajo);
+              }}
               className="snap-start shrink-0 basis-[78%] sm:basis-[48%] lg:basis-[30%] rounded-xl overflow-hidden border border-background/10 bg-background/5 text-left group"
               draggable={false}
             >
@@ -285,7 +394,14 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
                     alt={trabajo.titulo}
                     loading="lazy"
                     draggable={false}
-                    onError={fallback ? (e) => { e.currentTarget.src = fallback; e.currentTarget.onerror = null; } : undefined}
+                    onError={
+                      fallback
+                        ? (e) => {
+                            e.currentTarget.src = fallback;
+                            e.currentTarget.onerror = null;
+                          }
+                        : undefined
+                    }
                     className="h-full w-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-[1.04]"
                   />
                 ) : (
@@ -297,10 +413,30 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
                 {hasVideo && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
                     <div className="h-10 w-10 rounded-full bg-background/85 flex items-center justify-center shadow group-hover:scale-110 transition-transform">
-                      <svg viewBox="0 0 24 24" className="h-4 w-4 text-ink ml-0.5" fill="currentColor">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4 text-ink ml-0.5"
+                        fill="currentColor"
+                      >
                         <path d="M8 5v14l11-7z" />
                       </svg>
                     </div>
+                  </div>
+                )}
+                {/* Indicador de varios medios (estilo carrusel IG) */}
+                {multi && (
+                  <div className="absolute top-2 right-2 rounded-full bg-black/55 px-2 py-0.5 flex items-center gap-1 text-background/90">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-3 w-3"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <rect x="8" y="8" width="12" height="12" rx="2" />
+                      <path d="M4 16V6a2 2 0 0 1 2-2h10" />
+                    </svg>
+                    <span className="font-mono text-2xs">{trabajo.media.length}</span>
                   </div>
                 )}
               </div>
@@ -315,7 +451,9 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
                       </p>
                     )}
                     {trabajo.realizador && (
-                      <p className="text-xs text-background/45 truncate mt-0.5">{trabajo.realizador}</p>
+                      <p className="text-xs text-background/45 truncate mt-0.5">
+                        {trabajo.realizador}
+                      </p>
                     )}
                   </div>
                   {trabajo.categoria && (
@@ -785,9 +923,7 @@ function EstudioPage() {
         </section>
 
         {/* ── En acción — trabajos ──────────────────────────────────── */}
-        {trabajos.length > 0 && (
-          <TrabajosSection trabajos={trabajos} />
-        )}
+        {trabajos.length > 0 && <TrabajosSection trabajos={trabajos} />}
 
         {/* ── Dónde estamos ─────────────────────────────────────────── */}
         <section className="border-t hairline bg-surface px-4 lg:px-12 py-14">

@@ -1882,5 +1882,13 @@ def _init_db_schema(conn):
     conn.execute(
         "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS thumbnail_url TEXT"
     )
+    # Lista ordenada de links externos (YouTube/Instagram) por trabajo:
+    # [{tipo, url, thumbnail_url}]. Fuente única de medios externos; las
+    # columnas youtube_url/instagram_reel_url quedan como fallback legacy de
+    # lectura (migración on-write). El motor une links_json + fotos_json en el
+    # carrusel `media` que consume el front.
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS links_json TEXT NOT NULL DEFAULT '[]'"
+    )
 
     conn.commit()

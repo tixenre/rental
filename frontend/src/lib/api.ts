@@ -247,6 +247,24 @@ export type EstudioConfig = {
   trabajos?: EstudioTrabajo[];
 };
 
+/** Un medio del carrusel de un trabajo: link externo (YouTube/Instagram) o foto
+ *  subida. El backend une links_json + fotos_json en esta lista ordenada. */
+export type EstudioMedia =
+  | { kind: "youtube" | "instagram"; url: string; thumbnail: string | null }
+  | {
+      kind: "foto";
+      url: string;
+      url_sm: string | null;
+      url_avif: string | null;
+      url_sm_avif: string | null;
+    };
+
+export type EstudioTrabajoLink = {
+  tipo: "youtube" | "instagram";
+  url: string;
+  thumbnail_url: string | null;
+};
+
 export type EstudioTrabajo = {
   id: number;
   titulo: string;
@@ -257,9 +275,10 @@ export type EstudioTrabajo = {
   categoria: string;
   descripcion: string;
   tipo: "fotos" | "video";
-  youtube_url: string | null;
-  instagram_reel_url: string | null;
-  thumbnail_url: string | null;
+  /** Fuente única para mostrar: lista ordenada de medios (links + fotos). */
+  media: EstudioMedia[];
+  /** Links crudos (para el admin). */
+  links: EstudioTrabajoLink[];
   fotos: Array<{
     url: string;
     url_sm: string | null;

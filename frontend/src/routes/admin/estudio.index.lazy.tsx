@@ -62,6 +62,23 @@ export const Route = createLazyFileRoute("/admin/estudio/")({
   component: EstudioAdminPage,
 });
 
+// Clasifica un link externo para el ícono y el payload (el backend re-detecta).
+function linkTipo(url: string): "youtube" | "instagram" | null {
+  if (!url) return null;
+  if (/youtu/.test(url)) return "youtube";
+  if (/instagram\.com/.test(url)) return "instagram";
+  return null;
+}
+
+// Ícono de Instagram (lucide no trae el glifo de marca).
+function IgGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
+    </svg>
+  );
+}
+
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 // El value puede estar vacío: features con value en blanco se ocultan en
@@ -877,7 +894,9 @@ function TrabajoDialog({
   const [categoria, setCategoria] = useState(existing?.categoria ?? "");
   const [draggingOver, setDraggingOver] = useState(false);
   const [descripcion, setDescripcion] = useState(existing?.descripcion ?? "");
-  const [videoUrl, setVideoUrl] = useState(existing?.youtube_url || existing?.instagram_reel_url || "");
+  const [links, setLinks] = useState<string[]>(
+    existing?.links?.length ? existing.links.map((l) => l.url) : [""],
+  );
   const [activo, setActivo] = useState(existing?.activo ?? true);
   const [trabajoId, setTrabajoId] = useState<number | null>(existing?.id ?? null);
   const [fotos, setFotos] = useState(existing?.fotos ?? []);
@@ -892,11 +911,24 @@ function TrabajoDialog({
   const logoInputRef = useRef<HTMLInputElement>(null);
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-fetch metadata al pegar un link reconocido
-  function handleVideoUrlChange(url: string) {
-    setVideoUrl(url);
+  function setLinkAt(idx: number, url: string) {
+    setLinks((prev) => prev.map((l, i) => (i === idx ? url : l)));
+  }
+  function addLinkRow() {
+    setLinks((prev) => [...prev, ""]);
+  }
+  function removeLinkRow(idx: number) {
+    setLinks((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      return next.length ? next : [""];
+    });
+  }
+
+  // Auto-fetch metadata al pegar un link reconocido (prefill de titulo/realizador).
+  function handleLinkChange(idx: number, url: string) {
+    setLinkAt(idx, url);
     if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
-    if (!url || (!/youtu/.test(url) && !/instagram\.com/.test(url))) return;
+    if (!linkTipo(url)) return;
     fetchDebounceRef.current = setTimeout(async () => {
       setFetchingMeta(true);
       try {
@@ -904,8 +936,11 @@ function TrabajoDialog({
         if (meta.titulo && !titulo) setTitulo(meta.titulo);
         if (meta.realizador && !realizador) setRealizador(meta.realizador);
         if (meta.descripcion && !descripcion) setDescripcion(meta.descripcion);
-      } catch { /* best-effort */ }
-      finally { setFetchingMeta(false); }
+      } catch {
+        /* best-effort */
+      } finally {
+        setFetchingMeta(false);
+      }
     }, 700);
   }
 
@@ -919,7 +954,7 @@ function TrabajoDialog({
     setWeb(t?.realizador_web ?? "");
     setCategoria(t?.categoria ?? "");
     setDescripcion(t?.descripcion ?? "");
-    setVideoUrl(t?.youtube_url || t?.instagram_reel_url || "");
+    setLinks(t?.links?.length ? t.links.map((l) => l.url) : [""]);
     setActivo(t?.activo ?? true);
     setTrabajoId(t?.id ?? null);
     setFotos(t?.fotos ?? []);
@@ -927,25 +962,25 @@ function TrabajoDialog({
     setShowExtra(false);
   }, [open, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isYt = /youtu/.test(videoUrl);
-  const isIg = /instagram\.com/.test(videoUrl);
-  const ytUrl = isYt ? videoUrl : null;
-  const igUrl = isIg ? videoUrl : null;
+  const cleanLinks = links.map((l) => l.trim()).filter((l) => linkTipo(l));
+  const linksPayload = cleanLinks.map((url) => ({ url, tipo: linkTipo(url) }));
 
-  async function ensureCreated(): Promise<number> {
-    if (trabajoId) return trabajoId;
-    const data: EstudioTrabajoInput = {
+  function buildData(): EstudioTrabajoInput {
+    return {
       titulo,
       realizador,
       realizador_instagram: instagram || null,
       realizador_web: web || null,
       categoria,
       descripcion,
-      youtube_url: ytUrl,
-      instagram_reel_url: igUrl,
+      links: linksPayload,
       activo,
     };
-    const created = await trabajosAdminApi.create(data);
+  }
+
+  async function ensureCreated(): Promise<number> {
+    if (trabajoId) return trabajoId;
+    const created = await trabajosAdminApi.create(buildData());
     setTrabajoId(created.id);
     return created.id;
   }
@@ -953,17 +988,7 @@ function TrabajoDialog({
   async function handleSave() {
     setSaving(true);
     try {
-      const data: EstudioTrabajoInput = {
-        titulo,
-        realizador,
-        realizador_instagram: instagram || null,
-        realizador_web: web || null,
-        categoria,
-        descripcion,
-        youtube_url: ytUrl,
-        instagram_reel_url: igUrl,
-        activo,
-      };
+      const data = buildData();
       let result: EstudioTrabajo;
       if (trabajoId) {
         result = await trabajosAdminApi.update(trabajoId, data);
@@ -1046,50 +1071,79 @@ function TrabajoDialog({
         </div>
 
         <div className="p-5 space-y-5">
-          {/* URL — campo primario, auto-fetch */}
+          {/* Links — campo primario, auto-fetch en el primero. Varios links =
+              varias diapositivas del carrusel público. */}
           <div className="space-y-2">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground block">
-              Link del posteo
+              Links (YouTube / Instagram)
             </label>
-            <div className="flex items-center gap-2">
-              {isYt ? (
-                <Film className="h-4 w-4 shrink-0 text-muted-foreground" />
-              ) : isIg ? (
-                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-muted-foreground" fill="currentColor">
-                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
-                </svg>
-              ) : (
-                <Film className="h-4 w-4 shrink-0 text-muted-foreground/30" />
-              )}
-              <Input
-                value={videoUrl}
-                onChange={(e) => handleVideoUrlChange(e.target.value)}
-                placeholder="YouTube, Instagram (reel, foto, carrusel)\u2026"
-                autoFocus={!isEdit}
-              />
+            <div className="space-y-2">
+              {links.map((url, idx) => {
+                const tipo = linkTipo(url);
+                return (
+                  <div key={idx} className="flex items-center gap-2">
+                    {tipo === "youtube" ? (
+                      <Film className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    ) : tipo === "instagram" ? (
+                      <IgGlyph className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <Film className="h-4 w-4 shrink-0 text-muted-foreground/30" />
+                    )}
+                    <Input
+                      value={url}
+                      onChange={(e) => handleLinkChange(idx, e.target.value)}
+                      placeholder="Pegá un link de YouTube o Instagram…"
+                      autoFocus={!isEdit && idx === 0}
+                    />
+                    {(links.length > 1 || url) && (
+                      <button
+                        type="button"
+                        onClick={() => removeLinkRow(idx)}
+                        className="shrink-0 rounded-full p-1.5 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
+                        aria-label="Quitar link"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            {fetchingMeta && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Obteniendo info\u2026
-              </div>
-            )}
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={addLinkRow}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Agregar otro link
+              </button>
+              {fetchingMeta && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Obteniendo info…
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground/50">
+              Instagram funciona con reels, fotos y carruseles. Se muestran como un carrusel.
+            </p>
           </div>
 
-          {/* T\u00edtulo \u2014 auto-rellenado */}
+          {/* Título — auto-rellenado */}
           <div className="space-y-1">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              T\u00edtulo{" "}
+              Título{" "}
               <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
             </label>
             <Input
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Auto-rellenado desde el link, o escrib\u00ed uno"
+              placeholder="Auto-rellenado desde el link, o escribí uno"
             />
           </div>
 
-          {/* Realizador \u2014 auto-rellenado */}
+          {/* Realizador — auto-rellenado */}
           <div className="space-y-1">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Realizador / Productora{" "}
@@ -1098,14 +1152,14 @@ function TrabajoDialog({
             <Input
               value={realizador}
               onChange={(e) => setRealizador(e.target.value)}
-              placeholder="Auto-rellenado desde el link, o escrib\u00ed uno"
+              placeholder="Auto-rellenado desde el link, o escribí uno"
             />
           </div>
 
-          {/* Categor\u00eda */}
+          {/* Categoría */}
           <div className="space-y-2">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Categor\u00eda{" "}
+              Categoría{" "}
               <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
             </label>
             {availableCategorias.length > 0 && (
@@ -1135,7 +1189,11 @@ function TrabajoDialog({
             <Input
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
-              placeholder={availableCategorias.length > 0 ? "O escrib\u00ed una nueva\u2026" : "Ej: Moda, Editorial, Producto\u2026"}
+              placeholder={
+                availableCategorias.length > 0
+                  ? "O escribí una nueva…"
+                  : "Ej: Moda, Editorial, Producto…"
+              }
             />
           </div>
 
@@ -1143,9 +1201,11 @@ function TrabajoDialog({
           <div className="space-y-2">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Fotos{" "}
-              {fotos.length > 0
-                ? `(${fotos.length})`
-                : <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>}
+              {fotos.length > 0 ? (
+                `(${fotos.length})`
+              ) : (
+                <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
+              )}
             </label>
             {fotos.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
@@ -1154,11 +1214,7 @@ function TrabajoDialog({
                     key={idx}
                     className="relative aspect-square rounded-lg overflow-hidden border hairline group"
                   >
-                    <img
-                      src={f.url_sm ?? f.url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={f.url_sm ?? f.url} alt="" className="h-full w-full object-cover" />
                     <button
                       onClick={() => handleDeleteFoto(idx)}
                       className="absolute top-1 right-1 rounded-full bg-black/70 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1181,8 +1237,14 @@ function TrabajoDialog({
               }}
             />
             <div
-              onDragOver={(e) => { e.preventDefault(); setDraggingOver(true); }}
-              onDragEnter={(e) => { e.preventDefault(); setDraggingOver(true); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDraggingOver(true);
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setDraggingOver(true);
+              }}
               onDragLeave={() => setDraggingOver(false)}
               onDrop={(e) => {
                 e.preventDefault();
@@ -1192,30 +1254,31 @@ function TrabajoDialog({
               onClick={() => !uploadingFoto && fotoInputRef.current?.click()}
               className={cn(
                 "rounded-xl border-2 border-dashed p-5 text-center cursor-pointer transition-colors",
-                draggingOver
-                  ? "border-ink bg-ink/5"
-                  : "border-hairline hover:border-ink/40",
+                draggingOver ? "border-ink bg-ink/5" : "border-hairline hover:border-ink/40",
                 uploadingFoto && "opacity-60 cursor-not-allowed",
               )}
             >
               {uploadingFoto ? (
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Subiendo\u2026
+                  Subiendo…
                 </div>
               ) : (
                 <>
                   <Upload className="h-5 w-5 mx-auto mb-1.5 text-muted-foreground/50" />
                   <p className="text-sm text-muted-foreground">
-                    Arrastr\u00e1 fotos ac\u00e1 o <span className="text-foreground underline underline-offset-2">hac\u00e9 click</span>
+                    Arrastrá fotos acá o{" "}
+                    <span className="text-foreground underline underline-offset-2">hacé click</span>
                   </p>
-                  <p className="text-xs text-muted-foreground/50 mt-0.5">Pod\u00e9s seleccionar varias a la vez</p>
+                  <p className="text-xs text-muted-foreground/50 mt-0.5">
+                    Podés seleccionar varias a la vez
+                  </p>
                 </>
               )}
             </div>
           </div>
 
-          {/* M\u00e1s detalles \u2014 collapsible */}
+          {/* Más detalles — collapsible */}
           <div className="border-t hairline pt-4">
             <button
               type="button"
@@ -1231,13 +1294,13 @@ function TrabajoDialog({
               >
                 <path d="M9 18l6-6-6-6" />
               </svg>
-              M\u00e1s detalles (descripci\u00f3n, redes del realizador, logo, visibilidad)
+              Más detalles (descripción, redes del realizador, logo, visibilidad)
             </button>
             {showExtra && (
               <div className="space-y-4 mt-4">
                 <div className="space-y-1">
                   <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    Descripci\u00f3n breve
+                    Descripción breve
                   </label>
                   <Textarea
                     value={descripcion}
@@ -1324,18 +1387,23 @@ function TrabajoDialog({
                       )}
                     />
                   </button>
-                  <span className="text-sm text-muted-foreground">Visible en la p\u00e1gina p\u00fablica</span>
+                  <span className="text-sm text-muted-foreground">
+                    Visible en la página pública
+                  </span>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-                <div className="sticky bottom-0 bg-surface border-t hairline px-5 py-4 flex justify-end gap-2">
+        <div className="sticky bottom-0 bg-surface border-t hairline px-5 py-4 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={saving || !titulo.trim()}>
+          <Button
+            onClick={handleSave}
+            disabled={saving || (!cleanLinks.length && !titulo.trim() && !fotos.length)}
+          >
             {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
             {isEdit ? "Guardar cambios" : "Crear trabajo"}
           </Button>
@@ -1361,12 +1429,13 @@ function SortableTrabajoCard({
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
-  const thumb =
-    trabajo.tipo === "fotos"
-      ? (trabajo.fotos[0]?.url_sm ?? trabajo.fotos[0]?.url ?? null)
-      : trabajo.youtube_url
-        ? `https://img.youtube.com/vi/${extractYoutubeId(trabajo.youtube_url)}/mqdefault.jpg`
-        : null;
+  // Thumbnail = primer medio del carrusel (link procesado o foto).
+  const first = trabajo.media?.[0];
+  const thumb = first
+    ? first.kind === "foto"
+      ? (first.url_sm ?? first.url ?? null)
+      : (first.thumbnail ?? null)
+    : null;
 
   return (
     <div
@@ -1410,16 +1479,9 @@ function SortableTrabajoCard({
         <p className="text-xs text-muted-foreground truncate">{trabajo.realizador || "—"}</p>
       </div>
 
-      {/* Tipo badge */}
-      <span
-        className={cn(
-          "shrink-0 rounded-full px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em]",
-          trabajo.tipo === "video"
-            ? "bg-violet-100 text-violet-700"
-            : "bg-amber-100 text-amber-700",
-        )}
-      >
-        {trabajo.tipo}
+      {/* Cantidad de medios */}
+      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground">
+        {trabajo.media.length} {trabajo.media.length === 1 ? "medio" : "medios"}
       </span>
 
       {/* Actions */}
@@ -1452,11 +1514,6 @@ function SortableTrabajoCard({
       </div>
     </div>
   );
-}
-
-function extractYoutubeId(url: string): string {
-  const m = url.match(/(?:v=|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-  return m?.[1] ?? "";
 }
 
 function TrabajosSection({
@@ -1502,7 +1559,10 @@ function TrabajosSection({
     onError: (e) => toast.error("Error reordenando", { description: (e as Error).message }),
   });
 
-  function handleDragEnd(event: { active: { id: number | string }; over: { id: number | string } | null }) {
+  function handleDragEnd(event: {
+    active: { id: number | string };
+    over: { id: number | string } | null;
+  }) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     setTrabajos((prev) => {
@@ -1539,11 +1599,7 @@ function TrabajosSection({
           Producciones que aparecen en la sección "en acción" del estudio. Arrastrá para reordenar.
         </p>
 
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={trabajos.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
               {trabajos.map((t) => (

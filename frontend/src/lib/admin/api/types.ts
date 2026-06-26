@@ -1150,6 +1150,23 @@ export type EstudioTrabajoFoto = {
   path: string | null;
 };
 
+/** Un medio del carrusel: link externo (YouTube/Instagram) o foto subida. */
+export type EstudioMedia =
+  | { kind: "youtube" | "instagram"; url: string; thumbnail: string | null }
+  | {
+      kind: "foto";
+      url: string;
+      url_sm: string | null;
+      url_avif: string | null;
+      url_sm_avif: string | null;
+    };
+
+export type EstudioTrabajoLink = {
+  tipo: "youtube" | "instagram";
+  url: string;
+  thumbnail_url: string | null;
+};
+
 export type EstudioTrabajo = {
   id: number;
   titulo: string;
@@ -1160,9 +1177,8 @@ export type EstudioTrabajo = {
   categoria: string;
   descripcion: string;
   tipo: "fotos" | "video";
-  youtube_url: string | null;
-  instagram_reel_url: string | null;
-  thumbnail_url: string | null;
+  media: EstudioMedia[];
+  links: EstudioTrabajoLink[];
   fotos: EstudioTrabajoFoto[];
   orden: number;
   activo: boolean;
@@ -1177,8 +1193,8 @@ export type EstudioTrabajoInput = {
   realizador_web?: string | null;
   categoria?: string;
   descripcion?: string;
-  youtube_url?: string | null;
-  instagram_reel_url?: string | null;
+  /** Lista ordenada de links externos. El backend deriva el tipo y el thumbnail. */
+  links?: Array<{ url: string; tipo?: string | null }>;
   activo?: boolean;
 };
 

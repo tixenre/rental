@@ -218,10 +218,156 @@ def _fetch_og_meta(url: str) -> dict:
         return {}
 
 
-def _fetch_ig_thumbnail(shortcode: str, post_type: str = "reel") -> str | None:
-    """Intenta obtener la thumbnail de un post de IG vía og:image (best-effort)."""
-    meta = _fetch_og_meta(f"https://www.instagram.com/{post_type}/{shortcode}/")
-    return meta.get("image")
+# ── Medios externos (links YouTube/Instagram) ─────────────────────────────────
+#
+# Un trabajo es una lista ordenada de medios: links externos (YouTube/Instagram)
+# + fotos subidas. Los thumbnails de los links NO se hotlinkean crudos — las URLs
+# del CDN de Instagram expiran y se bloquean por referrer; las de YouTube son
+# estables pero igual las pasamos por el motor para tener una copia permanente +
+# AVIF. `_process_remote_thumbnail` baja la imagen y la guarda en R2 vía el motor
+# (dedup por hash → no reprocesa la misma imagen).
+
+
+def _detect_link_tipo(url: str) -> str | None:
+    """Clasifica una URL externa. None si no es un proveedor soportado."""
+    if not url:
+        return None
+    if "youtu" in url:
+        return "youtube"
+    if "instagram.com" in url:
+        return "instagram"
+    return None
+
+
+def _extract_yt_id(url: str) -> str | None:
+    m = _re.search(
+        r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|live/))([A-Za-z0-9_-]{11})",
+        url,
+    )
+    return m.group(1) if m else None
+
+
+def _process_remote_thumbnail(url: str | None) -> str | None:
+    """Baja una imagen remota (og:image de IG, thumb de YT) y la guarda permanente
+    en R2 vía el motor de medios. Devuelve la URL de display (webp). Best-effort:
+    None ante cualquier fallo (la card cae a un placeholder)."""
+    if not url:
+        return None
+    try:
+        with media_http():
+            _validate_ssrf_only(url)
+            raw, _ct = _download_image_bytes(url)
+        with get_db() as conn:
+            with media_http():
+                asset = store_upload(
+                    raw,
+                    kind="estudio",
+                    derive_specs=[
+                        DISPLAY_KEEP_ASPECT,
+                        DISPLAY_KEEP_ASPECT_SM,
+                        DISPLAY_KEEP_ASPECT_AVIF,
+                        DISPLAY_KEEP_ASPECT_SM_AVIF,
+                    ],
+                    conn=conn,
+                )
+            conn.commit()
+        return asset.variant("display").url
+    except Exception:
+        return None
+
+
+def _resolve_link_thumbnail(tipo: str, url: str) -> str | None:
+    """Obtiene un thumbnail permanente para un link, según el proveedor."""
+    if tipo == "youtube":
+        vid = _extract_yt_id(url)
+        if not vid:
+            return None
+        for quality in ("maxresdefault", "hqdefault"):
+            thumb = _process_remote_thumbnail(
+                f"https://img.youtube.com/vi/{vid}/{quality}.jpg"
+            )
+            if thumb:
+                return thumb
+        return None
+    if tipo == "instagram":
+        ig = _extract_ig_shortcode(url)
+        if not ig:
+            return None
+        og = _fetch_og_meta(f"https://www.instagram.com/{ig[1]}/{ig[0]}/")
+        return _process_remote_thumbnail(og.get("image"))
+    return None
+
+
+def _resolve_links(incoming: list, existing: list | None) -> list:
+    """Normaliza la lista de links entrante a [{tipo, url, thumbnail_url}].
+
+    Reusa el thumbnail ya procesado de un link cuya URL no cambió (evita re-bajar
+    y re-procesar en cada edición). El `tipo` lo decide el server (ignora lo que
+    mande el front)."""
+    existing_by_url = {l.get("url"): l for l in (existing or []) if l.get("url")}
+    out: list = []
+    seen: set = set()
+    for link in incoming:
+        url = (link.get("url") or "").strip()
+        if not url or url in seen:
+            continue
+        tipo = _detect_link_tipo(url)
+        if not tipo:
+            continue
+        seen.add(url)
+        prev = existing_by_url.get(url)
+        thumb = prev.get("thumbnail_url") if prev else None
+        if not thumb:
+            thumb = _resolve_link_thumbnail(tipo, url)
+        out.append({"tipo": tipo, "url": url, "thumbnail_url": thumb})
+    return out
+
+
+def _build_media(links: list, fotos: list) -> list:
+    """Une links + fotos en la lista `media` ordenada que consume el carrusel del
+    front. Links primero (el medio 'titular'), después las fotos subidas."""
+    media: list = []
+    for link in links or []:
+        media.append({
+            "kind": link.get("tipo"),
+            "url": link.get("url"),
+            "thumbnail": link.get("thumbnail_url"),
+        })
+    for foto in fotos or []:
+        media.append({
+            "kind": "foto",
+            "url": foto.get("url"),
+            "url_sm": foto.get("url_sm"),
+            "url_avif": foto.get("url_avif"),
+            "url_sm_avif": foto.get("url_sm_avif"),
+        })
+    return media
+
+
+def _trabajo_links(row) -> list:
+    """Lee los links de un trabajo: links_json, con fallback a las columnas
+    sueltas legacy (youtube_url/instagram_reel_url) para filas no migradas.
+
+    ⏰ LEGACY: el fallback a youtube_url/instagram_reel_url/thumbnail_url (acá +
+    en el UPDATE que las vacía) se remueve cuando todos los trabajos existentes
+    pasaron por links_json (editar y guardar cada uno migra on-write). Una vez
+    que no quede ninguna fila con esas columnas pobladas, dropear las 3 columnas
+    y este bloque."""
+    links = _parse_json_field(row["links_json"]) or []
+    if links:
+        return links
+    legacy: list = []
+    if row["youtube_url"]:
+        legacy.append({
+            "tipo": "youtube", "url": row["youtube_url"],
+            "thumbnail_url": row["thumbnail_url"],
+        })
+    if row["instagram_reel_url"]:
+        legacy.append({
+            "tipo": "instagram", "url": row["instagram_reel_url"],
+            "thumbnail_url": row["thumbnail_url"],
+        })
+    return legacy
 
 
 def _get_trabajos(conn, solo_activos: bool = True) -> list:
@@ -229,15 +375,18 @@ def _get_trabajos(conn, solo_activos: bool = True) -> list:
         "SELECT id, titulo, realizador, realizador_logo_url, "
         "realizador_instagram, realizador_web, categoria, descripcion, "
         "tipo, youtube_url, instagram_reel_url, thumbnail_url, "
-        "fotos_json, orden, activo, created_at, updated_at "
+        "links_json, fotos_json, orden, activo, created_at, updated_at "
         "FROM estudio_trabajos "
     )
     q += "WHERE activo = TRUE " if solo_activos else ""
     q += "ORDER BY orden, id"
     cur = conn.execute(q)
     rows = cur.fetchall()
-    return [
-        {
+    out = []
+    for r in rows:
+        links = _trabajo_links(r)
+        fotos = _parse_json_field(r["fotos_json"]) or []
+        out.append({
             "id": r["id"],
             "titulo": r["titulo"],
             "realizador": r["realizador"],
@@ -247,17 +396,17 @@ def _get_trabajos(conn, solo_activos: bool = True) -> list:
             "categoria": r["categoria"] or "",
             "descripcion": r["descripcion"] or "",
             "tipo": r["tipo"],
-            "youtube_url": r["youtube_url"],
-            "instagram_reel_url": r["instagram_reel_url"],
-            "thumbnail_url": r["thumbnail_url"],
-            "fotos": _parse_json_field(r["fotos_json"]) or [],
+            # Fuente única para el front: lista ordenada de medios (links + fotos).
+            "media": _build_media(links, fotos),
+            # Links crudos para que el admin pueda editarlos.
+            "links": links,
+            "fotos": fotos,
             "orden": r["orden"],
             "activo": bool(r["activo"]),
             "created_at": r["created_at"].isoformat() if r["created_at"] else None,
             "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
-        }
-        for r in rows
-    ]
+        })
+    return out
 
 
 @router.get("/estudio")
@@ -604,6 +753,13 @@ async def fetch_trabajo_meta(request: Request):
     return {"fuente": "desconocido"}
 
 
+class TrabajoLinkInput(BaseModel):
+    url: str
+    # `tipo` lo decide el server (`_resolve_links`); se acepta pero se ignora.
+    tipo: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+
+
 class TrabajoCreate(BaseModel):
     titulo: str = ""
     realizador: str = ""
@@ -611,21 +767,17 @@ class TrabajoCreate(BaseModel):
     realizador_web: Optional[str] = None
     categoria: str = ""
     descripcion: str = ""
-    youtube_url: Optional[str] = None
-    instagram_reel_url: Optional[str] = None
+    links: list[TrabajoLinkInput] = []
     activo: bool = True
 
 
 @router.post("/admin/estudio/trabajos")
 def admin_create_trabajo(body: TrabajoCreate, request: Request):
     require_admin(request)
-    # Auto-derivar tipo y buscar thumbnail de IG
-    tipo = "video" if body.youtube_url else "fotos"
-    thumbnail_url: Optional[str] = None
-    if body.instagram_reel_url:
-        ig = _extract_ig_shortcode(body.instagram_reel_url)
-        if ig:
-            thumbnail_url = _fetch_ig_thumbnail(*ig)
+    # Resolver links (baja + procesa thumbnails) ANTES de abrir la conexión del
+    # insert — `_process_remote_thumbnail` usa su propia conexión corta.
+    links = _resolve_links([l.dict() for l in body.links], existing=[])
+    tipo = "video" if links else "fotos"
     with get_db() as conn:
         cur = conn.execute(
             "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_trabajos"
@@ -634,12 +786,10 @@ def admin_create_trabajo(body: TrabajoCreate, request: Request):
         cur2 = conn.execute(
             "INSERT INTO estudio_trabajos "
             "(titulo, realizador, realizador_instagram, realizador_web, "
-            "categoria, descripcion, tipo, youtube_url, instagram_reel_url, "
-            "thumbnail_url, orden, activo) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            "categoria, descripcion, tipo, links_json, orden, activo) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
             (body.titulo, body.realizador, body.realizador_instagram, body.realizador_web,
-             body.categoria, body.descripcion, tipo, body.youtube_url,
-             body.instagram_reel_url, thumbnail_url, orden, body.activo),
+             body.categoria, body.descripcion, tipo, json.dumps(links), orden, body.activo),
         )
         new_id = cur2.fetchone()["id"]
         conn.commit()
@@ -654,24 +804,39 @@ class TrabajoUpdate(BaseModel):
     realizador_web: Optional[str] = None
     categoria: Optional[str] = None
     descripcion: Optional[str] = None
-    youtube_url: Optional[str] = None
-    instagram_reel_url: Optional[str] = None
+    links: Optional[list[TrabajoLinkInput]] = None
     activo: Optional[bool] = None
 
 
 @router.patch("/admin/estudio/trabajos/{trabajo_id}")
 def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request):
     require_admin(request)
-    updates = {k: v for k, v in body.dict().items() if v is not None}
+    updates = {
+        k: v for k, v in body.dict(exclude={"links"}).items() if v is not None
+    }
+    # Los links se manejan aparte: `links is not None` distingue "no tocar"
+    # (None) de "vaciar" ([]). Se resuelven antes de abrir la conexión del UPDATE.
+    if body.links is not None:
+        with get_db() as conn:
+            cur = conn.execute(
+                "SELECT links_json, youtube_url, instagram_reel_url, thumbnail_url "
+                "FROM estudio_trabajos WHERE id = ?",
+                (trabajo_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(404, "Trabajo no encontrado")
+            existing = _trabajo_links(row)
+        resolved = _resolve_links([l.dict() for l in body.links], existing=existing)
+        updates["links_json"] = json.dumps(resolved)
+        updates["tipo"] = "video" if resolved else "fotos"
+        # Migración on-write: las columnas legacy quedan vacías una vez que la
+        # fila pasó por links_json.
+        updates["youtube_url"] = None
+        updates["instagram_reel_url"] = None
+        updates["thumbnail_url"] = None
     if not updates:
         raise HTTPException(400, "Nada que actualizar")
-    # Auto-derivar tipo si cambió youtube_url o instagram_reel_url
-    if "youtube_url" in updates or "instagram_reel_url" in updates:
-        updates["tipo"] = "video" if updates.get("youtube_url") else "fotos"
-    # Si cambió instagram_reel_url, re-fetchear thumbnail
-    if "instagram_reel_url" in updates:
-        ig = _extract_ig_shortcode(updates["instagram_reel_url"] or "")
-        updates["thumbnail_url"] = _fetch_ig_thumbnail(*ig) if ig else None
     with get_db() as conn:
         set_parts = [f"{k} = ?" for k in updates]
         set_parts.append("updated_at = ?")
