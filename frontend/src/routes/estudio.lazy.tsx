@@ -184,7 +184,9 @@ function TrabajoModal({
   const isShort = current?.kind === "youtube" && /\/shorts\//.test(current.url);
   const modalWidth =
     current?.kind === "instagram"
-      ? "min(94vw, 480px)"
+      ? current.w && current.h
+        ? `min(94vw, calc((82vh - 260px) * ${(current.w / current.h).toFixed(4)}))`
+        : "min(94vw, 480px)"
       : current?.kind === "youtube"
         ? isShort
           ? "min(94vw, calc(82vh * 9 / 16))"
@@ -247,8 +249,8 @@ function TrabajoModal({
             // Así solo se ve el media; descripción, likes y comentarios quedan debajo
             // del overflow:hidden y no aparecen.
             const ar = current.w && current.h ? current.h / current.w : null;
-            const clipH = ar
-              ? `calc(min(94vw, 480px) * ${ar.toFixed(4)} + 260px)`
+            const clipH = ar && modalWidth
+              ? `calc(${modalWidth} * ${ar.toFixed(4)} + 260px)`
               : "82vh";
             return (
               <div
