@@ -1152,13 +1152,21 @@ export type EstudioTrabajoFoto = {
 
 /** Un medio del carrusel: link externo (YouTube/Instagram) o foto subida. */
 export type EstudioMedia =
-  | { kind: "youtube" | "instagram"; url: string; thumbnail: string | null }
+  | {
+      kind: "youtube" | "instagram";
+      url: string;
+      thumbnail: string | null;
+      w: number | null;
+      h: number | null;
+    }
   | {
       kind: "foto";
       url: string;
       url_sm: string | null;
       url_avif: string | null;
       url_sm_avif: string | null;
+      w: number | null;
+      h: number | null;
     };
 
 export type EstudioTrabajoLink = {

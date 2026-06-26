@@ -335,6 +335,110 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
   );
 }
 
+// Card del carrusel. Alto fijo, ancho según la proporción REAL del thumbnail
+// (vertical/cuadrado/horizontal) — sin recortar. Las dimensiones vienen del
+// backend (links) o se miden al cargar la imagen (fotos); default 4/5 vertical.
+function TrabajoCard({ trabajo, onOpen }: { trabajo: EstudioTrabajo; onOpen: () => void }) {
+  const first = trabajo.media[0];
+  const hasVideo = trabajo.media.some((m) => m.kind !== "foto");
+  const t = first ? mediaThumb(first) : null;
+  const multi = trabajo.media.length > 1;
+
+  const initial = first && first.w && first.h ? first.w / first.h : null;
+  const [aspect, setAspect] = useState<number | null>(initial);
+  const ar = aspect ?? 4 / 5;
+  // El ancho de la card sale del alto base × la proporción real, topado a 86vw.
+  // El thumbnail usa `aspect-ratio` (no alto fijo) → si el ancho topa en mobile,
+  // baja el alto y la proporción se mantiene (un video horizontal no se recorta).
+  const CARD_H = "clamp(12rem, 40vh, 22rem)";
+
+  return (
+    <button
+      onClick={onOpen}
+      className="snap-start shrink-0 rounded-xl overflow-hidden border border-background/10 bg-background/5 text-left group"
+      style={{ width: `min(calc(${CARD_H} * ${ar}), 86vw)` }}
+      draggable={false}
+    >
+      {/* Thumbnail — proporción real del medio (sin recortar) */}
+      <div className="relative w-full overflow-hidden bg-background/5" style={{ aspectRatio: ar }}>
+        {t?.src ? (
+          <img
+            src={t.src}
+            alt={trabajo.titulo}
+            loading="lazy"
+            draggable={false}
+            onLoad={(e) => {
+              const w = e.currentTarget.naturalWidth;
+              const h = e.currentTarget.naturalHeight;
+              if (w && h) setAspect(w / h);
+            }}
+            onError={
+              t.fallback
+                ? (e) => {
+                    e.currentTarget.src = t.fallback!;
+                    e.currentTarget.onerror = null;
+                  }
+                : undefined
+            }
+            className="h-full w-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-[1.04]"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-background/15 text-xs">sin imagen</span>
+          </div>
+        )}
+        {/* Play badge */}
+        {hasVideo && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+            <div className="h-10 w-10 rounded-full bg-background/85 flex items-center justify-center shadow group-hover:scale-110 transition-transform">
+              <svg viewBox="0 0 24 24" className="h-4 w-4 text-ink ml-0.5" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </div>
+        )}
+        {/* Indicador de varios medios (estilo carrusel IG) */}
+        {multi && (
+          <div className="absolute top-2 right-2 rounded-full bg-black/55 px-2 py-0.5 flex items-center gap-1 text-background/90">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <rect x="8" y="8" width="12" height="12" rx="2" />
+              <path d="M4 16V6a2 2 0 0 1 2-2h10" />
+            </svg>
+            <span className="font-mono text-2xs">{trabajo.media.length}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Footer compacto */}
+      <div className="px-3 py-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            {trabajo.titulo && (
+              <p className="text-sm font-semibold text-background leading-snug truncate">
+                {trabajo.titulo}
+              </p>
+            )}
+            {trabajo.realizador && (
+              <p className="text-xs text-background/45 truncate mt-0.5">{trabajo.realizador}</p>
+            )}
+          </div>
+          {trabajo.categoria && (
+            <span className="shrink-0 rounded-full bg-amber/15 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-amber/80 whitespace-nowrap">
+              {trabajo.categoria}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
 function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
   const [filtro, setFiltro] = useState<string | null>(null);
   const [selected, setSelected] = useState<EstudioTrabajo | null>(null);
@@ -419,103 +523,15 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
         onPointerLeave={onPointerUp}
         className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none"
       >
-        {visibles.map((trabajo) => {
-          const first = trabajo.media[0];
-          const hasVideo = trabajo.media.some((m) => m.kind !== "foto");
-          const t = first ? mediaThumb(first) : null;
-          const thumb = t?.src ?? null;
-          const fallback = t?.fallback;
-          const multi = trabajo.media.length > 1;
-
-          return (
-            <button
-              key={trabajo.id}
-              onClick={() => {
-                if (!drag.current.moved) setSelected(trabajo);
-              }}
-              className="snap-start shrink-0 basis-[78%] sm:basis-[48%] lg:basis-[30%] rounded-xl overflow-hidden border border-background/10 bg-background/5 text-left group"
-              draggable={false}
-            >
-              {/* Thumbnail */}
-              <div className="aspect-[3/2] relative overflow-hidden bg-background/5">
-                {thumb ? (
-                  <img
-                    src={thumb}
-                    alt={trabajo.titulo}
-                    loading="lazy"
-                    draggable={false}
-                    onError={
-                      fallback
-                        ? (e) => {
-                            e.currentTarget.src = fallback;
-                            e.currentTarget.onerror = null;
-                          }
-                        : undefined
-                    }
-                    className="h-full w-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-[1.04]"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-background/15 text-xs">sin imagen</span>
-                  </div>
-                )}
-                {/* Play badge */}
-                {hasVideo && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
-                    <div className="h-10 w-10 rounded-full bg-background/85 flex items-center justify-center shadow group-hover:scale-110 transition-transform">
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-4 w-4 text-ink ml-0.5"
-                        fill="currentColor"
-                      >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </div>
-                  </div>
-                )}
-                {/* Indicador de varios medios (estilo carrusel IG) */}
-                {multi && (
-                  <div className="absolute top-2 right-2 rounded-full bg-black/55 px-2 py-0.5 flex items-center gap-1 text-background/90">
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-3 w-3"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect x="8" y="8" width="12" height="12" rx="2" />
-                      <path d="M4 16V6a2 2 0 0 1 2-2h10" />
-                    </svg>
-                    <span className="font-mono text-2xs">{trabajo.media.length}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer compacto */}
-              <div className="px-3 py-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    {trabajo.titulo && (
-                      <p className="text-sm font-semibold text-background leading-snug truncate">
-                        {trabajo.titulo}
-                      </p>
-                    )}
-                    {trabajo.realizador && (
-                      <p className="text-xs text-background/45 truncate mt-0.5">
-                        {trabajo.realizador}
-                      </p>
-                    )}
-                  </div>
-                  {trabajo.categoria && (
-                    <span className="shrink-0 rounded-full bg-amber/15 px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-amber/80 whitespace-nowrap">
-                      {trabajo.categoria}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+        {visibles.map((trabajo) => (
+          <TrabajoCard
+            key={trabajo.id}
+            trabajo={trabajo}
+            onOpen={() => {
+              if (!drag.current.moved) setSelected(trabajo);
+            }}
+          />
+        ))}
       </div>
 
       {selected && <TrabajoModal trabajo={selected} onClose={() => setSelected(null)} />}

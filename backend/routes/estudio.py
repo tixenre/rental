@@ -271,13 +271,14 @@ def _process_remote_thumbnail(url: str | None) -> str | None:
                     conn=conn,
                 )
             conn.commit()
-        return asset.variant("display").url
+        v = asset.variant("display")
+        return {"url": v.url, "w": v.width or None, "h": v.height or None}
     except Exception:
         return None
 
 
-def _resolve_link_thumbnail(tipo: str, url: str) -> str | None:
-    """Obtiene un thumbnail permanente para un link, según el proveedor."""
+def _resolve_link_thumbnail(tipo: str, url: str) -> dict | None:
+    """Obtiene un thumbnail permanente {url, w, h} para un link, según el proveedor."""
     if tipo == "youtube":
         vid = _extract_yt_id(url)
         if not vid:
@@ -299,11 +300,11 @@ def _resolve_link_thumbnail(tipo: str, url: str) -> str | None:
 
 
 def _resolve_links(incoming: list, existing: list | None) -> list:
-    """Normaliza la lista de links entrante a [{tipo, url, thumbnail_url}].
+    """Normaliza la lista de links entrante a [{tipo, url, thumbnail_url, w, h}].
 
-    Reusa el thumbnail ya procesado de un link cuya URL no cambió (evita re-bajar
-    y re-procesar en cada edición). El `tipo` lo decide el server (ignora lo que
-    mande el front)."""
+    Reusa el thumbnail ya procesado (url + dimensiones) de un link cuya URL no
+    cambió (evita re-bajar y re-procesar en cada edición). El `tipo` lo decide el
+    server (ignora lo que mande el front)."""
     existing_by_url = {l.get("url"): l for l in (existing or []) if l.get("url")}
     out: list = []
     seen: set = set()
@@ -316,22 +317,36 @@ def _resolve_links(incoming: list, existing: list | None) -> list:
             continue
         seen.add(url)
         prev = existing_by_url.get(url)
-        thumb = prev.get("thumbnail_url") if prev else None
-        if not thumb:
-            thumb = _resolve_link_thumbnail(tipo, url)
-        out.append({"tipo": tipo, "url": url, "thumbnail_url": thumb})
+        if prev and prev.get("thumbnail_url"):
+            out.append({
+                "tipo": tipo, "url": url,
+                "thumbnail_url": prev.get("thumbnail_url"),
+                "thumbnail_w": prev.get("thumbnail_w"),
+                "thumbnail_h": prev.get("thumbnail_h"),
+            })
+            continue
+        thumb = _resolve_link_thumbnail(tipo, url)
+        out.append({
+            "tipo": tipo, "url": url,
+            "thumbnail_url": thumb["url"] if thumb else None,
+            "thumbnail_w": thumb["w"] if thumb else None,
+            "thumbnail_h": thumb["h"] if thumb else None,
+        })
     return out
 
 
 def _build_media(links: list, fotos: list) -> list:
     """Une links + fotos en la lista `media` ordenada que consume el carrusel del
-    front. Links primero (el medio 'titular'), después las fotos subidas."""
+    front. Links primero (el medio 'titular'), después las fotos subidas. `w`/`h`
+    = dimensiones del thumbnail, para que la card use la proporción real."""
     media: list = []
     for link in links or []:
         media.append({
             "kind": link.get("tipo"),
             "url": link.get("url"),
             "thumbnail": link.get("thumbnail_url"),
+            "w": link.get("thumbnail_w"),
+            "h": link.get("thumbnail_h"),
         })
     for foto in fotos or []:
         media.append({
@@ -340,6 +355,8 @@ def _build_media(links: list, fotos: list) -> list:
             "url_sm": foto.get("url_sm"),
             "url_avif": foto.get("url_avif"),
             "url_sm_avif": foto.get("url_sm_avif"),
+            "w": foto.get("w"),
+            "h": foto.get("h"),
         })
     return media
 
