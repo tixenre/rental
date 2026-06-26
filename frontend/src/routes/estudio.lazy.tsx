@@ -140,11 +140,16 @@ function LightboxSlide({
   const first = trabajo.media[0] ?? null;
   const t = first ? mediaThumb(first) : null;
   const isShort = first?.kind === "youtube" && /\/shorts\//.test(first.url);
+  const isLandscapeYt = first?.kind === "youtube" && !isShort;
+
+  // Landscape YouTube: 70 % del viewport para video grande con peeks laterales de ~15 %.
+  // Todo lo demás (IG, Shorts, fotos portrait): ancho fijo portrait.
+  const slideWidth = isLandscapeYt ? "70vw" : "min(88vw, 520px)";
 
   const igAr = first?.kind === "instagram" && first.w && first.h ? first.h / first.w : null;
   // Clip IG: altura natural capped a 80dvh para no rebasar la pantalla.
   const igClipH = igAr
-    ? `min(calc(min(90vw, 640px) * ${igAr.toFixed(4)} + 260px), 80dvh)`
+    ? `min(calc(min(88vw, 520px) * ${igAr.toFixed(4)} + 260px), 80dvh)`
     : "min(70dvh, 80dvh)";
 
   return (
@@ -156,7 +161,7 @@ function LightboxSlide({
           ? "opacity-100 scale-[1.08] z-10"
           : "opacity-40 scale-[0.88] cursor-pointer hover:opacity-60",
       )}
-      style={{ width: "min(90vw, 640px)" }}
+      style={{ width: slideWidth }}
       onClick={!isActive ? onActivate : undefined}
     >
       {isActive ? (
@@ -386,11 +391,21 @@ function TrabajoLightbox({
     };
   }, []);
 
-  // Ancho fijo del slide (igual en todos) para que el snap sea consistente.
-  // Los spacers al inicio/fin permiten que el primero y el último puedan
-  // quedar centrados en la pantalla.
-  // spacerW = (100vw - slideW) / 2 - gap/2  (gap = 12px entre items)
-  const SPACER_W = "max(0px, calc((100vw - min(90vw, 640px)) / 2 - 6px))";
+  // Spacers al inicio/fin para que el primer y último slide puedan centrarse.
+  // spacerW = (100vw - slideW) / 2 - gap/2  (gap = 12px → mitad = 6px)
+  // Cada spacer se calcula según el tipo del slide que necesita centrar.
+  const firstMedia = trabajos[0]?.media[0];
+  const lastMedia = trabajos[trabajos.length - 1]?.media[0];
+  const SPACER_LANDSCAPE = "max(0px, calc(15vw - 6px))"; // (100vw - 70vw) / 2 - 6px
+  const SPACER_PORTRAIT = "max(0px, calc((100vw - min(88vw, 520px)) / 2 - 6px))";
+  const SPACER_START =
+    firstMedia?.kind === "youtube" && !/\/shorts\//.test(firstMedia.url)
+      ? SPACER_LANDSCAPE
+      : SPACER_PORTRAIT;
+  const SPACER_END =
+    lastMedia?.kind === "youtube" && !/\/shorts\//.test(lastMedia.url)
+      ? SPACER_LANDSCAPE
+      : SPACER_PORTRAIT;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95">
@@ -439,7 +454,7 @@ function TrabajoLightbox({
         style={{ gap: "12px" }}
       >
         {/* Spacer inicial: permite centrar el primer slide */}
-        <div className="shrink-0" style={{ width: SPACER_W }} />
+        <div className="shrink-0" style={{ width: SPACER_START }} />
 
         {trabajos.map((trabajo, i) => (
           <LightboxSlide
@@ -452,7 +467,7 @@ function TrabajoLightbox({
         ))}
 
         {/* Spacer final: permite centrar el último slide */}
-        <div className="shrink-0" style={{ width: SPACER_W }} />
+        <div className="shrink-0" style={{ width: SPACER_END }} />
       </div>
     </div>
   );
