@@ -350,6 +350,17 @@ pase crítico eficiente (~10-15k, sin subagentes); escala a voces aisladas solo 
 gasto. El supervisor marca: (a) propuesta mediana/grande juzgada sin invocar el skill; (b) veredicto del
 consejo promovido a `MEMORIA.md` sin autorización del dueño.
 
+### 2026-06-26 — Theming por área: `--area-accent` cascade + `--color-estudio` token propio
+
+El accent de marketing de cada sección pública resuelve por `[data-area]` CSS cascade: `--area-accent` /
+`--area-accent-soft` / `--area-accent-hot` en `:root` (default → amber); `[data-area="estudio"]` →
+`--color-estudio` (`#E9552F`). `PublicLayout` inyecta el `data-area` por área. Los componentes consumen
+`var(--area-accent)` sin saber el contexto. **`--color-estudio` es token propio** — no reusar
+`--color-naranja` (es status Warning, misma hex, semántica distinta). **Focus rings, estados de UI
+cross-app, badges del kit, back-office y paleta de status → amber/status fijos, nunca por área.**
+El supervisor marca: `bg-naranja` donde debería ir `var(--area-accent)` en marketing del estudio;
+o `--color-naranja` en contexto de marketing de área.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

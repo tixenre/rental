@@ -1240,3 +1240,34 @@ cancel-in-progress` ya cancela corridas viejas.
   via `BITACORA.md` (registra qué juzgó vs. qué decidió el dueño — campo "¿coincidieron?"). Condición de retiro
   (anti-bloat): si el ledger de `gobernanza` lo muestra con uso <1/mes y veredictos tibios, se retira.
   y contabilidad/plata. No todo sistema necesita uno: si MEMORIA + MANIFIESTO ya lo cubren claro, no se fuerza.
+
+### 2026-06-26 — Theming por área: `--area-accent` cascade + `--color-estudio` token propio
+
+- **Contexto.** La página del Estudio (`/estudio`) tiene identidad visual propia (naranja cálido `#E9552F`)
+  pero todos sus componentes usaban `bg-amber`/`text-amber` hardcodeados. Dos problemas: (1) `--color-naranja`
+  existía como status Warning con la misma hex — reutilizarlo en marketing crea confusión semántica; (2) sin
+  mecanismo de cascade, cada componente del estudio necesitaría conocer su contexto de área.
+- **Decisión.** CSS cascade `[data-area]` con tokens semánticos de área:
+  1. `PublicLayout.tsx` inyecta `data-area="<area>"` en el div raíz según el `variant` del topbar.
+  2. `tokens/colors.css` define `--area-accent` / `--area-accent-soft` / `--area-accent-hot` en `:root`
+     (default → `--color-amber`) y los sobreescribe en `[data-area="estudio"]` (→ `--color-estudio`).
+  3. Los componentes consumen `var(--area-accent)` via Tailwind arbitrary values (`bg-[var(--area-accent)]`)
+     sin saber en qué área están.
+  4. `EstudioBand` (componente de la landing rental) usa `data-area="estudio"` en su `<section>` para
+     activar el cascade local (nested override), sin que el layout padre lo necesite saber.
+- **`--color-estudio` vs `--color-naranja`:** mismo hex `#E9552F`, tokens separados. `--naranja` = status
+  Warning (paleta semántica de pedidos); `--color-estudio` = accent de marketing del área. No mezclar —
+  son paralelos como `--color-amber` (marca) vs `--amber` (token de Tailwind en `@theme`).
+- **Límites del theming (fijos, no se tematizan por área):** focus rings (`border-amber/60`), estados de
+  UI cross-app, badges del kit (`EstadoBadge`/`PagoBadge`), back-office, paleta de status.
+- **WCAG sobre `#E9552F`:** `text-ink` puro (4.88:1) es el único opaco viable para texto normal sobre
+  el fondo naranja — ink/90 = 3.80:1 (falla AA), ink/65 = 3.00:1 (falla). Naranja sobre ink: ≥ 80%
+  de opacidad para pasar AA normal (80% → 4.60:1, 70% → 4.15:1 falla). La sección "Reservar" de
+  `estudio.lazy.tsx` bumpeó todos los `text-ink/55,/65,/50` a `text-ink` opaco por este motivo.
+- **Guard:** `frontend/e2e/area-accent-cascade.spec.ts` verifica `data-area` correcto por ruta y que
+  `--area-accent` resuelva distinto en estudio vs rental. Iniciativa #1063; Fase 2 (rental + workshops)
+  en el mismo PR.
+- **Why.** El cascade CSS es la solución elegante: zero runtime JS, composición natural del cascade,
+  ningún componente necesita prop de área. El token semántico `--area-accent` es más robusto que
+  `--color-estudio` directo porque desacopla la elección de color de la semántica de uso — agregar
+  workshops u otras áreas es un bloque CSS adicional, no un barrido de componentes.
