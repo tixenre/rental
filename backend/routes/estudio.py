@@ -856,6 +856,31 @@ class TrabajoUpdate(BaseModel):
     activo: Optional[bool] = None
 
 
+class TrabajoOrdenItem(BaseModel):
+    id: int
+    orden: int
+
+
+class TrabajoReorderBody(BaseModel):
+    trabajos: list[TrabajoOrdenItem]
+
+
+# OJO: la ruta literal `/orden` va ANTES que la dinámica `/{trabajo_id}` — si no,
+# FastAPI matchea `PATCH /trabajos/orden` contra `{trabajo_id}` con "orden" y
+# falla la conversión a int (422). Static-before-dynamic.
+@router.patch("/admin/estudio/trabajos/orden")
+def admin_reorder_trabajos(body: TrabajoReorderBody, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        for t in body.trabajos:
+            conn.execute(
+                "UPDATE estudio_trabajos SET orden = ? WHERE id = ?",
+                (t.orden, t.id),
+            )
+        conn.commit()
+        return {"trabajos": _get_trabajos(conn, solo_activos=False)}
+
+
 @router.patch("/admin/estudio/trabajos/{trabajo_id}")
 def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request):
     require_admin(request)
@@ -914,28 +939,6 @@ def admin_delete_trabajo(trabajo_id: int, request: Request):
         conn.execute("DELETE FROM estudio_trabajos WHERE id = ?", (trabajo_id,))
         conn.commit()
     return {"ok": True}
-
-
-class TrabajoOrdenItem(BaseModel):
-    id: int
-    orden: int
-
-
-class TrabajoReorderBody(BaseModel):
-    trabajos: list[TrabajoOrdenItem]
-
-
-@router.patch("/admin/estudio/trabajos/orden")
-def admin_reorder_trabajos(body: TrabajoReorderBody, request: Request):
-    require_admin(request)
-    with get_db() as conn:
-        for t in body.trabajos:
-            conn.execute(
-                "UPDATE estudio_trabajos SET orden = ? WHERE id = ?",
-                (t.orden, t.id),
-            )
-        conn.commit()
-        return {"trabajos": _get_trabajos(conn, solo_activos=False)}
 
 
 @router.post("/admin/estudio/trabajos/{trabajo_id}/upload-foto")
