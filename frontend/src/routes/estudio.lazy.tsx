@@ -80,7 +80,7 @@ function mediaThumb(m: EstudioMedia): { src: string; fallback?: string } | null 
     if (id) return { src: ytThumb(id), fallback: ytThumbFallback(id) };
   }
   return null;
-}// El embed oficial de IG muestra el post completo (foto/video + descripción +
+} // El embed oficial de IG muestra el post completo (foto/video + descripción +
 // likes + comentarios). Usamos CSS clipping para mostrar header + media + chrome
 // (dots, "View more", action bar, likes, input de comentario) pero NO el texto de
 // la descripción ni los hilos de comentarios que vienen después:
@@ -124,205 +124,125 @@ function IgEmbed({ url }: { url: string }) {
   );
 }
 
-function TrabajoModal({
-  trabajos,
-  initialIdx,
-  onClose,
+// Slide individual dentro del lightbox. Activo → embed completo + info.
+// Inactivo → thumbnail 4:5 con overlay, clickeable para ir a ese trabajo.
+function LightboxSlide({
+  idx,
+  trabajo,
+  isActive,
+  onActivate,
 }: {
-  trabajos: EstudioTrabajo[];
-  initialIdx: number;
-  onClose: () => void;
+  idx: number;
+  trabajo: EstudioTrabajo;
+  isActive: boolean;
+  onActivate: () => void;
 }) {
-  const tCount = trabajos.length;
-  const [tIdx, setTIdx] = useState(initialIdx);
-  const [mIdx, setMIdx] = useState(0);
+  const first = trabajo.media[0] ?? null;
+  const t = first ? mediaThumb(first) : null;
+  const isShort = first?.kind === "youtube" && /\/shorts\//.test(first.url);
 
-  const trabajo = trabajos[tIdx];
-  const media = trabajo?.media ?? [];
-  const mCount = media.length;
-  const current = media[Math.min(mIdx, Math.max(mCount - 1, 0))] ?? null;
-
-  // Navegar entre medios; al llegar al borde fluye al trabajo anterior/siguiente.
-  const goMedia = useCallback(
-    (d: number) => {
-      const next = mIdx + d;
-      if (next < 0) {
-        const prevT = (tIdx - 1 + tCount) % tCount;
-        setTIdx(prevT);
-        setMIdx(Math.max((trabajos[prevT]?.media?.length ?? 1) - 1, 0));
-      } else if (next >= mCount) {
-        setTIdx((tIdx + 1) % tCount);
-        setMIdx(0);
-      } else {
-        setMIdx(next);
-      }
-    },
-    [mIdx, mCount, tIdx, tCount, trabajos],
-  );
-
-  // Saltar directamente al trabajo anterior/siguiente (botones del footer).
-  const goTrabajo = useCallback(
-    (d: number) => {
-      setTIdx((i) => (i + d + tCount) % tCount);
-      setMIdx(0);
-    },
-    [tCount],
-  );
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight") goMedia(1);
-      else if (e.key === "ArrowLeft") goMedia(-1);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, goMedia]);
-
-  // El modal se ajusta al medio. YouTube = 16:9/9:16; IG = 480px (embed nativo);
-  // Foto = w-fit (proporción real de la imagen, sin asumir nada).
-  const isShort = current?.kind === "youtube" && /\/shorts\//.test(current.url);
-  const modalWidth =
-    current?.kind === "instagram"
-      ? "min(94vw, 520px)"
-      : current?.kind === "youtube"
-        ? isShort
-          ? "min(94vw, calc(82vh * 9 / 16))"
-          : "min(94vw, calc(82vh * 16 / 9))"
-        : undefined; // foto → w-fit (proporción nativa de la imagen)
+  const igAr = first?.kind === "instagram" && first.w && first.h ? first.h / first.w : null;
+  // Clip IG: altura natural capped a 80dvh para no rebasar la pantalla.
+  const igClipH = igAr
+    ? `min(calc(min(92vw, 520px) * ${igAr.toFixed(4)} + 260px), 80dvh)`
+    : "min(70dvh, 80dvh)";
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-2 sm:p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      data-slide-idx={idx}
+      className={cn(
+        "snap-center shrink-0 flex flex-col rounded-2xl overflow-hidden transition-opacity duration-300",
+        isActive ? "opacity-100" : "opacity-40 cursor-pointer hover:opacity-60",
+      )}
+      style={{ width: "min(92vw, 520px)" }}
+      onClick={!isActive ? onActivate : undefined}
     >
-      <div
-        className="relative bg-ink rounded-2xl overflow-hidden max-h-[96dvh] w-fit max-w-[94vw] flex flex-col"
-        style={{ width: modalWidth }}
-      >
-        {/* Cerrar */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-20 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-background/70 hover:text-background transition-colors"
-          aria-label="Cerrar"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
-
-        {/* Escenario de medios (carrusel). El modal ya tiene la proporción del
-            medio actual, así que cada medio llena el ancho. */}
-        <div className="relative bg-black shrink-0 flex items-center justify-center overflow-hidden">
-          {current?.kind === "youtube" &&
+      {isActive ? (
+        // ── Slide activo: embed real ──────────────────────────────────────────
+        <div className="shrink-0">
+          {first?.kind === "youtube" &&
             (() => {
-              const ytId = extractYtId(current.url);
+              const ytId = extractYtId(first.url);
               if (!ytId) return null;
               return (
-                <div
-                  className="relative w-full"
-                  style={{ aspectRatio: isShort ? "9 / 16" : "16 / 9" }}
-                >
+                <div className="w-full" style={{ aspectRatio: isShort ? "9/16" : "16/9" }}>
                   <iframe
                     src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
                     title={trabajo.titulo}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    className="absolute inset-0 h-full w-full"
+                    className="w-full h-full"
                   />
                 </div>
               );
             })()}
 
-          {current?.kind === "instagram" && (() => {
-            // Clipear a: 60px (header avatar/usuario) + ancho × relación alto/ancho.
-            // Así solo se ve el media; descripción, likes y comentarios quedan debajo
-            // del overflow:hidden y no aparecen.
-            const ar = current.w && current.h ? current.h / current.w : null;
-            const clipH = ar
-              ? `calc(min(94vw, 520px) * ${ar.toFixed(4)} + 260px)`
-              : "82vh";
-            return (
-              <div
-                className="relative w-full bg-zinc-100"
-                style={{ height: clipH, overflow: "hidden" }}
+          {first?.kind === "instagram" && (
+            <div
+              className="relative w-full"
+              style={{ height: igClipH, overflow: "hidden", backgroundColor: "rgb(244 244 245)" }}
+            >
+              <IgEmbed key={first.url} url={first.url} />
+              <a
+                href={first.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs text-background/80 hover:text-background transition-colors"
+                aria-label="Ver en Instagram"
               >
-                <IgEmbed key={current.url} url={current.url} />
-                <a
-                  href={current.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute bottom-2 right-2 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs text-background/80 hover:text-background transition-colors"
-                  aria-label="Ver en Instagram"
-                >
-                  <IgIcon />
-                  Ver en Instagram
-                </a>
-              </div>
-            );
-          })()}
+                <IgIcon />
+                Ver en Instagram
+              </a>
+            </div>
+          )}
 
-          {current?.kind === "foto" && (
+          {first?.kind === "foto" && (
             <img
-              src={current.url_avif ?? current.url}
+              src={
+                (first as EstudioMedia & { url_avif?: string }).url_avif ??
+                first.url_sm ??
+                first.url
+              }
               alt={trabajo.titulo}
-              className="block max-h-[82vh] max-w-[94vw]"
+              className="w-full object-contain max-h-[70dvh]"
             />
           )}
-
-          {/* Flechas dentro del medio (fluyen al trabajo anterior/siguiente al llegar al borde) */}
-          {mCount > 1 && (
-            <>
-              <button
-                onClick={() => goMedia(-1)}
-                className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
-                aria-label="Anterior"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => goMedia(1)}
-                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-black/55 hover:bg-black/75 flex items-center justify-center text-background transition-colors"
-                aria-label="Siguiente"
-              >
-                <ArrowRight className="h-5 w-5" />
-              </button>
-              <div className="absolute top-3 left-3 z-10 rounded-full bg-black/55 px-2.5 py-1 font-mono text-2xs text-background/80">
-                {mIdx + 1} / {mCount}
-              </div>
-            </>
+        </div>
+      ) : (
+        // ── Slide inactivo: thumbnail 4:5 ─────────────────────────────────────
+        <div className="relative overflow-hidden" style={{ aspectRatio: "4/5" }}>
+          {t?.src ? (
+            <img
+              src={t.src}
+              alt={trabajo.titulo}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              onError={
+                t.fallback
+                  ? (e) => {
+                      e.currentTarget.src = t.fallback!;
+                      e.currentTarget.onerror = null;
+                    }
+                  : undefined
+              }
+            />
+          ) : (
+            <div className="w-full h-full bg-background/5" />
+          )}
+          <div className="absolute inset-0 bg-black/25" />
+          {trabajo.titulo && (
+            <div className="absolute bottom-0 inset-x-0 p-3">
+              <p className="text-xs text-background/70 font-medium truncate">{trabajo.titulo}</p>
+            </div>
           )}
         </div>
+      )}
 
-        {/* Puntos del carrusel de medios */}
-        {mCount > 1 && (
-          <div className="flex items-center justify-center gap-1.5 py-3 bg-ink shrink-0">
-            {media.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setMIdx(i)}
-                aria-label={`Ir al medio ${i + 1}`}
-                className={cn(
-                  "h-1.5 rounded-full transition-all",
-                  i === mIdx ? "w-5 bg-amber" : "w-1.5 bg-background/25 hover:bg-background/45",
-                )}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Info */}
-        <div className="px-5 py-4 space-y-2 overflow-y-auto">
+      {/* Info debajo del embed (solo en el slide activo) */}
+      {isActive && (trabajo.titulo || trabajo.categorias.length > 0 || trabajo.realizador) && (
+        <div className="px-4 py-3 space-y-2 bg-ink shrink-0">
           {trabajo.categorias.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex flex-wrap gap-1.5">
               {trabajo.categorias.map((cat) => (
                 <span
                   key={cat}
@@ -334,20 +254,22 @@ function TrabajoModal({
             </div>
           )}
           {trabajo.titulo && (
-            <h3 className="font-display font-bold text-background text-xl leading-tight">
+            <h3 className="font-display font-bold text-background text-lg leading-tight">
               {trabajo.titulo}
             </h3>
           )}
           {trabajo.descripcion && (
-            <p className="text-sm text-background/55 leading-relaxed">{trabajo.descripcion}</p>
+            <p className="text-sm text-background/55 leading-relaxed line-clamp-3">
+              {trabajo.descripcion}
+            </p>
           )}
           {trabajo.realizador && (
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-2 flex-wrap">
               {trabajo.realizador_logo_url && (
                 <img
                   src={trabajo.realizador_logo_url}
                   alt={trabajo.realizador}
-                  className="h-6 w-6 rounded object-contain border border-background/10 shrink-0"
+                  className="h-5 w-5 rounded object-contain border border-background/10 shrink-0"
                 />
               )}
               <span className="text-sm font-medium text-background/65">{trabajo.realizador}</span>
@@ -356,7 +278,7 @@ function TrabajoModal({
                   href={`https://instagram.com/${trabajo.realizador_instagram.replace(/^@/, "")}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
+                  className="flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
                 >
                   <IgIcon />
                   {trabajo.realizador_instagram.startsWith("@")
@@ -373,7 +295,7 @@ function TrabajoModal({
                   }
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
+                  className="flex items-center gap-1 text-xs text-background/35 hover:text-amber transition-colors"
                 >
                   <WebIcon />
                   {trabajo.realizador_web.replace(/^https?:\/\//, "").replace(/\/$/, "")}
@@ -381,32 +303,154 @@ function TrabajoModal({
               )}
             </div>
           )}
-
-          {/* Navegación entre trabajos */}
-          {tCount > 1 && (
-            <div className="flex items-center justify-between pt-3 mt-1 border-t border-background/10">
-              <button
-                onClick={() => goTrabajo(-1)}
-                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
-                aria-label="Trabajo anterior"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                anterior
-              </button>
-              <span className="font-mono text-2xs text-background/25 tabular-nums">
-                {tIdx + 1} / {tCount}
-              </span>
-              <button
-                onClick={() => goTrabajo(1)}
-                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-amber transition-colors"
-                aria-label="Trabajo siguiente"
-              >
-                siguiente
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Lightbox de carrusel: todos los trabajos en un snap-scroll horizontal.
+// El slide centrado muestra el embed; los de los costados muestran el thumbnail
+// con opacidad reducida (asoman desde los bordes).
+function TrabajoLightbox({
+  trabajos,
+  initialIdx,
+  onClose,
+}: {
+  trabajos: EstudioTrabajo[];
+  initialIdx: number;
+  onClose: () => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIdx, setActiveIdx] = useState(initialIdx);
+
+  // Scroll al slide inicial (sin animación) tras el primer render.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      const target = el.querySelector<HTMLElement>(`[data-slide-idx="${initialIdx}"]`);
+      if (!target) return;
+      const targetCenter = target.offsetLeft + target.offsetWidth / 2;
+      el.scrollLeft = targetCenter - el.clientWidth / 2;
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Trackear qué slide está centrado mientras el usuario scrollea.
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const cx = el.scrollLeft + el.clientWidth / 2;
+    const slides = el.querySelectorAll<HTMLElement>("[data-slide-idx]");
+    let best = activeIdx;
+    let bestDist = Infinity;
+    slides.forEach((s) => {
+      const i = Number(s.dataset.slideIdx);
+      const d = Math.abs(s.offsetLeft + s.offsetWidth / 2 - cx);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    if (best !== activeIdx) setActiveIdx(best);
+  }, [activeIdx]);
+
+  // Helper: scroll suave a un slide por índice.
+  const scrollToIdx = useCallback((idx: number) => {
+    const el = scrollRef.current;
+    const target = el?.querySelector<HTMLElement>(`[data-slide-idx="${idx}"]`);
+    if (!target || !el) return;
+    const targetCenter = target.offsetLeft + target.offsetWidth / 2;
+    el.scrollTo({ left: targetCenter - el.clientWidth / 2, behavior: "smooth" });
+  }, []);
+
+  // Teclado: Escape cierra, flechas navegan.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") scrollToIdx(Math.max(0, activeIdx - 1));
+      else if (e.key === "ArrowRight") scrollToIdx(Math.min(trabajos.length - 1, activeIdx + 1));
+    };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose, activeIdx, trabajos.length, scrollToIdx]);
+
+  // Bloquear scroll del body mientras el lightbox está abierto.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  // Ancho fijo del slide (igual en todos) para que el snap sea consistente.
+  // Los spacers al inicio/fin permiten que el primero y el último puedan
+  // quedar centrados en la pantalla.
+  // spacerW = (100vw - slideW) / 2 - gap/2  (gap = 12px entre items)
+  const SPACER_W = "max(0px, calc((100vw - min(92vw, 520px)) / 2 - 6px))";
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/95">
+      {/* Cerrar */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-20 h-9 w-9 rounded-full bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+        aria-label="Cerrar"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+
+      {/* Flechas de navegación (desktop) */}
+      {activeIdx > 0 && (
+        <button
+          onClick={() => scrollToIdx(activeIdx - 1)}
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/10 items-center justify-center text-white/70 hover:text-white transition-colors hidden md:flex"
+          aria-label="Anterior"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+      )}
+      {activeIdx < trabajos.length - 1 && (
+        <button
+          onClick={() => scrollToIdx(activeIdx + 1)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-white/10 items-center justify-center text-white/70 hover:text-white transition-colors hidden md:flex"
+          aria-label="Siguiente"
+        >
+          <ArrowRight className="h-5 w-5" />
+        </button>
+      )}
+
+      {/* Carrusel */}
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="h-full flex items-center overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden"
+        style={{ gap: "12px" }}
+      >
+        {/* Spacer inicial: permite centrar el primer slide */}
+        <div className="shrink-0" style={{ width: SPACER_W }} />
+
+        {trabajos.map((trabajo, i) => (
+          <LightboxSlide
+            key={trabajo.id}
+            idx={i}
+            trabajo={trabajo}
+            isActive={i === activeIdx}
+            onActivate={() => scrollToIdx(i)}
+          />
+        ))}
+
+        {/* Spacer final: permite centrar el último slide */}
+        <div className="shrink-0" style={{ width: SPACER_W }} />
       </div>
     </div>
   );
@@ -426,8 +470,7 @@ function TrabajoCard({ trabajo, onOpen }: { trabajo: EstudioTrabajo; onOpen: () 
   const rawAr = aspect ?? 4 / 5;
   // Para IG, la og:image puede tener proporciones extremas (9:16 Reels, crops)
   // que no representan el display real. Clampear a [4:5, 16:9] — rango nativo de IG.
-  const ar =
-    first?.kind === "instagram" ? Math.min(Math.max(rawAr, 4 / 5), 16 / 9) : rawAr;
+  const ar = first?.kind === "instagram" ? Math.min(Math.max(rawAr, 4 / 5), 16 / 9) : rawAr;
   // El ancho de la card sale del alto base × la proporción real, topado a 86vw.
   // El thumbnail usa `aspect-ratio` (no alto fijo) → si el ancho topa en mobile,
   // baja el alto y la proporción se mantiene (un video horizontal no se recorta).
@@ -616,7 +659,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
       </div>
 
       {selectedIdx !== null && (
-        <TrabajoModal
+        <TrabajoLightbox
           trabajos={visibles}
           initialIdx={selectedIdx}
           onClose={() => setSelectedIdx(null)}
@@ -690,9 +733,7 @@ function DragGallery({ photos, compact = false }: { photos: Photo[]; compact?: b
         onPointerCancel={onPointerUp}
         className={cn(
           "flex gap-3 overflow-x-auto snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none touch-pan-x",
-          compact
-            ? "px-4 pb-4 pt-5 scroll-pl-4"
-            : "px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12",
+          compact ? "px-4 pb-4 pt-5 scroll-pl-4" : "px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12",
         )}
       >
         {photos.map((photo, i) => (
