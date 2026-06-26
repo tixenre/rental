@@ -891,7 +891,8 @@ function TrabajoDialog({
   const [realizador, setRealizador] = useState(existing?.realizador ?? "");
   const [instagram, setInstagram] = useState(existing?.realizador_instagram ?? "");
   const [web, setWeb] = useState(existing?.realizador_web ?? "");
-  const [categoria, setCategoria] = useState(existing?.categoria ?? "");
+  const [categorias, setCategorias] = useState<string[]>(existing?.categorias ?? []);
+  const [newTag, setNewTag] = useState("");
   const [draggingOver, setDraggingOver] = useState(false);
   const [descripcion, setDescripcion] = useState(existing?.descripcion ?? "");
   const [links, setLinks] = useState<string[]>(
@@ -924,6 +925,21 @@ function TrabajoDialog({
     });
   }
 
+  function toggleCategoria(cat: string) {
+    setCategorias((prev) =>
+      prev.some((c) => c.toLowerCase() === cat.toLowerCase())
+        ? prev.filter((c) => c.toLowerCase() !== cat.toLowerCase())
+        : [...prev, cat],
+    );
+  }
+  function addNewTag() {
+    const t = newTag.trim();
+    if (t && !categorias.some((c) => c.toLowerCase() === t.toLowerCase())) {
+      setCategorias((prev) => [...prev, t]);
+    }
+    setNewTag("");
+  }
+
   // Auto-fetch metadata al pegar un link reconocido (prefill de titulo/realizador).
   function handleLinkChange(idx: number, url: string) {
     setLinkAt(idx, url);
@@ -952,7 +968,8 @@ function TrabajoDialog({
     setRealizador(t?.realizador ?? "");
     setInstagram(t?.realizador_instagram ?? "");
     setWeb(t?.realizador_web ?? "");
-    setCategoria(t?.categoria ?? "");
+    setCategorias(t?.categorias ?? []);
+    setNewTag("");
     setDescripcion(t?.descripcion ?? "");
     setLinks(t?.links?.length ? t.links.map((l) => l.url) : [""]);
     setActivo(t?.activo ?? true);
@@ -971,7 +988,7 @@ function TrabajoDialog({
       realizador,
       realizador_instagram: instagram || null,
       realizador_web: web || null,
-      categoria,
+      categorias,
       descripcion,
       links: linksPayload,
       activo,
@@ -1156,45 +1173,62 @@ function TrabajoDialog({
             />
           </div>
 
-          {/* Categoría */}
+          {/* Categorías (tags) — multi-select */}
           <div className="space-y-2">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Categoría{" "}
-              <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
+              Categorías{" "}
+              <span className="normal-case tracking-normal font-sans opacity-50">
+                (opcional — podés elegir varias)
+              </span>
             </label>
-            {availableCategorias.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {availableCategorias.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setCategoria(cat)}
-                    className={cn(
-                      "rounded-full px-3 py-1 text-xs font-mono uppercase tracking-[0.1em] border transition-colors",
-                      categoria === cat
-                        ? "bg-ink text-background border-ink"
-                        : "border-hairline text-muted-foreground hover:border-ink/50 hover:text-foreground",
-                    )}
-                  >
-                    {cat}
-                  </button>
-                ))}
-                {categoria && !availableCategorias.includes(categoria) && (
-                  <span className="rounded-full px-3 py-1 text-xs font-mono uppercase tracking-[0.1em] border border-amber/50 bg-amber/10 text-amber">
-                    {categoria} (nueva)
-                  </span>
-                )}
-              </div>
-            )}
-            <Input
-              value={categoria}
-              onChange={(e) => setCategoria(e.target.value)}
-              placeholder={
-                availableCategorias.length > 0
-                  ? "O escribí una nueva…"
-                  : "Ej: Moda, Editorial, Producto…"
-              }
-            />
+            {(() => {
+              const all = [...new Set([...availableCategorias, ...categorias])];
+              return all.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {all.map((cat) => {
+                    const on = categorias.some((c) => c.toLowerCase() === cat.toLowerCase());
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => toggleCategoria(cat)}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-mono uppercase tracking-[0.1em] border transition-colors",
+                          on
+                            ? "bg-ink text-background border-ink"
+                            : "border-hairline text-muted-foreground hover:border-ink/50 hover:text-foreground",
+                        )}
+                      >
+                        {cat}
+                        {on && <X className="h-3 w-3" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null;
+            })()}
+            <div className="flex items-center gap-2">
+              <Input
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addNewTag();
+                  }
+                }}
+                placeholder="Agregá un tag y Enter (ej: Moda, Editorial…)"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addNewTag}
+                disabled={!newTag.trim()}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
 
           {/* Fotos */}
@@ -1635,7 +1669,7 @@ function TrabajosSection({
           handleSaved(t);
           setDialogOpen(false);
         }}
-        availableCategorias={[...new Set(trabajos.map((t) => t.categoria).filter(Boolean))]}
+        availableCategorias={[...new Set(trabajos.flatMap((t) => t.categorias ?? []))]}
       />
     </>
   );

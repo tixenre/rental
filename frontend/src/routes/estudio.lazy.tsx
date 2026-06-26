@@ -66,17 +66,6 @@ function ytThumbFallback(ytId: string) {
   return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
 }
 
-// Embed oficial de IG. `/embed/captioned/` incluye el pie de foto y soporta
-// reels, fotos y carruseles (preserva el tipo de post: /reel/ /p/ /tv/).
-function igEmbedUrl(url: string): string | null {
-  if (!url) return null;
-  const m = url.match(/instagram\.com\/(reel|p|tv)\/([A-Za-z0-9_-]+)/);
-  if (m) return `https://www.instagram.com/${m[1]}/${m[2]}/embed/captioned/`;
-  if (/^[A-Za-z0-9_-]{8,}$/.test(url))
-    return `https://www.instagram.com/reel/${url}/embed/captioned/`;
-  return null;
-}
-
 // Thumbnail de un medio para la card. Los links traen un thumbnail permanente
 // procesado por el backend; si falta (best-effort falló), YouTube cae a su
 // thumbnail en vivo.
@@ -91,6 +80,51 @@ function mediaThumb(m: EstudioMedia): { src: string; fallback?: string } | null 
     if (id) return { src: ytThumb(id), fallback: ytThumbFallback(id) };
   }
   return null;
+}
+
+// Embed nativo de Instagram vía el script oficial: renderiza el post en su
+// tamaño real (vertical/cuadrado/horizontal según el post, no forzado). El
+// script auto-dimensiona el iframe por postMessage — lo que un iframe directo
+// no puede hacer cross-origin.
+declare global {
+  interface Window {
+    instgrm?: { Embeds: { process: () => void } };
+  }
+}
+
+const IG_EMBED_SCRIPT = "https://www.instagram.com/embed.js";
+
+function IgEmbed({ url }: { url: string }) {
+  useEffect(() => {
+    const process = () => window.instgrm?.Embeds?.process();
+    if (window.instgrm) {
+      process();
+      return;
+    }
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${IG_EMBED_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener("load", process, { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = IG_EMBED_SCRIPT;
+    s.async = true;
+    s.addEventListener("load", process, { once: true });
+    document.body.appendChild(s);
+  }, [url]);
+
+  // key={url} fuerza un blockquote fresco al cambiar de slide (el script muta el
+  // nodo al procesarlo; remontar evita que React reconcilie un nodo ya mutado).
+  return (
+    <div key={url} className="flex w-full justify-center">
+      <blockquote
+        className="instagram-media"
+        data-instgrm-permalink={url}
+        data-instgrm-version="14"
+        style={{ width: "100%", maxWidth: 460, minWidth: 0, margin: 0 }}
+      />
+    </div>
+  );
 }
 
 function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: () => void }) {
@@ -139,43 +173,46 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
           </svg>
         </button>
 
-        {/* Escenario de medios (carrusel) */}
-        <div className="relative bg-black shrink-0 h-[56vh] sm:h-[62vh] flex items-center justify-center">
+        {/* Escenario de medios (carrusel). Sin alto fijo: cada medio se muestra
+            en su aspect ratio natural (vertical/cuadrado/horizontal), acotado por
+            el viewport. */}
+        <div className="relative bg-black shrink-0 flex items-center justify-center min-h-[40vh] overflow-hidden">
           {current?.kind === "youtube" &&
             (() => {
               const ytId = extractYtId(current.url);
-              return ytId ? (
-                <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
-                  title={trabajo.titulo}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="absolute inset-0 h-full w-full"
-                />
-              ) : null;
-            })()}
-
-          {current?.kind === "instagram" &&
-            (() => {
-              const embed = igEmbedUrl(current.url);
-              return embed ? (
-                <div className="h-full w-full flex justify-center overflow-y-auto bg-black py-2">
+              if (!ytId) return null;
+              const isShort = /\/shorts\//.test(current.url);
+              return (
+                <div
+                  className="relative mx-auto w-full"
+                  style={{
+                    aspectRatio: isShort ? "9 / 16" : "16 / 9",
+                    maxWidth: isShort ? "calc(74vh * 9 / 16)" : "calc(74vh * 16 / 9)",
+                    maxHeight: "74vh",
+                  }}
+                >
                   <iframe
-                    src={embed}
+                    src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
                     title={trabajo.titulo}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    scrolling="no"
-                    className="h-full w-full max-w-[460px] border-0"
+                    className="absolute inset-0 h-full w-full"
                   />
                 </div>
-              ) : null;
+              );
             })()}
+
+          {current?.kind === "instagram" && (
+            <div className="flex max-h-[80vh] w-full justify-center overflow-y-auto py-3">
+              <IgEmbed url={current.url} />
+            </div>
+          )}
 
           {current?.kind === "foto" && (
             <img
               src={current.url_avif ?? current.url}
               alt={trabajo.titulo}
-              className="max-h-full max-w-full object-contain"
+              className="max-h-[80vh] w-auto max-w-full object-contain"
             />
           )}
 
@@ -222,11 +259,16 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
 
         {/* Info */}
         <div className="px-5 py-4 space-y-2 overflow-y-auto">
-          {trabajo.categoria && (
+          {trabajo.categorias.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="rounded-full border border-amber/40 px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber">
-                {trabajo.categoria}
-              </span>
+              {trabajo.categorias.map((cat) => (
+                <span
+                  key={cat}
+                  className="rounded-full border border-amber/40 px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-amber"
+                >
+                  {cat}
+                </span>
+              ))}
             </div>
           )}
           {trabajo.titulo && (
@@ -291,13 +333,11 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
 
   const categorias = useMemo(() => {
     const set = new Set<string>();
-    trabajos.forEach((t) => {
-      if (t.categoria) set.add(t.categoria);
-    });
+    trabajos.forEach((t) => t.categorias.forEach((c) => set.add(c)));
     return [...set];
   }, [trabajos]);
 
-  const visibles = filtro ? trabajos.filter((t) => t.categoria === filtro) : trabajos;
+  const visibles = filtro ? trabajos.filter((t) => t.categorias.includes(filtro)) : trabajos;
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = ref.current;

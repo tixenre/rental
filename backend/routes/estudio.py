@@ -370,10 +370,36 @@ def _trabajo_links(row) -> list:
     return legacy
 
 
+def _clean_categorias(cats: list | None) -> list:
+    """Normaliza tags: trim, descarta vacíos, deduplica case-insensitive
+    preservando el orden y la capitalización de la primera aparición."""
+    out: list = []
+    seen: set = set()
+    for c in cats or []:
+        c = (c or "").strip()
+        if not c:
+            continue
+        key = c.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(c)
+    return out
+
+
+def _trabajo_categorias(row) -> list:
+    """Lee los tags de un trabajo: categorias_json, con fallback legacy a la
+    columna `categoria` (singular) para filas no migradas."""
+    cats = _parse_json_field(row["categorias_json"]) or []
+    if cats:
+        return cats
+    return [row["categoria"]] if row["categoria"] else []
+
+
 def _get_trabajos(conn, solo_activos: bool = True) -> list:
     q = (
         "SELECT id, titulo, realizador, realizador_logo_url, "
-        "realizador_instagram, realizador_web, categoria, descripcion, "
+        "realizador_instagram, realizador_web, categoria, categorias_json, descripcion, "
         "tipo, youtube_url, instagram_reel_url, thumbnail_url, "
         "links_json, fotos_json, orden, activo, created_at, updated_at "
         "FROM estudio_trabajos "
@@ -386,6 +412,7 @@ def _get_trabajos(conn, solo_activos: bool = True) -> list:
     for r in rows:
         links = _trabajo_links(r)
         fotos = _parse_json_field(r["fotos_json"]) or []
+        cats = _trabajo_categorias(r)
         out.append({
             "id": r["id"],
             "titulo": r["titulo"],
@@ -393,7 +420,9 @@ def _get_trabajos(conn, solo_activos: bool = True) -> list:
             "realizador_logo_url": r["realizador_logo_url"],
             "realizador_instagram": r["realizador_instagram"],
             "realizador_web": r["realizador_web"],
-            "categoria": r["categoria"] or "",
+            # `categoria` (singular) = primer tag, legacy; `categorias` = fuente única.
+            "categoria": cats[0] if cats else "",
+            "categorias": cats,
             "descripcion": r["descripcion"] or "",
             "tipo": r["tipo"],
             # Fuente única para el front: lista ordenada de medios (links + fotos).
@@ -765,7 +794,7 @@ class TrabajoCreate(BaseModel):
     realizador: str = ""
     realizador_instagram: Optional[str] = None
     realizador_web: Optional[str] = None
-    categoria: str = ""
+    categorias: list[str] = []
     descripcion: str = ""
     links: list[TrabajoLinkInput] = []
     activo: bool = True
@@ -778,6 +807,7 @@ def admin_create_trabajo(body: TrabajoCreate, request: Request):
     # insert — `_process_remote_thumbnail` usa su propia conexión corta.
     links = _resolve_links([l.dict() for l in body.links], existing=[])
     tipo = "video" if links else "fotos"
+    cats = _clean_categorias(body.categorias)
     with get_db() as conn:
         cur = conn.execute(
             "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_trabajos"
@@ -786,10 +816,11 @@ def admin_create_trabajo(body: TrabajoCreate, request: Request):
         cur2 = conn.execute(
             "INSERT INTO estudio_trabajos "
             "(titulo, realizador, realizador_instagram, realizador_web, "
-            "categoria, descripcion, tipo, links_json, orden, activo) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            "categoria, categorias_json, descripcion, tipo, links_json, orden, activo) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
             (body.titulo, body.realizador, body.realizador_instagram, body.realizador_web,
-             body.categoria, body.descripcion, tipo, json.dumps(links), orden, body.activo),
+             cats[0] if cats else "", json.dumps(cats), body.descripcion, tipo,
+             json.dumps(links), orden, body.activo),
         )
         new_id = cur2.fetchone()["id"]
         conn.commit()
@@ -802,7 +833,7 @@ class TrabajoUpdate(BaseModel):
     realizador: Optional[str] = None
     realizador_instagram: Optional[str] = None
     realizador_web: Optional[str] = None
-    categoria: Optional[str] = None
+    categorias: Optional[list[str]] = None
     descripcion: Optional[str] = None
     links: Optional[list[TrabajoLinkInput]] = None
     activo: Optional[bool] = None
@@ -812,8 +843,14 @@ class TrabajoUpdate(BaseModel):
 def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request):
     require_admin(request)
     updates = {
-        k: v for k, v in body.dict(exclude={"links"}).items() if v is not None
+        k: v for k, v in body.dict(exclude={"links", "categorias"}).items() if v is not None
     }
+    # Tags: `categorias is not None` distingue "no tocar" de "vaciar". Escribe la
+    # fuente única (categorias_json) + la columna legacy `categoria` (primer tag).
+    if body.categorias is not None:
+        cats = _clean_categorias(body.categorias)
+        updates["categorias_json"] = json.dumps(cats)
+        updates["categoria"] = cats[0] if cats else ""
     # Los links se manejan aparte: `links is not None` distingue "no tocar"
     # (None) de "vaciar" ([]). Se resuelven antes de abrir la conexión del UPDATE.
     if body.links is not None:

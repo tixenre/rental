@@ -272,7 +272,9 @@ export type EstudioTrabajo = {
   realizador_logo_url: string | null;
   realizador_instagram: string | null;
   realizador_web: string | null;
+  /** Primer tag (legacy/compat). Para filtrar/mostrar usar `categorias`. */
   categoria: string;
+  categorias: string[];
   descripcion: string;
   tipo: "fotos" | "video";
   /** Fuente única para mostrar: lista ordenada de medios (links + fotos). */

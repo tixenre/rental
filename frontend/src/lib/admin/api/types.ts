@@ -1175,6 +1175,7 @@ export type EstudioTrabajo = {
   realizador_instagram: string | null;
   realizador_web: string | null;
   categoria: string;
+  categorias: string[];
   descripcion: string;
   tipo: "fotos" | "video";
   media: EstudioMedia[];
@@ -1191,7 +1192,8 @@ export type EstudioTrabajoInput = {
   realizador?: string;
   realizador_instagram?: string | null;
   realizador_web?: string | null;
-  categoria?: string;
+  /** Tags del trabajo. El backend deduplica y deriva la columna legacy. */
+  categorias?: string[];
   descripcion?: string;
   /** Lista ordenada de links externos. El backend deriva el tipo y el thumbnail. */
   links?: Array<{ url: string; tipo?: string | null }>;

@@ -1890,5 +1890,10 @@ def _init_db_schema(conn):
     conn.execute(
         "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS links_json TEXT NOT NULL DEFAULT '[]'"
     )
+    # Un trabajo puede tener varios tags. categorias_json es la fuente única; la
+    # columna `categoria` (singular) queda como legacy de lectura (= primer tag).
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS categorias_json TEXT NOT NULL DEFAULT '[]'"
+    )
 
     conn.commit()
