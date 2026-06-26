@@ -34,6 +34,7 @@ type TallerAdmin = {
   cupos_confirmados: number;
   cupos_disponibles: number;
   precio_total: number;
+  precio_sena: number;
   activo: boolean;
 };
 
@@ -57,6 +58,9 @@ type UpdateBody = {
   instructor_proyectos?: string;
   programa_teorica?: string[];
   programa_practica?: string[];
+  precio_total?: number;
+  precio_sena?: number;
+  cupos_total?: number;
 };
 
 function FotoSection({ taller }: { taller: TallerAdmin }) {
@@ -260,6 +264,98 @@ function ContenidoSection({ taller }: { taller: TallerAdmin }) {
   );
 }
 
+function PreciosSection({ taller }: { taller: TallerAdmin }) {
+  const qc = useQueryClient();
+  const [precioTotal, setPrecioTotal] = useState(String(taller.precio_total));
+  const [precioSena, setPrecioSena] = useState(String(taller.precio_sena));
+  const [cuposTotal, setCuposTotal] = useState(String(taller.cupos_total));
+
+  useEffect(() => {
+    setPrecioTotal(String(taller.precio_total));
+    setPrecioSena(String(taller.precio_sena));
+    setCuposTotal(String(taller.cupos_total));
+  }, [taller.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mut = useMutation({
+    mutationFn: (body: UpdateBody) =>
+      authedJson<TallerAdmin>(`/api/admin/talleres/${taller.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: (updated) => {
+      toast.success("Precios actualizados");
+      qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
+        prev ? prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) : prev,
+      );
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  function handleSave() {
+    const total = parseInt(precioTotal, 10);
+    const sena = parseInt(precioSena, 10);
+    const cupos = parseInt(cuposTotal, 10);
+    if (isNaN(total) || isNaN(sena) || isNaN(cupos) || cupos < 1) {
+      toast.error("Ingresá números válidos");
+      return;
+    }
+    mut.mutate({ precio_total: total, precio_sena: sena, cupos_total: cupos });
+  }
+
+  return (
+    <AdminSection storageKey="talleres:precios" title="Precios y cupos">
+      <div className="flex flex-col gap-4">
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Precio total (ARS)
+            </label>
+            <Input
+              type="number"
+              min={0}
+              value={precioTotal}
+              onChange={(e) => setPrecioTotal(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Seña (ARS)
+            </label>
+            <Input
+              type="number"
+              min={0}
+              value={precioSena}
+              onChange={(e) => setPrecioSena(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+              Cupos totales
+            </label>
+            <Input
+              type="number"
+              min={1}
+              value={cuposTotal}
+              onChange={(e) => setCuposTotal(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
+            {mut.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Guardar
+          </Button>
+        </div>
+      </div>
+    </AdminSection>
+  );
+}
+
 function TalleresAdminPage() {
   useDocumentTitle("Talleres — Admin");
   const [tallerSeleccionado, setTallerSeleccionado] = useState<number | null>(null);
@@ -352,6 +448,7 @@ function TalleresAdminPage() {
       )}
 
       {taller && <FotoSection taller={taller} />}
+      {taller && <PreciosSection taller={taller} />}
       {taller && <ContenidoSection taller={taller} />}
 
       {loadingIns && <p className="text-sm text-muted-foreground">Cargando inscripciones…</p>}
