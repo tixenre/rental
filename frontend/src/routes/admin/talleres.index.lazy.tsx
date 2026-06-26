@@ -143,6 +143,23 @@ function badgeEstado(taller: TallerAdmin): { label: string; className: string } 
   return { label: "FINALIZADO", className: "bg-muted/40 text-muted-foreground" };
 }
 
+function CuposPill({ confirmados, total }: { confirmados: number; total: number }) {
+  const ratio = total > 0 ? confirmados / total : 0;
+  const cls =
+    ratio >= 1
+      ? "bg-destructive/10 text-destructive border-destructive/20"
+      : ratio >= 0.8
+        ? "bg-amber/15 text-amber border-amber/20"
+        : "bg-verde/10 text-verde-800 border-verde/20";
+  return (
+    <span
+      className={`shrink-0 rounded-full border px-2 py-0.5 text-2xs font-semibold font-mono tabular-nums ${cls}`}
+    >
+      {confirmados}/{total}
+    </span>
+  );
+}
+
 function generarSesionesSemanales(
   diaSemana: number,
   mesDesde: string,
@@ -1476,46 +1493,71 @@ function TallerAccordionRow({
       }`}
     >
       {/* Header row — clickable */}
-      <div className="flex items-center gap-3 px-4 py-3 cursor-pointer" onClick={onToggle}>
+      <div
+        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none"
+        onClick={onToggle}
+      >
         <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold font-mono uppercase tracking-wider ${badge.className}`}
+          className={`shrink-0 rounded-full px-2.5 py-0.5 text-2xs font-semibold font-mono uppercase tracking-wider ${badge.className}`}
         >
           {badge.label}
         </span>
 
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-ink text-sm truncate">{taller.nombre}</p>
-          <p className="text-xs text-muted-foreground truncate">{taller.instructor_nombre}</p>
+          <p className="font-semibold text-ink text-sm truncate leading-tight">{taller.nombre}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {taller.instructor_nombre}
+          </p>
         </div>
 
+        {/* Sesiones count — tablet+ */}
+        {taller.sesiones.length > 0 && (
+          <span className="hidden md:block shrink-0 text-2xs font-mono text-muted-foreground bg-muted/40 rounded-full px-2 py-0.5">
+            {taller.sesiones.length} {taller.sesiones.length === 1 ? "sesión" : "sesiones"}
+          </span>
+        )}
+
+        {/* Cupos — siempre visible */}
+        <CuposPill confirmados={taller.cupos_confirmados} total={taller.cupos_total} />
+
+        {/* Fecha rango — sm+ */}
         {taller.fecha_inicio && (
-          <span className="hidden sm:block text-xs text-muted-foreground shrink-0">
+          <span className="hidden sm:block text-xs text-muted-foreground shrink-0 tabular-nums">
             {new Date(taller.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", {
               day: "numeric",
               month: "short",
             })}
+            {taller.fecha_fin && taller.fecha_fin !== taller.fecha_inicio && (
+              <>
+                {" – "}
+                {new Date(taller.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </>
+            )}
           </span>
         )}
 
-        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-1.5">
-            {taller.activo ? (
-              <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <EyeOff className="h-3.5 w-3.5 text-muted-foreground/50" />
-            )}
-            <Switch
-              checked={taller.activo}
-              onCheckedChange={(v) => onToggleActivo(taller, v)}
-              disabled={togglePending}
-            />
-          </div>
+        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {taller.activo ? (
+            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+          ) : (
+            <EyeOff className="h-3.5 w-3.5 text-muted-foreground/40" />
+          )}
+          <Switch
+            checked={taller.activo}
+            onCheckedChange={(v) => onToggleActivo(taller, v)}
+            disabled={togglePending}
+            aria-label={taller.activo ? "Desactivar taller" : "Activar taller"}
+          />
           <a
             href={`/workshops/${taller.slug}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-1 rounded text-muted-foreground hover:text-ink transition"
+            className="p-1 rounded text-muted-foreground hover:text-ink transition ml-0.5"
             title="Ver en web"
+            aria-label="Ver taller en web"
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
@@ -1523,7 +1565,7 @@ function TallerAccordionRow({
 
         {/* Chevron */}
         <svg
-          className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-muted-foreground/60 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -1645,9 +1687,16 @@ function TalleresAdminPage() {
     <div className="flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Users className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-xl font-semibold text-ink">Talleres</h1>
+        <div>
+          <div className="flex items-center gap-2.5">
+            <Users className="h-5 w-5 text-muted-foreground" />
+            <h1 className="text-xl font-semibold text-ink">Talleres</h1>
+          </div>
+          {talleres.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-0.5 ml-7.5">
+              {talleres.filter((t) => t.activo).length} activos · {talleres.length} total
+            </p>
+          )}
         </div>
         <Button size="sm" className="gap-2" onClick={handleNuevoClean}>
           <Plus className="h-4 w-4" />
@@ -1655,7 +1704,25 @@ function TalleresAdminPage() {
         </Button>
       </div>
 
-      {loadingTalleres && <p className="text-sm text-muted-foreground">Cargando talleres…</p>}
+      {loadingTalleres && (
+        <div className="flex flex-col gap-2">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-border/60 px-4 py-3.5 flex items-center gap-3 animate-pulse"
+            >
+              <div className="h-5 w-24 rounded-full bg-muted/60 shrink-0" />
+              <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                <div className="h-4 w-40 rounded bg-muted/60" />
+                <div className="h-3 w-28 rounded bg-muted/40" />
+              </div>
+              <div className="h-5 w-10 rounded-full bg-muted/40 shrink-0" />
+              <div className="h-4 w-16 rounded bg-muted/30 shrink-0 hidden sm:block" />
+              <div className="h-5 w-9 rounded-full bg-muted/30 shrink-0" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Lista accordion */}
       {talleres.length > 0 && (
@@ -1675,8 +1742,14 @@ function TalleresAdminPage() {
       )}
 
       {talleres.length === 0 && !loadingTalleres && (
-        <div className="rounded-xl border border-dashed border-border/60 py-16 text-center">
-          <p className="text-sm text-muted-foreground mb-4">No hay talleres todavía.</p>
+        <div className="rounded-xl border border-dashed border-border/60 py-16 text-center flex flex-col items-center gap-4">
+          <Users className="h-8 w-8 text-muted-foreground/40" />
+          <div>
+            <p className="text-sm font-medium text-ink">No hay talleres todavía</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Creá el primero para que aparezca en la web.
+            </p>
+          </div>
           <Button size="sm" onClick={handleNuevoClean} className="gap-2">
             <Plus className="h-4 w-4" />
             Crear el primero
