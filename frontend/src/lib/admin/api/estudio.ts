@@ -98,6 +98,15 @@ async function _ok<T>(r: Response): Promise<T> {
 export const trabajosAdminApi = {
   list: () => authedJson<{ trabajos: EstudioTrabajo[] }>("/api/admin/estudio/trabajos"),
 
+  fetchMeta: (url: string) =>
+    authedFetch("/api/admin/estudio/trabajos/fetch-meta", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }).then((r) =>
+      _ok<{ titulo?: string | null; realizador?: string | null; thumbnail_url?: string | null; descripcion?: string | null; fuente?: string }>(r),
+    ),
+
   create: (data: EstudioTrabajoInput) =>
     authedPostJson<EstudioTrabajo>("/api/admin/estudio/trabajos", data),
 

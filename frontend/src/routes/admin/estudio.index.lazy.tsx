@@ -885,9 +885,29 @@ function TrabajoDialog({
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fetchingMeta, setFetchingMeta] = useState(false);
+  const [showExtra, setShowExtra] = useState(false);
 
   const fotoInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-fetch metadata al pegar un link reconocido
+  function handleVideoUrlChange(url: string) {
+    setVideoUrl(url);
+    if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    if (!url || (!/youtu/.test(url) && !/instagram\.com/.test(url))) return;
+    fetchDebounceRef.current = setTimeout(async () => {
+      setFetchingMeta(true);
+      try {
+        const meta = await trabajosAdminApi.fetchMeta(url);
+        if (meta.titulo && !titulo) setTitulo(meta.titulo);
+        if (meta.realizador && !realizador) setRealizador(meta.realizador);
+        if (meta.descripcion && !descripcion) setDescripcion(meta.descripcion);
+      } catch { /* best-effort */ }
+      finally { setFetchingMeta(false); }
+    }, 700);
+  }
 
   // Reset cuando cambia el diálogo
   useEffect(() => {
@@ -904,6 +924,7 @@ function TrabajoDialog({
     setTrabajoId(t?.id ?? null);
     setFotos(t?.fotos ?? []);
     setLogoUrl(t?.realizador_logo_url ?? null);
+    setShowExtra(false);
   }, [open, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isYt = /youtu/.test(videoUrl);
@@ -1025,22 +1046,67 @@ function TrabajoDialog({
         </div>
 
         <div className="p-5 space-y-5">
-          {/* Título */}
+          {/* URL — campo primario, auto-fetch */}
+          <div className="space-y-2">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground block">
+              Link del posteo
+            </label>
+            <div className="flex items-center gap-2">
+              {isYt ? (
+                <Film className="h-4 w-4 shrink-0 text-muted-foreground" />
+              ) : isIg ? (
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-muted-foreground" fill="currentColor">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
+                </svg>
+              ) : (
+                <Film className="h-4 w-4 shrink-0 text-muted-foreground/30" />
+              )}
+              <Input
+                value={videoUrl}
+                onChange={(e) => handleVideoUrlChange(e.target.value)}
+                placeholder="YouTube, Instagram (reel, foto, carrusel)\u2026"
+                autoFocus={!isEdit}
+              />
+            </div>
+            {fetchingMeta && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Obteniendo info\u2026
+              </div>
+            )}
+          </div>
+
+          {/* T\u00edtulo \u2014 auto-rellenado */}
           <div className="space-y-1">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Título
+              T\u00edtulo{" "}
+              <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
             </label>
             <Input
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Nombre del trabajo"
+              placeholder="Auto-rellenado desde el link, o escrib\u00ed uno"
             />
           </div>
 
-          {/* Categoría */}
+          {/* Realizador \u2014 auto-rellenado */}
+          <div className="space-y-1">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Realizador / Productora{" "}
+              <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
+            </label>
+            <Input
+              value={realizador}
+              onChange={(e) => setRealizador(e.target.value)}
+              placeholder="Auto-rellenado desde el link, o escrib\u00ed uno"
+            />
+          </div>
+
+          {/* Categor\u00eda */}
           <div className="space-y-2">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Categoría
+              Categor\u00eda{" "}
+              <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
             </label>
             {availableCategorias.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
@@ -1069,132 +1135,17 @@ function TrabajoDialog({
             <Input
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
-              placeholder={availableCategorias.length > 0 ? "O escribí una nueva…" : "Ej: Moda, Editorial, Producto…"}
+              placeholder={availableCategorias.length > 0 ? "O escrib\u00ed una nueva\u2026" : "Ej: Moda, Editorial, Producto\u2026"}
             />
-          </div>
-
-          {/* Realizador */}
-          <div className="space-y-1">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Realizador / Productora
-            </label>
-            <Input
-              value={realizador}
-              onChange={(e) => setRealizador(e.target.value)}
-              placeholder="Nombre del realizador o productora"
-            />
-          </div>
-
-          {/* Sociales del realizador */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Instagram
-              </label>
-              <Input
-                value={instagram}
-                onChange={(e) => setInstagram(e.target.value)}
-                placeholder="@usuario"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Web
-              </label>
-              <Input
-                value={web}
-                onChange={(e) => setWeb(e.target.value)}
-                placeholder="https://..."
-              />
-            </div>
-          </div>
-
-          {/* Logo del realizador */}
-          <div className="space-y-2">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Logo del realizador
-            </label>
-            <div className="flex items-center gap-3">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt="logo"
-                  className="h-12 w-12 rounded-lg object-contain border hairline bg-muted/30"
-                />
-              ) : (
-                <div className="h-12 w-12 rounded-lg border-dashed border-2 border-muted-foreground/30 flex items-center justify-center">
-                  <Image className="h-5 w-5 text-muted-foreground/40" />
-                </div>
-              )}
-              <input
-                ref={logoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleLogoUpload(f);
-                }}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => logoInputRef.current?.click()}
-                disabled={uploadingLogo}
-              >
-                {uploadingLogo ? (
-                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                ) : null}
-                {logoUrl ? "Cambiar logo" : "Subir logo"}
-              </Button>
-            </div>
-          </div>
-
-          {/* Descripción */}
-          <div className="space-y-1">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Descripción breve
-            </label>
-            <Textarea
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="Breve contexto del trabajo (opcional)"
-              rows={2}
-            />
-          </div>
-
-          {/* URL de video */}
-          <div className="space-y-2">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground block">
-              Video (opcional)
-            </label>
-            <div className="flex items-center gap-2">
-              {isYt ? (
-                <Film className="h-4 w-4 shrink-0 text-muted-foreground" />
-              ) : isIg ? (
-                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-muted-foreground" fill="currentColor">
-                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
-                </svg>
-              ) : (
-                <Film className="h-4 w-4 shrink-0 text-muted-foreground/30" />
-              )}
-              <Input
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="Pegá el link de YouTube o Instagram…"
-              />
-            </div>
-            {isIg && (
-              <p className="text-xs text-muted-foreground/60">
-                Instagram — funciona con reels, fotos y carruseles. El thumbnail se busca al guardar.
-              </p>
-            )}
           </div>
 
           {/* Fotos */}
           <div className="space-y-2">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Fotos {fotos.length > 0 && `(${fotos.length})`}
+              Fotos{" "}
+              {fotos.length > 0
+                ? `(${fotos.length})`
+                : <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>}
             </label>
             {fotos.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
@@ -1250,43 +1201,137 @@ function TrabajoDialog({
               {uploadingFoto ? (
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Subiendo…
+                  Subiendo\u2026
                 </div>
               ) : (
                 <>
                   <Upload className="h-5 w-5 mx-auto mb-1.5 text-muted-foreground/50" />
                   <p className="text-sm text-muted-foreground">
-                    Arrastrá fotos acá o <span className="text-foreground underline underline-offset-2">hacé click</span>
+                    Arrastr\u00e1 fotos ac\u00e1 o <span className="text-foreground underline underline-offset-2">hac\u00e9 click</span>
                   </p>
-                  <p className="text-xs text-muted-foreground/50 mt-0.5">Podés seleccionar varias a la vez</p>
+                  <p className="text-xs text-muted-foreground/50 mt-0.5">Pod\u00e9s seleccionar varias a la vez</p>
                 </>
               )}
             </div>
           </div>
 
-          {/* Activo */}
-          <div className="flex items-center gap-2">
+          {/* M\u00e1s detalles \u2014 collapsible */}
+          <div className="border-t hairline pt-4">
             <button
-              role="switch"
-              aria-checked={activo}
-              onClick={() => setActivo(!activo)}
-              className={cn(
-                "relative h-5 w-9 rounded-full transition-colors",
-                activo ? "bg-ink" : "bg-muted",
-              )}
+              type="button"
+              onClick={() => setShowExtra(!showExtra)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              <span
-                className={cn(
-                  "absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background transition-transform",
-                  activo ? "translate-x-4" : "translate-x-0",
-                )}
-              />
+              <svg
+                viewBox="0 0 24 24"
+                className={cn("h-3 w-3 transition-transform", showExtra && "rotate-90")}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+              M\u00e1s detalles (descripci\u00f3n, redes del realizador, logo, visibilidad)
             </button>
-            <span className="text-sm text-muted-foreground">Visible en la página pública</span>
+            {showExtra && (
+              <div className="space-y-4 mt-4">
+                <div className="space-y-1">
+                  <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                    Descripci\u00f3n breve
+                  </label>
+                  <Textarea
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    placeholder="Breve contexto del trabajo (opcional)"
+                    rows={2}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                      Instagram del realizador
+                    </label>
+                    <Input
+                      value={instagram}
+                      onChange={(e) => setInstagram(e.target.value)}
+                      placeholder="@usuario"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                      Web
+                    </label>
+                    <Input
+                      value={web}
+                      onChange={(e) => setWeb(e.target.value)}
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                    Logo del realizador
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt="logo"
+                        className="h-12 w-12 rounded-lg object-contain border hairline bg-muted/30"
+                      />
+                    ) : (
+                      <div className="h-12 w-12 rounded-lg border-dashed border-2 border-muted-foreground/30 flex items-center justify-center">
+                        <Image className="h-5 w-5 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleLogoUpload(f);
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={uploadingLogo}
+                    >
+                      {uploadingLogo ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : null}
+                      {logoUrl ? "Cambiar logo" : "Subir logo"}
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    role="switch"
+                    aria-checked={activo}
+                    onClick={() => setActivo(!activo)}
+                    className={cn(
+                      "relative h-5 w-9 rounded-full transition-colors",
+                      activo ? "bg-ink" : "bg-muted",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background transition-transform",
+                        activo ? "translate-x-4" : "translate-x-0",
+                      )}
+                    />
+                  </button>
+                  <span className="text-sm text-muted-foreground">Visible en la p\u00e1gina p\u00fablica</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-surface border-t hairline px-5 py-4 flex justify-end gap-2">
+                <div className="sticky bottom-0 bg-surface border-t hairline px-5 py-4 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>
             Cancelar
           </Button>

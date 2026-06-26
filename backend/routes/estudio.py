@@ -170,40 +170,58 @@ def _insert_foto(
 
 # ── Endpoint público ─────────────────────────────────────────────────────────
 
-def _extract_ig_shortcode(url_or_code: str) -> str | None:
-    """Extrae el shortcode de una URL de Instagram o lo devuelve si ya es shortcode."""
-    import re
+import re as _re
+
+
+def _extract_ig_shortcode(url_or_code: str) -> tuple[str, str] | None:
+    """Retorna (shortcode, post_type) donde post_type es 'reel', 'p' o 'tv'."""
     if not url_or_code:
         return None
-    m = re.search(r"instagram\.com/(?:reel|p|tv)/([A-Za-z0-9_-]+)", url_or_code)
+    m = _re.search(r"instagram\.com/(reel|p|tv)/([A-Za-z0-9_-]+)", url_or_code)
     if m:
-        return m.group(1)
-    if re.match(r"^[A-Za-z0-9_-]{8,}$", url_or_code):
-        return url_or_code
+        return (m.group(2), m.group(1))
+    if _re.match(r"^[A-Za-z0-9_-]{8,}$", url_or_code):
+        return (url_or_code, "reel")
     return None
 
 
-def _fetch_ig_thumbnail(shortcode: str) -> str | None:
-    """Intenta obtener la thumbnail de un reel de IG vía og:image (best-effort)."""
-    import re
+def _extract_og_tag(html_text: str, prop: str) -> str | None:
+    """Extrae el content de un og:meta tag, tolerando orden de atributos."""
+    for pat in (
+        rf'<meta[^>]+property="{_re.escape(prop)}"[^>]+content="([^"]+)"',
+        rf'<meta[^>]+content="([^"]+)"[^>]+property="{_re.escape(prop)}"',
+    ):
+        m = _re.search(pat, html_text)
+        if m:
+            return m.group(1).replace("\\u0026", "&").replace("&amp;", "&")
+    return None
+
+
+def _fetch_og_meta(url: str) -> dict:
+    """Descarga una URL y extrae og:title/image/description (best-effort)."""
     import httpx
     try:
-        url = f"https://www.instagram.com/reel/{shortcode}/"
         headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "es-AR,es;q=0.9",
+            "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+            "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
         }
-        resp = httpx.get(url, headers=headers, timeout=6.0, follow_redirects=True)
-        if resp.status_code == 200:
-            m = re.search(r'<meta property="og:image" content="([^"]+)"', resp.text)
-            if m:
-                return m.group(1).replace("\\u0026", "&")
+        resp = httpx.get(url, headers=headers, timeout=8.0, follow_redirects=True)
+        if resp.status_code != 200:
+            return {}
+        html = resp.text
+        return {
+            "title": _extract_og_tag(html, "og:title"),
+            "image": _extract_og_tag(html, "og:image"),
+            "description": _extract_og_tag(html, "og:description"),
+        }
     except Exception:
-        pass
-    return None
+        return {}
+
+
+def _fetch_ig_thumbnail(shortcode: str, post_type: str = "reel") -> str | None:
+    """Intenta obtener la thumbnail de un post de IG vía og:image (best-effort)."""
+    meta = _fetch_og_meta(f"https://www.instagram.com/{post_type}/{shortcode}/")
+    return meta.get("image")
 
 
 def _get_trabajos(conn, solo_activos: bool = True) -> list:
@@ -536,6 +554,56 @@ def admin_list_trabajos(request: Request):
         return {"trabajos": _get_trabajos(conn, solo_activos=False)}
 
 
+@router.post("/admin/estudio/trabajos/fetch-meta")
+async def fetch_trabajo_meta(request: Request):
+    """Dado un link de YouTube o Instagram, retorna metadata (titulo, realizador, thumbnail).
+    YouTube usa oEmbed oficial. Instagram usa og:tags (best-effort)."""
+    require_admin(request)
+    import httpx
+    body = await request.json()
+    url = (body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "url requerida")
+
+    # YouTube — oEmbed oficial, muy confiable
+    if "youtu" in url:
+        try:
+            resp = httpx.get(
+                "https://www.youtube.com/oembed",
+                params={"url": url, "format": "json"},
+                timeout=8.0,
+            )
+            if resp.status_code == 200:
+                d = resp.json()
+                return {
+                    "titulo": d.get("title"),
+                    "realizador": d.get("author_name"),
+                    "thumbnail_url": d.get("thumbnail_url"),
+                    "fuente": "youtube",
+                }
+        except Exception:
+            pass
+
+    # Instagram / cualquier otro — og:tags (best-effort)
+    meta = _fetch_og_meta(url)
+    if meta:
+        # og:title de IG: "Nombre (@handle) • Fotos y videos de Instagram"
+        raw_title = meta.get("title") or ""
+        realizador = None
+        m = _re.match(r"^(.+?)\s*[•·(@]", raw_title)
+        if m:
+            realizador = m.group(1).strip()
+        return {
+            "titulo": None,
+            "realizador": realizador,
+            "thumbnail_url": meta.get("image"),
+            "descripcion": meta.get("description"),
+            "fuente": "og",
+        }
+
+    return {"fuente": "desconocido"}
+
+
 class TrabajoCreate(BaseModel):
     titulo: str = ""
     realizador: str = ""
@@ -555,9 +623,9 @@ def admin_create_trabajo(body: TrabajoCreate, request: Request):
     tipo = "video" if body.youtube_url else "fotos"
     thumbnail_url: Optional[str] = None
     if body.instagram_reel_url:
-        sc = _extract_ig_shortcode(body.instagram_reel_url)
-        if sc:
-            thumbnail_url = _fetch_ig_thumbnail(sc)
+        ig = _extract_ig_shortcode(body.instagram_reel_url)
+        if ig:
+            thumbnail_url = _fetch_ig_thumbnail(*ig)
     with get_db() as conn:
         cur = conn.execute(
             "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_trabajos"
@@ -602,8 +670,8 @@ def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request)
         updates["tipo"] = "video" if updates.get("youtube_url") else "fotos"
     # Si cambió instagram_reel_url, re-fetchear thumbnail
     if "instagram_reel_url" in updates:
-        sc = _extract_ig_shortcode(updates["instagram_reel_url"] or "")
-        updates["thumbnail_url"] = _fetch_ig_thumbnail(sc) if sc else None
+        ig = _extract_ig_shortcode(updates["instagram_reel_url"] or "")
+        updates["thumbnail_url"] = _fetch_ig_thumbnail(*ig) if ig else None
     with get_db() as conn:
         set_parts = [f"{k} = ?" for k in updates]
         set_parts.append("updated_at = ?")
