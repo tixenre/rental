@@ -209,9 +209,10 @@ function EstudioPage() {
   const comoLlegar =
     data?.como_llegar ??
     "Acceso directo para descarga de equipos. Estacionamiento en la calle (zona azul gratuita los fines de semana).";
-  const iframeSrc = data?.mapa_embed_url ?? MAPA_EMBED_DEFAULT;
+  const iframeSrc = data?.mapa_embed_url || MAPA_EMBED_DEFAULT;
+  const navUrl = data?.mapa_url?.includes("/maps/embed") ? null : data?.mapa_url;
   const verMapaHref =
-    data?.mapa_url ??
+    navUrl ||
     (data?.direccion
       ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(data.direccion)}`
       : MAPA_NAV_DEFAULT);

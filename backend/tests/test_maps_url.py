@@ -16,10 +16,22 @@ from services.maps_url import MapsParseError, parse_maps_input
 def test_iframe_html_extrae_src():
     """El código que Google da en 'Compartir → Insertar mapa'."""
     html = (
-        '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12" '
+        '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3'
+        '!1d100!2d-57.566!3d-37.986" '
         'width="600" height="450" style="border:0;" allowfullscreen="" '
         'loading="lazy"></iframe>'
     )
+    result = parse_maps_input(html)
+    assert "maps/embed?pb=" in result.embed_url
+    # raw_url debe ser una URL de navegación, no la de embed.
+    assert "dir/?api=1" in result.raw_url
+    assert "-37.986" in result.raw_url
+    assert "-57.566" in result.raw_url
+
+
+def test_iframe_sin_coords_usa_embed_como_fallback():
+    """Si el iframe no tiene coords, raw_url queda como el src (el frontend lo filtra)."""
+    html = '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12" loading="lazy"></iframe>'
     result = parse_maps_input(html)
     assert result.embed_url == "https://www.google.com/maps/embed?pb=!1m18!1m12"
     assert result.raw_url == result.embed_url

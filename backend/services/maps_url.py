@@ -54,6 +54,8 @@ _IFRAME_SRC_RE = re.compile(r'<iframe[^>]*\bsrc=["\']([^"\']+)["\']', re.IGNOREC
 _COORDS_AT_RE = re.compile(r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?)z)?")
 # Coords en query `q=lat,lng` o `ll=lat,lng`.
 _COORDS_Q_RE = re.compile(r"[?&](?:q|ll)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
+# Coords en parámetro `pb=` del embed: `!2d<lng>!3d<lat>`.
+_COORDS_PB_RE = re.compile(r"!2d(-?\d+(?:\.\d+)?).*?!3d(-?\d+(?:\.\d+)?)")
 
 
 class MapsParseError(ValueError):
@@ -89,7 +91,24 @@ def _coords_from_url(url: str) -> Optional[tuple[float, float]]:
     m = _COORDS_Q_RE.search(url)
     if m:
         return float(m.group(1)), float(m.group(2))
+    m = _COORDS_PB_RE.search(url)
+    if m:
+        lng, lat = float(m.group(1)), float(m.group(2))
+        return lat, lng  # convención: (lat, lng)
     return None
+
+
+def _nav_url_from_embed(embed_src: str) -> str:
+    """Devuelve una URL de navegación a partir de una URL de embed de Google Maps.
+
+    Si tiene coords (caso `pb=`), arma google.com/maps/dir/?api=1&destination=lat,lng.
+    Si no, devuelve la URL de embed tal cual (el frontend la filtra).
+    """
+    coords = _coords_from_url(embed_src)
+    if coords:
+        lat, lng = coords
+        return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
+    return embed_src
 
 
 def _embed_from_long_url(long_url: str) -> str:
@@ -161,7 +180,8 @@ def parse_maps_input(raw: str) -> ParsedMaps:
         src = m.group(1).strip()
         if not _is_allowed_host(src, _ALLOWED_EMBED_HOSTS):
             raise MapsParseError(f"el iframe apunta a un host no permitido: {_host_of(src)}")
-        return ParsedMaps(embed_url=src, raw_url=src)
+        # raw_url = URL de navegación (no la de embed, que no se puede abrir directo).
+        return ParsedMaps(embed_url=src, raw_url=_nav_url_from_embed(src))
 
     # 2. Si pegó una URL: validar host y resolver shortlinks.
     if not (s.startswith("http://") or s.startswith("https://")):
