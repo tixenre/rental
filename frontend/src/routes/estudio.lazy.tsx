@@ -121,7 +121,7 @@ function IgEmbed({ url }: { url: string }) {
         className="instagram-media"
         data-instgrm-permalink={url}
         data-instgrm-version="14"
-        style={{ width: "100%", maxWidth: 460, minWidth: 0, margin: 0 }}
+        style={{ width: "100%", maxWidth: "100%", minWidth: 0, margin: 0 }}
       />
     </div>
   );
@@ -148,14 +148,30 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, go]);
 
+  // El modal se ajusta al medio actual (no al revés): IG = tarjeta angosta,
+  // YouTube = 16:9 (9:16 si es Short), foto = 3:2. Así no queda un marco negro
+  // gigante alrededor de un post chico.
+  const isShort = current?.kind === "youtube" && /\/shorts\//.test(current.url);
+  const modalWidth =
+    current?.kind === "instagram"
+      ? "min(94vw, 480px)"
+      : current?.kind === "youtube"
+        ? isShort
+          ? "min(94vw, calc(74vh * 9 / 16))"
+          : "min(94vw, calc(74vh * 16 / 9))"
+        : "min(94vw, calc(74vh * 3 / 2))"; // foto
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/90 p-0 sm:p-4 lg:p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-2 sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full sm:w-[94vw] lg:w-[82vw] max-w-5xl bg-ink rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[96dvh] flex flex-col">
+      <div
+        className="relative bg-ink rounded-2xl overflow-hidden max-h-[96dvh] flex flex-col"
+        style={{ width: modalWidth }}
+      >
         {/* Cerrar */}
         <button
           onClick={onClose}
@@ -173,23 +189,17 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
           </svg>
         </button>
 
-        {/* Escenario de medios (carrusel). Sin alto fijo: cada medio se muestra
-            en su aspect ratio natural (vertical/cuadrado/horizontal), acotado por
-            el viewport. */}
-        <div className="relative bg-black shrink-0 flex items-center justify-center min-h-[40vh] overflow-hidden">
+        {/* Escenario de medios (carrusel). El modal ya tiene la proporción del
+            medio actual, así que cada medio llena el ancho. */}
+        <div className="relative bg-black shrink-0 flex items-center justify-center overflow-hidden">
           {current?.kind === "youtube" &&
             (() => {
               const ytId = extractYtId(current.url);
               if (!ytId) return null;
-              const isShort = /\/shorts\//.test(current.url);
               return (
                 <div
-                  className="relative mx-auto w-full"
-                  style={{
-                    aspectRatio: isShort ? "9 / 16" : "16 / 9",
-                    maxWidth: isShort ? "calc(74vh * 9 / 16)" : "calc(74vh * 16 / 9)",
-                    maxHeight: "74vh",
-                  }}
+                  className="relative w-full"
+                  style={{ aspectRatio: isShort ? "9 / 16" : "16 / 9" }}
                 >
                   <iframe
                     src={`https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1`}
@@ -203,7 +213,7 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
             })()}
 
           {current?.kind === "instagram" && (
-            <div className="flex max-h-[80vh] w-full justify-center overflow-y-auto py-3">
+            <div className="max-h-[74vh] min-h-[420px] w-full overflow-y-auto bg-background">
               <IgEmbed url={current.url} />
             </div>
           )}
@@ -212,7 +222,7 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
             <img
               src={current.url_avif ?? current.url}
               alt={trabajo.titulo}
-              className="max-h-[80vh] w-auto max-w-full object-contain"
+              className="max-h-[74vh] w-full object-contain"
             />
           )}
 
