@@ -182,7 +182,7 @@ function CategoriaPage() {
           </p>
           <Link
             to="/rental"
-            className="inline-flex items-center gap-1.5 rounded-full bg-ink text-amber px-4 py-2 text-sm font-medium hover:brightness-110 transition"
+            className="inline-flex items-center gap-1.5 rounded-full bg-ink text-[var(--area-accent)] px-4 py-2 text-sm font-medium hover:brightness-110 transition"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Volver al catálogo
           </Link>

@@ -260,7 +260,7 @@ export function CatalogoMovil() {
   // h-dvh (dynamic viewport) respeta la URL bar de safari iOS — antes
   // h-screen dejaba el cart-bar tapado cuando safari mostraba su UI.
   return (
-    <div className="flex flex-col h-dvh overflow-hidden bg-background relative">
+    <div data-area="rental" className="flex flex-col h-dvh overflow-hidden bg-background relative">
       {/* Scroll container */}
       <div
         ref={scrollRef}

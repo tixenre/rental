@@ -80,7 +80,7 @@ function LandingHub() {
           <Link
             to="/estudio"
             className="group relative flex flex-col justify-start p-8 sm:p-10 min-h-[320px] md:min-h-0 overflow-hidden transition-[filter] hover:brightness-105 active:brightness-95"
-            style={{ backgroundColor: "var(--color-naranja)" }}
+            style={{ backgroundColor: "var(--color-estudio)" }}
           >
             {studioPic && (
               <img
@@ -113,7 +113,7 @@ function LandingHub() {
               <p className="text-ink text-sm mb-7 leading-relaxed max-w-xs md:min-h-[2lh]">
                 Set con fondo infinito, ciclorama y luz natural. Por hora.
               </p>
-              <span className="inline-flex items-center gap-2 w-fit rounded-full bg-white text-ink px-5 py-2.5 text-sm font-bold tracking-[-0.01em] transition-[gap] duration-150 group-hover:gap-3.5">
+              <span className="inline-flex items-center gap-2 w-fit rounded-full bg-ink text-background px-5 py-2.5 text-sm font-bold tracking-[-0.01em] transition-[gap] duration-150 group-hover:gap-3.5">
                 Ver el estudio <ArrowRight className="h-3.5 w-3.5" />
               </span>
             </div>
