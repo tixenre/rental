@@ -1161,6 +1161,8 @@ export type EstudioTrabajo = {
   descripcion: string;
   tipo: "fotos" | "video";
   youtube_url: string | null;
+  instagram_reel_url: string | null;
+  thumbnail_url: string | null;
   fotos: EstudioTrabajoFoto[];
   orden: number;
   activo: boolean;
@@ -1175,8 +1177,8 @@ export type EstudioTrabajoInput = {
   realizador_web?: string | null;
   categoria?: string;
   descripcion?: string;
-  tipo?: "fotos" | "video";
   youtube_url?: string | null;
+  instagram_reel_url?: string | null;
   activo?: boolean;
 };
 

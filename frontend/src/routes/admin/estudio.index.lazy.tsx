@@ -873,8 +873,8 @@ function TrabajoDialog({
   const [web, setWeb] = useState(existing?.realizador_web ?? "");
   const [categoria, setCategoria] = useState(existing?.categoria ?? "");
   const [descripcion, setDescripcion] = useState(existing?.descripcion ?? "");
-  const [tipo, setTipo] = useState<"fotos" | "video">(existing?.tipo ?? "fotos");
   const [youtubeUrl, setYoutubeUrl] = useState(existing?.youtube_url ?? "");
+  const [igReelUrl, setIgReelUrl] = useState(existing?.instagram_reel_url ?? "");
   const [activo, setActivo] = useState(existing?.activo ?? true);
   const [trabajoId, setTrabajoId] = useState<number | null>(existing?.id ?? null);
   const [fotos, setFotos] = useState(existing?.fotos ?? []);
@@ -896,8 +896,8 @@ function TrabajoDialog({
     setWeb(t?.realizador_web ?? "");
     setCategoria(t?.categoria ?? "");
     setDescripcion(t?.descripcion ?? "");
-    setTipo(t?.tipo ?? "fotos");
     setYoutubeUrl(t?.youtube_url ?? "");
+    setIgReelUrl(t?.instagram_reel_url ?? "");
     setActivo(t?.activo ?? true);
     setTrabajoId(t?.id ?? null);
     setFotos(t?.fotos ?? []);
@@ -913,10 +913,10 @@ function TrabajoDialog({
       realizador_web: web || null,
       categoria,
       descripcion,
-      tipo,
+      youtube_url: youtubeUrl || null,
+      instagram_reel_url: igReelUrl || null,
       activo,
     };
-    if (tipo === "video" && youtubeUrl) data.youtube_url = youtubeUrl;
     const created = await trabajosAdminApi.create(data);
     setTrabajoId(created.id);
     return created.id;
@@ -932,11 +932,10 @@ function TrabajoDialog({
         realizador_web: web || null,
         categoria,
         descripcion,
-        tipo,
+        youtube_url: youtubeUrl || null,
+        instagram_reel_url: igReelUrl || null,
         activo,
       };
-      if (tipo === "video" && youtubeUrl) data.youtube_url = youtubeUrl;
-      if (tipo !== "video") data.youtube_url = null;
       let result: EstudioTrabajo;
       if (trabajoId) {
         result = await trabajosAdminApi.update(trabajoId, data);
@@ -1133,102 +1132,88 @@ function TrabajoDialog({
             />
           </div>
 
-          {/* Tipo */}
-          <div className="space-y-2">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Tipo de contenido
+          {/* URLs de video */}
+          <div className="space-y-3">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground block">
+              Videos (opcional — completá uno, ambos, o ninguno)
             </label>
-            <div className="flex gap-2">
-              {(["fotos", "video"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTipo(t)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors",
-                    tipo === t
-                      ? "bg-ink text-background border-ink"
-                      : "border-hairline text-muted-foreground hover:border-ink/40",
-                  )}
-                >
-                  {t === "fotos" ? (
-                    <Image className="h-3.5 w-3.5" />
-                  ) : (
-                    <Film className="h-3.5 w-3.5" />
-                  )}
-                  {t === "fotos" ? "Galería de fotos" : "Video YouTube"}
-                </button>
-              ))}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Film className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <Input
+                  value={youtubeUrl}
+                  onChange={(e) => setYoutubeUrl(e.target.value)}
+                  placeholder="YouTube: https://www.youtube.com/watch?v=..."
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-muted-foreground" fill="currentColor">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
+                </svg>
+                <Input
+                  value={igReelUrl}
+                  onChange={(e) => setIgReelUrl(e.target.value)}
+                  placeholder="Instagram: https://www.instagram.com/reel/..."
+                />
+              </div>
             </div>
+            <p className="text-xs text-muted-foreground/60">
+              Instagram: el thumbnail se busca automáticamente al guardar.
+            </p>
           </div>
 
-          {/* YouTube URL */}
-          {tipo === "video" && (
-            <div className="space-y-1">
-              <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                URL de YouTube
-              </label>
-              <Input
-                value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=..."
-              />
-            </div>
-          )}
-
           {/* Fotos */}
-          {tipo === "fotos" && (
-            <div className="space-y-2">
-              <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Galería ({fotos.length} foto{fotos.length !== 1 ? "s" : ""})
-              </label>
-              {fotos.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {fotos.map((f, idx) => (
-                    <div
-                      key={idx}
-                      className="relative aspect-square rounded-lg overflow-hidden border hairline group"
+          <div className="space-y-2">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Fotos ({fotos.length} foto{fotos.length !== 1 ? "s" : ""})
+            </label>
+            {fotos.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {fotos.map((f, idx) => (
+                  <div
+                    key={idx}
+                    className="relative aspect-square rounded-lg overflow-hidden border hairline group"
+                  >
+                    <img
+                      src={f.url_sm ?? f.url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      onClick={() => handleDeleteFoto(idx)}
+                      className="absolute top-1 right-1 rounded-full bg-black/70 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      <img
-                        src={f.url_sm ?? f.url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                      <button
-                        onClick={() => handleDeleteFoto(idx)}
-                        className="absolute top-1 right-1 rounded-full bg-black/70 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="h-3 w-3 text-white" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                      <Trash2 className="h-3 w-3 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <input
+              ref={fotoInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) handleFotoUpload(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fotoInputRef.current?.click()}
+              disabled={uploadingFoto}
+            >
+              {uploadingFoto ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
               )}
-              <input
-                ref={fotoInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.length) handleFotoUpload(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fotoInputRef.current?.click()}
-                disabled={uploadingFoto}
-              >
-                {uploadingFoto ? (
-                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                ) : (
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                )}
-                Agregar foto{fotos.length === 0 ? "s" : " más"}
-              </Button>
-            </div>
-          )}
+              Agregar foto{fotos.length === 0 ? "s" : " más"}
+            </Button>
+          </div>
 
           {/* Activo */}
           <div className="flex items-center gap-2">

@@ -170,11 +170,48 @@ def _insert_foto(
 
 # ── Endpoint público ─────────────────────────────────────────────────────────
 
+def _extract_ig_shortcode(url_or_code: str) -> str | None:
+    """Extrae el shortcode de una URL de Instagram o lo devuelve si ya es shortcode."""
+    import re
+    if not url_or_code:
+        return None
+    m = re.search(r"instagram\.com/(?:reel|p|tv)/([A-Za-z0-9_-]+)", url_or_code)
+    if m:
+        return m.group(1)
+    if re.match(r"^[A-Za-z0-9_-]{8,}$", url_or_code):
+        return url_or_code
+    return None
+
+
+def _fetch_ig_thumbnail(shortcode: str) -> str | None:
+    """Intenta obtener la thumbnail de un reel de IG vía og:image (best-effort)."""
+    import re
+    import httpx
+    try:
+        url = f"https://www.instagram.com/reel/{shortcode}/"
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "es-AR,es;q=0.9",
+        }
+        resp = httpx.get(url, headers=headers, timeout=6.0, follow_redirects=True)
+        if resp.status_code == 200:
+            m = re.search(r'<meta property="og:image" content="([^"]+)"', resp.text)
+            if m:
+                return m.group(1).replace("\\u0026", "&")
+    except Exception:
+        pass
+    return None
+
+
 def _get_trabajos(conn, solo_activos: bool = True) -> list:
     q = (
         "SELECT id, titulo, realizador, realizador_logo_url, "
         "realizador_instagram, realizador_web, categoria, descripcion, "
-        "tipo, youtube_url, fotos_json, orden, activo, created_at, updated_at "
+        "tipo, youtube_url, instagram_reel_url, thumbnail_url, "
+        "fotos_json, orden, activo, created_at, updated_at "
         "FROM estudio_trabajos "
     )
     q += "WHERE activo = TRUE " if solo_activos else ""
@@ -193,6 +230,8 @@ def _get_trabajos(conn, solo_activos: bool = True) -> list:
             "descripcion": r["descripcion"] or "",
             "tipo": r["tipo"],
             "youtube_url": r["youtube_url"],
+            "instagram_reel_url": r["instagram_reel_url"],
+            "thumbnail_url": r["thumbnail_url"],
             "fotos": _parse_json_field(r["fotos_json"]) or [],
             "orden": r["orden"],
             "activo": bool(r["activo"]),
@@ -504,14 +543,21 @@ class TrabajoCreate(BaseModel):
     realizador_web: Optional[str] = None
     categoria: str = ""
     descripcion: str = ""
-    tipo: str = "fotos"
     youtube_url: Optional[str] = None
+    instagram_reel_url: Optional[str] = None
     activo: bool = True
 
 
 @router.post("/admin/estudio/trabajos")
 def admin_create_trabajo(body: TrabajoCreate, request: Request):
     require_admin(request)
+    # Auto-derivar tipo y buscar thumbnail de IG
+    tipo = "video" if body.youtube_url else "fotos"
+    thumbnail_url: Optional[str] = None
+    if body.instagram_reel_url:
+        sc = _extract_ig_shortcode(body.instagram_reel_url)
+        if sc:
+            thumbnail_url = _fetch_ig_thumbnail(sc)
     with get_db() as conn:
         cur = conn.execute(
             "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_trabajos"
@@ -520,10 +566,12 @@ def admin_create_trabajo(body: TrabajoCreate, request: Request):
         cur2 = conn.execute(
             "INSERT INTO estudio_trabajos "
             "(titulo, realizador, realizador_instagram, realizador_web, "
-            "categoria, descripcion, tipo, youtube_url, orden, activo) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            "categoria, descripcion, tipo, youtube_url, instagram_reel_url, "
+            "thumbnail_url, orden, activo) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
             (body.titulo, body.realizador, body.realizador_instagram, body.realizador_web,
-             body.categoria, body.descripcion, body.tipo, body.youtube_url, orden, body.activo),
+             body.categoria, body.descripcion, tipo, body.youtube_url,
+             body.instagram_reel_url, thumbnail_url, orden, body.activo),
         )
         new_id = cur2.fetchone()["id"]
         conn.commit()
@@ -538,8 +586,8 @@ class TrabajoUpdate(BaseModel):
     realizador_web: Optional[str] = None
     categoria: Optional[str] = None
     descripcion: Optional[str] = None
-    tipo: Optional[str] = None
     youtube_url: Optional[str] = None
+    instagram_reel_url: Optional[str] = None
     activo: Optional[bool] = None
 
 
@@ -549,6 +597,13 @@ def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request)
     updates = {k: v for k, v in body.dict().items() if v is not None}
     if not updates:
         raise HTTPException(400, "Nada que actualizar")
+    # Auto-derivar tipo si cambió youtube_url o instagram_reel_url
+    if "youtube_url" in updates or "instagram_reel_url" in updates:
+        updates["tipo"] = "video" if updates.get("youtube_url") else "fotos"
+    # Si cambió instagram_reel_url, re-fetchear thumbnail
+    if "instagram_reel_url" in updates:
+        sc = _extract_ig_shortcode(updates["instagram_reel_url"] or "")
+        updates["thumbnail_url"] = _fetch_ig_thumbnail(sc) if sc else None
     with get_db() as conn:
         set_parts = [f"{k} = ?" for k in updates]
         set_parts.append("updated_at = ?")

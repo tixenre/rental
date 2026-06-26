@@ -258,6 +258,8 @@ export type EstudioTrabajo = {
   descripcion: string;
   tipo: "fotos" | "video";
   youtube_url: string | null;
+  instagram_reel_url: string | null;
+  thumbnail_url: string | null;
   fotos: Array<{
     url: string;
     url_sm: string | null;

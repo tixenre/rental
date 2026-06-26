@@ -60,8 +60,17 @@ function ytThumbFallback(ytId: string) {
   return `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
 }
 
+function extractIgShortcode(url: string): string | null {
+  if (!url) return null;
+  const m = url.match(/instagram\.com\/(?:reel|p|tv)\/([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  if (/^[A-Za-z0-9_-]{8,}$/.test(url)) return url;
+  return null;
+}
+
 function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: () => void }) {
-  const ytId = trabajo.tipo === "video" && trabajo.youtube_url ? extractYtId(trabajo.youtube_url) : null;
+  const ytId = trabajo.youtube_url ? extractYtId(trabajo.youtube_url) : null;
+  const igCode = trabajo.instagram_reel_url ? extractIgShortcode(trabajo.instagram_reel_url) : null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -95,6 +104,14 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               className="h-full w-full"
+            />
+          ) : igCode ? (
+            <iframe
+              src={`https://www.instagram.com/reel/${igCode}/embed/`}
+              title={trabajo.titulo}
+              allowFullScreen
+              scrolling="no"
+              className="h-full w-full border-0"
             />
           ) : trabajo.fotos[0] ? (
             <img
@@ -246,10 +263,11 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
         className="flex gap-3 overflow-x-auto px-4 pb-2 lg:px-12 scroll-pl-4 lg:scroll-pl-12 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [scrollbar-width:none] cursor-grab active:cursor-grabbing select-none"
       >
         {visibles.map((trabajo) => {
-          const ytId = trabajo.tipo === "video" && trabajo.youtube_url ? extractYtId(trabajo.youtube_url) : null;
-          const thumb = trabajo.tipo === "fotos"
-            ? (trabajo.fotos[0]?.url_avif ?? trabajo.fotos[0]?.url_sm ?? trabajo.fotos[0]?.url ?? null)
-            : ytId ? ytThumb(ytId) : null;
+          const ytId = trabajo.youtube_url ? extractYtId(trabajo.youtube_url) : null;
+          const hasVideo = !!(ytId || trabajo.instagram_reel_url);
+          const thumb = ytId
+            ? ytThumb(ytId)
+            : (trabajo.thumbnail_url ?? trabajo.fotos[0]?.url_avif ?? trabajo.fotos[0]?.url_sm ?? trabajo.fotos[0]?.url ?? null);
           const fallback = ytId ? ytThumbFallback(ytId) : undefined;
 
           return (
@@ -276,7 +294,7 @@ function TrabajosSection({ trabajos }: { trabajos: EstudioTrabajo[] }) {
                   </div>
                 )}
                 {/* Play badge */}
-                {trabajo.tipo === "video" && (
+                {hasVideo && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
                     <div className="h-10 w-10 rounded-full bg-background/85 flex items-center justify-center shadow group-hover:scale-110 transition-transform">
                       <svg viewBox="0 0 24 24" className="h-4 w-4 text-ink ml-0.5" fill="currentColor">
