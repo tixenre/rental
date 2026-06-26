@@ -127,8 +127,9 @@ function TrabajoCard({ trabajo }: { trabajo: EstudioTrabajo }) {
     trabajo.tipo === "fotos"
       ? (trabajo.fotos[0]?.url_avif ?? trabajo.fotos[0]?.url_sm ?? trabajo.fotos[0]?.url ?? null)
       : ytId
-        ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`
+        ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`
         : null;
+  const thumbFallback = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : undefined;
 
   return (
     <div className="flex flex-col sm:flex-row gap-0 rounded-2xl overflow-hidden border border-background/10 bg-background/5">
@@ -148,6 +149,7 @@ function TrabajoCard({ trabajo }: { trabajo: EstudioTrabajo }) {
               src={thumb}
               alt={trabajo.titulo}
               loading="lazy"
+              onError={thumbFallback ? (e) => { e.currentTarget.src = thumbFallback; e.currentTarget.onerror = null; } : undefined}
               className="h-full w-full object-cover block transition-transform duration-500 hover:scale-[1.03]"
             />
             {trabajo.tipo === "video" && ytId && (

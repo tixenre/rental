@@ -206,7 +206,7 @@ def _get_trabajos(conn, solo_activos: bool = True) -> list:
 @router.get("/estudio")
 def get_estudio(response: Response):
     """Devuelve la configuración pública del estudio + fotos + pack curado + trabajos."""
-    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=30"
     with get_db() as conn:
         row = _get_estudio_row(conn)
         fotos = _get_fotos(conn)
