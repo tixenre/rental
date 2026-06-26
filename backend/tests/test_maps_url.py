@@ -32,14 +32,15 @@ def test_iframe_con_host_no_permitido_rechaza():
 
 
 def test_url_larga_con_coords_construye_embed():
-    """URL larga con `@lat,lng,zoom` — extraemos coords y armamos embed."""
+    """URL larga con `@lat,lng,zoom` — extraemos coords y armamos embed OSM."""
     long_url = (
         "https://www.google.com/maps/place/Rambla+Rental/"
         "@-38.0011,-57.5500,17z/data=!3m1!4b1"
     )
     result = parse_maps_input(long_url)
-    assert "-38.0011,-57.55" in result.embed_url
-    assert "output=embed" in result.embed_url
+    assert "openstreetmap.org" in result.embed_url
+    assert "-38.0011" in result.embed_url
+    assert "-57.55" in result.embed_url
     # raw_url queda el original (lo que pegó el dueño).
     assert result.raw_url == long_url
 
@@ -103,8 +104,9 @@ def test_shortlink_resuelve_con_mock(monkeypatch):
     monkeypatch.setattr(mod.httpx, "Client", FakeClient)
 
     result = parse_maps_input("https://maps.app.goo.gl/abc123")
-    assert "-38.5,-57.6" in result.embed_url
-    assert "output=embed" in result.embed_url
+    assert "openstreetmap.org" in result.embed_url
+    assert "-38.5" in result.embed_url
+    assert "-57.6" in result.embed_url
     # El raw_url debe quedar el shortlink original (más corto, abre la app móvil).
     assert result.raw_url == "https://maps.app.goo.gl/abc123"
 

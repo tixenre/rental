@@ -32,6 +32,7 @@ import httpx
 _ALLOWED_HOSTS = {
     "maps.app.goo.gl",
     "goo.gl",
+    "share.google",
     "consent.google.com",
     "consent.youtube.com",  # raros pero pueden aparecer
     "google.com",
@@ -92,18 +93,22 @@ def _coords_from_url(url: str) -> Optional[tuple[float, float]]:
 
 
 def _embed_from_long_url(long_url: str) -> str:
-    """Convierte una URL larga de google.com/maps a una URL embebible.
+    """Convierte una URL larga de google.com/maps a una URL embebible via OpenStreetMap.
 
-    Si la URL tiene coords (@lat,lng o q=lat,lng), se arma un embed centrado ahí.
-    Si no, se cae a `?q=<original>&output=embed` (Google sabe interpretar la URL).
+    El formato legacy `output=embed` de Google ya no funciona sin API key.
+    Cuando la URL tiene coords extraemos bbox y marker para OSM.
+    Sin coords levantamos error: el admin debe pegar el código iframe directamente.
     """
     coords = _coords_from_url(long_url)
     if coords:
         lat, lng = coords
-        return f"https://www.google.com/maps?q={lat},{lng}&output=embed"
-    # Fallback: dejamos que Google interprete la URL como query (suele funcionar
-    # con URLs /maps/place/... ya que el slug es legible).
-    return f"https://www.google.com/maps?q={long_url}&output=embed"
+        margin = 0.006  # ~600 m de margen alrededor del punto
+        bbox = f"{lng - margin},{lat - margin},{lng + margin},{lat + margin}"
+        return f"https://www.openstreetmap.org/export/embed.html?bbox={bbox}&layer=mapnik&marker={lat},{lng}"
+    raise MapsParseError(
+        "no pude extraer coordenadas del link. "
+        "Usá 'Compartir → Insertar mapa' en Google Maps y pegá el código <iframe> completo."
+    )
 
 
 def _resolve_shortlink(url: str, *, max_redirects: int = 5, timeout: float = 4.0) -> str:
@@ -166,7 +171,7 @@ def parse_maps_input(raw: str) -> ParsedMaps:
 
     final_url = s
     host = _host_of(s)
-    if host in {"maps.app.goo.gl", "goo.gl"} or host.endswith(".goo.gl"):
+    if host in {"maps.app.goo.gl", "goo.gl", "share.google"} or host.endswith(".goo.gl"):
         final_url = _resolve_shortlink(s)
         if not _is_allowed_host(final_url, _ALLOWED_HOSTS):
             raise MapsParseError(f"el link resuelve a un host no permitido: {_host_of(final_url)}")

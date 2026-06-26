@@ -15,11 +15,10 @@ export const Route = createLazyFileRoute("/estudio")({
   component: EstudioPage,
 });
 
-// Coordenadas del estudio (Mar del Plata) — reemplazar con dirección real del admin
 const MAPA_EMBED_DEFAULT =
-  "https://maps.google.com/maps?q=-38.0028,-57.5578&z=15&hl=es&output=embed";
-const MAPA_URL_DEFAULT =
-  "https://www.google.com/maps/search/?api=1&query=Mar+del+Plata+Buenos+Aires+Argentina";
+  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d5418.432520284455!2d-57.56597107511356!3d-37.98649647543215!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x9584db0050a8b0bf%3A0x3860608ed96f47f1!2sRambla%20Estudio%20y%20Rental!5e0!3m2!1ses-419!2sar!4v1782432663360!5m2!1ses-419!2sar";
+const MAPA_NAV_DEFAULT =
+  "https://www.google.com/maps/dir/?api=1&destination=Rambla+Estudio+y+Rental,+Chaco+1392,+Mar+del+Plata";
 
 // ── Grain overlay (reutilizado en secciones ink/amber) ─────────────────────
 const Grain = ({ opacity = 12 }: { opacity?: number }) => (
@@ -214,8 +213,8 @@ function EstudioPage() {
   const verMapaHref =
     data?.mapa_url ??
     (data?.direccion
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.direccion)}`
-      : MAPA_URL_DEFAULT);
+      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(data.direccion)}`
+      : MAPA_NAV_DEFAULT);
 
   const bookingConfig = data
     ? {
@@ -551,7 +550,7 @@ function EstudioPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-full border hairline bg-background px-4 py-2 text-sm text-ink hover:border-ink transition"
                 >
-                  Ver en Google Maps <ExternalLink className="h-3 w-3" />
+                  Cómo llegar <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
             </div>
