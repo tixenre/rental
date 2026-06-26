@@ -214,6 +214,9 @@ def auth_me(request: Request):
     # Import inline para evitar ciclo (admin_guard importa de routes.auth).
     from admin_guard import is_admin_email
 
+    if dev_bypass_enabled():
+        return {"email": "bypass@local", "name": "Dev Admin", "is_admin": True}
+
     session = require_session(request)
     email = (session.get("email") or "").strip().lower()
     return {**session, "is_admin": is_admin_email(email)}
