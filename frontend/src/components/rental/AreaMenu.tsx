@@ -55,7 +55,7 @@ export function AreaMenu({ current }: { current?: AreaKey | "cliente" }) {
         <button
           type="button"
           aria-label="Menú de navegación"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/25 text-white transition hover:bg-white/40"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink/10 text-ink transition hover:bg-ink/20"
         >
           <Menu className="h-5 w-5" />
         </button>

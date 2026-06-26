@@ -34,12 +34,12 @@ function FooterMobile() {
       <div className="px-4 py-6 space-y-4">
         {/* Logo + WhatsApp CTA en una fila */}
         <div className="flex items-center justify-between gap-3">
-          <Logo size="sm" linkTo={null} />
+          <Logo size="sm" linkTo={null} color="text-[var(--area-accent)]" />
           <a
             href={whatsappUrl("Hola! Tengo una consulta.")}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-full bg-ink text-amber px-3 py-1.5 text-xs font-medium"
+            className="inline-flex items-center gap-1.5 rounded-full bg-ink text-[var(--area-accent)] px-3 py-1.5 text-xs font-medium"
           >
             <MessageCircle className="h-3.5 w-3.5" />
             WhatsApp
@@ -51,19 +51,22 @@ function FooterMobile() {
             flex-wrap los ::before de filas apiladas se solaparían (mismo criterio
             que las pills de categoría). */}
         <nav className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-          <Link to="/rental" className="text-ink hover:text-amber transition">
+          <Link to="/rental" className="text-ink hover:text-[var(--area-accent)] transition">
             Catálogo
           </Link>
           <span className="text-muted-foreground/40">·</span>
-          <Link to="/estudio" className="text-ink hover:text-amber transition">
+          <Link to="/estudio" className="text-ink hover:text-[var(--area-accent)] transition">
             Estudio
           </Link>
           <span className="text-muted-foreground/40">·</span>
-          <Link to="/workshops" className="text-ink hover:text-amber transition">
+          <Link to="/workshops" className="text-ink hover:text-[var(--area-accent)] transition">
             Talleres
           </Link>
           <span className="text-muted-foreground/40">·</span>
-          <Link to="/preguntas-frecuentes" className="text-ink hover:text-amber transition">
+          <Link
+            to="/preguntas-frecuentes"
+            className="text-ink hover:text-[var(--area-accent)] transition"
+          >
             FAQ
           </Link>
           <span className="text-muted-foreground/40">·</span>
@@ -71,7 +74,7 @@ function FooterMobile() {
             href={`https://instagram.com/${contact.instagram}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-ink hover:text-amber transition"
+            className="inline-flex items-center gap-1 text-ink hover:text-[var(--area-accent)] transition"
           >
             <Instagram className="h-3 w-3" />
             Instagram
@@ -128,7 +131,7 @@ function FooterDesktop() {
         <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr]">
           {/* Branding + tagline */}
           <div>
-            <Logo size="lg" linkTo={null} />
+            <Logo size="lg" linkTo={null} color="text-[var(--area-accent)]" />
             <p className="mt-3 text-sm text-muted-foreground max-w-xs">
               Equipos audiovisuales y estudio de foto/video en Mar del Plata. Producciones de
               cualquier escala.
@@ -138,7 +141,7 @@ function FooterDesktop() {
               href={whatsappUrl("Hola! Tengo una consulta.")}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-5 inline-flex items-center gap-2 rounded-full bg-ink text-amber px-4 py-2 text-sm font-medium transition hover:brightness-110"
+              className="mt-5 inline-flex items-center gap-2 rounded-full bg-ink text-[var(--area-accent)] px-4 py-2 text-sm font-medium transition hover:brightness-110"
             >
               <MessageCircle className="h-4 w-4" />
               Consultanos por WhatsApp
@@ -157,7 +160,7 @@ function FooterDesktop() {
                   href={contact.mapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-ink hover:text-amber transition whitespace-pre-line"
+                  className="text-ink hover:text-[var(--area-accent)] transition whitespace-pre-line"
                 >
                   {contact.address}
                 </a>
@@ -168,7 +171,7 @@ function FooterDesktop() {
                   href={whatsappUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono tabular text-ink hover:text-amber transition"
+                  className="font-mono tabular text-ink hover:text-[var(--area-accent)] transition"
                 >
                   {contact.phoneDisplay}
                 </a>
@@ -177,7 +180,7 @@ function FooterDesktop() {
                 <Mail className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
                 <a
                   href={`mailto:${contact.email}`}
-                  className="text-ink hover:text-amber transition"
+                  className="text-ink hover:text-[var(--area-accent)] transition"
                 >
                   {contact.email}
                 </a>
@@ -202,22 +205,28 @@ function FooterDesktop() {
             </h3>
             <ul className="space-y-2.5 text-sm">
               <li>
-                <Link to="/rental" className="text-ink hover:text-amber transition">
+                <Link to="/rental" className="text-ink hover:text-[var(--area-accent)] transition">
                   Catálogo
                 </Link>
               </li>
               <li>
-                <Link to="/estudio" className="text-ink hover:text-amber transition">
+                <Link to="/estudio" className="text-ink hover:text-[var(--area-accent)] transition">
                   El Estudio
                 </Link>
               </li>
               <li>
-                <Link to="/workshops" className="text-ink hover:text-amber transition">
+                <Link
+                  to="/workshops"
+                  className="text-ink hover:text-[var(--area-accent)] transition"
+                >
                   Workshops & Talleres
                 </Link>
               </li>
               <li>
-                <Link to="/preguntas-frecuentes" className="text-ink hover:text-amber transition">
+                <Link
+                  to="/preguntas-frecuentes"
+                  className="text-ink hover:text-[var(--area-accent)] transition"
+                >
                   Preguntas frecuentes
                 </Link>
               </li>
@@ -226,7 +235,7 @@ function FooterDesktop() {
                   href={`https://instagram.com/${contact.instagram}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-ink hover:text-amber transition"
+                  className="inline-flex items-center gap-2 text-ink hover:text-[var(--area-accent)] transition"
                 >
                   <Instagram className="h-4 w-4" />@{contact.instagram}
                 </a>
