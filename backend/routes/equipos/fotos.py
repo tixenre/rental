@@ -29,6 +29,18 @@ MAX_PHOTO_CANDIDATES_BUSCAR_VALIDATE = 24
 MAX_PHOTO_CANDIDATES_BUSCAR_RETURN   = 16
 
 
+def _strip_html_noise(html: str) -> str:
+    """Elimina bloques de ruido (scripts, estilos, SVG) antes de persistir.
+
+    Reduce el tamaño típico de un HTML de B&H un 50-80% sin perder contenido
+    relevante para el extractor de specs (estructura DOM + texto).
+    """
+    for tag in ("script", "style", "noscript", "svg", "iframe"):
+        html = re.sub(rf"<{tag}[^>]*>.*?</{tag}>", "", html, flags=re.IGNORECASE | re.DOTALL)
+    html = re.sub(r"<link\b[^>]*>", "", html, flags=re.IGNORECASE)
+    return html
+
+
 @router.post("/admin/equipos/{id}/upload-html-source")
 async def admin_upload_html_source(
     id: int,
@@ -66,9 +78,11 @@ async def admin_upload_html_source(
     except Exception:
         raise HTTPException(400, "HTML inválido (no es UTF-8)")
 
+    html_content = _strip_html_noise(html_content)
+
     path = f"equipos/{id}/source.html"
     with media_http():
-        html_source_url = _put_r2(path, content, "text/html; charset=utf-8")
+        html_source_url = _put_r2(path, html_content.encode("utf-8"), "text/html; charset=utf-8")
 
     with get_db() as conn:
         try:
