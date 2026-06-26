@@ -178,6 +178,38 @@ function fmtDate(iso: string | null) {
   });
 }
 
+// ── HoraSelect ───────────────────────────────────────────────────────────────
+
+function HoraSelect({
+  value,
+  onChange,
+  min = 0,
+  max = 24,
+  className,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  className?: string;
+}) {
+  const hours = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+  return (
+    <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
+      <SelectTrigger className={className ?? "w-[90px]"}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {hours.map((h) => (
+          <SelectItem key={h} value={String(h)}>
+            {String(h).padStart(2, "0")}:00
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 // ── Session Assistant ─────────────────────────────────────────────────────────
 
 function SesionAsistente({
@@ -276,25 +308,11 @@ function SesionAsistente({
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">Desde (h)</label>
-            <Input
-              type="number"
-              min={0}
-              max={23}
-              value={newIni}
-              onChange={(e) => setNewIni(Number(e.target.value))}
-              className="w-[80px]"
-            />
+            <HoraSelect value={newIni} onChange={setNewIni} min={0} max={23} />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">Hasta (h)</label>
-            <Input
-              type="number"
-              min={1}
-              max={24}
-              value={newFin}
-              onChange={(e) => setNewFin(Number(e.target.value))}
-              className="w-[80px]"
-            />
+            <HoraSelect value={newFin} onChange={setNewFin} min={1} max={24} />
           </div>
           <Button variant="outline" size="sm" onClick={addIntensivo} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" />
@@ -340,25 +358,11 @@ function SesionAsistente({
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">Desde (h)</label>
-            <Input
-              type="number"
-              min={0}
-              max={23}
-              value={semIni}
-              onChange={(e) => setSemIni(Number(e.target.value))}
-              className="w-[75px]"
-            />
+            <HoraSelect value={semIni} onChange={setSemIni} min={0} max={23} />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-muted-foreground">Hasta (h)</label>
-            <Input
-              type="number"
-              min={1}
-              max={24}
-              value={semFin}
-              onChange={(e) => setSemFin(Number(e.target.value))}
-              className="w-[75px]"
-            />
+            <HoraSelect value={semFin} onChange={setSemFin} min={1} max={24} />
           </div>
           <Button variant="outline" size="sm" onClick={generateSemanal} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" />
