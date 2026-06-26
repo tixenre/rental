@@ -265,69 +265,70 @@ function LightboxSlide({
 
       {/* Info */}
       <div className="px-5 py-4 space-y-2 overflow-y-auto">
-        {trabajo.categorias.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {trabajo.categorias.map((cat) => (
-              <span
-                key={cat}
-                className="rounded-full border border-[color-mix(in_oklch,var(--area-accent)_40%,transparent)] px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-[var(--area-accent)]"
-              >
-                {cat}
-              </span>
-            ))}
-          </div>
-        )}
-        {trabajo.titulo && (
-          <h3 className="font-display font-bold text-background text-lg leading-tight">
-            {trabajo.titulo}
-          </h3>
-        )}
-        {trabajo.descripcion && (
-          <p className="text-sm text-background/55 leading-relaxed line-clamp-3">
-            {trabajo.descripcion}
-          </p>
-        )}
-        {trabajo.realizador && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {trabajo.realizador_logo_url && (
-              <img
-                src={trabajo.realizador_logo_url}
-                alt={trabajo.realizador}
-                className="h-5 w-5 rounded object-contain border border-background/10 shrink-0"
-              />
-            )}
-            <span className="text-sm font-medium text-background/65">{trabajo.realizador}</span>
-            {trabajo.realizador_instagram && (
-              <a
-                href={`https://instagram.com/${trabajo.realizador_instagram.replace(/^@/, "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-[var(--area-accent)] transition-colors"
-              >
-                <IgIcon />
-                {trabajo.realizador_instagram.startsWith("@")
-                  ? trabajo.realizador_instagram
-                  : `@${trabajo.realizador_instagram}`}
-              </a>
-            )}
-            {trabajo.realizador_web && (
-              <a
-                href={
-                  trabajo.realizador_web.startsWith("http")
-                    ? trabajo.realizador_web
-                    : `https://${trabajo.realizador_web}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-[var(--area-accent)] transition-colors"
-              >
-                <WebIcon />
-                {trabajo.realizador_web.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-              </a>
-            )}
-          </div>
-        )}
-      </div>
+          {trabajo.categorias.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {trabajo.categorias.map((cat) => (
+                <span
+                  key={cat}
+                  className="rounded-full border border-[color-mix(in_oklch,var(--area-accent)_40%,transparent)] px-2.5 py-0.5 font-mono text-2xs uppercase tracking-[0.15em] text-[var(--area-accent)]"
+                >
+                  {cat}
+                </span>
+              ))}
+            </div>
+          )}
+          {trabajo.titulo && (
+            <h3 className="font-display font-bold text-background text-lg leading-tight">
+              {trabajo.titulo}
+            </h3>
+          )}
+          {trabajo.descripcion && (
+            <p className="text-sm text-background/55 leading-relaxed line-clamp-3">
+              {trabajo.descripcion}
+            </p>
+          )}
+          {trabajo.realizador && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {trabajo.realizador_logo_url && (
+                <img
+                  src={trabajo.realizador_logo_url}
+                  alt={trabajo.realizador}
+                  className="h-5 w-5 rounded object-contain border border-background/10 shrink-0"
+                />
+              )}
+              <span className="text-sm font-medium text-background/65">{trabajo.realizador}</span>
+              {trabajo.realizador_instagram && (
+                <a
+                  href={`https://instagram.com/${trabajo.realizador_instagram.replace(/^@/, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-[var(--area-accent)] transition-colors"
+                >
+                  <IgIcon />
+                  {trabajo.realizador_instagram.startsWith("@")
+                    ? trabajo.realizador_instagram
+                    : `@${trabajo.realizador_instagram}`}
+                </a>
+              )}
+              {trabajo.realizador_web && (
+                <a
+                  href={
+                    trabajo.realizador_web.startsWith("http")
+                      ? trabajo.realizador_web
+                      : `https://${trabajo.realizador_web}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 flex items-center gap-1 text-xs text-background/35 hover:text-[var(--area-accent)] transition-colors"
+                >
+                  <WebIcon />
+                  {trabajo.realizador_web.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                </a>
+              )}
+            </div>
+          )}
+
+        </div>
     </div>
   );
 }
