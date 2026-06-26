@@ -68,12 +68,21 @@ Es read-only. Tarda < 2 minutos.
 
 **2a. Colores genéricos o hardcodeados**
 
+> **Patrones legítimos que NO son violaciones** — no los marques como drift:
+> - `bg-[var(--area-accent)]`, `text-[var(--area-accent)]`, `border-[var(--area-accent)]` — theming por área (cascade `[data-area]`)
+> - `bg-[color-mix(in_oklch,var(--area-accent)_N%,...)]` — tints del accent de área (canonical)
+> - `bg-[color-mix(in_oklch,var(--color-ink)_N%,var(--area-accent))]` — hover mix ink+area (canonical)
+> - `bg-estudio`, `text-estudio` en `src/data/areas.ts` y el topbar — colores de área en la capa de chrome
+> - El hex `#e9552f` en `estudio.tsx` (theme-color de la ruta) — metadata de navegador, no color de app
+>
+> Sí marcar como drift: `bg-naranja` (o `text-naranja`) en **superficies de marketing del Estudio** — debe ser `bg-[var(--area-accent)]`.
+
 ```bash
 # Tailwind genérico (debería haber 0 — ESLint los bloquea, pero buscar residuales o excepciones no documentadas)
 grep -rn 'bg-\(slate\|gray\|red\|green\|blue\|yellow\|purple\|pink\)-\|text-\(green\|blue\|red\|yellow\|purple\|pink\|gray\)-[0-9]' frontend/src/ --include="*.tsx" --include="*.ts" | grep -v eslint-disable
 
 # Hex crudos fuera de constantes Tier 3-4 documentadas (AVATAR_COLORS, WhatsApp, etc.)
-grep -rn '#[0-9a-fA-F]\{6\}' frontend/src/ --include="*.tsx" --include="*.ts" | grep -v 'AVATAR_COLORS\|25D366\|// Tier\|eslint-disable'
+grep -rn '#[0-9a-fA-F]\{6\}' frontend/src/ --include="*.tsx" --include="*.ts" | grep -v 'AVATAR_COLORS\|25D366\|// Tier\|eslint-disable\|e9552f\|theme-color'
 ```
 
 **2b. Magic font-sizes** — `text-[Nrem]` (ESLint bloquea `px`; los `rem` pueden escapar):

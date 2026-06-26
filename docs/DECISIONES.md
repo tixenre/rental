@@ -905,17 +905,18 @@ cancel-in-progress` ya cancela corridas viejas.
   (texto **dorado** en reposo), y el `variant="primary"` del DS con `bg-ink text-background` (texto
   **hueso**). Unificar a "una sola forma" exigía elegir el canon. El dueño pidió ver el botón antes de decidir.
 - **Decisión.** El dueño comparó ambas en vivo (render real, fuentes y colores de marca, reposo + hover) y
-  eligió **hueso**: `variant="primary"` = **fondo ink + texto hueso/bone** en reposo, invierte a **amber +
-  ink** en hover. El texto hueso en reposo es **decisión de marca, NO un bug**: no "corregir" a dorado.
-  El dorado es la jugada del **hover** (la _reverse signature_ ink↔amber).
+  eligió **hueso**: `variant="primary"` = **fondo ink + texto hueso/bone** en reposo, invierte a
+  **`--area-accent` + ink** en hover (`hover:bg-[var(--area-accent)] hover:text-ink`): amber en rental,
+  naranja en estudio, rosa en workshops. El texto hueso en reposo es **decisión de marca, NO un bug**:
+  no "corregir" a dorado. El accent del hover (la _reverse signature_ ink↔área) es la jugada de identidad.
 - **Why.** Dos formas del mismo CTA violan "una sola forma de hacer cada cosa" (_Filosofía de diseño del DS,
   2026-06-20_). Hueso da más contraste sobre ink (19:1 vs 11:1 del dorado — ambos AA holgado) y un look más
-  limpio; el dorado queda reservado al gesto del hover, más fuerte que un simple aclarado. Anclar la decisión
-  evita el churn de que un futuro cambio la "corrija" creyéndola un bug.
-- **Consecuencias.** Los ~14 CTAs migraron a `variant="primary"` (texto dorado → hueso) en PR #990. El
-  supervisor marca un CTA primario que vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente
-  el gesto en vez de usar `<Button>`. Documentado en `DESIGN_SYSTEM.md` (sección Button). Espeja las decisiones
-  tipo "no lo arregles, es del dueño" (_Presupuesto muestra IVA aparte (2026-06-06)_, verde WhatsApp tier-4).
+  limpio; el accent queda reservado al gesto del hover, más fuerte que un simple aclarado. Usar `--area-accent`
+  (no amber fijo) extiende la decisión a todas las áreas sin necesitar un override por área en el botón.
+- **Consecuencias.** Los ~14 CTAs migraron a `variant="primary"` (texto dorado → hueso) en PR #990.
+  Hover actualizado a `--area-accent` en #1063 (theming por área). El supervisor marca un CTA primario
+  cuyo hover invierta a un color fijo en vez de `--area-accent`, o un `<button>` crudo que reimplemente
+  el gesto. Documentado en `DESIGN_SYSTEM.md` (sección Button).
 
 ### 2026-06-23 — Capa de skills auto-gobernada y portable: registro verificado + routing de modelo + loop de aprendizaje
 
@@ -1240,3 +1241,34 @@ cancel-in-progress` ya cancela corridas viejas.
   via `BITACORA.md` (registra qué juzgó vs. qué decidió el dueño — campo "¿coincidieron?"). Condición de retiro
   (anti-bloat): si el ledger de `gobernanza` lo muestra con uso <1/mes y veredictos tibios, se retira.
   y contabilidad/plata. No todo sistema necesita uno: si MEMORIA + MANIFIESTO ya lo cubren claro, no se fuerza.
+
+### 2026-06-26 — Theming por área: `--area-accent` cascade + `--color-estudio` token propio
+
+- **Contexto.** La página del Estudio (`/estudio`) tiene identidad visual propia (naranja cálido `#E9552F`)
+  pero todos sus componentes usaban `bg-amber`/`text-amber` hardcodeados. Dos problemas: (1) `--color-naranja`
+  existía como status Warning con la misma hex — reutilizarlo en marketing crea confusión semántica; (2) sin
+  mecanismo de cascade, cada componente del estudio necesitaría conocer su contexto de área.
+- **Decisión.** CSS cascade `[data-area]` con tokens semánticos de área:
+  1. `PublicLayout.tsx` inyecta `data-area="<area>"` en el div raíz según el `variant` del topbar.
+  2. `tokens/colors.css` define `--area-accent` / `--area-accent-soft` / `--area-accent-hot` en `:root`
+     (default → `--color-amber`) y los sobreescribe en `[data-area="estudio"]` (→ `--color-estudio`).
+  3. Los componentes consumen `var(--area-accent)` via Tailwind arbitrary values (`bg-[var(--area-accent)]`)
+     sin saber en qué área están.
+  4. `EstudioBand` (componente de la landing rental) usa `data-area="estudio"` en su `<section>` para
+     activar el cascade local (nested override), sin que el layout padre lo necesite saber.
+- **`--color-estudio` vs `--color-naranja`:** mismo hex `#E9552F`, tokens separados. `--naranja` = status
+  Warning (paleta semántica de pedidos); `--color-estudio` = accent de marketing del área. No mezclar —
+  son paralelos como `--color-amber` (marca) vs `--amber` (token de Tailwind en `@theme`).
+- **Límites del theming (fijos, no se tematizan por área):** focus rings (`border-amber/60`), estados de
+  UI cross-app, badges del kit (`EstadoBadge`/`PagoBadge`), back-office, paleta de status.
+- **WCAG sobre `#E9552F`:** `text-ink` puro (4.88:1) es el único opaco viable para texto normal sobre
+  el fondo naranja — ink/90 = 3.80:1 (falla AA), ink/65 = 3.00:1 (falla). Naranja sobre ink: ≥ 80%
+  de opacidad para pasar AA normal (80% → 4.60:1, 70% → 4.15:1 falla). La sección "Reservar" de
+  `estudio.lazy.tsx` bumpeó todos los `text-ink/55,/65,/50` a `text-ink` opaco por este motivo.
+- **Guard:** `frontend/e2e/area-accent-cascade.spec.ts` verifica `data-area` correcto por ruta y que
+  `--area-accent` resuelva distinto en estudio vs rental. Iniciativa #1063; Fase 2 (rental + workshops)
+  en el mismo PR.
+- **Why.** El cascade CSS es la solución elegante: zero runtime JS, composición natural del cascade,
+  ningún componente necesita prop de área. El token semántico `--area-accent` es más robusto que
+  `--color-estudio` directo porque desacopla la elección de color de la semántica de uso — agregar
+  workshops u otras áreas es un bloque CSS adicional, no un barrido de componentes.

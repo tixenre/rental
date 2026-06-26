@@ -108,13 +108,18 @@ a reproducir (pedidos, clientes, cobranzas, lo que venga).
 | `--verde`             | `#009971`               | Status palette (Confirmado) — charts/montos/bandas |
 | `--verde-ink`         | `oklch(0.48 0.125 166.4)` | Texto de estado verde sobre tints (AA); NO el verde de marca |
 | `--azul-ink`          | `oklch(0.48 0.14 239)`  | Texto de estado azul/info sobre tints (AA); hermano de `verde-ink`; NO el azul de marca |
-| `--naranja`           | `#E9552F`               | Status palette (Warning)               |
+| `--naranja`           | `#E9552F`               | Status palette (Warning) — mismo hue que `--color-estudio`, tokens separados |
 | `--destructive`       | `oklch(0.55 0.22 27)`   | Errors/delete/Cancelado — AA texto-sobre-claro y blanco-sobre-rojo (era 0.62, #971) |
+| `--color-estudio`     | `#E9552F`               | Accent del Estudio — mismo hue que `--naranja`, token propio (ver §Accent por área) |
+| `--area-accent`       | `var(--color-amber)` por defecto | Accent de marketing del área activa — resuelve por `[data-area]` (ver §Accent por área) |
+| `--area-accent-soft`  | tint 18% del accent     | Fondo tintado del área activa (radio activo, badge bg) |
+| `--area-accent-hot`   | versión clara del accent | Hover highlight del área activa |
 
-**Regla del color (single-accent discipline):** la página es \*\*bone + ink
-
-- amber**. La paleta secundaria (rosa/azul/verde/naranja) **sólo\*\* para
-  status de pedido y gráficos — nunca en superficies de marketing.
+**Regla del color (accent por área):** la página es **bone + ink + `--area-accent`** — el accent
+de marketing resuelve por área activa (ver §Accent por área abajo). Sin contexto de área, el
+accent es `amber` (identidad global de Rambla). La paleta secundaria (rosa/azul/verde/naranja)
+**sólo** para status de pedido y gráficos — nunca en superficies de marketing. **Focus rings,
+estados de UI, badges del kit y back-office → amber fijo** (no se tematizan por área).
 
 **Orden de gráficos** (siempre): amber → azul → naranja → verde → rosa.
 
@@ -150,6 +155,29 @@ una clase de escala genérica (`text-green-700`, `bg-blue-500`, …) en
 **Regla:** colores genéricos/hex sólo se permiten en tiers 3 y 4, y ahí
 viven en constantes centralizadas y documentadas — nunca sueltos en una
 pantalla. Cualquier otro color sale de un token (tiers 1-2).
+
+#### Accent por área (`[data-area]` cascade)
+
+Cada sección pública tiene su propio accent de marketing. El mecanismo:
+
+1. `PublicLayout.tsx` inyecta `data-area="<area>"` en el div raíz según el `variant` del topbar.
+2. `tokens/colors.css` define `--area-accent` / `--area-accent-soft` / `--area-accent-hot` en `:root`
+   (default → amber) y los sobreescribe en `[data-area="estudio"]` (→ `--color-estudio`).
+3. Los componentes consumen `var(--area-accent)` vía Tailwind arbitrary values
+   (`bg-[var(--area-accent)]`) sin saber en qué área están.
+
+**Límites del theming:**
+- `--area-accent` gobierna **solo** el accent de marketing de la sección pública.
+- Focus rings, estados de UI cross-app (`border-amber/60`), badges del kit (`EstadoBadge`/`PagoBadge`),
+  back-office y la paleta de status → **amber/status fijos, nunca por área**.
+- `--color-estudio` (`#E9552F`) y `--color-naranja` (`#E9552F`) comparten el mismo valor hex pero
+  son **tokens separados con semánticas distintas**: estudio = marketing, naranja = status Warning.
+  **No usar `--color-naranja` donde debería ir `--color-estudio`** — el supervisor lo marca.
+
+**`EstudioBand` (componente de la landing rental):** usa `data-area="estudio"` en su `<section>` raíz
+para activar el cascade localmente (nested override), sin que el layout padre lo necesite saber.
+
+Regla viva: _2026-06-26 — Theming por área_ en [`MEMORIA.md`](MEMORIA.md).
 
 **Cómo exceptuar (tiers 3 y 4):** envolvé la constante con
 `/* eslint-disable no-restricted-syntax */` … `/* eslint-enable */` (o
@@ -382,10 +410,13 @@ import { Button } from "@/design-system/ui/button";
 
 > **CTA primario = ink + texto hueso (bone), NO dorado.** En reposo el
 > `variant="primary"` es **fondo ink + texto bone** (`bg-ink text-background`) e
-> **invierte a amber en hover** (`hover:bg-amber hover:text-ink`). El texto en
-> reposo es hueso a propósito — **decisión de marca explícita del dueño
-> (2026-06-22)**, NO un bug. No "arreglarlo" a texto dorado: el dorado aparece
-> recién en el hover (la inversión es la jugada signature).
+> **invierte a `--area-accent` en hover** (`hover:bg-[var(--area-accent)] hover:text-ink`).
+> El texto en reposo es hueso a propósito — **decisión de marca explícita del dueño
+> (2026-06-22)**, NO un bug. No "arreglarlo" a texto dorado: el accent del hover
+> se tiñe por área (ver §Accent por área).
+>
+> `variant="amber"` siempre muestra el accent activo (`bg-[var(--area-accent)]`) sin
+> inversión — en estudio aparece naranja, en rental/global aparece amber.
 
 ### EstadoBadge
 
@@ -488,9 +519,10 @@ reusar no recrear.
 - **`TopBarShell`** — el shell único: `<header>` sticky con **mismo alto, padding y logo**
   para todas las variantes. Recibe `section`, slots (`center`, `right`), y opcionales
   (`headerRef`, `labelOverride`). De acá salen rental / estudio / workshops / cliente.
-- **Color de marca por área** — cada área tiene su `bg` (amber / naranja / rosa / verde),
-  fuente única en **`src/data/areas.ts`** (`label/desc/href/color`), consumida por el
-  topbar **y** el menú. No duplicar la lista de áreas en otro lado.
+- **Color de marca por área** — el topbar usa el `bg`/`accent` declarado en **`src/data/areas.ts`**
+  (`label/desc/href/color`), consumida por el topbar **y** el menú. El resto de la página recibe
+  el accent via `--area-accent` (cascade `[data-area]`, ver §Accent por área). No duplicar la
+  lista de áreas en otro lado.
 - **Logo themeable** — sobre el color del área el logo va **blanco**: el wordmark
   (`Logo`) **normaliza sus fills a `currentColor`** (atributo `fill=` y `<style>`), así el
   SVG custom del admin también se tiñe; en mobile se usa el **isologo mono** (`LogoMark`,

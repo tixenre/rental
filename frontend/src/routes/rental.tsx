@@ -588,7 +588,7 @@ function Index() {
                       className={cn(
                         "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3.5 py-2.5 whitespace-nowrap shrink-0 text-sm transition",
                         isActive
-                          ? "border-transparent bg-amber font-bold text-ink"
+                          ? "border-transparent bg-[var(--area-accent)] font-bold text-ink"
                           : "border-hairline font-medium text-muted-foreground hover:border-ink hover:text-ink",
                       )}
                     >
@@ -615,7 +615,7 @@ function Index() {
                     className={cn(
                       "shrink-0 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-3 py-2.5 text-xs font-medium transition whitespace-nowrap",
                       favoritosOnly
-                        ? "border-[color-mix(in_oklch,var(--amber)_60%,transparent)] bg-amber-soft font-semibold text-ink"
+                        ? "border-[color-mix(in_oklch,var(--area-accent)_60%,transparent)] bg-[var(--area-accent-soft)] font-semibold text-ink"
                         : "border-hairline text-ink hover:border-ink hover:bg-muted/50",
                     )}
                     aria-pressed={favoritosOnly}
@@ -700,7 +700,7 @@ function Index() {
               className={cn(
                 "rounded-full border px-3 py-1 text-xs font-medium whitespace-nowrap transition shrink-0",
                 query === chip
-                  ? "border-amber/60 bg-amber/15 font-semibold text-ink"
+                  ? "border-[color-mix(in_oklch,var(--area-accent)_60%,transparent)] bg-[color-mix(in_oklch,var(--area-accent)_15%,transparent)] font-semibold text-ink"
                   : "border-hairline bg-surface text-ink hover:border-ink/40 hover:bg-muted/50",
               )}
             >
@@ -910,7 +910,7 @@ function GridMode({
             {selectedBrand && (
               <button
                 onClick={() => onBrandSelect(null)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs text-amber hover:opacity-90"
+                className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs text-[var(--area-accent)] hover:opacity-90"
                 aria-label={`Quitar filtro ${selectedBrand}`}
               >
                 {selectedBrand} ×
@@ -919,7 +919,7 @@ function GridMode({
             {[...selectedCats].map((c) => (
               <span
                 key={c}
-                className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs text-amber"
+                className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 text-xs text-[var(--area-accent)]"
               >
                 {c}
               </span>

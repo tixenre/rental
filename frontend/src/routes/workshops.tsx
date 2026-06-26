@@ -7,6 +7,7 @@ export const Route = createFileRoute("/workshops")({
   head: () => ({
     meta: [
       { title: "Workshops & Talleres — Rambla Rental" },
+      { name: "theme-color", content: "#ed7bad" },
       {
         name: "description",
         content:

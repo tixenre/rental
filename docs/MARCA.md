@@ -49,6 +49,8 @@ desde el celular — sin llamadas, sin sorpresas.
 
 > Alquiler por horas del espacio físico para producciones fotográficas y audiovisuales.
 
+**Color de área:** `#E9552F` (naranja cálido — token `--color-estudio`; mismo hue que `--naranja` status pero con semántica de marketing, ver `DESIGN_SYSTEM.md §Accent por área`).
+
 <!-- TODO: el dueño completa tagline + selling points del Estudio -->
 <!-- Sugerencia: qué hace único al estudio (ciclorama, superficie, amenities, ubicación, packs de equipos opcionales) -->
 

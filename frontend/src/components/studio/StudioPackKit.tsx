@@ -33,7 +33,9 @@ export function StudioPackKit({
           >
             <span
               className={`shrink-0 grid h-9 min-w-9 place-items-center rounded-md px-1.5 font-mono text-xs tabular ${
-                e.cantidad > 1 ? "bg-ink text-amber font-bold" : "bg-muted text-ink/70 sm:hidden"
+                e.cantidad > 1
+                  ? "bg-ink text-[var(--area-accent)] font-bold"
+                  : "bg-muted text-ink/70 sm:hidden"
               }`}
               aria-label={`Cantidad: ${e.cantidad}`}
             >

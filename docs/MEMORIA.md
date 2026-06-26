@@ -244,10 +244,11 @@ de implementar (2026-06-20)_; el detalle de método vive en el skill `auditoria-
 ### 2026-06-22 — CTA primario = ink + texto hueso (no dorado); el dorado es la jugada del hover
 
 El `variant="primary"` del `Button` es **fondo ink + texto hueso/bone** en reposo (`bg-ink text-background`) e
-invierte a **amber + ink** en hover. El texto hueso en reposo es **decisión de marca del dueño, NO un bug**:
-no "corregir" a dorado (el dorado es la jugada del hover, la _reverse signature_ ink↔amber). Materializa la
-_Filosofía de diseño del DS (2026-06-20)_ (una sola forma del CTA). El supervisor marca un CTA primario que
-vuelva a texto dorado en reposo, o un `<button>` crudo que reimplemente el gesto en vez de usar `<Button>`.
+invierte a **`--area-accent` + ink** en hover (`hover:bg-[var(--area-accent)] hover:text-ink`): amber en rental,
+naranja en estudio, rosa en workshops. El texto hueso en reposo es **decisión de marca del dueño, NO un bug**:
+no "corregir" a dorado — el accent del hover es la jugada de la _reverse signature_ ink↔área. Materializa la
+_Filosofía de diseño del DS (2026-06-20)_ (una sola forma del CTA). El supervisor marca un CTA primario cuyo
+hover invierta a un color fijo en vez de `--area-accent`, o un `<button>` crudo que reimplemente el gesto.
 
 ### 2026-06-23 — Capa de skills auto-gobernada y portable: registro verificado + routing de modelo + loop de aprendizaje
 
@@ -349,6 +350,17 @@ propia `BITACORA.md` con autoridad separada (lo que juzgó el consejo ≠ lo que
 pase crítico eficiente (~10-15k, sin subagentes); escala a voces aisladas solo si la decisión justifica el
 gasto. El supervisor marca: (a) propuesta mediana/grande juzgada sin invocar el skill; (b) veredicto del
 consejo promovido a `MEMORIA.md` sin autorización del dueño.
+
+### 2026-06-26 — Theming por área: `--area-accent` cascade + `--color-estudio` token propio
+
+El accent de marketing de cada sección pública resuelve por `[data-area]` CSS cascade: `--area-accent` /
+`--area-accent-soft` / `--area-accent-hot` en `:root` (default → amber); `[data-area="estudio"]` →
+`--color-estudio` (`#E9552F`). `PublicLayout` inyecta el `data-area` por área. Los componentes consumen
+`var(--area-accent)` sin saber el contexto. **`--color-estudio` es token propio** — no reusar
+`--color-naranja` (es status Warning, misma hex, semántica distinta). **Focus rings, estados de UI
+cross-app, badges del kit, back-office y paleta de status → amber/status fijos, nunca por área.**
+El supervisor marca: `bg-naranja` donde debería ir `var(--area-accent)` en marketing del estudio;
+o `--color-naranja` en contexto de marketing de área.
 
 ---
 

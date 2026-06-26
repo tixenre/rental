@@ -402,12 +402,12 @@ function EquipmentDetailBody({ item }: { item: Equipment }) {
             </Link>
           ))}
           {item.isNew && (
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-ink px-1.5 py-0.5 text-amber">
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-ink px-1.5 py-0.5 text-[var(--area-accent)]">
               <Sparkles className="h-2.5 w-2.5" /> nuevo
             </span>
           )}
           {item.destacado && (
-            <Pill className="gap-0.5 border-transparent bg-amber/15 px-1.5 text-ink">
+            <Pill className="gap-0.5 border-transparent bg-[color-mix(in_oklch,var(--area-accent)_15%,transparent)] px-1.5 text-ink">
               ★ destacado
             </Pill>
           )}
@@ -679,7 +679,7 @@ function CartButtons({
       <button
         onClick={() => !sinStock && onAdd()}
         disabled={sinStock}
-        className="inline-flex items-center justify-center gap-1.5 min-h-11 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-amber transition hover:bg-foreground disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex items-center justify-center gap-1.5 min-h-11 rounded-md bg-ink px-4 py-2.5 text-sm font-medium uppercase tracking-wider text-[var(--area-accent)] transition hover:bg-foreground disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Plus className="h-4 w-4" /> {sinStock ? "Sin stock" : "Agregar"}
       </button>
