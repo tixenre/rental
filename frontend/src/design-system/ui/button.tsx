@@ -21,14 +21,14 @@ export const buttonVariants = cva(
 
         // ── Rambla brand variants ─────────────────────────────────────────────
 
-        // primary — la jugada signature de marca: fondo ink, hover invierte a amber.
+        // primary — la jugada signature de marca: fondo ink, hover invierte al accent del área.
         // CTA principal del catálogo, carrito y flows de reserva.
-        primary: "bg-ink text-background shadow-sm hover:bg-amber hover:text-ink",
+        primary: "bg-ink text-background shadow-sm hover:bg-[var(--area-accent)] hover:text-ink",
 
-        // amber — siempre amber, sin inversión. Para CTAs sobre fondos oscuros
+        // amber — fondo accent del área, sin inversión. Para CTAs sobre fondos oscuros
         // (hero estudio, banners, etc.) o cuando el primario no tiene suficiente
-        // contraste con el fondo.
-        amber: "bg-amber text-ink shadow-sm hover:bg-amber-hot",
+        // contraste con el fondo. El nombre "amber" se mantiene (renombrar = churn).
+        amber: "bg-[var(--area-accent)] text-ink shadow-sm hover:bg-[var(--area-accent-hot)]",
       },
       size: {
         default: "h-9 px-4 py-2",
