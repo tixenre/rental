@@ -579,11 +579,11 @@ function PagosSection({ taller }: { taller: TallerAdmin }) {
       </div>
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-          Email de notificaciones
+          Email del instructor
         </label>
         <Input
           type="email"
-          placeholder="admin@ejemplo.com (vacío = email admin por defecto)"
+          placeholder="instructor@ejemplo.com (recibe las inscripciones)"
           value={form.notif_email}
           onChange={(e) => setForm((f) => ({ ...f, notif_email: e.target.value }))}
         />
