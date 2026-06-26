@@ -263,27 +263,8 @@ function LightboxSlide({
         </div>
       )}
 
-        {/* Puntos del carrusel de medios */}
-        {mCount > 1 && (
-          <div className="flex items-center justify-center gap-1.5 py-3 bg-ink shrink-0">
-            {media.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setMIdx(i)}
-                aria-label={`Ir al medio ${i + 1}`}
-                className={cn(
-                  "h-1.5 rounded-full transition-all",
-                  i === mIdx
-                    ? "w-5 bg-[var(--area-accent)]"
-                    : "w-1.5 bg-background/25 hover:bg-background/45",
-                )}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Info */}
-        <div className="px-5 py-4 space-y-2 overflow-y-auto">
+      {/* Info */}
+      <div className="px-5 py-4 space-y-2 overflow-y-auto">
           {trabajo.categorias.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {trabajo.categorias.map((cat) => (
@@ -347,30 +328,6 @@ function LightboxSlide({
             </div>
           )}
 
-          {/* Navegación entre trabajos */}
-          {tCount > 1 && (
-            <div className="flex items-center justify-between pt-3 mt-1 border-t border-background/10">
-              <button
-                onClick={() => goTrabajo(-1)}
-                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-[var(--area-accent)] transition-colors"
-                aria-label="Trabajo anterior"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                anterior
-              </button>
-              <span className="font-mono text-2xs text-background/25 tabular-nums">
-                {tIdx + 1} / {tCount}
-              </span>
-              <button
-                onClick={() => goTrabajo(1)}
-                className="flex items-center gap-1.5 text-xs text-background/40 hover:text-[var(--area-accent)] transition-colors"
-                aria-label="Trabajo siguiente"
-              >
-                siguiente
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
         </div>
     </div>
   );
