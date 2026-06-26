@@ -13,12 +13,10 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 ## Cómo trabajamos (esencial)
 
 - **El workflow de cambios tiene _fuente única_:** la decisión _2026-06-08 — Workflow de cambios_ del
-  digest (auto-cargada abajo). En una línea: **routing por riesgo** (trivial/normal → push directo a
-  `dev` = staging; grande / sensible / core de reservas o plata / lo que ve el cliente → rama
-  (`claude/<desc>`) + PR), **la sesión mergea a `dev` y avisa con plan de prueba**, los **gates del
-  dueño** son probar en staging + aprobar `dev → main`. **Nunca a `main` directo; no mergear con CI en
-  rojo.** El detalle y el _por qué_ no se repiten acá — viven en esa decisión.
-- **Antes de abrir/mergear una PR: despachar el agente `supervisor`** — revisión read-only de
+  digest (auto-cargada abajo). En una línea: **push directo a `dev` siempre** (staging; si se rompe se
+  pushea el fix); **PR solo para `dev → main`** (la puerta a prod). **Nunca a `main` directo; no pushear
+  con CI en rojo.** El detalle y el _por qué_ no se repiten acá — viven en esa decisión.
+- **Antes de abrir el PR `dev → main`: despachar el agente `supervisor`** — revisión read-only de
   scope / forma / drift, que resume en lenguaje claro y deja el plan de prueba. (Instrucción, no
   gate de sistema: en las apps de Mac/iPhone no hay hooks.)
 - **La conversación es para decisiones y la forma de hacer las cosas — no para el ruido de cada

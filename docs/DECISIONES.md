@@ -29,40 +29,28 @@
 
 ## Decisiones (ADR-lite)
 
-### 2026-06-08 — Workflow de cambios (fuente única): dev = staging, routing por riesgo, gates del dueño
+### 2026-06-08 — Workflow de cambios (fuente única): dev = staging, push directo siempre, PR solo para prod
 
-> **Fuente única del workflow.** Consolida y reemplaza las 6 decisiones de flujo previas (Branch+PR
-> siempre, Merge según tamaño, Staging→Prod, Método de merge por etapa, Bugfixes chicos, Quién clickea
-> el merge). No restatear el workflow en otros docs: CLAUDE.md y MANIFIESTO apuntan acá.
+> **Fuente única del workflow.** Consolida y reemplaza las 6 decisiones de flujo previas. Refinado
+> 2026-06-25: se elimina el "routing por riesgo" (rama+PR antes de dev para cambios grandes) — el
+> dueño prefiere push directo a dev siempre, PR solo para dev→main. No restatear en otros docs.
 
-- **Contexto:** las reglas de flujo estaban dispersas en 6 entradas que se solapaban + repetidas en
-  CLAUDE.md y MANIFIESTO §3 → drift y fricción (la sesión preguntaba "¿lo ves en staging o hago el PR?"
-  como si fueran alternativas). La aclaración que ordenó todo: **`dev` y "staging" son lo mismo** — el
-  environment Railway `dev` (atado a la rama `dev`) ES el staging; su base es una **copia de prod**
-  (2026-06-01), sin clientes reales. Railway **auto-deploya en cada push** a `dev` (staging) y a `main`
-  (prod). Por eso lo que muestra algo en staging es el **push a `dev`**, no el PR.
-- **Ambientes:** `dev` (rama `dev`) = **staging**; `main` = **prod**. **Prod es sagrado: no se prueba ahí.**
-- **Routing por RIESGO (no por trámite):**
-  - **Trivial / normal** (typo, copy, fix acotado, feature chica, UI puntual) → **push directo a `dev`**;
-    la sesión **verifica local antes** (typecheck/tests) para no romper el staging compartido.
-  - **Grande / sensible / core de reservas o plata / lo que ve el cliente** → **rama (`claude/<desc>`) +
-    PR**: el PR es el portón donde **CI + supervisor gatean ANTES** de tocar `dev`. **Ante la duda → PR.**
-  - **`main` nunca** recibe push/commit directo.
-- **Red de seguridad:** el **CI corre en cada push** a `dev` y `main` (lint/typecheck/tests/build/
-  migraciones/mobile-smoke), haya PR o no. Con PR gatea **antes** de entrar a `dev`; con push directo es
-  la **red de abajo** (te enterás aunque ya esté en staging). **No mergear/pushear con CI en rojo.**
-- **Quién mueve qué:** **la sesión mergea/pushea a `dev` sola** (supervisor OK en lo que pasó por PR + CI
-  verde) y **avisa al dueño con plan de prueba** ("andá a /X, probá Y, tenés que ver Z") — **no pide
-  permiso**. El **supervisor** se despacha antes de abrir/mergear un PR.
-- **Gates del dueño (los únicos dos):** (1) **probar en staging** lo que la sesión avisa; (2) **aprobar
-  la promoción `dev → main`** (la puerta a prod). El dueño no clickea merges a `dev` ya verificados.
-- **Métodos de merge:** `rama → dev` = **squash** (título `tipo: desc (#PR)`, 1 commit limpio). `dev →
-  main` = **merge commit** (NO squash → revert quirúrgico por PR en prod). Commits directos a `dev` no
-  llevan squash. Commits atómicos, Conventional Commits en español (`feat(scope):`, `fix`, `chore`, ...).
-- **Why:** `dev` es seguro (copia, sin clientes) → lo peor de un push roto es molestar el testeo del
-  dueño, nunca tocar prod. Reservar el PR para lo riesgoso baja la fricción sin perder red: el CI siempre
-  corre, el supervisor gatea lo grande, y prod sigue blindado por el PR `dev → main` + la aprobación del
-  dueño. El gate humano del dueño es **probar la conducta en staging**, no revisar código.
+- **Ambientes:** `dev` (rama `dev`) = **staging** en Railway (auto-deploy en cada push; copia de prod,
+  sin clientes reales); `main` = **prod** (sagrado, no se prueba ahí).
+- **Flujo único: push directo a `dev` siempre.** No hay ramas intermedias ni PR antes de staging.
+  Si algo se rompe en staging se pushea el fix — no hay clientes ahí, el costo es bajo. `main` nunca
+  recibe push directo.
+- **PR solo para `dev → main`** (la puerta a prod). Ese PR es donde el supervisor revisa, el CI corre
+  como gate, y el dueño aprueba antes de que llegue a producción.
+- **Red de seguridad:** el **CI corre en cada push** a `dev` y `main`. No pushear con CI en rojo.
+- **Quién mueve qué:** la sesión pushea a `dev` sola y avisa al dueño con plan de prueba — no pide
+  permiso. El dueño prueba en staging y aprueba el PR `dev → main`.
+- **Gates del dueño:** (1) probar en staging; (2) aprobar `dev → main`.
+- **Merge `dev → main`** = merge commit (NO squash → revert quirúrgico por PR si hace falta en prod).
+  Commits atómicos, Conventional Commits en español.
+- **Why:** `dev` es seguro (sin clientes) → el PR antes de staging era overhead sin beneficio real.
+  El único gate que importa es `dev → main`: ahí está el supervisor, el CI en modo gate, y el dueño.
+  Menos fricción, misma red de seguridad para prod.
 
 ### 2026-06-08 — Issues: la cola espeja el código (Closes #N → auto-cierre en dev→main; diferido aparte)
 

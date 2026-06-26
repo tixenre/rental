@@ -18,19 +18,16 @@
 
 ## Decisiones (ADR-lite)
 
-### 2026-06-08 — Workflow de cambios (fuente única): dev = staging, routing por riesgo, gates del dueño
+### 2026-06-08 — Workflow de cambios (fuente única): dev = staging, push directo siempre, PR solo para prod
 
-**Fuente única del workflow** (consolida 6 decisiones de flujo previas; no se restatea en otros docs).
+**Fuente única del workflow** (consolida 6 decisiones de flujo previas; refinado 2026-06-25).
 `dev` (rama `dev`) = **staging** en Railway (auto-deploy en cada push; base copiada de prod, sin
-clientes); `main` = **prod** (sagrado, no se prueba ahí). **Lo que muestra algo en staging es el push a
-`dev`, no el PR.** **Routing por riesgo:** trivial/normal → **push directo a `dev`** (la sesión verifica
-local antes para no romper staging); grande/sensible/core de reservas o plata/lo que ve el cliente →
-**rama (`claude/<desc>`) + PR** (CI + supervisor gatean antes de tocar `dev`); **ante la duda, PR**. El
-**CI corre en cada push** a `dev`/`main` (red incluso sin PR); **nunca a `main` directo**; **no mergear
-con CI en rojo**. **La sesión mergea/pushea a `dev` sola** (supervisor OK + verde) y **avisa con plan de
-prueba — no pide permiso**. **Gates del dueño:** probar en staging + aprobar `dev → main`. Merge:
-`rama→dev` = squash (`tipo: desc (#PR)`); `dev→main` = merge commit (revert por PR); directos a `dev`
-sin squash. Commits atómicos, Conventional Commits en español.
+clientes); `main` = **prod** (sagrado, no se prueba ahí). **Todo cambio va en push directo a `dev`** —
+si algo se rompe en staging se pushea el fix, no hay clientes ahí. **PR solo para `dev → main`** (la
+puerta a prod). **Nunca a `main` directo; no pushear con CI en rojo.** El **CI corre en cada push** a
+`dev`/`main`. **La sesión pushea a `dev` sola y avisa con plan de prueba — no pide permiso.**
+**Gates del dueño:** probar en staging + aprobar `dev → main`. Merge `dev→main` = merge commit
+(revert por PR). Commits atómicos, Conventional Commits en español.
 
 ### 2026-06-08 — Issues: la cola espeja el código (Closes #N → auto-cierre en dev→main; diferido aparte)
 
