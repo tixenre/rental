@@ -82,50 +82,6 @@ function mediaThumb(m: EstudioMedia): { src: string; fallback?: string } | null 
   return null;
 }
 
-// Embed nativo de Instagram vía el script oficial: renderiza el post en su
-// tamaño real (vertical/cuadrado/horizontal según el post, no forzado). El
-// script auto-dimensiona el iframe por postMessage — lo que un iframe directo
-// no puede hacer cross-origin.
-declare global {
-  interface Window {
-    instgrm?: { Embeds: { process: () => void } };
-  }
-}
-
-const IG_EMBED_SCRIPT = "https://www.instagram.com/embed.js";
-
-function IgEmbed({ url }: { url: string }) {
-  useEffect(() => {
-    const process = () => window.instgrm?.Embeds?.process();
-    if (window.instgrm) {
-      process();
-      return;
-    }
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${IG_EMBED_SCRIPT}"]`);
-    if (existing) {
-      existing.addEventListener("load", process, { once: true });
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = IG_EMBED_SCRIPT;
-    s.async = true;
-    s.addEventListener("load", process, { once: true });
-    document.body.appendChild(s);
-  }, [url]);
-
-  // key={url} fuerza un blockquote fresco al cambiar de slide (el script muta el
-  // nodo al procesarlo; remontar evita que React reconcilie un nodo ya mutado).
-  return (
-    <div key={url} className="flex w-full justify-center">
-      <blockquote
-        className="instagram-media"
-        data-instgrm-permalink={url}
-        data-instgrm-version="14"
-        style={{ width: "100%", maxWidth: "100%", minWidth: 0, margin: 0 }}
-      />
-    </div>
-  );
-}
 
 function TrabajoModal({
   trabajos,
@@ -246,8 +202,43 @@ function TrabajoModal({
             })()}
 
           {current?.kind === "instagram" && (
-            <div className="max-h-[86vh] min-h-[420px] w-full overflow-y-auto bg-background">
-              <IgEmbed key={current.url} url={current.url} />
+            <div className="relative w-full bg-black flex items-center justify-center">
+              {current.thumbnail ? (
+                <>
+                  <img
+                    src={current.thumbnail}
+                    alt={trabajo.titulo}
+                    className="block w-full max-h-[82vh] object-contain"
+                    style={
+                      current.w && current.h
+                        ? { aspectRatio: `${current.w} / ${current.h}` }
+                        : undefined
+                    }
+                  />
+                  <a
+                    href={current.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs text-background/70 hover:text-background transition-colors"
+                    aria-label="Ver en Instagram"
+                  >
+                    <IgIcon />
+                    Ver en Instagram
+                  </a>
+                </>
+              ) : (
+                <div className="flex min-h-48 items-center justify-center">
+                  <a
+                    href={current.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-background/50 hover:text-amber transition-colors"
+                  >
+                    <IgIcon />
+                    Ver en Instagram
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
