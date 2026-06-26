@@ -378,8 +378,7 @@ export function EquipoFormDialogV2({
   // categoría de specs".
   const specsTouchedRef = useRef(false);
   const htmlInputRef = useRef<HTMLInputElement | null>(null);
-  const [pasteHtmlOpen, setPasteHtmlOpen] = useState(false);
-  const [pasteHtmlText, setPasteHtmlText] = useState("");
+  const htmlEnrichInputRef = useRef<HTMLInputElement | null>(null);
   const [enrichingHtml, setEnrichingHtml] = useState(false);
   useEffect(() => {
     setCategoriaSpecs(initial?.categoria_specs ?? "");
@@ -705,17 +704,23 @@ export function EquipoFormDialogV2({
   // ════════════════════════════════════════════════════════════════════
   // Enriquecer desde HTML pegado (JSON, no guarda en R2)
   // ════════════════════════════════════════════════════════════════════
-  const handleEnriquecerFromHtml = async () => {
-    if (!initial?.id || !pasteHtmlText.trim()) return;
+  const handleEnriquecerFromHtml = async (file: File) => {
+    if (!initial?.id) return;
     setEnrichingHtml(true);
     try {
+      const html = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = () => reject(new Error("No se pudo leer el archivo"));
+        reader.readAsText(file, "utf-8");
+      });
       const r = await authedJson<{
         specs?: { label: string; value: string; spec_key?: string }[];
       }>(`/api/admin/equipos/${initial.id}/enriquecer-from-html`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          html: pasteHtmlText,
+          html,
           bh_url: form.getValues("bh_url") || undefined,
           categoria_hint: categoriaRoot ?? undefined,
         }),
@@ -766,8 +771,6 @@ export function EquipoFormDialogV2({
       } else {
         toast.success("HTML procesado", { description: "No se extrajeron specs" });
       }
-      setPasteHtmlOpen(false);
-      setPasteHtmlText("");
     } catch (e) {
       toast.error(`Error al procesar HTML: ${e instanceof Error ? e.message : ""}`);
     } finally {
@@ -1192,51 +1195,33 @@ export function EquipoFormDialogV2({
                   <FileCode className="h-3 w-3" /> HTML guardado
                 </span>
               )}
+              <input
+                ref={htmlEnrichInputRef}
+                type="file"
+                accept=".html,.htm"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void handleEnriquecerFromHtml(f);
+                }}
+              />
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => setPasteHtmlOpen(true)}
+                onClick={() => htmlEnrichInputRef.current?.click()}
                 disabled={uploadingHtml || enrichingHtml}
+                title="Guardá la página de B&H como 'Página web completa' y elegí el archivo .html acá"
               >
-                <FileCode className="h-3.5 w-3.5 mr-1" />
-                Pegar HTML
+                {enrichingHtml ? (
+                  <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Extrayendo…</>
+                ) : (
+                  <><FileCode className="h-3.5 w-3.5 mr-1" /> HTML sin guardar</>
+                )}
               </Button>
             </>
           )}
-
-          {/* Modal para pegar HTML de B&H */}
-          <Dialog open={pasteHtmlOpen} onOpenChange={(v) => { setPasteHtmlOpen(v); if (!v) setPasteHtmlText(""); }}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Pegar HTML de B&H</DialogTitle>
-              </DialogHeader>
-              <p className="text-sm text-muted-foreground">
-                Abrí la página del producto en B&H, seleccioná todo (Ctrl+A), copiá (Ctrl+C) y pegá acá.
-                Se van a extraer las specs técnicas automáticamente, sin guardar el HTML.
-              </p>
-              <Textarea
-                value={pasteHtmlText}
-                onChange={(e) => setPasteHtmlText(e.target.value)}
-                placeholder="Pegá el HTML acá…"
-                className="font-mono text-xs min-h-[200px] resize-y"
-                autoFocus
-              />
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => { setPasteHtmlOpen(false); setPasteHtmlText(""); }}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  disabled={!pasteHtmlText.trim() || enrichingHtml}
-                  onClick={handleEnriquecerFromHtml}
-                >
-                  {enrichingHtml ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCode className="h-4 w-4" />}
-                  Extraer specs
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
       </section>
 
