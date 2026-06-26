@@ -871,6 +871,8 @@ function TrabajoDialog({
   const [realizador, setRealizador] = useState(existing?.realizador ?? "");
   const [instagram, setInstagram] = useState(existing?.realizador_instagram ?? "");
   const [web, setWeb] = useState(existing?.realizador_web ?? "");
+  const [categoria, setCategoria] = useState(existing?.categoria ?? "");
+  const [descripcion, setDescripcion] = useState(existing?.descripcion ?? "");
   const [tipo, setTipo] = useState<"fotos" | "video">(existing?.tipo ?? "fotos");
   const [youtubeUrl, setYoutubeUrl] = useState(existing?.youtube_url ?? "");
   const [activo, setActivo] = useState(existing?.activo ?? true);
@@ -892,6 +894,8 @@ function TrabajoDialog({
     setRealizador(t?.realizador ?? "");
     setInstagram(t?.realizador_instagram ?? "");
     setWeb(t?.realizador_web ?? "");
+    setCategoria(t?.categoria ?? "");
+    setDescripcion(t?.descripcion ?? "");
     setTipo(t?.tipo ?? "fotos");
     setYoutubeUrl(t?.youtube_url ?? "");
     setActivo(t?.activo ?? true);
@@ -907,6 +911,8 @@ function TrabajoDialog({
       realizador,
       realizador_instagram: instagram || null,
       realizador_web: web || null,
+      categoria,
+      descripcion,
       tipo,
       activo,
     };
@@ -924,6 +930,8 @@ function TrabajoDialog({
         realizador,
         realizador_instagram: instagram || null,
         realizador_web: web || null,
+        categoria,
+        descripcion,
         tipo,
         activo,
       };
@@ -1023,6 +1031,18 @@ function TrabajoDialog({
             />
           </div>
 
+          {/* Categoría */}
+          <div className="space-y-1">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Categoría
+            </label>
+            <Input
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value)}
+              placeholder="Ej: Moda, Editorial, Producto, Eventos…"
+            />
+          </div>
+
           {/* Realizador */}
           <div className="space-y-1">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -1098,6 +1118,19 @@ function TrabajoDialog({
                 {logoUrl ? "Cambiar logo" : "Subir logo"}
               </Button>
             </div>
+          </div>
+
+          {/* Descripción */}
+          <div className="space-y-1">
+            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Descripción breve
+            </label>
+            <Textarea
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Breve contexto del trabajo (opcional)"
+              rows={2}
+            />
           </div>
 
           {/* Tipo */}

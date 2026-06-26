@@ -1157,6 +1157,8 @@ export type EstudioTrabajo = {
   realizador_logo_url: string | null;
   realizador_instagram: string | null;
   realizador_web: string | null;
+  categoria: string;
+  descripcion: string;
   tipo: "fotos" | "video";
   youtube_url: string | null;
   fotos: EstudioTrabajoFoto[];
@@ -1171,6 +1173,8 @@ export type EstudioTrabajoInput = {
   realizador?: string;
   realizador_instagram?: string | null;
   realizador_web?: string | null;
+  categoria?: string;
+  descripcion?: string;
   tipo?: "fotos" | "video";
   youtube_url?: string | null;
   activo?: boolean;

@@ -1870,5 +1870,11 @@ def _init_db_schema(conn):
     conn.execute(
         "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS realizador_web TEXT"
     )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS categoria TEXT NOT NULL DEFAULT ''"
+    )
+    conn.execute(
+        "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS descripcion TEXT NOT NULL DEFAULT ''"
+    )
 
     conn.commit()
