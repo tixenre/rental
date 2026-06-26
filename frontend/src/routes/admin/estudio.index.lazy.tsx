@@ -18,6 +18,7 @@ import {
   Film,
   Image,
   X,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -858,11 +859,13 @@ function TrabajoDialog({
   dialogMode,
   onClose,
   onSaved,
+  availableCategorias,
 }: {
   open: boolean;
   dialogMode: TrabajoDialogMode;
   onClose: () => void;
   onSaved: (t: EstudioTrabajo) => void;
+  availableCategorias: string[];
 }) {
   const isEdit = dialogMode.mode === "edit";
   const existing = isEdit ? dialogMode.trabajo : null;
@@ -872,6 +875,7 @@ function TrabajoDialog({
   const [instagram, setInstagram] = useState(existing?.realizador_instagram ?? "");
   const [web, setWeb] = useState(existing?.realizador_web ?? "");
   const [categoria, setCategoria] = useState(existing?.categoria ?? "");
+  const [draggingOver, setDraggingOver] = useState(false);
   const [descripcion, setDescripcion] = useState(existing?.descripcion ?? "");
   const [youtubeUrl, setYoutubeUrl] = useState(existing?.youtube_url ?? "");
   const [igReelUrl, setIgReelUrl] = useState(existing?.instagram_reel_url ?? "");
@@ -1031,14 +1035,38 @@ function TrabajoDialog({
           </div>
 
           {/* Categoría */}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
               Categoría
             </label>
+            {availableCategorias.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {availableCategorias.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoria(cat)}
+                    className={cn(
+                      "rounded-full px-3 py-1 text-xs font-mono uppercase tracking-[0.1em] border transition-colors",
+                      categoria === cat
+                        ? "bg-ink text-background border-ink"
+                        : "border-hairline text-muted-foreground hover:border-ink/50 hover:text-foreground",
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
+                {categoria && !availableCategorias.includes(categoria) && (
+                  <span className="rounded-full px-3 py-1 text-xs font-mono uppercase tracking-[0.1em] border border-amber/50 bg-amber/10 text-amber">
+                    {categoria} (nueva)
+                  </span>
+                )}
+              </div>
+            )}
             <Input
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
-              placeholder="Ej: Moda, Editorial, Producto, Eventos…"
+              placeholder={availableCategorias.length > 0 ? "O escribí una nueva…" : "Ej: Moda, Editorial, Producto…"}
             />
           </div>
 
@@ -1165,7 +1193,7 @@ function TrabajoDialog({
           {/* Fotos */}
           <div className="space-y-2">
             <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Fotos ({fotos.length} foto{fotos.length !== 1 ? "s" : ""})
+              Fotos {fotos.length > 0 && `(${fotos.length})`}
             </label>
             {fotos.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
@@ -1200,19 +1228,39 @@ function TrabajoDialog({
                 e.target.value = "";
               }}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fotoInputRef.current?.click()}
-              disabled={uploadingFoto}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDraggingOver(true); }}
+              onDragEnter={(e) => { e.preventDefault(); setDraggingOver(true); }}
+              onDragLeave={() => setDraggingOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDraggingOver(false);
+                if (e.dataTransfer.files?.length) handleFotoUpload(e.dataTransfer.files);
+              }}
+              onClick={() => !uploadingFoto && fotoInputRef.current?.click()}
+              className={cn(
+                "rounded-xl border-2 border-dashed p-5 text-center cursor-pointer transition-colors",
+                draggingOver
+                  ? "border-ink bg-ink/5"
+                  : "border-hairline hover:border-ink/40",
+                uploadingFoto && "opacity-60 cursor-not-allowed",
+              )}
             >
               {uploadingFoto ? (
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Subiendo…
+                </div>
               ) : (
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                <>
+                  <Upload className="h-5 w-5 mx-auto mb-1.5 text-muted-foreground/50" />
+                  <p className="text-sm text-muted-foreground">
+                    Arrastrá fotos acá o <span className="text-foreground underline underline-offset-2">hacé click</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground/50 mt-0.5">Podés seleccionar varias a la vez</p>
+                </>
               )}
-              Agregar foto{fotos.length === 0 ? "s" : " más"}
-            </Button>
+            </div>
           </div>
 
           {/* Activo */}
@@ -1485,6 +1533,7 @@ function TrabajosSection({
           handleSaved(t);
           setDialogOpen(false);
         }}
+        availableCategorias={[...new Set(trabajos.map((t) => t.categoria).filter(Boolean))]}
       />
     </>
   );

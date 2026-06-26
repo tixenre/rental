@@ -80,10 +80,10 @@ function TrabajoModal({ trabajo, onClose }: { trabajo: EstudioTrabajo; onClose: 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/90 p-0 sm:p-4 lg:p-8"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-full sm:max-w-3xl bg-ink rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[96dvh] flex flex-col">
+      <div className="relative w-full sm:w-[92vw] lg:w-[85vw] bg-ink rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[96dvh] flex flex-col">
         {/* Cerrar */}
         <button
           onClick={onClose}
