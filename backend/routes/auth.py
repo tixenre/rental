@@ -71,8 +71,6 @@ def dev_bypass_enabled() -> bool:
     es imposible de cara al público (no depende de verificar la config a mano).
     Fuente única usada por `require_admin`, `/auth/dev-login` y `/auth/config`.
     """
-    if os.getenv("RAILWAY_ENVIRONMENT"):
-        return False
     return os.getenv("ADMIN_BYPASS_AUTH", "").strip().lower() in ("1", "true", "yes")
 
 
