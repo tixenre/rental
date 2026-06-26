@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, MessageCircle, MapPin, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageCircle, MapPin } from "lucide-react";
 import { StudioBookingForm } from "@/components/studio/StudioBookingForm";
 import { StudioPackKit } from "@/components/studio/StudioPackKit";
 import { STUDIO, STUDIO_PHONE } from "@/data/studio";
@@ -17,8 +17,6 @@ export const Route = createLazyFileRoute("/estudio")({
 
 const MAPA_EMBED_DEFAULT =
   "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d5418.432520284455!2d-57.56597107511356!3d-37.98649647543215!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x9584db0050a8b0bf%3A0x3860608ed96f47f1!2sRambla%20Estudio%20y%20Rental!5e0!3m2!1ses-419!2sar!4v1782432663360!5m2!1ses-419!2sar";
-const MAPA_NAV_DEFAULT =
-  "https://www.google.com/maps/dir/?api=1&destination=Rambla+Estudio+y+Rental,+Chaco+1392,+Mar+del+Plata";
 
 // ── Grain overlay (reutilizado en secciones ink/amber) ─────────────────────
 const Grain = ({ opacity = 12 }: { opacity?: number }) => (
@@ -206,16 +204,7 @@ function EstudioPage() {
 
   // Ubicación — admin primero, fallback a coordenadas fijas MDQ
   const direccion = data?.direccion ?? "Mar del Plata, Buenos Aires, Argentina";
-  const comoLlegar =
-    data?.como_llegar ??
-    "Acceso directo para descarga de equipos. Estacionamiento en la calle (zona azul gratuita los fines de semana).";
   const iframeSrc = data?.mapa_embed_url || MAPA_EMBED_DEFAULT;
-  const navUrl = data?.mapa_url?.includes("/maps/embed") ? null : data?.mapa_url;
-  const verMapaHref =
-    navUrl ||
-    (data?.direccion
-      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(data.direccion)}`
-      : MAPA_NAV_DEFAULT);
 
   const bookingConfig = data
     ? {
@@ -537,33 +526,18 @@ function EstudioPage() {
           <h2 className="font-display font-black lowercase leading-[0.92] text-[clamp(1.75rem,4vw,2.5rem)] mb-8">
             dónde estamos.
           </h2>
-          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-            <div className="flex flex-col gap-4 pt-1">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-4 w-4 text-amber mt-0.5 shrink-0" />
-                <p className="text-base font-semibold leading-snug">{direccion}</p>
-              </div>
-              <p className="text-15 text-muted-foreground leading-relaxed pl-7">{comoLlegar}</p>
-              <div className="pl-7">
-                <a
-                  href={verMapaHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full border hairline bg-background px-4 py-2 text-sm text-ink hover:border-ink transition"
-                >
-                  Cómo llegar <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
-            </div>
-            <div className="aspect-[4/3] overflow-hidden rounded-2xl border hairline bg-surface min-h-60">
-              <iframe
-                title="Mapa del estudio"
-                src={iframeSrc}
-                className="h-full w-full border-0 block"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            </div>
+          <div className="flex items-start gap-3 mb-6">
+            <MapPin className="h-4 w-4 text-amber mt-0.5 shrink-0" />
+            <p className="text-base font-semibold leading-snug">{direccion}</p>
+          </div>
+          <div className="w-full aspect-[16/7] overflow-hidden rounded-2xl border hairline bg-surface min-h-60">
+            <iframe
+              title="Mapa del estudio"
+              src={iframeSrc}
+              className="h-full w-full border-0 block"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
           </div>
         </section>
 
