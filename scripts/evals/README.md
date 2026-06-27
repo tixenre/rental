@@ -34,14 +34,15 @@ caída → el 1-liner perdió el trigger → revert/engrosar esa entrada (keep/r
 Índice curado de escenarios decisivos, **casi todo reusado** (no machinery nueva):
 
 - **Backend** → `cd backend && python -m pytest -m golden` (marcador `golden` en `pytest.ini`; decora tests
-  que YA existen: concurrencia de reservas, gate de frontend-servible, ítem oculto).
+  que YA existen: la suite de concurrencia de reservas —overbooking/deadlock— y el gate de frontend-servible #930).
 - **UI** → `node .claude/skills/auditoria-profunda/ui-audit.mjs` con `LABEL=before|after` (el diff de flags
   del `_report.json` es el eval before/after).
 - **Gobernanza** → señales B y C de arriba, in-session, **solo cuando el cambio toca el digest o las skills**.
 
 ## Cuándo corre (gate proporcional)
 
-- Los tests `-m golden` **ya gatean** en CI (jobs `python-tests` / `db-migrations`). No se agrega workflow nuevo.
+- Los tests marcados **ya corren** en CI (están en `tests/`, los levantan los jobs `python-tests` / `db-migrations`);
+  el marcador `golden` es un **índice curado** para correrlos como set on-demand (`pytest -m golden`), no un job nuevo.
 - B / C / D se corren **solo cuando su target cambia** (digest → B; capa de skills → C/D), no en cada push:
   B necesita dispatch de agente y C una llamada a modelo (caro + no determinista en CI; un gate flaky de
   gobernanza va contra el ethos anti-bloat).
