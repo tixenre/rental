@@ -1,3 +1,4 @@
+import { es } from "date-fns/locale";
 import { Clock } from "lucide-react";
 import { Calendar } from "@/design-system/ui/calendar";
 
@@ -42,12 +43,14 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
     <div className="flex flex-col gap-4">
       <div className="pointer-events-none select-none">
         <Calendar
+          locale={es}
           defaultMonth={defaultMonth}
           numberOfMonths={numberOfMonths}
           modifiers={{ sesion: sesionDates }}
           modifiersClassNames={{
             sesion: "bg-rosa text-ink font-bold !opacity-100 rounded-md",
           }}
+          className="[--cell-size:2.75rem]"
         />
       </div>
 
