@@ -173,6 +173,14 @@ function PastWorkshopCard({ pw }: { pw: PastWorkshop }) {
   );
 }
 
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <p className="font-mono text-xs tracking-[0.2em] uppercase text-muted-foreground mt-4 mb-1">
+      {label}
+    </p>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 function TalleresPage() {
   const {
@@ -184,6 +192,27 @@ function TalleresPage() {
     queryFn: apiGetTalleres,
     staleTime: 1000 * 60 * 5,
   });
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const proximos = talleres
+    .filter((t) => new Date(t.fecha_inicio + "T00:00:00") > hoy)
+    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
+
+  const enCurso = talleres
+    .filter((t) => {
+      const inicio = new Date(t.fecha_inicio + "T00:00:00");
+      const fin = new Date(t.fecha_fin + "T00:00:00");
+      return inicio <= hoy && fin >= hoy;
+    })
+    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
+
+  const pasadosApi = talleres
+    .filter((t) => new Date(t.fecha_fin + "T00:00:00") < hoy)
+    .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
+
+  const hayTalleres = talleres.length > 0;
 
   return (
     <PublicLayout topBar={{ variant: "workshops" }}>
@@ -199,28 +228,43 @@ function TalleresPage() {
           </div>
         )}
 
-        {!isLoading && !isError && talleres.length === 0 && (
+        {!isLoading && !isError && !hayTalleres && (
           <div className="py-8 text-center text-muted-foreground text-sm">
             No hay talleres activos por el momento. Seguinos en Instagram para enterarte de los
             próximos.
           </div>
         )}
 
-        {talleres
-          .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime())
-          .map((t) => (
-            <WorkshopCard key={t.id} taller={t} />
-          ))}
+        {proximos.length > 0 && (
+          <>
+            <SectionLabel label="Próximos" />
+            {proximos.map((t) => (
+              <WorkshopCard key={t.id} taller={t} />
+            ))}
+          </>
+        )}
 
-        {/* Ediciones anteriores */}
-        <div className="mt-6 flex flex-col gap-3">
-          <p className="font-mono text-xs tracking-[0.2em] uppercase text-muted-foreground">
-            Ediciones anteriores
-          </p>
-          {TALLERES_PASADOS.map((pw, i) => (
-            <PastWorkshopCard key={i} pw={pw} />
-          ))}
-        </div>
+        {enCurso.length > 0 && (
+          <>
+            <SectionLabel label="En curso" />
+            {enCurso.map((t) => (
+              <WorkshopCard key={t.id} taller={t} />
+            ))}
+          </>
+        )}
+
+        {/* Pasados: primero los de la API, luego los hardcodeados */}
+        {(pasadosApi.length > 0 || TALLERES_PASADOS.length > 0) && (
+          <>
+            <SectionLabel label="Ediciones anteriores" />
+            {pasadosApi.map((t) => (
+              <WorkshopCard key={t.id} taller={t} />
+            ))}
+            {TALLERES_PASADOS.map((pw, i) => (
+              <PastWorkshopCard key={i} pw={pw} />
+            ))}
+          </>
+        )}
       </div>
     </PublicLayout>
   );
