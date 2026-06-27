@@ -79,7 +79,13 @@ function EdicionBadge({
   );
 }
 
-function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss: () => void }) {
+function SoldOutModal({
+  proxima,
+  onDismiss,
+}: {
+  proxima: EdicionLite;
+  onDismiss: () => void;
+}) {
   const opts: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" };
   const fechaA = new Date(proxima.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", opts);
   const fechaB = new Date(proxima.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", opts);
@@ -108,13 +114,14 @@ function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss:
           Pero hay lugar en la <strong className="text-ink">2da edición</strong> — {fechaA} y{" "}
           {fechaB}.
         </p>
-        <a
-          href="#inscripcion"
-          onClick={onDismiss}
+        <Link
+          to="/workshops/$slug"
+          params={{ slug: proxima.slug }}
           className="flex items-center justify-center w-full rounded-full bg-rosa text-ink font-bold py-3 hover:brightness-110 active:scale-[0.97] transition-all"
+          onClick={onDismiss}
         >
           Inscribirme en la 2da edición
-        </a>
+        </Link>
         <button
           onClick={onDismiss}
           className="w-full mt-3 text-sm text-muted-foreground hover:text-ink transition py-1"
