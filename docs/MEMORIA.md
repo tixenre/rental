@@ -299,6 +299,10 @@ Core Web Vitals); **`specs`** (taxonomía de specs de equipos: consistencia, gap
 (completitud de datos: fotos, descripciones, precios, specs mínimas por categoría); **`calidad-tests`** (cobertura
 de módulos críticos, calidad de assertions, edge cases sin tests). Todos son read-only y siguen el patrón
 propone-aprobás. `scripts/check-docs.mjs` los verifica como al resto.
+**Consolidación a 2 (`auditoria-codigo`+`auditoria-datos`) medida y RECHAZADA (2026-06-27, Exp 2):** mergear
+los 4 de código en uno carga los 4 lentes por invocación (**3.1× el costo** del skill puntual; el caso común
+es 1 lente) y el routing ya era **12/12 separado** → no aporta. Se mantienen los 6. **No re-mergear** sin un
+diseño de carga on-demand por lente.
 
 ### 2026-06-23 — docs/MARCA.md = hub de marca; skill `marca` gobierna el inventario de features
 

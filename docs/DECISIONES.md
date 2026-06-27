@@ -1083,6 +1083,15 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Consecuencias.** 13 skills en disco (6 activos previos + 6 nuevos + `pendientes` = 13 total).
   `CLAUDE.md` tiene 13 filas en la tabla de skills. `scripts/check-docs.mjs` los verifica todos.
   El supervisor marca cualquier skill en disco sin fila, o un skill que aplique sin aprobación.
+- **Consolidación a 2 medida y RECHAZADA (2026-06-27, Exp 2 del roadmap de gobernanza empírico).** Se probó
+  fusionar los 4 de código en `auditoria-codigo` (4 lentes) y `specs`+`catalogo` en `auditoria-datos`, con
+  medición before/after (`scripts/evals/`): **routing** 12/12 → 12/12 (no mejoró — ya era perfecto separado);
+  **costo por invocación** señal A: el merged carga TODOS los lentes por invocación → **3.1×** (`auditoria-codigo`)
+  y **1.9×** (`auditoria-datos`) el costo del skill puntual, contra un ahorro de tabla auto-cargada de solo
+  −192 tok/sesión. El caso común es 1 lente → el merge penaliza ~3× lo común para un beneficio marginal +
+  diluye el foco (4 checklists cuando se quiere 1). **Veredicto: revert, se mantienen los 6 separados.** No
+  re-mergear salvo con un diseño de **carga on-demand por lente** (progressive disclosure), no inline. Es el
+  primer caso del principio _2026-06-27 — empirismo proporcional_ matando un cambio que la intuición aprobaba.
 
 ### 2026-06-23 — docs/MARCA.md = hub de marca; skill `marca` gobierna el inventario de features
 
