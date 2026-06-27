@@ -1791,6 +1791,102 @@ def _init_db_schema(conn):
     # el admin las carga desde el back-office post-deploy con los datos reales.
     # Mientras no haya sesiones, la página pública muestra el campo `horario` de texto.
 
+    # ── Modelo de ediciones (F1): talleres → concepto + ediciones_taller + clases_taller ──
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS slug_base VARCHAR(120)")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ediciones_taller (
+            id                SERIAL PRIMARY KEY,
+            taller_id         INTEGER NOT NULL REFERENCES talleres(id) ON DELETE CASCADE,
+            numero_edicion    INTEGER NOT NULL DEFAULT 1,
+            slug              VARCHAR(120) NOT NULL UNIQUE,
+            tipo_taller       TEXT NOT NULL DEFAULT 'intensivo',
+            fecha_inicio      DATE NOT NULL,
+            fecha_fin         DATE NOT NULL,
+            horario           TEXT NOT NULL DEFAULT '',
+            cupos_total       INTEGER NOT NULL DEFAULT 12,
+            cupos_confirmados INTEGER NOT NULL DEFAULT 0,
+            precio_total      INTEGER NOT NULL DEFAULT 0,
+            precio_sena       INTEGER NOT NULL DEFAULT 0,
+            pago_alias        TEXT NOT NULL DEFAULT '',
+            pago_cbu          TEXT NOT NULL DEFAULT '',
+            pago_banco        TEXT NOT NULL DEFAULT '',
+            direccion         TEXT NOT NULL DEFAULT '',
+            activo            BOOLEAN NOT NULL DEFAULT TRUE,
+            snapshot          JSONB,
+            frozen_at         TIMESTAMPTZ,
+            created_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(taller_id, numero_edicion)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ediciones_taller_taller "
+        "ON ediciones_taller(taller_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ediciones_taller_slug "
+        "ON ediciones_taller(slug)"
+    )
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS clases_taller (
+            id          SERIAL PRIMARY KEY,
+            edicion_id  INTEGER NOT NULL REFERENCES ediciones_taller(id) ON DELETE CASCADE,
+            fecha       DATE    NOT NULL,
+            hora_inicio INTEGER NOT NULL,
+            hora_fin    INTEGER NOT NULL,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_clases_taller_edicion "
+        "ON clases_taller(edicion_id)"
+    )
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS interesados_taller (
+            id            SERIAL PRIMARY KEY,
+            taller_id     INTEGER NOT NULL REFERENCES talleres(id) ON DELETE CASCADE,
+            nombre        TEXT NOT NULL,
+            email         TEXT NOT NULL,
+            telefono      TEXT NOT NULL DEFAULT '',
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            notificado_at TIMESTAMPTZ
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_interesados_taller_taller "
+        "ON interesados_taller(taller_id)"
+    )
+
+    # Extender taller_inscripciones para el nuevo modelo
+    conn.execute(
+        "ALTER TABLE taller_inscripciones "
+        "ADD COLUMN IF NOT EXISTS edicion_id INTEGER REFERENCES ediciones_taller(id)"
+    )
+    conn.execute(
+        "ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS estado TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS comprobante_resto_url TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS comprobante_resto_key TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS notas_admin TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ"
+    )
+    conn.execute(
+        "ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS sena_verificada_at TIMESTAMPTZ"
+    )
+    conn.execute(
+        "ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS pago_completo_at TIMESTAMPTZ"
+    )
+
     # ── Carritos activos (#280 Fase 1): persistencia server-side ──────────────
     # Cada heartbeat del frontend hace upsert por session_id (UUID v4 generado
     # en el cliente). cliente_id se asocia automáticamente si hay sesión activa.
