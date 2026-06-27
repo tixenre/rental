@@ -60,7 +60,6 @@ def _modelo(conn, modelo: dict):
         """INSERT INTO app_settings (key, value, updated_by)
            VALUES ('comisiones_modelo', %s, 'test')
            ON CONFLICT (key) DO UPDATE SET value = excluded.value""",
-           ON CONFLICT (key) DO UPDATE SET value = excluded.value""",
         (json.dumps(modelo),),
     )
 
@@ -86,7 +85,6 @@ def setup():
         conn.execute(
             """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, monto_total, monto_pagado)
                VALUES (%s,%s,%s,%s,%s,%s)""",
-               VALUES (?,?,?,?,?,?)""",
             (P_JUNIO, "Cliente", "finalizado", "2026-06-05T08:00:00", 100000, 100000),
         )
         conn.execute(

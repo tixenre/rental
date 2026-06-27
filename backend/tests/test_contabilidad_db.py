@@ -76,14 +76,12 @@ def _pedido_y_pago(conn, monto, destinatario, fecha="2026-06-15T10:00:00",
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
            VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-           VALUES (?,?,?,?,?,?,?)""",
         (ped, "Cliente contab", "finalizado", fecha_desde,
          "2026-06-06T20:00:00", monto, monto),
     )
     conn.execute(
         """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
            VALUES (%s,%s,%s,%s,%s,%s)""",
-           VALUES (?,?,?,?,?,?)""",
         (ped, monto, "pago", destinatario, "transferencia", fecha),
     )
 
@@ -92,7 +90,6 @@ def _mov(conn, tipo, monto, origen=None, destino=None):
     conn.execute(
         """INSERT INTO movimientos (tipo, monto, cuenta_origen_id, cuenta_destino_id, created_by)
            VALUES (%s,%s,%s,%s,%s)""",
-           VALUES (?,?,?,?,?)""",
         (tipo, monto, origen, destino, "test"),
     )
 
@@ -297,7 +294,6 @@ def test_rendicion_cierra_en_cero_y_saldar(conn):
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
            VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-           VALUES (?,?,?,?,?,?,?)""",
         (PED2, "Cli rend", "finalizado", "2026-09-05T08:00:00", "2026-09-06T20:00:00",
          100000, 100000),
     )
@@ -308,7 +304,6 @@ def test_rendicion_cierra_en_cero_y_saldar(conn):
     conn.execute(
         """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
            VALUES (%s,%s,%s,%s,%s,%s)""",
-           VALUES (?,?,?,?,?,?)""",
         (PED2, 100000, "pago", "Tincho", "transferencia", "2026-09-15T10:00:00"),
     )
 

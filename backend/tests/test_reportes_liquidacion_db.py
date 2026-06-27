@@ -68,7 +68,6 @@ def _pedido(conn, pid, monto_total, items, monto_pagado=0, estado="finalizado",
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
            VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-           VALUES (?,?,?,?,?,?,?)""",
         (pid, "Cliente liquidación", estado, fecha_desde, "2026-06-06T20:00:00",
          monto_total, monto_pagado),
     )
