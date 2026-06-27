@@ -13,9 +13,10 @@ el modo de generación (intensivo | semanal). DEFAULT 'intensivo'.
 taller_cambio_datos: template de email para notificar a inscriptos confirmados
 cuando el admin cambia datos del taller (fechas, lugar, etc.).
 
-Seed idempotente: inserta las sesiones de los dos talleres Jime Troncoso ya
-existentes (2026-07-11 y 2026-07-18 para ed.1, 2026-08-15 y 2026-08-22 para
-ed.2), 9-13 hs, solo si no existen aún.
+No se seedean sesiones para talleres existentes: el admin las carga desde
+el back-office post-deploy con los datos reales (las fechas en prod pueden
+haber sido modificadas). Mientras no haya sesiones, la página pública muestra
+el campo 'horario' de texto (comportamiento idéntico al actual).
 
 Revision ID: t4ll3rs3s01
 Revises: m3rg3h34ds03
