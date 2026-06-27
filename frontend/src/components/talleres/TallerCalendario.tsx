@@ -50,7 +50,7 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
           modifiersClassNames={{
             sesion: "bg-rosa text-ink font-bold !opacity-100 rounded-md",
           }}
-          className="[--cell-size:2.75rem]"
+          className="[--cell-size:3.5rem]"
         />
       </div>
 
