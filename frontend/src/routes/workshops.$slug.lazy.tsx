@@ -396,15 +396,11 @@ function TallerLandingPage() {
                       const porcentaje =
                         taller.precio_total > 0
                           ? Math.round(
-                              (taller.precio_sena / taller.precio_total) * 100
+                              (taller.precio_sena / taller.precio_total) * 100,
                             )
                           : 0;
-                      return [
-                        `Seña del ${porcentaje}% al inscribirte (${formatARS(
-                          taller.precio_sena
-                        )})`,
-                        `Resto antes de la primera clase`,
-                      ];
+                      const senaText = `Seña del ${porcentaje}% al inscribirte (${formatARS(taller.precio_sena)})`;
+                      return [senaText, `Resto antes de la primera clase`];
                     })().map((item) => (
                       <li
                         key={item}
