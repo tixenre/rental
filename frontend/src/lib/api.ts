@@ -391,6 +391,8 @@ export type EdicionLite = {
   direccion: string;
 };
 
+export type Sesion = { fecha: string; hora_inicio: number; hora_fin: number };
+
 export type Taller = {
   id: number;
   slug: string;
@@ -421,6 +423,10 @@ export type Taller = {
   proxima_edicion_slug: string;
   proxima_edicion?: EdicionLite | null;
   edicion_anterior?: EdicionLite | null;
+  activo: boolean;
+  tipo_taller: string;
+  notif_email: string;
+  sesiones: Sesion[];
 };
 
 export type InscripcionBody = {

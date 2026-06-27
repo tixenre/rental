@@ -18,6 +18,7 @@ EXPECTED_KEYS = {
     "modificacion_cancelada_admin",
     "taller_inscripcion_admin",
     "taller_inscripcion_cliente",
+    "taller_cambio_datos",
 }
 
 

@@ -1616,12 +1616,31 @@ def _init_db_schema(conn):
         "CREATE INDEX IF NOT EXISTS idx_taller_inscripciones_taller "
         "ON taller_inscripciones(taller_id)"
     )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS taller_sesiones (
+            id          SERIAL PRIMARY KEY,
+            taller_id   INTEGER NOT NULL REFERENCES talleres(id) ON DELETE CASCADE,
+            fecha       DATE    NOT NULL,
+            hora_inicio INTEGER NOT NULL,
+            hora_fin    INTEGER NOT NULL,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_taller_sesiones_taller "
+        "ON taller_sesiones(taller_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_taller_sesiones_fecha "
+        "ON taller_sesiones(fecha)"
+    )
     # Seed idempotente del workshop de Jime Troncoso (julio 2026)
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_foto_url TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS numero_edicion INTEGER NOT NULL DEFAULT 1")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS proxima_edicion_slug TEXT NOT NULL DEFAULT ''")
     conn.execute("ALTER TABLE taller_inscripciones ADD COLUMN IF NOT EXISTS comprobante_key TEXT")
     conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS instructor_media_id BIGINT REFERENCES media_assets(id) ON DELETE SET NULL")
+    conn.execute("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS tipo_taller TEXT NOT NULL DEFAULT 'intensivo'")
     import json as _json_t
     _programa_teorica = _json_t.dumps([
         "Qué es la dirección de arte y cuál es su función dentro de un proyecto",
@@ -1768,6 +1787,9 @@ def _init_db_schema(conn):
     conn.execute(
         "UPDATE talleres SET numero_edicion = 2, proxima_edicion_slug = '' WHERE slug = 'direccion-de-arte-jime-troncoso-2'",
     )
+    # Las sesiones de talleres existentes no se seedean con fechas hardcodeadas:
+    # el admin las carga desde el back-office post-deploy con los datos reales.
+    # Mientras no haya sesiones, la página pública muestra el campo `horario` de texto.
 
     # ── Carritos activos (#280 Fase 1): persistencia server-side ──────────────
     # Cada heartbeat del frontend hace upsert por session_id (UUID v4 generado

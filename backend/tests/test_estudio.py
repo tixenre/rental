@@ -847,7 +847,7 @@ class _SlotBloqueoConn(_ConnCM):
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
         if "FROM ESTUDIO_SLOTS_FIJOS" in su and "WHERE ACTIVO" in su:
-            dia, mes, _mes2 = params
+            dia, mes, _mes2, *_ = params
             res = [
                 s for s in self.slots
                 if s["activo"] and s["dia_semana"] == dia

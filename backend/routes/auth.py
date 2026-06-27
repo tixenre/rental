@@ -66,12 +66,14 @@ SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
 def dev_bypass_enabled() -> bool:
     """¿Está activo el bypass de auth de dev (ADMIN_BYPASS_AUTH)?
 
-    Seguridad (#503): NUNCA en producción. Aunque `ADMIN_BYPASS_AUTH` quede
-    seteada por error en Railway, en un entorno Railway se ignora — el bypass
-    es imposible de cara al público (no depende de verificar la config a mano).
-    Fuente única usada por `require_admin`, `/auth/dev-login` y `/auth/config`.
+    Seguridad (#503): NUNCA en producción. Bloquea cuando RAILWAY_ENVIRONMENT
+    es explícitamente 'production'; en Railway dev/staging y en local se
+    permite si ADMIN_BYPASS_AUTH=1. Falla-cerrada: si alguien pone la var en
+    prod, RAILWAY_ENVIRONMENT=production la anula.
+    Fuente única usada por `require_admin`, `/auth/dev-login`, `/auth/me`
+    y `/auth/config`.
     """
-    if os.getenv("RAILWAY_ENVIRONMENT"):
+    if os.getenv("RAILWAY_ENVIRONMENT", "").strip().lower() == "production":
         return False
     return os.getenv("ADMIN_BYPASS_AUTH", "").strip().lower() in ("1", "true", "yes")
 
@@ -216,6 +218,9 @@ def auth_me(request: Request):
     # Import inline para evitar ciclo (admin_guard importa de routes.auth).
     from admin_guard import is_admin_email
 
+    if dev_bypass_enabled():
+        return {"email": "bypass@local", "name": "Dev Admin", "is_admin": True}
+
     session = require_session(request)
     email = (session.get("email") or "").strip().lower()
     return {**session, "is_admin": is_admin_email(email)}
@@ -343,6 +348,31 @@ def auth_dev_login():
         email="dev@local",
         name="Dev Admin",
         redirect="/admin",
+    )
+
+
+@router.get("/auth/dev-login-cliente")
+def auth_dev_login_cliente():
+    """Login de cliente sin OAuth — solo en dev (ADMIN_BYPASS_AUTH=1, nunca en prod).
+    Impersona al primer cliente del DB (por STAGING_CLIENTE_EMAIL o el primero que exista)."""
+    if not dev_bypass_enabled():
+        raise HTTPException(404, "No encontrado.")
+    cli = _resolve_staging_cliente(None)
+    if cli is None:
+        from database import get_db
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT id, email, nombre, apellido FROM clientes ORDER BY id LIMIT 1"
+            ).fetchone()
+        if row is None:
+            raise HTTPException(503, "No hay clientes en la base de datos.")
+        cli = {"id": row["id"], "email": row["email"],
+               "name": f"{row['nombre']} {row['apellido']}".strip()}
+    return _make_session_response(
+        email=cli["email"],
+        name=cli["name"],
+        redirect="/cliente",
+        extra={"role": "cliente", "cliente_id": cli["id"]},
     )
 
 

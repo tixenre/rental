@@ -6,6 +6,7 @@ import { Calendar, MapPin, Users, CheckCircle2, Clock, X } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { Logo } from "@/components/rental/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
+import { TallerCalendario } from "@/components/talleres/TallerCalendario";
 import { ResponsiveImage } from "@/components/common/ResponsiveImage";
 import { apiGetTaller, type EdicionLite, type Taller } from "@/lib/api";
 import { formatARS } from "@/lib/format";
@@ -56,7 +57,7 @@ function EdicionBadge({
   const className = activa
     ? "inline-flex items-center gap-1.5 rounded-full border border-background/40 bg-background/15 px-3 py-1.5 text-xs font-semibold text-background"
     : soldOut
-      ? "inline-flex items-center gap-1.5 rounded-full border border-background/20 px-3 py-1.5 text-xs text-background/40 line-through-status"
+      ? "inline-flex items-center gap-1.5 rounded-full border border-background/20 px-3 py-1.5 text-xs text-background/40 line-through"
       : "inline-flex items-center gap-1.5 rounded-full border border-background/25 px-3 py-1.5 text-xs text-background/60";
 
   if (activa) {
@@ -271,6 +272,16 @@ function TallerLandingPage() {
                     </div>
                   )}
                 </section>
+
+                {/* Cuándo */}
+                {formTaller.sesiones && formTaller.sesiones.length > 0 && (
+                  <section>
+                    <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-4">
+                      Cuándo
+                    </p>
+                    <TallerCalendario sesiones={formTaller.sesiones} horario={formTaller.horario} />
+                  </section>
+                )}
 
                 {/* Clase teórica */}
                 {taller.programa_teorica.length > 0 && (
