@@ -266,17 +266,15 @@ function TallerLandingPage() {
               >
                 {taller.subtitulo}
               </p>
-              {taller.numero_edicion > 1 && (
-                <p
-                  className="font-display font-black lowercase leading-tight tracking-[-0.02em] mt-2"
-                  style={{
-                    fontSize: "clamp(1.5rem, 4vw, 3rem)",
-                    color: "color-mix(in oklch, var(--color-rosa) 55%, white 45%)",
-                  }}
-                >
-                  {ordinalEdicion(taller.numero_edicion)} edición
-                </p>
-              )}
+              <p
+                className="font-display font-black lowercase leading-tight tracking-[-0.02em] mt-2"
+                style={{
+                  fontSize: "clamp(1.5rem, 4vw, 3rem)",
+                  color: "color-mix(in oklch, var(--color-rosa) 55%, white 45%)",
+                }}
+              >
+                {ordinalEdicion(taller.numero_edicion)} edición
+              </p>
 
               {/* Contexto de ediciones */}
               {(taller.edicion_anterior ||
