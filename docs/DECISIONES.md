@@ -1316,3 +1316,39 @@ cancel-in-progress` ya cancela corridas viejas.
   gobernanza (un archivo bajo git). El empirismo se reserva para donde genuinamente no se puede predecir el
   efecto (fuerza de enforcement tras un trim; routing tras un merge). Materializa y **acota** _Los hallazgos
   de una auditoría son hipótesis (2026-06-22)_: ahora la confirmación tiene método y techo de costo.
+
+### 2026-06-27 — DAL = wrapper fino `database/core.py` (NO ORM); guardas SQL mecánicas; sync + psycopg3
+
+- **Contexto.** El dueño encontró el comentario "nervioso" del wrapper (`database/core.py`) que documentaba
+  la traducción `?`→`%s` con una advertencia + un puntero stale a `routes/equipos.py:1817` (archivo partido
+  en paquete, #946) → dudó si la DB estaba "parcheada". El wrapper nació como shim de migración SQLite→
+  PostgreSQL: traduce placeholders `?` (sqlite3) a `%s` (psycopg) y emula `lastrowid` con `SELECT lastval()`.
+  La raíz de la inquietud (bien olida por el dueño): parte del wrapper EMULA formas peores cuando hay nativas
+  mejores (`?`, `lastrowid` vía `lastval()` — inferior a `RETURNING`, session-scoped) → residuo legacy de la
+  migración, no diseño superior. Su seguridad además dependía de una convención NO enforced, vigilada por prosa.
+- **Decisión.** Distinguir DOS cosas en el wrapper: (i) **muletas de compat (disfraz sqlite3)** → se sacan;
+  (ii) **infraestructura real** (pool, rollback-al-devolver, chokepoint de guardas) → se queda (no emula nada;
+  toda app la tiene en alguna forma). Concretamente: (a) **Endurecer** con guardas `_assert_pct_safe` (único
+  `%` válido = `%s`/`%(name)s`/`%%`) + `_assert_params_present` (agnóstica `?`/`%s`), en execute + executemany.
+  (b) **Migrar** lo legacy a nativo por fases bajo la red: `?`→`%s` (go-forward), `lastrowid` (7 usos)→
+  `RETURNING`, pool propio→`psycopg_pool`; core sagrado último. (c) **Driver psycopg3 sync** (3 archivos, el
+  wrapper lo aísla) — override informado del "diferir" del consejo (el dueño lo quiere al día, costo bajo).
+  (d) **El wrapper SE QUEDA** como DAL único — NO ORM, NO "psycopg crudo por todos lados". (e) **NO async.**
+- **Why.** Se evaluaron a fondo (evidencia web + consejo, lentes Contrario/Principista/Investigador/Cliente)
+  CUATRO alternativas más pesadas, y todas convergen al wrapper fino: **paramstyle nativo** = cosmético
+  (idiomático, no más seguro); **psycopg3** = beneficios no aterrizan (async no se hace; el 3-4x server-side
+  lo neutraliza PgBouncer) — pero barato, se hace por estar al día; **SQLAlchemy Core** = NO (SQL crudo por
+  elección, el core complejo no entra en el ORM, pool/dialect/migraciones ya están vía wrapper + Alembic; con
+  `text()` cargás su peso sin su valor — lo dice su creador); **SQLModel** = NO (ORM+Pydantic sobre SA → hereda
+  el "no"; su valor de unificar API/DB no aplica: no hay modelos de DB); **async** = NO (app DB-bound, conc.
+  moderada, DB same-datacenter, pool tuneado → sync bien pooleado es el fit; async = reescritura viral con
+  riesgo en el core sagrado por un techo que no se toca). Patrón: cuanto más pesado/famoso el tool, PEOR
+  encaja — raw SQL + wrapper fino es legítimo y a escala (Stripe/PostHog/Zapier). Clave: el plan saca CADA
+  pieza que emula una forma nativa mejor; lo que queda no disfraza nada.
+- **Consecuencias.** Guardas **seguras por construcción** (el wrapper siempre pasa una tupla → psycopg ya
+  pyformatea → un `%` desnudo ya fallaba; la guarda solo lo hace antes y claro; verificado 0 `%` literales en
+  SQL activo). Migración por fases con `⏰ LEGACY` en la traducción + el split; al no quedar ningún `?` se
+  borra el `replace` (Fase 6). Workflow especial (pedido del dueño, por tocar el spine): **rama aislada** →
+  testear/supervisor/simular → recién seguro a `dev` → PR a prod mucho después. El supervisor marca: `?` nuevo
+  en código nuevo, `%` literal en SQL, reimplementación/bypass del DAL, o un CTA de adoptar ORM/async sin que
+  cambien las condiciones de revisita (equipo >10 / multi-DB / tiempo-real). Implementación en el plan.
