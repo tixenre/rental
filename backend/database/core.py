@@ -4,6 +4,9 @@ database.py — Conexión PostgreSQL con pool de conexiones, migraciones y helpe
 
 import logging
 import pathlib
+import re
+from contextlib import contextmanager
+
 import psycopg2
 import psycopg2.extras
 import psycopg2.pool
@@ -126,33 +129,67 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     return _pool
 
 
-# ── Cursor wrapper para compatibilidad con sqlite3 ───────────────────────────
-# El proyecto migró de SQLite a PostgreSQL. Para no reescribir cientos de
-# queries, este wrapper traduce los placeholders `?` (sqlite3) a `%s` (psycopg2)
-# y emula `lastrowid` con `SELECT lastval()`. Convención del codebase: usar `?`
-# en TODAS las queries para que la traducción sea consistente.
-# Si en el futuro se quiere migrar a `%s` nativo, hay que hacerlo archivo por
-# archivo con tests, no con un sed global (hay `?` en regex y URLs que no se
-# deben tocar — ver `routes/equipos.py:1817`, `:2073`, `routes/auth.py`).
+# ── Guardas de seguridad SQL + traducción de paramstyle ──────────────────────
+# El proyecto migró de SQLite a PostgreSQL. El wrapper traduce los placeholders
+# `?` (sqlite3) → `%s` (psycopg) y emula `lastrowid` con `SELECT lastval()`.
+#
+# Convención go-forward: el código NUEVO se escribe en `%s` nativo (no más `?`).
+# El `?` legado migra a `%s` por fases; la coexistencia `?`+`%s` es segura (ambos
+# pasan por las guardas de abajo). El supervisor marca `?` nuevo en código nuevo.
+#
+# Las guardas `_assert_params_present` + `_assert_pct_safe` enforcan MECÁNICAMENTE
+# lo que antes era convención en prosa: todo VALOR va como bound param, y el único
+# `%` permitido es un placeholder (`%s`/`%(name)s`) o `%%`. Un `%` literal en el
+# SQL (ej. `LIKE '%x%'` inline) es un bug → el comodín de LIKE va en el param.
+
+# Un `%` es válido sólo si abre un placeholder (`%s`, `%(name)s`) o es `%%`.
+_VALID_PCT = re.compile(r"%(?:s|%|\([A-Za-z_]\w*\)s)")
+# Placeholders posicionales (`?`, a traducir) o nativos (`%s` / `%(name)s`).
+_HAS_PLACEHOLDER = re.compile(r"\?|%s|%\([A-Za-z_]\w*\)s")
+
+
+def _assert_pct_safe(sql: str) -> None:
+    """Rechaza un `%` que no sea un placeholder válido (`%s`/`%(name)s`/`%%`).
+
+    El wrapper siempre pasa una tupla de params → psycopg corre pyformat → un `%`
+    desnudo ya falla hoy con un error críptico. Esta guarda lo caza antes, con un
+    mensaje claro: el comodín de `LIKE` va en el param, nunca literal en el SQL.
+    Paramstyle-agnóstica → sobrevive a la migración `?`→`%s`.
+    """
+    i = sql.find("%")
+    while i != -1:
+        m = _VALID_PCT.match(sql, i)
+        if m is None:
+            raise ValueError(
+                f"`%` que no es placeholder válido en el SQL (usá %s / %%; "
+                f"el comodín de LIKE va en params). SQL: {sql[:120]!r}"
+            )
+        i = sql.find("%", m.end())
+
+
+def _assert_params_present(sql: str, params) -> None:
+    """Si el SQL tiene placeholders (`?` o `%s`) pero `params` está vacío, casi
+    seguro el caller olvidó la tupla. Avisa claro en vez del error críptico de
+    psycopg. Agnóstica de paramstyle → sucesora permanente del viejo check
+    `if '?' in sql and not params` (que sólo cubría `?`)."""
+    if not params and _HAS_PLACEHOLDER.search(sql):
+        raise ValueError(
+            f"SQL tiene placeholders pero `params` está vacío "
+            f"(¿olvidaste la tupla?). SQL: {sql[:120]!r}"
+        )
+
 
 class PGCursor:
     """Wrapper que permite acceder a resultados por índice O por nombre."""
     def __init__(self, raw_cursor):
         self.raw_cursor = raw_cursor
 
-    def execute(self, sql, params=()):
-        # Validación defensiva: si el SQL tiene `?` pero `params` está vacío,
-        # eso es muy probablemente un bug del caller (olvidó pasar el tuple).
-        # Antes el `replace` igual procedía y psycopg2 fallaba con un error
-        # críptico ("syntax error at or near %s"). Ahora avisamos claro.
+    def execute(self, sql: str, params=()):
         if not isinstance(sql, str):
             raise TypeError(f"execute() recibió SQL no-string: {type(sql).__name__}")
-        if '?' in sql and not params:
-            raise ValueError(
-                f"SQL tiene placeholders `?` pero `params` está vacío. "
-                f"SQL: {sql[:100]!r}"
-            )
-        sql = sql.replace('?', '%s')
+        _assert_params_present(sql, params)
+        _assert_pct_safe(sql)
+        sql = sql.replace("?", "%s")   # ⏰ LEGACY: remover al terminar la migración a %s nativo
         return self.raw_cursor.execute(sql, params)
 
     @property
@@ -225,27 +262,24 @@ class PGConnection:
         self.row_factory = None
         self._pool = pool   # Si viene del pool, close() devuelve en lugar de cerrar
 
-    def execute(self, sql, params=()):
+    def execute(self, sql: str, params=()) -> "PGCursor":
         """Ejecuta una query y retorna un cursor tipo sqlite3."""
         if not isinstance(sql, str):
             raise TypeError(f"execute() recibió SQL no-string: {type(sql).__name__}")
-        if '?' in sql and not params:
-            raise ValueError(
-                f"SQL tiene placeholders `?` pero `params` está vacío. "
-                f"SQL: {sql[:100]!r}"
-            )
+        _assert_params_present(sql, params)
+        _assert_pct_safe(sql)
         cur = self.raw_conn.cursor()
-        # Convertir placeholders de ? (sqlite3) a %s (psycopg2)
-        sql = sql.replace('?', '%s')
+        sql = sql.replace("?", "%s")   # ⏰ LEGACY: remover al terminar la migración a %s nativo
         cur.execute(sql, params)
         return PGCursor(cur)
 
-    def executemany(self, sql, params_list):
+    def executemany(self, sql: str, params_list) -> "PGCursor":
         """Ejecuta una query con múltiples filas de parámetros."""
         if not isinstance(sql, str):
             raise TypeError(f"executemany() recibió SQL no-string: {type(sql).__name__}")
+        _assert_pct_safe(sql)   # (paridad con execute; antes executemany no validaba nada)
         cur = self.raw_conn.cursor()
-        sql = sql.replace('?', '%s')
+        sql = sql.replace("?", "%s")   # ⏰ LEGACY: remover al terminar la migración a %s nativo
         for params in params_list:
             cur.execute(sql, params)
         return PGCursor(cur)
@@ -261,6 +295,28 @@ class PGConnection:
 
     def rollback(self):
         self.raw_conn.rollback()
+
+    @contextmanager
+    def transaction(self):
+        """Context manager de transacción: commit al salir OK, rollback ante
+        excepción. NO cierra la conexión (a diferencia de `with conn:` en
+        psycopg3). Reemplaza el patrón manual try / commit / except / rollback."""
+        try:
+            yield self
+            self.raw_conn.commit()
+        except Exception:
+            self.raw_conn.rollback()
+            raise
+
+    def insert_returning(self, sql: str, params=(), *, column: str = "id"):
+        """Ejecuta un `INSERT … RETURNING <column>` y devuelve el valor —
+        reemplazo idiomático de `lastrowid`. `sql` NO debe traer el RETURNING (se
+        agrega). `column` es un identificador del esquema (no acepta input de
+        usuario); se valida para descartar interpolación insegura."""
+        if not column.isidentifier():
+            raise ValueError(f"column inválida para RETURNING: {column!r}")
+        row = self.execute(f"{sql} RETURNING {column}", params).fetchone()
+        return row[0] if row is not None else None
 
     def close(self):
         if self._pool:
