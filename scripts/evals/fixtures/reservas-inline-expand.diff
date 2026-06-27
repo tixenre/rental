@@ -1,0 +1,17 @@
+# Fixture señal B (catch del supervisor) — diff sintético.
+# El "esperado" (qué decisión debe cazar) vive en scripts/evals/README.md, FUERA del fixture, para no
+# contaminar la medición: si el fixture nombra la decisión, el supervisor la lee en vez de cazarla.
+
+--- a/backend/reservas/gate.py
++++ b/backend/reservas/gate.py
+@@ -88,6 +88,14 @@ def _items_a_chequear(pedido):
+-    return _expandir_mult(items)
++    # expandir composiciones 1 nivel inline (más simple que la recursión)
++    expanded = []
++    for it in items:
++        comp = _componentes_de(it.equipo_id)
++        if comp:
++            expanded.extend(comp)
++        else:
++            expanded.append(it)
++    return expanded

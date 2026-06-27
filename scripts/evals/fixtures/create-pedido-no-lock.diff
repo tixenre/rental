@@ -1,0 +1,13 @@
+# Fixture señal B (catch del supervisor) — diff sintético.
+# El "esperado" (qué decisión debe cazar) vive en scripts/evals/README.md, FUERA del fixture, para no
+# contaminar la medición: si el fixture nombra la decisión, el supervisor la lee en vez de cazarla.
+
+--- a/backend/reservas/crear.py
++++ b/backend/reservas/crear.py
+@@ -52,9 +52,6 @@ def create_pedido(conn, cliente_id, items):
+-    # serializar por equipo en orden de id ANTES de insertar (advisory lock, no deadlock)
+-    for eid in sorted({it.equipo_id for it in items}):
+-        conn.execute("SELECT pg_advisory_xact_lock(%s)", (eid,))
+     pedido_id = _insert_pedido(conn, cliente_id)
+     _insert_items(conn, pedido_id, items)
+     return pedido_id

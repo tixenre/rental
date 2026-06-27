@@ -362,6 +362,16 @@ cross-app, badges del kit, back-office y paleta de status → amber/status fijos
 El supervisor marca: `bg-naranja` donde debería ir `var(--area-accent)` en marketing del estudio;
 o `--color-naranja` en contexto de marketing de área.
 
+### 2026-06-27 — Medir lo barato-e-incierto; juicio + reversibilidad para el resto (empirismo proporcional)
+
+Todo cambio que "paga" se valida empíricamente, pero **PROPORCIONAL**: se mide solo lo _barato-de-medir Y
+incierto-en-resultado_ (¿el digest se sigue haciendo cumplir tras un trim? ¿el routing sobrevive a un merge de
+skills?), con la **señal más barata** que conteste "¿ayudó o perjudicó?". Lo reversible-y-obvio (un doc, un
+1-liner del digest) se decide con **juicio + git**, no con un eval. La medición **nunca cuesta más que lo
+medido**; un eval que gatea 0 regresiones reales se retira (como `consejo`). Foundation en `scripts/evals/`
+(reusa pytest `-m golden` + `ui-audit.mjs` `LABEL=before/after` + dispatch del `supervisor`); detalle en el log.
+Acota _Los hallazgos de una auditoría son hipótesis (2026-06-22)_: la confirmación ahora tiene método y techo de costo.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

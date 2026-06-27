@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.golden  # golden set: gate de frontend-servible (#930) — ver scripts/evals/README.md
 def test_health_frontend_503_si_falta_el_spa(monkeypatch, tmp_path):
     import main
 

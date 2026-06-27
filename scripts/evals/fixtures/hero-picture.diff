@@ -1,0 +1,18 @@
+# Fixture señal B (catch del supervisor) — diff sintético.
+# El "esperado" (qué decisión debe cazar) vive en scripts/evals/README.md, FUERA del fixture, para no
+# contaminar la medición: si el fixture nombra la decisión, el supervisor la lee en vez de cazarla.
+
+--- a/frontend/src/components/rental/HeroBanner.tsx
++++ b/frontend/src/components/rental/HeroBanner.tsx
+@@ -34,7 +34,11 @@ export function HeroBanner({ photo }: Props) {
+   return (
+     <div className="hero-banner">
+-      <img {...heroImgProps(photo)} alt={photo.alt} className="hero-img" />
++      <picture>
++        <source srcSet={photo.avif} type="image/avif" />
++        <source srcSet={photo.webp} type="image/webp" />
++        <img src={photo.webp} alt={photo.alt} className="hero-img" />
++      </picture>
+     </div>
+   );
+ }

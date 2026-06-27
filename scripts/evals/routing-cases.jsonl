@@ -1,0 +1,12 @@
+{"phrase": "¿el código está bien escrito? ¿hay anti-patrones?", "original": "calidad-codigo", "merged": "auditoria-codigo"}
+{"phrase": "¿hay duplicación lógica en el repo? ¿qué tan escalable está?", "original": "calidad-codigo", "merged": "auditoria-codigo"}
+{"phrase": "auditá la seguridad, ¿hay vulnerabilidades? ¿está seguro el auth?", "original": "auditoria-seguridad", "merged": "auditoria-codigo"}
+{"phrase": "revisá el CORS y los headers HTTP, ¿qué tan vulnerable está?", "original": "auditoria-seguridad", "merged": "auditoria-codigo"}
+{"phrase": "¿está lenta la app? el bundle parece muy pesado", "original": "performance", "merged": "auditoria-codigo"}
+{"phrase": "¿hay N+1 en las queries? auditá la performance", "original": "performance", "merged": "auditoria-codigo"}
+{"phrase": "¿cómo está la cobertura de tests? ¿qué casos borde no están testeados?", "original": "calidad-tests", "merged": "auditoria-codigo"}
+{"phrase": "las specs están inconsistentes, ¿hay duplicadas con nombres distintos?", "original": "specs", "merged": "auditoria-datos"}
+{"phrase": "¿qué equipos están incompletos? sin foto o sin descripción", "original": "catalogo", "merged": "auditoria-datos"}
+{"phrase": "auditá a fondo el flujo de reserva, buscá bugs y races, tocá todos los botones", "original": "auditoria-profunda", "merged": "auditoria-profunda"}
+{"phrase": "limpiá el repo, ¿hay código muerto o deps sin usar? modularizá ese god-module", "original": "mantenimiento", "merged": "mantenimiento"}
+{"phrase": "esta pantalla del checkout está rara, pulí la UX/UI", "original": "pulido-frontend", "merged": "pulido-frontend"}
