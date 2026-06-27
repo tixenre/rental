@@ -1352,3 +1352,4 @@ cancel-in-progress` ya cancela corridas viejas.
   testear/supervisor/simular → recién seguro a `dev` → PR a prod mucho después. El supervisor marca: `?` nuevo
   en código nuevo, `%` literal en SQL, reimplementación/bypass del DAL, o un CTA de adoptar ORM/async sin que
   cambien las condiciones de revisita (equipo >10 / multi-DB / tiempo-real). Implementación en el plan.
+- **Estado (2026-06-27):** Fases 0-6 (`?`→`%s` + shim retirado) + `lastrowid`→`RETURNING` (7 usos) completadas en PR #1075.
