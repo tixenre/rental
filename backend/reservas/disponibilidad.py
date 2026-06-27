@@ -71,8 +71,8 @@ def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=No
         SELECT equipo_id, COALESCE(SUM(cantidad), 0) AS bloqueado
         FROM equipo_mantenimiento
         WHERE bloquea_stock = TRUE
-          AND fecha < ?
-          AND COALESCE(fecha_hasta, fecha) > ?
+          AND fecha < %s
+          AND COALESCE(fecha_hasta, fecha) > %s
         GROUP BY equipo_id
     """, (fecha_hasta, fecha_desde)).fetchall()
     en_mant = {r["equipo_id"]: r["bloqueado"] for r in mant}
@@ -156,7 +156,7 @@ def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> 
     if not demanda:
         return []
     ids = list(demanda.keys())
-    ph = ",".join("?" for _ in ids)
+    ph = ",".join("%s" for _ in ids)
 
     buffer_horas = get_buffer_horas(conn)
     buf = datetime.timedelta(hours=buffer_horas)
@@ -389,7 +389,7 @@ def estado_diario_equipo(conn, equipo_id: int, desde: str, hasta: str) -> dict:
         return {"stock": 0, "dias": {}}
 
     row = conn.execute(
-        "SELECT cantidad FROM equipos WHERE id = ? AND eliminado_at IS NULL",
+        "SELECT cantidad FROM equipos WHERE id = %s AND eliminado_at IS NULL",
         (equipo_id,),
     ).fetchone()
     if not row:
@@ -436,8 +436,8 @@ def estado_diario_equipo(conn, equipo_id: int, desde: str, hasta: str) -> dict:
         SELECT fecha AS fd, fecha_hasta AS fh, cantidad AS cant
         FROM equipo_mantenimiento
         WHERE bloquea_stock = TRUE
-          AND equipo_id = ?
-          AND COALESCE(fecha_hasta, fecha) >= ? AND fecha < ?
+          AND equipo_id = %s
+          AND COALESCE(fecha_hasta, fecha) >= %s AND fecha < %s
         """,
         (equipo_id, win_lo, win_hi),
     ).fetchall()

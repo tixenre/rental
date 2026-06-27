@@ -115,7 +115,7 @@ def list_pedidos(
 
         total = conn.execute(f"SELECT COUNT(*) FROM alquileres p {where}", params).fetchone()[0]
         rows  = conn.execute(
-            f"SELECT p.* FROM alquileres p {where} ORDER BY {order} LIMIT ? OFFSET ?",
+            f"SELECT p.* FROM alquileres p {where} ORDER BY {order} LIMIT %s OFFSET %s",
             params + [per_page, offset]
         ).fetchall()
 

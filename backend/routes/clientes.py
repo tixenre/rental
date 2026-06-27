@@ -113,12 +113,12 @@ def list_clientes(
             select_params = pred.score_params + params + [per_page, offset]
             rows = conn.execute(
                 f"SELECT c.*, ({pred.score}) AS _score FROM clientes c {where} "
-                f"ORDER BY _score DESC, c.apellido, c.nombre LIMIT ? OFFSET ?",
+                f"ORDER BY _score DESC, c.apellido, c.nombre LIMIT %s OFFSET %s",
                 select_params,
             ).fetchall()
         else:
             rows = conn.execute(
-                f"SELECT c.* FROM clientes c {where} ORDER BY c.apellido, c.nombre LIMIT ? OFFSET ?",
+                f"SELECT c.* FROM clientes c {where} ORDER BY c.apellido, c.nombre LIMIT %s OFFSET %s",
                 params + [per_page, offset],
             ).fetchall()
         items = []

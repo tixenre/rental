@@ -208,7 +208,7 @@ def list_emails_log(
                    status, provider, provider_id, error, sent_at
             FROM emails_log{clause}
             ORDER BY sent_at DESC, id DESC
-            LIMIT ? OFFSET ?
+            LIMIT %s OFFSET %s
             """,
             (*params, limit, offset),
         ).fetchall()

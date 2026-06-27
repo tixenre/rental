@@ -64,7 +64,7 @@ def validar_stock(conn, pedido_id: int, fecha_desde: str, fecha_hasta: str) -> l
     # catálogo y no reservan stock, así que no entran al gate.
     items = conn.execute(
         "SELECT equipo_id, cantidad FROM alquiler_items "
-        "WHERE pedido_id = ? AND equipo_id IS NOT NULL",
+        "WHERE pedido_id = %s AND equipo_id IS NOT NULL",
         (pedido_id,),
     ).fetchall()
 
@@ -145,7 +145,7 @@ def _validar_demanda(
     # Nombres para los mensajes (el stock AUTORITATIVO sale del lock de abajo, no
     # de acá). Orden ascendente de id → locking determinístico, sin deadlock.
     ids = sorted(demanda)
-    ph = ",".join("?" for _ in ids)
+    ph = ",".join("%s" for _ in ids)
     nombres = {
         r["id"]: r["nombre"]
         for r in conn.execute(
@@ -172,7 +172,7 @@ def _validar_demanda(
     stock: dict[int, int | None] = {}
     for eid in ids:  # ascendente por id (ORDER BY id)
         lock_result = conn.execute(
-            "SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE",
+            "SELECT cantidad FROM equipos WHERE id = %s FOR UPDATE",
             (eid,)
         ).fetchone()
         stock[eid] = lock_result["cantidad"] if lock_result else None

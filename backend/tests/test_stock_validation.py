@@ -76,7 +76,7 @@ class StockFakeConn:
         s_up = s.upper()
 
         # Buffer global (setting).
-        if "FROM APP_SETTINGS WHERE KEY = ?" in s_up:
+        if "FROM APP_SETTINGS WHERE KEY = %S" in s_up:
             return FakeCursor([FakeRow(value=str(self.buffer_horas))])
 
         # Unidades en mantenimiento que bloquean stock — batcheado (#626):
@@ -88,7 +88,7 @@ class StockFakeConn:
             ])
 
         # Items del pedido (primera query del gate).
-        if s_up.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
+        if s_up.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = %S"):
             pid = params[0]
             return FakeCursor([FakeRow(r) for r in self.pedido_items.get(pid, [])])
 
@@ -107,7 +107,7 @@ class StockFakeConn:
             ])
 
         # Lock + cantidad del equipo.
-        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s_up:
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = %S FOR UPDATE" in s_up:
             eq = self.equipos.get(params[0])
             if not eq:
                 return FakeCursor([])
@@ -516,7 +516,7 @@ class CycleFakeConn:
 
     def execute(self, sql, params=()):
         s_up = sql.upper()
-        if "SELECT COMPONENTE_ID FROM KIT_COMPONENTES WHERE EQUIPO_ID = ?" in s_up:
+        if "SELECT COMPONENTE_ID FROM KIT_COMPONENTES WHERE EQUIPO_ID = " in s_up:
             eq_id = params[0]
             return FakeCursor([
                 FakeRow(componente_id=cid)

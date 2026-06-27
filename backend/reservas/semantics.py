@@ -7,7 +7,7 @@ el grafo inverso (`parientes_de`) y el conteo de consumo recursivo
 (`reservado_total`) — para que lectura y gate cuenten los combos anidados sin
 divergir. El lock `FOR UPDATE` y la transacción NO viven acá — son del gate.
 
-Todos los valores van como bound params (`?`); los únicos tokens interpolados en
+Todos los valores van como bound params (`%s`); los únicos tokens interpolados en
 SQL son la constante interna `ESTADOS_RESERVADO` y el placeholder `ph` de los IN.
 """
 import datetime
@@ -39,7 +39,7 @@ _buffer_expira_en: float = 0.0
 
 def _leer_buffer_db(conn) -> int:
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", ("buffer_horas_alquiler",)
+        "SELECT value FROM app_settings WHERE key = %s", ("buffer_horas_alquiler",)
     ).fetchone()
     if not row:
         return 0
@@ -112,7 +112,7 @@ def unidades_en_mantenimiento_batch(
     ids = list(equipo_ids)
     if not ids:
         return {}
-    ph = ",".join("?" for _ in ids)
+    ph = ",".join("%s" for _ in ids)
     rows = conn.execute(f"""
         SELECT equipo_id, COALESCE(SUM(cantidad), 0)
         FROM equipo_mantenimiento
@@ -175,7 +175,7 @@ def componentes_de(conn, equipo_ids=None) -> dict:
         ids = list(equipo_ids)
         if not ids:
             return {}
-        ph = ",".join("?" for _ in ids)
+        ph = ",".join("%s" for _ in ids)
         rows = conn.execute(
             f"SELECT equipo_id, componente_id, cantidad, "
             f"COALESCE(esencial, TRUE) AS esencial FROM kit_componentes "
@@ -209,7 +209,7 @@ def parientes_de(conn, componente_ids=None) -> dict:
         ids = list(componente_ids)
         if not ids:
             return {}
-        ph = ",".join("?" for _ in ids)
+        ph = ",".join("%s" for _ in ids)
         rows = conn.execute(
             f"SELECT equipo_id, componente_id, cantidad, "
             f"COALESCE(esencial, TRUE) AS esencial FROM kit_componentes "
@@ -311,7 +311,7 @@ def reservado_directo_batch(
     ids = list(equipo_ids)
     if not ids:
         return {}
-    ph = ",".join("?" for _ in ids)
+    ph = ",".join("%s" for _ in ids)
     rows = conn.execute(f"""
         SELECT pi2.equipo_id, COALESCE(SUM(pi2.cantidad), 0)
         FROM alquiler_items pi2

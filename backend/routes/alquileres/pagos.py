@@ -185,16 +185,16 @@ def list_all_pagos(
     where = ["1=1"]
     params: list = []
     if destinatario:
-        where.append("ap.destinatario = ?")
+        where.append("ap.destinatario = %s")
         params.append(destinatario)
     if metodo:
-        where.append("ap.metodo = ?")
+        where.append("ap.metodo = %s")
         params.append(metodo)
     if desde:
-        where.append("ap.fecha::date >= ?")
+        where.append("ap.fecha::date >= %s")
         params.append(desde)
     if hasta:
-        where.append("ap.fecha::date <= ?")
+        where.append("ap.fecha::date <= %s")
         params.append(hasta)
     with get_db() as conn:
         rows = conn.execute(
@@ -206,7 +206,7 @@ def list_all_pagos(
               JOIN alquileres al ON al.id = ap.pedido_id
              WHERE {" AND ".join(where)}
              ORDER BY ap.fecha DESC, ap.id DESC
-             LIMIT ?
+             LIMIT %s
             """,
             (*params, limit),
         ).fetchall()

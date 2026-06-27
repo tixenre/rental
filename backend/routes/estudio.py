@@ -555,8 +555,8 @@ def patch_estudio(body: EstudioUpdate, request: Request):
 
     with get_db() as conn:
         if updates:
-            set_parts = [f"{k} = ?" for k in updates]
-            set_parts.append("updated_at = ?")
+            set_parts = [f"{k} = %s" for k in updates]
+            set_parts.append("updated_at = %s")
             values = list(updates.values())
             values.append(datetime.now(tz=timezone.utc))
             values.append(1)
@@ -932,8 +932,8 @@ def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request)
     if not updates:
         raise HTTPException(400, "Nada que actualizar")
     with get_db() as conn:
-        set_parts = [f"{k} = ?" for k in updates]
-        set_parts.append("updated_at = ?")
+        set_parts = [f"{k} = %s" for k in updates]
+        set_parts.append("updated_at = %s")
         vals = list(updates.values()) + [datetime.now(tz=timezone.utc), trabajo_id]
         conn.execute(
             f"UPDATE estudio_trabajos SET {', '.join(set_parts)} WHERE id = %s",

@@ -457,7 +457,7 @@ def list_equipos(
             select_cols = f"e.*, {MARCA_SUBQUERY}"
             select_params = params + [per_page, offset]
         rows  = conn.execute(
-            f"SELECT {select_cols} {base_sql} {order_clause} LIMIT ? OFFSET ?",
+            f"SELECT {select_cols} {base_sql} {order_clause} LIMIT %s OFFSET %s",
             select_params,
         ).fetchall()
         equipos = [row_to_dict(r) for r in rows]
