@@ -46,6 +46,10 @@ caída → el 1-liner perdió el trigger → revert/engrosar esa entrada (keep/r
 - B / C / D se corren **solo cuando su target cambia** (digest → B; capa de skills → C/D), no en cada push:
   B necesita dispatch de agente y C una llamada a modelo (caro + no determinista en CI; un gate flaky de
   gobernanza va contra el ethos anti-bloat).
+- **Auto-disparo (Nivel 1):** el hook `Stop` `.claude/hooks/check-governance-review.sh` detecta cuándo la
+  rama tocó el digest o las skills y **te surfacea la señal a correr** (una vez por cambio-set; corre el
+  `context-size` solo, el resto lo recordás). Corre en la **terminal/CLI, no en las apps GUI** de Mac/iPhone.
+  Automatiza el *disparador*, no el *juicio*: vos seguís siendo el gate de aplicar.
 
 ## Cláusula de retiro
 
