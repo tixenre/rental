@@ -70,7 +70,7 @@ def cobrado_por_socio(conn, desde: str, hasta: str) -> dict:
         WITH {SALDADO_CTE},
         en_rango AS (
             SELECT pedido_id FROM saldado
-            WHERE fecha_saldado::date BETWEEN ?::date AND ?::date
+            WHERE fecha_saldado::date BETWEEN %s::date AND %s::date
         )
         SELECT COALESCE(ap.destinatario, '__sin__') AS quien, COALESCE(SUM(ap.monto), 0) AS monto
         FROM alquiler_pagos ap
@@ -108,7 +108,7 @@ def ya_transferido(conn, mes: str) -> dict:
            FROM movimientos m
            LEFT JOIN cuentas co ON co.id = m.cuenta_origen_id
            LEFT JOIN cuentas cd ON cd.id = m.cuenta_destino_id
-           WHERE m.es_rendicion = TRUE AND m.anulado = FALSE AND m.rendicion_mes = ?""",
+           WHERE m.es_rendicion = TRUE AND m.anulado = FALSE AND m.rendicion_mes = %s""",
         (mes,),
     ).fetchall()
     t = {p: 0 for p in PARTES}
@@ -132,7 +132,7 @@ def _movimientos_rendicion(conn, mes: str) -> list[dict]:
            FROM movimientos m
            LEFT JOIN cuentas co ON co.id = m.cuenta_origen_id
            LEFT JOIN cuentas cd ON cd.id = m.cuenta_destino_id
-           WHERE m.es_rendicion = TRUE AND m.rendicion_mes = ?
+           WHERE m.es_rendicion = TRUE AND m.rendicion_mes = %s
            ORDER BY m.fecha DESC, m.id DESC""",
         (mes,),
     ).fetchall()
@@ -145,7 +145,7 @@ def cuenta_de_parte(conn, parte: str) -> int | None:
     if parte not in PARTES:
         return None
     row = conn.execute(
-        "SELECT id FROM cuentas WHERE socio = ? AND activa = TRUE", (parte,)
+        "SELECT id FROM cuentas WHERE socio = %s AND activa = TRUE", (parte,)
     ).fetchone()
     if row:
         return row[0]

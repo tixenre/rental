@@ -26,12 +26,12 @@ def reconciliar(conn) -> dict:
     # 2. Cobros de pedidos dentro del clean start (por fecha del alquiler) sin un
     #    cobrador válido como destinatario → no entran a ninguna caja y rompen la
     #    derivación de ingresos. Mismo recorte que `ingresos_derivados`.
-    _ph = ", ".join("?" for _ in COBRADORES)
+    _ph = ", ".join("%s" for _ in COBRADORES)
     row = conn.execute(
         f"""SELECT COUNT(*) AS n, COALESCE(SUM(ap.monto), 0) AS m
            FROM alquiler_pagos ap
            JOIN alquileres al ON al.id = ap.pedido_id
-           WHERE al.fecha_desde >= ?::date
+           WHERE al.fecha_desde >= %s::date
              AND (ap.destinatario IS NULL OR ap.destinatario NOT IN ({_ph}))""",
         (LIQUIDACION_INICIO, *COBRADORES),
     ).fetchone()
