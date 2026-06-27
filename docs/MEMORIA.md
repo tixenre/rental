@@ -94,14 +94,14 @@ lógica de reservas en routes. Cambios al paquete = alto radio de explosión →
 
 ### 2026-05-31 — Expansión recursiva del motor de reservas (C4 #635)
 
-Toda expansión de composición (forward + backward) es **recursiva hasta las hojas** vía la pieza única
-`_expandir_mult` (`reservas/semantics.py`); gate lockea en `ORDER BY id`; `FOR UPDATE`/transacción
-**byte-idénticos**. No reintroducir expansión inline de 1 nivel ni "otra función parecida".
+Toda expansión de composición es **recursiva hasta las hojas** vía la pieza única `_expandir_mult`. **No
+reintroducir expansión inline de 1 nivel ni "otra función parecida"**; el `FOR UPDATE`/transacción del gate
+son byte-idénticos (no se tocan). Cómo → [`backend/reservas/CLAUDE.md`](../backend/reservas/CLAUDE.md); porqué → `DECISIONES.md`.
 
 ### 2026-06-01 — Gotcha de Railway: fork de ambiente desincroniza la contraseña del Postgres
 
-Ante `password authentication failed` en un ambiente recién forkeado: **resetear la contraseña en la BD**
-por SSH + socket local (`ALTER USER`), no perseguir variables de entorno. Receta completa en el log.
+Ante `password authentication failed` en un ambiente forkeado: **resetear la contraseña en la BD** (`ALTER
+USER` por SSH), no perseguir env vars. Receta → [`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md) §Troubleshooting.
 
 ### 2026-06-02 — Google Analytics: sin consent, solo catálogo público, ID administrado desde el back-office
 
@@ -189,14 +189,11 @@ escrituras de prueba con IDs inexistentes para no mutar staging.
 
 ### 2026-06-20 — Gate de "frontend servible" + paths de assets a la raíz (no __file__ del paquete)
 
-El healthcheck de Railway (`railway.json`) apunta a **`/health/frontend`** (503 si falta
-`FRONT_NEW/index.html`; va en `middleware.PUBLIC_EXACT` porque el healthcheck es **sin auth**, si no 401 y
-ningún deploy pasa) → un deploy que no sirve el SPA **no se promueve**. Cazó la caída de prod **#930**
-(servía `"Frontend not built"`). Regla durable: las paths a assets de la **raíz** del repo
-(`FRONT`/`FRONT_NEW` → `frontend/public`/`dist`) se anclan a la raíz, **no** con `Path(__file__).parent`
-relativo al paquete — un **split** (`database.py` → paquete `database/`) las corre un nivel y quedan en
-`backend/…`. Staging sirve el SPA por Railway igual que prod → el gate `/health/frontend` cubre **staging y
-prod**. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
+El healthcheck `/health/frontend` (`railway.json`, en `middleware.PUBLIC_EXACT` porque es **sin auth**) → un
+deploy que no sirve el SPA **no se promueve** (cazó la caída de prod **#930**). Regla durable: las paths a
+assets de la **raíz** (`FRONT`/`FRONT_NEW`) se anclan a la raíz, **no** con `Path(__file__).parent` del
+paquete (un split las corre un nivel). Cubre staging y prod. Cómo + runbook →
+[`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md); regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
 
 ### 2026-06-20 — Iteración local con datos reales (clon de staging) + verificar sin mocks
 
@@ -222,13 +219,11 @@ marca un topbar fuera del shell o una lista de áreas duplicada.
 
 ### 2026-06-22 — Creación de pedidos concurrente: serializar por equipo con advisory lock (no tocar el gate)
 
-Reservas concurrentes del mismo equipo se deadlockeaban (FK KEY-SHARE del insert de ítems + `FOR
-UPDATE` del gate sobre la misma fila de `equipos`) → **500 intermitente**. Fix: `create_pedido` toma
-`pg_advisory_xact_lock` por equipo **en orden de id** ANTES de insertar (serializa, no deadlock);
-`create_pedido_retry` es la puerta única de creación (cliente+admin) y reintenta como backstop → **503**
-si persiste, **nunca 500**. **NO toca el `FOR UPDATE`** (motor de reservas sagrado). Verificado: 15
-paralelas → 6×201 + 9×409, 0×500, sin sobreventa ni huérfanos. Refina _motor único de reservas
-(2026-05-30)_. PR #969.
+Reservas concurrentes del mismo equipo se deadlockeaban → **500 intermitente**. Fix: `create_pedido` toma
+`pg_advisory_xact_lock` por equipo **en orden de id** ANTES de insertar; `create_pedido_retry`
+(`routes/alquileres/core.py`) es la **puerta única** de creación y reintenta → **503** si persiste, **nunca
+500**. **NO toca el `FOR UPDATE`** (motor sagrado). Refina _motor único de reservas (2026-05-30)_;
+verificación (15 paralelas → 0×500) + PR #969 → `DECISIONES.md`.
 
 ### 2026-06-22 — Los hallazgos de una auditoría son hipótesis: confirmar (código + en vivo) antes de arreglar
 
@@ -316,18 +311,12 @@ features nuevas sin comunicar y selling points stale, y propone borradores de co
 
 ### 2026-06-25 — Hero (LCP) = AVIF-directo + preload AVIF; el resto usa `picture`; SSR descartado
 
-El **elemento LCP** (hero del catálogo, mobile `HeroBanner` + desktop `HeroSection`) se sirve con `<img
-src=avif>` **directo** (NO `<picture>`) + `onError`→webp, vía el helper único `heroImgProps`
-(`hero-photos.ts`); el backend (`_inject_hero_preload`) preloadea el AVIF con `type=image/avif`. Razón: un
-preload AVIF solo matchea un `<img>` directo, **no** un `<source>` de `<picture>` (matching frágil en
-Chromium) → si no, el AVIF se baja dos veces y el LCP empeora. **Toda otra imagen** (catálogo, fichas) usa el
-`<picture><source avif><img webp>` canónico (fallback nativo). **webp NO se elimina**: es el fallback del
-`onError` y del `<picture>`; el JPEG es para OG/crawlers. **Gotcha:** preload (backend) y `<img>` (front)
-deben elegir la MISMA foto principal — ambos ordenan `es_principal DESC, orden ASC, id ASC`; si se cambia el
-orden en el endpoint, revisar que coincidan. **SSR descartado** (completo: inviable con backend Python, no
-Node; parcial del hero: hack con drift porque `createRoot` borra `#root`); **techo SPA ~80 mobile / ~91
-desktop es sano** — no re-evaluar SSR. El supervisor marca un `<picture>` en el LCP, o un `<img src=avif>` sin
-`onError`→webp fuera del LCP.
+El **elemento LCP** (hero) se sirve con `<img src=avif>` **directo** (NO `<picture>`) + `onError`→webp vía el
+helper único `heroImgProps`; el backend preloadea el AVIF (un preload AVIF no matchea un `<source>` de
+`<picture>`). **Toda otra imagen** usa el `<picture><source avif><img webp>` canónico; **webp NO se elimina**
+(es el fallback). **SSR descartado** (techo SPA ~80 mobile / ~91 desktop es sano — no re-evaluar). **El
+supervisor marca un `<picture>` en el LCP, o un `<img src=avif>` sin `onError`→webp fuera del LCP.** Cómo
+(preload, orden de foto principal, gotchas) → [`SISTEMA_FOTOS.md`](SISTEMA_FOTOS.md).
 
 ### 2026-06-25 — Manuales técnicos por sistema (`SISTEMA_X.md`): fuente única del "cómo", linkea a MEMORIA el "porqué"
 
