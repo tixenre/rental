@@ -507,11 +507,7 @@ function SesionesSection({ taller }: { taller: TallerAdmin }) {
           Cancelar
         </Button>
         <Button onClick={handleSave} disabled={mut.isPending} size="sm" className="gap-2">
-          {mut.isPending ? (
-            <Spinner size="xs" />
-          ) : (
-            <Save className="h-3.5 w-3.5" />
-          )}
+          {mut.isPending ? <Spinner size="xs" /> : <Save className="h-3.5 w-3.5" />}
           Guardar sesiones
         </Button>
       </div>
@@ -590,11 +586,7 @@ function PagosSection({ taller }: { taller: TallerAdmin }) {
       </div>
       <div className="flex justify-end">
         <Button onClick={() => mut.mutate({ ...form })} disabled={mut.isPending} className="gap-2">
-          {mut.isPending ? (
-            <Spinner size="sm" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
+          {mut.isPending ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
           Guardar
         </Button>
       </div>
@@ -665,11 +657,7 @@ function FotoSection({ taller }: { taller: TallerAdmin }) {
             onClick={() => fileRef.current?.click()}
             className="gap-2"
           >
-            {uploading ? (
-              <Spinner size="xs" />
-            ) : (
-              <Upload className="h-3.5 w-3.5" />
-            )}
+            {uploading ? <Spinner size="xs" /> : <Upload className="h-3.5 w-3.5" />}
             {taller.instructor_foto_url ? "Cambiar foto" : "Subir foto"}
           </Button>
         </div>
@@ -792,11 +780,7 @@ function ContenidoSection({ taller }: { taller: TallerAdmin }) {
       {field("Programa clase práctica (1 ítem por línea)", "programa_practica", { rows: 6 })}
       <div className="flex justify-end pt-2">
         <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
-          {mut.isPending ? (
-            <Spinner size="sm" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
+          {mut.isPending ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
           Guardar cambios
         </Button>
       </div>
@@ -893,11 +877,7 @@ function PreciosSection({ taller }: { taller: TallerAdmin }) {
       </div>
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
-          {mut.isPending ? (
-            <Spinner size="sm" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
+          {mut.isPending ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
           Guardar
         </Button>
       </div>
@@ -1158,11 +1138,7 @@ function InscripcionesSection({
               disabled={notificarMut.isPending}
               className="gap-2"
             >
-              {notificarMut.isPending ? (
-                <Spinner size="sm" />
-              ) : (
-                <Bell className="h-4 w-4" />
-              )}
+              {notificarMut.isPending ? <Spinner size="sm" /> : <Bell className="h-4 w-4" />}
               Enviar notificaciones
             </Button>
           </DialogFooter>
@@ -1434,11 +1410,7 @@ function NuevoTallerDialog({
             <Button variant="ghost">Cancelar</Button>
           </DialogClose>
           <Button onClick={handleSubmit} disabled={mut.isPending} className="gap-2">
-            {mut.isPending ? (
-              <Spinner size="sm" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
+            {mut.isPending ? <Spinner size="sm" /> : <Plus className="h-4 w-4" />}
             {template ? "Crear nueva edición" : "Crear taller"}
           </Button>
         </DialogFooter>
