@@ -319,7 +319,7 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
     with get_db() as conn:
         try:
             marca = conn.execute(
-                "SELECT id, nombre FROM marcas WHERE id = ?", (marca_id,)
+                "SELECT id, nombre FROM marcas WHERE id = %s", (marca_id,)
             ).fetchone()
             if not marca:
                 raise HTTPException(404, "Marca no encontrada")
@@ -333,7 +333,7 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
                 with media_http():
                     public_url = _r2_put(path, content, "image/svg+xml")
                 conn.execute(
-                    "UPDATE marcas SET logo_url = ?, updated_at = NOW() WHERE id = ?",
+                    "UPDATE marcas SET logo_url = %s, updated_at = NOW() WHERE id = %s",
                     (public_url, marca_id),
                 )
                 conn.commit()
@@ -358,8 +358,8 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
                 display = asset.variant("display")
                 display_sm = asset.variant("display-sm")
                 conn.execute(
-                    "UPDATE marcas SET logo_url = ?, logo_url_sm = ?, media_id = ?, "
-                    "updated_at = NOW() WHERE id = ?",
+                    "UPDATE marcas SET logo_url = %s, logo_url_sm = %s, media_id = %s, "
+                    "updated_at = NOW() WHERE id = %s",
                     (display.url, display_sm.url if display_sm else None, asset.id, marca_id),
                 )
                 conn.commit()

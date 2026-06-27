@@ -41,12 +41,12 @@ class MantenimientoUpdate(BaseModel):
 def list_mantenimiento(id: int):
     """Lista los eventos de mantenimiento del equipo, más recientes primero."""
     with get_db() as conn:
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+        if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
         rows = conn.execute("""
             SELECT id, equipo_id, fecha, tipo, descripcion, costo, proxima_revision,
                    fecha_hasta, cantidad, bloquea_stock, created_at
-            FROM equipo_mantenimiento WHERE equipo_id = ?
+            FROM equipo_mantenimiento WHERE equipo_id = %s
             ORDER BY fecha DESC, id DESC
         """, (id,)).fetchall()
         items = [row_to_dict(r) for r in rows]
@@ -69,20 +69,20 @@ def add_mantenimiento(id: int, data: MantenimientoCreate, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Equipo no encontrado")
             cur = conn.execute("""
                 INSERT INTO equipo_mantenimiento
                     (equipo_id, fecha, tipo, descripcion, costo, proxima_revision,
                      fecha_hasta, cantidad, bloquea_stock)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (id, data.fecha, data.tipo or "revision", data.descripcion, data.costo,
                   data.proxima_revision or None, data.fecha_hasta or None, max(1, data.cantidad),
                   data.bloquea_stock))
             conn.commit()
             new_id = cur.lastrowid
             row = conn.execute(
-                "SELECT * FROM equipo_mantenimiento WHERE id = ?", (new_id,)
+                "SELECT * FROM equipo_mantenimiento WHERE id = %s", (new_id,)
             ).fetchone()
             return row_to_dict(row)
         except Exception:
@@ -97,7 +97,7 @@ def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate, reques
     with get_db() as conn:
         try:
             existing = conn.execute(
-                "SELECT * FROM equipo_mantenimiento WHERE id = ? AND equipo_id = ?",
+                "SELECT * FROM equipo_mantenimiento WHERE id = %s AND equipo_id = %s",
                 (log_id, id),
             ).fetchone()
             if not existing:
@@ -111,12 +111,12 @@ def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate, reques
                     updates[k] = None
             set_clause = ", ".join(f"{k} = ?" for k in updates)
             conn.execute(
-                f"UPDATE equipo_mantenimiento SET {set_clause} WHERE id = ?",
+                f"UPDATE equipo_mantenimiento SET {set_clause} WHERE id = %s",
                 list(updates.values()) + [log_id],
             )
             conn.commit()
             row = conn.execute(
-                "SELECT * FROM equipo_mantenimiento WHERE id = ?", (log_id,)
+                "SELECT * FROM equipo_mantenimiento WHERE id = %s", (log_id,)
             ).fetchone()
             return row_to_dict(row)
         except Exception:
@@ -131,12 +131,12 @@ def delete_mantenimiento(id: int, log_id: int, request: Request):
     with get_db() as conn:
         try:
             existing = conn.execute(
-                "SELECT id FROM equipo_mantenimiento WHERE id = ? AND equipo_id = ?",
+                "SELECT id FROM equipo_mantenimiento WHERE id = %s AND equipo_id = %s",
                 (log_id, id),
             ).fetchone()
             if not existing:
                 raise HTTPException(404, "Evento no encontrado")
-            conn.execute("DELETE FROM equipo_mantenimiento WHERE id = ?", (log_id,))
+            conn.execute("DELETE FROM equipo_mantenimiento WHERE id = %s", (log_id,))
             conn.commit()
         except Exception:
             conn.rollback()

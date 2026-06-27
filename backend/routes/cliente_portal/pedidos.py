@@ -109,7 +109,7 @@ def cliente_crear_pedido(
             # oculto/interno (o sin precio) enumerando ids → pedido $0.
             row = conn.execute(
                 "SELECT precio_jornada FROM equipos "
-                "WHERE id = ? AND visible_catalogo = 1 AND precio_jornada IS NOT NULL",
+                "WHERE id = %s AND visible_catalogo = 1 AND precio_jornada IS NOT NULL",
                 (it.equipo_id,),
             ).fetchone()
             if not row:
@@ -155,14 +155,14 @@ def cliente_cancelar_pedido(id: int, request: Request):
     cliente_id = session["cliente_id"]
     with get_db() as conn:
         p = conn.execute(
-            "SELECT estado FROM alquileres WHERE id = ? AND cliente_id = ?",
+            "SELECT estado FROM alquileres WHERE id = %s AND cliente_id = %s",
             (id, cliente_id),
         ).fetchone()
         if not p:
             raise HTTPException(404, "Pedido no encontrado")
         if p["estado"] not in ("borrador", "presupuesto"):
             raise HTTPException(400, "Este pedido ya no se puede cancelar")
-        conn.execute("UPDATE alquileres SET estado = 'cancelado' WHERE id = ?", (id,))
+        conn.execute("UPDATE alquileres SET estado = 'cancelado' WHERE id = %s", (id,))
         # Si había alguna solicitud pendiente, cancelarla también para no
         # dejarla huérfana.
         _cancelar_solicitudes_pendientes(
@@ -184,7 +184,7 @@ def cliente_pedidos(request: Request):
             SELECT id, numero_pedido, estado, fecha_desde, fecha_hasta,
                    monto_total, monto_pagado, descuento_pct, notas, created_at
             FROM alquileres
-            WHERE cliente_id = ?
+            WHERE cliente_id = %s
             ORDER BY created_at DESC NULLS LAST, numero_pedido DESC
         """, (cliente_id,)).fetchall()
 
@@ -202,7 +202,7 @@ def cliente_pedidos(request: Request):
             pagos = conn.execute("""
                 SELECT monto, concepto, fecha
                 FROM alquiler_pagos
-                WHERE pedido_id = ?
+                WHERE pedido_id = %s
                 ORDER BY fecha
             """, (p["id"],)).fetchall()
             d["pagos"] = [row_to_dict(pg) for pg in pagos]
@@ -214,7 +214,7 @@ def cliente_pedidos(request: Request):
                 SELECT id, mensaje, estado, respuesta, resolved_by,
                        resolved_at, created_at
                 FROM solicitudes_modificacion
-                WHERE pedido_id = ? AND tipo = 'aprobacion'
+                WHERE pedido_id = %s AND tipo = 'aprobacion'
                 ORDER BY created_at DESC
             """, (p["id"],)).fetchall()
             d["solicitudes"] = [row_to_dict(s) for s in solic]
@@ -235,7 +235,7 @@ def cliente_pedido_detalle(id: int, request: Request):
                    monto_total, monto_pagado, descuento_pct,
                    descuento_jornadas_pct, cliente_id, notas, created_at
             FROM alquileres
-            WHERE id = ? AND cliente_id = ?
+            WHERE id = %s AND cliente_id = %s
         """, (id, cliente_id)).fetchone()
         if not pedido:
             raise HTTPException(404, "Pedido no encontrado")
@@ -249,7 +249,7 @@ def cliente_pedido_detalle(id: int, request: Request):
 
         pagos = conn.execute("""
             SELECT monto, concepto, fecha FROM alquiler_pagos
-            WHERE pedido_id = ? ORDER BY fecha
+            WHERE pedido_id = %s ORDER BY fecha
         """, (id,)).fetchall()
         d["pagos"] = [row_to_dict(p) for p in pagos]
 
@@ -257,7 +257,7 @@ def cliente_pedido_detalle(id: int, request: Request):
             SELECT id, mensaje, estado, respuesta, resolved_by,
                    resolved_at, created_at
             FROM solicitudes_modificacion
-            WHERE pedido_id = ? AND tipo = 'aprobacion'
+            WHERE pedido_id = %s AND tipo = 'aprobacion'
             ORDER BY created_at DESC
         """, (id,)).fetchall()
         d["solicitudes"] = [row_to_dict(s) for s in solicitudes]

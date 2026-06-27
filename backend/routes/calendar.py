@@ -44,7 +44,7 @@ _ESTADOS_FEED = ("confirmado", "retirado", "devuelto", "finalizado")
 
 def _get_token(conn) -> str:
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", (_TOKEN_KEY,)
+        "SELECT value FROM app_settings WHERE key = %s", (_TOKEN_KEY,)
     ).fetchone()
     return (row["value"] or "").strip() if row else ""
 
@@ -53,7 +53,7 @@ def _set_token(conn, token: str, actor: str) -> None:
     conn.execute(
         """
         INSERT INTO app_settings (key, value, updated_at, updated_by)
-        VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+        VALUES (%s, %s, CURRENT_TIMESTAMP, %s)
         ON CONFLICT (key) DO UPDATE
         SET value = EXCLUDED.value,
             updated_at = CURRENT_TIMESTAMP,

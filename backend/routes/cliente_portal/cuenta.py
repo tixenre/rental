@@ -76,7 +76,7 @@ def cliente_registro(request: Request, data: RegistroCreate):
     with get_db() as conn:
         # Verificar que no se haya registrado ya (doble submit)
         existente = conn.execute(
-            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(?)", (email,)
+            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
         ).fetchone()
         if existente:
             cliente_id = existente["id"]
@@ -90,7 +90,7 @@ def cliente_registro(request: Request, data: RegistroCreate):
                     nombre, apellido, email, telefono, direccion, cuit,
                     perfil_impuestos, direccion_maps_url,
                     razon_social, domicilio_fiscal, email_facturacion
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 data.nombre.strip(),
                 data.apellido.strip(),
@@ -106,7 +106,7 @@ def cliente_registro(request: Request, data: RegistroCreate):
             ))
             conn.commit()
             cliente_id = conn.execute(
-                "SELECT id FROM clientes WHERE LOWER(email) = LOWER(?)", (email,)
+                "SELECT id FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
             ).fetchone()["id"]
 
         session_data = {"email": email, "name": name, "role": "cliente", "cliente_id": cliente_id}
@@ -135,7 +135,7 @@ def cliente_me(request: Request):
                       nombre_renaper, apellido_renaper, fecha_nacimiento_renaper,
                       direccion_renaper, apodo,
                       dni_verificacion_estado, dni_verificacion_motivo
-               FROM clientes WHERE id = ?""",
+               FROM clientes WHERE id = %s""",
             (cliente_id,)
         ).fetchone()
         if not row:
@@ -219,7 +219,7 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
     with get_db() as conn:
         try:
             vals.append(cliente_id)
-            conn.execute(f"UPDATE clientes SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+            conn.execute(f"UPDATE clientes SET {', '.join(sets)} WHERE id = %s", tuple(vals))
             conn.commit()
             row = conn.execute(
                 """SELECT id, nombre, apellido, email, telefono, direccion, cuit,
@@ -229,7 +229,7 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
                           nombre_renaper, apellido_renaper, fecha_nacimiento_renaper,
                           direccion_renaper, apodo,
                           dni_verificacion_estado, dni_verificacion_motivo
-                   FROM clientes WHERE id = ?""",
+                   FROM clientes WHERE id = %s""",
                 (cliente_id,),
             ).fetchone()
             return row_to_dict(row) if row else {}

@@ -54,7 +54,7 @@ def _add_componentes(conn, items: list[dict]) -> None:
                    ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
             FROM kit_componentes kc
             JOIN equipos ec ON ec.id = kc.componente_id
-            WHERE kc.equipo_id = ?
+            WHERE kc.equipo_id = %s
         """, (item["equipo_id"],)).fetchall()
         item["componentes"] = [row_to_dict(c) for c in comp_rows]
 
@@ -136,7 +136,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
     """Construye el HTML + filename de un documento del pedido. Fuente ÚNICA
     usada por los GET de descarga y por el envío por mail."""
     if kind == "pdf":
-        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        row = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
@@ -147,7 +147,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         return _pedido_html(pedido), _pedido_filename(pedido)
 
     if kind == "albaran":
-        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        row = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
@@ -158,7 +158,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
                    e.nombre_publico, e.nombre_publico_largo, pi.equipo_id
             FROM alquiler_items pi
             LEFT JOIN equipos e ON e.id = pi.equipo_id
-            WHERE pi.pedido_id = ?
+            WHERE pi.pedido_id = %s
             ORDER BY pi.orden, pi.id
         """, (id,)).fetchall()
         pedido["items"] = [row_to_dict(i) for i in items]
@@ -169,7 +169,7 @@ def _doc_html(conn, id: int, kind: str) -> tuple[str, str]:
         return _albaran_html(pedido), _pedido_filename(pedido, doc="albaran")
 
     if kind == "packing-list":
-        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        row = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         pedido = row_to_dict(row)
@@ -277,7 +277,7 @@ def _ctx_mail_pedido(conn, id: int, docs: list[str], mensaje: Optional[str],
     documentos adjuntos y la nota del admin. Fuente ÚNICA usada por el envío y
     por el preview → el preview no puede divergir de lo que se manda."""
     if ped is None:
-        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        row = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         ped = row_to_dict(row)
@@ -360,14 +360,14 @@ async def enviar_documentos(id: int, data: EnviarDocsRequest, request: Request):
 
     # Resolver destinatario + metadatos del pedido (dentro de la conexión).
     with get_db() as conn:
-        row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+        row = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Pedido no encontrado")
         ped = row_to_dict(row)
         destinatario = (data.to or ped.get("cliente_email") or "").strip()
         if not destinatario and ped.get("cliente_id"):
             c = conn.execute(
-                "SELECT email FROM clientes WHERE id=?", (ped["cliente_id"],)
+                "SELECT email FROM clientes WHERE id=%s", (ped["cliente_id"],)
             ).fetchone()
             if c and c["email"]:
                 destinatario = c["email"].strip()
@@ -440,7 +440,7 @@ def mail_preview(id: int, data: MailPreviewRequest, request: Request):
 
     with get_db() as conn:
         row = conn.execute(
-            "SELECT numero_pedido, cliente_nombre FROM alquileres WHERE id=?", (id,)
+            "SELECT numero_pedido, cliente_nombre FROM alquileres WHERE id=%s", (id,)
         ).fetchone()
         if not row:
             raise HTTPException(404, "Pedido no encontrado")

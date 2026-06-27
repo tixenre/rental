@@ -122,7 +122,7 @@ def get_template(key: str, request: Request):
         row = conn.execute(
             """
             SELECT key, subject, body_html, body_text, enabled, updated_at, updated_by
-            FROM email_templates WHERE key = ?
+            FROM email_templates WHERE key = %s
             """,
             (key,),
         ).fetchone()
@@ -142,9 +142,9 @@ def update_template(key: str, data: TemplateUpdate, request: Request):
         cur = conn.execute(
             """
             UPDATE email_templates
-            SET subject = ?, body_html = ?, body_text = ?,
-                updated_at = CURRENT_TIMESTAMP, updated_by = ?
-            WHERE key = ?
+            SET subject = %s, body_html = %s, body_text = %s,
+                updated_at = CURRENT_TIMESTAMP, updated_by = %s
+            WHERE key = %s
             RETURNING key, subject, body_html, body_text, updated_at, updated_by
             """,
             (data.subject, data.body_html, data.body_text,
@@ -165,7 +165,7 @@ def set_template_enabled(key: str, data: TemplateEnabled, request: Request):
     require_admin(request)
     with get_db() as conn:
         cur = conn.execute(
-            "UPDATE email_templates SET enabled = ? WHERE key = ? RETURNING key, enabled",
+            "UPDATE email_templates SET enabled = %s WHERE key = %s RETURNING key, enabled",
             (data.enabled, key),
         )
         row = cur.fetchone()

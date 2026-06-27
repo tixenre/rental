@@ -76,10 +76,10 @@ def backfill(dry_run: bool = False) -> dict:
                 )
                 cur = conn.execute(
                     """
-                    UPDATE equipos SET foto_url_thumb = ?
+                    UPDATE equipos SET foto_url_thumb = %s
                     WHERE id IN (
                         SELECT equipo_id FROM equipo_fotos
-                        WHERE media_id = ? AND es_principal = TRUE
+                        WHERE media_id = %s AND es_principal = TRUE
                     )
                     """,
                     (url, asset_id),

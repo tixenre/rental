@@ -56,14 +56,14 @@ def _es_historico(fuente: str | None) -> bool:
 def _maybe_finalizar(conn, pedido_id: int):
     """Si el pedido está 'devuelto' y monto_pagado >= monto_total → 'finalizado'."""
     p = conn.execute(
-        "SELECT estado, monto_total, monto_pagado FROM alquileres WHERE id=?", (pedido_id,)
+        "SELECT estado, monto_total, monto_pagado FROM alquileres WHERE id=%s", (pedido_id,)
     ).fetchone()
     if not p:
         return
     if (p["estado"] == "devuelto"
             and (p["monto_pagado"] or 0) >= (p["monto_total"] or 0)
             and (p["monto_total"] or 0) > 0):
-        conn.execute("UPDATE alquileres SET estado='finalizado' WHERE id=?", (pedido_id,))
+        conn.execute("UPDATE alquileres SET estado='finalizado' WHERE id=%s", (pedido_id,))
 
 
 def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
@@ -77,7 +77,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
         FROM alquiler_items pi
         LEFT JOIN equipos e ON e.id = pi.equipo_id
         LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
-        WHERE pi.pedido_id = ?
+        WHERE pi.pedido_id = %s
         ORDER BY pi.orden, pi.id
     """, (pedido_id,)).fetchall()
     items = [row_to_dict(r) for r in rows]
@@ -199,13 +199,13 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
 
 def _get_alquiler_pagos(conn, pedido_id: int) -> list[dict]:
     rows = conn.execute("""
-        SELECT * FROM alquiler_pagos WHERE pedido_id = ? ORDER BY fecha, created_at
+        SELECT * FROM alquiler_pagos WHERE pedido_id = %s ORDER BY fecha, created_at
     """, (pedido_id,)).fetchall()
     return [row_to_dict(r) for r in rows]
 
 
 def _get_alquiler_detail(conn, id: int) -> dict:
-    row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+    row = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
     if not row:
         raise HTTPException(404, "Pedido no encontrado")
     pedido = row_to_dict(row)
@@ -232,7 +232,7 @@ def _enriquecer_pedido_con_total(conn, pedido: dict) -> dict:
     perfil = pedido.get("cliente_perfil_impuestos")
     if perfil is None and pedido.get("cliente_id"):
         row = conn.execute(
-            "SELECT perfil_impuestos FROM clientes WHERE id = ?",
+            "SELECT perfil_impuestos FROM clientes WHERE id = %s",
             (pedido["cliente_id"],),
         ).fetchone()
         if row:
@@ -288,7 +288,7 @@ def _enriquecer_pedido_con_cliente_fiscal(conn, pedido: dict) -> dict:
     row = conn.execute(
         """SELECT perfil_impuestos, razon_social, domicilio_fiscal,
                   email_facturacion, cuit
-           FROM clientes WHERE id = ?""",
+           FROM clientes WHERE id = %s""",
         (cid,),
     ).fetchone()
     if not row:
@@ -342,7 +342,7 @@ def _enriquecer_pedido_con_cliente(conn, pedido: dict) -> dict:
     row = conn.execute(
         """SELECT nombre, apellido, email, telefono,
                   dni, nombre_renaper, apellido_renaper, dni_validado_at
-           FROM clientes WHERE id = ?""",
+           FROM clientes WHERE id = %s""",
         (cid,),
     ).fetchone()
     if row:
@@ -381,7 +381,7 @@ def _get_historial_modificaciones(conn, pedido_id: int) -> list[dict]:
         SELECT id, mensaje, estado, respuesta, cambios_json, cambios_aplicados,
                tipo, resolved_at, resolved_by, created_at
         FROM solicitudes_modificacion
-        WHERE pedido_id = ?
+        WHERE pedido_id = %s
         ORDER BY created_at DESC
     """, (pedido_id,)).fetchall()
     return [row_to_dict(r) for r in rows]
@@ -710,7 +710,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
         try:
             descuento_pct = 0.0
             if data.cliente_id:
-                c = conn.execute("SELECT * FROM clientes WHERE id=?", (data.cliente_id,)).fetchone()
+                c = conn.execute("SELECT * FROM clientes WHERE id=%s", (data.cliente_id,)).fetchone()
                 if c:
                     cliente_nombre   = nombre_completo_cliente(c["nombre"], c["apellido"])
                     cliente_email    = cliente_email    or c["email"]
@@ -746,7 +746,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
             # al commit/rollback. `create_pedido_retry` queda de backstop.
             for _eid in sorted({it.equipo_id for it in data.items
                                 if getattr(it, "equipo_id", None)}):
-                conn.execute("SELECT pg_advisory_xact_lock(?, ?)",
+                conn.execute("SELECT pg_advisory_xact_lock(%s, %s)",
                              (_ADVISORY_NS_PEDIDO, _eid))
 
             estado_inicial = data.estado if data.estado in {"borrador", "presupuesto"} else "presupuesto"
@@ -758,7 +758,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                                      cliente_id, notas, fecha_desde, fecha_hasta,
                                      monto_total, estado, numero_pedido,
                                      descuento_pct, descuento_jornadas_pct)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (cliente_nombre, cliente_email, cliente_telefono,
                   data.cliente_id, data.notas, data.fecha_desde or None, data.fecha_hasta or None,
                   0, estado_inicial, next_num,
@@ -843,14 +843,14 @@ def _recalcular_total_pedido(conn, id: int) -> None:
     Lo usan `_apply_pedido_datos` (editar fechas/cliente/descuento), la edición
     de ítems y la propagación del descuento del cliente a sus presupuestos.
     """
-    p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+    p = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
     if not p:
         return
     d0 = to_datetime(p["fecha_desde"]) if p["fecha_desde"] else None
     d1 = to_datetime(p["fecha_hasta"]) if p["fecha_hasta"] else None
     jornadas = jornadas_periodo(d0, d1)
     items = conn.execute(
-        "SELECT id, equipo_id, cantidad, precio_jornada, cobro_modo FROM alquiler_items WHERE pedido_id=?",
+        "SELECT id, equipo_id, cantidad, precio_jornada, cobro_modo FROM alquiler_items WHERE pedido_id=%s",
         (id,),
     ).fetchall()
     # Subtotales persistidos por línea (los usan los visores). `bruto_linea`
@@ -861,7 +861,7 @@ def _recalcular_total_pedido(conn, id: int) -> None:
              "cobro_modo": it["cobro_modo"]},
             jornadas,
         )
-        conn.execute("UPDATE alquiler_items SET subtotal=? WHERE id=?", (sub, it["id"]))
+        conn.execute("UPDATE alquiler_items SET subtotal=%s WHERE id=%s", (sub, it["id"]))
     descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
     total_desglose = calcular_total(
         items=[
@@ -875,7 +875,7 @@ def _recalcular_total_pedido(conn, id: int) -> None:
         perfil_impuestos=None,  # persiste NETO; IVA es derivado al mostrar.
     )
     conn.execute(
-        "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
+        "UPDATE alquileres SET monto_total=%s, descuento_jornadas_pct=%s WHERE id=%s",
         (total_desglose["neto"], descuento_jornadas_pct, id),
     )
 
@@ -893,12 +893,12 @@ def propagar_descuento_a_presupuestos(conn, cliente_id: int, nuevo_pct: float) -
     ids = [
         r["id"]
         for r in conn.execute(
-            "SELECT id FROM alquileres WHERE cliente_id=? AND estado='presupuesto'",
+            "SELECT id FROM alquileres WHERE cliente_id=%s AND estado='presupuesto'",
             (cliente_id,),
         ).fetchall()
     ]
     for pid in ids:
-        conn.execute("UPDATE alquileres SET descuento_pct=? WHERE id=?", (nuevo_pct or 0, pid))
+        conn.execute("UPDATE alquileres SET descuento_pct=%s WHERE id=%s", (nuevo_pct or 0, pid))
         _recalcular_total_pedido(conn, pid)
     return len(ids)
 
@@ -914,7 +914,7 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
     back-office). Las propuestas del cliente (cliente_portal) usan el default
     `False` → el cliente sigue sin poder fechar en el pasado.
     """
-    p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+    p = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
     if not p:
         raise HTTPException(404, "Pedido no encontrado")
 
@@ -926,7 +926,7 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
 
     cliente_cambio = "cliente_id" in payload and payload["cliente_id"]
     if cliente_cambio:
-        c = conn.execute("SELECT * FROM clientes WHERE id=?", (payload["cliente_id"],)).fetchone()
+        c = conn.execute("SELECT * FROM clientes WHERE id=%s", (payload["cliente_id"],)).fetchone()
         if c:
             payload.setdefault("cliente_nombre",   nombre_completo_cliente(c["nombre"], c["apellido"]))
             payload.setdefault("cliente_email",    c["email"])
@@ -956,7 +956,7 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
         return _get_alquiler_detail(conn, id)
 
     cols = ", ".join(f"{k}=?" for k in payload)
-    conn.execute(f"UPDATE alquileres SET {cols} WHERE id=?", (*payload.values(), id))
+    conn.execute(f"UPDATE alquileres SET {cols} WHERE id=%s", (*payload.values(), id))
 
     if (
         "fecha_desde" in payload
@@ -975,7 +975,7 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     No valida stock — el caller debe llamar a `_check_stock` si corresponde.
     Lógica compartida entre admin y portal cliente.
     """
-    p = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+    p = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
     if not p:
         raise HTTPException(404, "Pedido no encontrado")
     if not items:
@@ -1020,7 +1020,7 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     rows = []
     for orden, ln in enumerate(lineas):
         if ln["equipo_id"] is not None and not conn.execute(
-            "SELECT id FROM equipos WHERE id=?", (ln["equipo_id"],)
+            "SELECT id FROM equipos WHERE id=%s", (ln["equipo_id"],)
         ).fetchone():
             raise HTTPException(404, f"Equipo {ln['equipo_id']} no encontrado")
         subtotal = bruto_linea(ln, jornadas)
@@ -1043,13 +1043,13 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     )
     monto_total = total_desglose["neto"]
 
-    conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (id,))
+    conn.execute("DELETE FROM alquiler_items WHERE pedido_id=%s", (id,))
     conn.executemany("""
         INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal, orden, nombre_libre, cobro_modo)
-        VALUES (?,?,?,?,?,?,?,?)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
     """, rows)
     conn.execute(
-        "UPDATE alquileres SET monto_total=?, descuento_jornadas_pct=? WHERE id=?",
+        "UPDATE alquileres SET monto_total=%s, descuento_jornadas_pct=%s WHERE id=%s",
         (monto_total, descuento_jornadas_pct, id),
     )
 

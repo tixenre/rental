@@ -59,14 +59,14 @@ def listar_compatibilidades(equipo_id: int, request: Request):
                 ec.id, ec.equipo_a_id, ec.equipo_b_id, ec.tipo, ec.nota,
                 ec.adaptador_id, ec.created_at,
                 ec.auto_generado, ec.razon_ia, ec.confianza,
-                CASE WHEN ec.equipo_a_id = ? THEN ec.equipo_b_id ELSE ec.equipo_a_id END AS otro_id,
+                CASE WHEN ec.equipo_a_id = %s THEN ec.equipo_b_id ELSE ec.equipo_a_id END AS otro_id,
                 eb.nombre AS otro_nombre, eb.foto_url AS otro_foto,
                 ea.nombre AS adaptador_nombre
             FROM equipo_compatibilidad ec
             LEFT JOIN equipos eb ON eb.id = CASE
-                WHEN ec.equipo_a_id = ? THEN ec.equipo_b_id ELSE ec.equipo_a_id END
+                WHEN ec.equipo_a_id = %s THEN ec.equipo_b_id ELSE ec.equipo_a_id END
             LEFT JOIN equipos ea ON ea.id = ec.adaptador_id
-            WHERE ec.equipo_a_id = ? OR ec.equipo_b_id = ?
+            WHERE ec.equipo_a_id = %s OR ec.equipo_b_id = %s
             ORDER BY ec.auto_generado ASC, ec.tipo, eb.nombre
             """,
             (equipo_id, equipo_id, equipo_id, equipo_id),
@@ -100,12 +100,12 @@ def crear_compatibilidad(equipo_id: int, payload: CompatibilidadInput, request: 
         raise HTTPException(400, "No se puede relacionar un equipo consigo mismo")
     with get_db() as conn:
         # Verificar que ambos existen
-        a_exists = conn.execute("SELECT id FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
-        b_exists = conn.execute("SELECT id FROM equipos WHERE id = ?", (payload.equipo_b_id,)).fetchone()
+        a_exists = conn.execute("SELECT id FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
+        b_exists = conn.execute("SELECT id FROM equipos WHERE id = %s", (payload.equipo_b_id,)).fetchone()
         if not a_exists or not b_exists:
             raise HTTPException(404, "Equipo no encontrado")
         if payload.adaptador_id:
-            ad = conn.execute("SELECT id FROM equipos WHERE id = ?", (payload.adaptador_id,)).fetchone()
+            ad = conn.execute("SELECT id FROM equipos WHERE id = %s", (payload.adaptador_id,)).fetchone()
             if not ad:
                 raise HTTPException(404, "Adaptador no encontrado")
         try:
@@ -113,7 +113,7 @@ def crear_compatibilidad(equipo_id: int, payload: CompatibilidadInput, request: 
                 """
                 INSERT INTO equipo_compatibilidad
                   (equipo_a_id, equipo_b_id, tipo, nota, adaptador_id)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (equipo_id, payload.equipo_b_id, payload.tipo, payload.nota, payload.adaptador_id),
@@ -132,7 +132,7 @@ def crear_compatibilidad(equipo_id: int, payload: CompatibilidadInput, request: 
 def borrar_compatibilidad(compat_id: int, request: Request):
     _require_admin(request)
     with get_db() as conn:
-        conn.execute("DELETE FROM equipo_compatibilidad WHERE id = ?", (compat_id,))
+        conn.execute("DELETE FROM equipo_compatibilidad WHERE id = %s", (compat_id,))
         conn.commit()
 
 
@@ -307,8 +307,8 @@ def _compute_compat(conn, equipo_a_id: int, equipo_b_id: int) -> dict:
                a.nombre AS adaptador_nombre
         FROM equipo_compatibilidad ec
         LEFT JOIN equipos a ON a.id = ec.adaptador_id
-        WHERE (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
-           OR (ec.equipo_a_id = ? AND ec.equipo_b_id = ?)
+        WHERE (ec.equipo_a_id = %s AND ec.equipo_b_id = %s)
+           OR (ec.equipo_a_id = %s AND ec.equipo_b_id = %s)
         LIMIT 1
         """,
         (equipo_a_id, equipo_b_id, equipo_b_id, equipo_a_id),
@@ -342,16 +342,16 @@ def _compute_compat(conn, equipo_a_id: int, equipo_b_id: int) -> dict:
           sd.enum_options,
           (SELECT rol_compatibilidad FROM categoria_spec_templates t
             JOIN equipo_categorias ec ON ec.categoria_id = t.categoria_id
-            WHERE ec.equipo_id = ? AND t.spec_def_id = sd.id
+            WHERE ec.equipo_id = %s AND t.spec_def_id = sd.id
             LIMIT 1) AS a_rol,
           (SELECT rol_compatibilidad FROM categoria_spec_templates t
             JOIN equipo_categorias ec ON ec.categoria_id = t.categoria_id
-            WHERE ec.equipo_id = ? AND t.spec_def_id = sd.id
+            WHERE ec.equipo_id = %s AND t.spec_def_id = sd.id
             LIMIT 1) AS b_rol
         FROM equipo_specs esa
         JOIN equipo_specs esb ON esb.spec_def_id = esa.spec_def_id
         JOIN spec_definitions sd ON sd.id = esa.spec_def_id
-        WHERE esa.equipo_id = ? AND esb.equipo_id = ?
+        WHERE esa.equipo_id = %s AND esb.equipo_id = %s
           AND sd.es_compatibilidad = TRUE
         """,
         (equipo_a_id, equipo_b_id, equipo_a_id, equipo_b_id),
@@ -426,9 +426,9 @@ def _compute_compat(conn, equipo_a_id: int, equipo_b_id: int) -> dict:
           sd_b.spec_key AS b_key, sd_b.label AS b_label, esb.value AS b_value
         FROM equipo_specs esa
         JOIN spec_definitions sd_a ON sd_a.id = esa.spec_def_id
-        JOIN equipo_specs esb ON esb.equipo_id = ?
+        JOIN equipo_specs esb ON esb.equipo_id = %s
         JOIN spec_definitions sd_b ON sd_b.id = esb.spec_def_id
-        WHERE esa.equipo_id = ?
+        WHERE esa.equipo_id = %s
           AND (
             (sd_a.spec_key = 'video_out' AND sd_b.spec_key = 'video_in')
             OR (sd_a.spec_key = 'video_in' AND sd_b.spec_key = 'video_out')
@@ -503,7 +503,7 @@ def listar_compatibles(
     _require_admin(request)
     with get_db() as conn:
         eq = conn.execute(
-            "SELECT id FROM equipos WHERE id = ? AND eliminado_at IS NULL",
+            "SELECT id FROM equipos WHERE id = %s AND eliminado_at IS NULL",
             (equipo_id,),
         ).fetchone()
         if not eq:
@@ -516,15 +516,15 @@ def listar_compatibles(
             FROM equipo_specs esa
             JOIN equipo_specs esb ON esb.spec_def_id = esa.spec_def_id
             JOIN spec_definitions sd ON sd.id = esa.spec_def_id
-            WHERE esa.equipo_id = ?
-              AND esb.equipo_id != ?
+            WHERE esa.equipo_id = %s
+              AND esb.equipo_id != %s
               AND sd.es_compatibilidad = TRUE
         """
         manual_candidatos_sql = """
             SELECT DISTINCT
-              CASE WHEN ec.equipo_a_id = ? THEN ec.equipo_b_id ELSE ec.equipo_a_id END AS id
+              CASE WHEN ec.equipo_a_id = %s THEN ec.equipo_b_id ELSE ec.equipo_a_id END AS id
             FROM equipo_compatibilidad ec
-            WHERE ec.equipo_a_id = ? OR ec.equipo_b_id = ?
+            WHERE ec.equipo_a_id = %s OR ec.equipo_b_id = %s
         """
         candidates_sql = f"""
             SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.foto_url
@@ -542,7 +542,7 @@ def listar_compatibles(
                 SELECT ec.equipo_id FROM equipo_categorias ec
                 WHERE ec.categoria_id IN (
                   WITH RECURSIVE sub AS (
-                    SELECT id FROM categorias WHERE id = ?
+                    SELECT id FROM categorias WHERE id = %s
                     UNION ALL
                     SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
                   )
@@ -630,7 +630,7 @@ def compat_bulk(payload: CompatBulkInput, request: Request):
                     """
                     DELETE FROM equipo_compatibilidad
                     WHERE auto_generado = TRUE
-                      AND (equipo_a_id = ? OR equipo_b_id = ?)
+                      AND (equipo_a_id = %s OR equipo_b_id = %s)
                     """,
                     (eq_id, eq_id),
                 )
@@ -644,9 +644,9 @@ def compat_bulk(payload: CompatBulkInput, request: Request):
                     """
                     SELECT id FROM equipo_compatibilidad
                     WHERE auto_generado = FALSE
-                      AND tipo = ?
-                      AND ((equipo_a_id = ? AND equipo_b_id = ?)
-                        OR (equipo_a_id = ? AND equipo_b_id = ?))
+                      AND tipo = %s
+                      AND ((equipo_a_id = %s AND equipo_b_id = %s)
+                        OR (equipo_a_id = %s AND equipo_b_id = %s))
                     LIMIT 1
                     """,
                     (it.tipo, it.equipo_a_id, it.equipo_b_id,
@@ -661,7 +661,7 @@ def compat_bulk(payload: CompatBulkInput, request: Request):
                         INSERT INTO equipo_compatibilidad
                           (equipo_a_id, equipo_b_id, tipo, nota, adaptador_id,
                            auto_generado, razon_ia, confianza)
-                        VALUES (?, ?, ?, ?, ?, TRUE, ?, ?)
+                        VALUES (%s, %s, %s, %s, %s, TRUE, %s, %s)
                         """,
                         (it.equipo_a_id, it.equipo_b_id, it.tipo, it.nota,
                          it.adaptador_id, it.razon_ia, it.confianza),
@@ -725,7 +725,7 @@ def listar_pendientes_compat(request: Request, limit: int = 50):
               AND (e.compat_analizado_at IS NULL
                    OR e.updated_at > e.compat_analizado_at)
             ORDER BY e.compat_analizado_at NULLS FIRST, e.updated_at DESC
-            LIMIT ?
+            LIMIT %s
             """,
             (limit,),
         ).fetchall()
@@ -758,7 +758,7 @@ def contexto_compat(equipo_id: int, request: Request):
             f"""
             SELECT e.id, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.dueno
             FROM equipos e
-            WHERE e.id = ? AND e.eliminado_at IS NULL
+            WHERE e.id = %s AND e.eliminado_at IS NULL
             """,
             (equipo_id,),
         ).fetchone()
@@ -771,7 +771,7 @@ def contexto_compat(equipo_id: int, request: Request):
             SELECT c.id, c.nombre, c.parent_id
             FROM equipo_categorias ec
             JOIN categorias c ON c.id = ec.categoria_id
-            WHERE ec.equipo_id = ?
+            WHERE ec.equipo_id = %s
             ORDER BY c.nombre
             """,
             (equipo_id,),
@@ -787,11 +787,11 @@ def contexto_compat(equipo_id: int, request: Request):
                 COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
                 (SELECT rol_compatibilidad FROM categoria_spec_templates t
                   JOIN equipo_categorias ec2 ON ec2.categoria_id = t.categoria_id
-                  WHERE ec2.equipo_id = ? AND t.spec_def_id = sd.id
+                  WHERE ec2.equipo_id = %s AND t.spec_def_id = sd.id
                   LIMIT 1) AS rol_compatibilidad
             FROM equipo_specs es
             JOIN spec_definitions sd ON sd.id = es.spec_def_id
-            WHERE es.equipo_id = ?
+            WHERE es.equipo_id = %s
             ORDER BY sd.label
             """,
             (equipo_id, equipo_id),
@@ -805,7 +805,7 @@ def contexto_compat(equipo_id: int, request: Request):
             """
             SELECT descripcion, notas
             FROM equipo_fichas
-            WHERE equipo_id = ?
+            WHERE equipo_id = %s
             """,
             (equipo_id,),
         ).fetchone()
@@ -816,12 +816,12 @@ def contexto_compat(equipo_id: int, request: Request):
             SELECT
                 ec.id, ec.equipo_a_id, ec.equipo_b_id, ec.tipo, ec.nota,
                 ec.adaptador_id,
-                CASE WHEN ec.equipo_a_id = ? THEN ec.equipo_b_id ELSE ec.equipo_a_id END AS otro_id,
+                CASE WHEN ec.equipo_a_id = %s THEN ec.equipo_b_id ELSE ec.equipo_a_id END AS otro_id,
                 eb.nombre AS otro_nombre
             FROM equipo_compatibilidad ec
             LEFT JOIN equipos eb ON eb.id = CASE
-                WHEN ec.equipo_a_id = ? THEN ec.equipo_b_id ELSE ec.equipo_a_id END
-            WHERE (ec.equipo_a_id = ? OR ec.equipo_b_id = ?)
+                WHEN ec.equipo_a_id = %s THEN ec.equipo_b_id ELSE ec.equipo_a_id END
+            WHERE (ec.equipo_a_id = %s OR ec.equipo_b_id = %s)
               AND ec.auto_generado = FALSE
             """,
             (equipo_id, equipo_id, equipo_id, equipo_id),

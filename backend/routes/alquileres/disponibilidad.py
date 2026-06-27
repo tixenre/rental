@@ -30,7 +30,7 @@ def _validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> None:
     cliente, que manda hora real (el admin carga date-only y no se restringe).
     Lanza HTTPException 400 si algo cae fuera."""
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", ("horarios_retiro",)
+        "SELECT value FROM app_settings WHERE key = %s", ("horarios_retiro",)
     ).fetchone()
     if not row or not row["value"]:
         return

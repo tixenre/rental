@@ -1185,7 +1185,7 @@ def _init_db_schema(conn):
         conn.execute(
             """
             INSERT INTO email_templates (key, subject, body_html, body_text, updated_by)
-            VALUES (?, ?, ?, ?, 'system:migration')
+            VALUES (%s, %s, %s, %s, 'system:migration')
             ON CONFLICT (key) DO NOTHING
             """,
             (_key, _tpl["subject"], _tpl["body_html"], _tpl["body_text"]),

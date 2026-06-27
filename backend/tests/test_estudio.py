@@ -539,7 +539,7 @@ class _NamesConn(_ConnCM):
 
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
-        if "FROM EQUIPOS E WHERE E.ID = ANY(?)" in su:
+        if "FROM EQUIPOS E WHERE E.ID = ANY(" in su:
             ids = params[0]
             return _Cur(
                 [{"id": i, "nombre": self.names[i][0], "marca": self.names[i][1],

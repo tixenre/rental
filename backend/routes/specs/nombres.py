@@ -205,11 +205,11 @@ def aplicar_clasificacion(payload: AplicarClasificacionInput, request: Request):
                     errores.append({"equipo_id": asig.get("equipo_id"), "error": "ids inválidos"})
                     continue
 
-                conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = ?", (eq_id,))
+                conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = %s", (eq_id,))
                 for orden, cat_id in enumerate(cat_ids):
                     conn.execute(
                         "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) "
-                        "VALUES (?, ?, ?) ON CONFLICT (equipo_id, categoria_id) DO NOTHING",
+                        "VALUES (%s, %s, %s) ON CONFLICT (equipo_id, categoria_id) DO NOTHING",
                         (eq_id, cat_id, orden),
                     )
                 try:
@@ -254,7 +254,7 @@ def aprobar_o_editar_nombre(equipo_id: int, payload: AprobarNombreInput, request
     _require_admin(request)
     with get_db() as conn:
         try:
-            eq = conn.execute("SELECT id FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
+            eq = conn.execute("SELECT id FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
             if not eq:
                 raise HTTPException(404, "Equipo no existe")
 
@@ -264,7 +264,7 @@ def aprobar_o_editar_nombre(equipo_id: int, payload: AprobarNombreInput, request
                 # Volver a pendiente: descartar override y recalcular auto.
                 conn.execute(
                     "UPDATE equipos SET nombre_publico_override = NULL, "
-                    "nombre_publico_revisado = FALSE WHERE id = ?",
+                    "nombre_publico_revisado = FALSE WHERE id = %s",
                     (equipo_id,),
                 )
                 try:
@@ -273,8 +273,8 @@ def aprobar_o_editar_nombre(equipo_id: int, payload: AprobarNombreInput, request
                     pass
             else:
                 conn.execute(
-                    "UPDATE equipos SET nombre_publico_override = ?, "
-                    "nombre_publico_revisado = TRUE WHERE id = ?",
+                    "UPDATE equipos SET nombre_publico_override = %s, "
+                    "nombre_publico_revisado = TRUE WHERE id = %s",
                     (override, equipo_id),
                 )
                 # Si override está seteado, recalculamos para que nombre_publico
@@ -287,7 +287,7 @@ def aprobar_o_editar_nombre(equipo_id: int, payload: AprobarNombreInput, request
             row = conn.execute(
                 "SELECT id, nombre_publico, nombre_publico_largo, "
                 "nombre_publico_override, nombre_publico_revisado "
-                "FROM equipos WHERE id = ?",
+                "FROM equipos WHERE id = %s",
                 (equipo_id,),
             ).fetchone()
             return row_to_dict(row)

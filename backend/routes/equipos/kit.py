@@ -28,7 +28,7 @@ class KitReorder(BaseModel):
 @router.get("/equipos/{id}/kit")
 def get_kit(id: int):
     with get_db() as conn:
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+        if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
         rows = conn.execute(f"""
             SELECT kc.id, kc.componente_id, kc.cantidad, kc.orden,
@@ -36,7 +36,7 @@ def get_kit(id: int):
                    e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url, e.visible_catalogo
             FROM kit_componentes kc
             JOIN equipos e ON e.id = kc.componente_id
-            WHERE kc.equipo_id = ?
+            WHERE kc.equipo_id = %s
             ORDER BY kc.orden ASC, e.nombre ASC
         """, (id,)).fetchall()
         return [row_to_dict(r) for r in rows]
@@ -67,7 +67,7 @@ def _crea_ciclo_kit(conn, equipo_id: int, componente_id: int) -> bool:
             continue
         visitados.add(actual)
         hijos = conn.execute(
-            "SELECT componente_id FROM kit_componentes WHERE equipo_id = ?", (actual,)
+            "SELECT componente_id FROM kit_componentes WHERE equipo_id = %s", (actual,)
         ).fetchall()
         pila.extend(h["componente_id"] for h in hijos)
     return False
@@ -80,10 +80,10 @@ def add_kit_item(id: int, data: KitItem, request: Request):
         raise HTTPException(400, "Un equipo no puede ser componente de sí mismo")
     with get_db() as conn:
         try:
-            if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Equipo no encontrado")
             if not conn.execute(
-                "SELECT id FROM equipos WHERE id=? AND eliminado_at IS NULL", (data.componente_id,)
+                "SELECT id FROM equipos WHERE id=%s AND eliminado_at IS NULL", (data.componente_id,)
             ).fetchone():
                 raise HTTPException(404, "Componente no encontrado")
             if _crea_ciclo_kit(conn, id, data.componente_id):
@@ -95,7 +95,7 @@ def add_kit_item(id: int, data: KitItem, request: Request):
             try:
                 conn.execute("""
                     INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, descuento_pct, esencial)
-                    VALUES (?,?,?,?,?)
+                    VALUES (%s,%s,%s,%s,%s)
                     ON CONFLICT(equipo_id, componente_id) DO UPDATE SET
                         cantidad=excluded.cantidad,
                         descuento_pct=excluded.descuento_pct,
@@ -116,7 +116,7 @@ def remove_kit_item(id: int, componente_id: int, request: Request):
     with get_db() as conn:
         try:
             conn.execute(
-                "DELETE FROM kit_componentes WHERE equipo_id=? AND componente_id=?",
+                "DELETE FROM kit_componentes WHERE equipo_id=%s AND componente_id=%s",
                 (id, componente_id)
             )
             conn.commit()
@@ -133,7 +133,7 @@ def reorder_kit(id: int, data: KitReorder, request: Request):
         try:
             for i, componente_id in enumerate(data.orden):
                 conn.execute(
-                    "UPDATE kit_componentes SET orden=? WHERE equipo_id=? AND componente_id=?",
+                    "UPDATE kit_componentes SET orden=%s WHERE equipo_id=%s AND componente_id=%s",
                     (i, id, componente_id)
                 )
             conn.commit()

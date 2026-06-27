@@ -89,7 +89,7 @@ def cerrar_mes(conn, mes: str, por: str | None) -> dict:
     conn.execute(
         """
         INSERT INTO liquidacion_cierres (mes, snapshot_json, modelo_json, cerrado_por, cerrado_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
         ON CONFLICT (mes) DO UPDATE SET
             snapshot_json = excluded.snapshot_json,
             modelo_json   = excluded.modelo_json,

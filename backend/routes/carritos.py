@@ -78,7 +78,7 @@ def cart_heartbeat(data: CartHeartbeat, request: Request):
                 session_id, cliente_id, items_json,
                 fecha_desde, fecha_hasta, hora_desde, hora_hasta,
                 total_items, monto_estimado, updated_at
-            ) VALUES (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, NOW())
+            ) VALUES (%s, %s, %s::jsonb, %s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (session_id) DO UPDATE SET
                 cliente_id     = COALESCE(EXCLUDED.cliente_id, carritos_activos.cliente_id),
                 items_json     = EXCLUDED.items_json,
@@ -131,7 +131,7 @@ def _enrich_items(
         for it in items:
             # alias `e` por convención de queries sobre equipos (MEMORIA 2026-05-26)
             row = conn.execute(
-                "SELECT e.nombre, e.precio_jornada FROM equipos e WHERE e.id = ?",
+                "SELECT e.nombre, e.precio_jornada FROM equipos e WHERE e.id = %s",
                 (it.equipo_id,),
             ).fetchone()
             nombre = row["nombre"] if row else str(it.equipo_id)
@@ -161,7 +161,7 @@ def marcar_confirmado(session_id: str, conn) -> None:
     """Cierra el funnel: marca el carrito como confirmado al crear el pedido."""
     conn.execute(
         "UPDATE carritos_activos SET confirmado = TRUE, updated_at = NOW() "
-        "WHERE session_id = ?",
+        "WHERE session_id = %s",
         (session_id,),
     )
 
@@ -193,7 +193,7 @@ def admin_listar_carritos(request: Request, horas: int = 72):
                 WHERE NOT confirmado
                   AND abandonado_en IS NULL
                   AND total_items > 0
-                  AND updated_at < NOW() - (? || ' hours')::interval
+                  AND updated_at < NOW() - (%s || ' hours')::interval
                 """,
                 (str(ABANDONO_HORAS),),
             )
@@ -223,7 +223,7 @@ def admin_listar_carritos(request: Request, horas: int = 72):
                 LEFT JOIN clientes cl ON cl.id = ca.cliente_id
                 WHERE NOT ca.confirmado
                   AND ca.total_items > 0
-                  AND ca.updated_at > NOW() - (? || ' hours')::interval
+                  AND ca.updated_at > NOW() - (%s || ' hours')::interval
                 ORDER BY ca.updated_at DESC
                 LIMIT 200
                 """,

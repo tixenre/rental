@@ -189,7 +189,7 @@ def template_debug(categoria_id: int, request: Request):
         raiz_row = conn.execute(
             """
             WITH RECURSIVE up AS (
-                SELECT id, parent_id, 0 AS depth FROM categorias WHERE id = ?
+                SELECT id, parent_id, 0 AS depth FROM categorias WHERE id = %s
                 UNION
                 SELECT c.id, c.parent_id, up.depth + 1
                 FROM categorias c JOIN up ON up.parent_id = c.id
@@ -202,7 +202,7 @@ def template_debug(categoria_id: int, request: Request):
 
         # 2) Conteo de specs en spec_definitions con esa raíz
         sd_row = conn.execute(
-            "SELECT COUNT(*) AS n FROM spec_definitions WHERE categoria_raiz_id = ?",
+            "SELECT COUNT(*) AS n FROM spec_definitions WHERE categoria_raiz_id = %s",
             (raiz_id,),
         ).fetchone()
         categoria_raiz_specs_count = row_to_dict(sd_row)["n"] if sd_row else 0
@@ -213,7 +213,7 @@ def template_debug(categoria_id: int, request: Request):
             SELECT sd.spec_key
             FROM categoria_spec_templates t
             JOIN spec_definitions sd ON sd.id = t.spec_def_id
-            WHERE t.categoria_id = ?
+            WHERE t.categoria_id = %s
             ORDER BY sd.label
             """,
             (categoria_id,),
@@ -225,10 +225,10 @@ def template_debug(categoria_id: int, request: Request):
             """
             SELECT sd.spec_key
             FROM spec_definitions sd
-            WHERE sd.categoria_raiz_id = ?
+            WHERE sd.categoria_raiz_id = %s
               AND NOT EXISTS (
                   SELECT 1 FROM categoria_spec_templates t
-                  WHERE t.categoria_id = ?
+                  WHERE t.categoria_id = %s
                     AND t.spec_def_id = sd.id
               )
             ORDER BY sd.label
@@ -239,7 +239,7 @@ def template_debug(categoria_id: int, request: Request):
 
         # 5) Categoria info para el response
         cat_row = conn.execute(
-            "SELECT id, nombre, parent_id FROM categorias WHERE id = ?",
+            "SELECT id, nombre, parent_id FROM categorias WHERE id = %s",
             (categoria_id,),
         ).fetchone()
         cat_info = row_to_dict(cat_row) if cat_row else None
@@ -281,7 +281,7 @@ def reorder_specs_categoria(categoria_id: int, payload: dict, request: Request):
         try:
             # Verificar que todos los ids pertenecen a la categoría
             rows = conn.execute(
-                "SELECT id FROM spec_definitions WHERE categoria_raiz_id = ?",
+                "SELECT id FROM spec_definitions WHERE categoria_raiz_id = %s",
                 (categoria_id,),
             ).fetchall()
             valid_ids = {row_to_dict(r)["id"] for r in rows}

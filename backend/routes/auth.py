@@ -385,12 +385,12 @@ def _resolve_staging_cliente(cliente_id: int | None) -> dict | None:
     with get_db() as conn:
         if cliente_id is not None:
             row = conn.execute(
-                "SELECT id, nombre, apellido, email FROM clientes WHERE id = ?",
+                "SELECT id, nombre, apellido, email FROM clientes WHERE id = %s",
                 (cliente_id,),
             ).fetchone()
         else:
             row = conn.execute(
-                "SELECT id, nombre, apellido, email FROM clientes WHERE LOWER(email) = LOWER(?)",
+                "SELECT id, nombre, apellido, email FROM clientes WHERE LOWER(email) = LOWER(%s)",
                 (STAGING_CLIENTE_EMAIL,),
             ).fetchone()
     if not row:
@@ -596,7 +596,7 @@ def cliente_auth_callback(request: Request):
     # ¿El cliente ya existe en la BD?
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(?)", (email,)
+            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
         ).fetchone()
 
     if row:

@@ -202,7 +202,7 @@ def equipos_afuera():
             JOIN equipos  e ON e.id  = pi.equipo_id
             LEFT JOIN clientes c ON c.id = p.cliente_id
             WHERE p.estado    = 'retirado'
-              AND p.fecha_hasta >= ?
+              AND p.fecha_hasta >= %s
             GROUP BY pi.equipo_id, e.cantidad
         """, (today,)).fetchall()
         return {str(r["equipo_id"]): row_to_dict(r) for r in rows}
@@ -370,8 +370,8 @@ def list_equipos(
                 " AND EXISTS ("
                 " SELECT 1 FROM equipo_specs es"
                 " JOIN spec_definitions sd ON sd.id = es.spec_def_id"
-                " WHERE es.equipo_id = e.id AND LOWER(sd.spec_key) = ?"
-                " AND LOWER(es.value) = LOWER(?))"
+                " WHERE es.equipo_id = e.id AND LOWER(sd.spec_key) = %s"
+                " AND LOWER(es.value) = LOWER(%s))"
             )
             params += [key, value]
     # Búsqueda fuzzy global (motor único backend/busqueda): sin tildes
@@ -392,7 +392,7 @@ def list_equipos(
                 SELECT ec.equipo_id FROM equipo_categorias ec
                 WHERE ec.categoria_id IN (
                     WITH RECURSIVE sub AS (
-                        SELECT id FROM categorias WHERE id = ?
+                        SELECT id FROM categorias WHERE id = %s
                         UNION ALL
                         SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
                     )
@@ -406,7 +406,7 @@ def list_equipos(
                 SELECT ec.equipo_id FROM equipo_categorias ec
                 WHERE ec.categoria_id IN (
                     WITH RECURSIVE sub AS (
-                        SELECT id FROM categorias WHERE nombre = ?
+                        SELECT id FROM categorias WHERE nombre = %s
                         UNION ALL
                         SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
                     )
@@ -420,7 +420,7 @@ def list_equipos(
           AND e.id IN (
             SELECT ee.equipo_id FROM equipo_etiquetas ee
             JOIN etiquetas et ON et.id = ee.etiqueta_id
-            WHERE LOWER(et.nombre) = LOWER(?)
+            WHERE LOWER(et.nombre) = LOWER(%s)
           )"""
         params.append(etiqueta)
 
@@ -539,7 +539,7 @@ def get_equipo(id_or_slug: str):
 
     with get_db() as conn:
         row = conn.execute(
-            f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id = ?", (actual_id,)
+            f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id = %s", (actual_id,)
         ).fetchone()
         if not row:
             raise HTTPException(404, "Equipo no encontrado")
@@ -554,7 +554,7 @@ def get_equipo(id_or_slug: str):
             SELECT kc.componente_id, kc.cantidad, kc.descuento_pct, kc.esencial,
                    e.nombre, {MARCA_SUBQUERY}, e.foto_url
             FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
-            WHERE kc.equipo_id = ?  ORDER BY kc.orden ASC, e.nombre ASC
+            WHERE kc.equipo_id = %s  ORDER BY kc.orden ASC, e.nombre ASC
         """, (actual_id,)).fetchall()
         equipo["kit"] = [row_to_dict(r) for r in kit]
         # Galería multi-foto (#125): el catálogo público expone las fotos de
@@ -562,7 +562,7 @@ def get_equipo(id_or_slug: str):
         # no solo `foto_url`. Shape liviano (url + es_principal) — sin internals.
         fotos = conn.execute(
             "SELECT url, es_principal FROM equipo_fotos "
-            "WHERE equipo_id = ? AND url IS NOT NULL AND url <> '' "
+            "WHERE equipo_id = %s AND url IS NOT NULL AND url <> '' "
             "ORDER BY es_principal DESC, orden ASC, id ASC",
             (actual_id,),
         ).fetchall()
@@ -593,7 +593,7 @@ def _check_serie_unica(conn, serie: Optional[str], exclude_id: Optional[int] = N
         return
     query = """
         SELECT id, nombre FROM equipos
-        WHERE TRIM(LOWER(serie)) = LOWER(?)
+        WHERE TRIM(LOWER(serie)) = LOWER(%s)
           AND eliminado_at IS NULL
     """
     params: list = [serie_norm]
@@ -619,15 +619,15 @@ def _resolve_brand_id(conn, nombre: str | None) -> int | None:
         return None
     nombre = nombre.strip()
     row = conn.execute(
-        "SELECT id FROM marcas WHERE LOWER(nombre) = LOWER(?) LIMIT 1", (nombre,)
+        "SELECT id FROM marcas WHERE LOWER(nombre) = LOWER(%s) LIMIT 1", (nombre,)
     ).fetchone()
     if row:
         return row["id"]
     conn.execute(
-        "INSERT INTO marcas (nombre) VALUES (?) ON CONFLICT (nombre) DO NOTHING", (nombre,)
+        "INSERT INTO marcas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING", (nombre,)
     )
     row = conn.execute(
-        "SELECT id FROM marcas WHERE LOWER(nombre) = LOWER(?) LIMIT 1", (nombre,)
+        "SELECT id FROM marcas WHERE LOWER(nombre) = LOWER(%s) LIMIT 1", (nombre,)
     ).fetchone()
     return row["id"] if row else None
 
@@ -646,7 +646,7 @@ def create_equipo(data: EquipoCreate, request: Request):
                                      valor_reposicion, foto_url, fecha_compra,
                                      serie, bh_url, dueno, visible_catalogo, estado,
                                      ficha_completa, categoria_specs, tipo)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (data.nombre, brand_id, data.modelo, data.cantidad,
                   data.precio_jornada, data.precio_usd, data.roi_pct,
                   data.valor_reposicion, data.foto_url, _normalize_fecha_compra(data.fecha_compra),
@@ -665,7 +665,7 @@ def create_equipo(data: EquipoCreate, request: Request):
             from dataio.slug import backfill_equipos_slug
             backfill_equipos_slug(conn)
             conn.commit()
-            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (new_id,)).fetchone()
+            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (new_id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]
             return equipo
         except Exception:
@@ -693,7 +693,7 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            existing = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
+            existing = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (id,)).fetchone()
             if not existing:
                 raise HTTPException(404, "Equipo no encontrado")
             updates = data.model_dump(exclude_unset=True)
@@ -715,7 +715,7 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
             # Registrar cambio de precio si cambió
             if "precio_jornada" in updates and updates["precio_jornada"] != existing["precio_jornada"]:
                 conn.execute(
-                    "INSERT INTO equipo_precio_historial (equipo_id, precio_jornada) VALUES (?,?)",
+                    "INSERT INTO equipo_precio_historial (equipo_id, precio_jornada) VALUES (%s,%s)",
                     (id, updates["precio_jornada"]),
                 )
             # Inferencia del flag `precio_jornada_manual` cuando el cliente
@@ -734,7 +734,7 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
                 updates["precio_jornada_manual"] = "roi_pct" not in updates
             set_clause = ", ".join(f"{k} = ?" for k in updates)
             set_clause += ", updated_at = CURRENT_TIMESTAMP"
-            conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = ?",
+            conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = %s",
                          list(updates.values()) + [id])
             # Si cambió algo que alimenta auto-tags, regenerar.
             if marca_cambio or any(k in updates for k in ("nombre", "modelo")):
@@ -747,7 +747,7 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
                 except Exception:
                     pass
             conn.commit()
-            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
+            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]
             return equipo
         except Exception:
@@ -766,7 +766,7 @@ def duplicate_equipo(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            src = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
+            src = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (id,)).fetchone()
             if not src:
                 raise HTTPException(404, "Equipo no encontrado")
             src_d = row_to_dict(src)
@@ -778,7 +778,7 @@ def duplicate_equipo(id: int, request: Request):
                     valor_reposicion, foto_url, fecha_compra,
                     serie, bh_url, dueno, visible_catalogo, estado,
                     ficha_completa, tipo
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (
                 f"{src_d['nombre']} (copia)",
                 src_d.get("brand_id"), src_d.get("modelo"), 1,
@@ -792,7 +792,7 @@ def duplicate_equipo(id: int, request: Request):
             new_id = cur.lastrowid
 
             # Copiar ficha si existe
-            ficha = conn.execute("SELECT * FROM equipo_fichas WHERE equipo_id=?", (id,)).fetchone()
+            ficha = conn.execute("SELECT * FROM equipo_fichas WHERE equipo_id=%s", (id,)).fetchone()
             if ficha:
                 f = row_to_dict(ficha)
                 cols = [k for k in f.keys() if k not in ("equipo_id", "created_at", "updated_at")]
@@ -804,10 +804,10 @@ def duplicate_equipo(id: int, request: Request):
 
             # Copiar categorías (con orden manual preservado)
             cats = conn.execute(
-                "SELECT categoria_id, orden FROM equipo_categorias WHERE equipo_id=?", (id,)
+                "SELECT categoria_id, orden FROM equipo_categorias WHERE equipo_id=%s", (id,)
             ).fetchall()
             conn.executemany(
-                "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
+                "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (%s, %s, %s)",
                 [(new_id, cat["categoria_id"], cat["orden"]) for cat in cats],
             )
 
@@ -816,21 +816,21 @@ def duplicate_equipo(id: int, request: Request):
             # el admin tipeó a mano.
             etqs = conn.execute(
                 "SELECT etiqueta_id, orden FROM equipo_etiquetas "
-                "WHERE equipo_id=? AND origen='manual'",
+                "WHERE equipo_id=%s AND origen='manual'",
                 (id,),
             ).fetchall()
             conn.executemany(
                 "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen) "
-                "VALUES (?, ?, ?, 'manual')",
+                "VALUES (%s, %s, %s, 'manual')",
                 [(new_id, e["etiqueta_id"], e["orden"]) for e in etqs],
             )
 
             # Copiar kit
             kit = conn.execute(
-                "SELECT componente_id, cantidad, orden FROM kit_componentes WHERE equipo_id=?", (id,)
+                "SELECT componente_id, cantidad, orden FROM kit_componentes WHERE equipo_id=%s", (id,)
             ).fetchall()
             conn.executemany(
-                "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, orden) VALUES (?, ?, ?, ?)",
+                "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad, orden) VALUES (%s, %s, %s, %s)",
                 [(new_id, componente_id, cantidad, orden) for (componente_id, cantidad, orden) in kit],
             )
 
@@ -843,7 +843,7 @@ def duplicate_equipo(id: int, request: Request):
                 logger.warning("regenerate_auto_tags falló para duplicado %s: %s", new_id, e)
 
             conn.commit()
-            row = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (new_id,)).fetchone()
+            row = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (new_id,)).fetchone()
             return attach_tags(conn, [row_to_dict(row)])[0]
         except Exception:
             conn.rollback()
@@ -857,14 +857,14 @@ def restore_equipo(id: int, request: Request):
     with get_db() as conn:
         try:
             row = conn.execute(
-                "SELECT id, eliminado_at FROM equipos WHERE id=?", (id,)
+                "SELECT id, eliminado_at FROM equipos WHERE id=%s", (id,)
             ).fetchone()
             if not row:
                 raise HTTPException(404, "Equipo no encontrado")
             if row["eliminado_at"] is None:
                 return {"ok": True, "message": "Ya estaba activo"}
             conn.execute(
-                "UPDATE equipos SET eliminado_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id=?",
+                "UPDATE equipos SET eliminado_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id=%s",
                 (id,),
             )
             conn.commit()
@@ -905,7 +905,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
                     raise HTTPException(400, "set_visible requiere visible: bool")
                 v = 1 if payload.visible else 0
                 conn.execute(
-                    f"UPDATE equipos SET visible_catalogo = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+                    f"UPDATE equipos SET visible_catalogo = %s, updated_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
                     [v, *ids],
                 )
 
@@ -913,7 +913,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 if payload.ficha_completa is None:
                     raise HTTPException(400, "set_ficha_completa requiere ficha_completa: bool")
                 conn.execute(
-                    f"UPDATE equipos SET ficha_completa = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+                    f"UPDATE equipos SET ficha_completa = %s, updated_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
                     [bool(payload.ficha_completa), *ids],
                 )
 
@@ -921,7 +921,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 if not payload.categoria_id:
                     raise HTTPException(400, "set_categoria requiere categoria_id: int")
                 cat_exists = conn.execute(
-                    "SELECT id FROM categorias WHERE id = ?", (payload.categoria_id,)
+                    "SELECT id FROM categorias WHERE id = %s", (payload.categoria_id,)
                 ).fetchone()
                 if not cat_exists:
                     raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
@@ -934,7 +934,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
                     ids,
                 )
                 conn.executemany(
-                    "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?, ?, ?)",
+                    "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (%s, %s, %s)",
                     [(eid, cid_int, orden) for eid in ids for orden, cid_int in enumerate(ancestor_ids)],
                 )
                 # Regeneración batch (1 pasada para los N equipos, no N+1).
@@ -951,7 +951,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 if not payload.categoria_id:
                     raise HTTPException(400, "add_categoria requiere categoria_id: int")
                 cat_exists = conn.execute(
-                    "SELECT id FROM categorias WHERE id = ?", (payload.categoria_id,)
+                    "SELECT id FROM categorias WHERE id = %s", (payload.categoria_id,)
                 ).fetchone()
                 if not cat_exists:
                     raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
@@ -960,7 +960,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 conn.executemany(
                     """
                     INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-                    VALUES (?, ?, ?)
+                    VALUES (%s, %s, %s)
                     ON CONFLICT (equipo_id, categoria_id) DO NOTHING
                     """,
                     [(eid, cid_int, orden) for eid in ids for orden, cid_int in enumerate(ancestor_ids)],
@@ -979,7 +979,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
                     raise HTTPException(400, "remove_categoria requiere categoria_id: int")
                 placeholders_ids = ",".join("?" * len(ids))
                 conn.execute(
-                    f"DELETE FROM equipo_categorias WHERE categoria_id = ? AND equipo_id IN ({placeholders_ids})",
+                    f"DELETE FROM equipo_categorias WHERE categoria_id = %s AND equipo_id IN ({placeholders_ids})",
                     [payload.categoria_id, *ids],
                 )
                 # Regeneración batch (1 pasada para los N equipos, no N+1).
@@ -1028,13 +1028,13 @@ def delete_equipo(id: int, request: Request):
     with get_db() as conn:
         try:
             row = conn.execute(
-                "SELECT id, html_source_url FROM equipos WHERE id=?", (id,)
+                "SELECT id, html_source_url FROM equipos WHERE id=%s", (id,)
             ).fetchone()
             if not row:
                 raise HTTPException(404, "Equipo no encontrado")
             html_source_url = row["html_source_url"]
             conn.execute(
-                "UPDATE equipos SET eliminado_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id=?",
+                "UPDATE equipos SET eliminado_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id=%s",
                 (id,),
             )
             conn.commit()
@@ -1093,7 +1093,7 @@ def disponibilidad_calendario(
 @router.get("/equipos/{id}/historial")
 def get_equipo_historial(id: int):
     with get_db() as conn:
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+        if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
 
         rows = conn.execute("""
@@ -1106,7 +1106,7 @@ def get_equipo_historial(id: int):
             FROM alquiler_items pi
             JOIN alquileres p ON p.id = pi.pedido_id
             LEFT JOIN clientes c ON c.id = p.cliente_id
-            WHERE pi.equipo_id = ?
+            WHERE pi.equipo_id = %s
             ORDER BY p.fecha_desde DESC
         """, (id,)).fetchall()
 
@@ -1130,12 +1130,12 @@ def get_equipo_historial(id: int):
 @router.get("/equipos/{id}/precio-historial")
 def get_precio_historial(id: int):
     with get_db() as conn:
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+        if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
         rows = conn.execute("""
             SELECT precio_jornada, changed_at
             FROM equipo_precio_historial
-            WHERE equipo_id = ?
+            WHERE equipo_id = %s
             ORDER BY changed_at DESC
         """, (id,)).fetchall()
         return [row_to_dict(r) for r in rows]
@@ -1207,7 +1207,7 @@ def get_equipo_calendario(id: int, year: int = Query(...), month: int = Query(..
 
     with get_db() as conn:
         equipo = conn.execute(
-            "SELECT id, cantidad FROM equipos WHERE id=?", (id,)
+            "SELECT id, cantidad FROM equipos WHERE id=%s", (id,)
         ).fetchone()
         if not equipo:
             raise HTTPException(404, "Equipo no encontrado")

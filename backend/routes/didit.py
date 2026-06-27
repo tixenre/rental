@@ -98,7 +98,7 @@ def iniciar_verificacion(cliente_id: int, request: Request):
     require_admin(request)
 
     with get_db() as conn:
-        row = conn.execute("SELECT id FROM clientes WHERE id=?", (cliente_id,)).fetchone()
+        row = conn.execute("SELECT id FROM clientes WHERE id=%s", (cliente_id,)).fetchone()
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
 
@@ -120,7 +120,7 @@ def iniciar_verificacion(cliente_id: int, request: Request):
 
     with get_db() as conn:
         conn.execute(
-            "UPDATE clientes SET didit_session_id=?, updated_at=? WHERE id=?",
+            "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
             (sesion.session_id, now_ar(), cliente_id),
         )
         conn.commit()
@@ -169,7 +169,7 @@ def cliente_iniciar_verificacion(request: Request, body: Optional[SesionVerifica
 
     with get_db() as conn:
         conn.execute(
-            "UPDATE clientes SET didit_session_id=?, updated_at=? WHERE id=?",
+            "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
             (sesion.session_id, now_ar(), cliente_id),
         )
         conn.commit()
@@ -296,26 +296,26 @@ def _guardar_verificacion(
     with get_db() as conn:
         conn.execute(
             """UPDATE clientes
-               SET dni=COALESCE(?, dni),
-                   cuil=COALESCE(?, cuil),
-                   dni_validado_at=?,
-                   didit_session_id=?,
+               SET dni=COALESCE(%s, dni),
+                   cuil=COALESCE(%s, cuil),
+                   dni_validado_at=%s,
+                   didit_session_id=%s,
                    dni_verificacion_estado='verificado',
                    dni_verificacion_motivo=NULL,
-                   nombre_renaper=COALESCE(?, nombre_renaper),
-                   apellido_renaper=COALESCE(?, apellido_renaper),
-                   nombre_completo_renaper=COALESCE(?, nombre_completo_renaper),
-                   fecha_nacimiento_renaper=COALESCE(?, fecha_nacimiento_renaper),
-                   direccion_renaper=COALESCE(?, direccion_renaper),
-                   genero_renaper=COALESCE(?, genero_renaper),
-                   nacionalidad_renaper=COALESCE(?, nacionalidad_renaper),
-                   lugar_nacimiento_renaper=COALESCE(?, lugar_nacimiento_renaper),
-                   vencimiento_documento_renaper=COALESCE(?, vencimiento_documento_renaper),
-                   emision_documento_renaper=COALESCE(?, emision_documento_renaper),
-                   tipo_documento_renaper=COALESCE(?, tipo_documento_renaper),
-                   estado_civil_renaper=COALESCE(?, estado_civil_renaper),
-                   updated_at=?
-               WHERE id=? AND didit_session_id=?""",
+                   nombre_renaper=COALESCE(%s, nombre_renaper),
+                   apellido_renaper=COALESCE(%s, apellido_renaper),
+                   nombre_completo_renaper=COALESCE(%s, nombre_completo_renaper),
+                   fecha_nacimiento_renaper=COALESCE(%s, fecha_nacimiento_renaper),
+                   direccion_renaper=COALESCE(%s, direccion_renaper),
+                   genero_renaper=COALESCE(%s, genero_renaper),
+                   nacionalidad_renaper=COALESCE(%s, nacionalidad_renaper),
+                   lugar_nacimiento_renaper=COALESCE(%s, lugar_nacimiento_renaper),
+                   vencimiento_documento_renaper=COALESCE(%s, vencimiento_documento_renaper),
+                   emision_documento_renaper=COALESCE(%s, emision_documento_renaper),
+                   tipo_documento_renaper=COALESCE(%s, tipo_documento_renaper),
+                   estado_civil_renaper=COALESCE(%s, estado_civil_renaper),
+                   updated_at=%s
+               WHERE id=%s AND didit_session_id=%s""",
             (datos.dni, datos.cuil, ahora, session_id,
              datos.nombre, datos.apellido, datos.nombre_completo,
              datos.fecha_nacimiento, datos.direccion,
@@ -354,10 +354,10 @@ def _actualizar_estado_verificacion(
     with get_db() as conn:
         conn.execute(
             """UPDATE clientes
-               SET dni_verificacion_estado=?,
-                   dni_verificacion_motivo=?,
-                   updated_at=?
-               WHERE id=? AND didit_session_id=?""",
+               SET dni_verificacion_estado=%s,
+                   dni_verificacion_motivo=%s,
+                   updated_at=%s
+               WHERE id=%s AND didit_session_id=%s""",
             (estado, motivo, now_ar(), cliente_id, session_id),
         )
         conn.commit()
