@@ -50,7 +50,7 @@ FRONT_NEW = BASE.parent.parent / "frontend" / "dist"
 # Uso (la convención es aliasar `equipos` como `e`):
 #     conn.execute(f"SELECT e.id, e.nombre, {MARCA_SUBQUERY} FROM equipos e ...")
 # Para predicados en WHERE/COALESCE:
-#     conn.execute(f"... WHERE LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(?) ...")
+#     conn.execute(f"... WHERE LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(%s) ...", (valor,))
 # Cuando el equipo va con OTRO alias (ej. `ec` para componentes de combo/kit, o
 # la tabla `equipos` sin aliasar), pasar el alias al helper:
 #     f"SELECT ec.nombre, {marca_subquery('ec')} FROM ... equipos ec ..."
