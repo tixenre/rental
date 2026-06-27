@@ -17,8 +17,8 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
   pushea el fix); **PR solo para `dev → main`** (la puerta a prod). **Nunca a `main` directo; no pushear
   con CI en rojo.** El detalle y el _por qué_ no se repiten acá — viven en esa decisión.
 - **Antes de abrir el PR `dev → main`: despachar el agente `supervisor`** — revisión read-only de
-  scope / forma / drift, que resume en lenguaje claro y deja el plan de prueba. (Instrucción, no
-  gate de sistema: en las apps de Mac/iPhone no hay hooks.)
+  scope / forma / drift, que resume en lenguaje claro y deja el plan de prueba. (Es **convención**, no
+  gate de sistema: depende de que la sesión lo despache — nada lo fuerza.)
 - **La conversación es para decisiones y la forma de hacer las cosas — no para el ruido de cada
   commit/diff.** El trabajo de revisión pesada va al subagente `supervisor` (contexto aislado).
 - **El dueño testea, no revisa código.** Acompañar cada cambio testeable con un **plan de prueba
