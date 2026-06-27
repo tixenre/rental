@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link, notFound } from "@tanstack/react-router";
 import { Calendar, MapPin, Users, CheckCircle2, Clock, X } from "lucide-react";
@@ -104,6 +104,86 @@ function SoldOutModal({
   );
 }
 
+// ── InteresadoForm ────────────────────────────────────────────────────────────
+
+function InteresadoForm({ slug }: { slug: string }) {
+  const [form, setForm] = useState({ nombre: "", email: "", telefono: "" });
+  const [status, setStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!form.nombre.trim() || !form.email.trim()) return;
+    setStatus("sending");
+    try {
+      const res = await fetch(`/api/talleres/${slug}/interesado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.detail ?? `Error ${res.status}`);
+      }
+      setStatus("ok");
+    } catch (err) {
+      setErrorMsg((err as Error).message);
+      setStatus("error");
+    }
+  }
+
+  if (status === "ok") {
+    return (
+      <div className="rounded-2xl border border-verde/40 bg-verde/10 px-5 py-6 text-center">
+        <CheckCircle2 className="h-8 w-8 text-verde mx-auto mb-3" strokeWidth={1.5} />
+        <p className="font-semibold text-ink">¡Anotado/a!</p>
+        <p className="text-sm text-muted-foreground mt-1">Te avisamos cuando haya nuevas fechas.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+        Avisame si hay más fechas
+      </p>
+      <input
+        required
+        type="text"
+        placeholder="Tu nombre"
+        value={form.nombre}
+        onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+        className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      <input
+        required
+        type="email"
+        placeholder="Tu email"
+        value={form.email}
+        onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+        className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      <input
+        type="tel"
+        placeholder="Tu teléfono (opcional)"
+        value={form.telefono}
+        onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
+        className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      {status === "error" && <p className="text-xs text-destructive">{errorMsg}</p>}
+      <button
+        type="submit"
+        disabled={status === "sending"}
+        className="w-full rounded-full bg-rosa text-ink font-bold py-3.5 text-base hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-60"
+      >
+        {status === "sending" ? "Enviando…" : "Avisame"}
+      </button>
+    </form>
+  );
+}
+
+// ── TallerLandingPage ─────────────────────────────────────────────────────────
+
 function TallerLandingPage() {
   const { slug } = Route.useParams();
   const {
@@ -138,8 +218,10 @@ function TallerLandingPage() {
   }
 
   const proxima = taller.proxima_edicion;
+  const isFrozen = taller.frozen_at != null;
+  const isFullySoldOut = !isFrozen && taller.cupos_disponibles === 0 && proxima == null;
   const switchToProxima =
-    taller.cupos_disponibles === 0 && proxima != null && proxima.cupos_disponibles > 0;
+    !isFrozen && taller.cupos_disponibles === 0 && proxima != null && proxima.cupos_disponibles > 0;
   const formTaller: Taller = switchToProxima ? ({ ...taller, ...proxima } as Taller) : taller;
 
   // Cuando está sold out, las fechas de toda la página muestran la 2da edición
@@ -413,28 +495,53 @@ function TallerLandingPage() {
 
                 {/* Formulario de inscripción */}
                 <div id="inscripcion" className="scroll-mt-20">
-                  {switchToProxima && (
-                    <div className="mb-4 rounded-xl border border-border/60 bg-ink px-4 py-3 text-background">
-                      <p className="text-xs font-mono uppercase tracking-widest opacity-50 mb-0.5">
-                        {ordinalEdicion(taller.numero_edicion)} edición
-                      </p>
-                      <p className="font-bold text-sm">Sold out</p>
-                      <p className="text-xs opacity-60 mt-1">
-                        Te anotamos en la {ordinalEdicion(proxima!.numero_edicion)} edición (
-                        {new Date(proxima!.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", {
-                          day: "numeric",
-                          month: "long",
-                        })}{" "}
-                        y{" "}
-                        {new Date(proxima!.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", {
-                          day: "numeric",
-                          month: "long",
-                        })}
-                        )
+                  {isFrozen ? (
+                    <div className="rounded-2xl border border-border/60 bg-muted/20 px-5 py-6 text-center">
+                      <p className="text-sm font-medium text-ink mb-1">Inscripciones cerradas</p>
+                      <p className="text-xs text-muted-foreground">
+                        Esta edición ya no acepta nuevas inscripciones.
                       </p>
                     </div>
+                  ) : isFullySoldOut ? (
+                    <>
+                      <div className="mb-4 rounded-xl border border-border/60 bg-ink px-4 py-3 text-background">
+                        <p className="text-xs font-mono uppercase tracking-widest opacity-50 mb-0.5">
+                          {ordinalEdicion(taller.numero_edicion)} edición
+                        </p>
+                        <p className="font-bold text-sm">Sold out</p>
+                        <p className="text-xs opacity-60 mt-1">Sin fechas próximas por ahora.</p>
+                      </div>
+                      <InteresadoForm slug={taller.slug} />
+                    </>
+                  ) : (
+                    <>
+                      {switchToProxima && (
+                        <div className="mb-4 rounded-xl border border-border/60 bg-ink px-4 py-3 text-background">
+                          <p className="text-xs font-mono uppercase tracking-widest opacity-50 mb-0.5">
+                            {ordinalEdicion(taller.numero_edicion)} edición
+                          </p>
+                          <p className="font-bold text-sm">Sold out</p>
+                          <p className="text-xs opacity-60 mt-1">
+                            Te anotamos en la {ordinalEdicion(proxima!.numero_edicion)} edición (
+                            {new Date(proxima!.fecha_inicio + "T12:00:00").toLocaleDateString(
+                              "es-AR",
+                              { day: "numeric", month: "long" },
+                            )}{" "}
+                            y{" "}
+                            {new Date(proxima!.fecha_fin + "T12:00:00").toLocaleDateString(
+                              "es-AR",
+                              {
+                                day: "numeric",
+                                month: "long",
+                              },
+                            )}
+                            )
+                          </p>
+                        </div>
+                      )}
+                      <WorkshopInscripcionForm taller={formTaller} />
+                    </>
                   )}
-                  <WorkshopInscripcionForm taller={formTaller} />
                 </div>
               </div>
             </div>

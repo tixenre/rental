@@ -426,6 +426,7 @@ export type Taller = {
   activo: boolean;
   tipo_taller: string;
   notif_email: string;
+  frozen_at: string | null;
   sesiones: Sesion[];
 };
 
