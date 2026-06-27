@@ -198,7 +198,7 @@ function TalleresPage() {
 
   const proximos = talleres
     .filter((t) => new Date(t.fecha_inicio + "T00:00:00") > hoy)
-    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
+    .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
 
   const enCurso = talleres
     .filter((t) => {
