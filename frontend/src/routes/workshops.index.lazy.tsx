@@ -207,7 +207,7 @@ function TalleresPage() {
         )}
 
         {talleres
-          .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime())
+          .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime())
           .map((t) => (
             <WorkshopCard key={t.id} taller={t} />
           ))}
