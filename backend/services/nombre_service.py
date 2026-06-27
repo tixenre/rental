@@ -33,7 +33,7 @@ def _categorias_de(conn, equipo_id: int) -> tuple[Optional[str], Optional[str]]:
             SELECT c.id, c.nombre, c.parent_id, c.prioridad, ec.orden
             FROM equipo_categorias ec
             JOIN categorias c ON c.id = ec.categoria_id
-            WHERE ec.equipo_id = ?
+            WHERE ec.equipo_id = %s
         )
         SELECT nombre, parent_id,
                (SELECT nombre FROM categorias WHERE id = ce.parent_id) AS parent_nombre
@@ -77,7 +77,7 @@ def _specs_en_nombre_de(conn, equipo_id: int) -> list[dict]:
           COALESCE(es.value, '') AS value,
           COALESCE(sd.prioridad, 100) AS prioridad
         FROM spec_definitions sd
-        JOIN equipo_categorias ec ON ec.equipo_id = ?
+        JOIN equipo_categorias ec ON ec.equipo_id = %s
         JOIN categorias c ON c.id = ec.categoria_id
         LEFT JOIN equipo_specs es
           ON es.equipo_id = ec.equipo_id AND es.spec_def_id = sd.id
@@ -124,7 +124,7 @@ def _specs_en_nombre_de(conn, equipo_id: int) -> list[dict]:
 def _ficha_template_de(conn, equipo_id: int) -> Optional[str]:
     """Lee el `nombre_publico_template` de la ficha (si existe)."""
     row = conn.execute(
-        "SELECT nombre_publico_template FROM equipo_fichas WHERE equipo_id = ?",
+        "SELECT nombre_publico_template FROM equipo_fichas WHERE equipo_id = %s",
         (equipo_id,),
     ).fetchone()
     if not row:
@@ -139,7 +139,7 @@ def calcular_nombres_para(conn, equipo_id: int) -> tuple[str, str]:
     eq = conn.execute(
         f"SELECT id, nombre, {marca_subquery('equipos')}, modelo, "
         "       nombre_publico_override, nombre_publico_revisado "
-        "FROM equipos WHERE id = ?",
+        "FROM equipos WHERE id = %s",
         (equipo_id,),
     ).fetchone()
     if not eq:
@@ -176,7 +176,7 @@ def actualizar_nombres_de(conn, equipo_id: int, *, commit: bool = True) -> tuple
     """
     corto, largo = calcular_nombres_para(conn, equipo_id)
     conn.execute(
-        "UPDATE equipos SET nombre_publico = ?, nombre_publico_largo = ? WHERE id = ?",
+        "UPDATE equipos SET nombre_publico = %s, nombre_publico_largo = %s WHERE id = %s",
         (corto, largo, equipo_id),
     )
     if commit:
@@ -217,8 +217,8 @@ def regenerar_nombres_todos(conn, *, dry_run: bool = False) -> dict:
                 })
                 if not dry_run:
                     conn.execute(
-                        "UPDATE equipos SET nombre_publico = ?, "
-                        "nombre_publico_largo = ? WHERE id = ?",
+                        "UPDATE equipos SET nombre_publico = %s, "
+                        "nombre_publico_largo = %s WHERE id = %s",
                         (corto, largo, r["id"]),
                     )
             else:

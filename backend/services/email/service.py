@@ -47,7 +47,7 @@ def _resolve_from(conn) -> str:
     if env_val:
         return env_val
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", ("email_from",),
+        "SELECT value FROM app_settings WHERE key = %s", ("email_from",),
     ).fetchone()
     if row and row["value"]:
         return row["value"]
@@ -62,7 +62,7 @@ def get_admin_to() -> Optional[str]:
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT value FROM app_settings WHERE key = ?", ("email_admin_to",),
+            "SELECT value FROM app_settings WHERE key = %s", ("email_admin_to",),
         ).fetchone()
         return row["value"] if row and row["value"] else None
     finally:
@@ -70,7 +70,7 @@ def get_admin_to() -> Optional[str]:
 
 
 def channel_status() -> dict:
-    """Estado del canal de mail para el back-office (indicador "¿está integrado?").
+    """Estado del canal de mail para el back-office (indicador "¿está integrado%s").
 
     Devuelve el backend activo, si manda de verdad (`activo`: test=False porque
     solo loggea en memoria), el `from` resuelto y el destinatario admin.
@@ -96,7 +96,7 @@ def channel_status() -> dict:
 def _setting(conn, key: str) -> str:
     """Lee un app_setting como string (vacío si no existe)."""
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", (key,)
+        "SELECT value FROM app_settings WHERE key = %s", (key,)
     ).fetchone()
     return (row["value"].strip() if row and row["value"] else "")
 
@@ -187,7 +187,7 @@ def render_template(
     conn = get_db()
     try:
         row = conn.execute(
-            "SELECT subject, body_html, body_text FROM email_templates WHERE key = ?",
+            "SELECT subject, body_html, body_text FROM email_templates WHERE key = %s",
             (template_key,),
         ).fetchone()
         if not row:
@@ -328,7 +328,7 @@ def send_email(
         # de prueba del admin pasa respect_enabled=False para saltarse el gate.
         if respect_enabled:
             erow = conn.execute(
-                "SELECT enabled FROM email_templates WHERE key = ?", (template_key,)
+                "SELECT enabled FROM email_templates WHERE key = %s", (template_key,)
             ).fetchone()
             if erow is not None and not erow["enabled"]:
                 logger.info(
@@ -343,7 +343,7 @@ def send_email(
             existing = conn.execute(
                 """
                 SELECT id FROM emails_log
-                 WHERE template_key = ? AND alquiler_id = ? AND status = 'sent'
+                 WHERE template_key = %s AND alquiler_id = %s AND status = 'sent'
                  LIMIT 1
                 """,
                 (template_key, alquiler_id),
@@ -442,7 +442,7 @@ def _insert_log(
             INSERT INTO emails_log
                 (to_addr, subject, template_key, alquiler_id,
                  status, provider, provider_id, error)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (to, subject, template_key, alquiler_id,
@@ -453,7 +453,7 @@ def _insert_log(
     except Exception as e:
         # El UNIQUE INDEX parcial del recordatorio puede tirar IntegrityError
         # si el job corre 2 veces — es comportamiento deseado (idempotencia).
-        logger.warning("emails_log INSERT falló (idempotencia?): %s", e)
+        logger.warning("emails_log INSERT falló (idempotencia%s): %s", e)
         try:
             conn.rollback()
         except Exception:

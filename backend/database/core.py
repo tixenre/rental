@@ -4,9 +4,12 @@ database.py — Conexión PostgreSQL con pool de conexiones, migraciones y helpe
 
 import logging
 import pathlib
-import psycopg2
-import psycopg2.extras
-import psycopg2.pool
+import re
+from contextlib import contextmanager
+
+import psycopg
+import psycopg.errors
+from psycopg_pool import ConnectionPool
 
 from config import settings
 
@@ -47,7 +50,7 @@ FRONT_NEW = BASE.parent.parent / "frontend" / "dist"
 # Uso (la convención es aliasar `equipos` como `e`):
 #     conn.execute(f"SELECT e.id, e.nombre, {MARCA_SUBQUERY} FROM equipos e ...")
 # Para predicados en WHERE/COALESCE:
-#     conn.execute(f"... WHERE LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(?) ...")
+#     conn.execute(f"... WHERE LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(%s) ...", (valor,))
 # Cuando el equipo va con OTRO alias (ej. `ec` para componentes de combo/kit, o
 # la tabla `equipos` sin aliasar), pasar el alias al helper:
 #     f"SELECT ec.nombre, {marca_subquery('ec')} FROM ... equipos ec ..."
@@ -79,7 +82,7 @@ if not DATABASE_URL:
 
 
 def get_connection_params():
-    """Parse DATABASE_URL a parámetros de psycopg2."""
+    """Parse DATABASE_URL a parámetros de conexión (host/port/user/password/database)."""
     try:
         from urllib.parse import urlparse
         parsed = urlparse(DATABASE_URL)
@@ -96,22 +99,22 @@ def get_connection_params():
 
 
 # ── Pool de conexiones ────────────────────────────────────────────────────────
-# ThreadedConnectionPool es thread-safe (FastAPI corre handlers sync en threads).
+# psycopg_pool.ConnectionPool es thread-safe (FastAPI corre handlers sync en threads).
 #
-# CLAVE: `maxconn` tiene que cubrir la concurrencia real de requests. FastAPI
+# CLAVE: `max_size` tiene que cubrir la concurrencia real de requests. FastAPI
 # corre cada handler sync en el threadpool de Starlette (default 40 threads),
-# y cada uno toma una conexión del pool. Si más de `maxconn` handlers corren a
-# la vez, psycopg2 NO espera: lanza `PoolError: connection pool exhausted` al
-# instante → 500 en cascada. Por eso el arranque (main.py) ACOTA el threadpool
-# a `pool_max()` menos un margen para workers de fondo (scheduler, init,
-# webhooks async): así los requests de más hacen cola en vez de explotar.
+# y cada uno toma una conexión del pool. Si más de `max_size` handlers corren
+# a la vez, psycopg_pool espera hasta `timeout` segundos (default 30s) antes
+# de lanzar `PoolTimeout` → 500. Por eso el arranque (main.py) ACOTA el
+# threadpool a `pool_max()` menos un margen para workers de fondo (scheduler,
+# init, webhooks async): así los requests de más hacen cola en vez de explotar.
 # Ambos valores se tunean por env (DB_POOL_MIN / DB_POOL_MAX) sin tocar código.
 import os as _os
 
 _POOL_MIN = int(_os.getenv("DB_POOL_MIN", "2"))
 _POOL_MAX = int(_os.getenv("DB_POOL_MAX", "25"))
 
-_pool: psycopg2.pool.ThreadedConnectionPool | None = None
+_pool: ConnectionPool | None = None
 
 
 def pool_max() -> int:
@@ -119,40 +122,74 @@ def pool_max() -> int:
     return _POOL_MAX
 
 
-def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
+def _get_pool() -> ConnectionPool:
     global _pool
     if _pool is None or _pool.closed:
-        _pool = psycopg2.pool.ThreadedConnectionPool(_POOL_MIN, _POOL_MAX, **get_connection_params())
+        # ClientCursor: sustitución client-side (= psycopg2) → None→NULL literal,
+        # sin IndeterminateDatatype. Clave para la migración desde psycopg2.
+        _pool = ConnectionPool(
+            DATABASE_URL,
+            min_size=_POOL_MIN,
+            max_size=_POOL_MAX,
+            kwargs={"cursor_factory": psycopg.ClientCursor},
+            open=True,
+        )
     return _pool
 
 
-# ── Cursor wrapper para compatibilidad con sqlite3 ───────────────────────────
-# El proyecto migró de SQLite a PostgreSQL. Para no reescribir cientos de
-# queries, este wrapper traduce los placeholders `?` (sqlite3) a `%s` (psycopg2)
-# y emula `lastrowid` con `SELECT lastval()`. Convención del codebase: usar `?`
-# en TODAS las queries para que la traducción sea consistente.
-# Si en el futuro se quiere migrar a `%s` nativo, hay que hacerlo archivo por
-# archivo con tests, no con un sed global (hay `?` en regex y URLs que no se
-# deben tocar — ver `routes/equipos.py:1817`, `:2073`, `routes/auth.py`).
+# ── Guardas de seguridad SQL ─────────────────────────────────────────────────
+# Todo el código usa `%s` nativo de psycopg (migración de `?` completada).
+# Las guardas `_assert_params_present` + `_assert_pct_safe` enforcan:
+#   · Todo VALOR va como bound param (no f-strings ni concatenación).
+#   · El único `%` permitido es placeholder (`%s`/`%(name)s`) o `%%`.
+#   · Un `%` literal (ej. `LIKE '%x%'` inline) es un bug → comodín en params.
+
+# Un `%` es válido sólo si abre un placeholder (`%s`, `%(name)s`) o es `%%`.
+_VALID_PCT = re.compile(r"%(?:s|%|\([A-Za-z_]\w*\)s)")
+# Placeholders nativos psycopg (`%s` / `%(name)s`).
+_HAS_PLACEHOLDER = re.compile(r"%s|%\([A-Za-z_]\w*\)s")
+
+
+def _assert_pct_safe(sql: str) -> None:
+    """Rechaza un `%` que no sea un placeholder válido (`%s`/`%(name)s`/`%%`).
+
+    El wrapper siempre pasa una tupla de params → psycopg corre pyformat → un `%`
+    desnudo ya falla hoy con un error críptico. Esta guarda lo caza antes, con un
+    mensaje claro: el comodín de `LIKE` va en el param, nunca literal en el SQL.
+    Paramstyle-agnóstica → sobrevive a la migración `?`→`%s`.
+    """
+    i = sql.find("%")
+    while i != -1:
+        m = _VALID_PCT.match(sql, i)
+        if m is None:
+            raise ValueError(
+                f"`%` que no es placeholder válido en el SQL (usá %s / %%; "
+                f"el comodín de LIKE va en params). SQL: {sql[:120]!r}"
+            )
+        i = sql.find("%", m.end())
+
+
+def _assert_params_present(sql: str, params) -> None:
+    """Si el SQL tiene placeholders (`%s`/`%(name)s`) pero `params` está vacío,
+    casi seguro el caller olvidó la tupla. Avisa claro en vez del error críptico
+    de psycopg."""
+    if not params and _HAS_PLACEHOLDER.search(sql):
+        raise ValueError(
+            f"SQL tiene placeholders pero `params` está vacío "
+            f"(¿olvidaste la tupla?). SQL: {sql[:120]!r}"
+        )
+
 
 class PGCursor:
     """Wrapper que permite acceder a resultados por índice O por nombre."""
     def __init__(self, raw_cursor):
         self.raw_cursor = raw_cursor
 
-    def execute(self, sql, params=()):
-        # Validación defensiva: si el SQL tiene `?` pero `params` está vacío,
-        # eso es muy probablemente un bug del caller (olvidó pasar el tuple).
-        # Antes el `replace` igual procedía y psycopg2 fallaba con un error
-        # críptico ("syntax error at or near %s"). Ahora avisamos claro.
+    def execute(self, sql: str, params=()):
         if not isinstance(sql, str):
             raise TypeError(f"execute() recibió SQL no-string: {type(sql).__name__}")
-        if '?' in sql and not params:
-            raise ValueError(
-                f"SQL tiene placeholders `?` pero `params` está vacío. "
-                f"SQL: {sql[:100]!r}"
-            )
-        sql = sql.replace('?', '%s')
+        _assert_params_present(sql, params)
+        _assert_pct_safe(sql)
         return self.raw_cursor.execute(sql, params)
 
     @property
@@ -218,42 +255,35 @@ class PGRow:
 # ── Wrapper para compatibilidad con sqlite3 ─────────────────────────────────
 
 class PGConnection:
-    """Envoltura de psycopg2 que simula interfaz sqlite3 para migración fácil."""
+    """Envoltura del pool de psycopg3: aísla la infra (pool, rollback, guardas) del resto."""
 
     def __init__(self, raw_conn, pool=None):
         self.raw_conn = raw_conn
         self.row_factory = None
         self._pool = pool   # Si viene del pool, close() devuelve en lugar de cerrar
 
-    def execute(self, sql, params=()):
+    def execute(self, sql: str, params=()) -> "PGCursor":
         """Ejecuta una query y retorna un cursor tipo sqlite3."""
         if not isinstance(sql, str):
             raise TypeError(f"execute() recibió SQL no-string: {type(sql).__name__}")
-        if '?' in sql and not params:
-            raise ValueError(
-                f"SQL tiene placeholders `?` pero `params` está vacío. "
-                f"SQL: {sql[:100]!r}"
-            )
+        _assert_params_present(sql, params)
+        _assert_pct_safe(sql)
         cur = self.raw_conn.cursor()
-        # Convertir placeholders de ? (sqlite3) a %s (psycopg2)
-        sql = sql.replace('?', '%s')
         cur.execute(sql, params)
         return PGCursor(cur)
 
-    def executemany(self, sql, params_list):
+    def executemany(self, sql: str, params_list) -> "PGCursor":
         """Ejecuta una query con múltiples filas de parámetros."""
         if not isinstance(sql, str):
             raise TypeError(f"executemany() recibió SQL no-string: {type(sql).__name__}")
+        _assert_pct_safe(sql)   # (paridad con execute; antes executemany no validaba nada)
         cur = self.raw_conn.cursor()
-        sql = sql.replace('?', '%s')
         for params in params_list:
             cur.execute(sql, params)
         return PGCursor(cur)
 
     def cursor(self, cursor_factory=None):
-        """Retorna un cursor (envuelto para compatibilidad)."""
-        if cursor_factory is not None:
-            return PGCursor(self.raw_conn.cursor(cursor_factory=cursor_factory))
+        """Retorna un cursor (envuelto para compatibilidad). `cursor_factory` ignorado (sin callers)."""
         return PGCursor(self.raw_conn.cursor())
 
     def commit(self):
@@ -261,6 +291,28 @@ class PGConnection:
 
     def rollback(self):
         self.raw_conn.rollback()
+
+    @contextmanager
+    def transaction(self):
+        """Context manager de transacción: commit al salir OK, rollback ante
+        excepción. NO cierra la conexión (a diferencia de `with conn:` en
+        psycopg3). Reemplaza el patrón manual try / commit / except / rollback."""
+        try:
+            yield self
+            self.raw_conn.commit()
+        except Exception:
+            self.raw_conn.rollback()
+            raise
+
+    def insert_returning(self, sql: str, params=(), *, column: str = "id"):
+        """Ejecuta un `INSERT … RETURNING <column>` y devuelve el valor —
+        reemplazo idiomático de `lastrowid`. `sql` NO debe traer el RETURNING (se
+        agrega). `column` es un identificador del esquema (no acepta input de
+        usuario); se valida para descartar interpolación insegura."""
+        if not column.isidentifier():
+            raise ValueError(f"column inválida para RETURNING: {column!r}")
+        row = self.execute(f"{sql} RETURNING {column}", params).fetchone()
+        return row[0] if row is not None else None
 
     def close(self):
         if self._pool:

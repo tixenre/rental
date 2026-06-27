@@ -72,7 +72,7 @@ class LockingFakeConn:
     def execute(self, sql, params=()):
         s_up = " ".join(sql.split()).upper()
 
-        if "FROM APP_SETTINGS WHERE KEY = ?" in s_up:
+        if "FROM APP_SETTINGS WHERE KEY = %S" in s_up:
             self.log.append("buffer")
             return FakeCursor([FakeRow(value=str(self.world.buffer_horas))])
 
@@ -82,7 +82,7 @@ class LockingFakeConn:
             self.log.append(("mant", tuple(params[:-2])))
             return FakeCursor([])
 
-        if s_up.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
+        if s_up.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = %S"):
             self.log.append("items")
             pid = params[0]
             return FakeCursor([FakeRow(r) for r in self.pedido_items.get(pid, [])])
@@ -100,7 +100,7 @@ class LockingFakeConn:
             ])
 
         # ── El lock: emula SELECT ... FOR UPDATE ──
-        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s_up:
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = %S FOR UPDATE" in s_up:
             eq_id = params[0]
             self.world.locks[eq_id].acquire()   # BLOQUEA si otra conn lo tiene
             self._held.append(eq_id)
@@ -159,13 +159,13 @@ def test_for_update_es_exclusivo():
     a = LockingFakeConn(world, {})
     b = LockingFakeConn(world, {})
 
-    a.execute("SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE", (1,))
+    a.execute("SELECT cantidad FROM equipos WHERE id = %s FOR UPDATE", (1,))
 
     arranco_b = threading.Event()
 
     def tomar_b():
         arranco_b.set()
-        b.execute("SELECT cantidad FROM equipos WHERE id = ? FOR UPDATE", (1,))
+        b.execute("SELECT cantidad FROM equipos WHERE id = %s FOR UPDATE", (1,))
         b.commit()
 
     t = threading.Thread(target=tomar_b)

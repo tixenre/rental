@@ -34,3 +34,9 @@
 - Qué se decidió: el dueño eligió la versión completa (capa `--area-accent` por área), mismo hue `#e9552f` en token propio, CTA que invierte al accent del área. Clave de marca: la marca del topbar va **blanca sobre el color** (revirtió el logo en negro que metió otra sesión). A prod fue **solo el theming (#1063)**; el resto de `dev` quedó en test.
 - ¿Coincidieron?: sí · validación independiente — el dueño acordó con el veredicto y las condiciones; el `design-system` (gobernanza) aprobó la arquitectura, el `supervisor` la promoción.
 - Calibrar: ¿el límite de los 3 roles del amber aguanta? Revisar si migrar el rental al token, o agregar un área nueva, reintroduce drift; y si "marca blanca sobre el color" mantiene contraste aceptable en áreas futuras.
+
+### 2026-06-27 — DB: ¿endurecer wrapper / migrar nativo / psycopg3 / SQLAlchemy / SQLModel / async?
+- Veredicto del consejo: endurecer el wrapper (AVANZAR) · `?`→`%s` idiomático (CON-CAMBIOS: vale como craft, no como función) · psycopg3 (DIFERIR — beneficios no aterrizan en sync+PgBouncer, pero el wrapper lo deja barato después) · SQLAlchemy Core (NO — problemas que no tenemos) · SQLModel (NO — ORM rechazado, peor encaje) · async (NO — app DB-bound, sync es el fit).
+- Qué se decidió: sync + psycopg3 + wrapper fino idiomático + guardas; sin ORM, sin async. (La raíz de la consulta del dueño: el wrapper EMULA formas peores —`lastrowid` vía `lastval()`, `?`— cuando hay nativas mejores; el plan saca cada emulación, deja solo infra genuina.)
+- ¿Coincidieron?: sí en casi todo — el dueño llegó a la misma conclusión tras entender cada tradeoff (proceso largo, no acatamiento). Divergió en psycopg3 (consejo: diferir; dueño: hacerlo sync ahora — override consciente, costo bajo, por el driver al día).
+- Calibrar: revisitar ORMs/async si el equipo crece >10, aparece multi-DB, o tiempo-real/escala. ¿El supervisor usa la entrada de MEMORIA para marcar `?` nuevo y CTAs de ORM?

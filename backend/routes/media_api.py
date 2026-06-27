@@ -27,7 +27,7 @@ def _load_variants(conn, media_id: int) -> list[dict]:
     """Carga las variantes de un media_asset desde media_variants."""
     rows = conn.execute(
         "SELECT name, url, width, height, content_type "
-        "FROM media_variants WHERE asset_id = ? ORDER BY id",
+        "FROM media_variants WHERE asset_id = %s ORDER BY id",
         (media_id,),
     ).fetchall()
     return [
@@ -45,7 +45,7 @@ def _load_variants(conn, media_id: int) -> list[dict]:
 def _load_asset_meta(conn, media_id: int) -> dict:
     """Lee lqip y status del media_asset. Defaults seguros si faltan columnas."""
     row = conn.execute(
-        "SELECT lqip, status FROM media_assets WHERE id = ?", (media_id,)
+        "SELECT lqip, status FROM media_assets WHERE id = %s", (media_id,)
     ).fetchone()
     if not row:
         return {"lqip": None, "status": "ready"}
@@ -89,7 +89,7 @@ def _build_asset(conn, row) -> dict:
 def _get_equipo_media(conn, entity_id: int) -> list[dict]:
     rows = conn.execute(
         "SELECT id, url, media_id, orden, es_principal "
-        "FROM equipo_fotos WHERE equipo_id = ? ORDER BY orden, id",
+        "FROM equipo_fotos WHERE equipo_id = %s ORDER BY orden, id",
         (entity_id,),
     ).fetchall()
     return [_build_asset(conn, r) for r in rows]
@@ -98,7 +98,7 @@ def _get_equipo_media(conn, entity_id: int) -> list[dict]:
 def _get_estudio_media(conn, entity_id: int) -> list[dict]:
     rows = conn.execute(
         "SELECT id, url, media_id, orden, es_principal "
-        "FROM estudio_fotos WHERE estudio_id = ? ORDER BY orden, id",
+        "FROM estudio_fotos WHERE estudio_id = %s ORDER BY orden, id",
         (entity_id,),
     ).fetchall()
     return [_build_asset(conn, r) for r in rows]
@@ -111,7 +111,7 @@ def _get_instructor_media(conn, entity_id: int) -> list[dict]:
     fotos como en equipo/estudio). El frontend no opera sobre ese campo.
     """
     row = conn.execute(
-        "SELECT id, instructor_foto_url, instructor_media_id FROM talleres WHERE id = ?",
+        "SELECT id, instructor_foto_url, instructor_media_id FROM talleres WHERE id = %s",
         (entity_id,),
     ).fetchone()
     if not row:

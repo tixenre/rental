@@ -144,14 +144,14 @@ def _insert_foto(
     conn.execute(
         "INSERT INTO estudio_fotos "
         "(estudio_id, url, url_sm, url_avif, url_sm_avif, path, orden, es_principal, media_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (1, url, url_sm, url_avif, url_sm_avif, path, orden, is_first, media_id),
     )
     conn.commit()
 
     cur3 = conn.execute(
         "SELECT id, url, url_sm, url_avif, url_sm_avif, path, orden, es_principal, created_at "
-        "FROM estudio_fotos WHERE path = ? AND estudio_id = 1",
+        "FROM estudio_fotos WHERE path = %s AND estudio_id = 1",
         (path,),
     )
     r = cur3.fetchone()
@@ -555,13 +555,13 @@ def patch_estudio(body: EstudioUpdate, request: Request):
 
     with get_db() as conn:
         if updates:
-            set_parts = [f"{k} = ?" for k in updates]
-            set_parts.append("updated_at = ?")
+            set_parts = [f"{k} = %s" for k in updates]
+            set_parts.append("updated_at = %s")
             values = list(updates.values())
             values.append(datetime.now(tz=timezone.utc))
             values.append(1)
             conn.execute(
-                f"UPDATE estudio SET {', '.join(set_parts)} WHERE id = ?",
+                f"UPDATE estudio SET {', '.join(set_parts)} WHERE id = %s",
                 tuple(values),
             )
             conn.commit()
@@ -695,7 +695,7 @@ def delete_foto(foto_id: int, request: Request):
 
     with get_db() as conn:
         cur = conn.execute(
-            "SELECT path, media_id FROM estudio_fotos WHERE id = ? AND estudio_id = 1",
+            "SELECT path, media_id FROM estudio_fotos WHERE id = %s AND estudio_id = 1",
             (foto_id,),
         )
         row = cur.fetchone()
@@ -709,9 +709,9 @@ def delete_foto(foto_id: int, request: Request):
         if media_id:
             r2_keys = collect_asset_keys(conn, media_id)
 
-        conn.execute("DELETE FROM estudio_fotos WHERE id = ?", (foto_id,))
+        conn.execute("DELETE FROM estudio_fotos WHERE id = %s", (foto_id,))
         if media_id:
-            conn.execute("DELETE FROM media_assets WHERE id = ?", (media_id,))
+            conn.execute("DELETE FROM media_assets WHERE id = %s", (media_id,))
         conn.commit()
 
     # Best-effort R2 cleanup (después del commit — la DB es la fuente de verdad)
@@ -740,8 +740,8 @@ def reorder_fotos(body: ReorderBody, request: Request):
     with get_db() as conn:
         for f in body.fotos:
             conn.execute(
-                "UPDATE estudio_fotos SET orden = ?, es_principal = ? "
-                "WHERE id = ? AND estudio_id = 1",
+                "UPDATE estudio_fotos SET orden = %s, es_principal = %s "
+                "WHERE id = %s AND estudio_id = 1",
                 (f.orden, f.es_principal, f.id),
             )
         conn.commit()
@@ -849,7 +849,7 @@ def admin_create_trabajo(body: TrabajoCreate, request: Request):
             "INSERT INTO estudio_trabajos "
             "(titulo, realizador, realizador_instagram, realizador_web, "
             "categoria, categorias_json, descripcion, tipo, links_json, orden, activo) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (body.titulo, body.realizador, body.realizador_instagram, body.realizador_web,
              cats[0] if cats else "", json.dumps(cats), body.descripcion, tipo,
              json.dumps(links), orden, body.activo),
@@ -889,7 +889,7 @@ def admin_reorder_trabajos(body: TrabajoReorderBody, request: Request):
     with get_db() as conn:
         for t in body.trabajos:
             conn.execute(
-                "UPDATE estudio_trabajos SET orden = ? WHERE id = ?",
+                "UPDATE estudio_trabajos SET orden = %s WHERE id = %s",
                 (t.orden, t.id),
             )
         conn.commit()
@@ -914,7 +914,7 @@ def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request)
         with get_db() as conn:
             cur = conn.execute(
                 "SELECT links_json, youtube_url, instagram_reel_url, thumbnail_url "
-                "FROM estudio_trabajos WHERE id = ?",
+                "FROM estudio_trabajos WHERE id = %s",
                 (trabajo_id,),
             )
             row = cur.fetchone()
@@ -932,11 +932,11 @@ def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request)
     if not updates:
         raise HTTPException(400, "Nada que actualizar")
     with get_db() as conn:
-        set_parts = [f"{k} = ?" for k in updates]
-        set_parts.append("updated_at = ?")
+        set_parts = [f"{k} = %s" for k in updates]
+        set_parts.append("updated_at = %s")
         vals = list(updates.values()) + [datetime.now(tz=timezone.utc), trabajo_id]
         conn.execute(
-            f"UPDATE estudio_trabajos SET {', '.join(set_parts)} WHERE id = ?",
+            f"UPDATE estudio_trabajos SET {', '.join(set_parts)} WHERE id = %s",
             vals,
         )
         conn.commit()
@@ -951,7 +951,7 @@ def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request)
 def admin_delete_trabajo(trabajo_id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
-        conn.execute("DELETE FROM estudio_trabajos WHERE id = ?", (trabajo_id,))
+        conn.execute("DELETE FROM estudio_trabajos WHERE id = %s", (trabajo_id,))
         conn.commit()
     return {"ok": True}
 
@@ -982,7 +982,7 @@ async def admin_upload_trabajo_foto(
     }
     with get_db() as conn:
         cur = conn.execute(
-            "SELECT fotos_json FROM estudio_trabajos WHERE id = ?", (trabajo_id,)
+            "SELECT fotos_json FROM estudio_trabajos WHERE id = %s", (trabajo_id,)
         )
         row = cur.fetchone()
         if not row:
@@ -990,7 +990,7 @@ async def admin_upload_trabajo_foto(
         fotos = _parse_json_field(row["fotos_json"]) or []
         fotos.append(nueva_foto)
         conn.execute(
-            "UPDATE estudio_trabajos SET fotos_json = ?, updated_at = ? WHERE id = ?",
+            "UPDATE estudio_trabajos SET fotos_json = %s, updated_at = %s WHERE id = %s",
             (json.dumps(fotos), datetime.now(tz=timezone.utc), trabajo_id),
         )
         conn.commit()
@@ -1003,7 +1003,7 @@ def admin_delete_trabajo_foto(trabajo_id: int, foto_idx: int, request: Request):
     require_admin(request)
     with get_db() as conn:
         cur = conn.execute(
-            "SELECT fotos_json FROM estudio_trabajos WHERE id = ?", (trabajo_id,)
+            "SELECT fotos_json FROM estudio_trabajos WHERE id = %s", (trabajo_id,)
         )
         row = cur.fetchone()
         if not row:
@@ -1013,7 +1013,7 @@ def admin_delete_trabajo_foto(trabajo_id: int, foto_idx: int, request: Request):
             raise HTTPException(400, f"Índice de foto inválido: {foto_idx}")
         fotos.pop(foto_idx)
         conn.execute(
-            "UPDATE estudio_trabajos SET fotos_json = ?, updated_at = ? WHERE id = ?",
+            "UPDATE estudio_trabajos SET fotos_json = %s, updated_at = %s WHERE id = %s",
             (json.dumps(fotos), datetime.now(tz=timezone.utc), trabajo_id),
         )
         conn.commit()
@@ -1036,7 +1036,7 @@ async def admin_upload_trabajo_logo(
     logo_url = result[DISPLAY_KEEP_ASPECT]["url"]
     with get_db() as conn:
         conn.execute(
-            "UPDATE estudio_trabajos SET realizador_logo_url = ?, updated_at = ? WHERE id = ?",
+            "UPDATE estudio_trabajos SET realizador_logo_url = %s, updated_at = %s WHERE id = %s",
             (logo_url, datetime.now(tz=timezone.utc), trabajo_id),
         )
         conn.commit()
@@ -1119,11 +1119,11 @@ def _centinela_libre(conn, equipo_id: int, fecha_desde, fecha_hasta,
         SELECT COUNT(*) AS cnt
         FROM alquiler_items pi
         JOIN alquileres p ON p.id = pi.pedido_id
-        WHERE pi.equipo_id = ?
+        WHERE pi.equipo_id = %s
           AND p.estado IN {ESTADOS_RESERVADO}
-          AND (? IS NULL OR p.id != ?)
-          AND p.fecha_desde < ?
-          AND p.fecha_hasta > ?
+          AND (%s IS NULL OR p.id != %s)
+          AND p.fecha_desde < %s
+          AND p.fecha_hasta > %s
         """,
         (equipo_id, exclude_pedido_id, exclude_pedido_id, hi, lo),
     ).fetchone()
@@ -1176,7 +1176,7 @@ def _pack_disponible(conn, fecha_desde, fecha_hasta, exclude_pedido_id: int | No
         f"""
         SELECT e.id, e.nombre, e.foto_url, {MARCA_SUBQUERY}
         FROM equipos e
-        WHERE e.id = ANY(?)
+        WHERE e.id = ANY(%s)
         ORDER BY e.nombre
         """,
         (list(libres.keys()),),
@@ -1241,7 +1241,7 @@ def agregar_pack_equipo(body: PackEquipoCreate, request: Request):
     with get_db() as conn:
         try:
             eq = conn.execute(
-                "SELECT id, es_recurso_interno, eliminado_at FROM equipos WHERE id = ?",
+                "SELECT id, es_recurso_interno, eliminado_at FROM equipos WHERE id = %s",
                 (body.equipo_id,),
             ).fetchone()
             if not eq or eq["eliminado_at"] is not None:
@@ -1253,7 +1253,7 @@ def agregar_pack_equipo(body: PackEquipoCreate, request: Request):
             ).fetchone()["next"]
             conn.execute(
                 "INSERT INTO estudio_pack_equipos (estudio_id, equipo_id, orden) "
-                "VALUES (1, ?, ?) ON CONFLICT (estudio_id, equipo_id) DO NOTHING",
+                "VALUES (1, %s, %s) ON CONFLICT (estudio_id, equipo_id) DO NOTHING",
                 (body.equipo_id, orden),
             )
             conn.commit()
@@ -1269,7 +1269,7 @@ def quitar_pack_equipo(equipo_id: int, request: Request):
     with get_db() as conn:
         try:
             conn.execute(
-                "DELETE FROM estudio_pack_equipos WHERE estudio_id = 1 AND equipo_id = ?",
+                "DELETE FROM estudio_pack_equipos WHERE estudio_id = 1 AND equipo_id = %s",
                 (equipo_id,),
             )
             conn.commit()
@@ -1372,9 +1372,9 @@ def _slot_bloqueante(conn, fecha_desde, fecha_hasta,
         """
         SELECT id, cliente, hora_desde, hora_hasta
         FROM estudio_slots_fijos
-        WHERE activo = TRUE AND dia_semana = ?
-          AND mes_desde <= ? AND mes_hasta >= ?
-          AND (? IS NULL OR id != ?)
+        WHERE activo = TRUE AND dia_semana = %s
+          AND mes_desde <= %s AND mes_hasta >= %s
+          AND (%s IS NULL OR id != %s)
         """,
         (dia, mes, mes, exclude_slot_id, exclude_slot_id),
     ).fetchall()
@@ -1463,7 +1463,7 @@ def _regenerar_pedidos_slot(conn, slot: dict) -> None:
     slot_id = slot["id"]
     mes_actual = _mes_actual_ar()
     existentes = conn.execute(
-        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = ?",
+        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = %s",
         (slot_id,),
     ).fetchall()
 
@@ -1474,7 +1474,7 @@ def _regenerar_pedidos_slot(conn, slot: dict) -> None:
         if mes_e < mes_actual or (e["monto_pagado"] or 0) > 0:
             conservados.add(mes_e)  # pasado o con pagos → intocable
         else:
-            conn.execute("DELETE FROM alquileres WHERE id = ?", (e["id"],))
+            conn.execute("DELETE FROM alquileres WHERE id = %s", (e["id"],))
 
     if not slot["activo"]:
         return
@@ -1495,7 +1495,7 @@ def _regenerar_pedidos_slot(conn, slot: dict) -> None:
             """
             INSERT INTO alquileres (cliente_nombre, fecha_desde, fecha_hasta, monto_total,
                                     estado, fuente, tipo, numero_pedido, estudio_slot_id)
-            VALUES (?,?,?,?,?,?,?,?,?)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             (slot["cliente"], fd, fh, slot["valor_mensual"], "confirmado",
              "estudio", "estudio_fijo", num, slot_id),
@@ -1508,14 +1508,14 @@ def _borrar_pedidos_futuros_impagos(conn, slot_id: int) -> None:
     el slot, vía FK ON DELETE SET NULL)."""
     mes_actual = _mes_actual_ar()
     rows = conn.execute(
-        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = ?",
+        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = %s",
         (slot_id,),
     ).fetchall()
     for e in rows:
         fd = to_datetime(e["fecha_desde"])
         mes_e = f"{fd.year:04d}-{fd.month:02d}"
         if mes_e >= mes_actual and (e["monto_pagado"] or 0) == 0:
-            conn.execute("DELETE FROM alquileres WHERE id = ?", (e["id"],))
+            conn.execute("DELETE FROM alquileres WHERE id = %s", (e["id"],))
 
 
 @router.get("/estudio/disponibilidad")
@@ -1582,7 +1582,7 @@ def _agregar_items_pack(conn, pedido_id: int, fecha_desde, fecha_hasta, pack_ids
             conn.execute(
                 """
                 INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-                VALUES (?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s)
                 """,
                 (pedido_id, eid, qty, 0, 0),
             )
@@ -1615,7 +1615,7 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
 
             # Datos del cliente desde la cuenta (no del body), mismo formato que create_pedido.
             cli = conn.execute(
-                "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = ?",
+                "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = %s",
                 (cliente_id,),
             ).fetchone()
             if not cli:
@@ -1654,12 +1654,12 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                 monto_total += estudio["pack_precio"] or 0
 
             next_num = _next_numero_pedido(conn)
-            cur = conn.execute(
+            pedido_id = conn.insert_returning(
                 """
                 INSERT INTO alquileres (cliente_id, cliente_nombre, cliente_email, cliente_telefono,
                                         fecha_desde, fecha_hasta, monto_total, estado,
                                         fuente, tipo, estudio_con_pack, numero_pedido)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (
                     cliente_id, cliente_nombre, cliente_email, cliente_telefono,
@@ -1667,7 +1667,6 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                     "estudio", "estudio", con_pack, next_num,
                 ),
             )
-            pedido_id = cur.lastrowid
 
             # ── Pack PRIMERO (antes del ítem centinela) ─────────────────────────────
             # Así _check_stock solo ve los equipos reales del pack y nunca el
@@ -1677,7 +1676,7 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                 if pack_ids:
                     # Lock de las filas del pack: serializa contra otras reservas que
                     # toquen estos equipos (su _check_stock también las lockea).
-                    conn.execute("SELECT id FROM equipos WHERE id = ANY(?) FOR UPDATE", (pack_ids,))
+                    conn.execute("SELECT id FROM equipos WHERE id = ANY(%s) FOR UPDATE", (pack_ids,))
                     _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
                     # Gate del motor (FOR UPDATE). Best-effort: si algo se lo llevó
                     # otro entre el snapshot y el lock, re-snapshoteamos bajo el lock
@@ -1686,7 +1685,7 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                     fd_iso, fh_iso = fecha_desde.isoformat(), fecha_hasta.isoformat()
                     if _check_stock(conn, pedido_id, fd_iso, fh_iso):
                         conn.execute(
-                            "DELETE FROM alquiler_items WHERE pedido_id = ? AND equipo_id = ANY(?)",
+                            "DELETE FROM alquiler_items WHERE pedido_id = %s AND equipo_id = ANY(%s)",
                             (pedido_id, pack_ids),
                         )
                         _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
@@ -1695,13 +1694,13 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
             conn.execute(
                 """
                 INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-                VALUES (?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s)
                 """,
                 (pedido_id, estudio["equipo_id"], 1, 0, 0),
             )
             # Lock del centinela (recurso único) + chequeo con SU buffer propio. Una
             # 2da reserva concurrente espera el lock y ve la 1ra commiteada.
-            conn.execute("SELECT id FROM equipos WHERE id = ? FOR UPDATE", (estudio["equipo_id"],))
+            conn.execute("SELECT id FROM equipos WHERE id = %s FOR UPDATE", (estudio["equipo_id"],))
             if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
                                     estudio["buffer_horas"], exclude_pedido_id=pedido_id):
                 raise HTTPException(409, "El estudio no está disponible en esa franja")
@@ -1760,7 +1759,7 @@ def _validar_slot(d: dict) -> None:
 
 
 def _get_slot(conn, slot_id: int) -> dict:
-    row = conn.execute("SELECT * FROM estudio_slots_fijos WHERE id = ?", (slot_id,)).fetchone()
+    row = conn.execute("SELECT * FROM estudio_slots_fijos WHERE id = %s", (slot_id,)).fetchone()
     if not row:
         raise HTTPException(404, "Slot no encontrado")
     return _slot_to_dict(row)
@@ -1786,20 +1785,20 @@ def crear_slot(body: SlotFijoCreate, request: Request):
             estudio = _get_estudio_row(conn)
             if not estudio["equipo_id"]:
                 raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
-            conn.execute("SELECT pg_advisory_xact_lock(?, ?)", (_ADVISORY_NS_ESTUDIO, 1))
+            conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
             if data.get("activo", True):
                 verificar_sesiones_disponibles(conn, estudio, _sesiones_de_slot(data))
-            cur = conn.execute(
+            slot_id = conn.insert_returning(
                 """
                 INSERT INTO estudio_slots_fijos
                     (cliente, dia_semana, hora_desde, hora_hasta, valor_mensual,
                      mes_desde, mes_hasta, activo)
-                VALUES (?,?,?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (data["cliente"], data["dia_semana"], data["hora_desde"], data["hora_hasta"],
                  data["valor_mensual"], data["mes_desde"], data["mes_hasta"], data["activo"]),
             )
-            slot = _get_slot(conn, cur.lastrowid)
+            slot = _get_slot(conn, slot_id)
             _regenerar_pedidos_slot(conn, slot)
             conn.commit()
             return slot
@@ -1830,7 +1829,7 @@ def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
                 updates["updated_at"] = now_ar()
                 set_parts = ", ".join(f"{k} = ?" for k in updates)
                 conn.execute(
-                    f"UPDATE estudio_slots_fijos SET {set_parts} WHERE id = ?",
+                    f"UPDATE estudio_slots_fijos SET {set_parts} WHERE id = %s",
                     (*updates.values(), slot_id),
                 )
             slot = _get_slot(conn, slot_id)
@@ -1851,7 +1850,7 @@ def borrar_slot(slot_id: int, request: Request):
             # Borra los pedidos futuros impagos; los pasados/pagados quedan (su
             # estudio_slot_id pasa a NULL por la FK ON DELETE SET NULL).
             _borrar_pedidos_futuros_impagos(conn, slot_id)
-            conn.execute("DELETE FROM estudio_slots_fijos WHERE id = ?", (slot_id,))
+            conn.execute("DELETE FROM estudio_slots_fijos WHERE id = %s", (slot_id,))
             conn.commit()
             return {"ok": True}
         except Exception:

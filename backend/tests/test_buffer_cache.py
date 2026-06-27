@@ -39,7 +39,7 @@ class _SettingsConn:
 
     def execute(self, sql, params=()):
         s = " ".join(sql.split()).upper()
-        if "FROM APP_SETTINGS WHERE KEY = ?" in s:
+        if "FROM APP_SETTINGS WHERE KEY = %S" in s:
             self.lecturas += 1
             return FakeCursor([FakeRow(value=str(self.valor))])
         return FakeCursor([])

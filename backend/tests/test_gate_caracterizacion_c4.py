@@ -48,12 +48,12 @@ class _World:
 
     def execute(self, sql, params=()):
         s = " ".join(sql.split()).upper()
-        if "FROM APP_SETTINGS WHERE KEY = ?" in s:
+        if "FROM APP_SETTINGS WHERE KEY = %S" in s:
             return _Cur([_Row(value="0")])
         if "FROM EQUIPO_MANTENIMIENTO" in s:  # batcheado: (*equipo_ids, f_hasta, f_desde)
             eq_ids = params[:-2]
             return _Cur([_Row({0: e, 1: self.mantenimiento.get(e, 0)}) for e in eq_ids])
-        if s.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
+        if s.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = %S"):
             return _Cur([_Row(r) for r in self.pedido_items])
         if s.startswith("SELECT EQUIPO_ID, COMPONENTE_ID, CANTIDAD") and "FROM KIT_COMPONENTES" in s:
             return _Cur([
@@ -62,7 +62,7 @@ class _World:
             ])
         if s.startswith("SELECT ID, NOMBRE FROM EQUIPOS WHERE ID IN"):
             return _Cur([_Row(id=i, nombre=v["nombre"]) for i, v in self.equipos.items()])
-        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = %S FOR UPDATE" in s:
             eq = self.equipos.get(params[0])
             return _Cur([_Row(cantidad=eq["cantidad"])] if eq else [])
         if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID IN" in s:

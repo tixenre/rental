@@ -1,6 +1,6 @@
 """Acceso a DB para media_assets y media_variants.
 
-Usa placeholders `?` (PGCursor los traduce a `%s`).
+Usa placeholders `%s` (psycopg nativo).
 Sin commits: el caller gestiona la transacción.
 """
 from .models import MediaAsset, MediaVariant
@@ -9,7 +9,7 @@ from .models import MediaAsset, MediaVariant
 def insert_asset(conn, kind: str, status: str = "ready") -> int:
     """Inserta una fila en media_assets y devuelve el id generado."""
     cur = conn.execute(
-        "INSERT INTO media_assets (kind, status) VALUES (?, ?) RETURNING id",
+        "INSERT INTO media_assets (kind, status) VALUES (%s, %s) RETURNING id",
         (kind, status),
     )
     return cur.fetchone()["id"]
@@ -18,7 +18,7 @@ def insert_asset(conn, kind: str, status: str = "ready") -> int:
 def update_asset_status(conn, asset_id: int, status: str) -> None:
     """Actualiza el campo status del asset (pending → ready | failed)."""
     conn.execute(
-        "UPDATE media_assets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE media_assets SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
         (status, asset_id),
     )
 
@@ -37,9 +37,9 @@ def update_asset_original(
     conn.execute(
         """
         UPDATE media_assets
-        SET original_key = ?, original_ct = ?, width = ?, height = ?, bytes = ?,
-            content_hash = ?, lqip = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
+        SET original_key = %s, original_ct = %s, width = %s, height = %s, bytes = %s,
+            content_hash = %s, lqip = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
         """,
         (original_key, original_ct, width, height, size_bytes, content_hash, lqip, asset_id),
     )
@@ -61,7 +61,7 @@ def insert_variant(
         """
         INSERT INTO media_variants
             (asset_id, name, key, url, content_type, width, height, bytes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (asset_id, name, key, url, content_type, width, height, size_bytes),
@@ -74,7 +74,7 @@ def find_by_hash(conn, kind: str, content_hash: str) -> "MediaAsset | None":
     Usado para dedup: si la misma imagen se sube dos veces, devuelve el asset previo.
     """
     row = conn.execute(
-        "SELECT * FROM media_assets WHERE kind = ? AND content_hash = ?",
+        "SELECT * FROM media_assets WHERE kind = %s AND content_hash = %s",
         (kind, content_hash),
     ).fetchone()
     if not row:
@@ -86,12 +86,12 @@ def collect_asset_keys(conn, asset_id: int) -> list[str]:
     """Devuelve todas las R2 keys (original + variantes) del asset. Sin modificar DB."""
     keys: list[str] = []
     row = conn.execute(
-        "SELECT original_key FROM media_assets WHERE id = ?", (asset_id,)
+        "SELECT original_key FROM media_assets WHERE id = %s", (asset_id,)
     ).fetchone()
     if row and row["original_key"]:
         keys.append(row["original_key"])
     variant_rows = conn.execute(
-        "SELECT key FROM media_variants WHERE asset_id = ?", (asset_id,)
+        "SELECT key FROM media_variants WHERE asset_id = %s", (asset_id,)
     ).fetchall()
     keys.extend(v["key"] for v in variant_rows if v["key"])
     return keys
@@ -107,11 +107,11 @@ def _safe_get(row, key: str):
 
 def load_asset(conn, asset_id: int) -> "MediaAsset | None":
     """Carga un MediaAsset completo (con variantes) desde la DB."""
-    row = conn.execute("SELECT * FROM media_assets WHERE id = ?", (asset_id,)).fetchone()
+    row = conn.execute("SELECT * FROM media_assets WHERE id = %s", (asset_id,)).fetchone()
     if not row:
         return None
     variant_rows = conn.execute(
-        "SELECT * FROM media_variants WHERE asset_id = ? ORDER BY id",
+        "SELECT * FROM media_variants WHERE asset_id = %s ORDER BY id",
         (asset_id,),
     ).fetchall()
     variants = [

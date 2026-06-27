@@ -307,7 +307,7 @@ def derive_and_finalize(
         return
 
     try:
-        row = conn.execute("SELECT * FROM media_assets WHERE id = ?", (asset_id,)).fetchone()
+        row = conn.execute("SELECT * FROM media_assets WHERE id = %s", (asset_id,)).fetchone()
         if not row:
             logger.error("derive_and_finalize: asset %s no encontrado", asset_id)
             return
@@ -334,8 +334,8 @@ def derive_and_finalize(
 
         first = variant_objects[0] if variant_objects else None
         conn.execute(
-            "UPDATE media_assets SET width = ?, height = ?, status = 'ready', "
-            "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE media_assets SET width = %s, height = %s, status = 'ready', "
+            "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
             (first.width if first else 0, first.height if first else 0, asset_id),
         )
         conn.commit()
@@ -345,7 +345,7 @@ def derive_and_finalize(
         logger.error("derive_and_finalize: error en asset %s: %s", asset_id, e, exc_info=True)
         try:
             conn.execute(
-                "UPDATE media_assets SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE media_assets SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                 (asset_id,),
             )
             conn.commit()

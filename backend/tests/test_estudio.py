@@ -276,7 +276,7 @@ class EstudioConflictoFakeConn:
         s = " ".join(sql.split()).upper()
 
         # Buffer global (setting app_settings) — separado del buffer del estudio.
-        if "FROM APP_SETTINGS WHERE KEY = ?" in s:
+        if "FROM APP_SETTINGS WHERE KEY = %S" in s:
             return _Cur([{"value": str(self.buffer_global)}])
 
         # Mantenimiento — ninguno (batcheado #626: sin filas → el gate default-ea a 0).
@@ -284,7 +284,7 @@ class EstudioConflictoFakeConn:
             return _Cur([])
 
         # Items del pedido (1ra query del gate): el centinela.
-        if s.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
+        if s.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = %S"):
             return _Cur([{"equipo_id": self.centinela_id, "cantidad": 1}])
 
         # Grafo de composición (componentes_de / parientes_de) — el centinela no es kit.
@@ -296,7 +296,7 @@ class EstudioConflictoFakeConn:
             return _Cur([{"id": self.centinela_id, "nombre": "Estudio (espacio)"}])
 
         # Lock + stock del centinela.
-        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = %S FOR UPDATE" in s:
             return _Cur([{"cantidad": self.stock}])
 
         # Reservas directas: sumamos las que se pisan con el rango consultado.
@@ -367,7 +367,7 @@ class CentinelaFakeConn:
             )
 
         # Lock del centinela (FOR UPDATE) en el POST.
-        if s.startswith("SELECT ID FROM EQUIPOS WHERE ID = ? FOR UPDATE"):
+        if s.startswith("SELECT ID FROM EQUIPOS WHERE ID = %S FOR UPDATE"):
             return _Cur([{"id": params[0]}])
 
         # Query dedicada de overlap del centinela.
@@ -539,7 +539,7 @@ class _NamesConn(_ConnCM):
 
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
-        if "FROM EQUIPOS E WHERE E.ID = ANY(?)" in su:
+        if "FROM EQUIPOS E WHERE E.ID = ANY(" in su:
             ids = params[0]
             return _Cur(
                 [{"id": i, "nombre": self.names[i][0], "marca": self.names[i][1],
@@ -727,6 +727,10 @@ class _RecordingConn(_ConnCM):
         if su.startswith("DELETE FROM ALQUILER_ITEMS"):
             return _Cur([])
         return _Cur([])
+
+    def insert_returning(self, sql, params=(), *, column="id"):
+        self.execute(sql, params)
+        return self.pedido_id
 
     def commit(self):
         self.committed = True
@@ -925,7 +929,7 @@ class _SlotRegenConn(_ConnCM):
 
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
-        if "FROM ALQUILERES WHERE ESTUDIO_SLOT_ID = ?" in su:
+        if "FROM ALQUILERES WHERE ESTUDIO_SLOT_ID = " in su:
             return _Cur(self.existing)
         if "NEXTVAL" in su:
             self._num += 1
@@ -936,7 +940,7 @@ class _SlotRegenConn(_ConnCM):
         if su.startswith("INSERT INTO ALQUILER_ITEMS"):
             self.item_inserts += 1
             return _Cur([])
-        if su.startswith("DELETE FROM ALQUILERES WHERE ID = ?"):
+        if su.startswith("DELETE FROM ALQUILERES WHERE ID = "):
             self.deleted.append(params[0])
             return _Cur([])
         return _Cur([])

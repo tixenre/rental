@@ -148,7 +148,7 @@ def extract_from_html(html_content: str) -> dict:
     # 2) URL canónica del producto (preferir JSON-LD; fallback al comentario "saved from url")
     url = _jsonld_url(html_content)
     if not url:
-        saved = re.search(r"saved from url=\(\d+\)(https?://\S+)", html_content)
+        saved = re.search(r"saved from url=\(\d+\)(https%s://\S+)", html_content)
         if saved:
             url = saved.group(1).strip()
 

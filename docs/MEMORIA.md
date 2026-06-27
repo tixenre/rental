@@ -366,6 +366,20 @@ medido**; un eval que gatea 0 regresiones reales se retira (como `consejo`). Fou
 (reusa pytest `-m golden` + `ui-audit.mjs` `LABEL=before/after` + dispatch del `supervisor`); detalle en el log.
 Acota _Los hallazgos de una auditoría son hipótesis (2026-06-22)_: la confirmación ahora tiene método y techo de costo.
 
+### 2026-06-27 — DAL = wrapper fino `database/core.py` (NO ORM); guardas SQL mecánicas; sync + psycopg3
+
+El acceso a datos vive en el **DAL único** `PGConnection`/`PGCursor` (`backend/database/core.py`) — **no
+ORM**. Guardas mecánicas (`_assert_pct_safe` + `_assert_params_present`) enforcan lo que era convención en
+prosa: todo VALOR como bound param; el único `%` válido es placeholder (`%s`/`%(name)s`) o `%%` — un `%`
+literal en SQL es bug (el comodín de `LIKE` va en params); placeholders sin params falla fuerte. **Código
+nuevo usa `%s` nativo**; el `?` legado (herencia sqlite3) migra a `%s` por fases bajo la red, **core sagrado
+último**; `lastrowid` (7 usos) → `RETURNING` vía helper `insert_returning()`. Driver: **psycopg3 sync**.
+**NO adoptar SQLAlchemy/SQLModel ni async** — evaluados a fondo (evidencia + consejo, 4 alternativas): no
+encajan en app **DB-bound, SQL-crudo-por-elección, con core de reservas complejo + Alembic ya presente** (SA
+aportaría algo solo en CRUD simple aislado, que ya está hecho). Revisita solo si: equipo >10 / multi-DB /
+necesidad de ORM o tiempo-real. El supervisor marca: `?` nuevo en código nuevo, `%` literal en SQL, y
+reimplementación o bypass del DAL.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

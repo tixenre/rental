@@ -98,7 +98,7 @@ def cliente_verificado(conn, cliente_id: int) -> bool:
     """True si el cliente completó la verificación de identidad (dni_validado_at).
     Fuente única del criterio "está verificado"; usa una conexión ya abierta."""
     row = conn.execute(
-        "SELECT dni_validado_at FROM clientes WHERE id = ?", (cliente_id,)
+        "SELECT dni_validado_at FROM clientes WHERE id = %s", (cliente_id,)
     ).fetchone()
     return bool(row and row["dni_validado_at"])
 
@@ -111,7 +111,7 @@ def require_cliente_verificado(request: Request) -> dict:
     session = require_cliente(request)
     cliente_id = session["cliente_id"]
     with get_db() as conn:
-        if conn.execute("SELECT 1 FROM clientes WHERE id = ?", (cliente_id,)).fetchone() is None:
+        if conn.execute("SELECT 1 FROM clientes WHERE id = %s", (cliente_id,)).fetchone() is None:
             raise HTTPException(404, "Cliente no encontrado.")
         if not cliente_verificado(conn, cliente_id):
             raise HTTPException(403, IDENTIDAD_NO_VERIFICADA_MSG)

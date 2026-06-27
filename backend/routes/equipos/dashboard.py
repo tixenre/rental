@@ -52,7 +52,7 @@ def admin_dashboard_uso(request: Request, dias_sin_uso: int = 90):
             LEFT JOIN alquileres p ON p.id = pi.pedido_id
             WHERE e.eliminado_at IS NULL AND e.es_recurso_interno = FALSE
             GROUP BY e.id, e.nombre, e.modelo, e.foto_url, e.valor_reposicion
-            HAVING (MAX(p.fecha_desde) IS NULL OR MAX(p.fecha_desde) < (CURRENT_DATE - (? || ' days')::INTERVAL))
+            HAVING (MAX(p.fecha_desde) IS NULL OR MAX(p.fecha_desde) < (CURRENT_DATE - (%s || ' days')::INTERVAL))
             ORDER BY ultimo_alquiler ASC NULLS FIRST
             LIMIT 25
         """, (dias_sin_uso,)).fetchall()

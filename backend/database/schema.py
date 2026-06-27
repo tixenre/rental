@@ -7,10 +7,10 @@ desde `database.py`; usa la conexión cruda + los wrappers del spine (`core`).
 import logging
 import time
 
-import psycopg2
+import psycopg
 
 from busqueda.motor import CAMPO_PLANTILLA
-from database.core import get_connection_params, PGConnection
+from database.core import DATABASE_URL, PGConnection
 from database.auto_tags import regenerate_auto_tags_all
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def _ddl_retry(conn, sql: str, retries: int = 3) -> None:
         try:
             conn.execute(sql)
             return
-        except psycopg2.Error as exc:
+        except psycopg.Error as exc:
             if "tuple concurrently updated" in str(exc) and attempt < retries - 1:
                 time.sleep(0.2 * (2 ** attempt))
             else:
@@ -35,8 +35,7 @@ def _ddl_retry(conn, sql: str, retries: int = 3) -> None:
 
 def init_db():
     """Crear todas las tablas si no existen."""
-    raw_conn = psycopg2.connect(**get_connection_params())
-    raw_conn.set_isolation_level(0)  # Autocommit
+    raw_conn = psycopg.connect(DATABASE_URL, autocommit=True, cursor_factory=psycopg.ClientCursor)
     conn = PGConnection(raw_conn)
     try:
         _init_db_schema(conn)
@@ -1186,7 +1185,7 @@ def _init_db_schema(conn):
         conn.execute(
             """
             INSERT INTO email_templates (key, subject, body_html, body_text, updated_by)
-            VALUES (?, ?, ?, ?, 'system:migration')
+            VALUES (%s, %s, %s, %s, 'system:migration')
             ON CONFLICT (key) DO NOTHING
             """,
             (_key, _tpl["subject"], _tpl["body_html"], _tpl["body_text"]),
@@ -1496,7 +1495,7 @@ def _init_db_schema(conn):
             RETURNING id
         """)
         centinela_id = cur_cent.fetchone()["id"]
-        conn.execute("UPDATE estudio SET equipo_id = ? WHERE id = 1", (centinela_id,))
+        conn.execute("UPDATE estudio SET equipo_id = %s WHERE id = 1", (centinela_id,))
 
     # ── Media pipeline no-destructivo (F1 — i1j2k3l4m5n6) ──────────────────────
     conn.execute("""

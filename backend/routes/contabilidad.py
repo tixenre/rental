@@ -249,7 +249,7 @@ def get_movimientos(
         if tipo in (None, "", "cobro") and not categoria_id and not beneficiario:
             cobrador = None
             if cuenta_id:
-                row = conn.execute("SELECT socio FROM cuentas WHERE id = ?", (cuenta_id,)).fetchone()
+                row = conn.execute("SELECT socio FROM cuentas WHERE id = %s", (cuenta_id,)).fetchone()
                 cobrador = row["socio"] if row else None
                 # Caja sin cobrador (Efectivo/Banco/Dólares) → no recibe cobros.
                 if not cobrador:
@@ -354,8 +354,8 @@ async def subir_comprobante(request: Request, mov_id: int, file: UploadFile = Fi
                 presign_expires=3600,
             )
             conn.execute(
-                "UPDATE movimientos SET comprobante_url = NULL, comprobante_key = ?, "
-                "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE movimientos SET comprobante_url = NULL, comprobante_key = %s, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                 (key, mov_id),
             )
             conn.commit()

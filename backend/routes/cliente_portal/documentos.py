@@ -21,7 +21,7 @@ from routes.cliente_portal.core import (
 def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
     """Carga el pedido validando ownership y rellena items + componentes."""
     row = conn.execute(
-        "SELECT * FROM alquileres WHERE id = ? AND cliente_id = ?",
+        "SELECT * FROM alquileres WHERE id = %s AND cliente_id = %s",
         (pedido_id, cliente_id),
     ).fetchone()
     if not row:
@@ -44,7 +44,7 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
                   perfil_impuestos, razon_social, domicilio_fiscal,
                   email_facturacion,
                   dni, nombre_renaper, apellido_renaper, direccion_renaper
-           FROM clientes WHERE id = ?""",
+           FROM clientes WHERE id = %s""",
         (cliente_id,),
     ).fetchone()
     if cli:

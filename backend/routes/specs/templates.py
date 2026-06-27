@@ -82,7 +82,7 @@ def listar_templates(categoria_id: int, request: Request):
         raiz_row = conn.execute(
             """
             WITH RECURSIVE up AS (
-                SELECT id, parent_id FROM categorias WHERE id = ?
+                SELECT id, parent_id FROM categorias WHERE id = %s
                 UNION
                 SELECT c.id, c.parent_id
                 FROM categorias c JOIN up ON up.parent_id = c.id
@@ -110,7 +110,7 @@ def listar_templates(categoria_id: int, request: Request):
               COALESCE(sd.compatibilidad_modo, 'exacta') AS compatibilidad_modo,
               sd.rol_compatibilidad
             FROM spec_definitions sd
-            WHERE sd.categoria_raiz_id = ?
+            WHERE sd.categoria_raiz_id = %s
             ORDER BY COALESCE(sd.prioridad, 100), sd.label
             """,
             (raiz_id,),
@@ -152,7 +152,7 @@ def listar_orphan_specs(categoria_id: int, request: Request):
                 JOIN equipos inner_e ON inner_e.id = inner_es.equipo_id
                 JOIN equipo_categorias inner_ec ON inner_ec.equipo_id = inner_e.id
                 WHERE inner_es.spec_def_id = es.spec_def_id
-                  AND inner_ec.categoria_id = ?
+                  AND inner_ec.categoria_id = %s
                   AND inner_e.eliminado_at IS NULL
                 LIMIT 3
               ) AS sample_values
@@ -160,7 +160,7 @@ def listar_orphan_specs(categoria_id: int, request: Request):
             JOIN equipos e ON e.id = es.equipo_id
             JOIN equipo_categorias ec ON ec.equipo_id = e.id
             JOIN spec_definitions sd ON sd.id = es.spec_def_id
-            WHERE ec.categoria_id = ?
+            WHERE ec.categoria_id = %s
               AND e.eliminado_at IS NULL
               AND NOT EXISTS (
                 SELECT 1 FROM categoria_spec_templates t
@@ -190,12 +190,12 @@ def asignar_spec_a_categoria(categoria_id: int, payload: SpecAssignmentInput, re
     _require_admin(request)
     with get_db() as conn:
         cat = conn.execute(
-            "SELECT id FROM categorias WHERE id = ?", (categoria_id,)
+            "SELECT id FROM categorias WHERE id = %s", (categoria_id,)
         ).fetchone()
         if not cat:
             raise HTTPException(404, f"Categoría {categoria_id} no existe")
         sd = conn.execute(
-            "SELECT id, label FROM spec_definitions WHERE id = ?", (payload.spec_def_id,)
+            "SELECT id, label FROM spec_definitions WHERE id = %s", (payload.spec_def_id,)
         ).fetchone()
         if not sd:
             raise HTTPException(404, f"Spec definition {payload.spec_def_id} no existe")
@@ -211,7 +211,7 @@ def asignar_spec_a_categoria(categoria_id: int, payload: SpecAssignmentInput, re
                   (categoria_id, spec_def_id, prioridad, destacado, obligatorio,
                    visible_en_card, visible_en_filtros, visible_en_nombre, ayuda,
                    rol_compatibilidad)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -255,13 +255,13 @@ def actualizar_asignacion(template_id: int, payload: SpecAssignmentUpdate, reque
     with get_db() as conn:
         try:
             existing = conn.execute(
-                "SELECT id FROM categoria_spec_templates WHERE id = ?", (template_id,)
+                "SELECT id FROM categoria_spec_templates WHERE id = %s", (template_id,)
             ).fetchone()
             if not existing:
                 raise HTTPException(404, "Asignación no existe")
             set_clause = ", ".join(f"{k} = ?" for k in updates)
             conn.execute(
-                f"UPDATE categoria_spec_templates SET {set_clause} WHERE id = ?",
+                f"UPDATE categoria_spec_templates SET {set_clause} WHERE id = %s",
                 list(updates.values()) + [template_id],
             )
             conn.commit()
@@ -277,7 +277,7 @@ def borrar_asignacion(template_id: int, request: Request):
     _require_admin(request)
     with get_db() as conn:
         conn.execute(
-            "DELETE FROM categoria_spec_templates WHERE id = ?", (template_id,)
+            "DELETE FROM categoria_spec_templates WHERE id = %s", (template_id,)
         )
         conn.commit()
         # NOTA: equipo_specs NO se borra al desasignar — los valores cargados
@@ -304,7 +304,7 @@ def reordenar_templates(payload: dict, request: Request):
                 if tid is None or prio is None:
                     raise HTTPException(400, "Cada item necesita 'id' y 'prioridad'")
                 conn.execute(
-                    "UPDATE categoria_spec_templates SET prioridad = ? WHERE id = ?",
+                    "UPDATE categoria_spec_templates SET prioridad = %s WHERE id = %s",
                     (int(prio), int(tid)),
                 )
             conn.commit()

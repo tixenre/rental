@@ -115,17 +115,17 @@ def _resolve_unidad_id(conn, simbolo: Optional[str]) -> Optional[int]:
     if not s:
         return None
     row = conn.execute(
-        "SELECT id FROM unidades WHERE simbolo = ?", (s,)
+        "SELECT id FROM unidades WHERE simbolo = %s", (s,)
     ).fetchone()
     if row:
         return row["id"] if isinstance(row, dict) or hasattr(row, "keys") else row[0]
     conn.execute(
         "INSERT INTO unidades (simbolo, nombre, dimension) "
-        "VALUES (?, ?, NULL) ON CONFLICT (simbolo) DO NOTHING",
+        "VALUES (%s, %s, NULL) ON CONFLICT (simbolo) DO NOTHING",
         (s, s),
     )
     row = conn.execute(
-        "SELECT id FROM unidades WHERE simbolo = ?", (s,)
+        "SELECT id FROM unidades WHERE simbolo = %s", (s,)
     ).fetchone()
     if row is None:
         return None
@@ -216,7 +216,7 @@ def crear_spec_definition(payload: SpecDefinitionInput, request: Request):
                   (spec_key, label, tipo, unidad, unidad_id, enum_options, ayuda,
                    es_compatibilidad, compatibilidad_modo, validado,
                    tabla_columnas, output_config)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -288,7 +288,7 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
     with get_db() as conn:
         try:
             existing = conn.execute(
-                "SELECT id, tipo, unidad, compatibilidad_modo FROM spec_definitions WHERE id = ?", (def_id,)
+                "SELECT id, tipo, unidad, compatibilidad_modo FROM spec_definitions WHERE id = %s", (def_id,)
             ).fetchone()
             if not existing:
                 raise HTTPException(404, "Definición no existe")
@@ -314,7 +314,7 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
             # el cambio podría invalidar todos los formatos guardados.
             if "tipo" in updates and updates["tipo"] != existing_dict.get("tipo"):
                 count = conn.execute(
-                    "SELECT COUNT(*) AS n FROM equipo_specs WHERE spec_def_id = ?", (def_id,)
+                    "SELECT COUNT(*) AS n FROM equipo_specs WHERE spec_def_id = %s", (def_id,)
                 ).fetchone()
                 if count and count["n"] > 0:
                     raise HTTPException(
@@ -325,7 +325,7 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
             set_clause = ", ".join(f"{k} = ?" for k in updates)
             try:
                 conn.execute(
-                    f"UPDATE spec_definitions SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    f"UPDATE spec_definitions SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                     list(updates.values()) + [def_id],
                 )
                 conn.commit()
@@ -351,12 +351,12 @@ def borrar_spec_definition(def_id: int, request: Request):
     _require_admin(request)
     with get_db() as conn:
         existing = conn.execute(
-            "SELECT id FROM spec_definitions WHERE id = ?", (def_id,)
+            "SELECT id FROM spec_definitions WHERE id = %s", (def_id,)
         ).fetchone()
         if not existing:
             raise HTTPException(404, "Definición no existe")
         usos = conn.execute(
-            "SELECT COUNT(*) AS n FROM categoria_spec_templates WHERE spec_def_id = ?", (def_id,)
+            "SELECT COUNT(*) AS n FROM categoria_spec_templates WHERE spec_def_id = %s", (def_id,)
         ).fetchone()
         if usos and usos["n"] > 0:
             raise HTTPException(
@@ -365,7 +365,7 @@ def borrar_spec_definition(def_id: int, request: Request):
                 "Desasignala primero antes de borrar la definición.",
             )
         equip = conn.execute(
-            "SELECT COUNT(*) AS n FROM equipo_specs WHERE spec_def_id = ?", (def_id,)
+            "SELECT COUNT(*) AS n FROM equipo_specs WHERE spec_def_id = %s", (def_id,)
         ).fetchone()
         if equip and equip["n"] > 0:
             raise HTTPException(
@@ -373,6 +373,6 @@ def borrar_spec_definition(def_id: int, request: Request):
                 f"Hay {equip['n']} equipos con valores cargados en esta spec. "
                 "Borralos primero.",
             )
-        conn.execute("DELETE FROM spec_definitions WHERE id = ?", (def_id,))
+        conn.execute("DELETE FROM spec_definitions WHERE id = %s", (def_id,))
         conn.commit()
 

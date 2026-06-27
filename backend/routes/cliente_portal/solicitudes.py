@@ -130,7 +130,7 @@ def _validar_ventana_corte(
 
 def _check_solicitud_pendiente(conn, pedido_id: int) -> None:
     pendiente = conn.execute(
-        "SELECT id FROM solicitudes_modificacion WHERE pedido_id = ? AND estado = 'pendiente'",
+        "SELECT id FROM solicitudes_modificacion WHERE pedido_id = %s AND estado = 'pendiente'",
         (pedido_id,)
     ).fetchone()
     if pendiente:
@@ -168,9 +168,9 @@ def _cancelar_solicitudes_pendientes(
     """
     rows = conn.execute(
         """UPDATE solicitudes_modificacion
-           SET estado = 'cancelada', respuesta = ?,
-               resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
-           WHERE pedido_id = ? AND estado = 'pendiente'
+           SET estado = 'cancelada', respuesta = %s,
+               resolved_at = CURRENT_TIMESTAMP, resolved_by = %s
+           WHERE pedido_id = %s AND estado = 'pendiente'
            RETURNING id""",
         (motivo, actor, pedido_id)
     ).fetchall()
@@ -201,7 +201,7 @@ def _lineas_libres_actuales(conn, pedido_id: int) -> list:
     from routes.alquileres import PedidoItem
     rows = conn.execute(
         "SELECT cantidad, precio_jornada, nombre_libre, cobro_modo "
-        "FROM alquiler_items WHERE pedido_id=? AND equipo_id IS NULL "
+        "FROM alquiler_items WHERE pedido_id=%s AND equipo_id IS NULL "
         "ORDER BY orden, id",
         (pedido_id,),
     ).fetchall()
@@ -224,7 +224,7 @@ def _precios_actuales(conn, pedido_id: int) -> dict[int, int]:
     del catálogo (`equipos.precio_jornada`) como fallback.
     """
     rows = conn.execute(
-        "SELECT equipo_id, precio_jornada FROM alquiler_items WHERE pedido_id=?",
+        "SELECT equipo_id, precio_jornada FROM alquiler_items WHERE pedido_id=%s",
         (pedido_id,)
     ).fetchall()
     return {r["equipo_id"]: r["precio_jornada"] for r in rows}
@@ -232,7 +232,7 @@ def _precios_actuales(conn, pedido_id: int) -> dict[int, int]:
 
 def _equipo_precio_catalogo(conn, equipo_id: int) -> int:
     row = conn.execute(
-        "SELECT precio_jornada FROM equipos WHERE id=?", (equipo_id,)
+        "SELECT precio_jornada FROM equipos WHERE id=%s", (equipo_id,)
     ).fetchone()
     return int(row["precio_jornada"] or 0) if row else 0
 
@@ -262,7 +262,7 @@ def cliente_modificar_pedido(
     with get_db() as conn:
         try:
             pedido = conn.execute(
-                "SELECT * FROM alquileres WHERE id = ? AND cliente_id = ?",
+                "SELECT * FROM alquileres WHERE id = %s AND cliente_id = %s",
                 (id, cliente_id)
             ).fetchone()
             if not pedido:
@@ -311,7 +311,7 @@ def cliente_modificar_pedido(
                 _apply_pedido_items(conn, id, pedido_items)
 
                 # Re-validar stock con el rango nuevo
-                p2 = conn.execute("SELECT fecha_desde, fecha_hasta FROM alquileres WHERE id=?", (id,)).fetchone()
+                p2 = conn.execute("SELECT fecha_desde, fecha_hasta FROM alquileres WHERE id=%s", (id,)).fetchone()
                 if p2["fecha_desde"] and p2["fecha_hasta"]:
                     problemas = _check_stock(conn, id, p2["fecha_desde"], p2["fecha_hasta"])
                     if problemas:
@@ -323,7 +323,7 @@ def cliente_modificar_pedido(
                 actor = session.get("email") or "cliente"
                 reciente = conn.execute(
                     """SELECT id FROM solicitudes_modificacion
-                       WHERE pedido_id = ? AND cliente_id = ? AND tipo = 'directo'
+                       WHERE pedido_id = %s AND cliente_id = %s AND tipo = 'directo'
                          AND resolved_at >= CURRENT_TIMESTAMP - INTERVAL '5 minutes'
                        ORDER BY resolved_at DESC LIMIT 1""",
                     (id, cliente_id)
@@ -332,16 +332,16 @@ def cliente_modificar_pedido(
                 if reciente:
                     conn.execute(
                         """UPDATE solicitudes_modificacion
-                           SET mensaje = ?, cambios_json = ?,
-                               resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
-                           WHERE id = ?""",
+                           SET mensaje = %s, cambios_json = %s,
+                               resolved_at = CURRENT_TIMESTAMP, resolved_by = %s
+                           WHERE id = %s""",
                         (data.mensaje, cambios_str, actor, reciente["id"])
                     )
                 else:
                     conn.execute(
                         """INSERT INTO solicitudes_modificacion
                            (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado, resolved_at, resolved_by)
-                           VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP,?)""",
+                           VALUES (%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP,%s)""",
                         (id, cliente_id, data.mensaje, cambios_str,
                          "directo", "aprobada", actor)
                     )
@@ -364,7 +364,7 @@ def cliente_modificar_pedido(
                 conn.execute(
                     """INSERT INTO solicitudes_modificacion
                        (pedido_id, cliente_id, mensaje, cambios_json, tipo, estado)
-                       VALUES (?,?,?,?,?,'pendiente')""",
+                       VALUES (%s,%s,%s,%s,%s,'pendiente')""",
                     (id, cliente_id, data.mensaje, json.dumps(data.model_dump()),
                      "aprobacion")
                 )
@@ -407,7 +407,7 @@ def cliente_cancelar_solicitud(
                FROM solicitudes_modificacion sm
                JOIN alquileres a ON a.id = sm.pedido_id
                JOIN clientes c ON c.id = sm.cliente_id
-               WHERE sm.id = ? AND sm.pedido_id = ? AND sm.cliente_id = ?
+               WHERE sm.id = %s AND sm.pedido_id = %s AND sm.cliente_id = %s
                FOR UPDATE OF sm""",
             (sm_id, id, cliente_id)
         ).fetchone()
@@ -417,8 +417,8 @@ def cliente_cancelar_solicitud(
             raise HTTPException(400, "Esta solicitud ya fue resuelta")
         conn.execute(
             """UPDATE solicitudes_modificacion
-               SET estado = 'cancelada', resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
-               WHERE id = ?""",
+               SET estado = 'cancelada', resolved_at = CURRENT_TIMESTAMP, resolved_by = %s
+               WHERE id = %s""",
             (session.get("email") or "cliente", sm_id)
         )
         conn.commit()
@@ -461,7 +461,7 @@ def cliente_disponibilidad(
     cliente_id = session["cliente_id"]
     with get_db() as conn:
         owned = conn.execute(
-            "SELECT id FROM alquileres WHERE id = ? AND cliente_id = ?",
+            "SELECT id FROM alquileres WHERE id = %s AND cliente_id = %s",
             (id, cliente_id)
         ).fetchone()
         if not owned:
@@ -644,7 +644,7 @@ def admin_responder_solicitud(
                    FROM solicitudes_modificacion sm
                    JOIN alquileres a ON a.id = sm.pedido_id
                    JOIN clientes c ON c.id = sm.cliente_id
-                   WHERE sm.id = ?
+                   WHERE sm.id = %s
                    FOR UPDATE OF sm""",
                 (id,)
             ).fetchone()
@@ -705,7 +705,7 @@ def admin_responder_solicitud(
 
                 # Re-validar stock con el rango nuevo
                 p2 = conn.execute(
-                    "SELECT fecha_desde, fecha_hasta FROM alquileres WHERE id=?",
+                    "SELECT fecha_desde, fecha_hasta FROM alquileres WHERE id=%s",
                     (sm["pedido_id"],)
                 ).fetchone()
                 if p2["fecha_desde"] and p2["fecha_hasta"]:
@@ -719,9 +719,9 @@ def admin_responder_solicitud(
 
             conn.execute(
                 """UPDATE solicitudes_modificacion
-                   SET estado = ?, respuesta = ?, cambios_aplicados = ?,
-                       resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
-                   WHERE id = ?""",
+                   SET estado = %s, respuesta = %s, cambios_aplicados = %s,
+                       resolved_at = CURRENT_TIMESTAMP, resolved_by = %s
+                   WHERE id = %s""",
                 (data.estado, data.respuesta, cambios_aplicados_str, admin_email, id)
             )
             conn.commit()

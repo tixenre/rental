@@ -31,14 +31,14 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
     _require_admin(request)
     with get_db() as conn:
         eq = conn.execute(
-            "SELECT id FROM equipos WHERE id = ?", (equipo_id,)
+            "SELECT id FROM equipos WHERE id = %s", (equipo_id,)
         ).fetchone()
         if not eq:
             raise HTTPException(404, "Equipo no existe")
 
         # Specs ya cargadas
         spec_rows = conn.execute(
-            "SELECT spec_def_id, value FROM equipo_specs WHERE equipo_id = ?",
+            "SELECT spec_def_id, value FROM equipo_specs WHERE equipo_id = %s",
             (equipo_id,),
         ).fetchall()
         specs = {str(r["spec_def_id"]): r["value"] for r in spec_rows}
@@ -54,7 +54,7 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         # migraciones del registry. El SELECT proyecta el shape completo del
         # tipo `SpecTemplate` del frontend.
         cs_row = conn.execute(
-            "SELECT categoria_specs FROM equipos WHERE id = ?", (equipo_id,)
+            "SELECT categoria_specs FROM equipos WHERE id = %s", (equipo_id,)
         ).fetchone()
         categoria_specs = (
             row_to_dict(cs_row).get("categoria_specs") if cs_row else None
@@ -63,7 +63,7 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
         template: list[dict] = []
         if categoria_specs:
             cat_row = conn.execute(
-                "SELECT id FROM categorias WHERE nombre = ? AND parent_id IS NULL",
+                "SELECT id FROM categorias WHERE nombre = %s AND parent_id IS NULL",
                 (categoria_specs,),
             ).fetchone()
             if cat_row:
@@ -85,7 +85,7 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
                         FALSE AS obligatorio,
                         sd.ayuda
                     FROM spec_definitions sd
-                    WHERE sd.categoria_raiz_id = ?
+                    WHERE sd.categoria_raiz_id = %s
                     ORDER BY COALESCE(sd.prioridad, 100), sd.label
                     """,
                     (raiz_id,),
@@ -113,7 +113,7 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
     with get_db() as conn:
         try:
             eq = conn.execute(
-                "SELECT id FROM equipos WHERE id = ?", (equipo_id,)
+                "SELECT id FROM equipos WHERE id = %s", (equipo_id,)
             ).fetchone()
             if not eq:
                 raise HTTPException(404, "Equipo no existe")
@@ -130,7 +130,7 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
 
             defs_by_id: dict[int, dict] = {}
             if keys_int:
-                placeholders = ",".join(["?"] * len(keys_int))
+                placeholders = ",".join(["%s"] * len(keys_int))
                 def_rows = conn.execute(
                     f"SELECT id, label, tipo, tabla_columnas, enum_options, unidad "
                     f"FROM spec_definitions WHERE id IN ({placeholders})",

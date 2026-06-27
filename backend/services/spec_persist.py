@@ -96,7 +96,7 @@ def persistir_specs(
     """
     from services.spec_coerce import coerce_and_serialize
 
-    conn.execute("DELETE FROM equipo_specs WHERE equipo_id = ?", (equipo_id,))
+    conn.execute("DELETE FROM equipo_specs WHERE equipo_id = %s", (equipo_id,))
     persisted = 0
     discarded: list[dict] = []
 
@@ -138,7 +138,7 @@ def persistir_specs(
             persist_value = str(value)
 
         conn.execute(
-            "INSERT INTO equipo_specs (equipo_id, spec_def_id, value) VALUES (?, ?, ?)"
+            "INSERT INTO equipo_specs (equipo_id, spec_def_id, value) VALUES (%s, %s, %s)"
             " ON CONFLICT (equipo_id, spec_def_id) DO UPDATE SET value = EXCLUDED.value",
             (equipo_id, spec_def_id, persist_value),
         )

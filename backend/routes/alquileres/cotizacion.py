@@ -89,7 +89,7 @@ def cotizar(data: CotizarRequest, request: Request):
                 })
                 continue
             row = conn.execute(
-                "SELECT precio_jornada, tipo FROM equipos WHERE id=? AND eliminado_at IS NULL",
+                "SELECT precio_jornada, tipo FROM equipos WHERE id=%s AND eliminado_at IS NULL",
                 (it.equipo_id,),
             ).fetchone()
             if not row:
@@ -128,7 +128,7 @@ def cotizar(data: CotizarRequest, request: Request):
                     target_cliente_id = data.cliente_id
             if target_cliente_id:
                 c = conn.execute(
-                    "SELECT perfil_impuestos, descuento FROM clientes WHERE id=?",
+                    "SELECT perfil_impuestos, descuento FROM clientes WHERE id=%s",
                     (target_cliente_id,),
                 ).fetchone()
                 if c:
