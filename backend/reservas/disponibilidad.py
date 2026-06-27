@@ -52,9 +52,9 @@ def calcular_disponibilidad(conn, fecha_desde, fecha_hasta, exclude_pedido_id=No
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE p.estado IN {ESTADOS_RESERVADO}
           AND pi.equipo_id IS NOT NULL
-          AND p.fecha_desde < ?
-          AND p.fecha_hasta > ?
-          AND (? IS NULL OR p.id != ?)
+          AND p.fecha_desde < %s
+          AND p.fecha_hasta > %s
+          AND (%s IS NULL OR p.id != %s)
         GROUP BY pi.equipo_id
     """, (fh_buf, fd_buf, excl, excl)).fetchall()
     reservados = {r["eid"]: r["cant"] for r in res_rows}
@@ -189,7 +189,7 @@ def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> 
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE p.estado IN {ESTADOS_RESERVADO}
           AND pi.equipo_id IS NOT NULL
-          AND p.fecha_hasta > ? AND p.fecha_desde < ?
+          AND p.fecha_hasta > %s AND p.fecha_desde < %s
         """,
         (win_lo, win_hi),
     ).fetchall()
@@ -212,7 +212,7 @@ def dias_no_disponibles(conn, items: dict[int, int], desde: str, hasta: str) -> 
         FROM equipo_mantenimiento
         WHERE bloquea_stock = TRUE
           AND equipo_id IN ({ph})
-          AND COALESCE(fecha_hasta, fecha) > ? AND fecha < ?
+          AND COALESCE(fecha_hasta, fecha) > %s AND fecha < %s
         """,
         (*ids, win_lo, win_hi),
     ).fetchall()
@@ -412,7 +412,7 @@ def estado_diario_equipo(conn, equipo_id: int, desde: str, hasta: str) -> dict:
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE p.estado IN {ESTADOS_RESERVADO}
           AND pi.equipo_id IS NOT NULL
-          AND p.fecha_hasta > ? AND p.fecha_desde < ?
+          AND p.fecha_hasta > %s AND p.fecha_desde < %s
         """,
         (win_lo, win_hi),
     ).fetchall()

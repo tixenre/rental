@@ -99,8 +99,8 @@ def test_params_van_como_bound_y_en_orden():
     sql, params = c.calls[-1]
     # equipo_id, excl_pedido_id, fh_buf, fd_buf — en ese orden, como bound params.
     assert params == (42, 7, "FH", "FD")
-    # SQL parametrizado: placeholders ? presentes y sin {…} sin sustituir.
-    assert "?" in sql and "{" not in sql
+    # SQL parametrizado: placeholders %s presentes (uppercased → %S) y sin {…} sin sustituir.
+    assert "%S" in sql and "{" not in sql
 
 
 # ── reservado_total — conteo de consumo recursivo (C4) ───────────────────────

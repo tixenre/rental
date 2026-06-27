@@ -66,7 +66,7 @@ def _saldo(conn, nombre: str):
 
 
 def _cuenta_id(conn, nombre: str):
-    row = conn.execute("SELECT id FROM cuentas WHERE nombre = ?", (nombre,)).fetchone()
+    row = conn.execute("SELECT id FROM cuentas WHERE nombre = %s", (nombre,)).fetchone()
     return row[0] if row else None
 
 
@@ -75,12 +75,14 @@ def _pedido_y_pago(conn, monto, destinatario, fecha="2026-06-15T10:00:00",
     conn.execute(
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
+           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
            VALUES (?,?,?,?,?,?,?)""",
         (ped, "Cliente contab", "finalizado", fecha_desde,
          "2026-06-06T20:00:00", monto, monto),
     )
     conn.execute(
         """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
+           VALUES (%s,%s,%s,%s,%s,%s)""",
            VALUES (?,?,?,?,?,?)""",
         (ped, monto, "pago", destinatario, "transferencia", fecha),
     )
@@ -89,6 +91,7 @@ def _pedido_y_pago(conn, monto, destinatario, fecha="2026-06-15T10:00:00",
 def _mov(conn, tipo, monto, origen=None, destino=None):
     conn.execute(
         """INSERT INTO movimientos (tipo, monto, cuenta_origen_id, cuenta_destino_id, created_by)
+           VALUES (%s,%s,%s,%s,%s)""",
            VALUES (?,?,?,?,?)""",
         (tipo, monto, origen, destino, "test"),
     )
@@ -200,7 +203,7 @@ def test_desactivar_falla_si_la_cuenta_tiene_saldo(conn):
 
 
 def _categoria_id(conn, nombre="Otros"):
-    row = conn.execute("SELECT id FROM gasto_categorias WHERE nombre = ?", (nombre,)).fetchone()
+    row = conn.execute("SELECT id FROM gasto_categorias WHERE nombre = %s", (nombre,)).fetchone()
     return row[0] if row else None
 
 
@@ -287,22 +290,24 @@ def test_rendicion_cierra_en_cero_y_saldar(conn):
     MES = "2026-09"
     EQ, PED2 = 9_400_900, 9_400_901
     conn.execute(
-        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (?,?,?,?)",
+        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
         (EQ, "Equipo Rend", 3, "Pablo"),
     )
     conn.execute(
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
+           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
            VALUES (?,?,?,?,?,?,?)""",
         (PED2, "Cli rend", "finalizado", "2026-09-05T08:00:00", "2026-09-06T20:00:00",
          100000, 100000),
     )
     conn.execute(
-        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (?,?,?,?)",
+        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (%s,%s,%s,%s)",
         (PED2, EQ, 1, 100000),
     )
     conn.execute(
         """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
+           VALUES (%s,%s,%s,%s,%s,%s)""",
            VALUES (?,?,?,?,?,?)""",
         (PED2, 100000, "pago", "Tincho", "transferencia", "2026-09-15T10:00:00"),
     )

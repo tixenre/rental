@@ -1121,9 +1121,9 @@ def _centinela_libre(conn, equipo_id: int, fecha_desde, fecha_hasta,
         JOIN alquileres p ON p.id = pi.pedido_id
         WHERE pi.equipo_id = %s
           AND p.estado IN {ESTADOS_RESERVADO}
-          AND (? IS NULL OR p.id != ?)
-          AND p.fecha_desde < ?
-          AND p.fecha_hasta > ?
+          AND (%s IS NULL OR p.id != %s)
+          AND p.fecha_desde < %s
+          AND p.fecha_hasta > %s
         """,
         (equipo_id, exclude_pedido_id, exclude_pedido_id, hi, lo),
     ).fetchone()

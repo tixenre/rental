@@ -73,18 +73,18 @@ def db_setup():
     try:
         _limpiar(conn)
         conn.execute(
-            "INSERT INTO equipos (id, nombre, cantidad) VALUES (?, ?, ?)",
+            "INSERT INTO equipos (id, nombre, cantidad) VALUES (%s, %s, %s)",
             (EQ_ID, "Cámara de test (concurrencia)", 1),
         )
         for pid in (PED_A, PED_B):
             conn.execute(
                 "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) "
-                "VALUES (?, ?, 'borrador', ?, ?)",
+                "VALUES (%s, %s, 'borrador', %s, %s)",
                 (pid, "Cliente de test (concurrencia)", FD, FH),
             )
             conn.execute(
                 "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) "
-                "VALUES (?, ?, ?)",
+                "VALUES (%s, %s, %s)",
                 (pid, EQ_ID, 1),
             )
         conn.commit()
@@ -102,9 +102,9 @@ def db_setup():
 
 
 def _limpiar(conn):
-    conn.execute("DELETE FROM alquiler_items WHERE equipo_id = ?", (EQ_ID,))
-    conn.execute("DELETE FROM alquileres WHERE id IN (?, ?)", (PED_A, PED_B))
-    conn.execute("DELETE FROM equipos WHERE id = ?", (EQ_ID,))
+    conn.execute("DELETE FROM alquiler_items WHERE equipo_id = %s", (EQ_ID,))
+    conn.execute("DELETE FROM alquileres WHERE id IN (%s, %s)", (PED_A, PED_B))
+    conn.execute("DELETE FROM equipos WHERE id = %s", (EQ_ID,))
 
 
 def _confirmar(pedido_id, barrera, resultados, errores):
@@ -121,7 +121,7 @@ def _confirmar(pedido_id, barrera, resultados, errores):
         problemas = validar_stock(conn, pedido_id, FD, FH)
         if not problemas:
             conn.execute(
-                "UPDATE alquileres SET estado = 'confirmado' WHERE id = ?",
+                "UPDATE alquileres SET estado = 'confirmado' WHERE id = %s",
                 (pedido_id,),
             )
             conn.commit()  # libera el lock recién acá
@@ -183,7 +183,7 @@ def test_la_verdad_quedo_consistente_en_la_db(db_setup):
     try:
         confirmados = conn.execute(
             "SELECT COUNT(*) AS n FROM alquileres "
-            "WHERE id IN (?, ?) AND estado = 'confirmado'",
+            "WHERE id IN (%s, %s) AND estado = 'confirmado'",
             (PED_A, PED_B),
         ).fetchone()["n"]
         assert confirmados == 1, f"esperaba 1 pedido confirmado en la DB, hay {confirmados}"
@@ -219,7 +219,7 @@ def db_setup_crear():
     try:
         _limpiar_crear(conn)
         conn.execute(
-            "INSERT INTO equipos (id, nombre, cantidad, precio_jornada) VALUES (?, ?, ?, ?)",
+            "INSERT INTO equipos (id, nombre, cantidad, precio_jornada) VALUES (%s, %s, %s, %s)",
             (EQ_ID2, "Equipo de test (crear concurrente)", STOCK2, 1000),
         )
         conn.commit()
@@ -239,11 +239,11 @@ def db_setup_crear():
 def _limpiar_crear(conn):
     conn.execute(
         "DELETE FROM alquiler_items WHERE pedido_id IN "
-        "(SELECT id FROM alquileres WHERE cliente_nombre = ?)",
+        "(SELECT id FROM alquileres WHERE cliente_nombre = %s)",
         (_NOMBRE_TEST,),
     )
-    conn.execute("DELETE FROM alquileres WHERE cliente_nombre = ?", (_NOMBRE_TEST,))
-    conn.execute("DELETE FROM equipos WHERE id = ?", (EQ_ID2,))
+    conn.execute("DELETE FROM alquileres WHERE cliente_nombre = %s", (_NOMBRE_TEST,))
+    conn.execute("DELETE FROM equipos WHERE id = %s", (EQ_ID2,))
 
 
 def _crear(barrera, idx, resultados, errores):
@@ -297,7 +297,7 @@ def test_crear_pedidos_concurrentes_sin_deadlock_ni_overbooking(db_setup_crear):
     conn = get_db()
     try:
         creados = conn.execute(
-            "SELECT COUNT(*) AS n FROM alquileres WHERE cliente_nombre = ?",
+            "SELECT COUNT(*) AS n FROM alquileres WHERE cliente_nombre = %s",
             (_NOMBRE_TEST,),
         ).fetchone()["n"]
         assert creados == STOCK2, f"esperaba {STOCK2} pedidos en la DB, hay {creados}"

@@ -118,8 +118,8 @@ def unidades_en_mantenimiento_batch(
         FROM equipo_mantenimiento
         WHERE equipo_id IN ({ph})
           AND bloquea_stock = TRUE
-          AND fecha < ?
-          AND COALESCE(fecha_hasta, fecha) > ?
+          AND fecha < %s
+          AND COALESCE(fecha_hasta, fecha) > %s
         GROUP BY equipo_id
     """, (*ids, fecha_hasta, fecha_desde)).fetchall()
     return {r[0]: int(r[1] or 0) for r in rows}
@@ -317,10 +317,10 @@ def reservado_directo_batch(
         FROM alquiler_items pi2
         JOIN alquileres p ON p.id = pi2.pedido_id
         WHERE pi2.equipo_id IN ({ph})
-          AND p.id != ?
+          AND p.id != %s
           AND p.estado IN {ESTADOS_RESERVADO}
-          AND p.fecha_desde < ?
-          AND p.fecha_hasta > ?
+          AND p.fecha_desde < %s
+          AND p.fecha_hasta > %s
         GROUP BY pi2.equipo_id
     """, (*ids, excl_pedido_id, fh_buf, fd_buf)).fetchall()
     return {r[0]: int(r[1] or 0) for r in rows}

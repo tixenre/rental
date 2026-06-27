@@ -103,8 +103,8 @@ def feed_ical(request: Request, token: str = ""):
                 SELECT id, numero_pedido, cliente_nombre, estado, tipo,
                        fecha_desde, fecha_hasta
                 FROM alquileres
-                WHERE estado IN ({','.join('?' for _ in _ESTADOS_FEED)})
-                  AND fecha_hasta >= ?
+                WHERE estado IN ({','.join('%s' for _ in _ESTADOS_FEED)})
+                  AND fecha_hasta >= %s
                 ORDER BY fecha_desde
                 """,
                 (*_ESTADOS_FEED, corte),

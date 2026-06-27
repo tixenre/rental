@@ -58,7 +58,8 @@ def _limpiar(conn):
 def _modelo(conn, modelo: dict):
     conn.execute(
         """INSERT INTO app_settings (key, value, updated_by)
-           VALUES ('comisiones_modelo', ?, 'test')
+           VALUES ('comisiones_modelo', %s, 'test')
+           ON CONFLICT (key) DO UPDATE SET value = excluded.value""",
            ON CONFLICT (key) DO UPDATE SET value = excluded.value""",
         (json.dumps(modelo),),
     )
@@ -73,26 +74,27 @@ def setup():
     try:
         _limpiar(conn)
         conn.execute(
-            "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (?,?,?,?)",
+            "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
             (E_PABLO, "Equipo Pablo", 5, "Pablo"),
         )
         conn.execute(
-            "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (?,?,?,?)",
+            "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
             (E_RAMBLA, "Equipo Rambla", 5, "Rambla"),
         )
         # P_JUNIO: 100k de Pablo, alquiler y saldo en junio → cuenta para junio
         # (fecha_desde dentro del clean start, ver liquidacion.LIQUIDACION_INICIO).
         conn.execute(
             """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, monto_total, monto_pagado)
+               VALUES (%s,%s,%s,%s,%s,%s)""",
                VALUES (?,?,?,?,?,?)""",
             (P_JUNIO, "Cliente", "finalizado", "2026-06-05T08:00:00", 100000, 100000),
         )
         conn.execute(
-            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (?,?,?,?)",
+            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (%s,%s,%s,%s)",
             (P_JUNIO, E_PABLO, 1, 100000),
         )
         conn.execute(
-            "INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha) VALUES (?,?,?,?)",
+            "INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha) VALUES (%s,%s,%s,%s)",
             (P_JUNIO, 100000, "pago", "2026-06-15T10:00:00"),
         )
         # Modelo default conocido.
@@ -179,7 +181,7 @@ def test_reconciliacion_caza_pedido_editado_en_mes_cerrado(setup):
 
         # Editamos el pedido saldado en junio DESPUÉS del cierre (bump updated_at).
         conn.execute(
-            "UPDATE alquileres SET updated_at = CURRENT_TIMESTAMP + INTERVAL '1 hour' WHERE id = ?",
+            "UPDATE alquileres SET updated_at = CURRENT_TIMESTAMP + INTERVAL '1 hour' WHERE id = %s",
             (P_JUNIO,),
         )
         conn.commit()

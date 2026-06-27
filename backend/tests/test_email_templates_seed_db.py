@@ -72,7 +72,7 @@ def test_init_db_siembra_y_el_preview_anda():
     # Punto de partida: tabla VACÍA (reproduce el estado roto).
     conn = get_db()
     try:
-        conn.execute("DELETE FROM email_templates WHERE key = ANY(?)", (list(EXPECTED_KEYS),))
+        conn.execute("DELETE FROM email_templates WHERE key = ANY(%s)", (list(EXPECTED_KEYS),))
         conn.commit()
     finally:
         conn.close()

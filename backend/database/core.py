@@ -137,23 +137,17 @@ def _get_pool() -> ConnectionPool:
     return _pool
 
 
-# ── Guardas de seguridad SQL + traducción de paramstyle ──────────────────────
-# El proyecto migró de SQLite a PostgreSQL. El wrapper traduce los placeholders
-# `?` (sqlite3) → `%s` (psycopg) y emula `lastrowid` con `SELECT lastval()`.
-#
-# Convención go-forward: el código NUEVO se escribe en `%s` nativo (no más `?`).
-# El `?` legado migra a `%s` por fases; la coexistencia `?`+`%s` es segura (ambos
-# pasan por las guardas de abajo). El supervisor marca `?` nuevo en código nuevo.
-#
-# Las guardas `_assert_params_present` + `_assert_pct_safe` enforcan MECÁNICAMENTE
-# lo que antes era convención en prosa: todo VALOR va como bound param, y el único
-# `%` permitido es un placeholder (`%s`/`%(name)s`) o `%%`. Un `%` literal en el
-# SQL (ej. `LIKE '%x%'` inline) es un bug → el comodín de LIKE va en el param.
+# ── Guardas de seguridad SQL ─────────────────────────────────────────────────
+# Todo el código usa `%s` nativo de psycopg (migración de `?` completada).
+# Las guardas `_assert_params_present` + `_assert_pct_safe` enforcan:
+#   · Todo VALOR va como bound param (no f-strings ni concatenación).
+#   · El único `%` permitido es placeholder (`%s`/`%(name)s`) o `%%`.
+#   · Un `%` literal (ej. `LIKE '%x%'` inline) es un bug → comodín en params.
 
 # Un `%` es válido sólo si abre un placeholder (`%s`, `%(name)s`) o es `%%`.
 _VALID_PCT = re.compile(r"%(?:s|%|\([A-Za-z_]\w*\)s)")
-# Placeholders posicionales (`?`, a traducir) o nativos (`%s` / `%(name)s`).
-_HAS_PLACEHOLDER = re.compile(r"\?|%s|%\([A-Za-z_]\w*\)s")
+# Placeholders nativos psycopg (`%s` / `%(name)s`).
+_HAS_PLACEHOLDER = re.compile(r"%s|%\([A-Za-z_]\w*\)s")
 
 
 def _assert_pct_safe(sql: str) -> None:
@@ -176,10 +170,9 @@ def _assert_pct_safe(sql: str) -> None:
 
 
 def _assert_params_present(sql: str, params) -> None:
-    """Si el SQL tiene placeholders (`?` o `%s`) pero `params` está vacío, casi
-    seguro el caller olvidó la tupla. Avisa claro en vez del error críptico de
-    psycopg. Agnóstica de paramstyle → sucesora permanente del viejo check
-    `if '?' in sql and not params` (que sólo cubría `?`)."""
+    """Si el SQL tiene placeholders (`%s`/`%(name)s`) pero `params` está vacío,
+    casi seguro el caller olvidó la tupla. Avisa claro en vez del error críptico
+    de psycopg."""
     if not params and _HAS_PLACEHOLDER.search(sql):
         raise ValueError(
             f"SQL tiene placeholders pero `params` está vacío "
@@ -197,7 +190,6 @@ class PGCursor:
             raise TypeError(f"execute() recibió SQL no-string: {type(sql).__name__}")
         _assert_params_present(sql, params)
         _assert_pct_safe(sql)
-        sql = sql.replace("?", "%s")   # ⏰ LEGACY: remover al terminar la migración a %s nativo
         return self.raw_cursor.execute(sql, params)
 
     @property
@@ -277,7 +269,6 @@ class PGConnection:
         _assert_params_present(sql, params)
         _assert_pct_safe(sql)
         cur = self.raw_conn.cursor()
-        sql = sql.replace("?", "%s")   # ⏰ LEGACY: remover al terminar la migración a %s nativo
         cur.execute(sql, params)
         return PGCursor(cur)
 
@@ -287,7 +278,6 @@ class PGConnection:
             raise TypeError(f"executemany() recibió SQL no-string: {type(sql).__name__}")
         _assert_pct_safe(sql)   # (paridad con execute; antes executemany no validaba nada)
         cur = self.raw_conn.cursor()
-        sql = sql.replace("?", "%s")   # ⏰ LEGACY: remover al terminar la migración a %s nativo
         for params in params_list:
             cur.execute(sql, params)
         return PGCursor(cur)

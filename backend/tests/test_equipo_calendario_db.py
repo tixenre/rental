@@ -66,11 +66,11 @@ def nested_setup():
     conn = get_db()
     try:
         _limpiar(conn)
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (Z, "Hoja Z cal", 1))
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (Y, "Kit Y cal", 9999))
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (X, "Combo X cal", 9999))
-        conn.execute("INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (?,?,?)", (Y, Z, 1))
-        conn.execute("INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (?,?,?)", (X, Y, 1))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (Z, "Hoja Z cal", 1))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (Y, "Kit Y cal", 9999))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (X, "Combo X cal", 9999))
+        conn.execute("INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (%s,%s,%s)", (Y, Z, 1))
+        conn.execute("INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (%s,%s,%s)", (X, Y, 1))
         conn.commit()
     finally:
         conn.close()
@@ -87,11 +87,11 @@ def nested_setup():
 
 def _crear_pedido(conn, pid, estado, equipo_id, fd=FD, fh=FH, cant=1):
     conn.execute(
-        "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (?,?,?,?,?)",
+        "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (%s,%s,%s,%s,%s)",
         (pid, "Cliente test (calendario)", estado, fd, fh),
     )
     conn.execute(
-        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (?,?,?)",
+        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (%s,%s,%s)",
         (pid, equipo_id, cant),
     )
 

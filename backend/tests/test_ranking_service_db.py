@@ -62,18 +62,18 @@ def universo():
     conn = get_db()
     try:
         _limpiar(conn)
-        conn.execute("INSERT INTO categorias (id, nombre) VALUES (?,?)", (CAT, "Cat Ranking Test"))
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (A, "Equipo A rank", 1))
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (B, "Equipo B rank", 1))
-        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id) VALUES (?,?)", (A, CAT))
-        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id) VALUES (?,?)", (B, CAT))
+        conn.execute("INSERT INTO categorias (id, nombre) VALUES (%s,%s)", (CAT, "Cat Ranking Test"))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (A, "Equipo A rank", 1))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (B, "Equipo B rank", 1))
+        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id) VALUES (%s,%s)", (A, CAT))
+        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id) VALUES (%s,%s)", (B, CAT))
         # Pedido confirmado para A: 1 × 1000 × 2 días = 2000 de ingreso, 1 pedido.
         conn.execute(
-            "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (?,?,?,?,?)",
+            "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (%s,%s,%s,%s,%s)",
             (PED, "Cliente rank", "confirmado", FD, FH),
         )
         conn.execute(
-            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada) VALUES (?,?,?,?)",
+            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada) VALUES (%s,%s,%s,%s)",
             (PED, A, 1, 1000),
         )
         conn.commit()
@@ -92,7 +92,7 @@ def universo():
 
 def _score(conn, eid):
     return conn.execute(
-        "SELECT popularidad_score, cant_pedidos, ingreso_total_ars FROM equipos WHERE id = ?",
+        "SELECT popularidad_score, cant_pedidos, ingreso_total_ars FROM equipos WHERE id = %s",
         (eid,),
     ).fetchone()
 

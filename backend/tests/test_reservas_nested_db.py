@@ -69,11 +69,11 @@ def nested_setup():
     conn = get_db()
     try:
         _limpiar(conn)
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (Z, "Hoja Z", 1))
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (Y, "Kit Y", 9999))
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (X, "Combo X", 9999))
-        conn.execute("INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (?,?,?)", (Y, Z, 1))
-        conn.execute("INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (?,?,?)", (X, Y, 1))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (Z, "Hoja Z", 1))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (Y, "Kit Y", 9999))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (X, "Combo X", 9999))
+        conn.execute("INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (%s,%s,%s)", (Y, Z, 1))
+        conn.execute("INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (%s,%s,%s)", (X, Y, 1))
         conn.commit()
     finally:
         conn.close()
@@ -90,11 +90,11 @@ def nested_setup():
 
 def _crear_pedido(conn, pid, estado, equipo_id, fd=FD, fh=FH, cant=1):
     conn.execute(
-        "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (?,?,?,?,?)",
+        "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (%s,%s,%s,%s,%s)",
         (pid, "Cliente test (anidado)", estado, fd, fh),
     )
     conn.execute(
-        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (?,?,?)",
+        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (%s,%s,%s)",
         (pid, equipo_id, cant),
     )
 
@@ -175,7 +175,7 @@ def _confirmar(pedido_id, equipo_id, barrera, resultados, errores):
         barrera.wait(timeout=5)
         problemas = validar_stock(conn, pedido_id, FD, FH)
         if not problemas:
-            conn.execute("UPDATE alquileres SET estado='confirmado' WHERE id=?", (pedido_id,))
+            conn.execute("UPDATE alquileres SET estado='confirmado' WHERE id=%s", (pedido_id,))
             conn.commit()
             resultados[pedido_id] = "confirmado"
         else:
@@ -213,7 +213,7 @@ def test_concurrencia_anidada_solo_una_pasa(nested_setup):
     conn = get_db()
     try:
         n = conn.execute(
-            "SELECT COUNT(*) AS n FROM alquileres WHERE id IN (?,?) AND estado='confirmado'",
+            "SELECT COUNT(*) AS n FROM alquileres WHERE id IN (%s,%s) AND estado='confirmado'",
             (PA, PB),
         ).fetchone()["n"]
         assert n == 1, f"esperaba 1 confirmado en la DB, hay {n}"
