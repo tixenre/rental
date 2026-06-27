@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { createLazyFileRoute, Link } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import {
   Users,
   ExternalLink,
@@ -38,7 +39,6 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/design-system/ui/dialog";
-import { formatARS } from "@/lib/format";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
 
 export const Route = createLazyFileRoute("/admin/talleres/")({
@@ -47,21 +47,14 @@ export const Route = createLazyFileRoute("/admin/talleres/")({
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type SesionBody = { fecha: string; hora_inicio: number; hora_fin: number };
+type ClaseBody = { fecha: string; hora_inicio: number; hora_fin: number };
 
-type TallerAdmin = {
+type EdicionAdmin = {
   id: number;
+  taller_id: number;
+  numero_edicion: number;
   slug: string;
-  nombre: string;
-  subtitulo: string;
-  instructor_nombre: string;
-  instructor_bio: string;
-  instructor_foto_url: string;
-  instructor_proyectos: string;
-  descripcion: string;
-  publico_objetivo: string;
-  programa_teorica: string[];
-  programa_practica: string[];
+  tipo_taller: string;
   fecha_inicio: string;
   fecha_fin: string;
   horario: string;
@@ -75,11 +68,26 @@ type TallerAdmin = {
   pago_banco: string;
   direccion: string;
   activo: boolean;
-  tipo_taller: string;
+  frozen_at: string | null;
+  clases: ClaseBody[];
+};
+
+type TallerConcepto = {
+  id: number;
+  slug_base: string;
+  nombre: string;
+  subtitulo: string;
+  instructor_nombre: string;
+  instructor_bio: string;
+  instructor_proyectos: string;
+  descripcion: string;
+  publico_objetivo: string;
+  programa_teorica: string[];
+  programa_practica: string[];
+  instructor_foto_url: string;
+  instructor_media_id: number | null;
   notif_email: string;
-  proxima_edicion_slug: string;
-  numero_edicion: number;
-  sesiones: SesionBody[];
+  ediciones: EdicionAdmin[];
 };
 
 type Inscripcion = {
@@ -90,56 +98,44 @@ type Inscripcion = {
   experiencia: string | null;
   comprobante_url: string | null;
   en_lista_espera: boolean;
+  estado: string | null;
+  edicion_id: number | null;
+  numero_edicion: number | null;
+  edicion_slug: string | null;
   created_at: string | null;
 };
 
-type UpdateBody = {
-  nombre?: string;
-  subtitulo?: string;
-  descripcion?: string;
-  publico_objetivo?: string;
-  instructor_nombre?: string;
-  instructor_bio?: string;
-  instructor_proyectos?: string;
-  programa_teorica?: string[];
-  programa_practica?: string[];
-  horario?: string;
-  precio_total?: number;
-  precio_sena?: number;
-  cupos_total?: number;
-  pago_alias?: string;
-  pago_cbu?: string;
-  pago_banco?: string;
-  direccion?: string;
-  activo?: boolean;
-  tipo_taller?: string;
-  notif_email?: string;
-  proxima_edicion_slug?: string;
-  sesiones?: SesionBody[];
-};
+// ── Cache helpers ─────────────────────────────────────────────────────────────
 
-type CreateBody = {
-  nombre: string;
-  instructor_nombre: string;
-  tipo_taller: string;
-  sesiones: SesionBody[];
-  cupos_total: number;
-  precio_total: number;
-  precio_sena: number;
-};
+function updateEdicionInCache(qc: QueryClient, updated: EdicionAdmin) {
+  qc.setQueryData(["admin", "talleres"], (prev: TallerConcepto[] | undefined) =>
+    prev?.map((c) => ({
+      ...c,
+      ediciones: c.ediciones.map((e) => (e.id === updated.id ? updated : e)),
+    })),
+  );
+}
+
+function updateConceptoInCache(qc: QueryClient, updated: TallerConcepto) {
+  qc.setQueryData(["admin", "talleres"], (prev: TallerConcepto[] | undefined) =>
+    prev?.map((c) => (c.id === updated.id ? updated : c)),
+  );
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-function badgeEstado(taller: TallerAdmin): { label: string; className: string } {
+function badgeEstadoEdicion(edicion: EdicionAdmin): { label: string; className: string } {
   const today = new Date().toISOString().slice(0, 10);
-  if (!taller.activo) return { label: "INACTIVO", className: "bg-muted/40 text-muted-foreground" };
-  if (taller.fecha_inicio > today)
+  if (!edicion.activo) return { label: "INACTIVA", className: "bg-muted/40 text-muted-foreground" };
+  if (edicion.frozen_at)
+    return { label: "CONGELADA", className: "bg-muted/60 text-muted-foreground" };
+  if (edicion.fecha_inicio > today)
     return { label: "PRÓXIMAMENTE", className: "bg-amber/20 text-amber" };
-  if (taller.fecha_fin >= today)
+  if (edicion.fecha_fin >= today)
     return { label: "EN CURSO", className: "bg-verde/20 text-verde-ink" };
-  return { label: "FINALIZADO", className: "bg-muted/40 text-muted-foreground" };
+  return { label: "FINALIZADA", className: "bg-muted/40 text-muted-foreground" };
 }
 
 function CuposPill({ confirmados, total }: { confirmados: number; total: number }) {
@@ -159,20 +155,20 @@ function CuposPill({ confirmados, total }: { confirmados: number; total: number 
   );
 }
 
-function generarSesionesSemanales(
+function generarClasesSemanales(
   diaSemana: number,
   mesDesde: string,
   mesHasta: string,
   horaInicio: number,
   horaFin: number,
-): SesionBody[] {
+): ClaseBody[] {
   const [yD, mD] = mesDesde.split("-").map(Number);
   const [yH, mH] = mesHasta.split("-").map(Number);
-  const end = new Date(yH, mH, 0); // last day of mesHasta
-  const jsDay = (diaSemana + 1) % 7; // Mon=0→1, ..., Sun=6→0
+  const end = new Date(yH, mH, 0);
+  const jsDay = (diaSemana + 1) % 7;
   const cur = new Date(yD, mD - 1, 1);
   while (cur.getDay() !== jsDay) cur.setDate(cur.getDate() + 1);
-  const result: SesionBody[] = [];
+  const result: ClaseBody[] = [];
   while (cur <= end) {
     result.push({
       fecha: cur.toISOString().slice(0, 10),
@@ -191,6 +187,13 @@ function fmtDate(iso: string | null) {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+  });
+}
+
+function fmtDay(iso: string) {
+  return new Date(iso + "T12:00:00").toLocaleDateString("es-AR", {
+    day: "numeric",
+    month: "short",
   });
 }
 
@@ -226,23 +229,22 @@ function HoraSelect({
   );
 }
 
-// ── Session Assistant ─────────────────────────────────────────────────────────
+// ── ClasesAsistente ───────────────────────────────────────────────────────────
 
-function SesionAsistente({
+function ClasesAsistente({
   tipo,
   onTipoChange,
-  sesiones,
+  clases,
   onChange,
 }: {
   tipo: string;
   onTipoChange: (t: string) => void;
-  sesiones: SesionBody[];
-  onChange: (s: SesionBody[]) => void;
+  clases: ClaseBody[];
+  onChange: (s: ClaseBody[]) => void;
 }) {
   const [newFecha, setNewFecha] = useState("");
   const [newIni, setNewIni] = useState(9);
   const [newFin, setNewFin] = useState(13);
-
   const [diaSemana, setDiaSemana] = useState(0);
   const [mesDesde, setMesDesde] = useState("");
   const [mesHasta, setMesHasta] = useState("");
@@ -258,12 +260,12 @@ function SesionAsistente({
       toast.error("Hora inicio debe ser menor a hora fin");
       return;
     }
-    if (sesiones.find((s) => s.fecha === newFecha)) {
+    if (clases.find((s) => s.fecha === newFecha)) {
       toast.error("Esa fecha ya está en la lista");
       return;
     }
     onChange(
-      [...sesiones, { fecha: newFecha, hora_inicio: newIni, hora_fin: newFin }].sort((a, b) =>
+      [...clases, { fecha: newFecha, hora_inicio: newIni, hora_fin: newFin }].sort((a, b) =>
         a.fecha.localeCompare(b.fecha),
       ),
     );
@@ -283,15 +285,15 @@ function SesionAsistente({
       toast.error("Hora inicio debe ser menor a hora fin");
       return;
     }
-    const generated = generarSesionesSemanales(diaSemana, mesDesde, mesHasta, semIni, semFin);
+    const generated = generarClasesSemanales(diaSemana, mesDesde, mesHasta, semIni, semFin);
     const existingDates = new Set(generated.map((g) => g.fecha));
-    const kept = sesiones.filter((s) => !existingDates.has(s.fecha));
+    const kept = clases.filter((s) => !existingDates.has(s.fecha));
     onChange([...kept, ...generated].sort((a, b) => a.fecha.localeCompare(b.fecha)));
-    toast.success(`${generated.length} sesiones generadas`);
+    toast.success(`${generated.length} clases generadas`);
   }
 
   function remove(fecha: string) {
-    onChange(sesiones.filter((s) => s.fecha !== fecha));
+    onChange(clases.filter((s) => s.fecha !== fecha));
   }
 
   return (
@@ -387,14 +389,14 @@ function SesionAsistente({
         </div>
       )}
 
-      {sesiones.length > 0 ? (
+      {clases.length > 0 ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-            {sesiones.length} sesión{sesiones.length !== 1 ? "es" : ""} · bloquean el estudio en
-            esas franjas
+            {clases.length} clase{clases.length !== 1 ? "s" : ""} · bloquean el estudio en esas
+            franjas
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {sesiones.map((s) => (
+            {clases.map((s) => (
               <span
                 key={s.fecha}
                 className="inline-flex items-center gap-1.5 rounded-full bg-muted/40 border border-border/50 px-3 py-1 text-xs"
@@ -420,368 +422,86 @@ function SesionAsistente({
         </div>
       ) : (
         <p className="text-xs text-muted-foreground/60 italic">
-          Sin sesiones. Agregá al menos una para bloquear el estudio.
+          Sin clases. Agregá al menos una para bloquear el estudio.
         </p>
       )}
     </div>
   );
 }
 
-// ── SesionesSection ───────────────────────────────────────────────────────────
+// ── ClasesSection ─────────────────────────────────────────────────────────────
 
-function SesionesSection({ taller }: { taller: TallerAdmin }) {
+function ClasesSection({ edicion }: { edicion: EdicionAdmin }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [tipo, setTipo] = useState(taller.tipo_taller || "intensivo");
-  const [sesiones, setSesiones] = useState<SesionBody[]>(taller.sesiones ?? []);
+  const [tipo, setTipo] = useState(edicion.tipo_taller || "intensivo");
+  const [clases, setClases] = useState<ClaseBody[]>(edicion.clases ?? []);
 
   useEffect(() => {
-    setTipo(taller.tipo_taller || "intensivo");
-    setSesiones(taller.sesiones ?? []);
-  }, [taller.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    setTipo(edicion.tipo_taller || "intensivo");
+    setClases(edicion.clases ?? []);
+  }, [edicion.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mut = useMutation({
-    mutationFn: (body: UpdateBody) =>
-      authedJson<TallerAdmin>(`/api/admin/talleres/${taller.id}`, {
+    mutationFn: (body: { tipo_taller: string; clases: ClaseBody[] }) =>
+      authedJson<EdicionAdmin>(`/api/admin/ediciones/${edicion.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
     onSuccess: (updated) => {
-      toast.success("Sesiones guardadas");
+      toast.success("Clases guardadas");
       setEditing(false);
-      qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
-        prev ? prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) : prev,
-      );
+      updateEdicionInCache(qc, updated);
     },
     onError: (e) => toast.error((e as Error).message),
   });
 
   function handleSave() {
-    if (sesiones.length === 0) {
-      toast.error("Agregá al menos una sesión");
+    if (clases.length === 0) {
+      toast.error("Agregá al menos una clase");
       return;
     }
-    mut.mutate({ tipo_taller: tipo, sesiones });
+    mut.mutate({ tipo_taller: tipo, clases });
   }
 
   function handleCancel() {
-    setTipo(taller.tipo_taller || "intensivo");
-    setSesiones(taller.sesiones ?? []);
+    setTipo(edicion.tipo_taller || "intensivo");
+    setClases(edicion.clases ?? []);
     setEditing(false);
   }
 
   return !editing ? (
     <div className="flex flex-col gap-4">
-      {taller.sesiones && taller.sesiones.length > 0 ? (
-        <TallerCalendario sesiones={taller.sesiones} horario={taller.horario} />
+      {edicion.clases && edicion.clases.length > 0 ? (
+        <TallerCalendario sesiones={edicion.clases} horario={edicion.horario} />
       ) : (
-        <p className="text-sm text-muted-foreground italic">Sin sesiones cargadas.</p>
+        <p className="text-sm text-muted-foreground italic">Sin clases cargadas.</p>
       )}
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-          Editar sesiones
+          Editar clases
         </Button>
       </div>
     </div>
   ) : (
     <div className="flex flex-col gap-5">
-      <SesionAsistente
-        tipo={tipo}
-        onTipoChange={setTipo}
-        sesiones={sesiones}
-        onChange={setSesiones}
-      />
-
-      {sesiones.length > 0 && (
+      <ClasesAsistente tipo={tipo} onTipoChange={setTipo} clases={clases} onChange={setClases} />
+      {clases.length > 0 && (
         <div className="pointer-events-none select-none">
           <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
             Preview
           </p>
-          <TallerCalendario sesiones={sesiones} />
+          <TallerCalendario sesiones={clases} />
         </div>
       )}
-
       <div className="flex gap-2 justify-end pt-2">
         <Button variant="ghost" size="sm" onClick={handleCancel}>
           Cancelar
         </Button>
         <Button onClick={handleSave} disabled={mut.isPending} size="sm" className="gap-2">
           {mut.isPending ? <Spinner size="xs" /> : <Save className="h-3.5 w-3.5" />}
-          Guardar sesiones
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ── PagosSection ──────────────────────────────────────────────────────────────
-
-function PagosSection({ taller }: { taller: TallerAdmin }) {
-  const qc = useQueryClient();
-  const [form, setForm] = useState({
-    pago_alias: taller.pago_alias ?? "",
-    pago_cbu: taller.pago_cbu ?? "",
-    pago_banco: taller.pago_banco ?? "",
-    direccion: taller.direccion ?? "",
-    notif_email: taller.notif_email ?? "",
-  });
-
-  useEffect(() => {
-    setForm({
-      pago_alias: taller.pago_alias ?? "",
-      pago_cbu: taller.pago_cbu ?? "",
-      pago_banco: taller.pago_banco ?? "",
-      direccion: taller.direccion ?? "",
-      notif_email: taller.notif_email ?? "",
-    });
-  }, [taller.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const mut = useMutation({
-    mutationFn: (body: UpdateBody) =>
-      authedJson<TallerAdmin>(`/api/admin/talleres/${taller.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-    onSuccess: (updated) => {
-      toast.success("Guardado");
-      qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
-        prev ? prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) : prev,
-      );
-    },
-    onError: (e) => toast.error((e as Error).message),
-  });
-
-  const tf = (label: string, key: keyof typeof form) => (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-        {label}
-      </label>
-      <Input
-        value={String(form[key])}
-        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-      />
-    </div>
-  );
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid sm:grid-cols-2 gap-4">{tf("Dirección", "direccion")}</div>
-      <div className="grid sm:grid-cols-3 gap-4">
-        {tf("Alias de pago", "pago_alias")}
-        {tf("CBU", "pago_cbu")}
-        {tf("Banco", "pago_banco")}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-          Email del instructor
-        </label>
-        <Input
-          type="email"
-          placeholder="instructor@ejemplo.com (recibe las inscripciones)"
-          value={form.notif_email}
-          onChange={(e) => setForm((f) => ({ ...f, notif_email: e.target.value }))}
-        />
-      </div>
-      <div className="flex justify-end">
-        <Button onClick={() => mut.mutate({ ...form })} disabled={mut.isPending} className="gap-2">
-          {mut.isPending ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
-          Guardar
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ── FotoSection ───────────────────────────────────────────────────────────────
-
-function FotoSection({ taller }: { taller: TallerAdmin }) {
-  const qc = useQueryClient();
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const [uploading, setUploading] = useState(false);
-
-  async function handleUpload(file: File) {
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await authedFetch(`/api/admin/talleres/${taller.id}/upload-foto-instructor`, {
-        method: "POST",
-        body: fd,
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.detail ?? `Error ${res.status}`);
-      toast.success("Foto actualizada");
-      qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  return (
-    <div className="flex items-start gap-6">
-      {taller.instructor_foto_url ? (
-        <img
-          src={taller.instructor_foto_url}
-          alt={taller.instructor_nombre}
-          className="w-24 h-24 rounded-full object-cover object-top border border-border/40 shrink-0"
-        />
-      ) : (
-        <div className="w-24 h-24 rounded-full bg-muted/40 border border-dashed border-border/60 flex items-center justify-center shrink-0">
-          <span className="text-xs text-muted-foreground text-center px-2">Sin foto</span>
-        </div>
-      )}
-      <div className="flex flex-col gap-2">
-        <p className="text-sm text-muted-foreground">
-          JPG, PNG o WebP · máx. 8 MB. Se muestra en la sección "Sobre" de la landing del workshop.
-        </p>
-        <div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) handleUpload(f);
-            }}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={uploading}
-            onClick={() => fileRef.current?.click()}
-            className="gap-2"
-          >
-            {uploading ? <Spinner size="xs" /> : <Upload className="h-3.5 w-3.5" />}
-            {taller.instructor_foto_url ? "Cambiar foto" : "Subir foto"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── ContenidoSection ──────────────────────────────────────────────────────────
-
-function ContenidoSection({ taller }: { taller: TallerAdmin }) {
-  const qc = useQueryClient();
-
-  const [form, setForm] = useState({
-    nombre: taller.nombre,
-    subtitulo: taller.subtitulo,
-    instructor_nombre: taller.instructor_nombre,
-    descripcion: taller.descripcion,
-    publico_objetivo: taller.publico_objetivo,
-    instructor_bio: taller.instructor_bio,
-    instructor_proyectos: taller.instructor_proyectos,
-    programa_teorica: (taller.programa_teorica ?? []).join("\n"),
-    programa_practica: (taller.programa_practica ?? []).join("\n"),
-  });
-
-  useEffect(() => {
-    setForm({
-      nombre: taller.nombre,
-      subtitulo: taller.subtitulo,
-      instructor_nombre: taller.instructor_nombre,
-      descripcion: taller.descripcion,
-      publico_objetivo: taller.publico_objetivo,
-      instructor_bio: taller.instructor_bio,
-      instructor_proyectos: taller.instructor_proyectos,
-      programa_teorica: (taller.programa_teorica ?? []).join("\n"),
-      programa_practica: (taller.programa_practica ?? []).join("\n"),
-    });
-  }, [taller.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const mut = useMutation({
-    mutationFn: (body: UpdateBody) =>
-      authedJson<TallerAdmin>(`/api/admin/talleres/${taller.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
-    onSuccess: (updated) => {
-      toast.success("Guardado");
-      qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
-        prev ? prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) : prev,
-      );
-    },
-    onError: (e) => toast.error((e as Error).message),
-  });
-
-  function handleSave() {
-    mut.mutate({
-      nombre: form.nombre,
-      subtitulo: form.subtitulo,
-      instructor_nombre: form.instructor_nombre,
-      descripcion: form.descripcion,
-      publico_objetivo: form.publico_objetivo,
-      instructor_bio: form.instructor_bio,
-      instructor_proyectos: form.instructor_proyectos,
-      programa_teorica: form.programa_teorica
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      programa_practica: form.programa_practica
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    });
-  }
-
-  const field = (
-    label: string,
-    key: keyof typeof form,
-    opts?: { rows?: number; hint?: string },
-  ) => (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-        {label}
-      </label>
-      {opts?.hint && <p className="text-xs text-muted-foreground/70 -mt-1">{opts.hint}</p>}
-      {(opts?.rows ?? 1) === 1 ? (
-        <Input
-          value={form[key] as string}
-          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-        />
-      ) : (
-        <textarea
-          rows={opts?.rows}
-          value={form[key] as string}
-          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
-        />
-      )}
-    </div>
-  );
-
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="grid sm:grid-cols-2 gap-4">
-        {field("Nombre", "nombre")}
-        {field("Subtítulo", "subtitulo")}
-      </div>
-      {field("Instructor/a", "instructor_nombre")}
-      {field("Descripción", "descripcion", { rows: 4 })}
-      {field("¿Para quiénes?", "publico_objetivo", {
-        rows: 3,
-        hint: "Texto que aparece en el box 'Orientado a'",
-      })}
-      {field("Bio del/la instructor/a", "instructor_bio", { rows: 4 })}
-      {field("Proyectos (separados por coma)", "instructor_proyectos", {
-        rows: 2,
-        hint: "Se muestran como pills.",
-      })}
-      {field("Programa clase teórica (1 ítem por línea)", "programa_teorica", { rows: 6 })}
-      {field("Programa clase práctica (1 ítem por línea)", "programa_practica", { rows: 6 })}
-      <div className="flex justify-end pt-2">
-        <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
-          {mut.isPending ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
-          Guardar cambios
+          Guardar clases
         </Button>
       </div>
     </div>
@@ -790,30 +510,28 @@ function ContenidoSection({ taller }: { taller: TallerAdmin }) {
 
 // ── PreciosSection ────────────────────────────────────────────────────────────
 
-function PreciosSection({ taller }: { taller: TallerAdmin }) {
+function PreciosSection({ edicion }: { edicion: EdicionAdmin }) {
   const qc = useQueryClient();
-  const [precioTotal, setPrecioTotal] = useState(String(taller.precio_total));
-  const [precioSena, setPrecioSena] = useState(String(taller.precio_sena));
-  const [cuposTotal, setCuposTotal] = useState(String(taller.cupos_total));
+  const [precioTotal, setPrecioTotal] = useState(String(edicion.precio_total));
+  const [precioSena, setPrecioSena] = useState(String(edicion.precio_sena));
+  const [cuposTotal, setCuposTotal] = useState(String(edicion.cupos_total));
 
   useEffect(() => {
-    setPrecioTotal(String(taller.precio_total));
-    setPrecioSena(String(taller.precio_sena));
-    setCuposTotal(String(taller.cupos_total));
-  }, [taller.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    setPrecioTotal(String(edicion.precio_total));
+    setPrecioSena(String(edicion.precio_sena));
+    setCuposTotal(String(edicion.cupos_total));
+  }, [edicion.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mut = useMutation({
-    mutationFn: (body: UpdateBody) =>
-      authedJson<TallerAdmin>(`/api/admin/talleres/${taller.id}`, {
+    mutationFn: (body: { precio_total: number; precio_sena: number; cupos_total: number }) =>
+      authedJson<EdicionAdmin>(`/api/admin/ediciones/${edicion.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
     onSuccess: (updated) => {
       toast.success("Precios actualizados");
-      qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
-        prev ? prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) : prev,
-      );
+      updateEdicionInCache(qc, updated);
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -826,8 +544,8 @@ function PreciosSection({ taller }: { taller: TallerAdmin }) {
       toast.error("Ingresá números válidos");
       return;
     }
-    if (cupos < taller.cupos_confirmados) {
-      toast.error(`No podés bajar cupos a ${cupos}: hay ${taller.cupos_confirmados} confirmados`);
+    if (cupos < edicion.cupos_confirmados) {
+      toast.error(`No podés bajar cupos a ${cupos}: hay ${edicion.cupos_confirmados} confirmados`);
       return;
     }
     mut.mutate({ precio_total: total, precio_sena: sena, cupos_total: cupos });
@@ -835,9 +553,9 @@ function PreciosSection({ taller }: { taller: TallerAdmin }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {taller.cupos_confirmados >= taller.cupos_total && (
+      {edicion.cupos_confirmados >= edicion.cupos_total && (
         <div className="rounded-lg bg-amber/10 border border-amber/30 px-4 py-3 text-sm text-amber">
-          ⚠ Taller completo — {taller.cupos_confirmados}/{taller.cupos_total} cupos ocupados
+          ⚠ Edición completa — {edicion.cupos_confirmados}/{edicion.cupos_total} cupos ocupados
         </div>
       )}
       <div className="grid sm:grid-cols-3 gap-4">
@@ -885,14 +603,279 @@ function PreciosSection({ taller }: { taller: TallerAdmin }) {
   );
 }
 
+// ── PagosSection ──────────────────────────────────────────────────────────────
+
+function PagosSection({ edicion }: { edicion: EdicionAdmin }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    pago_alias: edicion.pago_alias ?? "",
+    pago_cbu: edicion.pago_cbu ?? "",
+    pago_banco: edicion.pago_banco ?? "",
+    direccion: edicion.direccion ?? "",
+  });
+
+  useEffect(() => {
+    setForm({
+      pago_alias: edicion.pago_alias ?? "",
+      pago_cbu: edicion.pago_cbu ?? "",
+      pago_banco: edicion.pago_banco ?? "",
+      direccion: edicion.direccion ?? "",
+    });
+  }, [edicion.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mut = useMutation({
+    mutationFn: (body: typeof form) =>
+      authedJson<EdicionAdmin>(`/api/admin/ediciones/${edicion.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: (updated) => {
+      toast.success("Guardado");
+      updateEdicionInCache(qc, updated);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const tf = (label: string, key: keyof typeof form) => (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+        {label}
+      </label>
+      <Input
+        value={form[key]}
+        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+      />
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid sm:grid-cols-2 gap-4">{tf("Dirección", "direccion")}</div>
+      <div className="grid sm:grid-cols-3 gap-4">
+        {tf("Alias de pago", "pago_alias")}
+        {tf("CBU", "pago_cbu")}
+        {tf("Banco", "pago_banco")}
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={() => mut.mutate(form)} disabled={mut.isPending} className="gap-2">
+          {mut.isPending ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
+          Guardar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── FotoSection ───────────────────────────────────────────────────────────────
+
+function FotoSection({ concepto }: { concepto: TallerConcepto }) {
+  const qc = useQueryClient();
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleUpload(file: File) {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await authedFetch(`/api/admin/talleres/${concepto.id}/upload-foto-instructor`, {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.detail ?? `Error ${res.status}`);
+      toast.success("Foto actualizada");
+      qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="flex items-start gap-6">
+      {concepto.instructor_foto_url ? (
+        <img
+          src={concepto.instructor_foto_url}
+          alt={concepto.instructor_nombre}
+          className="w-24 h-24 rounded-full object-cover object-top border border-border/40 shrink-0"
+        />
+      ) : (
+        <div className="w-24 h-24 rounded-full bg-muted/40 border border-dashed border-border/60 flex items-center justify-center shrink-0">
+          <span className="text-xs text-muted-foreground text-center px-2">Sin foto</span>
+        </div>
+      )}
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-muted-foreground">
+          JPG, PNG o WebP · máx. 8 MB. Se muestra en la sección "Sobre" de la landing del workshop.
+        </p>
+        <div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUpload(f);
+            }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+            className="gap-2"
+          >
+            {uploading ? <Spinner size="xs" /> : <Upload className="h-3.5 w-3.5" />}
+            {concepto.instructor_foto_url ? "Cambiar foto" : "Subir foto"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ContenidoSection ──────────────────────────────────────────────────────────
+
+function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    nombre: concepto.nombre,
+    subtitulo: concepto.subtitulo,
+    instructor_nombre: concepto.instructor_nombre,
+    descripcion: concepto.descripcion,
+    publico_objetivo: concepto.publico_objetivo,
+    instructor_bio: concepto.instructor_bio,
+    instructor_proyectos: concepto.instructor_proyectos,
+    programa_teorica: (concepto.programa_teorica ?? []).join("\n"),
+    programa_practica: (concepto.programa_practica ?? []).join("\n"),
+    notif_email: concepto.notif_email ?? "",
+  });
+
+  useEffect(() => {
+    setForm({
+      nombre: concepto.nombre,
+      subtitulo: concepto.subtitulo,
+      instructor_nombre: concepto.instructor_nombre,
+      descripcion: concepto.descripcion,
+      publico_objetivo: concepto.publico_objetivo,
+      instructor_bio: concepto.instructor_bio,
+      instructor_proyectos: concepto.instructor_proyectos,
+      programa_teorica: (concepto.programa_teorica ?? []).join("\n"),
+      programa_practica: (concepto.programa_practica ?? []).join("\n"),
+      notif_email: concepto.notif_email ?? "",
+    });
+  }, [concepto.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mut = useMutation({
+    mutationFn: (body: object) =>
+      authedJson<TallerConcepto>(`/api/admin/talleres/${concepto.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: (updated) => {
+      toast.success("Guardado");
+      updateConceptoInCache(qc, updated);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  function handleSave() {
+    mut.mutate({
+      nombre: form.nombre,
+      subtitulo: form.subtitulo,
+      instructor_nombre: form.instructor_nombre,
+      descripcion: form.descripcion,
+      publico_objetivo: form.publico_objetivo,
+      instructor_bio: form.instructor_bio,
+      instructor_proyectos: form.instructor_proyectos,
+      programa_teorica: form.programa_teorica
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      programa_practica: form.programa_practica
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      notif_email: form.notif_email,
+    });
+  }
+
+  const field = (
+    label: string,
+    key: keyof typeof form,
+    opts?: { rows?: number; hint?: string; type?: string },
+  ) => (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+        {label}
+      </label>
+      {opts?.hint && <p className="text-xs text-muted-foreground/70 -mt-1">{opts.hint}</p>}
+      {(opts?.rows ?? 1) === 1 ? (
+        <Input
+          type={opts?.type ?? "text"}
+          value={form[key] as string}
+          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+        />
+      ) : (
+        <textarea
+          rows={opts?.rows}
+          value={form[key] as string}
+          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid sm:grid-cols-2 gap-4">
+        {field("Nombre", "nombre")}
+        {field("Subtítulo", "subtitulo")}
+      </div>
+      {field("Instructor/a", "instructor_nombre")}
+      {field("Descripción", "descripcion", { rows: 4 })}
+      {field("¿Para quiénes?", "publico_objetivo", {
+        rows: 3,
+        hint: "Texto que aparece en el box 'Orientado a'",
+      })}
+      {field("Bio del/la instructor/a", "instructor_bio", { rows: 4 })}
+      {field("Proyectos (separados por coma)", "instructor_proyectos", {
+        rows: 2,
+        hint: "Se muestran como pills.",
+      })}
+      {field("Programa clase teórica (1 ítem por línea)", "programa_teorica", { rows: 6 })}
+      {field("Programa clase práctica (1 ítem por línea)", "programa_practica", { rows: 6 })}
+      {field("Email del instructor/a", "notif_email", {
+        type: "email",
+        hint: "Recibe las notificaciones de inscripción.",
+      })}
+      <div className="flex justify-end pt-2">
+        <Button onClick={handleSave} disabled={mut.isPending} className="gap-2">
+          {mut.isPending ? <Spinner size="sm" /> : <Save className="h-4 w-4" />}
+          Guardar cambios
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── InscripcionesSection ──────────────────────────────────────────────────────
 
 function InscripcionesSection({
-  taller,
+  edicion,
+  concepto,
   inscripciones,
   loading,
 }: {
-  taller: TallerAdmin;
+  edicion: EdicionAdmin;
+  concepto: TallerConcepto;
   inscripciones: Inscripcion[];
   loading: boolean;
 }) {
@@ -905,30 +888,27 @@ function InscripcionesSection({
 
   const eliminarMut = useMutation({
     mutationFn: (insId: number) =>
-      authedJson<TallerAdmin>(`/api/admin/talleres/${taller.id}/inscripciones/${insId}`, {
+      authedJson<{ ok: boolean }>(`/api/admin/talleres/${concepto.id}/inscripciones/${insId}`, {
         method: "DELETE",
       }),
-    onSuccess: (updated) => {
+    onSuccess: () => {
       toast.success("Inscripción eliminada");
-      qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
-        prev ? prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) : prev,
-      );
-      qc.invalidateQueries({ queryKey: ["admin", "talleres", taller.id, "inscripciones"] });
+      qc.invalidateQueries({ queryKey: ["admin", "ediciones", edicion.id, "inscripciones"] });
+      qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
     },
     onError: (e) => toast.error((e as Error).message),
   });
 
   const confirmarMut = useMutation({
     mutationFn: (insId: number) =>
-      authedJson<TallerAdmin>(`/api/admin/talleres/${taller.id}/inscripciones/${insId}/confirmar`, {
-        method: "POST",
-      }),
-    onSuccess: (updated) => {
+      authedJson<{ ok: boolean }>(
+        `/api/admin/talleres/${concepto.id}/inscripciones/${insId}/confirmar`,
+        { method: "POST" },
+      ),
+    onSuccess: () => {
       toast.success("Inscripción confirmada");
-      qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
-        prev ? prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) : prev,
-      );
-      qc.invalidateQueries({ queryKey: ["admin", "talleres", taller.id, "inscripciones"] });
+      qc.invalidateQueries({ queryKey: ["admin", "ediciones", edicion.id, "inscripciones"] });
+      qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -936,7 +916,7 @@ function InscripcionesSection({
   const notificarMut = useMutation({
     mutationFn: (mensaje: string) =>
       authedJson<{ enviados: number; fallidos: number }>(
-        `/api/admin/talleres/${taller.id}/notificar-cambios`,
+        `/api/admin/talleres/${concepto.id}/notificar-cambios`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -953,13 +933,13 @@ function InscripcionesSection({
 
   async function handleCsvDownload() {
     try {
-      const res = await authedFetch(`/api/admin/talleres/${taller.id}/inscripciones/export-csv`);
+      const res = await authedFetch(`/api/admin/talleres/${concepto.id}/inscripciones/export-csv`);
       if (!res.ok) throw new Error(`Error ${res.status}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `inscripciones-${taller.slug}.csv`;
+      a.download = `inscripciones-${concepto.slug_base}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -990,7 +970,7 @@ function InscripcionesSection({
           <tr className="text-left text-xs text-muted-foreground border-b border-border/60">
             <th className="pb-2 pr-4 font-medium">Nombre</th>
             <th className="pb-2 pr-4 font-medium">Email</th>
-            <th className="pb-2 pr-4 font-medium">Teléfono</th>
+            <th className="pb-2 pr-4 font-medium hidden sm:table-cell">Teléfono</th>
             <th className="pb-2 pr-4 font-medium hidden lg:table-cell">Experiencia</th>
             <th className="pb-2 pr-4 font-medium">Comp.</th>
             <th className="pb-2 pr-4 font-medium">Fecha</th>
@@ -1006,7 +986,9 @@ function InscripcionesSection({
                   {ins.email}
                 </a>
               </td>
-              <td className="py-2.5 pr-4 text-muted-foreground">{ins.telefono}</td>
+              <td className="py-2.5 pr-4 text-muted-foreground hidden sm:table-cell">
+                {ins.telefono}
+              </td>
               <td className="py-2.5 pr-4 text-muted-foreground hidden lg:table-cell max-w-[180px] truncate">
                 {ins.experiencia || "—"}
               </td>
@@ -1106,7 +1088,6 @@ function InscripcionesSection({
         </div>
       )}
 
-      {/* Notificar cambios dialog */}
       <Dialog open={notifOpen} onOpenChange={setNotifOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1148,132 +1129,384 @@ function InscripcionesSection({
   );
 }
 
-// ── EdicionesSection ──────────────────────────────────────────────────────────
+// ── EdicionSubRow ─────────────────────────────────────────────────────────────
 
-function EdicionesSection({
-  taller,
-  onNuevaDuplica,
+function EdicionSubRow({
+  edicion,
+  concepto,
+  onDelete,
 }: {
-  taller: TallerAdmin;
-  onNuevaDuplica: () => void;
+  edicion: EdicionAdmin;
+  concepto: TallerConcepto;
+  onDelete: (edicionId: number) => void;
 }) {
   const qc = useQueryClient();
-  const [proximaSlug, setProximaSlug] = useState(taller.proxima_edicion_slug ?? "");
+  const badge = badgeEstadoEdicion(edicion);
+  const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<"clases" | "precios" | "inscripciones">("clases");
 
-  useEffect(() => {
-    setProximaSlug(taller.proxima_edicion_slug ?? "");
-  }, [taller.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: inscripciones = [], isLoading: loadingIns } = useQuery({
+    queryKey: ["admin", "ediciones", edicion.id, "inscripciones"],
+    queryFn: () => authedJson<Inscripcion[]>(`/api/admin/ediciones/${edicion.id}/inscripciones`),
+    enabled: expanded && activeTab === "inscripciones",
+    staleTime: 1000 * 30,
+  });
 
-  const mut = useMutation({
-    mutationFn: (proxima_edicion_slug: string) =>
-      authedJson<TallerAdmin>(`/api/admin/talleres/${taller.id}`, {
+  const toggleActivoMut = useMutation({
+    mutationFn: (activo: boolean) =>
+      authedJson<EdicionAdmin>(`/api/admin/ediciones/${edicion.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proxima_edicion_slug }),
+        body: JSON.stringify({ activo }),
       }),
     onSuccess: (updated) => {
-      toast.success("Guardado");
-      qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
-        prev ? prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) : prev,
-      );
+      toast.success(updated.activo ? "Edición activada" : "Edición desactivada");
+      updateEdicionInCache(qc, updated);
     },
     onError: (e) => toast.error((e as Error).message),
   });
 
+  const deleteMut = useMutation({
+    mutationFn: () =>
+      authedJson<{ ok: boolean }>(`/api/admin/ediciones/${edicion.id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      toast.success("Edición eliminada");
+      onDelete(edicion.id);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  function handleToggleActivo(v: boolean) {
+    if (!v && edicion.cupos_confirmados > 0) {
+      const ok = window.confirm(
+        `¿Desactivar la edición #${edicion.numero_edicion}?\n\n` +
+          `Hay ${edicion.cupos_confirmados} inscriptos confirmados. ¿Confirmar?`,
+      );
+      if (!ok) return;
+    }
+    toggleActivoMut.mutate(v);
+  }
+
+  function handleDelete() {
+    if (edicion.cupos_confirmados > 0) {
+      toast.error(`No se puede eliminar: hay ${edicion.cupos_confirmados} inscriptos confirmados`);
+      return;
+    }
+    if (!window.confirm(`¿Eliminar la edición #${edicion.numero_edicion} de "${concepto.nombre}"?`))
+      return;
+    deleteMut.mutate();
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-4 text-sm">
-        <span className="text-muted-foreground">
-          Edición actual: <strong className="text-ink">#{taller.numero_edicion}</strong>
+    <div
+      className={`rounded-lg border transition-colors ${
+        expanded ? "border-ink/20 bg-ink/3" : "border-border/50"
+      }`}
+    >
+      {/* Edition header */}
+      <div
+        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer select-none"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span className="shrink-0 text-xs font-mono font-semibold text-muted-foreground">
+          #{edicion.numero_edicion}
         </span>
-        <Link
-          to="/workshops/$slug"
-          params={{ slug: taller.slug }}
-          target="_blank"
-          className="inline-flex items-center gap-1 text-muted-foreground hover:text-ink transition text-xs"
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold font-mono uppercase tracking-wider ${badge.className}`}
         >
-          ver en web <ExternalLink className="h-3 w-3" />
-        </Link>
-      </div>
+          {badge.label}
+        </span>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-          Slug de próxima edición
-        </label>
-        <p className="text-xs text-muted-foreground/70 -mt-1">
-          Cuando esta edición está sold out, los visitantes verán un link a la próxima.
-        </p>
-        <div className="flex gap-2">
-          <Input
-            value={proximaSlug}
-            onChange={(e) => setProximaSlug(e.target.value)}
-            placeholder="Ej: direccion-de-arte-jime-troncoso-2"
-            className="flex-1"
+        {/* Date range */}
+        {edicion.fecha_inicio && (
+          <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
+            {fmtDay(edicion.fecha_inicio)}
+            {edicion.fecha_fin && edicion.fecha_fin !== edicion.fecha_inicio && (
+              <> – {fmtDay(edicion.fecha_fin)}</>
+            )}
+          </span>
+        )}
+
+        <CuposPill confirmados={edicion.cupos_confirmados} total={edicion.cupos_total} />
+
+        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {edicion.activo ? (
+            <Eye className="h-3 w-3 text-muted-foreground" />
+          ) : (
+            <EyeOff className="h-3 w-3 text-muted-foreground/40" />
+          )}
+          <Switch
+            checked={edicion.activo}
+            onCheckedChange={handleToggleActivo}
+            disabled={toggleActivoMut.isPending}
+            aria-label={edicion.activo ? "Desactivar edición" : "Activar edición"}
           />
-          <Button
-            variant="outline"
-            onClick={() => mut.mutate(proximaSlug)}
-            disabled={mut.isPending}
-            size="sm"
+          <a
+            href={`/workshops/${edicion.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1 rounded text-muted-foreground hover:text-ink transition"
+            title="Ver en web"
+            aria-label="Ver edición en web"
           >
-            {mut.isPending ? <Spinner size="xs" /> : "Guardar"}
-          </Button>
+            <ExternalLink className="h-3 w-3" />
+          </a>
         </div>
+
+        <svg
+          className={`h-3.5 w-3.5 text-muted-foreground/60 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </div>
 
-      <div className="pt-1">
-        <Button variant="outline" size="sm" onClick={onNuevaDuplica} className="gap-2">
-          <Plus className="h-3.5 w-3.5" />
-          Nueva edición (duplicar este taller)
-        </Button>
-      </div>
+      {/* Edition detail */}
+      {expanded && (
+        <div className="border-t border-border/40">
+          <div className="flex border-b border-border/50 overflow-x-auto">
+            {(
+              [
+                { id: "clases", label: "Fechas y clases" },
+                { id: "precios", label: "Precios y pago" },
+                {
+                  id: "inscripciones",
+                  label: `Inscripciones${edicion.cupos_confirmados > 0 ? ` (${edicion.cupos_confirmados})` : ""}`,
+                },
+              ] as { id: "clases" | "precios" | "inscripciones"; label: string }[]
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`shrink-0 px-3 py-2 text-sm border-b-2 -mb-[1px] transition-colors ${
+                  activeTab === tab.id
+                    ? "border-ink text-ink font-medium"
+                    : "border-transparent text-muted-foreground hover:text-ink"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+            <div className="flex-1" />
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete();
+              }}
+              disabled={deleteMut.isPending}
+              className="px-3 py-2 text-xs text-muted-foreground/60 hover:text-destructive transition shrink-0"
+              title="Eliminar edición"
+            >
+              {deleteMut.isPending ? <Spinner size="xs" /> : <Trash2 className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+
+          <div className="px-4 pb-5 pt-4">
+            {activeTab === "clases" && <ClasesSection edicion={edicion} />}
+            {activeTab === "precios" && (
+              <div className="flex flex-col gap-0">
+                <PreciosSection edicion={edicion} />
+                <div className="border-t border-border/40 mt-6 pt-6">
+                  <PagosSection edicion={edicion} />
+                </div>
+              </div>
+            )}
+            {activeTab === "inscripciones" && (
+              <InscripcionesSection
+                edicion={edicion}
+                concepto={concepto}
+                inscripciones={inscripciones}
+                loading={loadingIns}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── NuevoTallerDialog ─────────────────────────────────────────────────────────
+// ── TallerConceptoRow ─────────────────────────────────────────────────────────
 
-function NuevoTallerDialog({
+function TallerConceptoRow({
+  concepto,
+  expanded,
+  onToggle,
+  onNuevaEdicion,
+}: {
+  concepto: TallerConcepto;
+  expanded: boolean;
+  onToggle: () => void;
+  onNuevaEdicion: (c: TallerConcepto) => void;
+}) {
+  const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"ediciones" | "taller">("ediciones");
+
+  const totalConfirmados = concepto.ediciones.reduce((s, e) => s + e.cupos_confirmados, 0);
+  const activeEdiciones = concepto.ediciones.filter((e) => e.activo);
+
+  function handleDeleteEdicion(edicionId: number) {
+    qc.setQueryData(["admin", "talleres"], (prev: TallerConcepto[] | undefined) =>
+      prev?.map((c) =>
+        c.id === concepto.id
+          ? { ...c, ediciones: c.ediciones.filter((e) => e.id !== edicionId) }
+          : c,
+      ),
+    );
+  }
+
+  return (
+    <div
+      className={`rounded-xl border transition-colors ${
+        expanded ? "border-ink/30 bg-ink/5" : "border-border/60"
+      }`}
+    >
+      {/* Concept header */}
+      <div
+        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none"
+        onClick={onToggle}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-ink text-sm truncate leading-tight">{concepto.nombre}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {concepto.instructor_nombre}
+          </p>
+        </div>
+
+        <span className="hidden md:block shrink-0 text-2xs font-mono text-muted-foreground bg-muted/40 rounded-full px-2 py-0.5">
+          {concepto.ediciones.length === 1 ? "1 edición" : `${concepto.ediciones.length} ediciones`}
+          {activeEdiciones.length !== concepto.ediciones.length &&
+            ` · ${activeEdiciones.length} activa${activeEdiciones.length !== 1 ? "s" : ""}`}
+        </span>
+
+        {totalConfirmados > 0 && (
+          <span className="shrink-0 text-2xs font-mono text-muted-foreground bg-muted/40 rounded-full px-2 py-0.5 tabular-nums">
+            {totalConfirmados} inscripto{totalConfirmados !== 1 ? "s" : ""}
+          </span>
+        )}
+
+        <svg
+          className={`h-4 w-4 text-muted-foreground/60 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+
+      {/* Detail */}
+      {expanded && (
+        <div className="border-t border-border/40">
+          <div className="flex border-b border-border/60 overflow-x-auto">
+            {(
+              [
+                { id: "ediciones", label: "Ediciones" },
+                { id: "taller", label: "El taller" },
+              ] as { id: "ediciones" | "taller"; label: string }[]
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`shrink-0 px-4 py-2.5 text-sm border-b-2 -mb-[1px] transition-colors ${
+                  activeTab === tab.id
+                    ? "border-ink text-ink font-medium"
+                    : "border-transparent text-muted-foreground hover:text-ink"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-4 pb-6 pt-5">
+            {activeTab === "ediciones" && (
+              <div className="flex flex-col gap-3">
+                {concepto.ediciones.map((edicion) => (
+                  <EdicionSubRow
+                    key={edicion.id}
+                    edicion={edicion}
+                    concepto={concepto}
+                    onDelete={handleDeleteEdicion}
+                  />
+                ))}
+                {concepto.ediciones.length === 0 && (
+                  <p className="text-sm text-muted-foreground italic">Sin ediciones.</p>
+                )}
+                <div className="flex justify-end pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onNuevaEdicion(concepto)}
+                    className="gap-1.5"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Nueva edición
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "taller" && (
+              <div className="flex flex-col gap-0">
+                <FotoSection concepto={concepto} />
+                <div className="border-t border-border/40 mt-6 pt-6">
+                  <ContenidoSection concepto={concepto} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── NuevoConceptoDialog ───────────────────────────────────────────────────────
+
+function NuevoConceptoDialog({
   open,
   onClose,
   onSuccess,
-  template,
 }: {
   open: boolean;
   onClose: () => void;
-  onSuccess: (slug: string) => void;
-  template?: { nombre: string; instructor_nombre: string; tipo_taller: string };
+  onSuccess: (created: TallerConcepto) => void;
 }) {
-  const [nombre, setNombre] = useState(template?.nombre ?? "");
-  const [instructorNombre, setInstructorNombre] = useState(template?.instructor_nombre ?? "");
-  const [tipo, setTipo] = useState(template?.tipo_taller ?? "intensivo");
-  const [sesiones, setSesiones] = useState<SesionBody[]>([]);
+  const [nombre, setNombre] = useState("");
+  const [instructorNombre, setInstructorNombre] = useState("");
+  const [tipo, setTipo] = useState("intensivo");
+  const [clases, setClases] = useState<ClaseBody[]>([]);
   const [cupos, setCupos] = useState("12");
   const [precioTotal, setPrecioTotal] = useState("0");
   const [precioSena, setPrecioSena] = useState("0");
 
   useEffect(() => {
     if (open) {
-      setNombre(template?.nombre ?? "");
-      setInstructorNombre(template?.instructor_nombre ?? "");
-      setTipo(template?.tipo_taller ?? "intensivo");
-      setSesiones([]);
+      setNombre("");
+      setInstructorNombre("");
+      setTipo("intensivo");
+      setClases([]);
       setCupos("12");
       setPrecioTotal("0");
       setPrecioSena("0");
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const mut = useMutation({
-    mutationFn: (body: CreateBody) =>
-      authedJson<TallerAdmin>("/api/admin/talleres", {
+    mutationFn: (body: object) =>
+      authedJson<TallerConcepto>("/api/admin/talleres", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
     onSuccess: (created) => {
       toast.success(`Taller creado: ${created.nombre}`);
-      onSuccess(created.slug);
+      onSuccess(created);
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -1287,8 +1520,8 @@ function NuevoTallerDialog({
       toast.error("Ingresá el nombre del/la instructor/a");
       return;
     }
-    if (sesiones.length === 0) {
-      toast.error("Agregá al menos una sesión");
+    if (clases.length === 0) {
+      toast.error("Agregá al menos una clase");
       return;
     }
     const c = parseInt(cupos, 10);
@@ -1305,11 +1538,14 @@ function NuevoTallerDialog({
     mut.mutate({
       nombre: nombre.trim(),
       instructor_nombre: instructorNombre.trim(),
-      tipo_taller: tipo,
-      sesiones,
-      cupos_total: c,
-      precio_total: pt,
-      precio_sena: ps,
+      edicion: {
+        tipo_taller: tipo,
+        clases,
+        cupos_total: c,
+        precio_total: pt,
+        precio_sena: ps,
+        numero_edicion: 1,
+      },
     });
   }
 
@@ -1317,17 +1553,10 @@ function NuevoTallerDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{template ? "Nueva edición (duplicar taller)" : "Nuevo taller"}</DialogTitle>
+          <DialogTitle>Nuevo taller</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-5 py-2">
-          {template && (
-            <div className="rounded-lg bg-muted/30 border border-border/50 px-4 py-3 text-sm text-muted-foreground">
-              Copiando datos de <strong className="text-ink">{template.nombre}</strong>. Cambiá las
-              sesiones para la nueva edición.
-            </div>
-          )}
-
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
@@ -1353,17 +1582,17 @@ function NuevoTallerDialog({
 
           <div className="border-t border-border/50 pt-4">
             <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
-              Sesiones *
+              Clases — 1.ª edición *
             </p>
-            <SesionAsistente
+            <ClasesAsistente
               tipo={tipo}
               onTipoChange={setTipo}
-              sesiones={sesiones}
-              onChange={setSesiones}
+              clases={clases}
+              onChange={setClases}
             />
-            {sesiones.length > 0 && (
+            {clases.length > 0 && (
               <div className="mt-4 pointer-events-none select-none">
-                <TallerCalendario sesiones={sesiones} />
+                <TallerCalendario sesiones={clases} />
               </div>
             )}
           </div>
@@ -1411,7 +1640,7 @@ function NuevoTallerDialog({
           </DialogClose>
           <Button onClick={handleSubmit} disabled={mut.isPending} className="gap-2">
             {mut.isPending ? <Spinner size="sm" /> : <Plus className="h-4 w-4" />}
-            {template ? "Crear nueva edición" : "Crear taller"}
+            Crear taller
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1419,193 +1648,156 @@ function NuevoTallerDialog({
   );
 }
 
-// ── TallerAccordionRow ────────────────────────────────────────────────────────
+// ── NuevaEdicionDialog ────────────────────────────────────────────────────────
 
-function TallerAccordionRow({
-  taller,
-  expanded,
-  onToggle,
-  onNuevaDuplica,
-  onToggleActivo,
-  togglePending,
+function NuevaEdicionDialog({
+  concepto,
+  open,
+  onClose,
+  onSuccess,
 }: {
-  taller: TallerAdmin;
-  expanded: boolean;
-  onToggle: () => void;
-  onNuevaDuplica: (t: TallerAdmin) => void;
-  onToggleActivo: (t: TallerAdmin, v: boolean) => void;
-  togglePending: boolean;
+  concepto: TallerConcepto | null;
+  open: boolean;
+  onClose: () => void;
+  onSuccess: (created: EdicionAdmin) => void;
 }) {
-  const badge = badgeEstado(taller);
-  const [activeTab, setActiveTab] = useState<"sesiones" | "datos" | "contenido" | "inscripciones">(
-    "sesiones",
-  );
+  const nextNumero =
+    concepto && concepto.ediciones.length > 0
+      ? Math.max(...concepto.ediciones.map((e) => e.numero_edicion)) + 1
+      : 1;
 
-  const { data: inscripciones = [], isLoading: loadingIns } = useQuery({
-    queryKey: ["admin", "talleres", taller.id, "inscripciones"],
-    queryFn: () => authedJson<Inscripcion[]>(`/api/admin/talleres/${taller.id}/inscripciones`),
-    enabled: expanded && activeTab === "inscripciones",
-    staleTime: 1000 * 30,
+  const [tipo, setTipo] = useState("intensivo");
+  const [clases, setClases] = useState<ClaseBody[]>([]);
+  const [cupos, setCupos] = useState("12");
+  const [precioTotal, setPrecioTotal] = useState("0");
+  const [precioSena, setPrecioSena] = useState("0");
+
+  useEffect(() => {
+    if (open) {
+      setTipo("intensivo");
+      setClases([]);
+      setCupos("12");
+      setPrecioTotal("0");
+      setPrecioSena("0");
+    }
+  }, [open]);
+
+  const mut = useMutation({
+    mutationFn: (body: object) =>
+      authedJson<EdicionAdmin>(`/api/admin/talleres/${concepto!.id}/ediciones`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: (created) => {
+      toast.success(`Edición #${created.numero_edicion} creada`);
+      onSuccess(created);
+    },
+    onError: (e) => toast.error((e as Error).message),
   });
 
+  function handleSubmit() {
+    if (clases.length === 0) {
+      toast.error("Agregá al menos una clase");
+      return;
+    }
+    const c = parseInt(cupos, 10);
+    const pt = parseInt(precioTotal, 10);
+    const ps = parseInt(precioSena, 10);
+    if (isNaN(c) || c < 1) {
+      toast.error("Cupos inválidos");
+      return;
+    }
+    if (isNaN(pt) || isNaN(ps) || ps > pt) {
+      toast.error("Precios inválidos (la seña no puede superar el total)");
+      return;
+    }
+    mut.mutate({
+      tipo_taller: tipo,
+      clases,
+      cupos_total: c,
+      precio_total: pt,
+      precio_sena: ps,
+      numero_edicion: nextNumero,
+    });
+  }
+
   return (
-    <div
-      className={`rounded-xl border transition-colors ${
-        expanded ? "border-ink/30 bg-ink/5" : "border-border/60"
-      }`}
-    >
-      {/* Header row — clickable */}
-      <div
-        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer select-none"
-        onClick={onToggle}
-      >
-        <span
-          className={`shrink-0 rounded-full px-2.5 py-0.5 text-2xs font-semibold font-mono uppercase tracking-wider ${badge.className}`}
-        >
-          {badge.label}
-        </span>
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Nueva edición — {concepto?.nombre}
+            <span className="ml-2 text-sm font-normal text-muted-foreground">#{nextNumero}</span>
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-ink text-sm truncate leading-tight">{taller.nombre}</p>
-          <p className="text-xs text-muted-foreground truncate mt-0.5">
-            {taller.instructor_nombre}
-          </p>
-        </div>
-
-        {/* Sesiones count — tablet+ */}
-        {taller.sesiones.length > 0 && (
-          <span className="hidden md:block shrink-0 text-2xs font-mono text-muted-foreground bg-muted/40 rounded-full px-2 py-0.5">
-            {taller.sesiones.length} {taller.sesiones.length === 1 ? "sesión" : "sesiones"}
-          </span>
-        )}
-
-        {/* Cupos — siempre visible */}
-        <CuposPill confirmados={taller.cupos_confirmados} total={taller.cupos_total} />
-
-        {/* Fecha rango — sm+ */}
-        {taller.fecha_inicio && (
-          <span className="hidden sm:block text-xs text-muted-foreground shrink-0 tabular-nums">
-            {new Date(taller.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", {
-              day: "numeric",
-              month: "short",
-            })}
-            {taller.fecha_fin && taller.fecha_fin !== taller.fecha_inicio && (
-              <>
-                {" – "}
-                {new Date(taller.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", {
-                  day: "numeric",
-                  month: "short",
-                })}
-              </>
+        <div className="flex flex-col gap-5 py-2">
+          <div className="border-b border-border/50 pb-4">
+            <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
+              Clases *
+            </p>
+            <ClasesAsistente
+              tipo={tipo}
+              onTipoChange={setTipo}
+              clases={clases}
+              onChange={setClases}
+            />
+            {clases.length > 0 && (
+              <div className="mt-4 pointer-events-none select-none">
+                <TallerCalendario sesiones={clases} />
+              </div>
             )}
-          </span>
-        )}
-
-        <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-          {taller.activo ? (
-            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-          ) : (
-            <EyeOff className="h-3.5 w-3.5 text-muted-foreground/40" />
-          )}
-          <Switch
-            checked={taller.activo}
-            onCheckedChange={(v) => onToggleActivo(taller, v)}
-            disabled={togglePending}
-            aria-label={taller.activo ? "Desactivar taller" : "Activar taller"}
-          />
-          <a
-            href={`/workshops/${taller.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1 rounded text-muted-foreground hover:text-ink transition ml-0.5"
-            title="Ver en web"
-            aria-label="Ver taller en web"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        </div>
-
-        {/* Chevron */}
-        <svg
-          className={`h-4 w-4 text-muted-foreground/60 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </div>
-
-      {/* Detail — tabs */}
-      {expanded && (
-        <div className="border-t border-border/40">
-          {/* Tab bar */}
-          <div className="flex border-b border-border/60">
-            {(
-              [
-                { id: "sesiones", label: "Sesiones" },
-                { id: "datos", label: "Datos" },
-                { id: "contenido", label: "Contenido" },
-                {
-                  id: "inscripciones",
-                  label: `Inscripciones${taller.cupos_confirmados > 0 ? ` (${taller.cupos_confirmados})` : ""}`,
-                },
-              ] as {
-                id: "sesiones" | "datos" | "contenido" | "inscripciones";
-                label: string;
-              }[]
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2.5 text-sm border-b-2 -mb-[1px] transition-colors ${
-                  activeTab === tab.id
-                    ? "border-ink text-ink font-medium"
-                    : "border-transparent text-muted-foreground hover:text-ink"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
           </div>
 
-          {/* Tab panels */}
-          <div className="px-4 pb-6 pt-5">
-            {activeTab === "sesiones" && <SesionesSection taller={taller} />}
-
-            {activeTab === "datos" && (
-              <div className="flex flex-col gap-0">
-                <PagosSection taller={taller} />
-                <div className="border-t border-border/40 mt-6 pt-6">
-                  <PreciosSection taller={taller} />
-                </div>
-                <div className="border-t border-border/40 mt-6 pt-6">
-                  <EdicionesSection taller={taller} onNuevaDuplica={() => onNuevaDuplica(taller)} />
-                </div>
-              </div>
-            )}
-
-            {activeTab === "contenido" && (
-              <div className="flex flex-col gap-0">
-                <FotoSection taller={taller} />
-                <div className="border-t border-border/40 mt-6 pt-6">
-                  <ContenidoSection taller={taller} />
-                </div>
-              </div>
-            )}
-
-            {activeTab === "inscripciones" && (
-              <InscripcionesSection
-                taller={taller}
-                inscripciones={inscripciones}
-                loading={loadingIns}
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                Cupos totales
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={cupos}
+                onChange={(e) => setCupos(e.target.value)}
               />
-            )}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                Precio total (ARS)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={precioTotal}
+                onChange={(e) => setPrecioTotal(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                Seña (ARS)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={precioSena}
+                onChange={(e) => setPrecioSena(e.target.value)}
+              />
+            </div>
           </div>
         </div>
-      )}
-    </div>
+
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost">Cancelar</Button>
+          </DialogClose>
+          <Button onClick={handleSubmit} disabled={mut.isPending} className="gap-2">
+            {mut.isPending ? <Spinner size="sm" /> : <Plus className="h-4 w-4" />}
+            Crear edición
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1616,85 +1808,36 @@ function TalleresAdminPage() {
   const qc = useQueryClient();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [nuevoOpen, setNuevoOpen] = useState(false);
-  const [duplicaTemplate, setDuplicaTemplate] = useState<
-    { nombre: string; instructor_nombre: string; tipo_taller: string } | undefined
-  >(undefined);
-  const [duplicaFromId, setDuplicaFromId] = useState<number | null>(null);
+  const [nuevaEdicionConcepto, setNuevaEdicionConcepto] = useState<TallerConcepto | null>(null);
 
-  const { data: talleres = [], isLoading: loadingTalleres } = useQuery({
+  const { data: conceptos = [], isLoading } = useQuery({
     queryKey: ["admin", "talleres"],
-    queryFn: () => authedJson<TallerAdmin[]>("/api/admin/talleres"),
+    queryFn: () => authedJson<TallerConcepto[]>("/api/admin/talleres"),
     staleTime: 1000 * 60,
   });
 
-  const toggleActivoMut = useMutation({
-    mutationFn: ({ id, activo }: { id: number; activo: boolean }) =>
-      authedJson<TallerAdmin>(`/api/admin/talleres/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activo }),
-      }),
-    onSuccess: (updated) => {
-      toast.success(updated.activo ? "Taller activado" : "Taller desactivado");
-      qc.setQueryData(["admin", "talleres"], (prev: TallerAdmin[] | undefined) =>
-        prev ? prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)) : prev,
-      );
-    },
-    onError: (e) => toast.error((e as Error).message),
-  });
-
-  function handleToggleActivo(t: TallerAdmin, newActivo: boolean) {
-    if (!newActivo && t.cupos_confirmados > 0) {
-      const ok = window.confirm(
-        `¿Desactivar "${t.nombre}"?\n\n` +
-          `Hay ${t.cupos_confirmados} inscriptos confirmados. Al desactivar:\n` +
-          `• El taller desaparece de la web pública\n` +
-          `• Se libera el bloqueo del estudio en esas fechas\n\n` +
-          `¿Confirmar?`,
-      );
-      if (!ok) return;
-    }
-    toggleActivoMut.mutate({ id: t.id, activo: newActivo });
-  }
-
-  function handleNuevaDuplica(taller: TallerAdmin) {
-    setDuplicaTemplate({
-      nombre: taller.nombre,
-      instructor_nombre: taller.instructor_nombre,
-      tipo_taller: taller.tipo_taller,
-    });
-    setDuplicaFromId(taller.id);
-    setNuevoOpen(true);
-  }
-
-  async function handleNuevoSuccess(slug: string) {
-    qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
+  function handleNuevoConceptoSuccess(created: TallerConcepto) {
+    qc.setQueryData(["admin", "talleres"], (prev: TallerConcepto[] | undefined) =>
+      prev ? [created, ...prev] : [created],
+    );
     setNuevoOpen(false);
-    setDuplicaTemplate(undefined);
-
-    if (duplicaFromId !== null) {
-      const original = talleres.find((t) => t.id === duplicaFromId);
-      if (original && !original.proxima_edicion_slug) {
-        try {
-          await authedJson(`/api/admin/talleres/${duplicaFromId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ proxima_edicion_slug: slug }),
-          });
-          qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
-          toast.success("Link a la nueva edición configurado automáticamente");
-        } catch {
-          // non-critical
-        }
-      }
-      setDuplicaFromId(null);
-    }
+    setExpandedId(created.id);
   }
 
-  function handleNuevoClean() {
-    setNuevoOpen(true);
-    setDuplicaTemplate(undefined);
-    setDuplicaFromId(null);
+  function handleNuevaEdicionSuccess(created: EdicionAdmin) {
+    qc.setQueryData(["admin", "talleres"], (prev: TallerConcepto[] | undefined) =>
+      prev?.map((c) =>
+        c.id === nuevaEdicionConcepto?.id
+          ? {
+              ...c,
+              ediciones: [...c.ediciones, created].sort(
+                (a, b) => a.numero_edicion - b.numero_edicion,
+              ),
+            }
+          : c,
+      ),
+    );
+    setNuevaEdicionConcepto(null);
   }
 
   return (
@@ -1706,56 +1849,54 @@ function TalleresAdminPage() {
             <Users className="h-5 w-5 text-muted-foreground" />
             <h1 className="text-xl font-semibold text-ink">Talleres</h1>
           </div>
-          {talleres.length > 0 && (
+          {conceptos.length > 0 && (
             <p className="text-xs text-muted-foreground mt-0.5 ml-7.5">
-              {talleres.filter((t) => t.activo).length} activos · {talleres.length} total
+              {conceptos.length} concepto{conceptos.length !== 1 ? "s" : ""} ·{" "}
+              {conceptos.reduce((s, c) => s + c.ediciones.length, 0)} ediciones
             </p>
           )}
         </div>
-        <Button size="sm" className="gap-2" onClick={handleNuevoClean}>
+        <Button size="sm" className="gap-2" onClick={() => setNuevoOpen(true)}>
           <Plus className="h-4 w-4" />
           Nuevo taller
         </Button>
       </div>
 
-      {loadingTalleres && (
+      {/* Loading skeleton */}
+      {isLoading && (
         <div className="flex flex-col gap-2">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
               className="rounded-xl border border-border/60 px-4 py-3.5 flex items-center gap-3 animate-pulse"
             >
-              <div className="h-5 w-24 rounded-full bg-muted/60 shrink-0" />
               <div className="flex-1 flex flex-col gap-1.5 min-w-0">
                 <div className="h-4 w-40 rounded bg-muted/60" />
                 <div className="h-3 w-28 rounded bg-muted/40" />
               </div>
-              <div className="h-5 w-10 rounded-full bg-muted/40 shrink-0" />
-              <div className="h-4 w-16 rounded bg-muted/30 shrink-0 hidden sm:block" />
-              <div className="h-5 w-9 rounded-full bg-muted/30 shrink-0" />
+              <div className="h-5 w-20 rounded-full bg-muted/40 shrink-0 hidden md:block" />
+              <div className="h-4 w-4 rounded bg-muted/30 shrink-0" />
             </div>
           ))}
         </div>
       )}
 
-      {/* Lista accordion */}
-      {talleres.length > 0 && (
+      {/* Lista */}
+      {conceptos.length > 0 && (
         <div className="flex flex-col gap-2">
-          {talleres.map((t) => (
-            <TallerAccordionRow
-              key={t.id}
-              taller={t}
-              expanded={expandedId === t.id}
-              onToggle={() => setExpandedId(expandedId === t.id ? null : t.id)}
-              onNuevaDuplica={handleNuevaDuplica}
-              onToggleActivo={handleToggleActivo}
-              togglePending={toggleActivoMut.isPending}
+          {conceptos.map((concepto) => (
+            <TallerConceptoRow
+              key={concepto.id}
+              concepto={concepto}
+              expanded={expandedId === concepto.id}
+              onToggle={() => setExpandedId(expandedId === concepto.id ? null : concepto.id)}
+              onNuevaEdicion={(c) => setNuevaEdicionConcepto(c)}
             />
           ))}
         </div>
       )}
 
-      {talleres.length === 0 && !loadingTalleres && (
+      {conceptos.length === 0 && !isLoading && (
         <div className="rounded-xl border border-dashed border-border/60 py-16 text-center flex flex-col items-center gap-4">
           <Users className="h-8 w-8 text-muted-foreground/40" />
           <div>
@@ -1764,22 +1905,24 @@ function TalleresAdminPage() {
               Creá el primero para que aparezca en la web.
             </p>
           </div>
-          <Button size="sm" onClick={handleNuevoClean} className="gap-2">
+          <Button size="sm" onClick={() => setNuevoOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
             Crear el primero
           </Button>
         </div>
       )}
 
-      <NuevoTallerDialog
+      <NuevoConceptoDialog
         open={nuevoOpen}
-        onClose={() => {
-          setNuevoOpen(false);
-          setDuplicaTemplate(undefined);
-          setDuplicaFromId(null);
-        }}
-        onSuccess={handleNuevoSuccess}
-        template={duplicaTemplate}
+        onClose={() => setNuevoOpen(false)}
+        onSuccess={handleNuevoConceptoSuccess}
+      />
+
+      <NuevaEdicionDialog
+        concepto={nuevaEdicionConcepto}
+        open={nuevaEdicionConcepto !== null}
+        onClose={() => setNuevaEdicionConcepto(null)}
+        onSuccess={handleNuevaEdicionSuccess}
       />
     </div>
   );

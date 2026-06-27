@@ -226,8 +226,11 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
           Comprobante de transferencia {!enListaActual && <span className="text-rosa">*</span>}
         </Label>
         <p className="text-xs text-muted-foreground -mt-0.5">
-          Para reservar tu cupo, realizá el pago del 50% ({formatARS(taller.precio_sena)}) y adjuntá
-          el comprobante.
+          Para reservar tu cupo, realizá el pago del{" "}
+          {taller.precio_total > 0
+            ? Math.round((taller.precio_sena / taller.precio_total) * 100)
+            : 0}
+          % ({formatARS(taller.precio_sena)}) y adjuntá el comprobante.
         </p>
         <div className="mt-1 rounded-xl border border-dashed border-border/80 bg-muted/20 p-4">
           {upload.status === "idle" || upload.status === "error" ? (

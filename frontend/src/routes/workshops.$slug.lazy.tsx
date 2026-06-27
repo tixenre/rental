@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createLazyFileRoute, Link, notFound } from "@tanstack/react-router";
 import { Calendar, MapPin, Users, CheckCircle2, Clock, X } from "lucide-react";
@@ -44,45 +44,20 @@ function ordinalEdicion(n: number): string {
   return map[n] ?? `${n}ta`;
 }
 
-function EdicionBadge({
-  edicion,
-  activa,
+function SoldOutModal({
+  proxima,
+  currentEdicion,
+  onDismiss,
 }: {
-  edicion: EdicionLite & { nombre?: string };
-  activa: boolean;
+  proxima: EdicionLite;
+  currentEdicion: number;
+  onDismiss: () => void;
 }) {
-  const soldOut = edicion.cupos_disponibles === 0;
-  const label = `${ordinalEdicion(edicion.numero_edicion)} edición`;
-  const status = soldOut ? "sold out" : `${edicion.cupos_disponibles} cupos`;
-  const className = activa
-    ? "inline-flex items-center gap-1.5 rounded-full border border-background/40 bg-background/15 px-3 py-1.5 text-xs font-semibold text-background"
-    : soldOut
-      ? "inline-flex items-center gap-1.5 rounded-full border border-background/20 px-3 py-1.5 text-xs text-background/40 line-through"
-      : "inline-flex items-center gap-1.5 rounded-full border border-background/25 px-3 py-1.5 text-xs text-background/60";
-
-  if (activa) {
-    return (
-      <span className={className}>
-        {label} <span className="opacity-60">—</span> {status}
-      </span>
-    );
-  }
-  return (
-    <Link
-      to="/workshops/$slug"
-      params={{ slug: edicion.slug }}
-      className={className}
-      style={soldOut ? { opacity: 0.5 } : undefined}
-    >
-      {label} <span className="opacity-50">—</span> {soldOut ? <s>{status}</s> : status}
-    </Link>
-  );
-}
-
-function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss: () => void }) {
   const opts: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" };
   const fechaA = new Date(proxima.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", opts);
   const fechaB = new Date(proxima.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", opts);
+  const labelActual = ordinalEdicion(currentEdicion);
+  const labelProxima = ordinalEdicion(proxima.numero_edicion);
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
@@ -97,7 +72,9 @@ function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss:
         >
           <X className="h-4 w-4" />
         </button>
-        <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-3">1ra edición</p>
+        <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-3">
+          {labelActual} edición
+        </p>
         <h2
           className="font-display font-bold lowercase text-ink leading-tight mb-2"
           style={{ fontSize: "1.6rem" }}
@@ -105,16 +82,17 @@ function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss:
           los cupos se agotaron
         </h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Pero hay lugar en la <strong className="text-ink">2da edición</strong> — {fechaA} y{" "}
-          {fechaB}.
+          Pero hay lugar en la <strong className="text-ink">{labelProxima} edición</strong> —{" "}
+          {fechaA} y {fechaB}.
         </p>
-        <a
-          href="#inscripcion"
-          onClick={onDismiss}
+        <Link
+          to="/workshops/$slug"
+          params={{ slug: proxima.slug }}
           className="flex items-center justify-center w-full rounded-full bg-rosa text-ink font-bold py-3 hover:brightness-110 active:scale-[0.97] transition-all"
+          onClick={onDismiss}
         >
-          Inscribirme en la 2da edición
-        </a>
+          Inscribirme en la {labelProxima} edición
+        </Link>
         <button
           onClick={onDismiss}
           className="w-full mt-3 text-sm text-muted-foreground hover:text-ink transition py-1"
@@ -125,6 +103,86 @@ function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss:
     </div>
   );
 }
+
+// ── InteresadoForm ────────────────────────────────────────────────────────────
+
+function InteresadoForm({ slug }: { slug: string }) {
+  const [form, setForm] = useState({ nombre: "", email: "", telefono: "" });
+  const [status, setStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!form.nombre.trim() || !form.email.trim()) return;
+    setStatus("sending");
+    try {
+      const res = await fetch(`/api/talleres/${slug}/interesado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.detail ?? `Error ${res.status}`);
+      }
+      setStatus("ok");
+    } catch (err) {
+      setErrorMsg((err as Error).message);
+      setStatus("error");
+    }
+  }
+
+  if (status === "ok") {
+    return (
+      <div className="rounded-2xl border border-verde/40 bg-verde/10 px-5 py-6 text-center">
+        <CheckCircle2 className="h-8 w-8 text-verde mx-auto mb-3" strokeWidth={1.5} />
+        <p className="font-semibold text-ink">¡Anotado/a!</p>
+        <p className="text-sm text-muted-foreground mt-1">Te avisamos cuando haya nuevas fechas.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+        Avisame si hay más fechas
+      </p>
+      <input
+        required
+        type="text"
+        placeholder="Tu nombre"
+        value={form.nombre}
+        onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+        className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      <input
+        required
+        type="email"
+        placeholder="Tu email"
+        value={form.email}
+        onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+        className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      <input
+        type="tel"
+        placeholder="Tu teléfono (opcional)"
+        value={form.telefono}
+        onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
+        className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      {status === "error" && <p className="text-xs text-destructive">{errorMsg}</p>}
+      <button
+        type="submit"
+        disabled={status === "sending"}
+        className="w-full rounded-full bg-rosa text-ink font-bold py-3.5 text-base hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-60"
+      >
+        {status === "sending" ? "Enviando…" : "Avisame"}
+      </button>
+    </form>
+  );
+}
+
+// ── TallerLandingPage ─────────────────────────────────────────────────────────
 
 function TallerLandingPage() {
   const { slug } = Route.useParams();
@@ -160,8 +218,10 @@ function TallerLandingPage() {
   }
 
   const proxima = taller.proxima_edicion;
+  const isFrozen = taller.frozen_at != null;
+  const isFullySoldOut = !isFrozen && taller.cupos_disponibles === 0 && proxima == null;
   const switchToProxima =
-    taller.cupos_disponibles === 0 && proxima != null && proxima.cupos_disponibles > 0;
+    !isFrozen && taller.cupos_disponibles === 0 && proxima != null && proxima.cupos_disponibles > 0;
   const formTaller: Taller = switchToProxima ? ({ ...taller, ...proxima } as Taller) : taller;
 
   // Cuando está sold out, las fechas de toda la página muestran la 2da edición
@@ -174,7 +234,11 @@ function TallerLandingPage() {
   return (
     <>
       {switchToProxima && !soldOutModalDismissed && (
-        <SoldOutModal proxima={proxima!} onDismiss={() => setSoldOutModalDismissed(true)} />
+        <SoldOutModal
+          proxima={proxima!}
+          currentEdicion={taller.numero_edicion}
+          onDismiss={() => setSoldOutModalDismissed(true)}
+        />
       )}
       <PublicLayout
         topBar={{ variant: "workshops", cta: { label: "Inscribirme", href: "#inscripcion" } }}
@@ -202,21 +266,40 @@ function TallerLandingPage() {
               >
                 {taller.subtitulo}
               </p>
+              <p
+                className="font-display font-black lowercase leading-tight tracking-[-0.02em] mt-2"
+                style={{
+                  fontSize: "clamp(1.5rem, 4vw, 3rem)",
+                  color: "color-mix(in oklch, var(--color-rosa) 55%, white 45%)",
+                }}
+              >
+                {ordinalEdicion(taller.numero_edicion)} edición
+              </p>
 
-              {/* Badges de edición */}
-              {/* La próxima edición se muestra solo cuando esta está sold out */}
+              {/* Contexto de ediciones */}
               {(taller.edicion_anterior ||
                 (taller.proxima_edicion && taller.cupos_disponibles === 0)) && (
-                <div className="mt-6 flex flex-wrap gap-2">
+                <div className="mt-5 flex flex-wrap items-center gap-4">
                   {taller.edicion_anterior && (
-                    <EdicionBadge edicion={taller.edicion_anterior} activa={false} />
+                    <Link
+                      to="/workshops/$slug"
+                      params={{ slug: taller.edicion_anterior.slug }}
+                      className="text-xs text-background/35 hover:text-background/60 transition"
+                    >
+                      {ordinalEdicion(taller.edicion_anterior.numero_edicion)} edición — agotada
+                    </Link>
                   )}
-                  <EdicionBadge
-                    edicion={{ ...taller, cupos_disponibles: taller.cupos_disponibles }}
-                    activa={true}
-                  />
                   {taller.proxima_edicion && taller.cupos_disponibles === 0 && (
-                    <EdicionBadge edicion={taller.proxima_edicion} activa={false} />
+                    <Link
+                      to="/workshops/$slug"
+                      params={{ slug: taller.proxima_edicion.slug }}
+                      className="inline-flex items-center gap-2 rounded-full border border-rosa/50 bg-rosa/10 px-4 py-1.5 text-sm font-semibold text-rosa hover:bg-rosa/20 transition"
+                    >
+                      {ordinalEdicion(taller.proxima_edicion.numero_edicion)} edición{" "}
+                      <span className="opacity-70">
+                        · {taller.proxima_edicion.cupos_disponibles} cupos
+                      </span>
+                    </Link>
                   )}
                 </div>
               )}
@@ -392,10 +475,14 @@ function TallerLandingPage() {
                     {formatARS(taller.precio_total)}
                   </p>
                   <ul className="mt-3 flex flex-col gap-1.5">
-                    {[
-                      `Seña del 50% al inscribirte (${formatARS(taller.precio_sena)})`,
-                      `Resto antes de la primera clase`,
-                    ].map((item) => (
+                    {(() => {
+                      const porcentaje =
+                        taller.precio_total > 0
+                          ? Math.round((taller.precio_sena / taller.precio_total) * 100)
+                          : 0;
+                      const senaText = `Seña del ${porcentaje}% al inscribirte (${formatARS(taller.precio_sena)})`;
+                      return [senaText, `Resto antes de la primera clase`];
+                    })().map((item) => (
                       <li
                         key={item}
                         className="flex items-start gap-2 text-xs text-muted-foreground"
@@ -412,28 +499,53 @@ function TallerLandingPage() {
 
                 {/* Formulario de inscripción */}
                 <div id="inscripcion" className="scroll-mt-20">
-                  {switchToProxima && (
-                    <div className="mb-4 rounded-xl border border-border/60 bg-ink px-4 py-3 text-background">
-                      <p className="text-xs font-mono uppercase tracking-widest opacity-50 mb-0.5">
-                        {ordinalEdicion(taller.numero_edicion)} edición
-                      </p>
-                      <p className="font-bold text-sm">Sold out</p>
-                      <p className="text-xs opacity-60 mt-1">
-                        Te anotamos en la {ordinalEdicion(proxima!.numero_edicion)} edición (
-                        {new Date(proxima!.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", {
-                          day: "numeric",
-                          month: "long",
-                        })}{" "}
-                        y{" "}
-                        {new Date(proxima!.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", {
-                          day: "numeric",
-                          month: "long",
-                        })}
-                        )
+                  {isFrozen ? (
+                    <div className="rounded-2xl border border-border/60 bg-muted/20 px-5 py-6 text-center">
+                      <p className="text-sm font-medium text-ink mb-1">Inscripciones cerradas</p>
+                      <p className="text-xs text-muted-foreground">
+                        Esta edición ya no acepta nuevas inscripciones.
                       </p>
                     </div>
+                  ) : isFullySoldOut ? (
+                    <>
+                      <div className="mb-4 rounded-xl border border-border/60 bg-ink px-4 py-3 text-background">
+                        <p className="text-xs font-mono uppercase tracking-widest opacity-50 mb-0.5">
+                          {ordinalEdicion(taller.numero_edicion)} edición
+                        </p>
+                        <p className="font-bold text-sm">Sold out</p>
+                        <p className="text-xs opacity-60 mt-1">Sin fechas próximas por ahora.</p>
+                      </div>
+                      <InteresadoForm slug={taller.slug} />
+                    </>
+                  ) : (
+                    <>
+                      {switchToProxima && (
+                        <div className="mb-4 rounded-xl border border-border/60 bg-ink px-4 py-3 text-background">
+                          <p className="text-xs font-mono uppercase tracking-widest opacity-50 mb-0.5">
+                            {ordinalEdicion(taller.numero_edicion)} edición
+                          </p>
+                          <p className="font-bold text-sm">Sold out</p>
+                          <p className="text-xs opacity-60 mt-1">
+                            Te anotamos en la {ordinalEdicion(proxima!.numero_edicion)} edición (
+                            {new Date(proxima!.fecha_inicio + "T12:00:00").toLocaleDateString(
+                              "es-AR",
+                              { day: "numeric", month: "long" },
+                            )}{" "}
+                            y{" "}
+                            {new Date(proxima!.fecha_fin + "T12:00:00").toLocaleDateString(
+                              "es-AR",
+                              {
+                                day: "numeric",
+                                month: "long",
+                              },
+                            )}
+                            )
+                          </p>
+                        </div>
+                      )}
+                      <WorkshopInscripcionForm taller={formTaller} />
+                    </>
                   )}
-                  <WorkshopInscripcionForm taller={formTaller} />
                 </div>
               </div>
             </div>

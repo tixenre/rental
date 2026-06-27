@@ -62,6 +62,7 @@ function WorkshopCard({ taller }: { taller: Taller }) {
       ? fechaInicio.toLocaleDateString("es-AR", optsDate)
       : `${fechaInicio.toLocaleDateString("es-AR", optsDate)} – ${fechaFin.toLocaleDateString("es-AR", optsDate)}`;
 
+  const soldOut = taller.cupos_disponibles === 0;
   const cuposLabel =
     taller.cupos_disponibles > 0
       ? `${taller.cupos_disponibles} lugar${taller.cupos_disponibles === 1 ? "" : "es"} disponible${taller.cupos_disponibles === 1 ? "" : "s"}`
@@ -71,7 +72,11 @@ function WorkshopCard({ taller }: { taller: Taller }) {
     <Link
       to="/workshops/$slug"
       params={{ slug: taller.slug }}
-      className="group flex flex-col sm:flex-row rounded-2xl border border-border/60 bg-background overflow-hidden hover:border-rosa/40 hover:shadow-md transition-all duration-200"
+      className={`group flex flex-col sm:flex-row rounded-2xl border overflow-hidden transition-all duration-200 ${
+        soldOut
+          ? "border-border/40 bg-muted/20 opacity-70 hover:opacity-80"
+          : "border-border/60 bg-background hover:border-rosa/40 hover:shadow-md"
+      }`}
     >
       {/* Bloque oscuro izquierdo */}
       <div className="relative bg-ink sm:w-64 shrink-0 px-6 pt-7 pb-6 flex flex-col justify-between overflow-hidden min-h-[130px] sm:min-h-0">
@@ -86,23 +91,31 @@ function WorkshopCard({ taller }: { taller: Taller }) {
           </h2>
           <p className="text-background/55 mt-1.5 text-sm">{taller.subtitulo}</p>
         </div>
+        {soldOut && (
+          <span className="relative self-start mt-4 inline-block rounded-full border border-background/30 text-background/60 text-2xs font-mono tracking-widest uppercase px-3 py-1">
+            Sold out
+          </span>
+        )}
       </div>
 
       {/* Cuerpo derecho */}
       <div className="flex-1 px-6 sm:px-8 py-5 flex flex-col justify-between gap-3">
-        <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5 shrink-0" />
-            {fechaStr} · {taller.horario}
+        <div className="flex flex-col gap-3 text-sm">
+          <span className="flex items-baseline gap-1.5 font-semibold text-ink">
+            <Calendar className="h-4 w-4 shrink-0" />
+            <span className="text-base">{fechaStr}</span>
+            <span className="text-muted-foreground font-normal">· {taller.horario}</span>
           </span>
-          <span className="flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0" />
-            {taller.direccion}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5 shrink-0" />
-            {cuposLabel}
-          </span>
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              {taller.direccion}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 shrink-0" />
+              {cuposLabel}
+            </span>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground line-clamp-2">{taller.descripcion}</p>
         <div className="flex items-center justify-between pt-1">
@@ -160,6 +173,14 @@ function PastWorkshopCard({ pw }: { pw: PastWorkshop }) {
   );
 }
 
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <p className="font-mono text-xs tracking-[0.2em] uppercase text-muted-foreground mt-4 mb-1">
+      {label}
+    </p>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 function TalleresPage() {
   const {
@@ -171,6 +192,27 @@ function TalleresPage() {
     queryFn: apiGetTalleres,
     staleTime: 1000 * 60 * 5,
   });
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const proximos = talleres
+    .filter((t) => new Date(t.fecha_inicio + "T00:00:00") > hoy)
+    .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
+
+  const enCurso = talleres
+    .filter((t) => {
+      const inicio = new Date(t.fecha_inicio + "T00:00:00");
+      const fin = new Date(t.fecha_fin + "T00:00:00");
+      return inicio <= hoy && fin >= hoy;
+    })
+    .sort((a, b) => new Date(a.fecha_inicio).getTime() - new Date(b.fecha_inicio).getTime());
+
+  const pasadosApi = talleres
+    .filter((t) => new Date(t.fecha_fin + "T00:00:00") < hoy)
+    .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
+
+  const hayTalleres = talleres.length > 0;
 
   return (
     <PublicLayout topBar={{ variant: "workshops" }}>
@@ -186,28 +228,43 @@ function TalleresPage() {
           </div>
         )}
 
-        {!isLoading && !isError && talleres.length === 0 && (
+        {!isLoading && !isError && !hayTalleres && (
           <div className="py-8 text-center text-muted-foreground text-sm">
             No hay talleres activos por el momento. Seguinos en Instagram para enterarte de los
             próximos.
           </div>
         )}
 
-        {talleres
-          .filter((_, i) => talleres.slice(0, i).every((prev) => prev.cupos_disponibles === 0))
-          .map((t) => (
-            <WorkshopCard key={t.id} taller={t} />
-          ))}
+        {proximos.length > 0 && (
+          <>
+            <SectionLabel label="Próximos" />
+            {proximos.map((t) => (
+              <WorkshopCard key={t.id} taller={t} />
+            ))}
+          </>
+        )}
 
-        {/* Ediciones anteriores */}
-        <div className="mt-6 flex flex-col gap-3">
-          <p className="font-mono text-xs tracking-[0.2em] uppercase text-muted-foreground">
-            Ediciones anteriores
-          </p>
-          {TALLERES_PASADOS.map((pw, i) => (
-            <PastWorkshopCard key={i} pw={pw} />
-          ))}
-        </div>
+        {enCurso.length > 0 && (
+          <>
+            <SectionLabel label="En curso" />
+            {enCurso.map((t) => (
+              <WorkshopCard key={t.id} taller={t} />
+            ))}
+          </>
+        )}
+
+        {/* Pasados: primero los de la API, luego los hardcodeados */}
+        {(pasadosApi.length > 0 || TALLERES_PASADOS.length > 0) && (
+          <>
+            <SectionLabel label="Ediciones anteriores" />
+            {pasadosApi.map((t) => (
+              <WorkshopCard key={t.id} taller={t} />
+            ))}
+            {TALLERES_PASADOS.map((pw, i) => (
+              <PastWorkshopCard key={i} pw={pw} />
+            ))}
+          </>
+        )}
       </div>
     </PublicLayout>
   );

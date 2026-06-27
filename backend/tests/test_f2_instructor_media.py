@@ -34,12 +34,13 @@ def _fake_asset(asset_id=7, media_id_url="https://cdn.test/display.webp"):
 # ── test: _taller_to_dict incluye instructor_media_id ─────────────────────────
 
 def test_taller_to_dict_incluye_instructor_media_id():
-    """_taller_to_dict devuelve instructor_media_id cuando la columna existe."""
-    from routes.talleres import _taller_to_dict
+    """_concepto_to_admin_dict devuelve instructor_media_id cuando la columna existe."""
+    from routes.talleres import _concepto_to_admin_dict
 
     row = {
         "id": 1,
         "slug": "foto-nivel-intermedio",
+        "slug_base": None,
         "nombre": "Foto",
         "subtitulo": "",
         "instructor_nombre": "Ana",
@@ -49,34 +50,23 @@ def test_taller_to_dict_incluye_instructor_media_id():
         "publico_objetivo": "",
         "programa_teorica": "[]",
         "programa_practica": "[]",
-        "fecha_inicio": None,
-        "fecha_fin": None,
-        "horario": "",
-        "cupos_total": 10,
-        "cupos_confirmados": 0,
-        "precio_total": 0,
-        "precio_sena": 0,
-        "pago_alias": "",
-        "pago_cbu": "",
-        "pago_banco": "",
-        "direccion": "",
         "instructor_foto_url": "https://cdn/old.jpg",
         "instructor_media_id": 42,
-        "numero_edicion": 1,
-        "proxima_edicion_slug": "",
+        "notif_email": "",
     }
-    d = _taller_to_dict(row)
+    d = _concepto_to_admin_dict(row)
     assert d["instructor_media_id"] == 42
     assert d["instructor_foto_url"] == "https://cdn/old.jpg"
 
 
 def test_taller_to_dict_sin_instructor_media_id():
-    """_taller_to_dict devuelve None cuando la columna no está en el row (pre-F2)."""
-    from routes.talleres import _taller_to_dict
+    """_concepto_to_admin_dict devuelve None cuando instructor_media_id no está en el row."""
+    from routes.talleres import _concepto_to_admin_dict
 
     row = {
         "id": 2,
         "slug": "x",
+        "slug_base": None,
         "nombre": "X",
         "subtitulo": "",
         "instructor_nombre": "B",
@@ -86,20 +76,11 @@ def test_taller_to_dict_sin_instructor_media_id():
         "publico_objetivo": "",
         "programa_teorica": "[]",
         "programa_practica": "[]",
-        "fecha_inicio": None,
-        "fecha_fin": None,
-        "horario": "",
-        "cupos_total": 0,
-        "cupos_confirmados": 0,
-        "precio_total": 0,
-        "precio_sena": 0,
-        "pago_alias": "",
-        "pago_cbu": "",
-        "pago_banco": "",
-        "direccion": "",
-        # instructor_media_id no está
+        "instructor_foto_url": "",
+        "instructor_media_id": None,
+        "notif_email": "",
     }
-    d = _taller_to_dict(row)
+    d = _concepto_to_admin_dict(row)
     assert d["instructor_media_id"] is None
 
 
