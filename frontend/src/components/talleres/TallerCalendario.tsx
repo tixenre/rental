@@ -1,5 +1,5 @@
-import { es } from "date-fns/locale";
 import { Clock } from "lucide-react";
+import { es } from "date-fns/locale";
 import { Calendar } from "@/design-system/ui/calendar";
 
 export type Sesion = { fecha: string; hora_inicio: number; hora_fin: number };

@@ -108,13 +108,14 @@ function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss:
           Pero hay lugar en la <strong className="text-ink">2da edición</strong> — {fechaA} y{" "}
           {fechaB}.
         </p>
-        <a
-          href="#inscripcion"
-          onClick={onDismiss}
+        <Link
+          to="/workshops/$slug"
+          params={{ slug: proxima.slug }}
           className="flex items-center justify-center w-full rounded-full bg-rosa text-ink font-bold py-3 hover:brightness-110 active:scale-[0.97] transition-all"
+          onClick={onDismiss}
         >
           Inscribirme en la 2da edición
-        </a>
+        </Link>
         <button
           onClick={onDismiss}
           className="w-full mt-3 text-sm text-muted-foreground hover:text-ink transition py-1"
@@ -392,10 +393,14 @@ function TallerLandingPage() {
                     {formatARS(taller.precio_total)}
                   </p>
                   <ul className="mt-3 flex flex-col gap-1.5">
-                    {[
-                      `Seña del 50% al inscribirte (${formatARS(taller.precio_sena)})`,
-                      `Resto antes de la primera clase`,
-                    ].map((item) => (
+                    {(() => {
+                      const porcentaje =
+                        taller.precio_total > 0
+                          ? Math.round((taller.precio_sena / taller.precio_total) * 100)
+                          : 0;
+                      const senaText = `Seña del ${porcentaje}% al inscribirte (${formatARS(taller.precio_sena)})`;
+                      return [senaText, `Resto antes de la primera clase`];
+                    })().map((item) => (
                       <li
                         key={item}
                         className="flex items-start gap-2 text-xs text-muted-foreground"
