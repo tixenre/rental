@@ -1,4 +1,5 @@
 import { Clock } from "lucide-react";
+import { es } from "date-fns/locale";
 import { Calendar } from "@/design-system/ui/calendar";
 
 export type Sesion = { fecha: string; hora_inicio: number; hora_fin: number };
@@ -48,7 +49,7 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
           modifiersClassNames={{
             sesion: "bg-rosa text-ink font-bold !opacity-100 rounded-md",
           }}
-          locale="es-AR"
+          locale={es}
         />
       </div>
 

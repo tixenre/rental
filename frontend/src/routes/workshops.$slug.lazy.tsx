@@ -79,13 +79,7 @@ function EdicionBadge({
   );
 }
 
-function SoldOutModal({
-  proxima,
-  onDismiss,
-}: {
-  proxima: EdicionLite;
-  onDismiss: () => void;
-}) {
+function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss: () => void }) {
   const opts: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" };
   const fechaA = new Date(proxima.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", opts);
   const fechaB = new Date(proxima.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", opts);
@@ -402,9 +396,7 @@ function TallerLandingPage() {
                     {(() => {
                       const porcentaje =
                         taller.precio_total > 0
-                          ? Math.round(
-                              (taller.precio_sena / taller.precio_total) * 100,
-                            )
+                          ? Math.round((taller.precio_sena / taller.precio_total) * 100)
                           : 0;
                       const senaText = `Seña del ${porcentaje}% al inscribirte (${formatARS(taller.precio_sena)})`;
                       return [senaText, `Resto antes de la primera clase`];
