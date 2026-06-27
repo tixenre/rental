@@ -250,11 +250,6 @@ function TallerLandingPage() {
             <div className="relative max-w-[1100px] mx-auto px-4 sm:px-6 py-16 sm:py-24">
               <p className="font-mono text-2xs tracking-[0.3em] uppercase text-rosa mb-4">
                 Workshop
-                {taller.numero_edicion > 1 && (
-                  <span className="text-rosa/60 ml-2">
-                    · {ordinalEdicion(taller.numero_edicion)} edición
-                  </span>
-                )}
               </p>
               <h1
                 className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-background"
@@ -271,6 +266,17 @@ function TallerLandingPage() {
               >
                 {taller.subtitulo}
               </p>
+              {taller.numero_edicion > 1 && (
+                <p
+                  className="font-display font-black lowercase leading-tight tracking-[-0.02em] mt-2"
+                  style={{
+                    fontSize: "clamp(1.5rem, 4vw, 3rem)",
+                    color: "color-mix(in oklch, var(--color-rosa) 55%, white 45%)",
+                  }}
+                >
+                  {ordinalEdicion(taller.numero_edicion)} edición
+                </p>
+              )}
 
               {/* Contexto de ediciones */}
               {(taller.edicion_anterior ||
