@@ -193,7 +193,7 @@ function TallerLandingPage() {
   } = useQuery({
     queryKey: ["taller", slug],
     queryFn: () => apiGetTaller(slug),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
   });
 
   // Hooks antes del early-return (regla de hooks de React)

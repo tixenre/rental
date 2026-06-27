@@ -41,7 +41,7 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="pointer-events-none select-none">
+      <div className="pointer-events-none select-none flex justify-center">
         <Calendar
           locale={es}
           defaultMonth={defaultMonth}
@@ -50,18 +50,19 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
           modifiersClassNames={{
             sesion: "bg-rosa text-ink font-bold !opacity-100 rounded-md",
           }}
-          className="[--cell-size:3.5rem]"
+          showOutsideDays={false}
+          className="[--cell-size:2.75rem] sm:[--cell-size:3.5rem]"
         />
       </div>
 
-      <div className="flex items-start gap-2 text-sm text-muted-foreground">
-        <Clock className="h-4 w-4 shrink-0 mt-0.5 text-rosa" />
+      <div className="flex items-center gap-2 text-sm">
+        <Clock className="h-4 w-4 shrink-0 text-rosa" />
         {allSameTimes ? (
-          <span>
+          <span className="font-medium text-ink">
             {fmtHora(sorted[0].hora_inicio)} — {fmtHora(sorted[0].hora_fin)} hs
           </span>
         ) : (
-          <ul className="flex flex-col gap-0.5">
+          <ul className="flex flex-col gap-1">
             {sorted.map((s) => {
               const d = new Date(s.fecha + "T12:00:00");
               const label = d.toLocaleDateString("es-AR", {
@@ -70,8 +71,8 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
                 month: "short",
               });
               return (
-                <li key={s.fecha}>
-                  <span className="text-ink/60">{label}:</span> {fmtHora(s.hora_inicio)} —{" "}
+                <li key={s.fecha} className="font-medium text-ink">
+                  <span className="font-normal text-ink/50">{label}:</span> {fmtHora(s.hora_inicio)} —{" "}
                   {fmtHora(s.hora_fin)} hs
                 </li>
               );
