@@ -60,7 +60,7 @@ def cierre_de(conn, mes: str) -> dict | None:
 
     row = conn.execute(
         """SELECT mes, snapshot_json, modelo_json, cerrado_por, cerrado_at
-           FROM liquidacion_cierres WHERE mes = ?""",
+           FROM liquidacion_cierres WHERE mes = %s""",
         (mes,),
     ).fetchone()
     return row_to_dict(row) if row else None
@@ -108,6 +108,6 @@ def reabrir_mes(conn, mes: str) -> bool:
     validar_mes(mes)
     existia = cierre_de(conn, mes) is not None
     if existia:
-        conn.execute("DELETE FROM liquidacion_cierres WHERE mes = ?", (mes,))
+        conn.execute("DELETE FROM liquidacion_cierres WHERE mes = %s", (mes,))
         conn.commit()
     return existia

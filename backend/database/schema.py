@@ -1495,7 +1495,7 @@ def _init_db_schema(conn):
             RETURNING id
         """)
         centinela_id = cur_cent.fetchone()["id"]
-        conn.execute("UPDATE estudio SET equipo_id = ? WHERE id = 1", (centinela_id,))
+        conn.execute("UPDATE estudio SET equipo_id = %s WHERE id = 1", (centinela_id,))
 
     # ── Media pipeline no-destructivo (F1 — i1j2k3l4m5n6) ──────────────────────
     conn.execute("""

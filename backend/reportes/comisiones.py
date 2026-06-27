@@ -26,7 +26,7 @@ SETTING_KEY = "comisiones_modelo"
 def cargar_modelo(conn) -> dict[str, dict[str, float]]:
     """Lee el modelo de `app_settings`; cae al default si no hay o está roto."""
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", (SETTING_KEY,)
+        "SELECT value FROM app_settings WHERE key = %s", (SETTING_KEY,)
     ).fetchone()
     if not row or not row["value"]:
         return DEFAULT_MODELO

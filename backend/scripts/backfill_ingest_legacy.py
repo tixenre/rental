@@ -156,7 +156,7 @@ def backfill(dry_run: bool = False, solo_tier: str | None = None) -> dict:
 
                 # 3. UPDATE equipo_fotos (no INSERT — la fila ya existe)
                 conn.execute(
-                    "UPDATE equipo_fotos SET media_id = ?, url = ?, path = ? WHERE id = ?",
+                    "UPDATE equipo_fotos SET media_id = %s, url = %s, path = %s WHERE id = %s",
                     (asset.id, display.url, display.key, foto_id),
                 )
 
