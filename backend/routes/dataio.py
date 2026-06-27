@@ -9,13 +9,17 @@ Expone:
         - catalog-all: ZIP con las 8 entidades del catálogo.
         - operacional-all: ZIP con clientes + alquileres (datos privados).
         - full: ZIP con todo (catálogo + operacional).
-        - equipos-csv|alquileres-csv|clientes-csv: planilla CSV plana.
-        - csv-all: ZIP con las 3 planillas CSV.
+        - equipos-csv|alquileres-csv|clientes-csv|inventario-csv: planilla CSV plana.
+        - csv-all: ZIP con las 4 planillas CSV.
 
     POST /api/admin/dataio/import?scope=operacional
         Sube un ZIP con clientes.json/alquileres.json para upsert. Solo
         operacional desde la UI (catálogo se importa al startup).
         Query param `dry_run=true` para simular.
+
+    POST /api/admin/dataio/import-inventario?dry_run=true
+        Import CSV liviano para completar serie/valor_reposicion/bh_url/fecha_compra
+        en bulk. dry_run=true (default) muestra el diff sin escribir nada.
 """
 
 import io
@@ -32,6 +36,7 @@ from admin_guard import require_admin
 from database import get_db
 from dataio import orchestrator
 from dataio.csv_exporters import CSV_EXPORTERS
+from dataio.csv_importers import CSVImportError, import_inventario_csv
 from dataio.paths import BACKUP_GROUPS, CATALOG_ENTITIES, ENTITY_ORDER, OPERATIONAL_ENTITIES
 
 logger = logging.getLogger(__name__)
@@ -300,6 +305,36 @@ def _bump_operacional_sequences(conn) -> list[str]:
         except Exception as e:
             logger.warning("setval %s fallo (no critico): %s", seq, e)
     return bumped
+
+
+@router.post("/admin/dataio/import-inventario")
+async def import_inventario(
+    file: UploadFile = File(...),
+    dry_run: bool = Query(True, description="Simular sin escribir (default=true)."),
+    _admin: dict = Depends(require_admin),
+):
+    """Import CSV de inventario: actualiza serie / valor_reposicion / bh_url /
+    fecha_compra en bulk.
+
+    Match por columna `id`. Celdas vacías = sin cambio. Siempre incluir
+    dry_run=true para ver el diff antes de aplicar.
+    """
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(400, "Solo archivos .csv permitidos")
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Archivo vacío")
+
+    with get_db() as conn:
+        try:
+            result = import_inventario_csv(conn, content, dry_run=dry_run)
+        except CSVImportError as exc:
+            raise HTTPException(400, str(exc))
+        except Exception as exc:
+            logger.exception("import_inventario falló")
+            raise HTTPException(500, f"Import falló: {exc}")
+
+    return result
 
 
 RESET_CONFIRMATION = "BORRAR TODO"

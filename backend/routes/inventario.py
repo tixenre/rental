@@ -56,6 +56,17 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
               )
         """).fetchone()[0]
 
+        # Equipos sin specs: no tienen ninguna fila en equipo_specs.
+        sin_specs = conn.execute("""
+            SELECT COUNT(*)
+            FROM equipos e
+            WHERE e.eliminado_at IS NULL
+              AND e.es_recurso_interno = FALSE
+              AND NOT EXISTS (
+                SELECT 1 FROM equipo_specs es WHERE es.equipo_id = e.id
+              )
+        """).fetchone()[0]
+
         faltantes = {
             "serie":              row["sin_serie"],
             "valor_reposicion":   row["sin_valor_reposicion"],
@@ -63,11 +74,12 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
             "descripcion":        row["sin_descripcion"],
             "nombre_publico":     row["sin_nombre_publico"],
             "categoria":          sin_categoria,
+            "specs":              sin_specs,
         }
 
-        # Score de completitud: cada equipo tiene 6 "slots" (serie, valor,
-        # foto, descripción, nombre público, categoría). Slot lleno = +1.
-        # Total posible = total * 6. Porcentaje = slots llenos / total posible.
+        # Score de completitud: cada equipo tiene 7 "slots" (serie, valor,
+        # foto, descripción, nombre público, categoría, specs). Slot lleno = +1.
+        # Total posible = total * 7. Porcentaje = slots llenos / total posible.
         if total == 0:
             completos_pct = 100
         else:

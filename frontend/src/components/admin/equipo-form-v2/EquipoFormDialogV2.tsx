@@ -1702,6 +1702,75 @@ ${fotoTag}
           <Field label="Notas internas (no se muestran al cliente)">
             <Textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} />
           </Field>
+
+          {isEdit && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const nombre = form.getValues("nombre") || initial?.nombre || "";
+                  const modelo = form.getValues("modelo") || "";
+                  const serieVal = form.getValues("serie") || "";
+                  const valorRep = form.getValues("valor_reposicion");
+                  const fotoUrl = form.getValues("foto_url") || initial?.foto_url || "";
+                  const fotoTag = fotoUrl
+                    ? `<img src="${fotoUrl.replace(/"/g, "&quot;")}" style="max-height:160px;max-width:200px;object-fit:contain;float:right;margin:0 0 8px 16px;">`
+                    : "";
+                  const specsRows = specs
+                    .filter((s) => s.value?.trim())
+                    .map(
+                      (s) =>
+                        `<tr><td class="spec-label">${s.label.replace(/</g, "&lt;")}</td><td>${s.value.replace(/</g, "&lt;")}</td></tr>`,
+                    )
+                    .join("");
+                  const contenidoRows = contenidoIncluido
+                    .map(
+                      (c) =>
+                        `<tr><td>${c.nombre.replace(/</g, "&lt;")}</td><td style="text-align:center">${c.cantidad}</td><td style="text-align:center;width:32px">☐</td></tr>`,
+                    )
+                    .join("");
+                  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<title>Inventario: ${nombre.replace(/</g, "&lt;")}</title>
+<style>
+  body { font-family: -apple-system, Helvetica, sans-serif; color: #111; padding: 24px 32px; max-width: 680px; margin: 0 auto; font-size: 13px; }
+  h2 { margin: 0 0 2px; font-size: 20px; }
+  .sub { color: #555; font-size: 12px; margin-bottom: 12px; }
+  .clearfix::after { content:""; display:table; clear:both; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #666; padding: 6px 8px; border-bottom: 2px solid #111; }
+  td { padding: 5px 8px; border-bottom: 1px solid #eee; vertical-align: middle; }
+  .spec-label { color: #555; width: 45%; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; background: #f6f6f6; border-radius: 6px; padding: 10px 14px; margin-top: 12px; }
+  .meta dt { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+  .meta dd { font-weight: 600; margin: 0; }
+  h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin: 16px 0 2px; }
+  @media print { @page { margin: 14mm; } }
+</style>
+</head><body>
+<div class="clearfix">
+${fotoTag}
+<h2>${nombre.replace(/</g, "&lt;")}</h2>
+<div class="sub">${modelo ? `Modelo: ${modelo.replace(/</g, "&lt;")}` : ""}</div>
+</div>
+<dl class="meta">
+  <div><dt>N° de serie</dt><dd>${serieVal ? serieVal.replace(/</g, "&lt;") : "—"}</dd></div>
+  <div><dt>Valor de reposición</dt><dd>${valorRep != null ? `USD ${valorRep}` : "—"}</dd></div>
+</dl>
+${specsRows ? `<h3>Specs técnicas</h3><table><tbody>${specsRows}</tbody></table>` : ""}
+${contenidoRows ? `<h3>Contenido incluido</h3><table><thead><tr><th>Ítem</th><th style="text-align:center">Cant.</th><th style="text-align:center">✓</th></tr></thead><tbody>${contenidoRows}</tbody></table>` : ""}
+<script>window.onload=function(){window.print();};</script>
+</body></html>`;
+                  const w = window.open("", "_blank", "width=760,height=700");
+                  if (w) { w.document.write(html); w.document.close(); }
+                }}
+                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground border hairline hover:text-ink hover:bg-muted/50 transition"
+              >
+                <Printer className="h-3 w-3" />
+                Ficha de inventario
+              </button>
+            </div>
+          )}
         </div>
       </CollapsibleSection>
     </>

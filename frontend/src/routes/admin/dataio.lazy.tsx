@@ -11,6 +11,7 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
   AlertTriangle,
+  CheckCircle2,
   Database,
   Download,
   FileArchive,
@@ -53,6 +54,16 @@ type ImportResult = {
   stats: Record<string, { inserted?: number; updated?: number; skipped?: number }>;
   total_inserted: number;
   total_updated: number;
+};
+
+type InventarioCsvResult = {
+  dry_run: boolean;
+  total_filas: number;
+  actualizados: number;
+  sin_cambio: number;
+  no_encontrados: number[];
+  errores: string[];
+  diff: { id: number; campo: string; antes: string | null; despues: string | null }[];
 };
 
 // Los 3 grupos que ve el dueño. Cada uno mapea a un scope del backend.
@@ -119,6 +130,9 @@ function DataIoPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
+  const [invCsvBusy, setInvCsvBusy] = useState<"sim" | "apply" | null>(null);
+  const [invCsvResult, setInvCsvResult] = useState<InventarioCsvResult | null>(null);
+  const invCsvRef = useRef<HTMLInputElement>(null);
 
   const handleDownload = async (entity: string, label: string, fallback: string) => {
     setBusy(entity);
@@ -149,6 +163,28 @@ function DataIoPage() {
       toast.error(`Restaurar ${label} falló: ${(e as Error).message}`);
     } finally {
       setImportBusy(null);
+    }
+  };
+
+  const handleInvCsv = async (file: File, dryRun: boolean) => {
+    setInvCsvBusy(dryRun ? "sim" : "apply");
+    setInvCsvResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const url = `/api/admin/dataio/import-inventario?dry_run=${dryRun}`;
+      const res = await authedFetch(url, { method: "POST", body: fd });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.detail ?? `${res.status} ${res.statusText}`);
+      setInvCsvResult(json as InventarioCsvResult);
+      const msg = dryRun
+        ? `Simulación: ${json.actualizados} cambios, ${json.sin_cambio} sin cambio`
+        : `Aplicado: ${json.actualizados} equipos actualizados`;
+      toast.success(msg);
+    } catch (e) {
+      toast.error(`Import CSV inventario falló: ${(e as Error).message}`);
+    } finally {
+      setInvCsvBusy(null);
     }
   };
 
@@ -230,6 +266,143 @@ function DataIoPage() {
           borrar lo que no esté en el archivo. Los archivos con datos de clientes/pedidos{" "}
           <strong className="text-foreground">nunca se commitean al repo</strong>.
         </p>
+      </section>
+
+      {/* ─── Inventario CSV ─── */}
+      <section className="rounded-lg border bg-card p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="grid size-9 place-items-center rounded-md bg-muted shrink-0">
+            <FileSpreadsheet className="size-4" />
+          </div>
+          <div>
+            <h2 className="font-display text-lg text-ink">Inventario CSV</h2>
+            <p className="text-sm text-muted-foreground">
+              Completá en masa: número de serie, valor de reposición, URL B&H y fecha de compra.
+              Descargá la plantilla, completala en Excel y subila acá.
+            </p>
+          </div>
+        </div>
+
+        <input
+          ref={invCsvRef}
+          type="file"
+          accept=".csv"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            const dryRun = e.target.dataset.dryRun === "true";
+            e.target.value = "";
+            delete e.target.dataset.dryRun;
+            if (f) handleInvCsv(f, dryRun);
+          }}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDownload("inventario-csv", "Plantilla inventario", "inventario.csv")}
+            disabled={busy !== null}
+          >
+            {busy === "inventario-csv" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            Descargar plantilla
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (invCsvRef.current) {
+                invCsvRef.current.dataset.dryRun = "true";
+                invCsvRef.current.click();
+              }
+            }}
+            disabled={invCsvBusy !== null}
+          >
+            {invCsvBusy === "sim" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Upload className="size-4" />
+            )}
+            Importar (simular)
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              if (invCsvRef.current) {
+                invCsvRef.current.dataset.dryRun = "false";
+                invCsvRef.current.click();
+              }
+            }}
+            disabled={invCsvBusy !== null}
+          >
+            {invCsvBusy === "apply" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="size-4" />
+            )}
+            Importar (aplicar)
+          </Button>
+        </div>
+
+        {invCsvResult && (
+          <div className="space-y-2 text-sm">
+            <div className="flex flex-wrap gap-4 font-mono text-xs bg-muted/50 rounded px-3 py-2">
+              {invCsvResult.dry_run && (
+                <span className="text-amber-600 font-semibold">[SIMULACIÓN]</span>
+              )}
+              <span>{invCsvResult.total_filas} filas</span>
+              <span className="text-green-700">{invCsvResult.actualizados} cambios</span>
+              <span>{invCsvResult.sin_cambio} sin cambio</span>
+              {invCsvResult.no_encontrados.length > 0 && (
+                <span className="text-destructive">
+                  {invCsvResult.no_encontrados.length} no encontrados
+                </span>
+              )}
+              {invCsvResult.errores.length > 0 && (
+                <span className="text-destructive">{invCsvResult.errores.length} errores</span>
+              )}
+            </div>
+
+            {invCsvResult.errores.length > 0 && (
+              <ul className="text-xs text-destructive space-y-0.5 font-mono pl-2">
+                {invCsvResult.errores.map((e, i) => (
+                  <li key={i}>⚠ {e}</li>
+                ))}
+              </ul>
+            )}
+
+            {invCsvResult.diff.length > 0 && (
+              <div className="rounded border overflow-auto max-h-72">
+                <table className="text-xs w-full">
+                  <thead className="bg-muted sticky top-0">
+                    <tr>
+                      <th className="text-left px-3 py-1.5 font-medium">ID</th>
+                      <th className="text-left px-3 py-1.5 font-medium">Campo</th>
+                      <th className="text-left px-3 py-1.5 font-medium">Antes</th>
+                      <th className="text-left px-3 py-1.5 font-medium">Después</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {invCsvResult.diff.map((d, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-1.5 font-mono">{d.id}</td>
+                        <td className="px-3 py-1.5 font-mono">{d.campo}</td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {d.antes ?? <em>vacío</em>}
+                        </td>
+                        <td className="px-3 py-1.5 text-green-700">{d.despues}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ─── Zona destructiva ─── */}

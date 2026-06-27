@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Lightbulb,
   Loader2,
+  ListChecks,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -220,6 +221,7 @@ function CalidadView({ data }: { data: CalidadInventario }) {
     { key: "descripcion", label: "sin descripción extendida", icon: FileText },
     { key: "serie", label: "sin número de serie", icon: Hash },
     { key: "valor_reposicion", label: "sin valor de reposición", icon: DollarSign },
+    { key: "specs", label: "sin specs técnicas", icon: ListChecks },
   ];
 
   return (

@@ -7,14 +7,15 @@ export type { EstadoPedido };
 
 // ── Dashboard ────────────────────────────────────────────────────────────
 
-/** Campos que el dashboard de calidad sabe detectar como faltantes (#349, #350). */
+/** Campos que el dashboard de calidad sabe detectar como faltantes (#349, #350, #1051). */
 export type FaltaField =
   | "foto"
   | "categoria"
   | "nombre_publico"
   | "descripcion"
   | "serie"
-  | "valor_reposicion";
+  | "valor_reposicion"
+  | "specs";
 
 /** Sugerencia automática del sistema (#352). */
 export type Sugerencia = {
@@ -46,6 +47,7 @@ export type CalidadInventario = {
     descripcion: number;
     nombre_publico: number;
     categoria: number;
+    specs: number;
   };
 };
 
