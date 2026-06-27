@@ -28,7 +28,7 @@ def log_server_error(route: str, exc: Exception, request_id: Optional[str] = Non
             conn.execute(
                 """
                 INSERT INTO server_errors (route, error_type, message, traceback, request_id)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
                 (route, error_type, message, tb_truncated, request_id),
             )

@@ -137,7 +137,7 @@ def precio_combo(conn, equipo_id: int) -> int:
     rows = conn.execute(
         "SELECT e.precio_jornada, kc.cantidad, kc.descuento_pct "
         "FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id "
-        "WHERE kc.equipo_id = ? AND e.eliminado_at IS NULL",
+        "WHERE kc.equipo_id = %s AND e.eliminado_at IS NULL",
         (equipo_id,),
     ).fetchall()
     return _precio_combo_calc(rows)

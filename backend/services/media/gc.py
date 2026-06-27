@@ -64,7 +64,7 @@ def _find_orphan_ids(conn, *, kind: str | None = None) -> list[int]:
     )
     where = f"WHERE {not_exists_clauses}"
     if kind:
-        where += " AND ma.kind = ?"
+        where += " AND ma.kind = %s"
         params: tuple = (kind,)
     else:
         params = ()
@@ -102,7 +102,7 @@ def reconcile_media(
             keys = repository.collect_asset_keys(conn, asset_id)
             original_key = None
             row = conn.execute(
-                "SELECT original_key FROM media_assets WHERE id = ?", (asset_id,)
+                "SELECT original_key FROM media_assets WHERE id = %s", (asset_id,)
             ).fetchone()
             if row:
                 original_key = row["original_key"]
@@ -115,7 +115,7 @@ def reconcile_media(
                     result.r2_keys_deleted += 1
 
             # Borrar de DB (media_variants borrado en CASCADE)
-            conn.execute("DELETE FROM media_assets WHERE id = ?", (asset_id,))
+            conn.execute("DELETE FROM media_assets WHERE id = %s", (asset_id,))
             result.orphans_purged += 1
 
         except Exception as e:
@@ -147,7 +147,7 @@ def rederive_variants(
     from . import storage, repository
 
     row = conn.execute(
-        "SELECT original_key, original_ct FROM media_assets WHERE id = ?", (asset_id,)
+        "SELECT original_key, original_ct FROM media_assets WHERE id = %s", (asset_id,)
     ).fetchone()
     if not row or not row["original_key"]:
         raise MediaError(404, f"Asset {asset_id} no encontrado o sin original_key")
@@ -164,7 +164,7 @@ def rederive_variants(
 
         # Clave determinística: si ya existe la variante en la DB, reusar la key
         existing = conn.execute(
-            "SELECT key FROM media_variants WHERE asset_id = ? AND name = ?",
+            "SELECT key FROM media_variants WHERE asset_id = %s AND name = %s",
             (asset_id, spec.name),
         ).fetchone()
 
@@ -178,7 +178,7 @@ def rederive_variants(
             )
             # Corregir el key usando el kind real del asset
             kind_row = conn.execute(
-                "SELECT kind FROM media_assets WHERE id = ?", (asset_id,)
+                "SELECT kind FROM media_assets WHERE id = %s", (asset_id,)
             ).fetchone()
             if kind_row:
                 v_key = make_variant_key(
@@ -190,13 +190,13 @@ def rederive_variants(
 
         # Upsert en media_variants
         existing2 = conn.execute(
-            "SELECT id FROM media_variants WHERE asset_id = ? AND name = ?",
+            "SELECT id FROM media_variants WHERE asset_id = %s AND name = %s",
             (asset_id, spec.name),
         ).fetchone()
         if existing2:
             conn.execute(
-                "UPDATE media_variants SET key=?, url=?, content_type=?, width=?, height=?, bytes=? "
-                "WHERE id=?",
+                "UPDATE media_variants SET key=%s, url=%s, content_type=%s, width=%s, height=%s, bytes=%s "
+                "WHERE id=%s",
                 (v_key, v_url, v_ct, v_w, v_h, len(v_content), existing2["id"]),
             )
             vid = existing2["id"]
