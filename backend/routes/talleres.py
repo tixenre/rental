@@ -1044,6 +1044,40 @@ def admin_list_inscripciones(taller_id: int, request: Request):
     ]
 
 
+@router.get("/admin/ediciones/{edicion_id}/inscripciones")
+def admin_list_inscripciones_edicion(edicion_id: int, request: Request):
+    """Lista inscripciones de una edición específica."""
+    require_admin(request)
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT ti.*, e.numero_edicion, e.slug AS edicion_slug
+            FROM taller_inscripciones ti
+            LEFT JOIN ediciones_taller e ON e.id = ti.edicion_id
+            WHERE ti.edicion_id = %s
+            ORDER BY ti.en_lista_espera, ti.created_at
+            """,
+            (edicion_id,),
+        ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "nombre": r["nombre"],
+            "email": r["email"],
+            "telefono": r["telefono"],
+            "experiencia": r["experiencia"],
+            "comprobante_url": r["comprobante_url"],
+            "en_lista_espera": r["en_lista_espera"],
+            "estado": r["estado"],
+            "edicion_id": r["edicion_id"],
+            "numero_edicion": r["numero_edicion"],
+            "edicion_slug": r["edicion_slug"],
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+        }
+        for r in rows
+    ]
+
+
 @router.get("/admin/talleres/{taller_id}/inscripciones/export-csv")
 def admin_export_inscripciones_csv(taller_id: int, request: Request):
     """Descarga CSV de inscriptos de un concepto de taller."""

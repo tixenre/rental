@@ -869,10 +869,12 @@ function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
 // ── InscripcionesSection ──────────────────────────────────────────────────────
 
 function InscripcionesSection({
+  edicion,
   concepto,
   inscripciones,
   loading,
 }: {
+  edicion: EdicionAdmin;
   concepto: TallerConcepto;
   inscripciones: Inscripcion[];
   loading: boolean;
@@ -891,7 +893,7 @@ function InscripcionesSection({
       }),
     onSuccess: () => {
       toast.success("Inscripción eliminada");
-      qc.invalidateQueries({ queryKey: ["admin", "talleres", concepto.id, "inscripciones"] });
+      qc.invalidateQueries({ queryKey: ["admin", "ediciones", edicion.id, "inscripciones"] });
       qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
     },
     onError: (e) => toast.error((e as Error).message),
@@ -905,7 +907,7 @@ function InscripcionesSection({
       ),
     onSuccess: () => {
       toast.success("Inscripción confirmada");
-      qc.invalidateQueries({ queryKey: ["admin", "talleres", concepto.id, "inscripciones"] });
+      qc.invalidateQueries({ queryKey: ["admin", "ediciones", edicion.id, "inscripciones"] });
       qc.invalidateQueries({ queryKey: ["admin", "talleres"] });
     },
     onError: (e) => toast.error((e as Error).message),
@@ -969,7 +971,6 @@ function InscripcionesSection({
             <th className="pb-2 pr-4 font-medium">Nombre</th>
             <th className="pb-2 pr-4 font-medium">Email</th>
             <th className="pb-2 pr-4 font-medium hidden sm:table-cell">Teléfono</th>
-            <th className="pb-2 pr-4 font-medium">Ed.</th>
             <th className="pb-2 pr-4 font-medium hidden lg:table-cell">Experiencia</th>
             <th className="pb-2 pr-4 font-medium">Comp.</th>
             <th className="pb-2 pr-4 font-medium">Fecha</th>
@@ -987,9 +988,6 @@ function InscripcionesSection({
               </td>
               <td className="py-2.5 pr-4 text-muted-foreground hidden sm:table-cell">
                 {ins.telefono}
-              </td>
-              <td className="py-2.5 pr-4 text-muted-foreground text-xs font-mono">
-                {ins.numero_edicion ? `#${ins.numero_edicion}` : "—"}
               </td>
               <td className="py-2.5 pr-4 text-muted-foreground hidden lg:table-cell max-w-[180px] truncate">
                 {ins.experiencia || "—"}
@@ -1145,7 +1143,14 @@ function EdicionSubRow({
   const qc = useQueryClient();
   const badge = badgeEstadoEdicion(edicion);
   const [expanded, setExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<"clases" | "precios">("clases");
+  const [activeTab, setActiveTab] = useState<"clases" | "precios" | "inscripciones">("clases");
+
+  const { data: inscripciones = [], isLoading: loadingIns } = useQuery({
+    queryKey: ["admin", "ediciones", edicion.id, "inscripciones"],
+    queryFn: () => authedJson<Inscripcion[]>(`/api/admin/ediciones/${edicion.id}/inscripciones`),
+    enabled: expanded && activeTab === "inscripciones",
+    staleTime: 1000 * 30,
+  });
 
   const toggleActivoMut = useMutation({
     mutationFn: (activo: boolean) =>
@@ -1267,7 +1272,11 @@ function EdicionSubRow({
               [
                 { id: "clases", label: "Fechas y clases" },
                 { id: "precios", label: "Precios y pago" },
-              ] as { id: "clases" | "precios"; label: string }[]
+                {
+                  id: "inscripciones",
+                  label: `Inscripciones${edicion.cupos_confirmados > 0 ? ` (${edicion.cupos_confirmados})` : ""}`,
+                },
+              ] as { id: "clases" | "precios" | "inscripciones"; label: string }[]
             ).map((tab) => (
               <button
                 key={tab.id}
@@ -1305,6 +1314,14 @@ function EdicionSubRow({
                 </div>
               </div>
             )}
+            {activeTab === "inscripciones" && (
+              <InscripcionesSection
+                edicion={edicion}
+                concepto={concepto}
+                inscripciones={inscripciones}
+                loading={loadingIns}
+              />
+            )}
           </div>
         </div>
       )}
@@ -1326,17 +1343,10 @@ function TallerConceptoRow({
   onNuevaEdicion: (c: TallerConcepto) => void;
 }) {
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"ediciones" | "taller" | "inscripciones">("ediciones");
+  const [activeTab, setActiveTab] = useState<"ediciones" | "taller">("ediciones");
 
   const totalConfirmados = concepto.ediciones.reduce((s, e) => s + e.cupos_confirmados, 0);
   const activeEdiciones = concepto.ediciones.filter((e) => e.activo);
-
-  const { data: inscripciones = [], isLoading: loadingIns } = useQuery({
-    queryKey: ["admin", "talleres", concepto.id, "inscripciones"],
-    queryFn: () => authedJson<Inscripcion[]>(`/api/admin/talleres/${concepto.id}/inscripciones`),
-    enabled: expanded && activeTab === "inscripciones",
-    staleTime: 1000 * 30,
-  });
 
   function handleDeleteEdicion(edicionId: number) {
     qc.setQueryData(["admin", "talleres"], (prev: TallerConcepto[] | undefined) =>
@@ -1397,11 +1407,7 @@ function TallerConceptoRow({
               [
                 { id: "ediciones", label: "Ediciones" },
                 { id: "taller", label: "El taller" },
-                {
-                  id: "inscripciones",
-                  label: `Inscripciones${totalConfirmados > 0 ? ` (${totalConfirmados})` : ""}`,
-                },
-              ] as { id: "ediciones" | "taller" | "inscripciones"; label: string }[]
+              ] as { id: "ediciones" | "taller"; label: string }[]
             ).map((tab) => (
               <button
                 key={tab.id}
@@ -1452,14 +1458,6 @@ function TallerConceptoRow({
                   <ContenidoSection concepto={concepto} />
                 </div>
               </div>
-            )}
-
-            {activeTab === "inscripciones" && (
-              <InscripcionesSection
-                concepto={concepto}
-                inscripciones={inscripciones}
-                loading={loadingIns}
-              />
             )}
           </div>
         </div>
