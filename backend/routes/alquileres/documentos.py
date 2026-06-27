@@ -96,7 +96,7 @@ def _agrupar_items_por_categoria(conn, items: list[dict]) -> list[dict]:
     eq_ids = list({it["equipo_id"] for it in items if it.get("equipo_id") is not None})
     cat_de_equipo: dict[int, tuple] = {}
     if eq_ids:
-        ph = ",".join("?" for _ in eq_ids)
+        ph = ",".join("%s" for _ in eq_ids)
         # `first_cat`: la primera categoría de cada equipo (misma convención que
         # arriba). `climb`: trepa recursivamente por `parent_id` hasta la raíz
         # (parent_id IS NULL) — soporta cualquier profundidad (hija/nieta/…).

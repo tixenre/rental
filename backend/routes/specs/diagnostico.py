@@ -299,9 +299,9 @@ def reorder_specs_categoria(categoria_id: int, payload: dict, request: Request):
             case_parts = []
             params: list[int] = []
             for idx, spec_id in enumerate(ids):
-                case_parts.append("WHEN id = ? THEN ?")
+                case_parts.append("WHEN id = %s THEN %s")
                 params.extend([spec_id, (idx + 1) * 10])
-            placeholders = ",".join("?" for _ in ids)
+            placeholders = ",".join("%s" for _ in ids)
             params.extend(ids)
             conn.execute(
                 f"""UPDATE spec_definitions

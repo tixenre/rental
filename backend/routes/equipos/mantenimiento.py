@@ -71,7 +71,7 @@ def add_mantenimiento(id: int, data: MantenimientoCreate, request: Request):
         try:
             if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Equipo no encontrado")
-            cur = conn.execute("""
+            new_id = conn.insert_returning("""
                 INSERT INTO equipo_mantenimiento
                     (equipo_id, fecha, tipo, descripcion, costo, proxima_revision,
                      fecha_hasta, cantidad, bloquea_stock)
@@ -80,7 +80,6 @@ def add_mantenimiento(id: int, data: MantenimientoCreate, request: Request):
                   data.proxima_revision or None, data.fecha_hasta or None, max(1, data.cantidad),
                   data.bloquea_stock))
             conn.commit()
-            new_id = cur.lastrowid
             row = conn.execute(
                 "SELECT * FROM equipo_mantenimiento WHERE id = %s", (new_id,)
             ).fetchone()

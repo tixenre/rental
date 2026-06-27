@@ -123,7 +123,7 @@ def clasificar_bulk(request: Request, payload: dict = None):
         where = ["e.es_recurso_interno = FALSE"]
         params: list = []
         if equipo_ids:
-            placeholders = ",".join(["?"] * len(equipo_ids))
+            placeholders = ",".join(["%s"] * len(equipo_ids))
             where.append(f"e.id IN ({placeholders})")
             params.extend(int(i) for i in equipo_ids)
         elif solo_sin:

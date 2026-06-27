@@ -59,8 +59,7 @@ def equipo_con_marca():
     conn = get_db()
     try:
         _limpiar(conn)
-        cur = conn.execute("INSERT INTO marcas (nombre) VALUES (%s)", (MARCA,))
-        brand_id = cur.lastrowid
+        brand_id = conn.insert_returning("INSERT INTO marcas (nombre) VALUES (%s)", (MARCA,))
         conn.execute(
             "INSERT INTO equipos (id, nombre, brand_id, modelo, cantidad, slug) VALUES (%s,%s,%s,%s,%s,%s)",
             (EID, "Equipo Roundtrip", brand_id, "RT900", 2, SLUG),

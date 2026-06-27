@@ -426,7 +426,7 @@ def list_equipos(
 
     if marca:
         # Filtro por marca exacta (case-insensitive) contra marcas.nombre (brand_id FK).
-        base_sql += f" AND LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(?)"
+        base_sql += f" AND LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(%s)"
         params.append(marca)
 
     # ── Sort ──
@@ -640,7 +640,7 @@ def create_equipo(data: EquipoCreate, request: Request):
             # Validar serie única (rechaza 409 si choca con otro activo)
             _check_serie_unica(conn, data.serie)
             brand_id = _resolve_brand_id(conn, data.marca)
-            cur  = conn.execute("""
+            new_id = conn.insert_returning("""
                 INSERT INTO equipos (nombre, brand_id, modelo, cantidad,
                                      precio_jornada, precio_usd, roi_pct,
                                      valor_reposicion, foto_url, fecha_compra,
@@ -652,7 +652,6 @@ def create_equipo(data: EquipoCreate, request: Request):
                   data.valor_reposicion, data.foto_url, _normalize_fecha_compra(data.fecha_compra),
                   data.serie, data.bh_url, data.dueno, data.visible_catalogo, data.estado,
                   bool(data.ficha_completa), data.categoria_specs, data.tipo or "simple"))
-            new_id = cur.lastrowid
             # Hook: calcular nombre_publico inicial. No falla el create si esto
             # rompe (ej. si los servicios no están disponibles).
             try:
@@ -771,7 +770,7 @@ def duplicate_equipo(id: int, request: Request):
                 raise HTTPException(404, "Equipo no encontrado")
             src_d = row_to_dict(src)
 
-            cur = conn.execute("""
+            new_id = conn.insert_returning("""
                 INSERT INTO equipos (
                     nombre, brand_id, modelo, cantidad,
                     precio_jornada, precio_usd, roi_pct,
@@ -789,14 +788,13 @@ def duplicate_equipo(id: int, request: Request):
                 False,  # ficha_completa false para que el admin la revise
                 src_d.get("tipo", "simple"),  # hereda el tipo del original
             ))
-            new_id = cur.lastrowid
 
             # Copiar ficha si existe
             ficha = conn.execute("SELECT * FROM equipo_fichas WHERE equipo_id=%s", (id,)).fetchone()
             if ficha:
                 f = row_to_dict(ficha)
                 cols = [k for k in f.keys() if k not in ("equipo_id", "created_at", "updated_at")]
-                placeholders = ", ".join(["?"] * (len(cols) + 1))
+                placeholders = ", ".join(["%s"] * (len(cols) + 1))
                 conn.execute(
                     f"INSERT INTO equipo_fichas (equipo_id, {', '.join(cols)}) VALUES ({placeholders})",
                     [new_id] + [f.get(c) for c in cols],
@@ -897,7 +895,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
     if not ids:
         return {"affected": 0}
 
-    placeholders = ",".join(["?"] * len(ids))
+    placeholders = ",".join(["%s"] * len(ids))
     with get_db() as conn:
         try:
             if payload.action == "set_visible":
@@ -977,7 +975,7 @@ def bulk_action(payload: BulkActionInput, request: Request):
                 # NO borramos esas hijas — solo la categoría exacta indicada.
                 if not payload.categoria_id:
                     raise HTTPException(400, "remove_categoria requiere categoria_id: int")
-                placeholders_ids = ",".join("?" * len(ids))
+                placeholders_ids = ",".join("%s" * len(ids))
                 conn.execute(
                     f"DELETE FROM equipo_categorias WHERE categoria_id = %s AND equipo_id IN ({placeholders_ids})",
                     [payload.categoria_id, *ids],
@@ -1172,7 +1170,7 @@ def _expand_to_ancestors(conn, ids) -> list[int]:
             pending.append(iv)
 
     while pending:
-        placeholders = ",".join(["?"] * len(pending))
+        placeholders = ",".join(["%s"] * len(pending))
         rows = conn.execute(
             f"SELECT id, parent_id FROM categorias WHERE id IN ({placeholders})",
             pending,

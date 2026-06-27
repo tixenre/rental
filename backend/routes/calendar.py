@@ -138,7 +138,7 @@ def _items_por_pedido(conn, pedido_ids: list[int]) -> dict[int, list[dict]]:
     """Trae los equipos de varios pedidos en una query (evita N+1)."""
     if not pedido_ids:
         return {}
-    placeholders = ",".join("?" for _ in pedido_ids)
+    placeholders = ",".join("%s" for _ in pedido_ids)
     rows = conn.execute(
         f"""
         SELECT pi.pedido_id, pi.cantidad, e.nombre, {MARCA_NOMBRE_EXPR} AS marca

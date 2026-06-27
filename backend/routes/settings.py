@@ -417,7 +417,7 @@ def recalcular_precios(payload: dict, request: Request):
             elif mode == "auto":
                 where += " AND precio_jornada_manual = FALSE"
             elif mode == "ids":
-                placeholders = ",".join(["?"] * len(ids))
+                placeholders = ",".join(["%s"] * len(ids))
                 where += f" AND id IN ({placeholders})"
                 params.extend(int(i) for i in ids)
             # mode == "all": sin filtro adicional

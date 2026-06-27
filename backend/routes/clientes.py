@@ -165,14 +165,14 @@ def create_cliente(data: ClienteCreate, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            cur  = conn.execute("""
+            cliente_id = conn.insert_returning("""
                 INSERT INTO clientes (nombre, apellido, telefono, email, direccion, cuit,
                                       descuento, perfil_impuestos, notas, direccion_maps_url)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (data.nombre, data.apellido, data.telefono, data.email, data.direccion,
                   data.cuit, data.descuento, data.perfil_impuestos, data.notas, data.direccion_maps_url))
             conn.commit()
-            row = conn.execute("SELECT * FROM clientes WHERE id=%s", (cur.lastrowid,)).fetchone()
+            row = conn.execute("SELECT * FROM clientes WHERE id=%s", (cliente_id,)).fetchone()
             return row_to_dict(row)
         except Exception:
             conn.rollback()

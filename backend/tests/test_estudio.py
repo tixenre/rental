@@ -728,6 +728,10 @@ class _RecordingConn(_ConnCM):
             return _Cur([])
         return _Cur([])
 
+    def insert_returning(self, sql, params=(), *, column="id"):
+        self.execute(sql, params)
+        return self.pedido_id
+
     def commit(self):
         self.committed = True
 

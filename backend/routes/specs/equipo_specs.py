@@ -130,7 +130,7 @@ def reemplazar_specs_equipo(equipo_id: int, payload: EquipoSpecsInput, request: 
 
             defs_by_id: dict[int, dict] = {}
             if keys_int:
-                placeholders = ",".join(["?"] * len(keys_int))
+                placeholders = ",".join(["%s"] * len(keys_int))
                 def_rows = conn.execute(
                     f"SELECT id, label, tipo, tabla_columnas, enum_options, unidad "
                     f"FROM spec_definitions WHERE id IN ({placeholders})",

@@ -93,7 +93,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
         item.setdefault("componentes", [])
     if not equipo_ids:
         return items
-    placeholders = ",".join("?" for _ in equipo_ids)
+    placeholders = ",".join("%s" for _ in equipo_ids)
     comp_rows = conn.execute(f"""
         SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.foto_url_sm, ec.foto_url_thumb, ec.cantidad AS stock_total,
                ec.modelo, ec.serie, ec.valor_reposicion,
@@ -157,7 +157,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     if not pedido_ids:
         return {}
 
-    ph = ",".join(["?"] * len(pedido_ids))
+    ph = ",".join(["%s"] * len(pedido_ids))
     rows = conn.execute(f"""
         SELECT pi.*, COALESCE(e.nombre, pi.nombre_libre) AS nombre,
                {MARCA_SUBQUERY},
@@ -176,7 +176,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
     comp_map: dict[int, list[dict]] = {eid: [] for eid in equipo_ids}
 
     if equipo_ids:
-        cph = ",".join(["?"] * len(equipo_ids))
+        cph = ",".join(["%s"] * len(equipo_ids))
         comp_rows = conn.execute(f"""
             SELECT kc.*, ec.nombre, {marca_subquery('ec')}, ec.foto_url, ec.foto_url_sm, ec.foto_url_thumb, ec.cantidad AS stock_total,
                    ec.modelo, ec.serie, ec.valor_reposicion,
@@ -355,7 +355,7 @@ def _enriquecer_pedidos_con_cliente(conn, pedidos: list[dict]) -> None:
     ids = sorted({p["cliente_id"] for p in pedidos if p.get("cliente_id")})
     if not ids:
         return
-    ph = ",".join(["?"] * len(ids))
+    ph = ",".join(["%s"] * len(ids))
     rows = conn.execute(
         f"""SELECT id, nombre, apellido, email, telefono,
                    dni, nombre_renaper, apellido_renaper, dni_validado_at
@@ -753,7 +753,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
             next_num = _next_numero_pedido(conn)
             # Cabecera primero con totales en 0; los ítems se aplican vía el helper
             # canónico, que recalcula monto_total y descuento_jornadas_pct.
-            cur = conn.execute("""
+            pedido_id = conn.insert_returning("""
                 INSERT INTO alquileres (cliente_nombre, cliente_email, cliente_telefono,
                                      cliente_id, notas, fecha_desde, fecha_hasta,
                                      monto_total, estado, numero_pedido,
@@ -763,7 +763,6 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                   data.cliente_id, data.notas, data.fecha_desde or None, data.fecha_hasta or None,
                   0, estado_inicial, next_num,
                   descuento_pct, 0.0))
-            pedido_id = cur.lastrowid
 
             # Ítems vía la fuente única `_apply_pedido_items` (#805): preserva las
             # líneas personalizadas (equipo_id None → nombre_libre/cobro_modo/orden),

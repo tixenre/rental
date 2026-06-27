@@ -127,7 +127,7 @@ def list_pedidos(
         pedido_ids = [p["id"] for p in pedidos]
         pendientes: set[int] = set()
         if pedido_ids:
-            ph = ",".join(["?"] * len(pedido_ids))
+            ph = ",".join(["%s"] * len(pedido_ids))
             for r in conn.execute(
                 f"""SELECT DISTINCT pedido_id FROM solicitudes_modificacion
                     WHERE estado = 'pendiente' AND pedido_id IN ({ph})""",

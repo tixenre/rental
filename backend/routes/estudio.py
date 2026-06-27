@@ -1654,7 +1654,7 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                 monto_total += estudio["pack_precio"] or 0
 
             next_num = _next_numero_pedido(conn)
-            cur = conn.execute(
+            pedido_id = conn.insert_returning(
                 """
                 INSERT INTO alquileres (cliente_id, cliente_nombre, cliente_email, cliente_telefono,
                                         fecha_desde, fecha_hasta, monto_total, estado,
@@ -1667,7 +1667,6 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                     "estudio", "estudio", con_pack, next_num,
                 ),
             )
-            pedido_id = cur.lastrowid
 
             # ── Pack PRIMERO (antes del ítem centinela) ─────────────────────────────
             # Así _check_stock solo ve los equipos reales del pack y nunca el
@@ -1786,10 +1785,10 @@ def crear_slot(body: SlotFijoCreate, request: Request):
             estudio = _get_estudio_row(conn)
             if not estudio["equipo_id"]:
                 raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
-            conn.execute("SELECT pg_advisory_xact_lock(?, ?)", (_ADVISORY_NS_ESTUDIO, 1))
+            conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
             if data.get("activo", True):
                 verificar_sesiones_disponibles(conn, estudio, _sesiones_de_slot(data))
-            cur = conn.execute(
+            slot_id = conn.insert_returning(
                 """
                 INSERT INTO estudio_slots_fijos
                     (cliente, dia_semana, hora_desde, hora_hasta, valor_mensual,
@@ -1799,7 +1798,7 @@ def crear_slot(body: SlotFijoCreate, request: Request):
                 (data["cliente"], data["dia_semana"], data["hora_desde"], data["hora_hasta"],
                  data["valor_mensual"], data["mes_desde"], data["mes_hasta"], data["activo"]),
             )
-            slot = _get_slot(conn, cur.lastrowid)
+            slot = _get_slot(conn, slot_id)
             _regenerar_pedidos_slot(conn, slot)
             conn.commit()
             return slot
