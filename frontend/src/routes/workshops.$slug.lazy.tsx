@@ -392,10 +392,15 @@ function TallerLandingPage() {
                     {formatARS(taller.precio_total)}
                   </p>
                   <ul className="mt-3 flex flex-col gap-1.5">
-                    {[
-                      `Seña del 50% al inscribirte (${formatARS(taller.precio_sena)})`,
-                      `Resto antes de la primera clase`,
-                    ].map((item) => (
+                    {(() => {
+                      const porcentaje = taller.precio_total > 0
+                        ? Math.round((taller.precio_sena / taller.precio_total) * 100)
+                        : 0;
+                      return [
+                        `Seña del ${porcentaje}% al inscribirte (${formatARS(taller.precio_sena)})`,
+                        `Resto antes de la primera clase`,
+                      ];
+                    })().map((item) => (
                       <li
                         key={item}
                         className="flex items-start gap-2 text-xs text-muted-foreground"
