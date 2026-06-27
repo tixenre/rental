@@ -1388,19 +1388,21 @@ def _taller_bloqueante(conn, fecha_desde, fecha_hasta,
                        exclude_taller_id: Optional[int] = None) -> Optional[str]:
     """Si la franja solapa una sesión de un taller activo, devuelve el nombre del
     taller. Compara contra la fecha literal — no deriva weekday ni rango.
-    Minutos desde medianoche (igual que _slot_bloqueante; hora_fin=24 OK)."""
+    Minutos desde medianoche (igual que _slot_bloqueante; hora_fin=24 OK).
+    Consulta clases_taller (modelo vigente; taller_sesiones era el modelo anterior)."""
     dia = fecha_desde.date()
     dia_base = fecha_desde.replace(hour=0, minute=0, second=0, microsecond=0)
     ini = int((fecha_desde - dia_base).total_seconds() // 60)
     fin = int((fecha_hasta - dia_base).total_seconds() // 60)
     rows = conn.execute(
         """
-        SELECT t.nombre, s.hora_inicio, s.hora_fin
-        FROM taller_sesiones s
-        JOIN talleres t ON t.id = s.taller_id
+        SELECT t.nombre, c.hora_inicio, c.hora_fin
+        FROM clases_taller c
+        JOIN ediciones_taller e ON e.id = c.edicion_id
+        JOIN talleres t ON t.id = e.taller_id
         WHERE t.activo = TRUE
-          AND s.fecha = ?
-          AND (? IS NULL OR t.id != ?)
+          AND c.fecha = %s
+          AND (%s IS NULL OR t.id != %s)
         """,
         (dia, exclude_taller_id, exclude_taller_id),
     ).fetchall()
