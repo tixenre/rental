@@ -48,6 +48,7 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
           modifiersClassNames={{
             sesion: "bg-rosa text-ink font-bold !opacity-100 rounded-md",
           }}
+          locale="es-AR"
         />
       </div>
 
