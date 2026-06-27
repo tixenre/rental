@@ -1316,3 +1316,65 @@ cancel-in-progress` ya cancela corridas viejas.
   gobernanza (un archivo bajo git). El empirismo se reserva para donde genuinamente no se puede predecir el
   efecto (fuerza de enforcement tras un trim; routing tras un merge). Materializa y **acota** _Los hallazgos
   de una auditoría son hipótesis (2026-06-22)_: ahora la confirmación tiene método y techo de costo.
+
+### 2026-06-27 — Filosofía de trabajo derivada del corpus, mantenida como hipótesis (defaults, no leyes)
+
+- **Contexto.** El dueño quería que la sesión entendiera "cómo quiere desarrollar y mantener el repo" sin un
+  ensayo de personalidad ni una lista declarada de mandamientos: que se **derivara por análisis** del cuerpo de
+  decisiones y preferencias ya tomadas, que **no quedara congelada**, y —clave— que se **aplicara sola**, sin
+  que él tenga que pedirlo ni estar atento ("como verificar que los skills tengan algo para aprender").
+- **Qué se decidió.** (1) Los principios se **derivan del corpus** (clusters de evidencia en las propias
+  decisiones), no se declaran. (2) Viven **auto-cargados en `CLAUDE.md`** (sección "Filosofía de trabajo") →
+  están en contexto en toda sesión y superficie, y son la base desde la que la sesión propone. (3) Se mantienen
+  como **hipótesis**: se ponen a prueba, mutan o aparece uno nuevo contra cada decisión. (4) **Son defaults, no
+  leyes** — el dueño puede ir en contra; la sesión **nota la desviación, nombra el principio y explica el
+  porqué** (porque el dueño también se puede confundir), y si confirma, **procede**. Una **excepción puntual no
+  deroga** el principio; solo un **patrón repetido** o un **cambio de criterio explícito** lo muta, y la
+  mutación se **propone** a la memoria (aprobación del dueño). (5) **Aplicar esto es default de la sesión** —
+  no requiere pedido ni vigilancia: mismo loop que el `## Auto-mejora` de los skills (el sistema detecta y
+  propone; el dueño aprueba).
+- **Cómo se mantiene (mecanismo).** Auto-load nativo (CLAUDE.md se lee en cada sesión, todas las superficies) =
+  los principios siempre en contexto. El **supervisor** (ya despachado antes de cada PR) suma a su checklist:
+  ¿el lote confirma/tensiona/suma un principio? → distingue **excepción puntual** (no propone) de **drift
+  recurrente / cambio de criterio** (propone mutar). `gobernanza` los **re-deriva del corpus** en el cierre
+  mensual (anti-congelamiento). El hook `check-governance-review.sh` los **surfacea** como backstop cuando la
+  rama toca el digest (local: terminal/desktop; no en celu/web).
+- **Por qué así (reusar, no recrear).** Es el mecanismo que el dueño ya confía para los skills (`## Auto-mejora`:
+  detectar-proponer sin pedido), aplicado a los principios — no se inventa uno nuevo (principio #1). Límite
+  honesto: el auto-load corre en todas las superficies; el hook solo local. Aplicarlos **no es más débil** que
+  el resto del modus operandi: es el **mismo** mecanismo de regla auto-cargada que ya gobierna todo lo que la
+  sesión hace sin que se lo pidan. _(Primera aplicación en vivo, antes de estar grabada: el dueño pidió mandar
+  esto directo a prod; la sesión lo marcó como desviación del gate `dev→main`, el dueño confirmó con razón
+  válida —son docs sin comportamiento que probar en staging— y se procedió. La excepción no derogó el gate.)_
+- **Los 5 (derivados; evidencia entre paréntesis).**
+  1. **Una sola forma de cada cosa** (motores únicos: reservas/reportes/contabilidad/búsqueda/branding;
+     `equipment/shared/`; _Fijarse en el repo antes de implementar (2026-06-20)_).
+  2. **El core que anda no se toca; lo nuevo se acopla** (El Estudio reusa el motor sin tocarlo; advisory lock
+     sin tocar el `FOR UPDATE`; reservas = Opus por radio de explosión).
+  3. **Lo vivo se mantiene chico y curado — se poda lo que no rinde, no lo que cuesta** (curación no
+     append-only; cláusula de retiro de evals; anti-bloat con **techo de valor**, no de costo — corrección
+     explícita del dueño: lo valioso se hace aunque sea difícil).
+  4. **Lo que paga se mide barato; lo reversible se decide con juicio + git** (empirismo proporcional 2026-06-27;
+     _Los hallazgos son hipótesis (2026-06-22)_).
+  5. **El sistema propone, el dueño decide — y dice la verdad** (propone-no-escribe en supervisor/gobernanza/
+     buzón; "no fabriques churn"; el dueño es el gate).
+
+### 2026-06-27 — PR como hoja de ruta: rama aislada → PR scoped del tema → issue de tracking → batch a prod
+
+- **Contexto.** En una misma sesión se abrieron 3 PR para lo que era un solo tema; el dueño ("ya vamos por el PR
+  mil") pidió **menos PR, no redundantes**, y a la vez quería **encapsular** los cambios grandes "por si las
+  dudas" y poder **ver qué se hizo** sin leer código.
+- **Qué se decidió.** Para trabajo grande/encapsulado (lo chico sigue por push-directo-a-`dev`, _Workflow de
+  cambios 2026-06-08_): (1) **una rama aislada por tema**; (2) **un PR scoped del tema** (no uno por commit ni
+  varios por fase) que funciona como **hoja de ruta + historial** legible; (3) los PR del tema se **dejan sin
+  mergear** — el dueño es el gate que mergea; (4) la **issue de tracking** es la **historia** que apunta a los PR
+  (un issue por iniciativa, no por fase — espeja _Modus operandi (2026-05-25)_); (5) a prod, **batch `dev →
+  main`**: un PR de promoción que reconcilia el lote (espeja _Issues (2026-06-08)_).
+- **Tensión resuelta (git).** Un mismo PR no puede apuntar a `dev` y a `main` a la vez; por eso el modelo es
+  **PR-del-tema → `dev`** + **PR-batch `dev→main`**, atados por la **issue de tracking** como hoja de ruta, en
+  vez de un único PR imposible. Menos PR sueltos, trazabilidad por issue. **Excepción reconocida:** un cambio
+  **solo-docs/gobernanza** (sin comportamiento que probar en staging) puede ir en **un PR aislado directo a
+  `main`** — el "probalo en `dev` primero" aplica a código, no a docs (decisión del dueño, 2026-06-27).
+- **Why.** Espeja lo que ya estaba (_Workflow 2026-06-08_, _Issues espeja el código 2026-06-08_, _Modus operandi
+  2026-05-25_): un issue de tracking por iniciativa; el commit/PR como registro. No introduce mecanismo nuevo;
+  ordena el existente para que no proliferen PR/issues.

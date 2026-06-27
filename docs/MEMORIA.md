@@ -366,6 +366,30 @@ medido**; un eval que gatea 0 regresiones reales se retira (como `consejo`). Fou
 (reusa pytest `-m golden` + `ui-audit.mjs` `LABEL=before/after` + dispatch del `supervisor`); detalle en el log.
 Acota _Los hallazgos de una auditoría son hipótesis (2026-06-22)_: la confirmación ahora tiene método y techo de costo.
 
+### 2026-06-27 — Filosofía de trabajo derivada del corpus, mantenida como hipótesis (defaults, no leyes)
+
+Los principios de cómo se desarrolla/mantiene el repo **se derivan del corpus** (no se declaran) y viven
+**auto-cargados en `CLAUDE.md`** (sección "Filosofía de trabajo"). Son **defaults, no leyes**: ante un
+pedido que va en contra, la sesión lo **nota, nombra el principio y explica el porqué** (red contra la
+confusión del dueño) y, si el dueño confirma, **procede** — la **excepción no deroga** el principio; solo
+un **patrón repetido** o un **cambio de criterio explícito** lo muta. **Aplicarlos es default de la sesión,
+no se pide** (mismo loop que el `## Auto-mejora` de los skills: el sistema detecta y propone, el dueño
+aprueba). Los **mantiene** el supervisor (testea cada lote: _excepción puntual_ vs. _drift recurrente_ →
+propone mutar) + `gobernanza` (re-deriva en el cierre mensual). El supervisor marca un principio aplicado
+como ley rígida (sin permitir excepción confirmada por el dueño) o una mutación grabada sin su aprobación.
+
+### 2026-06-27 — PR como hoja de ruta: rama aislada → PR scoped del tema → issue de tracking → batch a prod
+
+Refina _Workflow de cambios (2026-06-08)_ para el trabajo **grande/encapsulado** (el push-directo-a-`dev`
+sigue para lo chico). Un tema = **una rama aislada** → se trabaja y commitea → **un PR scoped del tema** (no
+uno por commit, no varios por fase), que queda como **hoja de ruta + historial** legible de qué se hizo; los
+PR del tema se dejan **sin mergear** (el dueño es el gate que clickea). La **issue de tracking** es la
+**historia** que apunta a esos PR (un issue por iniciativa, espeja _Modus operandi (2026-05-25)_). A prod va
+en **batch `dev → main`** (un PR de promoción que reconcilia el lote, espeja _Issues (2026-06-08)_). Tensión
+de git resuelta: un PR no puede apuntar a `dev` y `main` a la vez → PR-del-tema→`dev` + PR-batch `dev→main`,
+atados por la issue. El supervisor marca un PR por-commit, un tema partido en varios PR sin razón, o issues
+duplicadas por fase.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
