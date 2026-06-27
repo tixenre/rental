@@ -23,9 +23,13 @@ lo ejecutable se **reusa** (pytest, `ui-audit.mjs`, dispatch del `supervisor`). 
 | `reservas-inline-expand.diff` | 2026-05-31 — Expansión recursiva del motor de reservas |
 | `create-pedido-no-lock.diff` | 2026-06-22 — Creación de pedidos concurrente: advisory lock |
 | `asset-path-file-parent.diff` | 2026-06-20 — Gate de "frontend servible" + paths de assets a la raíz |
+| `confirmed-requote.diff` | 2026-06-06 — Datos del pedido: contacto en vivo, plata congelada — **caso difícil** (drift sutil, sin frase-gatillo) |
 
-Catch-rate baseline (digest completo) = **4/4**. Tras el trim del digest debe **seguir siendo 4/4**; una
-caída → el 1-liner perdió el trigger → revert/engrosar esa entrada (keep/revert por-entrada).
+Los 4 primeros son el **caso favorable** (la decisión tiene un "el supervisor marca…" explícito); el 5º es el
+**caso difícil** (regla de principio, sin frase literal) que estresa el límite digest-vs-log. Baseline (digest
+completo): los 4 fáciles **4/4**; el difícil debe cazarse también. _Validado 2026-06-27: el difícil se cazó
+**desde el digest solo** (sin abrir `DECISIONES.md`) — la regla de principio alcanzó, no hace falta frase-gatillo
+literal._ Tras un trim, la cifra debe **sostenerse**; una caída → el 1-liner perdió el trigger → revert/engrosar (keep/revert por-entrada).
 | **C · El routing sobrevive** | ¿Mergear skills rompe qué skill se dispara? | LLM-as-judge sobre `routing-cases.jsonl`: dadas las descripciones (6 viejas vs 2 merged) + el árbol de decisión de `CLAUDE.md`, ¿qué skill matchea cada frase? Baseline vs after. **In-session.** |
 | **D · Paridad de hallazgos** | ¿El skill merged encuentra lo que encontraban los originales? | Invocar el merged contra `fixtures/auditoria-codigo-smoke.*` (un defecto plantado por lente); **ojo del dueño, una vez**. No es gate automático. |
 
@@ -48,8 +52,8 @@ caída → el 1-liner perdió el trigger → revert/engrosar esa entrada (keep/r
   gobernanza va contra el ethos anti-bloat).
 - **Auto-disparo (Nivel 1):** el hook `Stop` `.claude/hooks/check-governance-review.sh` detecta cuándo la
   rama tocó el digest o las skills y **te surfacea la señal a correr** (una vez por cambio-set; corre el
-  `context-size` solo, el resto lo recordás). Corre en la **terminal/CLI, no en las apps GUI** de Mac/iPhone.
-  Automatiza el *disparador*, no el *juicio*: vos seguís siendo el gate de aplicar.
+  `context-size` solo, el resto lo recordás). Corre en la **terminal y en el desktop de Claude Code** (local);
+  no en el chat de Mac/iPhone ni en la web/nube. Automatiza el *disparador*, no el *juicio*: vos seguís siendo el gate de aplicar.
 
 ## Cláusula de retiro
 

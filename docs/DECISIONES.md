@@ -45,7 +45,8 @@
 - **Red de seguridad:** el **CI corre en cada push** a `dev` y `main`. No pushear con CI en rojo.
 - **Quién mueve qué:** la sesión pushea a `dev` sola y avisa al dueño con plan de prueba — no pide
   permiso. El dueño prueba en staging y aprueba el PR `dev → main`.
-- **Gates del dueño:** (1) probar en staging; (2) aprobar `dev → main`.
+- **Gates del dueño:** (1) probar en staging; (2) aprobar `dev → main`. Helper: `scripts/pre-promote.sh`
+  (corrélo antes de promover — lista el scope dev→main, corre check-docs y recuerda el checklist supervisor/app/CI).
 - **Merge `dev → main`** = merge commit (NO squash → revert quirúrgico por PR si hace falta en prod).
   Commits atómicos, Conventional Commits en español.
 - **Why:** `dev` es seguro (sin clientes) → el PR antes de staging era overhead sin beneficio real.
