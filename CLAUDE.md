@@ -1,7 +1,7 @@
 # Rambla Rental — guía de sesión
 
 > **Front door auto-cargado.** Liviano a propósito: el modus operandi esencial está acá; el
-> contexto profundo se lee on-demand. **No** se inlinea el `MANIFIESTO.md` completo (~290 líneas)
+> contexto profundo se lee on-demand. **No** se inlinea el `MANIFIESTO.md` completo
 > para no inundar la sesión — se lee cuando hace falta, y el supervisor lo lee en su ventana.
 
 ## Qué es
@@ -17,12 +17,35 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
   pushea el fix); **PR solo para `dev → main`** (la puerta a prod). **Nunca a `main` directo; no pushear
   con CI en rojo.** El detalle y el _por qué_ no se repiten acá — viven en esa decisión.
 - **Antes de abrir el PR `dev → main`: despachar el agente `supervisor`** — revisión read-only de
-  scope / forma / drift, que resume en lenguaje claro y deja el plan de prueba. (Instrucción, no
-  gate de sistema: en las apps de Mac/iPhone no hay hooks.)
+  scope / forma / drift, que resume en lenguaje claro y deja el plan de prueba. (Es **convención**, no
+  gate de sistema: depende de que la sesión lo despache — nada lo fuerza.)
 - **La conversación es para decisiones y la forma de hacer las cosas — no para el ruido de cada
   commit/diff.** El trabajo de revisión pesada va al subagente `supervisor` (contexto aislado).
 - **El dueño testea, no revisa código.** Acompañar cada cambio testeable con un **plan de prueba
   en lenguaje claro** ("andá a /X, hacé Y, tenés que ver Z"). El dueño prueba en **staging**.
+
+## Filosofía de trabajo (derivada, no declarada)
+
+Estos principios **se derivaron del corpus de decisiones** (no son un manifiesto declarado); se mantienen
+como **hipótesis** —se ponen a prueba, mutan o crece uno nuevo contra cada decisión— y son la base desde
+la que la sesión te propone. **Son defaults, no leyes:** podés ir en contra. Si un pedido va contra uno,
+la sesión lo **nota, te dice cuál y por qué no solés quererlo, y te explica el porqué** (por si te
+confundiste); si confirmás, **va igual** — la **excepción no deroga** el principio. Solo un **patrón
+repetido** o tu **cambio de criterio explícito** lo muta (ahí se propone a la memoria, con tu aprobación).
+**Aplicar esto es default de la sesión: no hay que pedirlo.**
+
+1. **Una sola forma de cada cosa.** Reusar antes de recrear; antes de construir, fijarse si ya existe.
+2. **El core que anda no se toca; lo nuevo se acopla alrededor.**
+3. **Lo vivo se mantiene chico y curado** (memoria, skills, evals se podan) — se poda lo que **no rinde**,
+   no lo que cuesta: lo valioso se hace aunque sea difícil, si vale más que su costo.
+4. **Lo que paga se mide barato; lo reversible se decide con juicio + git.** Un hallazgo es hipótesis
+   hasta confirmarlo.
+5. **El sistema propone, el dueño decide — y dice la verdad** (honestidad > actividad).
+
+> Quién lo mantiene: el **supervisor** testea cada lote contra estos principios (distingue _excepción
+> puntual_ de _drift recurrente_) y propone mutaciones; `gobernanza` los **re-deriva** del corpus en el
+> cierre mensual (anti-congelamiento). Evidencia + mecanismo → _2026-06-27 — Filosofía de trabajo derivada_
+> en [`docs/MEMORIA.md`](docs/MEMORIA.md) / [`docs/DECISIONES.md`](docs/DECISIONES.md).
 
 ## Memoria — dónde vive qué
 

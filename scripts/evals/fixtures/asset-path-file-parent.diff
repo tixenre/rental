@@ -1,0 +1,11 @@
+# Fixture señal B (catch del supervisor) — diff sintético.
+# El "esperado" (qué decisión debe cazar) vive en scripts/evals/README.md, FUERA del fixture, para no
+# contaminar la medición: si el fixture nombra la decisión, el supervisor la lee en vez de cazarla.
+
+--- a/backend/main.py
++++ b/backend/main.py
+@@ -18,8 +18,8 @@ from pathlib import Path
+-FRONT = Path(__file__).resolve().parents[1] / "frontend" / "public"
+-FRONT_NEW = Path(__file__).resolve().parents[1] / "frontend" / "dist"
++FRONT = Path(__file__).parent / "frontend" / "public"
++FRONT_NEW = Path(__file__).parent / "frontend" / "dist"

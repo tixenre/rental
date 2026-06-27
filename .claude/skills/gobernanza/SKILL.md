@@ -135,6 +135,12 @@ El dueño revisa y aprueba. Lo que se aprueba: aplicar propuestas del buzón, ar
 `model:`, actualizar `last-reviewed`. **Todo va a memoria + DECISIONES en paridad** si es una
 decisión de criterio nueva.
 
+**Re-derivar los principios (anti-congelamiento).** En el cierre, releé el corpus de decisiones del período
+y preguntá: ¿algún principio de `CLAUDE.md` (sección "Filosofía de trabajo") **mutó, se reforzó, o apareció
+uno nuevo**? Los principios son hipótesis, no dogma — se mantienen vivos re-derivándolos del corpus, no
+declarándolos. Proponé el ajuste (el dueño aprueba; memoria + DECISIONES en paridad). Ver
+_2026-06-27 — Filosofía de trabajo derivada_.
+
 ## Regla de oro
 
 **Proponer, no aplicar.** Este skill razona sobre el meta-nivel y lleva propuestas al dueño — igual

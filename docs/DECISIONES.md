@@ -45,7 +45,8 @@
 - **Red de seguridad:** el **CI corre en cada push** a `dev` y `main`. No pushear con CI en rojo.
 - **Quién mueve qué:** la sesión pushea a `dev` sola y avisa al dueño con plan de prueba — no pide
   permiso. El dueño prueba en staging y aprueba el PR `dev → main`.
-- **Gates del dueño:** (1) probar en staging; (2) aprobar `dev → main`.
+- **Gates del dueño:** (1) probar en staging; (2) aprobar `dev → main`. Helper: `scripts/pre-promote.sh`
+  (corrélo antes de promover — lista el scope dev→main, corre check-docs y recuerda el checklist supervisor/app/CI).
 - **Merge `dev → main`** = merge commit (NO squash → revert quirúrgico por PR si hace falta en prod).
   Commits atómicos, Conventional Commits en español.
 - **Why:** `dev` es seguro (sin clientes) → el PR antes de staging era overhead sin beneficio real.
@@ -1083,6 +1084,15 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Consecuencias.** 13 skills en disco (6 activos previos + 6 nuevos + `pendientes` = 13 total).
   `CLAUDE.md` tiene 13 filas en la tabla de skills. `scripts/check-docs.mjs` los verifica todos.
   El supervisor marca cualquier skill en disco sin fila, o un skill que aplique sin aprobación.
+- **Consolidación a 2 medida y RECHAZADA (2026-06-27, Exp 2 del roadmap de gobernanza empírico).** Se probó
+  fusionar los 4 de código en `auditoria-codigo` (4 lentes) y `specs`+`catalogo` en `auditoria-datos`, con
+  medición before/after (`scripts/evals/`): **routing** 12/12 → 12/12 (no mejoró — ya era perfecto separado);
+  **costo por invocación** señal A: el merged carga TODOS los lentes por invocación → **3.1×** (`auditoria-codigo`)
+  y **1.9×** (`auditoria-datos`) el costo del skill puntual, contra un ahorro de tabla auto-cargada de solo
+  −192 tok/sesión. El caso común es 1 lente → el merge penaliza ~3× lo común para un beneficio marginal +
+  diluye el foco (4 checklists cuando se quiere 1). **Veredicto: revert, se mantienen los 6 separados.** No
+  re-mergear salvo con un diseño de **carga on-demand por lente** (progressive disclosure), no inline. Es el
+  primer caso del principio _2026-06-27 — empirismo proporcional_ matando un cambio que la intuición aprobaba.
 
 ### 2026-06-23 — docs/MARCA.md = hub de marca; skill `marca` gobierna el inventario de features
 
@@ -1272,3 +1282,99 @@ cancel-in-progress` ya cancela corridas viejas.
   ningún componente necesita prop de área. El token semántico `--area-accent` es más robusto que
   `--color-estudio` directo porque desacopla la elección de color de la semántica de uso — agregar
   workshops u otras áreas es un bloque CSS adicional, no un barrido de componentes.
+
+### 2026-06-27 — Medir lo barato-e-incierto; juicio + reversibilidad para el resto (empirismo proporcional)
+
+- **Contexto.** Tras la auditoría externa del sistema de gobernanza (comparado contra Hermes Agent,
+  MemGPT/Letta, Voyager, ADR/Zettelkasten), el dueño aprobó el roadmap de mejoras con una condición que
+  cambia su forma: _"todo lo que rinde, pero **empíricamente** — medilo, compará antes/después, y lo que no
+  demuestra que mejora se revierte. Incluso esta filosofía puede quedar grabada."_ Riesgo real en un repo con
+  ethos anti-bloat: el **aparato de medición puede volverse él mismo el bloat**.
+- **Decisión — la regla de proporcionalidad.** El 2×2 de (barato vs caro de medir) × (resultado cierto vs
+  incierto): **se mide SOLO el cuadrante barato-Y-incierto**. Caro-de-medir u obvio-y-reversible → **juicio +
+  git revert**, no eval. La medición nunca cuesta más que lo medido.
+- **Qué SÍ se mide (cheap + uncertain):** (a) ¿el digest se sigue haciendo cumplir tras un trim? → dispatch
+  del `supervisor` contra `scripts/evals/fixtures/*.diff` que violan la decisión trimeada, catch-rate
+  antes/después; (b) ¿el routing sobrevive a un merge de skills? → LLM-as-judge sobre las descripciones
+  (`routing-cases.jsonl`); (c) el tamaño del prefijo auto-cargado → `context-size.mjs` (lado valor del trim,
+  lado costo del merge).
+- **Qué NO se mide (judgment + reversibility):** "¿es bueno este manual/doc?", un 1-liner del digest — son
+  reversibles (un archivo, git, auto-cargado fresco cada sesión); el gate es leerlo + el link-check de
+  `check-docs`. Un judge automático de "paridad de hallazgos" sería más ruidoso que lo que chequea → se hace
+  con un fixture smoke + ojo del dueño, una vez.
+- **Foundation.** `scripts/evals/` (único hogar net-new; ~80 líneas de código real, el resto data/runbook).
+  Reusa lo existente: pytest `-m golden` (tests decisivos ya escritos, sólo marcados), `ui-audit.mjs`
+  (`LABEL=before/after`), y el dispatch de subagentes (precedente: `consejo` despacha voces aisladas). Las
+  señales B/C/D corren **solo cuando su target cambia** (digest → B; capa de skills → C/D), **no en cada
+  push**: B necesita dispatch de agente y C una llamada a modelo (caro + no determinista en CI; un gate flaky
+  de gobernanza va contra el ethos). Los `-m golden` sí gatean en CI (jobs `python-tests`/`db-migrations`).
+- **Cláusula de retiro (auto-referencial).** Cada eval lleva fecha: si gatea 0 regresiones reales en N meses
+  → se retira vía `gobernanza` (igual que el self-revert de `consejo`). El golden set es **curado, no
+  append-only** (misma disciplina que la memoria). Esta misma filosofía queda grabada como principio —
+  satisfaciendo el _"incluso esto puede quedar"_.
+- **Why.** La reversibilidad es una red más barata que la medición para la mayoría de los cambios de
+  gobernanza (un archivo bajo git). El empirismo se reserva para donde genuinamente no se puede predecir el
+  efecto (fuerza de enforcement tras un trim; routing tras un merge). Materializa y **acota** _Los hallazgos
+  de una auditoría son hipótesis (2026-06-22)_: ahora la confirmación tiene método y techo de costo.
+
+### 2026-06-27 — Filosofía de trabajo derivada del corpus, mantenida como hipótesis (defaults, no leyes)
+
+- **Contexto.** El dueño quería que la sesión entendiera "cómo quiere desarrollar y mantener el repo" sin un
+  ensayo de personalidad ni una lista declarada de mandamientos: que se **derivara por análisis** del cuerpo de
+  decisiones y preferencias ya tomadas, que **no quedara congelada**, y —clave— que se **aplicara sola**, sin
+  que él tenga que pedirlo ni estar atento ("como verificar que los skills tengan algo para aprender").
+- **Qué se decidió.** (1) Los principios se **derivan del corpus** (clusters de evidencia en las propias
+  decisiones), no se declaran. (2) Viven **auto-cargados en `CLAUDE.md`** (sección "Filosofía de trabajo") →
+  están en contexto en toda sesión y superficie, y son la base desde la que la sesión propone. (3) Se mantienen
+  como **hipótesis**: se ponen a prueba, mutan o aparece uno nuevo contra cada decisión. (4) **Son defaults, no
+  leyes** — el dueño puede ir en contra; la sesión **nota la desviación, nombra el principio y explica el
+  porqué** (porque el dueño también se puede confundir), y si confirma, **procede**. Una **excepción puntual no
+  deroga** el principio; solo un **patrón repetido** o un **cambio de criterio explícito** lo muta, y la
+  mutación se **propone** a la memoria (aprobación del dueño). (5) **Aplicar esto es default de la sesión** —
+  no requiere pedido ni vigilancia: mismo loop que el `## Auto-mejora` de los skills (el sistema detecta y
+  propone; el dueño aprueba).
+- **Cómo se mantiene (mecanismo).** Auto-load nativo (CLAUDE.md se lee en cada sesión, todas las superficies) =
+  los principios siempre en contexto. El **supervisor** (ya despachado antes de cada PR) suma a su checklist:
+  ¿el lote confirma/tensiona/suma un principio? → distingue **excepción puntual** (no propone) de **drift
+  recurrente / cambio de criterio** (propone mutar). `gobernanza` los **re-deriva del corpus** en el cierre
+  mensual (anti-congelamiento). El hook `check-governance-review.sh` los **surfacea** como backstop cuando la
+  rama toca el digest (local: terminal/desktop; no en celu/web).
+- **Por qué así (reusar, no recrear).** Es el mecanismo que el dueño ya confía para los skills (`## Auto-mejora`:
+  detectar-proponer sin pedido), aplicado a los principios — no se inventa uno nuevo (principio #1). Límite
+  honesto: el auto-load corre en todas las superficies; el hook solo local. Aplicarlos **no es más débil** que
+  el resto del modus operandi: es el **mismo** mecanismo de regla auto-cargada que ya gobierna todo lo que la
+  sesión hace sin que se lo pidan. _(Primera aplicación en vivo, antes de estar grabada: el dueño pidió mandar
+  esto directo a prod; la sesión lo marcó como desviación del gate `dev→main`, el dueño confirmó con razón
+  válida —son docs sin comportamiento que probar en staging— y se procedió. La excepción no derogó el gate.)_
+- **Los 5 (derivados; evidencia entre paréntesis).**
+  1. **Una sola forma de cada cosa** (motores únicos: reservas/reportes/contabilidad/búsqueda/branding;
+     `equipment/shared/`; _Fijarse en el repo antes de implementar (2026-06-20)_).
+  2. **El core que anda no se toca; lo nuevo se acopla** (El Estudio reusa el motor sin tocarlo; advisory lock
+     sin tocar el `FOR UPDATE`; reservas = Opus por radio de explosión).
+  3. **Lo vivo se mantiene chico y curado — se poda lo que no rinde, no lo que cuesta** (curación no
+     append-only; cláusula de retiro de evals; anti-bloat con **techo de valor**, no de costo — corrección
+     explícita del dueño: lo valioso se hace aunque sea difícil).
+  4. **Lo que paga se mide barato; lo reversible se decide con juicio + git** (empirismo proporcional 2026-06-27;
+     _Los hallazgos son hipótesis (2026-06-22)_).
+  5. **El sistema propone, el dueño decide — y dice la verdad** (propone-no-escribe en supervisor/gobernanza/
+     buzón; "no fabriques churn"; el dueño es el gate).
+
+### 2026-06-27 — PR como hoja de ruta: rama aislada → PR scoped del tema → issue de tracking → batch a prod
+
+- **Contexto.** En una misma sesión se abrieron 3 PR para lo que era un solo tema; el dueño ("ya vamos por el PR
+  mil") pidió **menos PR, no redundantes**, y a la vez quería **encapsular** los cambios grandes "por si las
+  dudas" y poder **ver qué se hizo** sin leer código.
+- **Qué se decidió.** Para trabajo grande/encapsulado (lo chico sigue por push-directo-a-`dev`, _Workflow de
+  cambios 2026-06-08_): (1) **una rama aislada por tema**; (2) **un PR scoped del tema** (no uno por commit ni
+  varios por fase) que funciona como **hoja de ruta + historial** legible; (3) los PR del tema se **dejan sin
+  mergear** — el dueño es el gate que mergea; (4) la **issue de tracking** es la **historia** que apunta a los PR
+  (un issue por iniciativa, no por fase — espeja _Modus operandi (2026-05-25)_); (5) a prod, **batch `dev →
+  main`**: un PR de promoción que reconcilia el lote (espeja _Issues (2026-06-08)_).
+- **Tensión resuelta (git).** Un mismo PR no puede apuntar a `dev` y a `main` a la vez; por eso el modelo es
+  **PR-del-tema → `dev`** + **PR-batch `dev→main`**, atados por la **issue de tracking** como hoja de ruta, en
+  vez de un único PR imposible. Menos PR sueltos, trazabilidad por issue. **Excepción reconocida:** un cambio
+  **solo-docs/gobernanza** (sin comportamiento que probar en staging) puede ir en **un PR aislado directo a
+  `main`** — el "probalo en `dev` primero" aplica a código, no a docs (decisión del dueño, 2026-06-27).
+- **Why.** Espeja lo que ya estaba (_Workflow 2026-06-08_, _Issues espeja el código 2026-06-08_, _Modus operandi
+  2026-05-25_): un issue de tracking por iniciativa; el commit/PR como registro. No introduce mecanismo nuevo;
+  ordena el existente para que no proliferen PR/issues.

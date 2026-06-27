@@ -26,7 +26,8 @@ clientes); `main` = **prod** (sagrado, no se prueba ahí). **Todo cambio va en p
 si algo se rompe en staging se pushea el fix, no hay clientes ahí. **PR solo para `dev → main`** (la
 puerta a prod). **Nunca a `main` directo; no pushear con CI en rojo.** El **CI corre en cada push** a
 `dev`/`main`. **La sesión pushea a `dev` sola y avisa con plan de prueba — no pide permiso.**
-**Gates del dueño:** probar en staging + aprobar `dev → main`. Merge `dev→main` = merge commit
+**Gates del dueño:** probar en staging + aprobar `dev → main` (helper: `scripts/pre-promote.sh` lista el
+scope + checklist antes de promover). Merge `dev→main` = merge commit
 (revert por PR). Commits atómicos, Conventional Commits en español.
 
 ### 2026-06-08 — Issues: la cola espeja el código (Closes #N → auto-cierre en dev→main; diferido aparte)
@@ -94,14 +95,14 @@ lógica de reservas en routes. Cambios al paquete = alto radio de explosión →
 
 ### 2026-05-31 — Expansión recursiva del motor de reservas (C4 #635)
 
-Toda expansión de composición (forward + backward) es **recursiva hasta las hojas** vía la pieza única
-`_expandir_mult` (`reservas/semantics.py`); gate lockea en `ORDER BY id`; `FOR UPDATE`/transacción
-**byte-idénticos**. No reintroducir expansión inline de 1 nivel ni "otra función parecida".
+Toda expansión de composición es **recursiva hasta las hojas** vía la pieza única `_expandir_mult`. **No
+reintroducir expansión inline de 1 nivel ni "otra función parecida"**; el `FOR UPDATE`/transacción del gate
+son byte-idénticos (no se tocan). Cómo → [`backend/reservas/CLAUDE.md`](../backend/reservas/CLAUDE.md); porqué → `DECISIONES.md`.
 
 ### 2026-06-01 — Gotcha de Railway: fork de ambiente desincroniza la contraseña del Postgres
 
-Ante `password authentication failed` en un ambiente recién forkeado: **resetear la contraseña en la BD**
-por SSH + socket local (`ALTER USER`), no perseguir variables de entorno. Receta completa en el log.
+Ante `password authentication failed` en un ambiente forkeado: **resetear la contraseña en la BD** (`ALTER
+USER` por SSH), no perseguir env vars. Receta → [`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md) §Troubleshooting.
 
 ### 2026-06-02 — Google Analytics: sin consent, solo catálogo público, ID administrado desde el back-office
 
@@ -189,14 +190,11 @@ escrituras de prueba con IDs inexistentes para no mutar staging.
 
 ### 2026-06-20 — Gate de "frontend servible" + paths de assets a la raíz (no __file__ del paquete)
 
-El healthcheck de Railway (`railway.json`) apunta a **`/health/frontend`** (503 si falta
-`FRONT_NEW/index.html`; va en `middleware.PUBLIC_EXACT` porque el healthcheck es **sin auth**, si no 401 y
-ningún deploy pasa) → un deploy que no sirve el SPA **no se promueve**. Cazó la caída de prod **#930**
-(servía `"Frontend not built"`). Regla durable: las paths a assets de la **raíz** del repo
-(`FRONT`/`FRONT_NEW` → `frontend/public`/`dist`) se anclan a la raíz, **no** con `Path(__file__).parent`
-relativo al paquete — un **split** (`database.py` → paquete `database/`) las corre un nivel y quedan en
-`backend/…`. Staging sirve el SPA por Railway igual que prod → el gate `/health/frontend` cubre **staging y
-prod**. Regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
+El healthcheck `/health/frontend` (`railway.json`, en `middleware.PUBLIC_EXACT` porque es **sin auth**) → un
+deploy que no sirve el SPA **no se promueve** (cazó la caída de prod **#930**). Regla durable: las paths a
+assets de la **raíz** (`FRONT`/`FRONT_NEW`) se anclan a la raíz, **no** con `Path(__file__).parent` del
+paquete (un split las corre un nivel). Cubre staging y prod. Cómo + runbook →
+[`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md); regresión: `test_front_paths.py` + `test_health_frontend_gate.py`.
 
 ### 2026-06-20 — Iteración local con datos reales (clon de staging) + verificar sin mocks
 
@@ -222,13 +220,11 @@ marca un topbar fuera del shell o una lista de áreas duplicada.
 
 ### 2026-06-22 — Creación de pedidos concurrente: serializar por equipo con advisory lock (no tocar el gate)
 
-Reservas concurrentes del mismo equipo se deadlockeaban (FK KEY-SHARE del insert de ítems + `FOR
-UPDATE` del gate sobre la misma fila de `equipos`) → **500 intermitente**. Fix: `create_pedido` toma
-`pg_advisory_xact_lock` por equipo **en orden de id** ANTES de insertar (serializa, no deadlock);
-`create_pedido_retry` es la puerta única de creación (cliente+admin) y reintenta como backstop → **503**
-si persiste, **nunca 500**. **NO toca el `FOR UPDATE`** (motor de reservas sagrado). Verificado: 15
-paralelas → 6×201 + 9×409, 0×500, sin sobreventa ni huérfanos. Refina _motor único de reservas
-(2026-05-30)_. PR #969.
+Reservas concurrentes del mismo equipo se deadlockeaban → **500 intermitente**. Fix: `create_pedido` toma
+`pg_advisory_xact_lock` por equipo **en orden de id** ANTES de insertar; `create_pedido_retry`
+(`routes/alquileres/core.py`) es la **puerta única** de creación y reintenta → **503** si persiste, **nunca
+500**. **NO toca el `FOR UPDATE`** (motor sagrado). Refina _motor único de reservas (2026-05-30)_;
+verificación (15 paralelas → 0×500) + PR #969 → `DECISIONES.md`.
 
 ### 2026-06-22 — Los hallazgos de una auditoría son hipótesis: confirmar (código + en vivo) antes de arreglar
 
@@ -304,6 +300,10 @@ Core Web Vitals); **`specs`** (taxonomía de specs de equipos: consistencia, gap
 (completitud de datos: fotos, descripciones, precios, specs mínimas por categoría); **`calidad-tests`** (cobertura
 de módulos críticos, calidad de assertions, edge cases sin tests). Todos son read-only y siguen el patrón
 propone-aprobás. `scripts/check-docs.mjs` los verifica como al resto.
+**Consolidación a 2 (`auditoria-codigo`+`auditoria-datos`) medida y RECHAZADA (2026-06-27, Exp 2):** mergear
+los 4 de código en uno carga los 4 lentes por invocación (**3.1× el costo** del skill puntual; el caso común
+es 1 lente) y el routing ya era **12/12 separado** → no aporta. Se mantienen los 6. **No re-mergear** sin un
+diseño de carga on-demand por lente.
 
 ### 2026-06-23 — docs/MARCA.md = hub de marca; skill `marca` gobierna el inventario de features
 
@@ -316,18 +316,12 @@ features nuevas sin comunicar y selling points stale, y propone borradores de co
 
 ### 2026-06-25 — Hero (LCP) = AVIF-directo + preload AVIF; el resto usa `picture`; SSR descartado
 
-El **elemento LCP** (hero del catálogo, mobile `HeroBanner` + desktop `HeroSection`) se sirve con `<img
-src=avif>` **directo** (NO `<picture>`) + `onError`→webp, vía el helper único `heroImgProps`
-(`hero-photos.ts`); el backend (`_inject_hero_preload`) preloadea el AVIF con `type=image/avif`. Razón: un
-preload AVIF solo matchea un `<img>` directo, **no** un `<source>` de `<picture>` (matching frágil en
-Chromium) → si no, el AVIF se baja dos veces y el LCP empeora. **Toda otra imagen** (catálogo, fichas) usa el
-`<picture><source avif><img webp>` canónico (fallback nativo). **webp NO se elimina**: es el fallback del
-`onError` y del `<picture>`; el JPEG es para OG/crawlers. **Gotcha:** preload (backend) y `<img>` (front)
-deben elegir la MISMA foto principal — ambos ordenan `es_principal DESC, orden ASC, id ASC`; si se cambia el
-orden en el endpoint, revisar que coincidan. **SSR descartado** (completo: inviable con backend Python, no
-Node; parcial del hero: hack con drift porque `createRoot` borra `#root`); **techo SPA ~80 mobile / ~91
-desktop es sano** — no re-evaluar SSR. El supervisor marca un `<picture>` en el LCP, o un `<img src=avif>` sin
-`onError`→webp fuera del LCP.
+El **elemento LCP** (hero) se sirve con `<img src=avif>` **directo** (NO `<picture>`) + `onError`→webp vía el
+helper único `heroImgProps`; el backend preloadea el AVIF (un preload AVIF no matchea un `<source>` de
+`<picture>`). **Toda otra imagen** usa el `<picture><source avif><img webp>` canónico; **webp NO se elimina**
+(es el fallback). **SSR descartado** (techo SPA ~80 mobile / ~91 desktop es sano — no re-evaluar). **El
+supervisor marca un `<picture>` en el LCP, o un `<img src=avif>` sin `onError`→webp fuera del LCP.** Cómo
+(preload, orden de foto principal, gotchas) → [`SISTEMA_FOTOS.md`](SISTEMA_FOTOS.md).
 
 ### 2026-06-25 — Manuales técnicos por sistema (`SISTEMA_X.md`): fuente única del "cómo", linkea a MEMORIA el "porqué"
 
@@ -361,6 +355,40 @@ El accent de marketing de cada sección pública resuelve por `[data-area]` CSS 
 cross-app, badges del kit, back-office y paleta de status → amber/status fijos, nunca por área.**
 El supervisor marca: `bg-naranja` donde debería ir `var(--area-accent)` en marketing del estudio;
 o `--color-naranja` en contexto de marketing de área.
+
+### 2026-06-27 — Medir lo barato-e-incierto; juicio + reversibilidad para el resto (empirismo proporcional)
+
+Todo cambio que "paga" se valida empíricamente, pero **PROPORCIONAL**: se mide solo lo _barato-de-medir Y
+incierto-en-resultado_ (¿el digest se sigue haciendo cumplir tras un trim? ¿el routing sobrevive a un merge de
+skills?), con la **señal más barata** que conteste "¿ayudó o perjudicó?". Lo reversible-y-obvio (un doc, un
+1-liner del digest) se decide con **juicio + git**, no con un eval. La medición **nunca cuesta más que lo
+medido**; un eval que gatea 0 regresiones reales se retira (como `consejo`). Foundation en `scripts/evals/`
+(reusa pytest `-m golden` + `ui-audit.mjs` `LABEL=before/after` + dispatch del `supervisor`); detalle en el log.
+Acota _Los hallazgos de una auditoría son hipótesis (2026-06-22)_: la confirmación ahora tiene método y techo de costo.
+
+### 2026-06-27 — Filosofía de trabajo derivada del corpus, mantenida como hipótesis (defaults, no leyes)
+
+Los principios de cómo se desarrolla/mantiene el repo **se derivan del corpus** (no se declaran) y viven
+**auto-cargados en `CLAUDE.md`** (sección "Filosofía de trabajo"). Son **defaults, no leyes**: ante un
+pedido que va en contra, la sesión lo **nota, nombra el principio y explica el porqué** (red contra la
+confusión del dueño) y, si el dueño confirma, **procede** — la **excepción no deroga** el principio; solo
+un **patrón repetido** o un **cambio de criterio explícito** lo muta. **Aplicarlos es default de la sesión,
+no se pide** (mismo loop que el `## Auto-mejora` de los skills: el sistema detecta y propone, el dueño
+aprueba). Los **mantiene** el supervisor (testea cada lote: _excepción puntual_ vs. _drift recurrente_ →
+propone mutar) + `gobernanza` (re-deriva en el cierre mensual). El supervisor marca un principio aplicado
+como ley rígida (sin permitir excepción confirmada por el dueño) o una mutación grabada sin su aprobación.
+
+### 2026-06-27 — PR como hoja de ruta: rama aislada → PR scoped del tema → issue de tracking → batch a prod
+
+Refina _Workflow de cambios (2026-06-08)_ para el trabajo **grande/encapsulado** (el push-directo-a-`dev`
+sigue para lo chico). Un tema = **una rama aislada** → se trabaja y commitea → **un PR scoped del tema** (no
+uno por commit, no varios por fase), que queda como **hoja de ruta + historial** legible de qué se hizo; los
+PR del tema se dejan **sin mergear** (el dueño es el gate que clickea). La **issue de tracking** es la
+**historia** que apunta a esos PR (un issue por iniciativa, espeja _Modus operandi (2026-05-25)_). A prod va
+en **batch `dev → main`** (un PR de promoción que reconcilia el lote, espeja _Issues (2026-06-08)_). Tensión
+de git resuelta: un PR no puede apuntar a `dev` y `main` a la vez → PR-del-tema→`dev` + PR-batch `dev→main`,
+atados por la issue. El supervisor marca un PR por-commit, un tema partido en varios PR sin razón, o issues
+duplicadas por fase.
 
 ---
 
