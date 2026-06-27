@@ -348,6 +348,7 @@ class TallerCreateBody(BaseModel):
     direccion: str = ""
     notif_email: str = ""
     activo: bool = True
+    numero_edicion: int = 1
 
 
 class TallerUpdateBody(BaseModel):
@@ -452,11 +453,11 @@ def admin_create_taller(body: TallerCreateBody, request: Request):
                     fecha_inicio, fecha_fin, horario,
                     cupos_total, precio_total, precio_sena,
                     pago_alias, pago_cbu, pago_banco,
-                    direccion, notif_email, activo
+                    direccion, notif_email, activo, numero_edicion
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s::jsonb, %s::jsonb,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 ) RETURNING id
                 """,
                 (
@@ -469,6 +470,7 @@ def admin_create_taller(body: TallerCreateBody, request: Request):
                     body.cupos_total, body.precio_total, body.precio_sena,
                     body.pago_alias.strip(), body.pago_cbu.strip(), body.pago_banco.strip(),
                     body.direccion.strip(), body.notif_email.strip(), body.activo,
+                    max(1, body.numero_edicion),
                 ),
             )
             taller_id = cur.fetchone()["id"]

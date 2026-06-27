@@ -44,45 +44,20 @@ function ordinalEdicion(n: number): string {
   return map[n] ?? `${n}ta`;
 }
 
-function EdicionBadge({
-  edicion,
-  activa,
+function SoldOutModal({
+  proxima,
+  currentEdicion,
+  onDismiss,
 }: {
-  edicion: EdicionLite & { nombre?: string };
-  activa: boolean;
+  proxima: EdicionLite;
+  currentEdicion: number;
+  onDismiss: () => void;
 }) {
-  const soldOut = edicion.cupos_disponibles === 0;
-  const label = `${ordinalEdicion(edicion.numero_edicion)} edición`;
-  const status = soldOut ? "sold out" : `${edicion.cupos_disponibles} cupos`;
-  const className = activa
-    ? "inline-flex items-center gap-1.5 rounded-full border border-background/40 bg-background/15 px-3 py-1.5 text-xs font-semibold text-background"
-    : soldOut
-      ? "inline-flex items-center gap-1.5 rounded-full border border-background/20 px-3 py-1.5 text-xs text-background/40 line-through"
-      : "inline-flex items-center gap-1.5 rounded-full border border-background/25 px-3 py-1.5 text-xs text-background/60";
-
-  if (activa) {
-    return (
-      <span className={className}>
-        {label} <span className="opacity-60">—</span> {status}
-      </span>
-    );
-  }
-  return (
-    <Link
-      to="/workshops/$slug"
-      params={{ slug: edicion.slug }}
-      className={className}
-      style={soldOut ? { opacity: 0.5 } : undefined}
-    >
-      {label} <span className="opacity-50">—</span> {soldOut ? <s>{status}</s> : status}
-    </Link>
-  );
-}
-
-function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss: () => void }) {
   const opts: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" };
   const fechaA = new Date(proxima.fecha_inicio + "T12:00:00").toLocaleDateString("es-AR", opts);
   const fechaB = new Date(proxima.fecha_fin + "T12:00:00").toLocaleDateString("es-AR", opts);
+  const labelActual = ordinalEdicion(currentEdicion);
+  const labelProxima = ordinalEdicion(proxima.numero_edicion);
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
@@ -97,7 +72,9 @@ function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss:
         >
           <X className="h-4 w-4" />
         </button>
-        <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-3">1ra edición</p>
+        <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-3">
+          {labelActual} edición
+        </p>
         <h2
           className="font-display font-bold lowercase text-ink leading-tight mb-2"
           style={{ fontSize: "1.6rem" }}
@@ -105,8 +82,8 @@ function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss:
           los cupos se agotaron
         </h2>
         <p className="text-sm text-muted-foreground mb-6">
-          Pero hay lugar en la <strong className="text-ink">2da edición</strong> — {fechaA} y{" "}
-          {fechaB}.
+          Pero hay lugar en la <strong className="text-ink">{labelProxima} edición</strong> —{" "}
+          {fechaA} y {fechaB}.
         </p>
         <Link
           to="/workshops/$slug"
@@ -114,7 +91,7 @@ function SoldOutModal({ proxima, onDismiss }: { proxima: EdicionLite; onDismiss:
           className="flex items-center justify-center w-full rounded-full bg-rosa text-ink font-bold py-3 hover:brightness-110 active:scale-[0.97] transition-all"
           onClick={onDismiss}
         >
-          Inscribirme en la 2da edición
+          Inscribirme en la {labelProxima} edición
         </Link>
         <button
           onClick={onDismiss}
@@ -175,7 +152,11 @@ function TallerLandingPage() {
   return (
     <>
       {switchToProxima && !soldOutModalDismissed && (
-        <SoldOutModal proxima={proxima!} onDismiss={() => setSoldOutModalDismissed(true)} />
+        <SoldOutModal
+          proxima={proxima!}
+          currentEdicion={taller.numero_edicion}
+          onDismiss={() => setSoldOutModalDismissed(true)}
+        />
       )}
       <PublicLayout
         topBar={{ variant: "workshops", cta: { label: "Inscribirme", href: "#inscripcion" } }}
@@ -187,6 +168,11 @@ function TallerLandingPage() {
             <div className="relative max-w-[1100px] mx-auto px-4 sm:px-6 py-16 sm:py-24">
               <p className="font-mono text-2xs tracking-[0.3em] uppercase text-rosa mb-4">
                 Workshop
+                {taller.numero_edicion > 1 && (
+                  <span className="text-rosa/60 ml-2">
+                    · {ordinalEdicion(taller.numero_edicion)} edición
+                  </span>
+                )}
               </p>
               <h1
                 className="font-display font-black lowercase leading-[0.88] tracking-[-0.02em] text-background"
@@ -204,20 +190,30 @@ function TallerLandingPage() {
                 {taller.subtitulo}
               </p>
 
-              {/* Badges de edición */}
-              {/* La próxima edición se muestra solo cuando esta está sold out */}
+              {/* Contexto de ediciones */}
               {(taller.edicion_anterior ||
                 (taller.proxima_edicion && taller.cupos_disponibles === 0)) && (
-                <div className="mt-6 flex flex-wrap gap-2">
+                <div className="mt-5 flex flex-wrap items-center gap-4">
                   {taller.edicion_anterior && (
-                    <EdicionBadge edicion={taller.edicion_anterior} activa={false} />
+                    <Link
+                      to="/workshops/$slug"
+                      params={{ slug: taller.edicion_anterior.slug }}
+                      className="text-xs text-background/35 hover:text-background/60 transition"
+                    >
+                      {ordinalEdicion(taller.edicion_anterior.numero_edicion)} edición — agotada
+                    </Link>
                   )}
-                  <EdicionBadge
-                    edicion={{ ...taller, cupos_disponibles: taller.cupos_disponibles }}
-                    activa={true}
-                  />
                   {taller.proxima_edicion && taller.cupos_disponibles === 0 && (
-                    <EdicionBadge edicion={taller.proxima_edicion} activa={false} />
+                    <Link
+                      to="/workshops/$slug"
+                      params={{ slug: taller.proxima_edicion.slug }}
+                      className="inline-flex items-center gap-2 rounded-full border border-rosa/50 bg-rosa/10 px-4 py-1.5 text-sm font-semibold text-rosa hover:bg-rosa/20 transition"
+                    >
+                      {ordinalEdicion(taller.proxima_edicion.numero_edicion)} edición{" "}
+                      <span className="opacity-70">
+                        · {taller.proxima_edicion.cupos_disponibles} cupos
+                      </span>
+                    </Link>
                   )}
                 </div>
               )}

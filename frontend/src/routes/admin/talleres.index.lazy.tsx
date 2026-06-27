@@ -126,6 +126,7 @@ type CreateBody = {
   cupos_total: number;
   precio_total: number;
   precio_sena: number;
+  numero_edicion?: number;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1150,13 +1151,7 @@ function InscripcionesSection({
 
 // ── EdicionesSection ──────────────────────────────────────────────────────────
 
-function EdicionesSection({
-  taller,
-  onNuevaDuplica,
-}: {
-  taller: TallerAdmin;
-  onNuevaDuplica: () => void;
-}) {
+function EdicionesSection({ taller }: { taller: TallerAdmin }) {
   const qc = useQueryClient();
   const [proximaSlug, setProximaSlug] = useState(taller.proxima_edicion_slug ?? "");
 
@@ -1181,52 +1176,21 @@ function EdicionesSection({
   });
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-4 text-sm">
-        <span className="text-muted-foreground">
-          Edición actual: <strong className="text-ink">#{taller.numero_edicion}</strong>
-        </span>
-        <Link
-          to="/workshops/$slug"
-          params={{ slug: taller.slug }}
-          target="_blank"
-          className="inline-flex items-center gap-1 text-muted-foreground hover:text-ink transition text-xs"
-        >
-          ver en web <ExternalLink className="h-3 w-3" />
-        </Link>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-          Slug de próxima edición
-        </label>
-        <p className="text-xs text-muted-foreground/70 -mt-1">
-          Cuando esta edición está sold out, los visitantes verán un link a la próxima.
-        </p>
-        <div className="flex gap-2">
-          <Input
-            value={proximaSlug}
-            onChange={(e) => setProximaSlug(e.target.value)}
-            placeholder="Ej: direccion-de-arte-jime-troncoso-2"
-            className="flex-1"
-          />
-          <Button
-            variant="outline"
-            onClick={() => mut.mutate(proximaSlug)}
-            disabled={mut.isPending}
-            size="sm"
-          >
-            {mut.isPending ? <Spinner size="xs" /> : "Guardar"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="pt-1">
-        <Button variant="outline" size="sm" onClick={onNuevaDuplica} className="gap-2">
-          <Plus className="h-3.5 w-3.5" />
-          Nueva edición (duplicar este taller)
-        </Button>
-      </div>
+    <div className="flex gap-2">
+      <Input
+        value={proximaSlug}
+        onChange={(e) => setProximaSlug(e.target.value)}
+        placeholder="Ej: direccion-de-arte-jime-troncoso-2"
+        className="flex-1"
+      />
+      <Button
+        variant="outline"
+        onClick={() => mut.mutate(proximaSlug)}
+        disabled={mut.isPending}
+        size="sm"
+      >
+        {mut.isPending ? <Spinner size="xs" /> : "Guardar"}
+      </Button>
     </div>
   );
 }
@@ -1242,7 +1206,12 @@ function NuevoTallerDialog({
   open: boolean;
   onClose: () => void;
   onSuccess: (slug: string) => void;
-  template?: { nombre: string; instructor_nombre: string; tipo_taller: string };
+  template?: {
+    nombre: string;
+    instructor_nombre: string;
+    tipo_taller: string;
+    numero_edicion?: number;
+  };
 }) {
   const [nombre, setNombre] = useState(template?.nombre ?? "");
   const [instructorNombre, setInstructorNombre] = useState(template?.instructor_nombre ?? "");
@@ -1310,6 +1279,7 @@ function NuevoTallerDialog({
       cupos_total: c,
       precio_total: pt,
       precio_sena: ps,
+      numero_edicion: template?.numero_edicion ?? 1,
     });
   }
 
@@ -1437,7 +1407,7 @@ function TallerAccordionRow({
   togglePending: boolean;
 }) {
   const badge = badgeEstado(taller);
-  const [activeTab, setActiveTab] = useState<"sesiones" | "datos" | "contenido" | "inscripciones">(
+  const [activeTab, setActiveTab] = useState<"sesiones" | "edicion" | "taller" | "inscripciones">(
     "sesiones",
   );
 
@@ -1541,25 +1511,25 @@ function TallerAccordionRow({
       {expanded && (
         <div className="border-t border-border/40">
           {/* Tab bar */}
-          <div className="flex border-b border-border/60">
+          <div className="flex border-b border-border/60 overflow-x-auto">
             {(
               [
-                { id: "sesiones", label: "Sesiones" },
-                { id: "datos", label: "Datos" },
-                { id: "contenido", label: "Contenido" },
+                { id: "sesiones", label: "Fechas y sesiones" },
+                { id: "edicion", label: "Esta edición" },
+                { id: "taller", label: "El taller" },
                 {
                   id: "inscripciones",
                   label: `Inscripciones${taller.cupos_confirmados > 0 ? ` (${taller.cupos_confirmados})` : ""}`,
                 },
               ] as {
-                id: "sesiones" | "datos" | "contenido" | "inscripciones";
+                id: "sesiones" | "edicion" | "taller" | "inscripciones";
                 label: string;
               }[]
             ).map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2.5 text-sm border-b-2 -mb-[1px] transition-colors ${
+                className={`shrink-0 px-4 py-2.5 text-sm border-b-2 -mb-[1px] transition-colors ${
                   activeTab === tab.id
                     ? "border-ink text-ink font-medium"
                     : "border-transparent text-muted-foreground hover:text-ink"
@@ -1574,19 +1544,51 @@ function TallerAccordionRow({
           <div className="px-4 pb-6 pt-5">
             {activeTab === "sesiones" && <SesionesSection taller={taller} />}
 
-            {activeTab === "datos" && (
+            {activeTab === "edicion" && (
               <div className="flex flex-col gap-0">
-                <PagosSection taller={taller} />
+                <div className="flex items-center justify-between gap-3 mb-5">
+                  <div className="text-xs text-muted-foreground">
+                    Edición{" "}
+                    <strong className="text-ink font-semibold">#{taller.numero_edicion}</strong>
+                    {" · "}
+                    <a
+                      href={`/workshops/${taller.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 hover:text-ink transition"
+                    >
+                      ver en web <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onNuevaDuplica(taller)}
+                    className="gap-1.5 shrink-0"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Nueva edición
+                  </Button>
+                </div>
+                <PreciosSection taller={taller} />
                 <div className="border-t border-border/40 mt-6 pt-6">
-                  <PreciosSection taller={taller} />
+                  <PagosSection taller={taller} />
                 </div>
                 <div className="border-t border-border/40 mt-6 pt-6">
-                  <EdicionesSection taller={taller} onNuevaDuplica={() => onNuevaDuplica(taller)} />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                      Slug de próxima edición
+                    </label>
+                    <p className="text-xs text-muted-foreground/70 -mt-1">
+                      Cuando esta edición está sold out, los visitantes verán un link a la próxima.
+                    </p>
+                    <EdicionesSection taller={taller} />
+                  </div>
                 </div>
               </div>
             )}
 
-            {activeTab === "contenido" && (
+            {activeTab === "taller" && (
               <div className="flex flex-col gap-0">
                 <FotoSection taller={taller} />
                 <div className="border-t border-border/40 mt-6 pt-6">
@@ -1617,7 +1619,8 @@ function TalleresAdminPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [duplicaTemplate, setDuplicaTemplate] = useState<
-    { nombre: string; instructor_nombre: string; tipo_taller: string } | undefined
+    | { nombre: string; instructor_nombre: string; tipo_taller: string; numero_edicion?: number }
+    | undefined
   >(undefined);
   const [duplicaFromId, setDuplicaFromId] = useState<number | null>(null);
 
@@ -1662,6 +1665,7 @@ function TalleresAdminPage() {
       nombre: taller.nombre,
       instructor_nombre: taller.instructor_nombre,
       tipo_taller: taller.tipo_taller,
+      numero_edicion: taller.numero_edicion + 1,
     });
     setDuplicaFromId(taller.id);
     setNuevoOpen(true);
