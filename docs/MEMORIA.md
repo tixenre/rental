@@ -26,7 +26,8 @@ clientes); `main` = **prod** (sagrado, no se prueba ahí). **Todo cambio va en p
 si algo se rompe en staging se pushea el fix, no hay clientes ahí. **PR solo para `dev → main`** (la
 puerta a prod). **Nunca a `main` directo; no pushear con CI en rojo.** El **CI corre en cada push** a
 `dev`/`main`. **La sesión pushea a `dev` sola y avisa con plan de prueba — no pide permiso.**
-**Gates del dueño:** probar en staging + aprobar `dev → main`. Merge `dev→main` = merge commit
+**Gates del dueño:** probar en staging + aprobar `dev → main` (helper: `scripts/pre-promote.sh` lista el
+scope + checklist antes de promover). Merge `dev→main` = merge commit
 (revert por PR). Commits atómicos, Conventional Commits en español.
 
 ### 2026-06-08 — Issues: la cola espeja el código (Closes #N → auto-cierre en dev→main; diferido aparte)
