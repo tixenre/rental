@@ -7,9 +7,9 @@ import pathlib
 import re
 from contextlib import contextmanager
 
-import psycopg2
-import psycopg2.extras
-import psycopg2.pool
+import psycopg
+import psycopg.errors
+from psycopg_pool import ConnectionPool
 
 from config import settings
 
@@ -82,7 +82,7 @@ if not DATABASE_URL:
 
 
 def get_connection_params():
-    """Parse DATABASE_URL a parámetros de psycopg2."""
+    """Parse DATABASE_URL a parámetros de conexión (host/port/user/password/database)."""
     try:
         from urllib.parse import urlparse
         parsed = urlparse(DATABASE_URL)
@@ -99,22 +99,22 @@ def get_connection_params():
 
 
 # ── Pool de conexiones ────────────────────────────────────────────────────────
-# ThreadedConnectionPool es thread-safe (FastAPI corre handlers sync en threads).
+# psycopg_pool.ConnectionPool es thread-safe (FastAPI corre handlers sync en threads).
 #
-# CLAVE: `maxconn` tiene que cubrir la concurrencia real de requests. FastAPI
+# CLAVE: `max_size` tiene que cubrir la concurrencia real de requests. FastAPI
 # corre cada handler sync en el threadpool de Starlette (default 40 threads),
-# y cada uno toma una conexión del pool. Si más de `maxconn` handlers corren a
-# la vez, psycopg2 NO espera: lanza `PoolError: connection pool exhausted` al
-# instante → 500 en cascada. Por eso el arranque (main.py) ACOTA el threadpool
-# a `pool_max()` menos un margen para workers de fondo (scheduler, init,
-# webhooks async): así los requests de más hacen cola en vez de explotar.
+# y cada uno toma una conexión del pool. Si más de `max_size` handlers corren
+# a la vez, psycopg_pool espera hasta `timeout` segundos (default 30s) antes
+# de lanzar `PoolTimeout` → 500. Por eso el arranque (main.py) ACOTA el
+# threadpool a `pool_max()` menos un margen para workers de fondo (scheduler,
+# init, webhooks async): así los requests de más hacen cola en vez de explotar.
 # Ambos valores se tunean por env (DB_POOL_MIN / DB_POOL_MAX) sin tocar código.
 import os as _os
 
 _POOL_MIN = int(_os.getenv("DB_POOL_MIN", "2"))
 _POOL_MAX = int(_os.getenv("DB_POOL_MAX", "25"))
 
-_pool: psycopg2.pool.ThreadedConnectionPool | None = None
+_pool: ConnectionPool | None = None
 
 
 def pool_max() -> int:
@@ -122,10 +122,18 @@ def pool_max() -> int:
     return _POOL_MAX
 
 
-def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
+def _get_pool() -> ConnectionPool:
     global _pool
     if _pool is None or _pool.closed:
-        _pool = psycopg2.pool.ThreadedConnectionPool(_POOL_MIN, _POOL_MAX, **get_connection_params())
+        # ClientCursor: sustitución client-side (= psycopg2) → None→NULL literal,
+        # sin IndeterminateDatatype. Clave para la migración desde psycopg2.
+        _pool = ConnectionPool(
+            DATABASE_URL,
+            min_size=_POOL_MIN,
+            max_size=_POOL_MAX,
+            kwargs={"cursor_factory": psycopg.ClientCursor},
+            open=True,
+        )
     return _pool
 
 
@@ -255,7 +263,7 @@ class PGRow:
 # ── Wrapper para compatibilidad con sqlite3 ─────────────────────────────────
 
 class PGConnection:
-    """Envoltura de psycopg2 que simula interfaz sqlite3 para migración fácil."""
+    """Envoltura del pool de psycopg3: aísla la infra (pool, rollback, guardas) del resto."""
 
     def __init__(self, raw_conn, pool=None):
         self.raw_conn = raw_conn
@@ -285,9 +293,7 @@ class PGConnection:
         return PGCursor(cur)
 
     def cursor(self, cursor_factory=None):
-        """Retorna un cursor (envuelto para compatibilidad)."""
-        if cursor_factory is not None:
-            return PGCursor(self.raw_conn.cursor(cursor_factory=cursor_factory))
+        """Retorna un cursor (envuelto para compatibilidad). `cursor_factory` ignorado (sin callers)."""
         return PGCursor(self.raw_conn.cursor())
 
     def commit(self):

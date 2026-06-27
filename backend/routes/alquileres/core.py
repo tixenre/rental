@@ -11,7 +11,7 @@ import logging
 import time
 from typing import Optional
 
-import psycopg2.errors
+import psycopg.errors
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, field_validator, model_validator
@@ -780,7 +780,7 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
 
             conn.commit()
             pedido = _get_alquiler_detail(conn, pedido_id)
-        except psycopg2.errors.DeadlockDetected:
+        except psycopg.errors.DeadlockDetected:
             # Deadlock transitorio por upgrade de lock bajo concurrencia (FK
             # KEY-SHARE del insert de ítems + FOR UPDATE del gate sobre la misma
             # fila de `equipos`). PG aborta una de las transacciones. NO es un
@@ -820,7 +820,7 @@ def create_pedido_retry(data: PedidoCreate, background: Optional[BackgroundTasks
     for i in range(intentos):
         try:
             return create_pedido(data, background=background, es_admin=es_admin)
-        except psycopg2.errors.DeadlockDetected:
+        except psycopg.errors.DeadlockDetected:
             if i == intentos - 1:
                 logger.warning("Pedido: deadlock persistente tras %d intentos → 503", intentos)
                 raise HTTPException(

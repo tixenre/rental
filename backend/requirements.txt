@@ -9,6 +9,10 @@ itsdangerous==2.2.0
 pydantic==2.13.4
 pydantic-settings==2.14.2
 email-validator==2.2.0
+# psycopg3 — driver moderno (sync). Runtime usa este; psycopg2 queda solo para Alembic/SQLAlchemy.
+psycopg[binary]==3.3.4
+psycopg_pool==3.3.1
+# ⏰ LEGACY: remover cuando Alembic/SQLAlchemy migre a psycopg3 (postgresql+psycopg:// URL)
 psycopg2-binary==2.9.12
 pyjwt[crypto]==2.13.0
 authlib==1.7.2
@@ -23,7 +27,7 @@ python-json-logger==4.1.0
 playwright==1.60.0
 
 # Migraciones versionadas. SQLAlchemy se usa solo como engine para Alembic
-# (no como ORM — el código sigue usando psycopg2 directo via PGCursor wrapper).
+# (no como ORM — el código usa psycopg3 directo via PGCursor wrapper).
 alembic==1.18.4
 SQLAlchemy==2.0.51
 
