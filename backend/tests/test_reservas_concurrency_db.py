@@ -41,6 +41,7 @@ def _looks_like_test_db() -> bool:
 
 pytestmark = [
     pytest.mark.integration,
+    pytest.mark.golden,  # golden set: el core de reservas (overbooking/deadlock) — ver scripts/evals/README.md
     pytest.mark.skipif(
         not _OPT_IN,
         reason="opt-in: setear RESERVAS_DB_TEST=1 + DATABASE_URL a una base de prueba",

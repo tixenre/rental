@@ -1083,6 +1083,15 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Consecuencias.** 13 skills en disco (6 activos previos + 6 nuevos + `pendientes` = 13 total).
   `CLAUDE.md` tiene 13 filas en la tabla de skills. `scripts/check-docs.mjs` los verifica todos.
   El supervisor marca cualquier skill en disco sin fila, o un skill que aplique sin aprobación.
+- **Consolidación a 2 medida y RECHAZADA (2026-06-27, Exp 2 del roadmap de gobernanza empírico).** Se probó
+  fusionar los 4 de código en `auditoria-codigo` (4 lentes) y `specs`+`catalogo` en `auditoria-datos`, con
+  medición before/after (`scripts/evals/`): **routing** 12/12 → 12/12 (no mejoró — ya era perfecto separado);
+  **costo por invocación** señal A: el merged carga TODOS los lentes por invocación → **3.1×** (`auditoria-codigo`)
+  y **1.9×** (`auditoria-datos`) el costo del skill puntual, contra un ahorro de tabla auto-cargada de solo
+  −192 tok/sesión. El caso común es 1 lente → el merge penaliza ~3× lo común para un beneficio marginal +
+  diluye el foco (4 checklists cuando se quiere 1). **Veredicto: revert, se mantienen los 6 separados.** No
+  re-mergear salvo con un diseño de **carga on-demand por lente** (progressive disclosure), no inline. Es el
+  primer caso del principio _2026-06-27 — empirismo proporcional_ matando un cambio que la intuición aprobaba.
 
 ### 2026-06-23 — docs/MARCA.md = hub de marca; skill `marca` gobierna el inventario de features
 
@@ -1272,3 +1281,37 @@ cancel-in-progress` ya cancela corridas viejas.
   ningún componente necesita prop de área. El token semántico `--area-accent` es más robusto que
   `--color-estudio` directo porque desacopla la elección de color de la semántica de uso — agregar
   workshops u otras áreas es un bloque CSS adicional, no un barrido de componentes.
+
+### 2026-06-27 — Medir lo barato-e-incierto; juicio + reversibilidad para el resto (empirismo proporcional)
+
+- **Contexto.** Tras la auditoría externa del sistema de gobernanza (comparado contra Hermes Agent,
+  MemGPT/Letta, Voyager, ADR/Zettelkasten), el dueño aprobó el roadmap de mejoras con una condición que
+  cambia su forma: _"todo lo que rinde, pero **empíricamente** — medilo, compará antes/después, y lo que no
+  demuestra que mejora se revierte. Incluso esta filosofía puede quedar grabada."_ Riesgo real en un repo con
+  ethos anti-bloat: el **aparato de medición puede volverse él mismo el bloat**.
+- **Decisión — la regla de proporcionalidad.** El 2×2 de (barato vs caro de medir) × (resultado cierto vs
+  incierto): **se mide SOLO el cuadrante barato-Y-incierto**. Caro-de-medir u obvio-y-reversible → **juicio +
+  git revert**, no eval. La medición nunca cuesta más que lo medido.
+- **Qué SÍ se mide (cheap + uncertain):** (a) ¿el digest se sigue haciendo cumplir tras un trim? → dispatch
+  del `supervisor` contra `scripts/evals/fixtures/*.diff` que violan la decisión trimeada, catch-rate
+  antes/después; (b) ¿el routing sobrevive a un merge de skills? → LLM-as-judge sobre las descripciones
+  (`routing-cases.jsonl`); (c) el tamaño del prefijo auto-cargado → `context-size.mjs` (lado valor del trim,
+  lado costo del merge).
+- **Qué NO se mide (judgment + reversibility):** "¿es bueno este manual/doc?", un 1-liner del digest — son
+  reversibles (un archivo, git, auto-cargado fresco cada sesión); el gate es leerlo + el link-check de
+  `check-docs`. Un judge automático de "paridad de hallazgos" sería más ruidoso que lo que chequea → se hace
+  con un fixture smoke + ojo del dueño, una vez.
+- **Foundation.** `scripts/evals/` (único hogar net-new; ~80 líneas de código real, el resto data/runbook).
+  Reusa lo existente: pytest `-m golden` (tests decisivos ya escritos, sólo marcados), `ui-audit.mjs`
+  (`LABEL=before/after`), y el dispatch de subagentes (precedente: `consejo` despacha voces aisladas). Las
+  señales B/C/D corren **solo cuando su target cambia** (digest → B; capa de skills → C/D), **no en cada
+  push**: B necesita dispatch de agente y C una llamada a modelo (caro + no determinista en CI; un gate flaky
+  de gobernanza va contra el ethos). Los `-m golden` sí gatean en CI (jobs `python-tests`/`db-migrations`).
+- **Cláusula de retiro (auto-referencial).** Cada eval lleva fecha: si gatea 0 regresiones reales en N meses
+  → se retira vía `gobernanza` (igual que el self-revert de `consejo`). El golden set es **curado, no
+  append-only** (misma disciplina que la memoria). Esta misma filosofía queda grabada como principio —
+  satisfaciendo el _"incluso esto puede quedar"_.
+- **Why.** La reversibilidad es una red más barata que la medición para la mayoría de los cambios de
+  gobernanza (un archivo bajo git). El empirismo se reserva para donde genuinamente no se puede predecir el
+  efecto (fuerza de enforcement tras un trim; routing tras un merge). Materializa y **acota** _Los hallazgos
+  de una auditoría son hipótesis (2026-06-22)_: ahora la confirmación tiene método y techo de costo.
