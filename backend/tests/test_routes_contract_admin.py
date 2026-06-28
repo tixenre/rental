@@ -2,11 +2,14 @@
 
 Continúa la red de `test_routes_contract.py` (alquileres + cliente_portal) hacia
 los routers que faltaban antes de la modularización #501 — en particular
-`equipos.py`, cuyo split (fase a de #501) cierra #179. Requests con `TestClient`
-(no introspección, frágil entre versiones), **sin tocar la DB**.
+`equipos.py`, cuyo split (fase a de #501) cierra #179. **Sin tocar la DB**: las
+capas 1-2 (guards) mandan requests con `TestClient`; la capa 3 (existencia) lee
+la tabla de rutas (`route_status`) en vez de mandar un request — esos endpoints
+tocan la DB antes del guard y colgaban el pool sin Postgres.
 
-Tres capas (todas con sesión NO-admin / anónima, para no ejecutar handlers admin
-—varios hacen I/O externo: uploads, R2, scraping— y mantener el test hermético):
+Tres capas (las de guard con sesión NO-admin / anónima, para no ejecutar handlers
+admin —varios hacen I/O externo: uploads, R2, scraping— y mantener el test
+hermético):
 
   1. **Anónimo** → 401/403 en TODO endpoint admin (lo corta el middleware).
   2. **Guard del handler** (anti-#55) → una sesión logueada no-admin la rechaza el
@@ -16,9 +19,9 @@ Tres capas (todas con sesión NO-admin / anónima, para no ejecutar handlers adm
      verifica en la fase de INTEGRACIÓN de #862 (Postgres real). Igual prueba que
      la ruta existe.
   3. **Existencia** → la ruta sigue ruteando (no 404/405), para los endpoints que
-     sin DB dan 500 (tocan la DB antes del guard) o 422/400 (validan body antes) y
-     para los públicos del catálogo. Límite: un GET dropeado cae al catch-all del
-     SPA (200) → no se caza acá.
+     sin DB darían 500 (tocan la DB antes del guard) o 422/400 (validan body antes)
+     y para los públicos del catálogo. Se lee la tabla de rutas → instantáneo, sin
+     DB, y caza también los GET dropeados (el catch-all del SPA queda excluido).
 
 Las listas se clasificaron data-driven (probe del status real sin DB). Fuente:
 `routes/equipos.py`, `routes/specs.py`, `routes/contabilidad.py` (prefix `/api`).
@@ -28,6 +31,7 @@ from fastapi.testclient import TestClient
 
 import main
 from routes.auth import signer
+from tests.contract_routing import route_status
 
 pytestmark = pytest.mark.unit
 
@@ -191,9 +195,14 @@ def test_admin_guard_rechaza_no_admin(method, path):
 
 @pytest.mark.parametrize("method,path", _EXISTENCIA, ids=_ids(_EXISTENCIA))
 def test_endpoint_existe(method, path):
-    """La ruta sigue ruteando (no 404/405). Un 401/403/422/400/500 = existe igual;
-    solo 404/405 significan que #501 movió/renombró la ruta."""
-    res = client.request(method, path, json={}, headers={"Cookie": _COOKIE_CLIENTE})
-    assert res.status_code not in (404, 405), (
-        f"{method} {path} no existe (status {res.status_code}) — ¿la movió/renombró #501?"
+    """La ruta sigue ruteando (no 404/405). Se chequea leyendo la tabla de rutas
+    (`route_status`), no mandando un request: estos endpoints tocan la DB antes
+    del guard, así que el request colgaba el timeout del pool sin Postgres (el
+    cuello de botella del job). Instantáneo y sin DB. Cómo →
+    `tests/contract_routing.py`."""
+    estado = route_status(method, path)
+    assert estado == "full", (
+        f"{method} {path} no rutea "
+        f"({'método caído → 405' if estado == 'partial' else 'ruta caída → 404'})"
+        f" — ¿la movió/renombró un refactor?"
     )
