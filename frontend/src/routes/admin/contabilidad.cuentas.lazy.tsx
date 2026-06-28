@@ -8,12 +8,13 @@
  *  - **Cajas · Plata del negocio** (Efectivo/Banco/Fondo Rambla/Dólares…): plata
  *    real; suben/bajan con movimientos. Se pueden crear, editar y dar de baja.
  */
-import { createLazyFileRoute, Link } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { adminApi, type CuentaSaldo, type TipoCuenta } from "@/lib/admin/api";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -42,96 +43,84 @@ function CuentasPage() {
   const cajas = q.data?.cajas ?? [];
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-8 max-w-4xl mx-auto">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Back-office · Finanzas
+    <AdminPage
+      title="Cuentas"
+      maxW="max-w-4xl"
+      description="La cuenta corriente de cada socio (quién le debe a quién) y las cajas con la plata real del negocio."
+      backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
+    >
+      <div className="space-y-8">
+        {q.isLoading && <div className="text-sm text-muted-foreground">Cargando cuentas…</div>}
+        {q.isError && (
+          <div className="text-sm text-destructive">
+            Error cargando las cuentas. {(q.error as Error)?.message}
           </div>
-          <h1 className="font-display text-3xl text-ink">Cuentas</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            La cuenta corriente de cada socio (quién le debe a quién) y las cajas con la plata real
-            del negocio.
-          </p>
-        </div>
-        <Link
-          to="/admin/contabilidad"
-          className="shrink-0 h-9 rounded-md border hairline px-3 text-sm flex items-center hover:bg-muted/40"
-        >
-          ← Tablero
-        </Link>
-      </header>
+        )}
 
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando cuentas…</div>}
-      {q.isError && (
-        <div className="text-sm text-destructive">
-          Error cargando las cuentas. {(q.error as Error)?.message}
-        </div>
-      )}
+        {/* Socios · Cuenta corriente */}
+        {socios.length > 0 && (
+          <section className="space-y-3">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Socios · Cuenta corriente
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {socios.map((s) => (
+                <SocioCard key={s.id} socio={s} cajas={cajas} onChanged={invalidar} />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              El <strong>arranque</strong> es lo que cobró antes del sistema. Se va saldando con{" "}
+              <strong>su parte</strong> de lo que se alquila: cuando llega a cero están a mano, y si
+              se da vuelta, Rambla le debe a él.
+            </p>
+          </section>
+        )}
 
-      {/* Socios · Cuenta corriente */}
-      {socios.length > 0 && (
-        <section className="space-y-3">
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Socios · Cuenta corriente
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {socios.map((s) => (
-              <SocioCard key={s.id} socio={s} cajas={cajas} onChanged={invalidar} />
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            El <strong>arranque</strong> es lo que cobró antes del sistema. Se va saldando con{" "}
-            <strong>su parte</strong> de lo que se alquila: cuando llega a cero están a mano, y si
-            se da vuelta, Rambla le debe a él.
-          </p>
-        </section>
-      )}
-
-      {/* Cajas · Plata del negocio */}
-      {q.data && (
-        <section className="space-y-3">
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Cajas · Plata del negocio
-          </div>
-          <div className="overflow-x-auto rounded-lg border hairline">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">Caja</th>
-                  <th className="px-3 py-2 font-medium">Tipo</th>
-                  <th className="px-3 py-2 font-medium text-right">Saldo inicial</th>
-                  <th className="px-3 py-2 font-medium text-right">Saldo actual</th>
-                  <th className="px-3 py-2 font-medium text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cajas.map((c) => (
-                  <CajaRow key={c.id} cuenta={c} onChanged={invalidar} />
-                ))}
-              </tbody>
-              <tfoot>
-                {Object.entries(q.data.totales)
-                  .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b)))
-                  .map(([moneda, total]) => (
-                    <tr key={moneda} className="border-t hairline">
-                      <td className="px-3 py-2 font-medium" colSpan={3}>
-                        Total disponible {moneda !== "ARS" ? `(${moneda})` : ""}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
-                        {formatMoney(total, moneda)}
-                      </td>
-                      <td />
-                    </tr>
+        {/* Cajas · Plata del negocio */}
+        {q.data && (
+          <section className="space-y-3">
+            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+              Cajas · Plata del negocio
+            </div>
+            <div className="overflow-x-auto rounded-lg border hairline">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2 font-medium">Caja</th>
+                    <th className="px-3 py-2 font-medium">Tipo</th>
+                    <th className="px-3 py-2 font-medium text-right">Saldo inicial</th>
+                    <th className="px-3 py-2 font-medium text-right">Saldo actual</th>
+                    <th className="px-3 py-2 font-medium text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cajas.map((c) => (
+                    <CajaRow key={c.id} cuenta={c} onChanged={invalidar} />
                   ))}
-              </tfoot>
-            </table>
-          </div>
-        </section>
-      )}
+                </tbody>
+                <tfoot>
+                  {Object.entries(q.data.totales)
+                    .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b)))
+                    .map(([moneda, total]) => (
+                      <tr key={moneda} className="border-t hairline">
+                        <td className="px-3 py-2 font-medium" colSpan={3}>
+                          Total disponible {moneda !== "ARS" ? `(${moneda})` : ""}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
+                          {formatMoney(total, moneda)}
+                        </td>
+                        <td />
+                      </tr>
+                    ))}
+                </tfoot>
+              </table>
+            </div>
+          </section>
+        )}
 
-      <NuevaCuentaForm onCreated={invalidar} />
-    </div>
+        <NuevaCuentaForm onCreated={invalidar} />
+      </div>
+    </AdminPage>
   );
 }
 

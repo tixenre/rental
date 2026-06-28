@@ -2,6 +2,7 @@ import type * as React from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Sparkles, ExternalLink, Bug, Wrench, Plus, FileText, Tag } from "lucide-react";
 
+import { AdminPage } from "@/components/admin/AdminPage";
 import { Badge } from "@/design-system/ui/badge";
 import { changelog, type ChangelogEntry } from "@/data/changelog";
 
@@ -12,24 +13,13 @@ export const Route = createFileRoute("/admin/novedades")({
 
 function NovedadesPage() {
   return (
-    <div className="px-4 md:px-8 py-6 md:py-10 max-w-3xl mx-auto">
-      <div className="mb-8">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
-        </div>
-        <h1 className="font-display text-3xl md:text-4xl text-ink flex items-center gap-2">
-          <Sparkles className="h-7 w-7 text-ink" />
-          Novedades
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">Cambios recientes en el sistema.</p>
-      </div>
-
+    <AdminPage title="Novedades" maxW="max-w-3xl" description="Cambios recientes en el sistema.">
       <ol className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-px before:bg-border before:hairline">
         {changelog.map((entry) => (
           <EntryCard key={entry.number} entry={entry} />
         ))}
       </ol>
-    </div>
+    </AdminPage>
   );
 }
 

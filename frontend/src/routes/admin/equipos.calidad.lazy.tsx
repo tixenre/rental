@@ -2,7 +2,6 @@ import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  Sparkles,
   Hash,
   DollarSign,
   Camera,
@@ -24,6 +23,7 @@ import {
   type FaltaField,
   type Sugerencia,
 } from "@/lib/admin/api";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/calidad")({
@@ -39,21 +39,11 @@ function CalidadPage() {
   });
 
   return (
-    <div className="px-4 md:px-8 py-6 md:py-10 max-w-3xl mx-auto">
-      <header className="mb-8">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office › Equipos
-        </div>
-        <h1 className="font-display text-3xl md:text-4xl text-ink flex items-center gap-2">
-          <Sparkles className="h-7 w-7 text-ink" />
-          Calidad del inventario
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Qué equipos tienen datos faltantes. Solo lectura — los CTAs para completar llegan en una
-          segunda iteración (#350).
-        </p>
-      </header>
-
+    <AdminPage
+      title="Calidad del inventario"
+      maxW="max-w-3xl"
+      description="Qué equipos tienen datos faltantes. Solo lectura — los CTAs para completar llegan en una segunda iteración (#350)."
+    >
       {isLoading && <Skeleton />}
 
       {isError && (
@@ -68,7 +58,7 @@ function CalidadPage() {
       {data && <CalidadView data={data} />}
 
       <SugerenciasSection />
-    </div>
+    </AdminPage>
   );
 }
 

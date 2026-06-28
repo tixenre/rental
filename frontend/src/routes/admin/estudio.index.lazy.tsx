@@ -56,6 +56,7 @@ import {
 } from "@/lib/admin/api";
 import { uploadStudioFile } from "@/lib/studio/photos";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminSection } from "@/components/admin/AdminSection";
 import { useConfirm } from "@/components/admin/useConfirm";
 
@@ -181,36 +182,32 @@ function EstudioAdminPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-6 py-6 space-y-8">
-      <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
-        </div>
-        <h1 className="font-display text-3xl text-ink">Estudio</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configuración del espacio, precios y galería de fotos.
-        </p>
-      </header>
+    <AdminPage
+      title="Estudio"
+      maxW="max-w-3xl"
+      description="Configuración del espacio, precios y galería de fotos."
+    >
+      <div className="space-y-8">
+        <ConfigForm
+          config={data}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
+        />
 
-      <ConfigForm
-        config={data}
-        onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
-      />
+        <PackSection />
 
-      <PackSection />
+        <GaleriaSection
+          fotos={data.fotos}
+          onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
+        />
 
-      <GaleriaSection
-        fotos={data.fotos}
-        onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
-      />
+        <TrabajosSection
+          trabajos={data.trabajos ?? []}
+          onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
+        />
 
-      <TrabajosSection
-        trabajos={data.trabajos ?? []}
-        onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
-      />
-
-      <SlotsSection />
-    </div>
+        <SlotsSection />
+      </div>
+    </AdminPage>
   );
 }
 

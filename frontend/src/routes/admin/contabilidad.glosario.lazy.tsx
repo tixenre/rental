@@ -5,8 +5,9 @@
  * cada acción. Para releer y sacarse dudas. NO calcula nada — es documentación viva
  * dentro del back-office (el modelo real vive en backend/contabilidad/).
  */
-import { createLazyFileRoute, Link } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 
+import { AdminPage } from "@/components/admin/AdminPage";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/contabilidad/glosario")({
@@ -106,28 +107,17 @@ function GlosarioPage() {
   useDocumentTitle("Glosario · Finanzas");
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-8 max-w-3xl mx-auto">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Back-office · Finanzas
-          </div>
-          <h1 className="font-display text-3xl text-ink">Glosario</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Qué significa cada término y qué hace cada acción. Para releer y sacarse dudas.
-          </p>
-        </div>
-        <Link
-          to="/admin/contabilidad"
-          className="shrink-0 h-9 rounded-md border hairline px-3 text-sm flex items-center hover:bg-muted/40"
-        >
-          ← Tablero
-        </Link>
-      </header>
-
-      <Bloque titulo="Términos" items={TERMINOS} />
-      <Bloque titulo="Acciones" items={ACCIONES} />
-    </div>
+    <AdminPage
+      title="Glosario"
+      maxW="max-w-3xl"
+      description="Qué significa cada término y qué hace cada acción. Para releer y sacarse dudas."
+      backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
+    >
+      <div className="space-y-8">
+        <Bloque titulo="Términos" items={TERMINOS} />
+        <Bloque titulo="Acciones" items={ACCIONES} />
+      </div>
+    </AdminPage>
   );
 }
 

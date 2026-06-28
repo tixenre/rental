@@ -20,6 +20,7 @@ import {
   type MovimientoInput,
   type TipoMovimiento,
 } from "@/lib/admin/api";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
@@ -122,112 +123,100 @@ function MovimientosPage() {
   }
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Back-office · Finanzas
-          </div>
-          <h1 className="font-display text-3xl text-ink">Movimientos</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Toda la plata de las cajas: los cobros de pedidos (que entran solos, una línea por mes)
-            más los gastos, transferencias, retiros y aportes.
-          </p>
-        </div>
-        <Link
-          to="/admin/contabilidad"
-          className="shrink-0 h-9 rounded-md border hairline px-3 text-sm flex items-center hover:bg-muted/40"
-        >
-          ← Tablero
-        </Link>
-      </header>
+    <AdminPage
+      title="Movimientos"
+      maxW="max-w-5xl"
+      description="Toda la plata de las cajas: los cobros de pedidos (que entran solos, una línea por mes) más los gastos, transferencias, retiros y aportes."
+      backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
+    >
+      <div className="space-y-6">
+        <NuevoMovimientoForm onCreated={invalidar} />
 
-      <NuevoMovimientoForm onCreated={invalidar} />
-
-      {/* Filtro por tipo */}
-      <div className="flex flex-wrap gap-1">
-        {[
-          ["", "Todos"],
-          ["cobro", "Cobros"],
-          ...TIPOS_MOVIMIENTO.map((t) => [t, TIPO_LABEL[t]] as [string, string]),
-        ].map(([val, lbl]) => (
-          <button
-            key={val}
-            type="button"
-            onClick={() => setTipoFiltro(val)}
-            className={cn(
-              "rounded-md border px-2.5 py-1.5 text-xs font-medium transition",
-              tipoFiltro === val
-                ? "border-ink bg-ink text-background"
-                : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
-            )}
-          >
-            {lbl}
-          </button>
-        ))}
-      </div>
-
-      {movsQ.isLoading && (
-        <div className="text-sm text-muted-foreground">Cargando movimientos…</div>
-      )}
-      {movsQ.isError && (
-        <div className="text-sm text-destructive">
-          Error cargando los movimientos. {(movsQ.error as Error)?.message}
-        </div>
-      )}
-
-      {beneficiarioFiltro && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Beneficiario:</span>
-          <span className="rounded-md bg-ink px-2 py-0.5 text-xs text-background">
-            {beneficiarioFiltro}
-          </span>
-          <button
-            type="button"
-            onClick={() => setBeneficiarioFiltro("")}
-            className="text-xs text-muted-foreground hover:text-ink underline"
-          >
-            quitar
-          </button>
-        </div>
-      )}
-
-      {movsQ.data && filas.length === 0 && (
-        <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
-          Todavía no hay movimientos para este filtro.
-        </div>
-      )}
-
-      {filas.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border hairline">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Fecha</th>
-                <th className="px-3 py-2 font-medium">Tipo</th>
-                <th className="px-3 py-2 font-medium">Detalle</th>
-                <th className="px-3 py-2 font-medium text-right">Monto</th>
-                <th className="px-3 py-2 font-medium text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map((f) =>
-                f.kind === "mov" ? (
-                  <MovimientoRow
-                    key={`m${f.mov.id}`}
-                    mov={f.mov}
-                    onChanged={invalidar}
-                    onBeneficiario={setBeneficiarioFiltro}
-                  />
-                ) : (
-                  <CobroRow key={`c${f.cobro.mes}`} cobro={f.cobro} />
-                ),
+        {/* Filtro por tipo */}
+        <div className="flex flex-wrap gap-1">
+          {[
+            ["", "Todos"],
+            ["cobro", "Cobros"],
+            ...TIPOS_MOVIMIENTO.map((t) => [t, TIPO_LABEL[t]] as [string, string]),
+          ].map(([val, lbl]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setTipoFiltro(val)}
+              className={cn(
+                "rounded-md border px-2.5 py-1.5 text-xs font-medium transition",
+                tipoFiltro === val
+                  ? "border-ink bg-ink text-background"
+                  : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
               )}
-            </tbody>
-          </table>
+            >
+              {lbl}
+            </button>
+          ))}
         </div>
-      )}
-    </div>
+
+        {movsQ.isLoading && (
+          <div className="text-sm text-muted-foreground">Cargando movimientos…</div>
+        )}
+        {movsQ.isError && (
+          <div className="text-sm text-destructive">
+            Error cargando los movimientos. {(movsQ.error as Error)?.message}
+          </div>
+        )}
+
+        {beneficiarioFiltro && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Beneficiario:</span>
+            <span className="rounded-md bg-ink px-2 py-0.5 text-xs text-background">
+              {beneficiarioFiltro}
+            </span>
+            <button
+              type="button"
+              onClick={() => setBeneficiarioFiltro("")}
+              className="text-xs text-muted-foreground hover:text-ink underline"
+            >
+              quitar
+            </button>
+          </div>
+        )}
+
+        {movsQ.data && filas.length === 0 && (
+          <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
+            Todavía no hay movimientos para este filtro.
+          </div>
+        )}
+
+        {filas.length > 0 && (
+          <div className="overflow-x-auto rounded-lg border hairline">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-2 font-medium">Fecha</th>
+                  <th className="px-3 py-2 font-medium">Tipo</th>
+                  <th className="px-3 py-2 font-medium">Detalle</th>
+                  <th className="px-3 py-2 font-medium text-right">Monto</th>
+                  <th className="px-3 py-2 font-medium text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filas.map((f) =>
+                  f.kind === "mov" ? (
+                    <MovimientoRow
+                      key={`m${f.mov.id}`}
+                      mov={f.mov}
+                      onChanged={invalidar}
+                      onBeneficiario={setBeneficiarioFiltro}
+                    />
+                  ) : (
+                    <CobroRow key={`c${f.cobro.mes}`} cobro={f.cobro} />
+                  ),
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </AdminPage>
   );
 }
 

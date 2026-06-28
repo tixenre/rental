@@ -19,6 +19,7 @@ import { adminApi } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
 import { fmtArs } from "@/lib/format";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { Kpi, Section, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
 
 export const Route = createLazyFileRoute("/admin/estadisticas")({
@@ -35,17 +36,11 @@ function EstadisticasPage() {
   const data = statsQ.data;
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-7xl mx-auto">
-      <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
-        </div>
-        <h1 className="font-display text-3xl text-ink">Estadísticas</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Métricas del negocio. El reporte de liquidación ahora vive en Finanzas.
-        </p>
-      </header>
-
+    <AdminPage
+      title="Estadísticas"
+      maxW="max-w-7xl"
+      description="Métricas del negocio. El reporte de liquidación ahora vive en Finanzas."
+    >
       <div className="space-y-6">
         <p className="text-xs text-muted-foreground">
           Solo se contabilizan pedidos confirmados, retirados y finalizados.
@@ -223,7 +218,7 @@ function EstadisticasPage() {
 
         <BusquedasSection />
       </div>
-    </div>
+    </AdminPage>
   );
 }
 

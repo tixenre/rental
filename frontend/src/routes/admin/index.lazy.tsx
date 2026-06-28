@@ -13,6 +13,7 @@ import {
 import { adminApi, type PedidoResumen } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { CalendarioWidget } from "@/components/admin/CalendarioWidget";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
@@ -36,14 +37,7 @@ function AdminDashboard() {
   const conSaldo = saldoQ.data?.total ?? 0;
 
   return (
-    <div className="px-4 md:px-8 py-6 md:py-10 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
-        </div>
-        <h1 className="font-display text-3xl md:text-4xl text-ink">Dashboard</h1>
-      </div>
-
+    <AdminPage title="Dashboard" maxW="max-w-6xl">
       {isLoading && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[0, 1, 2, 3].map((i) => (
@@ -154,7 +148,7 @@ function AdminDashboard() {
           </div>
         </>
       )}
-    </div>
+    </AdminPage>
   );
 }
 

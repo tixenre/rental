@@ -36,6 +36,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/design-system/ui/alert-dialog";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { authedFetch } from "@/lib/authedFetch";
@@ -176,215 +177,210 @@ function DataIoPage() {
   };
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-8 max-w-4xl mx-auto">
-      <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
+    <AdminPage
+      title="Datos y backups"
+      maxW="max-w-4xl"
+      description="Guardá una copia de tus datos, restaurala cuando quieras, o borrá todo para arrancar de cero."
+    >
+      <div className="space-y-8">
+        {/* Guía del flujo (lenguaje claro) */}
+        <div className="rounded-lg border border-amber/30 bg-amber/5 p-4 text-sm space-y-1.5">
+          <div className="font-medium text-ink">Cómo usarlo para probar antes del lanzamiento</div>
+          <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
+            <li>
+              <strong className="text-foreground">Descargá los backups</strong> que quieras guardar
+              (cada uno es un solo archivo <code>backup-…-fecha.zip</code>).
+            </li>
+            <li>Probá libremente: hacé pedidos como si fueras un cliente.</li>
+            <li>
+              Cuando quieras <strong className="text-foreground">arrancar de cero</strong>: “Borrar
+              clientes y pedidos” → escribí <code>{RESET_CONFIRMATION}</code>. Vuelve la numeración
+              a #1.
+            </li>
+            <li>
+              Para <strong className="text-foreground">recuperar</strong> lo guardado: en cada
+              grupo, “Restaurar (simular)” te muestra qué va a pasar; después “Restaurar (aplicar)”.
+            </li>
+          </ol>
         </div>
-        <h1 className="font-display text-3xl text-ink">Datos y backups</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Guardá una copia de tus datos, restaurala cuando quieras, o borrá todo para arrancar de
-          cero.
-        </p>
-      </header>
 
-      {/* Guía del flujo (lenguaje claro) */}
-      <div className="rounded-lg border border-amber/30 bg-amber/5 p-4 text-sm space-y-1.5">
-        <div className="font-medium text-ink">Cómo usarlo para probar antes del lanzamiento</div>
-        <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
-          <li>
-            <strong className="text-foreground">Descargá los backups</strong> que quieras guardar
-            (cada uno es un solo archivo <code>backup-…-fecha.zip</code>).
-          </li>
-          <li>Probá libremente: hacé pedidos como si fueras un cliente.</li>
-          <li>
-            Cuando quieras <strong className="text-foreground">arrancar de cero</strong>: “Borrar
-            clientes y pedidos” → escribí <code>{RESET_CONFIRMATION}</code>. Vuelve la numeración a
-            #1.
-          </li>
-          <li>
-            Para <strong className="text-foreground">recuperar</strong> lo guardado: en cada grupo,
-            “Restaurar (simular)” te muestra qué va a pasar; después “Restaurar (aplicar)”.
-          </li>
-        </ol>
-      </div>
-
-      {/* ─── BACKUPS por grupo ─── */}
-      <section className="space-y-3">
-        <h2 className="font-display text-lg">Backup y restaurar</h2>
-        <div className="space-y-3">
-          {GROUPS.map((g) => (
-            <GroupCard
-              key={g.scope}
-              group={g}
-              busy={busy}
-              importBusy={importBusy}
-              lastImport={lastImport?.scope === g.scope ? lastImport.result : null}
-              onDownload={handleDownload}
-              onImport={handleImport}
-            />
-          ))}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Restaurar hace <strong>upsert</strong>: agrega lo que falta y actualiza lo que cambió, sin
-          borrar lo que no esté en el archivo. Los archivos con datos de clientes/pedidos{" "}
-          <strong className="text-foreground">nunca se commitean al repo</strong>.
-        </p>
-      </section>
-
-      {/* ─── Zona destructiva ─── */}
-      <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-5 space-y-2">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="size-5 text-destructive shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h2 className="font-display text-lg text-destructive">Arrancar de cero</h2>
-            <p className="text-sm text-muted-foreground">
-              Borra <strong>todos los clientes y pedidos</strong> (con sus items, pagos y
-              solicitudes) y reinicia los contadores, incluida la numeración de pedidos (el próximo
-              vuelve a ser #1). El catálogo y la configuración no se tocan.{" "}
-              <strong className="text-destructive">No es reversible</strong> — descargá el backup de
-              Clientes y Pedidos antes.
-            </p>
-          </div>
-        </div>
-        <AlertDialog
-          open={resetOpen}
-          onOpenChange={(open) => {
-            setResetOpen(open);
-            if (!open) setResetConfirm("");
-          }}
-        >
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" size="sm">
-              <Trash2 className="size-4" />
-              Borrar clientes y pedidos
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Borrar TODOS los clientes y pedidos?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Elimina permanentemente todos los clientes, pedidos, items, pagos y solicitudes. El
-                catálogo y la configuración no se tocan.
-                <br />
-                <br />
-                Para confirmar, escribí{" "}
-                <code className="font-mono font-bold">{RESET_CONFIRMATION}</code> abajo:
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <Input
-              autoFocus
-              value={resetConfirm}
-              onChange={(e) => setResetConfirm(e.target.value)}
-              placeholder={RESET_CONFIRMATION}
-              className="font-mono"
-            />
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={resetBusy}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={resetConfirm !== RESET_CONFIRMATION || resetBusy}
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleResetOperacional();
-                }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {resetBusy ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Trash2 className="size-4" />
-                )}
-                Borrar definitivamente
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </section>
-
-      {/* ─── Avanzado (plegado) ─── */}
-      <details className="rounded-lg border bg-card">
-        <summary className="cursor-pointer select-none px-5 py-4 font-display text-lg flex items-center gap-2">
-          <FileArchive className="size-4" />
-          Avanzado · exportar por entidad / CSV
-        </summary>
-        <div className="border-t px-5 py-5 space-y-6">
-          <p className="text-sm text-muted-foreground">
-            Para casos puntuales: versionar el catálogo en git, o abrir los datos en Excel. El
-            catálogo oficial vive en <code className="text-xs">data/catalog/</code> y se importa al
-            arrancar.
-          </p>
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                handleDownload("catalog-all", "Catálogo completo (JSON)", "catalogo.zip")
-              }
-              disabled={busy !== null}
-            >
-              {busy === "catalog-all" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <FileArchive className="size-4" />
-              )}
-              Catálogo (ZIP de JSONs)
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDownload("csv-all", "Planillas (CSV)", "planillas-csv.zip")}
-              disabled={busy !== null}
-            >
-              {busy === "csv-all" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="size-4" />
-              )}
-              Planillas CSV (ZIP)
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDownload("full", "Backup completo", "backup-full.zip")}
-              disabled={busy !== null}
-            >
-              {busy === "full" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Database className="size-4" />
-              )}
-              Todo en un ZIP
-            </Button>
-          </div>
-
-          <div className="rounded-md border divide-y">
-            {CATALOG_ENTITIES.map((e) => (
-              <div key={e.key} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileJson className="size-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm truncate">{e.label}</span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDownload(e.key, e.label, `${e.key}.json`)}
-                  disabled={busy !== null}
-                  className="shrink-0"
-                >
-                  {busy === e.key ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Download className="size-4" />
-                  )}
-                  JSON
-                </Button>
-              </div>
+        {/* ─── BACKUPS por grupo ─── */}
+        <section className="space-y-3">
+          <h2 className="font-display text-lg">Backup y restaurar</h2>
+          <div className="space-y-3">
+            {GROUPS.map((g) => (
+              <GroupCard
+                key={g.scope}
+                group={g}
+                busy={busy}
+                importBusy={importBusy}
+                lastImport={lastImport?.scope === g.scope ? lastImport.result : null}
+                onDownload={handleDownload}
+                onImport={handleImport}
+              />
             ))}
           </div>
-        </div>
-      </details>
-    </div>
+          <p className="text-xs text-muted-foreground">
+            Restaurar hace <strong>upsert</strong>: agrega lo que falta y actualiza lo que cambió,
+            sin borrar lo que no esté en el archivo. Los archivos con datos de clientes/pedidos{" "}
+            <strong className="text-foreground">nunca se commitean al repo</strong>.
+          </p>
+        </section>
+
+        {/* ─── Zona destructiva ─── */}
+        <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-5 space-y-2">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="size-5 text-destructive shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <h2 className="font-display text-lg text-destructive">Arrancar de cero</h2>
+              <p className="text-sm text-muted-foreground">
+                Borra <strong>todos los clientes y pedidos</strong> (con sus items, pagos y
+                solicitudes) y reinicia los contadores, incluida la numeración de pedidos (el
+                próximo vuelve a ser #1). El catálogo y la configuración no se tocan.{" "}
+                <strong className="text-destructive">No es reversible</strong> — descargá el backup
+                de Clientes y Pedidos antes.
+              </p>
+            </div>
+          </div>
+          <AlertDialog
+            open={resetOpen}
+            onOpenChange={(open) => {
+              setResetOpen(open);
+              if (!open) setResetConfirm("");
+            }}
+          >
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm">
+                <Trash2 className="size-4" />
+                Borrar clientes y pedidos
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Borrar TODOS los clientes y pedidos?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Elimina permanentemente todos los clientes, pedidos, items, pagos y solicitudes.
+                  El catálogo y la configuración no se tocan.
+                  <br />
+                  <br />
+                  Para confirmar, escribí{" "}
+                  <code className="font-mono font-bold">{RESET_CONFIRMATION}</code> abajo:
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Input
+                autoFocus
+                value={resetConfirm}
+                onChange={(e) => setResetConfirm(e.target.value)}
+                placeholder={RESET_CONFIRMATION}
+                className="font-mono"
+              />
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={resetBusy}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={resetConfirm !== RESET_CONFIRMATION || resetBusy}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleResetOperacional();
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {resetBusy ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="size-4" />
+                  )}
+                  Borrar definitivamente
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </section>
+
+        {/* ─── Avanzado (plegado) ─── */}
+        <details className="rounded-lg border bg-card">
+          <summary className="cursor-pointer select-none px-5 py-4 font-display text-lg flex items-center gap-2">
+            <FileArchive className="size-4" />
+            Avanzado · exportar por entidad / CSV
+          </summary>
+          <div className="border-t px-5 py-5 space-y-6">
+            <p className="text-sm text-muted-foreground">
+              Para casos puntuales: versionar el catálogo en git, o abrir los datos en Excel. El
+              catálogo oficial vive en <code className="text-xs">data/catalog/</code> y se importa
+              al arrancar.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  handleDownload("catalog-all", "Catálogo completo (JSON)", "catalogo.zip")
+                }
+                disabled={busy !== null}
+              >
+                {busy === "catalog-all" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <FileArchive className="size-4" />
+                )}
+                Catálogo (ZIP de JSONs)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownload("csv-all", "Planillas (CSV)", "planillas-csv.zip")}
+                disabled={busy !== null}
+              >
+                {busy === "csv-all" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="size-4" />
+                )}
+                Planillas CSV (ZIP)
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownload("full", "Backup completo", "backup-full.zip")}
+                disabled={busy !== null}
+              >
+                {busy === "full" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Database className="size-4" />
+                )}
+                Todo en un ZIP
+              </Button>
+            </div>
+
+            <div className="rounded-md border divide-y">
+              {CATALOG_ENTITIES.map((e) => (
+                <div key={e.key} className="flex items-center justify-between gap-4 px-4 py-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileJson className="size-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm truncate">{e.label}</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownload(e.key, e.label, `${e.key}.json`)}
+                    disabled={busy !== null}
+                    className="shrink-0"
+                  >
+                    {busy === e.key ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Download className="size-4" />
+                    )}
+                    JSON
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
+      </div>
+    </AdminPage>
   );
 }
 

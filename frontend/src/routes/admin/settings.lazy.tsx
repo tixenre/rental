@@ -1,6 +1,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminSection } from "@/components/admin/AdminSection";
 import { EmailsAdmin } from "@/components/admin/email/EmailsAdmin";
 import { ComisionesSection } from "@/components/admin/settings/ComisionesSection";
@@ -21,60 +22,56 @@ function SettingsPage() {
   useDocumentTitle("Settings · Back Office");
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-4xl mx-auto">
-      <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
-        </div>
-        <h1 className="font-display text-3xl text-ink">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configuración del sistema y herramientas de mantenimiento.
-        </p>
-      </header>
+    <AdminPage
+      title="Settings"
+      maxW="max-w-4xl"
+      description="Configuración del sistema y herramientas de mantenimiento."
+    >
+      <div className="space-y-6">
+        <AdminSection title="Descuentos por jornadas" storageKey="settings:descuentos">
+          <DescuentosJornadaSection />
+        </AdminSection>
 
-      <AdminSection title="Descuentos por jornadas" storageKey="settings:descuentos">
-        <DescuentosJornadaSection />
-      </AdminSection>
+        <AdminSection title="Buffer entre alquileres" storageKey="settings:buffer">
+          <BufferSection />
+        </AdminSection>
 
-      <AdminSection title="Buffer entre alquileres" storageKey="settings:buffer">
-        <BufferSection />
-      </AdminSection>
+        <AdminSection title="Horarios de retiro" storageKey="settings:horarios">
+          <HorariosSection />
+        </AdminSection>
 
-      <AdminSection title="Horarios de retiro" storageKey="settings:horarios">
-        <HorariosSection />
-      </AdminSection>
+        <AdminSection title="Preguntas frecuentes" storageKey="settings:faq" defaultOpen={false}>
+          <FaqSection />
+        </AdminSection>
 
-      <AdminSection title="Preguntas frecuentes" storageKey="settings:faq" defaultOpen={false}>
-        <FaqSection />
-      </AdminSection>
+        <AdminSection title="Cambio y precios" storageKey="settings:cambio">
+          <CambioYPreciosSection />
+        </AdminSection>
 
-      <AdminSection title="Cambio y precios" storageKey="settings:cambio">
-        <CambioYPreciosSection />
-      </AdminSection>
+        <AdminSection title="Ranking automático" storageKey="settings:ranking" defaultOpen={false}>
+          <RankingSection />
+        </AdminSection>
 
-      <AdminSection title="Ranking automático" storageKey="settings:ranking" defaultOpen={false}>
-        <RankingSection />
-      </AdminSection>
+        <AdminSection title="Google Analytics" storageKey="settings:ga4" defaultOpen={false}>
+          <GoogleAnalyticsSection />
+        </AdminSection>
 
-      <AdminSection title="Google Analytics" storageKey="settings:ga4" defaultOpen={false}>
-        <GoogleAnalyticsSection />
-      </AdminSection>
+        <AdminSection title="Calendario (feed iCal)" storageKey="settings:ical" defaultOpen={false}>
+          <CalendarFeedSection />
+        </AdminSection>
 
-      <AdminSection title="Calendario (feed iCal)" storageKey="settings:ical" defaultOpen={false}>
-        <CalendarFeedSection />
-      </AdminSection>
+        <AdminSection
+          title="Reparto de comisiones"
+          storageKey="settings:comisiones"
+          defaultOpen={false}
+        >
+          <ComisionesSection />
+        </AdminSection>
 
-      <AdminSection
-        title="Reparto de comisiones"
-        storageKey="settings:comisiones"
-        defaultOpen={false}
-      >
-        <ComisionesSection />
-      </AdminSection>
-
-      <AdminSection title="Emails" storageKey="settings:emails" defaultOpen={false}>
-        <EmailsAdmin />
-      </AdminSection>
-    </div>
+        <AdminSection title="Emails" storageKey="settings:emails" defaultOpen={false}>
+          <EmailsAdmin />
+        </AdminSection>
+      </div>
+    </AdminPage>
   );
 }
