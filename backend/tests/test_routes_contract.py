@@ -2,18 +2,17 @@
 
 Cuando la modularización del backend (#501) mueva los handlers de
 `routes/alquileres.py` y `routes/cliente_portal.py` a paquetes/routers nuevos,
-lo que NO debe cambiar es el **contrato HTTP externo**. Estos tests lo fijan de
-punta a punta (app real + middleware + routing), en cuatro capas, todas vía
-requests con `TestClient` (no introspección de estructura interna, que es frágil
-entre versiones) y **sin tocar la DB** (el rechazo/los 404 ocurren antes de
-cualquier query; la lógica de negocio puede 500ear sin DB y no afecta el assert):
+lo que NO debe cambiar es el **contrato HTTP externo**. Estos tests lo fijan en
+cuatro capas, **sin tocar la DB**. La capa 1 (existencia) lee la tabla de rutas;
+las capas 2-4 (guards) mandan requests reales con `TestClient` (app + middleware
++ routing) — esos guards rechazan ANTES de cualquier query, así que el assert no
+depende de la DB:
 
-  1. **Existencia** — cada ruta esperada sigue ruteando (no 404/405). Se manda
-     con una sesión admin que pasa el middleware en todas las rutas, así el
-     request llega al routing. Caza drops de MÉTODO (405) y de rutas no-GET
-     (404), incluidas las POST públicas (`cotizar`/`registro`). Límite conocido:
-     un GET dropeado cae al catch-all del SPA (200, no 404) → ese caso lo cubren
-     las capas 3-4 para los GET con guard. (`test_endpoint_existe`)
+  1. **Existencia** — cada ruta esperada sigue ruteando (no 404/405). Se chequea
+     leyendo la tabla de rutas de la app (`route_status`, ver
+     `tests/contract_routing.py`), no mandando un request: instantáneo, sin DB, y
+     caza también los GET dropeados — el enfoque viejo por-request los perdía
+     (caían al catch-all del SPA → 200, no 404). (`test_endpoint_existe`)
   2. **Middleware** — un anónimo no entra a ningún endpoint protegido (401/403).
      (`test_endpoint_protegido_rechaza_anonimo`)
   3. **Guard admin** — una sesión logueada pero NO admin la rechaza el
@@ -31,15 +30,16 @@ from fastapi.testclient import TestClient
 
 import main
 from routes.auth import signer
+from tests.contract_routing import route_status
 
 pytestmark = pytest.mark.unit
 
 # TestClient sin entrar al context manager → NO dispara los eventos de startup
-# (scheduler/DB); solo ejercita routing + middleware + guards.
-# `raise_server_exceptions=False`: si un handler llega a la DB y esta no está
-# (CI corre sin Postgres), queremos un 500 como respuesta —no que TestClient
-# re-lance la excepción— para que el chequeo de existencia distinga "ruta existe
-# pero la lógica 500ea sin DB" (ok) de "ruta perdida" (404/405).
+# (scheduler/DB); solo ejercita middleware + guards (la existencia ya no manda
+# request, ver `route_status`). `raise_server_exceptions=False`: si un guard
+# FALTA, el request llega al handler y este 500ea sin Postgres; queremos ese 500
+# como respuesta —no que TestClient re-lance— para que el assert del guard lo lea
+# como "guard perdido" en vez de romper el test con una excepción.
 client = TestClient(main.app, raise_server_exceptions=False)
 
 # Cookies de sesión firmadas con el MISMO signer de la app (mismo SECRET_KEY de
@@ -142,17 +142,17 @@ def _id(pares):
 
 @pytest.mark.parametrize("method,path", _TODOS, ids=_id(_TODOS))
 def test_endpoint_existe(method, path):
-    """Cada ruta esperada sigue ruteando. Se manda con una sesión admin (pasa el
-    middleware en todas las rutas) para LLEGAR al routing: un 404 = path perdido,
-    un 405 = método perdido. La lógica puede 500ear sin DB o devolver 401/403/422
-    (existe igual) — solo 404/405 significan que #501 movió/renombró la ruta.
-
-    Límite: un GET dropeado cae al catch-all del SPA (200, no 404) → no se caza
-    acá; los GET con guard quedan cubiertos por las capas 3-4. Los métodos de
-    escritura y las POST públicas sí se cazan (el SPA solo sirve GET)."""
-    res = client.request(method, path, json={}, headers={"Cookie": _COOKIE_ADMIN})
-    assert res.status_code not in (404, 405), (
-        f"{method} {path} no existe (status {res.status_code}) — ¿la movió/renombró #501?"
+    """Cada ruta esperada sigue ruteando (no 404/405). Se chequea leyendo la tabla
+    de rutas (`route_status`), NO mandando un request: el request llegaba al
+    handler → `get_db()` y sin Postgres colgaba el timeout del pool (era el cuello
+    de botella del job `python-tests`). Leer la tabla es instantáneo y, a
+    diferencia del enfoque viejo, caza también los GET dropeados (antes caían al
+    catch-all del SPA → 200). Cómo → `tests/contract_routing.py`."""
+    estado = route_status(method, path)
+    assert estado == "full", (
+        f"{method} {path} no rutea "
+        f"({'método caído → 405' if estado == 'partial' else 'ruta caída → 404'})"
+        f" — ¿la movió/renombró un refactor?"
     )
 
 
