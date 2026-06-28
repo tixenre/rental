@@ -40,6 +40,7 @@ import {
   DialogClose,
 } from "@/design-system/ui/dialog";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 export const Route = createLazyFileRoute("/admin/talleres/")({
   component: TalleresAdminPage,
@@ -880,6 +881,7 @@ function InscripcionesSection({
   loading: boolean;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [notifMsg, setNotifMsg] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -947,9 +949,17 @@ function InscripcionesSection({
     }
   }
 
-  function handleEliminar(ins: Inscripcion) {
+  async function handleEliminar(ins: Inscripcion) {
     const label = ins.en_lista_espera ? "de lista de espera" : "confirmada";
-    if (!window.confirm(`Eliminar inscripción ${label} de ${ins.nombre}?`)) return;
+    if (
+      !(await confirm({
+        title: "¿Eliminar inscripción?",
+        description: `Se eliminará la inscripción ${label} de ${ins.nombre}.`,
+        danger: true,
+        confirmLabel: "Eliminar",
+      }))
+    )
+      return;
     eliminarMut.mutate(ins.id);
   }
 
@@ -1141,6 +1151,7 @@ function EdicionSubRow({
   onDelete: (edicionId: number) => void;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const badge = badgeEstadoEdicion(edicion);
   const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<"clases" | "precios" | "inscripciones">("clases");
@@ -1176,23 +1187,32 @@ function EdicionSubRow({
     onError: (e) => toast.error((e as Error).message),
   });
 
-  function handleToggleActivo(v: boolean) {
+  async function handleToggleActivo(v: boolean) {
     if (!v && edicion.cupos_confirmados > 0) {
-      const ok = window.confirm(
-        `¿Desactivar la edición #${edicion.numero_edicion}?\n\n` +
-          `Hay ${edicion.cupos_confirmados} inscriptos confirmados. ¿Confirmar?`,
-      );
+      const ok = await confirm({
+        title: `¿Desactivar la edición #${edicion.numero_edicion}?`,
+        description: `Hay ${edicion.cupos_confirmados} inscriptos confirmados.`,
+        danger: true,
+        confirmLabel: "Desactivar",
+      });
       if (!ok) return;
     }
     toggleActivoMut.mutate(v);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (edicion.cupos_confirmados > 0) {
       toast.error(`No se puede eliminar: hay ${edicion.cupos_confirmados} inscriptos confirmados`);
       return;
     }
-    if (!window.confirm(`¿Eliminar la edición #${edicion.numero_edicion} de "${concepto.nombre}"?`))
+    if (
+      !(await confirm({
+        title: `¿Eliminar la edición #${edicion.numero_edicion}?`,
+        description: `Se eliminará la edición de "${concepto.nombre}".`,
+        danger: true,
+        confirmLabel: "Eliminar",
+      }))
+    )
       return;
     deleteMut.mutate();
   }

@@ -63,6 +63,7 @@ import {
 } from "@/design-system/ui/select";
 import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import type { ContenidoIncluidoItem } from "@/data/equipment";
@@ -122,6 +123,7 @@ export function EquipoFormDialogV2({
 }) {
   const isEdit = !!initial;
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const { rate: usdRate } = useUsdRate();
   const roiDefault = useRoiPctDefault();
 
@@ -759,11 +761,17 @@ export function EquipoFormDialogV2({
               (e.serie ?? "").trim().toLowerCase() === serieTrim.toLowerCase(),
           );
           if (dups.length > 0) {
-            const ok = window.confirm(
-              `Ya hay otro equipo con la serie "${serieTrim}":\n  • ${dups[0].nombre}` +
-                (dups.length > 1 ? ` (+${dups.length - 1} más)` : "") +
-                `\n\n¿Guardar igual?`,
-            );
+            const ok = await confirm({
+              title: "¿Guardar con serie duplicada?",
+              description: (
+                <>
+                  Ya hay otro equipo con la serie "{serieTrim}":
+                  <br />• {dups[0].nombre}
+                  {dups.length > 1 ? ` (+${dups.length - 1} más)` : ""}
+                </>
+              ),
+              confirmLabel: "Guardar igual",
+            });
             if (!ok) return;
           }
         } catch {

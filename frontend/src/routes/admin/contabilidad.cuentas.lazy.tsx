@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { adminApi, type CuentaSaldo, type TipoCuenta } from "@/lib/admin/api";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
@@ -363,6 +364,7 @@ function SocioCard({
 }
 
 function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => void }) {
+  const confirm = useConfirm();
   const [editando, setEditando] = useState(false);
   const [nombre, setNombre] = useState(cuenta.nombre);
   const [valor, setValor] = useState(String(cuenta.saldo_inicial));
@@ -465,11 +467,14 @@ function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => 
             </button>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  window.confirm(
-                    `¿Dar de baja "${cuenta.nombre}"? Solo se puede si su saldo es cero.`,
-                  )
+                  await confirm({
+                    title: `¿Dar de baja "${cuenta.nombre}"?`,
+                    description: "Solo se puede si su saldo es cero.",
+                    danger: true,
+                    confirmLabel: "Dar de baja",
+                  })
                 )
                   baja.mutate();
               }}

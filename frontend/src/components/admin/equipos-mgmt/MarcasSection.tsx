@@ -73,11 +73,13 @@ import {
   DropdownMenuSeparator,
 } from "@/design-system/ui/dropdown-menu";
 import { adminApi, type MarcaAdmin } from "@/lib/admin/api";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { InlineSvg } from "@/design-system/ui/InlineSvg";
 import { isSvgUrl } from "@/design-system/ui/inline-svg-utils";
 
 export function MarcasSection() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const listQ = useQuery({
     queryKey: ["admin", "marcas"],
@@ -327,11 +329,14 @@ export function MarcasSection() {
                     </span>
                     <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (
-                          confirm(
-                            `¿Fusionar "${src.nombre}" en "${target.nombre}"? Los ${src.total} equipos pasarán a "${target.nombre}" y "${src.nombre}" se borrará.`,
-                          )
+                          await confirm({
+                            title: `¿Fusionar "${src.nombre}" en "${target.nombre}"?`,
+                            description: `Los ${src.total} equipos pasarán a "${target.nombre}" y "${src.nombre}" se borrará.`,
+                            danger: true,
+                            confirmLabel: "Fusionar",
+                          })
                         ) {
                           mergeMut.mutate({ sourceId: src.id, targetId: target.id });
                         }

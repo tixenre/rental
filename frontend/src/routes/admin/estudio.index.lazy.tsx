@@ -57,6 +57,7 @@ import {
 import { uploadStudioFile } from "@/lib/studio/photos";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { AdminSection } from "@/components/admin/AdminSection";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 export const Route = createLazyFileRoute("/admin/estudio/")({
   component: EstudioAdminPage,
@@ -403,6 +404,7 @@ type SlotFormValues = z.infer<typeof slotSchema>;
 
 function SlotsSection() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [editando, setEditando] = useState<EstudioSlotFijo | null>(null);
   const [creando, setCreando] = useState(false);
 
@@ -464,11 +466,14 @@ function SlotsSection() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      confirm(
-                        `¿Borrar el slot de ${s.cliente}? Se eliminan los pedidos futuros impagos.`,
-                      )
+                      await confirm({
+                        title: `¿Borrar el slot de ${s.cliente}?`,
+                        description: "Se eliminan los pedidos futuros impagos.",
+                        danger: true,
+                        confirmLabel: "Eliminar",
+                      })
                     )
                       delMut.mutate(s.id);
                   }}

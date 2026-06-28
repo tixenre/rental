@@ -33,6 +33,7 @@ import {
 } from "@/design-system/ui/select";
 
 import { adminApi, type Equipo, type MantenimientoInput } from "@/lib/admin/api";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { formatARS } from "@/lib/format";
 
 const TIPOS = [
@@ -80,6 +81,7 @@ export function MantenimientoEquipoDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const queryKey = ["admin", "equipo-mantenimiento", equipo?.id];
 
   const logQ = useQuery({
@@ -340,8 +342,15 @@ export function MantenimientoEquipoDialog({
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => {
-                    if (confirm(`Eliminar evento del ${fmtFecha(ev.fecha)}?`)) {
+                  onClick={async () => {
+                    if (
+                      await confirm({
+                        title: "¿Eliminar evento?",
+                        description: `Se eliminará el evento del ${fmtFecha(ev.fecha)}.`,
+                        danger: true,
+                        confirmLabel: "Eliminar",
+                      })
+                    ) {
                       deleteMut.mutate(ev.id);
                     }
                   }}

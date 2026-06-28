@@ -52,6 +52,7 @@ import {
 
 import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
 import { stashEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { ActionMenu } from "@/components/mobile";
 import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
@@ -89,6 +90,7 @@ type EquiposSearch = {
 function EquiposPage() {
   useDocumentTitle("Equipos · Back Office");
   const qc = useQueryClient();
+  const confirm = useConfirm();
 
   const search = useSearch({ strict: false }) as EquiposSearch;
   const navigate = useNavigate();
@@ -583,14 +585,26 @@ function EquiposPage() {
           <Button
             size="sm"
             variant="destructive"
-            onClick={() => {
+            onClick={async () => {
               // En papelera, "Eliminar" hace hard delete (delete_permanent).
               // En vista normal, soft delete (delete). #punto4
               const permanent = vistaPapelera;
-              const msg = permanent
-                ? `Eliminar PERMANENTEMENTE ${selectedIds.size} equipo${selectedIds.size === 1 ? "" : "s"} de la papelera?\n\nEsta acción no se puede deshacer y borra ficha, kit, categorías y etiquetas asociadas.`
-                : `Eliminar ${selectedIds.size} equipo${selectedIds.size === 1 ? "" : "s"}? Quedan en la papelera y se pueden restaurar.`;
-              if (confirm(msg)) {
+              const n = selectedIds.size;
+              const plural = n === 1 ? "" : "s";
+              const ok = permanent
+                ? await confirm({
+                    title: `¿Eliminar permanentemente ${n} equipo${plural}?`,
+                    description: `Esta acción no se puede deshacer y borra ficha, kit, categorías y etiquetas asociadas.`,
+                    danger: true,
+                    confirmLabel: "Eliminar",
+                  })
+                : await confirm({
+                    title: `¿Eliminar ${n} equipo${plural}?`,
+                    description: `Quedan en la papelera y se pueden restaurar.`,
+                    danger: true,
+                    confirmLabel: "Eliminar",
+                  });
+              if (ok) {
                 bulkMut.mutate({
                   ids: [...selectedIds],
                   action: permanent ? "delete_permanent" : "delete",

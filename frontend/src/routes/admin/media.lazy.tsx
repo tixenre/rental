@@ -5,6 +5,7 @@ import { Database, RefreshCw, Trash2, RotateCcw, AlertCircle } from "lucide-reac
 
 import { adminApi } from "@/lib/admin/api";
 import type { GcResult } from "@/lib/admin/api";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +85,7 @@ function MediaDashboardPage() {
   useDocumentTitle("Media · Back Office");
 
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [gcResult, setGcResult] = useState<GcResult | null>(null);
 
   const {
@@ -173,8 +175,15 @@ function MediaDashboardPage() {
             Detectar (dry-run)
           </button>
           <button
-            onClick={() => {
-              if (confirm("¿Ejecutar GC real? Esta acción borra assets y keys de R2.")) {
+            onClick={async () => {
+              if (
+                await confirm({
+                  title: "¿Ejecutar GC real?",
+                  description: "Esta acción borra assets y keys de R2.",
+                  danger: true,
+                  confirmLabel: "Ejecutar",
+                })
+              ) {
                 gcRun.mutate();
               }
             }}
