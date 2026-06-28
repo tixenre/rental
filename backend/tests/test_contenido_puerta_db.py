@@ -158,3 +158,18 @@ def test_hoja_sin_componentes(setup_grafo):
         assert contenido_de(conn, Z) == []
     finally:
         conn.close()
+
+
+def test_solo_activos_false_incluye_soft_deleted(setup_grafo):
+    """Con solo_activos=False (documentos/detalle de pedido), el componente
+    soft-deleted (W) SÍ aparece — un documento de un pedido existente muestra lo
+    que el pedido lleva, aunque una pieza se haya retirado después."""
+    from database import get_db
+    from services.contenido import contenido_de
+
+    conn = get_db()
+    try:
+        ids = {c["componente_id"] for c in contenido_de(conn, Y, solo_activos=False)}
+        assert ids == {Z, W}, "con solo_activos=False se incluye el soft-deleted W"
+    finally:
+        conn.close()
