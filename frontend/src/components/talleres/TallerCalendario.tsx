@@ -39,7 +39,7 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
       <div className="rounded-2xl bg-rosa/5 border border-rosa/20 overflow-hidden pointer-events-none select-none">
         <Calendar
           locale={es}
-          defaultMonth={defaultMonth}
+          month={defaultMonth}
           numberOfMonths={numberOfMonths}
           modifiers={{ sesion: sesionDates }}
           modifiersClassNames={{
