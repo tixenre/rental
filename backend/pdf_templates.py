@@ -131,7 +131,7 @@ def _active_wordmark() -> str:
         conn = get_db()
         try:
             row = conn.execute(
-                "SELECT value FROM app_settings WHERE key = ?", ("wordmark_svg",)
+                "SELECT value FROM app_settings WHERE key = %s", ("wordmark_svg",)
             ).fetchone()
         finally:
             conn.close()

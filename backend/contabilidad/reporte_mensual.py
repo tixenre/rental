@@ -25,7 +25,7 @@ PARTES = ("Pablo", "Tincho", "Rambla")
 def _movimientos_socios_mes(conn, desde: str, hasta: str) -> dict:
     """Por socio humano: lo que Rambla le CARGÓ (caja→socio, sube deuda) y lo que el
     socio PAGÓ/rindió (socio→caja, baja deuda) este mes. Transferencias no anuladas."""
-    ph = ", ".join("?" for _ in SOCIOS_HUMANOS)
+    ph = ", ".join("%s" for _ in SOCIOS_HUMANOS)
     rows = conn.execute(
         f"""
         SELECT cd.socio AS cargo_socio, co.socio AS pago_socio, m.monto
@@ -33,7 +33,7 @@ def _movimientos_socios_mes(conn, desde: str, hasta: str) -> dict:
         LEFT JOIN cuentas co ON co.id = m.cuenta_origen_id
         LEFT JOIN cuentas cd ON cd.id = m.cuenta_destino_id
         WHERE m.tipo = 'transferencia' AND NOT m.anulado
-          AND m.fecha BETWEEN ?::date AND ?::date
+          AND m.fecha BETWEEN %s::date AND %s::date
           AND (cd.socio IN ({ph}) OR co.socio IN ({ph}))
         """,
         (desde, hasta, *SOCIOS_HUMANOS, *SOCIOS_HUMANOS),

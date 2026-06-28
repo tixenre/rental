@@ -38,13 +38,13 @@ def create_descuento_jornada(data: DescuentoJornadaIn, request: Request):
         raise HTTPException(400, "pct debe estar entre 0 y 100")
     with get_db() as conn:
         conn.execute(
-            "INSERT INTO descuentos_jornada (jornadas, pct) VALUES (?, ?) "
+            "INSERT INTO descuentos_jornada (jornadas, pct) VALUES (%s, %s) "
             "ON CONFLICT (jornadas) DO UPDATE SET pct = EXCLUDED.pct",
             (data.jornadas, data.pct)
         )
         conn.commit()
         row = conn.execute(
-            "SELECT id, jornadas, pct FROM descuentos_jornada WHERE jornadas = ?",
+            "SELECT id, jornadas, pct FROM descuentos_jornada WHERE jornadas = %s",
             (data.jornadas,)
         ).fetchone()
         return row_to_dict(row)
@@ -54,5 +54,5 @@ def create_descuento_jornada(data: DescuentoJornadaIn, request: Request):
 def delete_descuento_jornada(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
-        conn.execute("DELETE FROM descuentos_jornada WHERE id = ?", (id,))
+        conn.execute("DELETE FROM descuentos_jornada WHERE id = %s", (id,))
         conn.commit()

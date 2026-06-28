@@ -40,7 +40,7 @@ def _categorias_raiz_de(conn, equipo_id: int) -> list[int]:
             CASE WHEN c.parent_id IS NULL THEN c.id ELSE c.parent_id END AS raiz_id
         FROM equipo_categorias ec
         JOIN categorias c ON c.id = ec.categoria_id
-        WHERE ec.equipo_id = ?
+        WHERE ec.equipo_id = %s
         """,
         (equipo_id,),
     ).fetchall()
@@ -59,7 +59,7 @@ def calcular_estadisticas_equipo(
     Devuelve {cant_pedidos, ingreso_total_ars}.
     """
     estados_validos = ("confirmado", "retirado", "devuelto", "finalizado")
-    placeholders = ",".join(["?"] * len(estados_validos))
+    placeholders = ",".join(["%s"] * len(estados_validos))
 
     # fecha_desde / fecha_hasta son TIMESTAMP. La resta date - date en PG
     # devuelve int (días directamente).
@@ -76,11 +76,11 @@ def calcular_estadisticas_equipo(
             ), 0) AS ingreso_total_ars
         FROM alquiler_items ai
         JOIN alquileres a ON a.id = ai.pedido_id
-        WHERE ai.equipo_id = ?
+        WHERE ai.equipo_id = %s
           AND a.estado IN ({placeholders})
           AND a.fecha_desde IS NOT NULL
           AND a.fecha_hasta IS NOT NULL
-          AND a.fecha_desde >= CURRENT_DATE - (? || ' days')::interval
+          AND a.fecha_desde >= CURRENT_DATE - (%s || ' days')::interval
         """,
         (equipo_id, *estados_validos, str(ventana_dias)),
     ).fetchone()
@@ -183,11 +183,11 @@ def recalcular_ranking_todos(
                 conn.execute(
                     """
                     UPDATE equipos
-                    SET popularidad_score = ?,
-                        cant_pedidos = ?,
-                        ingreso_total_ars = ?,
+                    SET popularidad_score = %s,
+                        cant_pedidos = %s,
+                        ingreso_total_ars = %s,
                         ranking_actualizado = CURRENT_TIMESTAMP
-                    WHERE id = ?
+                    WHERE id = %s
                     """,
                     (
                         nuevo_score,
@@ -234,7 +234,7 @@ def _recalcular_ranking_categorias(
     porque hay pocas categorías y la comparación tiene sentido entre todas).
     """
     estados_validos = ("confirmado", "retirado", "devuelto", "finalizado")
-    placeholders = ",".join(["?"] * len(estados_validos))
+    placeholders = ",".join(["%s"] * len(estados_validos))
 
     # Para cada categoría: sumar pedidos e ingresos de equipos en sus
     # categoria_id (incluye sub-categorías si las hay).
@@ -261,7 +261,7 @@ def _recalcular_ranking_categorias(
             AND a.estado IN ({placeholders})
             AND a.fecha_desde IS NOT NULL
             AND a.fecha_hasta IS NOT NULL
-            AND a.fecha_desde >= CURRENT_DATE - (? || ' days')::interval
+            AND a.fecha_desde >= CURRENT_DATE - (%s || ' days')::interval
         GROUP BY c.id, c.nombre, c.popularidad_score, c.cant_pedidos, c.ingreso_total_ars
         """,
         (*estados_validos, str(ventana_dias)),
@@ -293,11 +293,11 @@ def _recalcular_ranking_categorias(
                 conn.execute(
                     """
                     UPDATE categorias
-                    SET popularidad_score = ?,
-                        cant_pedidos = ?,
-                        ingreso_total_ars = ?,
+                    SET popularidad_score = %s,
+                        cant_pedidos = %s,
+                        ingreso_total_ars = %s,
                         ranking_actualizado = CURRENT_TIMESTAMP
-                    WHERE id = ?
+                    WHERE id = %s
                     """,
                     (nuevo_score, pedidos, ingreso, r["id"]),
                 )
@@ -317,7 +317,7 @@ def _recalcular_ranking_marcas(
     la fuente única del nombre de marca.
     """
     estados_validos = ("confirmado", "retirado", "devuelto", "finalizado")
-    placeholders = ",".join(["?"] * len(estados_validos))
+    placeholders = ",".join(["%s"] * len(estados_validos))
 
     rows = conn.execute(
         f"""
@@ -342,7 +342,7 @@ def _recalcular_ranking_marcas(
             AND a.estado IN ({placeholders})
             AND a.fecha_desde IS NOT NULL
             AND a.fecha_hasta IS NOT NULL
-            AND a.fecha_desde >= CURRENT_DATE - (? || ' days')::interval
+            AND a.fecha_desde >= CURRENT_DATE - (%s || ' days')::interval
         GROUP BY m.id, m.nombre, m.popularidad_score, m.cant_pedidos, m.ingreso_total_ars
         """,
         (*estados_validos, str(ventana_dias)),
@@ -374,11 +374,11 @@ def _recalcular_ranking_marcas(
                 conn.execute(
                     """
                     UPDATE marcas
-                    SET popularidad_score = ?,
-                        cant_pedidos = ?,
-                        ingreso_total_ars = ?,
+                    SET popularidad_score = %s,
+                        cant_pedidos = %s,
+                        ingreso_total_ars = %s,
                         ranking_actualizado = CURRENT_TIMESTAMP
-                    WHERE id = ?
+                    WHERE id = %s
                     """,
                     (nuevo_score, pedidos, ingreso, r["id"]),
                 )

@@ -93,9 +93,9 @@ def list_pedidos(
             # (el contacto se muestra en vivo → buscar por el dato corregido
             # también tiene que encontrar el pedido).
             where += (
-                " AND (p.cliente_nombre LIKE ? OR CAST(p.numero_pedido AS TEXT) LIKE ?"
+                " AND (p.cliente_nombre LIKE %s OR CAST(p.numero_pedido AS TEXT) LIKE %s"
                 " OR EXISTS (SELECT 1 FROM clientes c WHERE c.id = p.cliente_id"
-                " AND (c.nombre LIKE ? OR c.apellido LIKE ?)))"
+                " AND (c.nombre LIKE %s OR c.apellido LIKE %s)))"
             )
             params += [like, like, like, like]
         if con_saldo:
@@ -115,7 +115,7 @@ def list_pedidos(
 
         total = conn.execute(f"SELECT COUNT(*) FROM alquileres p {where}", params).fetchone()[0]
         rows  = conn.execute(
-            f"SELECT p.* FROM alquileres p {where} ORDER BY {order} LIMIT ? OFFSET ?",
+            f"SELECT p.* FROM alquileres p {where} ORDER BY {order} LIMIT %s OFFSET %s",
             params + [per_page, offset]
         ).fetchall()
 
@@ -127,7 +127,7 @@ def list_pedidos(
         pedido_ids = [p["id"] for p in pedidos]
         pendientes: set[int] = set()
         if pedido_ids:
-            ph = ",".join(["?"] * len(pedido_ids))
+            ph = ",".join(["%s"] * len(pedido_ids))
             for r in conn.execute(
                 f"""SELECT DISTINCT pedido_id FROM solicitudes_modificacion
                     WHERE estado = 'pendiente' AND pedido_id IN ({ph})""",
@@ -155,12 +155,12 @@ def delete_pedido(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
+            if not conn.execute("SELECT id FROM alquileres WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Pedido no encontrado")
             # Borrar ítems, pagos e historicos asociados (FK cascade si está activada, pero por las dudas)
-            conn.execute("DELETE FROM alquiler_items  WHERE pedido_id=?", (id,))
-            conn.execute("DELETE FROM alquiler_pagos  WHERE pedido_id=?", (id,))
-            conn.execute("DELETE FROM alquileres       WHERE id=?",        (id,))
+            conn.execute("DELETE FROM alquiler_items  WHERE pedido_id=%s", (id,))
+            conn.execute("DELETE FROM alquiler_pagos  WHERE pedido_id=%s", (id,))
+            conn.execute("DELETE FROM alquileres       WHERE id=%s",        (id,))
             conn.commit()
         except Exception:
             logger.error("Error eliminando pedido %s", id, exc_info=True)
@@ -176,7 +176,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
 
     with get_db() as conn:
         try:
-            p_row = conn.execute("SELECT * FROM alquileres WHERE id=?", (id,)).fetchone()
+            p_row = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
             if not p_row:
                 raise HTTPException(404, "Pedido no encontrado")
 
@@ -199,7 +199,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                         errores.append("Las fechas tienen formato inválido")
 
                 if not conn.execute(
-                    "SELECT 1 FROM alquiler_items WHERE pedido_id=?", (id,)
+                    "SELECT 1 FROM alquiler_items WHERE pedido_id=%s", (id,)
                 ).fetchone():
                     errores.append("El pedido no tiene equipos cargados.")
                 if p_row["fecha_desde"] and p_row["fecha_hasta"] and not errores:
@@ -235,7 +235,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                 updates["numero_pedido"] = next_n
 
             set_clause = ", ".join(f"{k}=?" for k in updates)
-            conn.execute(f"UPDATE alquileres SET {set_clause} WHERE id=?", (*updates.values(), id))
+            conn.execute(f"UPDATE alquileres SET {set_clause} WHERE id=%s", (*updates.values(), id))
 
             # Si el pedido se va a un estado fuera de los modificables, las
             # solicitudes pendientes quedan huérfanas. Las cancelamos en la
@@ -302,7 +302,7 @@ def update_alquiler_items(id: int, data: PedidoItemUpdate, request: Request):
             # aplicar los nuevos items. Sin esto el admin podía sumar cantidades
             # que excedieran el stock disponible y crear doble booking silencioso.
             p = conn.execute(
-                "SELECT estado, fecha_desde, fecha_hasta FROM alquileres WHERE id=?", (id,)
+                "SELECT estado, fecha_desde, fecha_hasta FROM alquileres WHERE id=%s", (id,)
             ).fetchone()
             if (
                 p["estado"] in {"presupuesto", "confirmado", "retirado"}

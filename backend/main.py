@@ -430,7 +430,7 @@ def root():
         conn = get_db()
         try:
             row = conn.execute(
-                "SELECT value FROM app_settings WHERE key = ?", ("og_image_url",)
+                "SELECT value FROM app_settings WHERE key = %s", ("og_image_url",)
             ).fetchone()
             # Foto principal del estudio = LCP del home (misma fuente y orden que
             # `useHeroPhotos`: es_principal DESC, orden ASC). Se preloadea para que
@@ -739,7 +739,7 @@ def equipo_page(id_or_slug: str):
                        ef.descripcion
                 FROM equipos e
                 LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
-                WHERE e.id = ?
+                WHERE e.id = %s
                 """,
                 (equipo_id,),
             ).fetchone()
@@ -748,7 +748,7 @@ def equipo_page(id_or_slug: str):
                 """
                 SELECT mv.url FROM equipo_fotos ef
                 JOIN media_variants mv ON mv.asset_id = ef.media_id
-                WHERE ef.equipo_id = ? AND mv.name = 'og'
+                WHERE ef.equipo_id = %s AND mv.name = 'og'
                 ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC
                 LIMIT 1
                 """,
@@ -759,7 +759,7 @@ def equipo_page(id_or_slug: str):
                 """
                 SELECT c.nombre FROM categorias c
                 JOIN equipo_categorias ec ON ec.categoria_id = c.id
-                WHERE ec.equipo_id = ?
+                WHERE ec.equipo_id = %s
                 ORDER BY ec.id LIMIT 1
                 """,
                 (equipo_id,),

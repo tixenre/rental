@@ -57,7 +57,7 @@ def setup():
     conn = get_db()
     try:
         _limpiar(conn)
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (EQ, "Equipo libre-test", 1))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (EQ, "Equipo libre-test", 1))
         conn.commit()
     finally:
         conn.close()
@@ -72,7 +72,7 @@ def setup():
 
 def _crear_pedido(conn, pid, estado):
     conn.execute(
-        "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (?,?,?,?,?)",
+        "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (%s,%s,%s,%s,%s)",
         (pid, "Cliente test (#805)", estado, FD, FH),
     )
 
@@ -86,12 +86,12 @@ def test_linea_libre_no_rompe_el_gate_ni_reserva_stock(setup):
         # P1 confirmado: 1 unidad del equipo (stock total = 1) + una línea libre.
         _crear_pedido(conn, P1, "confirmado")
         conn.execute(
-            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (?,?,?)",
+            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (%s,%s,%s)",
             (P1, EQ, 1),
         )
         conn.execute(
             "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, nombre_libre, cobro_modo, precio_jornada) "
-            "VALUES (?,?,?,?,?,?)",
+            "VALUES (%s,%s,%s,%s,%s,%s)",
             (P1, None, 2, "Flete", "fijo", 20000),
         )
         conn.commit()
@@ -104,12 +104,12 @@ def test_linea_libre_no_rompe_el_gate_ni_reserva_stock(setup):
         # P1 no liberó ni ocupó nada; el cuello sigue siendo la 1 unidad del equipo).
         _crear_pedido(conn, P2, "presupuesto")
         conn.execute(
-            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (?,?,?)",
+            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (%s,%s,%s)",
             (P2, EQ, 1),
         )
         conn.execute(
             "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, nombre_libre, cobro_modo) "
-            "VALUES (?,?,?,?,?)",
+            "VALUES (%s,%s,%s,%s,%s)",
             (P2, None, 1, "Operador", "jornada"),
         )
         conn.commit()
@@ -128,12 +128,12 @@ def test_lectura_incluye_la_linea_libre(setup):
     try:
         _crear_pedido(conn, P1, "confirmado")
         conn.execute(
-            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, orden) VALUES (?,?,?,?)",
+            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, orden) VALUES (%s,%s,%s,%s)",
             (P1, EQ, 1, 0),
         )
         conn.execute(
             "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, nombre_libre, cobro_modo, precio_jornada, orden) "
-            "VALUES (?,?,?,?,?,?,?)",
+            "VALUES (%s,%s,%s,%s,%s,%s,%s)",
             (P1, None, 1, "Flete", "fijo", 15000, 1),
         )
         conn.commit()
@@ -165,12 +165,12 @@ def test_edicion_del_portal_preserva_lineas_libres(setup):
     try:
         _crear_pedido(conn, P1, "presupuesto")
         conn.execute(
-            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, orden) VALUES (?,?,?,?,?)",
+            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, orden) VALUES (%s,%s,%s,%s,%s)",
             (P1, EQ, 1, 5000, 0),
         )
         conn.execute(
             "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, nombre_libre, cobro_modo, precio_jornada, orden) "
-            "VALUES (?,?,?,?,?,?,?)",
+            "VALUES (%s,%s,%s,%s,%s,%s,%s)",
             (P1, None, 1, "Flete", "fijo", 20000, 1),
         )
         conn.commit()
@@ -238,8 +238,8 @@ def test_create_pedido_arma_la_linea_personalizada(setup, monkeypatch):
     finally:
         conn = get_db()
         try:
-            conn.execute("DELETE FROM alquiler_items WHERE pedido_id=?", (pid,))
-            conn.execute("DELETE FROM alquileres WHERE id=?", (pid,))
+            conn.execute("DELETE FROM alquiler_items WHERE pedido_id=%s", (pid,))
+            conn.execute("DELETE FROM alquileres WHERE id=%s", (pid,))
             conn.commit()
         finally:
             conn.close()

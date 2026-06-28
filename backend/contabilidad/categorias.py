@@ -34,10 +34,10 @@ def crear_categoria(conn, nombre) -> dict:
     nombre = validar_categoria(nombre)
     conn.execute(
         """INSERT INTO gasto_categorias (nombre, orden)
-           VALUES (?, 50) ON CONFLICT (nombre) DO NOTHING""",
+           VALUES (%s, 50) ON CONFLICT (nombre) DO NOTHING""",
         (nombre,),
     )
     row = conn.execute(
-        "SELECT id, nombre, activa, orden FROM gasto_categorias WHERE nombre = ?", (nombre,)
+        "SELECT id, nombre, activa, orden FROM gasto_categorias WHERE nombre = %s", (nombre,)
     ).fetchone()
     return row_to_dict(row)

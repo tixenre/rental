@@ -55,7 +55,7 @@ def equipo_sin_slug():
     try:
         conn.execute("DELETE FROM equipos WHERE id = %s", (EID,))
         conn.execute(
-            "INSERT INTO equipos (id, nombre, modelo, cantidad, slug) VALUES (?,?,?,?,NULL)",
+            "INSERT INTO equipos (id, nombre, modelo, cantidad, slug) VALUES (%s,%s,%s,%s,NULL)",
             (EID, "Equipo Sin Slug Test", "ZZ-922", 1),
         )
         conn.commit()
@@ -73,7 +73,7 @@ def equipo_sin_slug():
 
 
 def _slug_de(conn, eid):
-    return conn.execute("SELECT slug FROM equipos WHERE id = ?", (eid,)).fetchone()["slug"]
+    return conn.execute("SELECT slug FROM equipos WHERE id = %s", (eid,)).fetchone()["slug"]
 
 
 def test_export_equipos_no_muta_slug(equipo_sin_slug):

@@ -92,7 +92,7 @@ def main() -> None:
             print(f"  {mark} {f['label']}: \"{f['value']}\"{tag}")
 
         conn.execute(
-            "UPDATE estudio SET descripcion = ?, features_json = ?, updated_at = NOW() WHERE id = 1",
+            "UPDATE estudio SET descripcion = %s, features_json = %s, updated_at = NOW() WHERE id = 1",
             (DESCRIPCION_NUEVA, json.dumps(nuevas, ensure_ascii=False)),
         )
         conn.commit()

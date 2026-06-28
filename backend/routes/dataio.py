@@ -262,14 +262,14 @@ def _create_placeholder_equipos(conn, zip_bytes: bytes) -> int:
         # placeholder, pero los datasets son chicos (<100) y evita el
         # quilombo del ON CONFLICT con partial vs full index.
         exists = conn.execute(
-            "SELECT 1 FROM equipos WHERE slug = ? LIMIT 1", (slug,)
+            "SELECT 1 FROM equipos WHERE slug = %s LIMIT 1", (slug,)
         ).fetchone()
         if exists:
             continue
         conn.execute(
             """
             INSERT INTO equipos (slug, nombre, cantidad, visible_catalogo, estado)
-            VALUES (?, ?, 0, 0, 'historico')
+            VALUES (%s, %s, 0, 0, 'historico')
             """,
             (slug, nombre),
         )

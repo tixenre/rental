@@ -68,10 +68,10 @@ class FichaUpdate(BaseModel):
 @router.get("/equipos/{id}/ficha")
 def get_ficha(id: int):
     with get_db() as conn:
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+        if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
         row = conn.execute(
-            "SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)
+            "SELECT * FROM equipo_fichas WHERE equipo_id = %s", (id,)
         ).fetchone()
         base = row_to_dict(row) if row else {
             "equipo_id": id, "descripcion": None, "notas": None,
@@ -95,20 +95,20 @@ def upsert_ficha(id: int, data: FichaUpdate, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Equipo no encontrado")
 
             patch = data.model_dump(exclude_unset=True)
             # Inserta una fila vacía si no existe (para que el UPDATE encuentre algo).
             conn.execute(
-                "INSERT INTO equipo_fichas (equipo_id) VALUES (?) ON CONFLICT(equipo_id) DO NOTHING",
+                "INSERT INTO equipo_fichas (equipo_id) VALUES (%s) ON CONFLICT(equipo_id) DO NOTHING",
                 (id,),
             )
             if patch:
                 set_clause = ", ".join(f"{k} = ?" for k in patch)
                 set_clause += ", updated_at = CURRENT_TIMESTAMP"
                 conn.execute(
-                    f"UPDATE equipo_fichas SET {set_clause} WHERE equipo_id = ?",
+                    f"UPDATE equipo_fichas SET {set_clause} WHERE equipo_id = %s",
                     list(patch.values()) + [id],
                 )
                 # Hook: si cambió el template de nombre, recalcular nombre_publico.
@@ -121,7 +121,7 @@ def upsert_ficha(id: int, data: FichaUpdate, request: Request):
                         pass
             conn.commit()
             row = conn.execute(
-                "SELECT * FROM equipo_fichas WHERE equipo_id = ?", (id,)
+                "SELECT * FROM equipo_fichas WHERE equipo_id = %s", (id,)
             ).fetchone()
             return row_to_dict(row)
         except Exception:

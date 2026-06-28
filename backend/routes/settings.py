@@ -211,7 +211,7 @@ def analytics_config():
         return {"ga4_id": None}
     with get_db() as conn:
         row = conn.execute(
-            "SELECT value FROM app_settings WHERE key = ?", ("ga4_measurement_id",)
+            "SELECT value FROM app_settings WHERE key = %s", ("ga4_measurement_id",)
         ).fetchone()
         value = row["value"].strip() if row and row["value"] else None
         return {"ga4_id": value or None}
@@ -225,7 +225,7 @@ def get_setting(key: str):
         raise HTTPException(404, f"Setting '{key}' no existe")
     with get_db() as conn:
         row = conn.execute(
-            "SELECT value, updated_at, updated_by FROM app_settings WHERE key = ?",
+            "SELECT value, updated_at, updated_by FROM app_settings WHERE key = %s",
             (key,),
         ).fetchone()
         if not row:
@@ -272,7 +272,7 @@ def update_setting(key: str, payload: dict, request: Request):
             raise HTTPException(400, "El valor no puede estar vacío")
         # Para claves "limpiables" borrar la fila → cae al default del cliente.
         with get_db() as conn:
-            conn.execute("DELETE FROM app_settings WHERE key = ?", (key,))
+            conn.execute("DELETE FROM app_settings WHERE key = %s", (key,))
             conn.commit()
             return {"key": key, "value": "", "updated_by": None}
     value = str(value).strip()
@@ -341,7 +341,7 @@ def update_setting(key: str, payload: dict, request: Request):
         try:
             conn.execute("""
                 INSERT INTO app_settings (key, value, updated_at, updated_by)
-                VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+                VALUES (%s, %s, CURRENT_TIMESTAMP, %s)
                 ON CONFLICT (key) DO UPDATE
                 SET value      = EXCLUDED.value,
                     updated_at = CURRENT_TIMESTAMP,
@@ -401,7 +401,7 @@ def recalcular_precios(payload: dict, request: Request):
     with get_db() as conn:
         try:
             row = conn.execute(
-                "SELECT value FROM app_settings WHERE key = ?", ("usd_rate",)
+                "SELECT value FROM app_settings WHERE key = %s", ("usd_rate",)
             ).fetchone()
             if not row:
                 raise HTTPException(400, "usd_rate no configurado")
@@ -417,7 +417,7 @@ def recalcular_precios(payload: dict, request: Request):
             elif mode == "auto":
                 where += " AND precio_jornada_manual = FALSE"
             elif mode == "ids":
-                placeholders = ",".join(["?"] * len(ids))
+                placeholders = ",".join(["%s"] * len(ids))
                 where += f" AND id IN ({placeholders})"
                 params.extend(int(i) for i in ids)
             # mode == "all": sin filtro adicional
@@ -445,9 +445,9 @@ def recalcular_precios(payload: dict, request: Request):
                         # vuelve a la fórmula). Si el admin quiere preservarlo
                         # como manual debe usar mode="auto" que ya skipea.
                         conn.execute(
-                            "UPDATE equipos SET precio_jornada = ?, "
+                            "UPDATE equipos SET precio_jornada = %s, "
                             "precio_jornada_manual = FALSE, "
-                            "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                             (nuevo, r["id"]),
                         )
             if not dry_run:
@@ -473,7 +473,7 @@ def listar_precios_manuales(request: Request):
     require_admin(request)
     with get_db() as conn:
         row = conn.execute(
-            "SELECT value FROM app_settings WHERE key = ?", ("usd_rate",)
+            "SELECT value FROM app_settings WHERE key = %s", ("usd_rate",)
         ).fetchone()
         usd_rate = float(row["value"]) if row else 0.0
 

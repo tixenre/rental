@@ -40,7 +40,7 @@ def _env(name: str) -> str | None:
 
 def _setting(conn, key: str) -> str:
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", (key,)
+        "SELECT value FROM app_settings WHERE key = %s", (key,)
     ).fetchone()
     return (row["value"].strip() if row and row["value"] else "")
 

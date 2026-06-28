@@ -61,14 +61,14 @@ def ingresos_derivados(conn, desde: str | None = None, hasta: str | None = None)
         FROM alquiler_pagos ap
         JOIN alquileres al ON al.id = ap.pedido_id
         WHERE ap.destinatario IS NOT NULL
-          AND al.fecha_desde >= ?::date
+          AND al.fecha_desde >= %s::date
     """
     params: list = [LIQUIDACION_INICIO]
     if desde:
-        sql += " AND ap.fecha::date >= ?::date"
+        sql += " AND ap.fecha::date >= %s::date"
         params.append(desde)
     if hasta:
-        sql += " AND ap.fecha::date <= ?::date"
+        sql += " AND ap.fecha::date <= %s::date"
         params.append(hasta)
     sql += " GROUP BY ap.destinatario"
     rows = conn.execute(sql, tuple(params)).fetchall()
@@ -88,10 +88,10 @@ def movimientos_planos(conn, desde: str | None = None, hasta: str | None = None)
     """
     params: list = []
     if desde:
-        sql += " AND fecha >= ?::date"
+        sql += " AND fecha >= %s::date"
         params.append(desde)
     if hasta:
-        sql += " AND fecha <= ?::date"
+        sql += " AND fecha <= %s::date"
         params.append(hasta)
     return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
 

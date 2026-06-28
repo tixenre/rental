@@ -59,10 +59,9 @@ def equipo_con_marca():
     conn = get_db()
     try:
         _limpiar(conn)
-        cur = conn.execute("INSERT INTO marcas (nombre) VALUES (?)", (MARCA,))
-        brand_id = cur.lastrowid
+        brand_id = conn.insert_returning("INSERT INTO marcas (nombre) VALUES (%s)", (MARCA,))
         conn.execute(
-            "INSERT INTO equipos (id, nombre, brand_id, modelo, cantidad, slug) VALUES (?,?,?,?,?,?)",
+            "INSERT INTO equipos (id, nombre, brand_id, modelo, cantidad, slug) VALUES (%s,%s,%s,%s,%s,%s)",
             (EID, "Equipo Roundtrip", brand_id, "RT900", 2, SLUG),
         )
         conn.commit()
@@ -103,7 +102,7 @@ def test_export_import_export_es_estable(equipo_con_marca):
             conn.execute("DELETE FROM equipos WHERE id = %s", (EID,))
             conn.commit()
             assert conn.execute(
-                "SELECT COUNT(*) AS n FROM equipos WHERE slug = ?", (SLUG,)
+                "SELECT COUNT(*) AS n FROM equipos WHERE slug = %s", (SLUG,)
             ).fetchone()["n"] == 0
 
             orchestrator.import_all(conn, out, only=["marcas", "equipos"])
@@ -115,7 +114,7 @@ def test_export_import_export_es_estable(equipo_con_marca):
         conn = get_db()
         try:
             row = conn.execute(
-                "SELECT nombre, modelo, cantidad FROM equipos WHERE slug = ?", (SLUG,)
+                "SELECT nombre, modelo, cantidad FROM equipos WHERE slug = %s", (SLUG,)
             ).fetchone()
             assert row is not None, "el import debe restaurar el equipo"
             assert row["nombre"] == "Equipo Roundtrip"

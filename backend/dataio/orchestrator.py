@@ -284,7 +284,7 @@ def init_slugs(conn, dry_run: bool = False) -> dict[str, int]:
         disamb = slug != base
         if not dry_run:
             conn.execute(
-                "UPDATE equipos SET slug = ? WHERE id = ?", (slug, r["id"])
+                "UPDATE equipos SET slug = %s WHERE id = %s", (slug, r["id"])
             )
         used_slugs.add(slug)
         stats["updated"] += 1

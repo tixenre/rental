@@ -35,11 +35,11 @@ def set_etiquetas(id: int, data: EtiquetasUpdate, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Equipo no encontrado")
             # Borrar solo manuales; las auto siguen vivas.
             conn.execute(
-                "DELETE FROM equipo_etiquetas WHERE equipo_id = ? AND origen = 'manual'",
+                "DELETE FROM equipo_etiquetas WHERE equipo_id = %s AND origen = 'manual'",
                 (id,),
             )
             for orden, nombre in enumerate(data.etiquetas):
@@ -47,22 +47,22 @@ def set_etiquetas(id: int, data: EtiquetasUpdate, request: Request):
                 if not nombre:
                     continue
                 conn.execute(
-                    "INSERT INTO etiquetas (nombre) VALUES (?) ON CONFLICT (nombre) DO NOTHING",
+                    "INSERT INTO etiquetas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING",
                     (nombre,),
                 )
                 row = conn.execute(
-                    "SELECT id FROM etiquetas WHERE nombre = ?", (nombre,)
+                    "SELECT id FROM etiquetas WHERE nombre = %s", (nombre,)
                 ).fetchone()
                 if not row:
                     continue
                 conn.execute("""
                     INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen)
-                    VALUES (?, ?, ?, 'manual')
+                    VALUES (%s, %s, %s, 'manual')
                     ON CONFLICT (equipo_id, etiqueta_id)
                     DO UPDATE SET orden = EXCLUDED.orden, origen = 'manual'
                 """, (id, row["id"], orden))
             conn.commit()
-            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
+            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]
             return equipo
         except Exception:
@@ -149,7 +149,7 @@ def admin_create_etiqueta(data: EtiquetaCreate, request: Request):
             # Validar parent: debe existir y ser raíz (forzar 2 niveles).
             if data.parent_id is not None:
                 prow = conn.execute(
-                    "SELECT id, parent_id FROM etiquetas WHERE id = ?", (data.parent_id,)
+                    "SELECT id, parent_id FROM etiquetas WHERE id = %s", (data.parent_id,)
                 ).fetchone()
                 if not prow:
                     raise HTTPException(400, "parent_id no existe")
@@ -157,7 +157,7 @@ def admin_create_etiqueta(data: EtiquetaCreate, request: Request):
                     raise HTTPException(400, "Solo se permiten 2 niveles (el padre ya es subcategoría)")
             cur = conn.execute("""
                 INSERT INTO etiquetas (nombre, prioridad, parent_id)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
                 ON CONFLICT (nombre) DO UPDATE
                     SET prioridad = EXCLUDED.prioridad,
                         parent_id = EXCLUDED.parent_id
@@ -193,7 +193,7 @@ def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
         # Validar que el padre exista y sea raíz.
         with get_db() as conn0:
             prow = conn0.execute(
-                "SELECT id, parent_id FROM etiquetas WHERE id = ?", (patch.parent_id,)
+                "SELECT id, parent_id FROM etiquetas WHERE id = %s", (patch.parent_id,)
             ).fetchone()
             if not prow:
                 raise HTTPException(400, "parent_id no existe")
@@ -201,7 +201,7 @@ def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
                 raise HTTPException(400, "Solo se permiten 2 niveles")
             # Verificar que esta etiqueta no tenga hijos (sino bajaríamos un nivel raíz).
             chrow = conn0.execute(
-                "SELECT 1 FROM etiquetas WHERE parent_id = ? LIMIT 1", (eid,)
+                "SELECT 1 FROM etiquetas WHERE parent_id = %s LIMIT 1", (eid,)
             ).fetchone()
             if chrow:
                 raise HTTPException(400, "Esta etiqueta tiene hijos; no puede convertirse en hija")
@@ -210,7 +210,7 @@ def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
         raise HTTPException(400, "Sin cambios")
     with get_db() as conn:
         vals.append(eid)
-        conn.execute(f"UPDATE etiquetas SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+        conn.execute(f"UPDATE etiquetas SET {', '.join(sets)} WHERE id = %s", tuple(vals))
         conn.commit()
         return {"ok": True}
 
@@ -220,7 +220,7 @@ def admin_delete_etiqueta(eid: int, request: Request):
     require_admin(request)
     with get_db() as conn:
         # ON DELETE CASCADE en equipo_etiquetas + SET NULL en parent_id de hijos.
-        conn.execute("DELETE FROM etiquetas WHERE id = ?", (eid,))
+        conn.execute("DELETE FROM etiquetas WHERE id = %s", (eid,))
         conn.commit()
 
 
@@ -230,7 +230,7 @@ def admin_reorder_etiquetas(payload: EtiquetasReorder, request: Request):
     with get_db() as conn:
         for idx, eid in enumerate(payload.ids):
             conn.execute(
-                "UPDATE etiquetas SET prioridad = ? WHERE id = ?",
+                "UPDATE etiquetas SET prioridad = %s WHERE id = %s",
                 ((idx + 1) * 10, eid),
             )
         conn.commit()
@@ -251,7 +251,7 @@ def set_categorias(id: int, data: CategoriasUpdate, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+            if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Equipo no encontrado")
             # Expandir a ancestros: si llega "Montura E" (hija), también se asigna
             # "Lente" (madre). Mantiene el orden original para las que ya vinieron;
@@ -274,11 +274,11 @@ def set_categorias(id: int, data: CategoriasUpdate, request: Request):
                     seen.add(iv)
                     ordered.append(iv)
 
-            conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = ?", (id,))
+            conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = %s", (id,))
             for orden, cid_int in enumerate(ordered):
                 conn.execute("""
                     INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-                    VALUES (?, ?, ?)
+                    VALUES (%s, %s, %s)
                     ON CONFLICT (equipo_id, categoria_id) DO UPDATE SET orden = EXCLUDED.orden
                 """, (id, cid_int, orden))
             regenerate_auto_tags(conn, id)
@@ -289,7 +289,7 @@ def set_categorias(id: int, data: CategoriasUpdate, request: Request):
             except Exception:
                 pass
             conn.commit()
-            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=?", (id,)).fetchone()
+            row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (id,)).fetchone()
             equipo = attach_tags(conn, [row_to_dict(row)])[0]
             equipo = attach_categorias(conn, [equipo])[0]
             return equipo
@@ -527,7 +527,7 @@ def admin_create_categoria(data: CategoriaCreate, request: Request):
         try:
             if data.parent_id is not None:
                 prow = conn.execute(
-                    "SELECT id, parent_id FROM categorias WHERE id = ?", (data.parent_id,)
+                    "SELECT id, parent_id FROM categorias WHERE id = %s", (data.parent_id,)
                 ).fetchone()
                 if not prow:
                     raise HTTPException(400, "parent_id no existe")
@@ -537,13 +537,13 @@ def admin_create_categoria(data: CategoriaCreate, request: Request):
                 grandparent_id = prow["parent_id"]
                 if grandparent_id is not None:
                     grow = conn.execute(
-                        "SELECT parent_id FROM categorias WHERE id = ?", (grandparent_id,)
+                        "SELECT parent_id FROM categorias WHERE id = %s", (grandparent_id,)
                     ).fetchone()
                     if grow and grow["parent_id"] is not None:
                         raise HTTPException(400, "Solo se permiten 3 niveles de categorías")
             cur = conn.execute("""
                 INSERT INTO categorias (nombre, prioridad, parent_id)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
                 ON CONFLICT (nombre) DO UPDATE
                     SET prioridad = EXCLUDED.prioridad,
                         parent_id = EXCLUDED.parent_id
@@ -585,7 +585,7 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
             raise HTTPException(400, "Una categoría no puede ser su propio padre")
         with get_db() as conn0:
             prow = conn0.execute(
-                "SELECT id, parent_id FROM categorias WHERE id = ?", (patch.parent_id,)
+                "SELECT id, parent_id FROM categorias WHERE id = %s", (patch.parent_id,)
             ).fetchone()
             if not prow:
                 raise HTTPException(400, "parent_id no existe")
@@ -596,7 +596,7 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
                 cur = node_id
                 while True:
                     r = conn0.execute(
-                        "SELECT parent_id FROM categorias WHERE id = ?", (cur,)
+                        "SELECT parent_id FROM categorias WHERE id = %s", (cur,)
                     ).fetchone()
                     if not r or r["parent_id"] is None:
                         return d
@@ -613,7 +613,7 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
                     nid, d = q.popleft()
                     m = max(m, d)
                     children = conn0.execute(
-                        "SELECT id FROM categorias WHERE parent_id = ?", (nid,)
+                        "SELECT id FROM categorias WHERE parent_id = %s", (nid,)
                     ).fetchall()
                     for ch in children:
                         q.append((ch["id"], d + 1))
@@ -630,7 +630,7 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
             while q:
                 nid = q.popleft()
                 children = conn0.execute(
-                    "SELECT id FROM categorias WHERE parent_id = ?", (nid,)
+                    "SELECT id FROM categorias WHERE parent_id = %s", (nid,)
                 ).fetchall()
                 for ch in children:
                     descendants.add(ch["id"])
@@ -647,12 +647,12 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
     if nuevo_nombre is not None:
         with get_db() as conn0:
             existe = conn0.execute(
-                "SELECT id FROM categorias WHERE id = ?", (cid,)
+                "SELECT id FROM categorias WHERE id = %s", (cid,)
             ).fetchone()
             if not existe:
                 raise HTTPException(404, f"Categoría {cid} no existe")
             choca = conn0.execute(
-                "SELECT id, nombre FROM categorias WHERE LOWER(nombre) = LOWER(?) AND id != ?",
+                "SELECT id, nombre FROM categorias WHERE LOWER(nombre) = LOWER(%s) AND id != %s",
                 (nuevo_nombre, cid),
             ).fetchone()
             if choca:
@@ -661,11 +661,11 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
     with get_db() as conn:
         try:
             vals.append(cid)
-            conn.execute(f"UPDATE categorias SET {', '.join(sets)} WHERE id = ?", tuple(vals))
+            conn.execute(f"UPDATE categorias SET {', '.join(sets)} WHERE id = %s", tuple(vals))
             # Si renombró, regenerar auto-tags de los equipos afectados.
             if nuevo_nombre is not None:
                 eq_rows = conn.execute(
-                    "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = ?", (cid,)
+                    "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = %s", (cid,)
                 ).fetchall()
                 try:
                     regenerate_auto_tags_batch(conn, [r["equipo_id"] for r in eq_rows])
@@ -682,7 +682,7 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
                 eq_rows = conn.execute(
                     """
                     WITH RECURSIVE descendants AS (
-                        SELECT id FROM categorias WHERE id = ?
+                        SELECT id FROM categorias WHERE id = %s
                         UNION
                         SELECT c.id FROM categorias c
                         JOIN descendants d ON c.parent_id = d.id
@@ -718,10 +718,10 @@ def admin_delete_categoria(cid: int, request: Request):
     require_admin(request)
     with get_db() as conn:
         eq_rows = conn.execute(
-            "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = ?", (cid,)
+            "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = %s", (cid,)
         ).fetchall()
         affected = [r["equipo_id"] for r in eq_rows]
-        conn.execute("DELETE FROM categorias WHERE id = ?", (cid,))
+        conn.execute("DELETE FROM categorias WHERE id = %s", (cid,))
         regenerate_auto_tags_batch(conn, affected)
         conn.commit()
 
@@ -732,7 +732,7 @@ def admin_reorder_categorias(payload: CategoriasReorder, request: Request):
     with get_db() as conn:
         for idx, cid in enumerate(payload.ids):
             conn.execute(
-                "UPDATE categorias SET prioridad = ? WHERE id = ?",
+                "UPDATE categorias SET prioridad = %s WHERE id = %s",
                 ((idx + 1) * 10, cid),
             )
         conn.commit()
@@ -788,12 +788,12 @@ def admin_clasificar(request: Request, apply: int = Query(0)):
                     matched += 1
                     if apply:
                         conn.execute(
-                            "DELETE FROM equipo_categorias WHERE equipo_id = ?", (eq["id"],)
+                            "DELETE FROM equipo_categorias WHERE equipo_id = %s", (eq["id"],)
                         )
                         for orden, name in enumerate(propuestas):
                             conn.execute("""
                                 INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-                                VALUES (?, ?, ?)
+                                VALUES (%s, %s, %s)
                                 ON CONFLICT (equipo_id, categoria_id)
                                 DO UPDATE SET orden = EXCLUDED.orden
                             """, (eq["id"], leaf_id[name], orden))

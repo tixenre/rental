@@ -80,10 +80,10 @@ def backfill(dry_run: bool = False) -> dict:
                 # Denormalizar: si este asset es la principal de algún equipo, llenar foto_url_sm.
                 cur = conn.execute(
                     """
-                    UPDATE equipos SET foto_url_sm = ?
+                    UPDATE equipos SET foto_url_sm = %s
                     WHERE id IN (
                         SELECT equipo_id FROM equipo_fotos
-                        WHERE media_id = ? AND es_principal = TRUE
+                        WHERE media_id = %s AND es_principal = TRUE
                     )
                     """,
                     (url, asset_id),

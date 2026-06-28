@@ -83,5 +83,5 @@ def backfill_equipos_slug(conn) -> int:
         base = equipo_slug(r["marca"], r["modelo"], r["nombre"]) or f"equipo-{r['id']}"
         slug = slug_unico(base, ocupados)
         ocupados.add(slug)
-        conn.execute("UPDATE equipos SET slug = ? WHERE id = ?", (slug, r["id"]))
+        conn.execute("UPDATE equipos SET slug = %s WHERE id = %s", (slug, r["id"]))
     return len(pendientes)

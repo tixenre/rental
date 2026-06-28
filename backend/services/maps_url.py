@@ -3,7 +3,7 @@
 El dueño puede pegar en el admin tres formatos distintos:
 
 1. **iframe HTML** — el código que da Google en "Compartir → Insertar mapa":
-   `<iframe src="https://www.google.com/maps/embed?pb=..." ...></iframe>`
+   `<iframe src="https://www.google.com/maps/embed%spb=..." ...></iframe>`
    → extraemos el `src` y lo usamos como embed URL.
 
 2. **Shortlink** — `https://maps.app.goo.gl/xxxxx` (lo que da el botón compartir

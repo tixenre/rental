@@ -50,7 +50,7 @@ def _pedidos_para_retiro(conn, hoy, dias_antes: int) -> list[dict]:
         hour=0, minute=0, second=0, microsecond=0
     )
     dia_fin = dia_ini + timedelta(days=1)
-    ph = ",".join(["?"] * len(ESTADOS_RECORDABLES))
+    ph = ",".join(["%s"] * len(ESTADOS_RECORDABLES))
     rows = conn.execute(
         f"""
         SELECT a.id, a.numero_pedido, a.cliente_nombre, a.cliente_email,
@@ -58,14 +58,14 @@ def _pedidos_para_retiro(conn, hoy, dias_antes: int) -> list[dict]:
                a.monto_total, a.notas
         FROM alquileres a
         WHERE a.estado IN ({ph})
-          AND a.fecha_desde >= ?
-          AND a.fecha_desde <  ?
+          AND a.fecha_desde >= %s
+          AND a.fecha_desde <  %s
           AND a.cliente_email IS NOT NULL
           AND a.cliente_email <> ''
           AND NOT EXISTS (
               SELECT 1 FROM emails_log el
               WHERE el.alquiler_id = a.id
-                AND el.template_key = ?
+                AND el.template_key = %s
                 AND el.status = 'sent'
           )
         ORDER BY a.id

@@ -99,8 +99,8 @@ def test_params_van_como_bound_y_en_orden():
     sql, params = c.calls[-1]
     # equipo_id, excl_pedido_id, fh_buf, fd_buf — en ese orden, como bound params.
     assert params == (42, 7, "FH", "FD")
-    # SQL parametrizado: placeholders ? presentes y sin {…} sin sustituir.
-    assert "?" in sql and "{" not in sql
+    # SQL parametrizado: placeholders %s presentes (uppercased → %S) y sin {…} sin sustituir.
+    assert "%S" in sql and "{" not in sql
 
 
 # ── reservado_total — conteo de consumo recursivo (C4) ───────────────────────
@@ -208,7 +208,7 @@ class _HipoteticoConn:
 
     def execute(self, sql, params=()):
         s = " ".join(sql.split()).upper()
-        if "FROM APP_SETTINGS WHERE KEY = ?" in s:
+        if "FROM APP_SETTINGS WHERE KEY = %S" in s:
             return FakeCursor([FakeRow(value=str(self.buffer_horas))])
         # Mantenimiento batcheado (#626): IN + GROUP BY; este conn no modela
         # mantenimiento → sin filas (el gate default-ea a 0).
@@ -223,7 +223,7 @@ class _HipoteticoConn:
             return FakeCursor([
                 FakeRow(id=i, nombre=self.nombres.get(i, f"eq{i}")) for i in self.stock
             ])
-        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = %S FOR UPDATE" in s:
             i = params[0]
             return FakeCursor([FakeRow(cantidad=self.stock[i])] if i in self.stock else [])
         # reservado directo batcheado (#626): (*equipo_ids, excl, fh_buf, fd_buf).

@@ -55,7 +55,7 @@ def _limpiar(conn):
 
 def _equipo(conn, eid, nombre, dueno):
     conn.execute(
-        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (?,?,?,?)",
+        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
         (eid, nombre, 5, dueno),
     )
 
@@ -67,20 +67,20 @@ def _pedido(conn, pid, monto_total, items, monto_pagado=0, estado="finalizado",
     conn.execute(
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
-           VALUES (?,?,?,?,?,?,?)""",
+           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
         (pid, "Cliente liquidación", estado, fecha_desde, "2026-06-06T20:00:00",
          monto_total, monto_pagado),
     )
     for equipo_id, subtotal in items:
         conn.execute(
-            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (?,?,?,?)",
+            "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (%s,%s,%s,%s)",
             (pid, equipo_id, 1, subtotal),
         )
 
 
 def _pago(conn, pid, monto, fecha, concepto="pago"):
     conn.execute(
-        "INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha) VALUES (?,?,?,?)",
+        "INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha) VALUES (%s,%s,%s,%s)",
         (pid, monto, concepto, fecha),
     )
 

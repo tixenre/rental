@@ -76,9 +76,9 @@ def _recalcular_monto_pagado(conn, pedido_id: int):
            SET monto_pagado = (
                SELECT COALESCE(SUM(monto), 0)
                  FROM alquiler_pagos
-                WHERE pedido_id = ?
+                WHERE pedido_id = %s
            )
-         WHERE id = ?
+         WHERE id = %s
         """,
         (pedido_id, pedido_id),
     )
@@ -96,7 +96,7 @@ def _recalcular_monto_pagado(conn, pedido_id: int):
 def list_pagos(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
-        if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
+        if not conn.execute("SELECT id FROM alquileres WHERE id=%s", (id,)).fetchone():
             raise HTTPException(404, "Pedido no encontrado")
         pagos = _get_alquiler_pagos(conn, id)
         return pagos
@@ -111,7 +111,7 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
     destinatario, metodo = _resolver_destino_metodo(data.destinatario, data.metodo)
     with get_db() as conn:
         try:
-            p = conn.execute("SELECT estado FROM alquileres WHERE id=?", (id,)).fetchone()
+            p = conn.execute("SELECT estado FROM alquileres WHERE id=%s", (id,)).fetchone()
             if not p:
                 raise HTTPException(404, "Pedido no encontrado")
             if p["estado"] in ("cancelado",):
@@ -120,7 +120,7 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
             fecha = data.fecha or datetime.date.today().isoformat()
             conn.execute("""
                 INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
-                VALUES (?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s)
             """, (id, data.monto, data.concepto, destinatario, metodo, fecha))
 
             _recalcular_monto_pagado(conn, id)
@@ -141,20 +141,20 @@ def eliminar_pago(id: int, pago_id: int, request: Request):
     """Elimina una entrada de pago y recalcula monto_pagado."""
     with get_db() as conn:
         try:
-            if not conn.execute("SELECT id FROM alquileres WHERE id=?", (id,)).fetchone():
+            if not conn.execute("SELECT id FROM alquileres WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Pedido no encontrado")
             if not conn.execute(
-                "SELECT id FROM alquiler_pagos WHERE id=? AND pedido_id=?", (pago_id, id)
+                "SELECT id FROM alquiler_pagos WHERE id=%s AND pedido_id=%s", (pago_id, id)
             ).fetchone():
                 raise HTTPException(404, "Pago no encontrado")
 
-            conn.execute("DELETE FROM alquiler_pagos WHERE id=?", (pago_id,))
+            conn.execute("DELETE FROM alquiler_pagos WHERE id=%s", (pago_id,))
             _recalcular_monto_pagado(conn, id)
 
             # Si se quitó pago, puede que ya no esté finalizado → revertir si aplica
-            p = conn.execute("SELECT estado, monto_total, monto_pagado FROM alquileres WHERE id=?", (id,)).fetchone()
+            p = conn.execute("SELECT estado, monto_total, monto_pagado FROM alquileres WHERE id=%s", (id,)).fetchone()
             if p and p["estado"] == "finalizado" and (p["monto_pagado"] or 0) < (p["monto_total"] or 0):
-                conn.execute("UPDATE alquileres SET estado='devuelto' WHERE id=?", (id,))
+                conn.execute("UPDATE alquileres SET estado='devuelto' WHERE id=%s", (id,))
 
             conn.commit()
             pedido = _get_alquiler_detail(conn, id)
@@ -185,16 +185,16 @@ def list_all_pagos(
     where = ["1=1"]
     params: list = []
     if destinatario:
-        where.append("ap.destinatario = ?")
+        where.append("ap.destinatario = %s")
         params.append(destinatario)
     if metodo:
-        where.append("ap.metodo = ?")
+        where.append("ap.metodo = %s")
         params.append(metodo)
     if desde:
-        where.append("ap.fecha::date >= ?")
+        where.append("ap.fecha::date >= %s")
         params.append(desde)
     if hasta:
-        where.append("ap.fecha::date <= ?")
+        where.append("ap.fecha::date <= %s")
         params.append(hasta)
     with get_db() as conn:
         rows = conn.execute(
@@ -206,7 +206,7 @@ def list_all_pagos(
               JOIN alquileres al ON al.id = ap.pedido_id
              WHERE {" AND ".join(where)}
              ORDER BY ap.fecha DESC, ap.id DESC
-             LIMIT ?
+             LIMIT %s
             """,
             (*params, limit),
         ).fetchall()

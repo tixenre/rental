@@ -115,24 +115,24 @@ def listar_movimientos(conn, *, tipo=None, cuenta_id=None, categoria_id=None,
     if not incluir_anulados:
         sql += " AND m.anulado = FALSE"
     if tipo:
-        sql += " AND m.tipo = ?"
+        sql += " AND m.tipo = %s"
         params.append(tipo)
     if cuenta_id:
-        sql += " AND (m.cuenta_origen_id = ? OR m.cuenta_destino_id = ?)"
+        sql += " AND (m.cuenta_origen_id = %s OR m.cuenta_destino_id = %s)"
         params.extend([cuenta_id, cuenta_id])
     if categoria_id:
-        sql += " AND m.categoria_id = ?"
+        sql += " AND m.categoria_id = %s"
         params.append(categoria_id)
     if beneficiario:
-        sql += " AND m.beneficiario = ?"
+        sql += " AND m.beneficiario = %s"
         params.append(beneficiario)
     if desde:
-        sql += " AND m.fecha >= ?::date"
+        sql += " AND m.fecha >= %s::date"
         params.append(desde)
     if hasta:
-        sql += " AND m.fecha <= ?::date"
+        sql += " AND m.fecha <= %s::date"
         params.append(hasta)
-    sql += " ORDER BY m.fecha DESC, m.id DESC LIMIT ?"
+    sql += " ORDER BY m.fecha DESC, m.id DESC LIMIT %s"
     params.append(min(int(limit or 500), 2000))
     return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
 
@@ -143,7 +143,7 @@ def obtener_movimiento(conn, mov_id: int) -> dict | None:
         """SELECT id, tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
                   metodo, fecha, nota, beneficiario, comprobante_url, comprobante_key, es_rendicion,
                   rendicion_mes, anulado, anulado_motivo, created_by, created_at
-           FROM movimientos WHERE id = ?""",
+           FROM movimientos WHERE id = %s""",
         (mov_id,),
     ).fetchone()
     return row_to_dict(row) if row else None
@@ -169,7 +169,7 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
     # (no hay conversión automática; los saldos no se mezclan).
     if cuenta_origen_id and cuenta_destino_id:
         rows = conn.execute(
-            "SELECT id, moneda FROM cuentas WHERE id IN (?, ?)",
+            "SELECT id, moneda FROM cuentas WHERE id IN (%s, %s)",
             (cuenta_origen_id, cuenta_destino_id),
         ).fetchall()
         mon = {r["id"]: r["moneda"] for r in rows}
@@ -177,7 +177,7 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
             raise ValueError("No se puede transferir entre cuentas de distinta moneda.")
     if categoria_id:
         ok = conn.execute(
-            "SELECT 1 FROM gasto_categorias WHERE id = ? AND activa = TRUE", (categoria_id,)
+            "SELECT 1 FROM gasto_categorias WHERE id = %s AND activa = TRUE", (categoria_id,)
         ).fetchone()
         if not ok:
             raise ValueError("La categoría indicada no existe o está inactiva.")
@@ -187,7 +187,7 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
         """INSERT INTO movimientos
                (tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
                 metodo, fecha, nota, beneficiario, es_rendicion, rendicion_mes, created_by, updated_by)
-           VALUES (?, ?, ?, ?, ?, ?, COALESCE(?::date, CURRENT_DATE), ?, ?, ?, ?, ?, ?)
+           VALUES (%s, %s, %s, %s, %s, %s, COALESCE(%s::date, CURRENT_DATE), %s, %s, %s, %s, %s, %s)
            RETURNING id""",
         (tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
          metodo, fecha, nota, beneficiario, bool(es_rendicion), rendicion_mes, por, por),
@@ -228,23 +228,23 @@ def editar_movimiento(conn, mov_id: int, *, campos: dict, por=None) -> dict:
         if k not in campos:
             continue
         if k == "fecha":
-            sets.append("fecha = ?::date")
+            sets.append("fecha = %s::date")
         elif k == "monto":
-            sets.append("monto = ?")
+            sets.append("monto = %s")
             campos[k] = int(campos[k] or 0)
         elif k == "beneficiario":
-            sets.append("beneficiario = ?")
+            sets.append("beneficiario = %s")
             campos[k] = (campos[k] or "").strip() or None  # mismo saneo que al crear
         else:
-            sets.append(f"{k} = ?")
+            sets.append(f"{k} = %s")
         params.append(campos[k])
     if not sets:
         return actual
-    sets.append("updated_by = ?")
+    sets.append("updated_by = %s")
     params.append(por)
     sets.append("updated_at = CURRENT_TIMESTAMP")
     params.append(mov_id)
-    conn.execute(f"UPDATE movimientos SET {', '.join(sets)} WHERE id = ?", tuple(params))
+    conn.execute(f"UPDATE movimientos SET {', '.join(sets)} WHERE id = %s", tuple(params))
     return obtener_movimiento(conn, mov_id)
 
 
@@ -262,8 +262,8 @@ def anular_movimiento(conn, mov_id: int, *, motivo, por=None) -> dict:
     _exigir_mes_abierto(conn, actual["fecha"])
     conn.execute(
         """UPDATE movimientos
-           SET anulado = TRUE, anulado_por = ?, anulado_at = CURRENT_TIMESTAMP, anulado_motivo = ?
-           WHERE id = ?""",
+           SET anulado = TRUE, anulado_por = %s, anulado_at = CURRENT_TIMESTAMP, anulado_motivo = %s
+           WHERE id = %s""",
         (por, motivo, mov_id),
     )
     return obtener_movimiento(conn, mov_id)
@@ -284,10 +284,10 @@ def gastos_por_categoria(conn, desde=None, hasta=None) -> list[dict]:
     """
     params: list = []
     if desde:
-        sql += " AND m.fecha >= ?::date"
+        sql += " AND m.fecha >= %s::date"
         params.append(desde)
     if hasta:
-        sql += " AND m.fecha <= ?::date"
+        sql += " AND m.fecha <= %s::date"
         params.append(hasta)
     sql += " GROUP BY gc.nombre ORDER BY monto DESC"
     return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
@@ -310,17 +310,17 @@ def cobros_mensuales(conn, desde=None, hasta=None, cobrador=None) -> list[dict]:
                COUNT(*) AS cantidad
         FROM alquiler_pagos ap
         JOIN alquileres al ON al.id = ap.pedido_id
-        WHERE ap.destinatario IS NOT NULL AND al.fecha_desde >= ?::date
+        WHERE ap.destinatario IS NOT NULL AND al.fecha_desde >= %s::date
     """
     params: list = [LIQUIDACION_INICIO]
     if cobrador:
-        sql += " AND ap.destinatario = ?"
+        sql += " AND ap.destinatario = %s"
         params.append(cobrador)
     if desde:
-        sql += " AND ap.fecha::date >= ?::date"
+        sql += " AND ap.fecha::date >= %s::date"
         params.append(desde)
     if hasta:
-        sql += " AND ap.fecha::date <= ?::date"
+        sql += " AND ap.fecha::date <= %s::date"
         params.append(hasta)
     sql += " GROUP BY 1 ORDER BY 1 DESC"
     return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]

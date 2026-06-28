@@ -17,7 +17,7 @@ from reportes.cierres import rango_mes, validar_mes
 def cierre_de(conn, mes: str) -> dict | None:
     from database import row_to_dict
     row = conn.execute(
-        "SELECT mes, snapshot_json, cerrado_por, cerrado_at FROM contabilidad_cierres WHERE mes = ?",
+        "SELECT mes, snapshot_json, cerrado_por, cerrado_at FROM contabilidad_cierres WHERE mes = %s",
         (mes,),
     ).fetchone()
     return row_to_dict(row) if row else None
@@ -60,7 +60,7 @@ def cerrar_mes(conn, mes: str, por: str | None) -> dict:
     }
     conn.execute(
         """INSERT INTO contabilidad_cierres (mes, snapshot_json, cerrado_por, cerrado_at)
-           VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+           VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
            ON CONFLICT (mes) DO UPDATE SET
                snapshot_json = excluded.snapshot_json,
                cerrado_por   = excluded.cerrado_por,
@@ -76,6 +76,6 @@ def reabrir_mes(conn, mes: str) -> bool:
     validar_mes(mes)
     existia = cierre_de(conn, mes) is not None
     if existia:
-        conn.execute("DELETE FROM contabilidad_cierres WHERE mes = ?", (mes,))
+        conn.execute("DELETE FROM contabilidad_cierres WHERE mes = %s", (mes,))
         conn.commit()
     return existia

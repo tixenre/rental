@@ -23,28 +23,28 @@ def get_dashboard(_admin: dict = Depends(require_admin)):
         ).fetchone()[0]
 
         activos = conn.execute(
-            "SELECT COUNT(*) FROM alquileres WHERE estado IN ('confirmado','retirado') AND fecha_hasta >= ?", (hoy,)
+            "SELECT COUNT(*) FROM alquileres WHERE estado IN ('confirmado','retirado') AND fecha_hasta >= %s", (hoy,)
         ).fetchone()[0]
 
         salen_hoy = conn.execute("""
             SELECT p.id, p.cliente_nombre, p.fecha_desde, p.fecha_hasta, p.monto_total
             FROM alquileres p
             WHERE estado IN ('confirmado','retirado')
-              AND p.fecha_desde::date = ?
+              AND p.fecha_desde::date = %s
             ORDER BY p.fecha_desde
         """, (hoy,)).fetchall()
 
         devuelven_hoy = conn.execute("""
             SELECT p.id, p.cliente_nombre, p.fecha_desde, p.fecha_hasta, p.monto_total
             FROM alquileres p
-            WHERE estado IN ('confirmado','retirado') AND p.fecha_hasta::date = ?
+            WHERE estado IN ('confirmado','retirado') AND p.fecha_hasta::date = %s
             ORDER BY p.fecha_hasta
         """, (hoy,)).fetchall()
 
         devuelven_manana = conn.execute("""
             SELECT p.id, p.cliente_nombre, p.fecha_desde, p.fecha_hasta, p.monto_total
             FROM alquileres p
-            WHERE estado IN ('confirmado','retirado') AND p.fecha_hasta::date = ?
+            WHERE estado IN ('confirmado','retirado') AND p.fecha_hasta::date = %s
             ORDER BY p.fecha_hasta
         """, (manana,)).fetchall()
 
@@ -53,7 +53,7 @@ def get_dashboard(_admin: dict = Depends(require_admin)):
             WHERE estado = 'finalizado'
               AND monto_total > 0
               AND monto_pagado >= monto_total
-              AND fecha_desde >= ?
+              AND fecha_desde >= %s
         """, (mes_ini,)).fetchone()[0]
 
         total_clientes = conn.execute("SELECT COUNT(*) FROM clientes").fetchone()[0]
@@ -65,7 +65,7 @@ def get_dashboard(_admin: dict = Depends(require_admin)):
             JOIN equipos e ON e.id = pi.equipo_id
             LEFT JOIN marcas mb ON mb.id = e.brand_id
             JOIN alquileres p ON p.id = pi.pedido_id
-            WHERE p.estado IN ('confirmado','retirado') AND p.fecha_hasta >= ?
+            WHERE p.estado IN ('confirmado','retirado') AND p.fecha_hasta >= %s
             GROUP BY pi.equipo_id, p.id, e.nombre, mb.nombre, p.cliente_nombre, p.fecha_hasta
             ORDER BY p.fecha_hasta
         """, (hoy,)).fetchall()
@@ -97,7 +97,7 @@ def get_calendario(
             JOIN alquiler_items pi ON pi.pedido_id = p.id
             JOIN equipos e ON e.id = pi.equipo_id
             WHERE p.estado IN ('presupuesto','confirmado','retirado','devuelto','finalizado')
-              AND p.fecha_hasta >= ? AND p.fecha_desde <= ?
+              AND p.fecha_hasta >= %s AND p.fecha_desde <= %s
             GROUP BY p.id, p.numero_pedido, p.cliente_nombre, p.estado,
                      p.fecha_desde, p.fecha_hasta, p.monto_total
             ORDER BY p.fecha_desde

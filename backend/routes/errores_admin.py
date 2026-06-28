@@ -25,7 +25,7 @@ def listar_server_errors(request: Request, limite: int = 200):
                 SELECT id, route, error_type, message, traceback, request_id, created_at
                 FROM server_errors
                 ORDER BY created_at DESC
-                LIMIT ?
+                LIMIT %s
                 """,
                 (limite,),
             ).fetchall()

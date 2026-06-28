@@ -167,7 +167,7 @@ def reporte_destinatarios(request: Request):
     require_admin(request)
     with get_db() as conn:
         row = conn.execute(
-            "SELECT value FROM app_settings WHERE key = ?", (_DESTINATARIOS_KEY,)
+            "SELECT value FROM app_settings WHERE key = %s", (_DESTINATARIOS_KEY,)
         ).fetchone()
         if row and row["value"]:
             return {"destinatarios": _split_emails(row["value"])}
@@ -211,7 +211,7 @@ async def enviar_reporte_mail(request: Request, body: EnviarReporteBody):
         conn.execute(
             """
             INSERT INTO app_settings (key, value, updated_at, updated_by)
-            VALUES (?, ?, NOW(), ?)
+            VALUES (%s, %s, NOW(), %s)
             ON CONFLICT (key) DO UPDATE
             SET value = EXCLUDED.value, updated_at = NOW(), updated_by = EXCLUDED.updated_by
             """,

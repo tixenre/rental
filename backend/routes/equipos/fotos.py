@@ -52,7 +52,7 @@ async def admin_upload_html_source(
     require_admin(request)
 
     with get_db() as conn:
-        if not conn.execute("SELECT id FROM equipos WHERE id=?", (id,)).fetchone():
+        if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
 
     content = await file.read()
@@ -73,7 +73,7 @@ async def admin_upload_html_source(
     with get_db() as conn:
         try:
             conn.execute(
-                "UPDATE equipos SET html_source_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id=?",
+                "UPDATE equipos SET html_source_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id=%s",
                 (html_source_url, id),
             )
             conn.commit()
@@ -599,7 +599,7 @@ async def admin_upload_foto_file(
 def _get_equipo_fotos(conn, equipo_id: int) -> list[dict]:
     rows = conn.execute(
         "SELECT id, url, path, media_id, orden, es_principal, created_at "
-        "FROM equipo_fotos WHERE equipo_id = ? ORDER BY orden, id",
+        "FROM equipo_fotos WHERE equipo_id = %s ORDER BY orden, id",
         (equipo_id,),
     ).fetchall()
     return [
@@ -622,13 +622,13 @@ def _principal_sm_url(conn, equipo_id: int) -> str | None:
     media_id, o aún sin backfill) → el front cae a foto_url (sin srcset, cero rotura).
     """
     row = conn.execute(
-        "SELECT media_id FROM equipo_fotos WHERE equipo_id = ? AND es_principal = TRUE LIMIT 1",
+        "SELECT media_id FROM equipo_fotos WHERE equipo_id = %s AND es_principal = TRUE LIMIT 1",
         (equipo_id,),
     ).fetchone()
     if not row or not row["media_id"]:
         return None
     v = conn.execute(
-        "SELECT url FROM media_variants WHERE asset_id = ? AND name = 'display-sm' LIMIT 1",
+        "SELECT url FROM media_variants WHERE asset_id = %s AND name = 'display-sm' LIMIT 1",
         (row["media_id"],),
     ).fetchone()
     return v["url"] if v else None
@@ -638,13 +638,13 @@ def _principal_thumb_url(conn, equipo_id: int) -> str | None:
     """URL de la variante 'display-thumb' (160px) de la foto PRINCIPAL del equipo,
     para srcset en slots de ~48px. None si no existe (foto pre-backfill) → fallback seguro."""
     row = conn.execute(
-        "SELECT media_id FROM equipo_fotos WHERE equipo_id = ? AND es_principal = TRUE LIMIT 1",
+        "SELECT media_id FROM equipo_fotos WHERE equipo_id = %s AND es_principal = TRUE LIMIT 1",
         (equipo_id,),
     ).fetchone()
     if not row or not row["media_id"]:
         return None
     v = conn.execute(
-        "SELECT url FROM media_variants WHERE asset_id = ? AND name = 'display-thumb' LIMIT 1",
+        "SELECT url FROM media_variants WHERE asset_id = %s AND name = 'display-thumb' LIMIT 1",
         (row["media_id"],),
     ).fetchone()
     return v["url"] if v else None
@@ -657,14 +657,14 @@ def _sync_principal_denorm(conn, equipo_id: int) -> None:
     No commitea — el caller lo hace.
     """
     row = conn.execute(
-        "SELECT url, media_id FROM equipo_fotos WHERE equipo_id = ? AND es_principal = TRUE LIMIT 1",
+        "SELECT url, media_id FROM equipo_fotos WHERE equipo_id = %s AND es_principal = TRUE LIMIT 1",
         (equipo_id,),
     ).fetchone()
     if not row:
         conn.execute(
             "UPDATE equipos SET foto_url = NULL, foto_url_sm = NULL, foto_url_thumb = NULL, "
             "foto_url_avif = NULL, foto_url_sm_avif = NULL, foto_url_thumb_avif = NULL, "
-            "foto_lqip = NULL WHERE id = ?",
+            "foto_lqip = NULL WHERE id = %s",
             (equipo_id,),
         )
         return
@@ -675,7 +675,7 @@ def _sync_principal_denorm(conn, equipo_id: int) -> None:
 
     if media_id:
         for v in conn.execute(
-            "SELECT name, url FROM media_variants WHERE asset_id = ? "
+            "SELECT name, url FROM media_variants WHERE asset_id = %s "
             "AND name IN ('display-sm','display-thumb','display-avif','display-sm-avif','display-thumb-avif')",
             (media_id,),
         ).fetchall():
@@ -690,14 +690,14 @@ def _sync_principal_denorm(conn, equipo_id: int) -> None:
             elif v["name"] == "display-thumb-avif":
                 thumb_avif = v["url"]
         lqip_row = conn.execute(
-            "SELECT lqip FROM media_assets WHERE id = ?", (media_id,)
+            "SELECT lqip FROM media_assets WHERE id = %s", (media_id,)
         ).fetchone()
         lqip = lqip_row["lqip"] if lqip_row else None
 
     conn.execute(
-        "UPDATE equipos SET foto_url = ?, foto_url_sm = ?, foto_url_thumb = ?, "
-        "foto_url_avif = ?, foto_url_sm_avif = ?, foto_url_thumb_avif = ?, foto_lqip = ? "
-        "WHERE id = ?",
+        "UPDATE equipos SET foto_url = %s, foto_url_sm = %s, foto_url_thumb = %s, "
+        "foto_url_avif = %s, foto_url_sm_avif = %s, foto_url_thumb_avif = %s, foto_lqip = %s "
+        "WHERE id = %s",
         (principal_url, sm, thumb, avif, sm_avif, thumb_avif, lqip, equipo_id),
     )
 
@@ -707,17 +707,17 @@ def _insert_equipo_foto(conn, equipo_id: int, url: str, path: str, media_id: int
     La primera foto del equipo se marca como principal automáticamente.
     """
     cur = conn.execute(
-        "SELECT COALESCE(MAX(orden), -1) + 1 AS next_orden FROM equipo_fotos WHERE equipo_id = ?",
+        "SELECT COALESCE(MAX(orden), -1) + 1 AS next_orden FROM equipo_fotos WHERE equipo_id = %s",
         (equipo_id,),
     )
     orden = cur.fetchone()["next_orden"]
 
-    cur2 = conn.execute("SELECT COUNT(*) AS cnt FROM equipo_fotos WHERE equipo_id = ?", (equipo_id,))
+    cur2 = conn.execute("SELECT COUNT(*) AS cnt FROM equipo_fotos WHERE equipo_id = %s", (equipo_id,))
     is_first = cur2.fetchone()["cnt"] == 0
 
     conn.execute(
         "INSERT INTO equipo_fotos (equipo_id, url, path, media_id, orden, es_principal) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "VALUES (%s, %s, %s, %s, %s, %s)",
         (equipo_id, url, path, media_id, orden, is_first),
     )
 
@@ -728,7 +728,7 @@ def _insert_equipo_foto(conn, equipo_id: int, url: str, path: str, media_id: int
 
     cur3 = conn.execute(
         "SELECT id, url, path, media_id, orden, es_principal, created_at "
-        "FROM equipo_fotos WHERE equipo_id = ? ORDER BY id DESC LIMIT 1",
+        "FROM equipo_fotos WHERE equipo_id = %s ORDER BY id DESC LIMIT 1",
         (equipo_id,),
     )
     r = cur3.fetchone()
@@ -747,7 +747,7 @@ def _insert_equipo_foto(conn, equipo_id: int, url: str, path: str, media_id: int
 def get_equipo_fotos(equipo_id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
-        eq = conn.execute("SELECT id FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
+        eq = conn.execute("SELECT id FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
         if not eq:
             raise HTTPException(404, "Equipo no encontrado")
         return {"fotos": _get_equipo_fotos(conn, equipo_id)}
@@ -771,7 +771,7 @@ async def upload_equipo_foto(equipo_id: int, request: Request):
 
     with get_db() as conn:
         try:
-            eq = conn.execute("SELECT id FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
+            eq = conn.execute("SELECT id FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
             if not eq:
                 raise HTTPException(404, "Equipo no encontrado")
             with media_http():
@@ -808,7 +808,7 @@ def upload_equipo_foto_from_url(equipo_id: int, body: EquipoFotoFromUrlBody, req
 
     with get_db() as conn:
         try:
-            eq = conn.execute("SELECT id FROM equipos WHERE id = ?", (equipo_id,)).fetchone()
+            eq = conn.execute("SELECT id FROM equipos WHERE id = %s", (equipo_id,)).fetchone()
             if not eq:
                 raise HTTPException(404, "Equipo no encontrado")
             with media_http():
@@ -829,7 +829,7 @@ def delete_equipo_foto(equipo_id: int, foto_id: int, request: Request):
     with get_db() as conn:
         cur = conn.execute(
             "SELECT url, path, media_id, es_principal FROM equipo_fotos "
-            "WHERE id = ? AND equipo_id = ?",
+            "WHERE id = %s AND equipo_id = %s",
             (foto_id, equipo_id),
         )
         row = cur.fetchone()
@@ -844,19 +844,19 @@ def delete_equipo_foto(equipo_id: int, foto_id: int, request: Request):
         if media_id:
             r2_keys = collect_asset_keys(conn, media_id)
 
-        conn.execute("DELETE FROM equipo_fotos WHERE id = ?", (foto_id,))
+        conn.execute("DELETE FROM equipo_fotos WHERE id = %s", (foto_id,))
         if media_id:
-            conn.execute("DELETE FROM media_assets WHERE id = ?", (media_id,))
+            conn.execute("DELETE FROM media_assets WHERE id = %s", (media_id,))
 
         # Si era la principal, promover la siguiente en orden
         if was_principal:
             next_foto = conn.execute(
-                "SELECT id, url FROM equipo_fotos WHERE equipo_id = ? ORDER BY orden, id LIMIT 1",
+                "SELECT id, url FROM equipo_fotos WHERE equipo_id = %s ORDER BY orden, id LIMIT 1",
                 (equipo_id,),
             ).fetchone()
             if next_foto:
                 conn.execute(
-                    "UPDATE equipo_fotos SET es_principal = TRUE WHERE id = ?", (next_foto["id"],)
+                    "UPDATE equipo_fotos SET es_principal = TRUE WHERE id = %s", (next_foto["id"],)
                 )
             _sync_principal_denorm(conn, equipo_id)
 
@@ -888,13 +888,13 @@ def reorder_equipo_fotos(equipo_id: int, body: EquipoFotoReorderBody, request: R
         principal_url: str | None = None
         for f in body.fotos:
             conn.execute(
-                "UPDATE equipo_fotos SET orden = ?, es_principal = ? "
-                "WHERE id = ? AND equipo_id = ?",
+                "UPDATE equipo_fotos SET orden = %s, es_principal = %s "
+                "WHERE id = %s AND equipo_id = %s",
                 (f.orden, f.es_principal, f.id, equipo_id),
             )
             if f.es_principal:
                 row = conn.execute(
-                    "SELECT url FROM equipo_fotos WHERE id = ?", (f.id,)
+                    "SELECT url FROM equipo_fotos WHERE id = %s", (f.id,)
                 ).fetchone()
                 if row:
                     principal_url = row["url"]
