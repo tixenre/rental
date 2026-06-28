@@ -61,6 +61,7 @@ from routes.contabilidad     import router as contabilidad_router
 from routes.busquedas        import router as busquedas_router
 from routes.dashboard        import router as dashboard_router
 from routes.auth             import router as auth_router
+from routes.auth_passkey     import router as auth_passkey_router
 from routes.settings         import router as settings_router
 from routes.cliente_portal   import router as cliente_portal_router
 from routes.marcas           import router as marcas_router
@@ -305,6 +306,7 @@ if FRONT_NEW.exists():
 # ── Routers ──────────────────────────────────────────────────────────────────
 
 app.include_router(auth_router)
+app.include_router(auth_passkey_router)  # /auth/passkey/* + /cliente/auth/passkey/* (sin prefijo /api)
 app.include_router(equipos_router,        prefix="/api")
 app.include_router(alquileres_router,     prefix="/api")
 app.include_router(clientes_router,       prefix="/api")

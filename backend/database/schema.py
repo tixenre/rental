@@ -253,6 +253,40 @@ def _init_db_schema(conn):
     )
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_verificacion_motivo TEXT")
 
+    # Passkeys (WebAuthn/FIDO2) — login aditivo a Google OAuth. Una sola tabla
+    # para admin (owner_email, cliente_id NULL) y
+    # cliente (cliente_id seteado), con discriminador `owner_type`. credential_id /
+    # public_key en base64url TEXT (el browser manda el id en base64url → lookup
+    # de texto directo). Esquema en dos capas (MEMORIA 2026-06-03): espejo
+    # idempotente de la migración a1f2b3c4d5e6.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS passkey_credentials (
+            id             SERIAL PRIMARY KEY,
+            owner_type     TEXT NOT NULL CHECK (owner_type IN ('admin', 'cliente')),
+            owner_email    TEXT NOT NULL,
+            cliente_id     INTEGER REFERENCES clientes(id) ON DELETE CASCADE,
+            credential_id  TEXT NOT NULL UNIQUE,
+            public_key     TEXT NOT NULL,
+            sign_count     BIGINT NOT NULL DEFAULT 0,
+            transports     TEXT,
+            aaguid         TEXT,
+            device_name    TEXT,
+            user_handle    TEXT NOT NULL,
+            created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_used_at   TIMESTAMP,
+            CHECK ((owner_type = 'cliente' AND cliente_id IS NOT NULL)
+                OR (owner_type = 'admin'   AND cliente_id IS NULL))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_passkey_cred_cliente "
+        "ON passkey_credentials(cliente_id) WHERE owner_type = 'cliente'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_passkey_cred_admin "
+        "ON passkey_credentials(LOWER(owner_email)) WHERE owner_type = 'admin'"
+    )
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
             id               SERIAL PRIMARY KEY,
