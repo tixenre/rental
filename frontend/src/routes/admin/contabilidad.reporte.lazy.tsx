@@ -2,9 +2,10 @@
  * contabilidad.reporte.lazy.tsx — Reporte mensual de Rambla (#809).
  *
  * Todo derivado del motor (endpoint `reporte/{mes}`), sin recalcular en el front:
- * devengado (lo que se ganó) · cobrado (lo que entró) · gastos por categoría ·
- * ganancia neta (devengado − gastos) · cargos/pagos de socios del mes · cuenta
- * corriente al día. Devengado y percibido van separados, nunca sumados.
+ * facturado (devengado) · comisiones a dueños · gastos · ganancia de Rambla
+ * (facturado − comisiones − gastos) · cobrado · cuenta corriente al día. La
+ * comisión de los dueños es un COSTO, no ganancia. Devengado y percibido van
+ * separados, nunca sumados.
  */
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -40,7 +41,7 @@ function ReporteMensualPage() {
     <AdminPage
       title="Reporte mensual"
       maxW="max-w-4xl"
-      description="El mes de Rambla, completo: cuánto se ganó, qué entró, los gastos y la deuda con cada socio. Todo sale del mismo motor — no hay un peso sumado dos veces."
+      description="El mes de Rambla, completo: lo facturado, lo que se llevan los dueños de los equipos, los gastos, y lo que realmente le queda a Rambla. Todo sale del mismo motor — no hay un peso sumado dos veces."
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
       actions={
         <input
@@ -67,19 +68,24 @@ function ReporteMensualPage() {
               </div>
             )}
 
-            {/* KPIs del mes */}
-            <div className="grid gap-3 sm:grid-cols-3">
+            {/* Cascada del mes: facturado − comisiones a dueños − gastos = ganancia */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Kpi
-                label="Se ganó (devengado)"
+                label="Facturado (devengado)"
                 value={formatARS(r.devengado.total)}
                 sub={`${r.devengado.pedidos} pedido(s) saldado(s)`}
               />
-              <Kpi label="Gastos del mes" value={formatARS(r.gastos.total)} />
               <Kpi
-                label="Ganancia neta"
+                label="Comisiones a dueños"
+                value={`− ${formatARS(r.comisiones_duenos)}`}
+                sub="Parte de los dueños de los equipos"
+              />
+              <Kpi label="Gastos del mes" value={`− ${formatARS(r.gastos.total)}`} />
+              <Kpi
+                label="Ganancia de Rambla"
                 value={formatARS(r.ganancia_neta)}
                 tone={r.ganancia_neta >= 0 ? "ink" : "destructive"}
-                sub="Se ganó − gastos"
+                sub="Facturado − comisiones − gastos"
               />
             </div>
 

@@ -255,6 +255,46 @@ def test_reporte_mensual_gasto_si_baja_ganancia(conn):
     assert reporte_mensual(conn, mes)["ganancia_neta"] == gan_base - 20000
 
 
+def test_reporte_ganancia_descuenta_comision_de_duenos(conn):
+    # Núcleo del fix de plata: un pedido saldado de $100k con equipo de Pablo. Del
+    # reparto, a Rambla le tocan $45k (45%); Pablo+Tincho se llevan $55k. La
+    # ganancia parte de los $45k de Rambla, NO de los $100k facturados — la comisión
+    # de los dueños es un COSTO, no ganancia de Rambla.
+    from contabilidad.reporte_mensual import reporte_mensual
+
+    EQ, PEDX = 9_400_700, 9_400_701
+    conn.execute(
+        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
+        (EQ, "Equipo Pablo gan", 1, "Pablo"),
+    )
+    conn.execute(
+        """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
+                                   monto_total, monto_pagado)
+           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+        (PEDX, "Cli gan", "finalizado", "2026-06-05T08:00:00", "2026-06-06T20:00:00",
+         100000, 100000),
+    )
+    conn.execute(
+        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (%s,%s,%s,%s)",
+        (PEDX, EQ, 1, 100000),
+    )
+    conn.execute(
+        """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
+           VALUES (%s,%s,%s,%s,%s,%s)""",
+        (PEDX, 100000, "pago", "Rambla", "transferencia", "2026-06-15T10:00:00"),
+    )
+
+    rep = reporte_mensual(conn, "2026-06")
+    assert rep["devengado"]["total"] == 100000  # se facturó el total
+    assert rep["devengado"]["por_socio"]["Rambla"] == 45000  # a Rambla le toca el 45%
+    assert rep["comisiones_duenos"] == 55000  # Pablo 50k + Tincho 5k
+    assert rep["ganancia_neta"] == 45000  # parte de Rambla − 0 gastos (NO los 100k)
+    # Invariante del modelo: ganancia = facturado − comisiones − gastos.
+    assert rep["ganancia_neta"] == (
+        rep["devengado"]["total"] - rep["comisiones_duenos"] - rep["gastos"]["total"]
+    )
+
+
 def test_listar_movimientos_resuelve_nombres(conn):
     from contabilidad.movimientos import crear_movimiento, listar_movimientos
 
