@@ -11,7 +11,8 @@ from fastapi import Request, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from database import get_db, row_to_dict, MARCA_SUBQUERY, marca_subquery
+from database import get_db, row_to_dict, MARCA_SUBQUERY
+from services.contenido import contenido_de_batch
 from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html, _render_pdf, _pedido_filename
 from admin_guard import require_admin
 from services.email import send_email, send_raw_email, render_template, wrap_preview, Attachment
@@ -45,18 +46,27 @@ DOCUMENTOS = {
 
 
 def _add_componentes(conn, items: list[dict]) -> None:
-    """Agrega `componentes` a cada item (kits). Compartido por albarán y contrato."""
+    """Agrega `componentes` a cada item (kits) vía la puerta única
+    (services.contenido). Compartido por albarán y contrato. `solo_activos=False`:
+    un documento de un pedido existente muestra TODOS los componentes que lleva,
+    incluso una pieza dada de baja después (no filtra soft-deleted). Una query
+    batcheada para todos los items en vez de N (una por item)."""
+    eq_ids = [it["equipo_id"] for it in items if it.get("equipo_id") is not None]
+    por_equipo = contenido_de_batch(conn, eq_ids, solo_activos=False)
     for item in items:
-        comp_rows = conn.execute(f"""
-            SELECT ec.nombre, {marca_subquery('ec')},
-                   ec.modelo, ec.serie, ec.valor_reposicion,
-                   ec.foto_url, ec.foto_url_sm, ec.foto_url_thumb,
-                   ec.nombre_publico, ec.nombre_publico_largo, kc.cantidad
-            FROM kit_componentes kc
-            JOIN equipos ec ON ec.id = kc.componente_id
-            WHERE kc.equipo_id = %s
-        """, (item["equipo_id"],)).fetchall()
-        item["componentes"] = [row_to_dict(c) for c in comp_rows]
+        item["componentes"] = [{
+            "nombre":               c["nombre"],
+            "marca":                c["marca"],
+            "modelo":               c["modelo"],
+            "serie":                c["serie"],
+            "valor_reposicion":     c["valor_reposicion"],
+            "foto_url":             c["foto_url"],
+            "foto_url_sm":          c["foto_url_sm"],
+            "foto_url_thumb":       c["foto_url_thumb"],
+            "nombre_publico":       c["nombre_publico"],
+            "nombre_publico_largo": c["nombre_publico_largo"],
+            "cantidad":             c["cantidad"],
+        } for c in por_equipo.get(item.get("equipo_id"), [])]
 
 
 def _ordenar_items_en_grupos(items: list[dict], cat_de_equipo: dict) -> list[dict]:
