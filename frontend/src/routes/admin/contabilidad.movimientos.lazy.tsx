@@ -24,19 +24,12 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { TipoMovimientoBadge, TIPO_MOVIMIENTO_META } from "@/components/admin/badges";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/contabilidad/movimientos")({
   component: MovimientosPage,
 });
-
-const TIPO_LABEL: Record<TipoMovimiento, string> = {
-  gasto: "Gasto",
-  transferencia: "Transferencia",
-  retiro: "Retiro",
-  aporte: "Aporte",
-  ajuste: "Ajuste",
-};
 
 function descMovimiento(m: Movimiento): string {
   const o = m.cuenta_origen_nombre ?? "—";
@@ -137,7 +130,7 @@ function MovimientosPage() {
           {[
             ["", "Todos"],
             ["cobro", "Cobros"],
-            ...TIPOS_MOVIMIENTO.map((t) => [t, TIPO_LABEL[t]] as [string, string]),
+            ...TIPOS_MOVIMIENTO.map((t) => [t, TIPO_MOVIMIENTO_META[t].label] as [string, string]),
           ].map(([val, lbl]) => (
             <button
               key={val}
@@ -246,7 +239,7 @@ function MovimientoRow({
         {formatFechaDisplay(mov.fecha)}
       </td>
       <td className="px-3 py-2">
-        <Badge variant="secondary">{TIPO_LABEL[mov.tipo]}</Badge>
+        <TipoMovimientoBadge tipo={mov.tipo} />
       </td>
       <td className="px-3 py-2">
         <span className={cn(mov.anulado && "line-through")}>{descMovimiento(mov)}</span>
@@ -440,7 +433,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
                 : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
             )}
           >
-            {TIPO_LABEL[t]}
+            {TIPO_MOVIMIENTO_META[t].label}
           </button>
         ))}
       </div>
