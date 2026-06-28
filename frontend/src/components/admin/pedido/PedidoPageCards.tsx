@@ -605,9 +605,7 @@ export function HistorialModificaciones({ items }: { items: PedidoHistorialItem[
               {isDirecto && (
                 <span className="text-2xs uppercase tracking-wide text-muted-foreground">Auto</span>
               )}
-              {overrideAplicado && (
-                <span className="text-2xs text-amber">modificada al aprobar</span>
-              )}
+              {overrideAplicado && <span className="text-2xs text-ink">modificada al aprobar</span>}
               <span className="ml-auto text-2xs text-muted-foreground tabular-nums">
                 {fmtFecha(h.created_at)}
               </span>
@@ -623,7 +621,7 @@ export function HistorialModificaciones({ items }: { items: PedidoHistorialItem[
               </div>
             )}
             {overrideAplicado && a && (
-              <div className="text-xs text-amber mt-1 tabular-nums">
+              <div className="text-xs text-ink mt-1 tabular-nums">
                 Aplicado: {fmtFecha(a.fecha_desde ?? "")} → {fmtFecha(a.fecha_hasta ?? "")}
                 {a.items && ` · ${a.items.length} item${a.items.length !== 1 ? "s" : ""}`}
               </div>

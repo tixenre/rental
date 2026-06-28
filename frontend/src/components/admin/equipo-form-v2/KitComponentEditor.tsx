@@ -470,13 +470,13 @@ function SortableItem({
         >
           {esencial ? (
             <>
-              <ShieldCheck className="h-3.5 w-3.5 text-verde" />
+              <ShieldCheck className="h-3.5 w-3.5 text-verde-ink" />
               <span className="text-verde-ink font-medium">Esencial</span>
             </>
           ) : (
             <>
-              <ShieldAlert className="h-3.5 w-3.5 text-amber" />
-              <span className="text-amber font-medium">Best-effort</span>
+              <ShieldAlert className="h-3.5 w-3.5 text-ink" />
+              <span className="text-ink font-medium">Best-effort</span>
             </>
           )}
         </button>

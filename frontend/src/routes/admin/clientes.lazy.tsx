@@ -151,7 +151,7 @@ function ClientesPage() {
                     <span className="text-ink">{nombreCliente(c)}</span>
                     {c.dni_validado_at ? (
                       <ShieldCheck
-                        className="h-3.5 w-3.5 shrink-0 text-verde"
+                        className="h-3.5 w-3.5 shrink-0 text-verde-ink"
                         aria-label="Identidad verificada"
                       />
                     ) : null}
@@ -460,7 +460,7 @@ function ClienteHistorialSheet({
                         className="flex items-center gap-1 rounded-md border hairline bg-surface px-2.5 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors shrink-0 h-[30px]"
                       >
                         {copiado ? (
-                          <Check className="h-3.5 w-3.5 text-verde" />
+                          <Check className="h-3.5 w-3.5 text-verde-ink" />
                         ) : (
                           <Copy className="h-3.5 w-3.5" />
                         )}

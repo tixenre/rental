@@ -482,7 +482,7 @@ function EquiposPage() {
       {/* Banner: equipos sin serie cargada (calidad inventario, issue #91) */}
       {sinSerieQ.data && sinSerieQ.data.total > 0 && (
         <div className="flex items-start gap-2.5 rounded-md border hairline border-amber/40 bg-amber-soft/30 px-3 py-2 text-sm">
-          <AlertCircle className="h-4 w-4 mt-0.5 text-amber shrink-0" />
+          <AlertCircle className="h-4 w-4 mt-0.5 text-ink shrink-0" />
           <div className="flex-1">
             <span className="font-medium text-ink">
               {sinSerieQ.data.total} equipo
@@ -727,16 +727,16 @@ function EquiposPage() {
                       </span>
                     )}
                     {esDestacado(eq) && (
-                      <span className="text-amber shrink-0" title="Destacado">
+                      <span className="text-ink shrink-0" title="Destacado">
                         ★
                       </span>
                     )}
                     {!eq.ficha_completa && (
                       <span
-                        className="text-2xs text-amber bg-amber-soft/40 px-1 py-0.5 rounded shrink-0"
+                        className="inline-flex shrink-0"
                         title="Ficha pendiente — marcala como completa en el form cuando termines de cargarla"
                       >
-                        pendiente
+                        <Pill tone="warning">pendiente</Pill>
                       </span>
                     )}
                   </div>
@@ -862,7 +862,7 @@ function EquiposPage() {
                         onClick={() => restoreMut.mutate(eq.id)}
                         disabled={restoreMut.isPending}
                       >
-                        <RotateCcw className="h-4 w-4 text-amber" />
+                        <RotateCcw className="h-4 w-4 text-ink" />
                       </Button>
                     ) : (
                       <Button

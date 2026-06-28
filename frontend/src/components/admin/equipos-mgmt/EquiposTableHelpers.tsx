@@ -324,7 +324,7 @@ export function FaltaBanner({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-amber/40 bg-amber-soft px-4 py-2.5">
-      <AlertCircle className="h-4 w-4 shrink-0 text-amber" />
+      <AlertCircle className="h-4 w-4 shrink-0 text-ink" />
       <div className="flex-1 min-w-0 text-sm">
         <span className="font-medium text-ink">Filtrando equipos {FALTA_LABELS[falta]}</span>
         <span className="text-muted-foreground">

@@ -18,7 +18,7 @@ function NovedadesPage() {
           Back-office
         </div>
         <h1 className="font-display text-3xl md:text-4xl text-ink flex items-center gap-2">
-          <Sparkles className="h-7 w-7 text-amber" />
+          <Sparkles className="h-7 w-7 text-ink" />
           Novedades
         </h1>
         <p className="text-sm text-muted-foreground mt-1">Cambios recientes en el sistema.</p>

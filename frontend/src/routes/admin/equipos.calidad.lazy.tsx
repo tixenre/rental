@@ -45,7 +45,7 @@ function CalidadPage() {
           Back-office › Equipos
         </div>
         <h1 className="font-display text-3xl md:text-4xl text-ink flex items-center gap-2">
-          <Sparkles className="h-7 w-7 text-amber" />
+          <Sparkles className="h-7 w-7 text-ink" />
           Calidad del inventario
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -118,7 +118,7 @@ function SugerenciasSection() {
   return (
     <section className="mt-8 rounded-2xl border hairline bg-surface">
       <header className="flex items-center gap-2 px-5 pt-4 pb-3 border-b hairline">
-        <Lightbulb className="h-4 w-4 text-amber" />
+        <Lightbulb className="h-4 w-4 text-ink" />
         <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
           Sugerencias del sistema · {data.total}
         </span>
@@ -182,7 +182,7 @@ function SugerenciasSection() {
                         {" "}
                         · id={m.id} · {m.equipos} equipos · {m.cant_pedidos} pedidos
                       </span>
-                      {idx === 0 && <span className="ml-2 text-amber">(canonical)</span>}
+                      {idx === 0 && <span className="ml-2 text-ink">(canonical)</span>}
                     </li>
                   ))}
                 </ul>

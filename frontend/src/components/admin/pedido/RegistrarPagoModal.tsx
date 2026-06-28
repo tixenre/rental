@@ -150,7 +150,7 @@ export function RegistrarPagoModal({
           <Label className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
             Monto
           </Label>
-          <div className="flex items-center gap-1.5 rounded-md border hairline bg-surface-elevated px-3 h-12">
+          <div className="flex items-center gap-1.5 rounded-md border hairline bg-surface-elevated px-3 h-12 focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent">
             <span className="font-mono text-muted-foreground text-sm">$</span>
             <input
               type="number"

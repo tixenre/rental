@@ -278,7 +278,7 @@ function CarritoCard({ carrito: c }: { carrito: Carrito }) {
               href={wasaLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-verde hover:bg-verde/10 transition"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-verde-ink hover:bg-verde/10 transition"
               title="Escribir por WhatsApp"
             >
               <MessageCircle className="h-4 w-4" />

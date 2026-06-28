@@ -73,7 +73,7 @@ function ReporteMensualPage() {
       {r && (
         <>
           {r.cerrado && (
-            <div className="rounded-md border border-amber/40 bg-amber/5 px-3 py-2 text-xs text-amber">
+            <div className="rounded-md border border-amber/40 bg-amber/5 px-3 py-2 text-xs text-ink">
               Mes cerrado — los números son la foto congelada.
             </div>
           )}

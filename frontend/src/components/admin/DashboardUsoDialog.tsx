@@ -226,7 +226,7 @@ export function DashboardUsoDialog({
             {/* Sin uso */}
             <section>
               <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                <AlertCircle className="h-4 w-4 text-amber" />
+                <AlertCircle className="h-4 w-4 text-ink" />
                 Sin movimiento hace +{dataQ.data.dias_sin_uso_threshold} días
                 <span className="text-xs text-muted-foreground font-normal">
                   · candidatos a revisar/vender
@@ -372,7 +372,7 @@ export function DashboardUsoDialog({
             {/* Cuentas por cobrar */}
             <section>
               <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 text-amber" /> Por cobrar
+                <DollarSign className="h-4 w-4 text-ink" /> Por cobrar
                 <span className="text-xs text-muted-foreground font-normal">
                   · pedidos confirmados con monto pendiente
                 </span>
@@ -405,7 +405,7 @@ export function DashboardUsoDialog({
                             </Badge>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-xs tabular-nums font-medium text-amber">
+                            <div className="text-xs tabular-nums font-medium text-ink">
                               {fmtMoneda(p.pendiente)}
                             </div>
                             <div className="text-2xs text-muted-foreground tabular-nums">
@@ -459,7 +459,7 @@ export function DashboardUsoDialog({
                             <TableCell className="text-right tabular-nums text-xs">
                               {fmtMoneda(p.monto_total)}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums text-xs font-medium text-amber">
+                            <TableCell className="text-right tabular-nums text-xs font-medium text-ink">
                               {fmtMoneda(p.pendiente)}
                             </TableCell>
                           </TableRow>

@@ -1,35 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
-import {
-  LayoutDashboard,
-  Package,
-  ClipboardList,
-  Users,
-  BarChart3,
-  Settings,
-  LogOut,
-  ChevronRight,
-  List,
-  FolderTree,
-  Tag,
-  Wrench,
-  Sparkles,
-  Building2,
-  Palette,
-  Megaphone,
-  Ruler,
-  ShieldCheck,
-  Database,
-  HardDriveDownload,
-  Clapperboard,
-  Wallet,
-  BookOpen,
-  Calculator,
-  GraduationCap,
-  ShoppingCart,
-  AlertTriangle,
-} from "lucide-react";
+import { LogOut, ChevronRight, PanelLeft } from "lucide-react";
 
 import {
   Sidebar,
@@ -42,102 +14,41 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-  SidebarTrigger,
   useSidebar,
 } from "@/design-system/ui/sidebar";
 import { authedFetch } from "@/lib/authedFetch";
-
-type SubItem = { title: string; url: string; icon?: typeof LayoutDashboard };
-type NavItem = {
-  title: string;
-  url: string;
-  icon: typeof LayoutDashboard;
-  exact?: boolean;
-  children?: SubItem[];
-};
-
-const items: NavItem[] = [
-  {
-    title: "Dashboard",
-    url: "/admin",
-    icon: LayoutDashboard,
-    exact: true,
-  },
-  { title: "Pedidos", url: "/admin/pedidos", icon: ClipboardList },
-  { title: "Carritos activos", url: "/admin/carritos", icon: ShoppingCart },
-  {
-    title: "Inventario",
-    url: "/admin/equipos",
-    icon: Package,
-    children: [
-      { title: "Equipos", url: "/admin/equipos", icon: List },
-      { title: "Calidad", url: "/admin/equipos/calidad", icon: ShieldCheck },
-      { title: "Categorías", url: "/admin/equipos/categorias", icon: FolderTree },
-      { title: "Marcas", url: "/admin/equipos/marcas", icon: Building2 },
-      { title: "Specs", url: "/admin/specs", icon: Database },
-      { title: "Unidades", url: "/admin/unidades", icon: Ruler },
-    ],
-  },
-  { title: "Estudio", url: "/admin/estudio", icon: Clapperboard },
-  { title: "Talleres", url: "/admin/talleres", icon: GraduationCap },
-  // Solicitudes se accede desde la página de Pedidos (no se duplica en el sidebar).
-  { title: "Clientes", url: "/admin/clientes", icon: Users },
-  { title: "Estadísticas", url: "/admin/estadisticas", icon: BarChart3 },
-  {
-    title: "Finanzas",
-    url: "/admin/contabilidad",
-    icon: Wallet,
-    children: [
-      { title: "Tablero", url: "/admin/contabilidad", icon: LayoutDashboard },
-      { title: "Movimientos", url: "/admin/contabilidad/movimientos", icon: ClipboardList },
-      { title: "Cuentas", url: "/admin/contabilidad/cuentas", icon: Wallet },
-      { title: "Reporte mensual", url: "/admin/contabilidad/reporte", icon: BarChart3 },
-      { title: "Liquidación", url: "/admin/contabilidad/liquidacion", icon: Calculator },
-      { title: "Cobros de pedidos", url: "/admin/pagos", icon: List },
-      { title: "Glosario", url: "/admin/contabilidad/glosario", icon: BookOpen },
-    ],
-  },
-  { title: "Assets y diseño", url: "/admin/diseno", icon: Palette },
-  { title: "Marca", url: "/admin/marca", icon: Megaphone },
-  { title: "Novedades", url: "/admin/novedades", icon: Sparkles },
-  { title: "Datos y backups", url: "/admin/dataio", icon: HardDriveDownload },
-  { title: "Media", url: "/admin/media", icon: Database },
-  { title: "Settings", url: "/admin/settings", icon: Settings },
-  { title: "Errores del servidor", url: "/admin/errores", icon: AlertTriangle },
-];
+import { ADMIN_NAV } from "./adminNav";
 
 export function AdminSidebar({ email }: { email: string }) {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
   const currentPath = useRouterState({
     select: (router) => router.location.pathname,
   });
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  // Grupos abiertos: solo el que contiene la ruta actual. No se persiste —
-  // cada carga arranca limpia y el grupo activo se abre solo.
+  // Grupos abiertos por id. Init: defaultOpen del grupo OR el grupo que contiene
+  // la ruta actual. No se persiste — cada carga arranca según esta regla.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const path = typeof window !== "undefined" ? window.location.pathname : "";
     const initial: Record<string, boolean> = {};
-    for (const item of items) {
-      if (item.children?.some((c) => path === c.url || path.startsWith(c.url + "/"))) {
-        initial[item.url] = true;
-      }
+    for (const g of ADMIN_NAV) {
+      const hasActive = g.items.some(
+        (it) => path === it.url || (!it.exact && path.startsWith(it.url + "/")),
+      );
+      initial[g.id] = g.defaultOpen || hasActive;
     }
     return initial;
   });
 
-  // Al navegar a una sub-ruta, abrir el grupo padre (sin cerrar otros).
+  // Al navegar, abrir el grupo que contiene la ruta actual (sin cerrar otros).
   useEffect(() => {
-    for (const item of items) {
-      if (item.children?.some((c) => isActive(c.url, false))) {
-        setOpenGroups((s) => ({ ...s, [item.url]: true }));
+    for (const g of ADMIN_NAV) {
+      if (g.items.some((it) => isActive(it.url, it.exact))) {
+        setOpenGroups((s) => ({ ...s, [g.id]: true }));
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-expandir solo al cambiar de ruta; items es config estable y setOpenGroups usa functional update
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-expandir solo al cambiar de ruta; ADMIN_NAV es config estable y setOpenGroups usa functional update
   }, [currentPath]);
 
   const handleSignOut = async () => {
@@ -159,15 +70,8 @@ export function AdminSidebar({ email }: { email: string }) {
     return currentPath === url || currentPath.startsWith(url + "/");
   }
 
-  // Para items con children, el padre se considera "activo" si yo estoy
-  // exactamente en su URL O en cualquiera de sus hijos.
-  function isParentActive(item: NavItem): boolean {
-    if (isActive(item.url, true)) return true;
-    return !!item.children?.some((c) => isActive(c.url, false));
-  }
-
-  function toggleGroup(url: string) {
-    setOpenGroups((s) => ({ ...s, [url]: !s[url] }));
+  function toggleGroup(id: string) {
+    setOpenGroups((s) => ({ ...s, [id]: !s[id] }));
   }
 
   return (
@@ -205,91 +109,69 @@ export function AdminSidebar({ email }: { email: string }) {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          {!collapsed && (
-            <SidebarGroupLabel className="font-mono text-2xs uppercase tracking-[0.2em]">
-              General
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => {
-                const hasChildren = !!item.children && item.children.length > 0;
-                const isOpen = openGroups[item.url] ?? false;
-                const active = hasChildren ? isParentActive(item) : isActive(item.url, item.exact);
-
-                // Item con hijos
-                if (hasChildren && !collapsed) {
-                  return (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton
-                        onClick={() => toggleGroup(item.url)}
-                        isActive={active}
-                        className="cursor-pointer"
-                      >
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        <span>{item.title}</span>
-                        <ChevronRight
-                          className={`ml-auto h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-90" : ""}`}
-                        />
-                      </SidebarMenuButton>
-                      {isOpen && (
-                        <SidebarMenuSub>
-                          {(item.children ?? []).map((child) => {
-                            const childActive =
-                              child.url === item.url
-                                ? isActive(child.url, true)
-                                : isActive(child.url, false);
-                            return (
-                              <SidebarMenuSubItem key={child.url}>
-                                <SidebarMenuSubButton asChild isActive={childActive}>
-                                  <Link to={child.url} className="flex items-center gap-2">
-                                    {child.icon && <child.icon className="h-3.5 w-3.5 shrink-0" />}
-                                    <span>{child.title}</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            );
-                          })}
-                        </SidebarMenuSub>
-                      )}
-                    </SidebarMenuItem>
-                  );
-                }
-
-                // Item con hijos pero sidebar colapsada — link directo al padre
-                // (los sub-items se acceden al expandir la sidebar)
-                if (hasChildren && collapsed) {
-                  return (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
-                        <Link to={item.url}>
-                          <item.icon className="h-4 w-4 shrink-0" />
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                }
-
-                // Item simple
-                return (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      tooltip={collapsed ? item.title : undefined}
+        {collapsed
+          ? // Modo icon-rail: todo plano como iconos, sin labels de grupo.
+            ADMIN_NAV.map((g) => (
+              <SidebarGroup key={g.id} className="py-0">
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {g.items.map((it) => (
+                      <SidebarMenuItem key={it.url}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive(it.url, it.exact)}
+                          tooltip={it.title}
+                        >
+                          <Link to={it.url}>
+                            <it.icon className="h-4 w-4 shrink-0" />
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ))
+          : // Modo expandido: 5 grupos por dominio, label colapsable.
+            ADMIN_NAV.map((g) => {
+              const isOpen = openGroups[g.id] ?? g.defaultOpen;
+              return (
+                <SidebarGroup key={g.id}>
+                  <SidebarGroupLabel asChild>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(g.id)}
+                      className="flex w-full items-center font-mono text-2xs uppercase tracking-[0.2em]"
+                      aria-expanded={isOpen}
                     >
-                      <Link to={item.url} className="flex items-center gap-2">
-                        <item.icon className="h-4 w-4 shrink-0" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                      <span>{g.label}</span>
+                      <ChevronRight
+                        className={`ml-auto h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                      />
+                    </button>
+                  </SidebarGroupLabel>
+                  {isOpen && (
+                    <SidebarGroupContent>
+                      <SidebarMenu>
+                        {g.items.map((it) => (
+                          <SidebarMenuItem key={it.url}>
+                            <SidebarMenuButton asChild isActive={isActive(it.url, it.exact)}>
+                              <Link
+                                to={it.url}
+                                className="flex items-center gap-2 min-h-11 md:min-h-0"
+                              >
+                                <it.icon className="h-4 w-4 shrink-0" />
+                                <span>{it.title}</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        ))}
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  )}
+                </SidebarGroup>
+              );
+            })}
       </SidebarContent>
 
       <SidebarFooter className="border-t hairline">
@@ -315,10 +197,13 @@ export function AdminSidebar({ email }: { email: string }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarTrigger
-              className="w-full"
+            <SidebarMenuButton
+              onClick={toggleSidebar}
               tooltip={collapsed ? "Expandir sidebar" : undefined}
-            />
+            >
+              <PanelLeft className="h-4 w-4 shrink-0" />
+              {!collapsed && <span>Colapsar</span>}
+            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

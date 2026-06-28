@@ -273,14 +273,14 @@ function SocioCard({
           <button
             type="button"
             onClick={() => setMovAbierto((v) => !v)}
-            className="text-xs text-ink underline hover:text-amber"
+            className="text-xs text-ink underline hover:text-ink"
           >
             Registrar movimiento
           </button>
           <button
             type="button"
             onClick={() => setEditando(true)}
-            className="text-xs text-muted-foreground underline hover:text-amber"
+            className="text-xs text-muted-foreground underline hover:text-ink"
             title="Editar el arranque (lo que cobró antes del sistema)"
           >
             Editar arranque
@@ -458,7 +458,7 @@ function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => 
             <button
               type="button"
               onClick={() => setEditando(true)}
-              className="text-xs text-muted-foreground underline hover:text-amber"
+              className="text-xs text-muted-foreground underline hover:text-ink"
               title="Editar nombre y saldo inicial"
             >
               Editar

@@ -421,13 +421,13 @@ function PedidosPage() {
 function hoyTag(p: Pedido): ReactNode | null {
   if (esHoy(p.fecha_desde) && p.estado === "confirmado")
     return (
-      <span className="font-mono text-2xs font-bold uppercase tracking-[0.2em] text-amber">
+      <span className="font-mono text-2xs font-bold uppercase tracking-[0.2em] text-ink">
         retira hoy
       </span>
     );
   if (esHoy(p.fecha_hasta) && p.estado === "retirado")
     return (
-      <span className="font-mono text-2xs font-bold uppercase tracking-[0.2em] text-rosa">
+      <span className="font-mono text-2xs font-bold uppercase tracking-[0.2em] text-ink">
         devuelve hoy
       </span>
     );
@@ -738,7 +738,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-amber shrink-0" />
+              <ShieldAlert className="h-4 w-4 text-ink shrink-0" />
               Cliente sin identidad verificada
             </AlertDialogTitle>
             <AlertDialogDescription>

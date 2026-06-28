@@ -99,7 +99,7 @@ function UnidadesPage() {
             Back-office › Specs
           </div>
           <h1 className="font-display text-3xl text-ink flex items-center gap-2">
-            <Ruler className="h-6 w-6 text-amber" />
+            <Ruler className="h-6 w-6 text-ink" />
             Unidades
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">

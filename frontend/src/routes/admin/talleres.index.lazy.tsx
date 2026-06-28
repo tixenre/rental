@@ -132,7 +132,7 @@ function badgeEstadoEdicion(edicion: EdicionAdmin): { label: string; className: 
   if (edicion.frozen_at)
     return { label: "CONGELADA", className: "bg-muted/60 text-muted-foreground" };
   if (edicion.fecha_inicio > today)
-    return { label: "PRÓXIMAMENTE", className: "bg-amber/20 text-amber" };
+    return { label: "PRÓXIMAMENTE", className: "bg-amber/20 text-ink" };
   if (edicion.fecha_fin >= today)
     return { label: "EN CURSO", className: "bg-verde/20 text-verde-ink" };
   return { label: "FINALIZADA", className: "bg-muted/40 text-muted-foreground" };
@@ -144,7 +144,7 @@ function CuposPill({ confirmados, total }: { confirmados: number; total: number 
     ratio >= 1
       ? "bg-destructive/10 text-destructive border-destructive/20"
       : ratio >= 0.8
-        ? "bg-amber/15 text-amber border-amber/20"
+        ? "bg-amber/15 text-ink border-amber/20"
         : "bg-verde/10 text-verde-ink border-verde/20";
   return (
     <span
@@ -554,7 +554,7 @@ function PreciosSection({ edicion }: { edicion: EdicionAdmin }) {
   return (
     <div className="flex flex-col gap-4">
       {edicion.cupos_confirmados >= edicion.cupos_total && (
-        <div className="rounded-lg bg-amber/10 border border-amber/30 px-4 py-3 text-sm text-amber">
+        <div className="rounded-lg bg-amber/10 border border-amber/30 px-4 py-3 text-sm text-ink">
           ⚠ Edición completa — {edicion.cupos_confirmados}/{edicion.cupos_total} cupos ocupados
         </div>
       )}
@@ -998,9 +998,9 @@ function InscripcionesSection({
                     href={ins.comprobante_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-ink hover:text-amber transition"
+                    className="inline-flex items-center gap-1 text-ink hover:text-ink transition"
                   >
-                    <CheckCircle2 className="h-3.5 w-3.5 text-verde" strokeWidth={1.5} />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-verde-ink" strokeWidth={1.5} />
                     <ExternalLink className="h-3 w-3" />
                   </a>
                 ) : (

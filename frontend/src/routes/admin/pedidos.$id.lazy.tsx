@@ -378,7 +378,7 @@ function PedidoEditorPage() {
           {/* Banner solicitud pendiente (deferido — solo aviso read-only) */}
           {p.tiene_solicitud_pendiente && (
             <div className="flex items-start gap-2 rounded-lg border border-amber/40 bg-amber/5 px-3 py-2.5 text-sm">
-              <Info className="h-4 w-4 text-amber shrink-0 mt-0.5" />
+              <Info className="h-4 w-4 text-ink shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <span className="font-medium text-ink">Hay una solicitud de cambio pendiente.</span>{" "}
                 <Link to="/admin/solicitudes" className="underline text-muted-foreground">
@@ -626,7 +626,7 @@ function PedidoEditorPage() {
           {/* Identidad del cliente (solo cuando tiene ficha vinculada sin verificar) */}
           {clienteSinVerificar && (
             <RailSection label="Identidad del cliente">
-              <div className="flex items-center gap-1.5 text-amber text-sm mb-2">
+              <div className="flex items-center gap-1.5 text-ink text-sm mb-2">
                 <ShieldAlert className="h-4 w-4 shrink-0" />
                 <span>Sin verificar</span>
               </div>
@@ -649,7 +649,7 @@ function PedidoEditorPage() {
                       className="flex items-center gap-1 rounded-md border hairline bg-surface px-2.5 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors shrink-0 h-[30px]"
                     >
                       {copiadoLink ? (
-                        <Check className="h-3.5 w-3.5 text-verde" />
+                        <Check className="h-3.5 w-3.5 text-verde-ink" />
                       ) : (
                         <Copy className="h-3.5 w-3.5" />
                       )}
@@ -874,7 +874,7 @@ function PedidoEditorPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-amber shrink-0" />
+              <ShieldAlert className="h-4 w-4 text-ink shrink-0" />
               Cliente sin identidad verificada
             </AlertDialogTitle>
             <AlertDialogDescription>

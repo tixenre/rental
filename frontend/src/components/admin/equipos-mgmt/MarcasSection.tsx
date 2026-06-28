@@ -305,7 +305,7 @@ export function MarcasSection() {
       {!listQ.isLoading && duplicateGroups.length > 0 && (
         <div className="rounded-md border border-amber/40 bg-amber-soft/50 p-3 space-y-2">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber" />
+            <AlertTriangle className="h-4 w-4 text-ink" />
             <span className="text-sm font-medium text-ink">
               Marcas posiblemente duplicadas ({duplicateGroups.length})
             </span>
@@ -595,7 +595,7 @@ function SortableMarcaRow(props: RowProps) {
         disabled={disabled}
         className={`h-8 w-8 grid place-items-center rounded-md transition disabled:opacity-50 shrink-0 ${
           marca.destacada
-            ? "text-amber hover:bg-amber-soft"
+            ? "text-ink hover:bg-amber-soft"
             : "text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted"
         }`}
         title={marca.destacada ? "Quitar de destacadas" : "Destacar en home"}

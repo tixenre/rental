@@ -32,6 +32,7 @@ import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Button } from "@/design-system/ui/button";
 import { Switch } from "@/design-system/ui/switch";
 import { Badge } from "@/design-system/ui/badge";
+import { Pill } from "@/design-system/kit/Pill";
 import { authedJson } from "@/lib/authedFetch";
 
 type SpecTipo =
@@ -239,11 +240,7 @@ function SortableSpecRow({ spec, onSelect }: { spec: Spec; onSelect: () => void 
           {spec.unidad && (
             <span className="text-2xs text-muted-foreground font-mono">{spec.unidad}</span>
           )}
-          {spec.es_compatibilidad && (
-            <Badge className="text-2xs px-1 py-0 bg-amber/20 text-amber-foreground border-amber/40">
-              compat
-            </Badge>
-          )}
+          {spec.es_compatibilidad && <Pill tone="warning">compat</Pill>}
         </div>
         <div className="text-xs text-muted-foreground font-mono mt-0.5">
           {spec.spec_key}
@@ -469,14 +466,12 @@ function FlagDisplay({
 }) {
   return (
     <div className="flex items-start gap-2.5">
-      <div className={`mt-1 ${checked ? "text-amber" : "text-muted-foreground/40"}`}>{icon}</div>
+      <div className={`mt-1 ${checked ? "text-ink" : "text-muted-foreground/40"}`}>{icon}</div>
       <div className="flex-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-ink">{label}</span>
           {checked ? (
-            <Badge className="text-2xs px-1.5 py-0 bg-amber/20 text-amber-foreground border-amber/40">
-              ON
-            </Badge>
+            <Pill tone="warning">ON</Pill>
           ) : (
             <Badge variant="secondary" className="text-2xs px-1.5 py-0">
               OFF

@@ -18,7 +18,7 @@ function MarcaPage() {
         <h1 className="font-display text-3xl text-ink">Identidad de marca</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Hub canónico de marca. Los contenidos con{" "}
-          <span className="text-amber font-medium">TODO</span> están pendientes del dueño.
+          <span className="text-ink font-medium">TODO</span> están pendientes del dueño.
         </p>
       </header>
 
@@ -162,7 +162,7 @@ function SellingPoint({ title, desc }: { title: string; desc: string }) {
 function TodoBanner({ area }: { area: string }) {
   return (
     <div className="rounded-xl border border-amber/30 bg-amber/10 px-4 py-4 flex items-start gap-3">
-      <Megaphone className="h-4 w-4 text-amber mt-0.5 shrink-0" />
+      <Megaphone className="h-4 w-4 text-ink mt-0.5 shrink-0" />
       <div>
         <p className="text-sm font-medium text-ink">Pendiente del dueño</p>
         <p className="text-xs text-muted-foreground mt-0.5">

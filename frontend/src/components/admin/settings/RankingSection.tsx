@@ -32,7 +32,7 @@ export function RankingSection() {
     <section className="rounded-lg border hairline bg-background p-4 space-y-3">
       <div>
         <h2 className="font-display text-lg text-ink flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-amber" /> Ranking automático
+          <Sparkles className="h-4 w-4 text-ink" /> Ranking automático
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           Calcula la prioridad de cada equipo en el catálogo basándose en el histórico de pedidos e

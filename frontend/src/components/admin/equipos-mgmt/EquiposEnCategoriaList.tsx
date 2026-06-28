@@ -116,7 +116,7 @@ export function EquiposPanel({
         <button
           type="button"
           onClick={() => onAddEquipos(categoriaId, categoriaNombre)}
-          className="inline-flex items-center gap-1 text-xs text-ink hover:text-amber transition py-0.5"
+          className="inline-flex items-center gap-1 text-xs text-ink hover:text-ink transition py-0.5"
           title="Agregar más equipos a esta categoría"
         >
           <Plus className="h-3 w-3" /> Agregar equipos

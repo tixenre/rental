@@ -487,7 +487,7 @@ function EmailChannelBanner({ status }: { status: EmailChannelStatus }) {
   if (!status.activo) {
     return (
       <div className="rounded-md border border-amber/40 bg-amber/10 p-4 flex items-start gap-3">
-        <AlertTriangle className="h-5 w-5 text-amber shrink-0 mt-0.5" />
+        <AlertTriangle className="h-5 w-5 text-ink shrink-0 mt-0.5" />
         <div className="text-sm">
           <div className="font-display text-ink">El canal de mail está apagado</div>
           <p className="text-muted-foreground mt-0.5">
@@ -502,7 +502,7 @@ function EmailChannelBanner({ status }: { status: EmailChannelStatus }) {
   }
   return (
     <div className="rounded-md border border-verde/30 bg-verde/10 p-4 flex items-start gap-3">
-      <CheckCircle2 className="h-5 w-5 text-verde shrink-0 mt-0.5" />
+      <CheckCircle2 className="h-5 w-5 text-verde-ink shrink-0 mt-0.5" />
       <div className="text-sm">
         <div className="font-display text-ink">
           Canal de mail activo · {provLabel[status.provider] ?? status.provider}
