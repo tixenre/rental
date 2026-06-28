@@ -105,7 +105,7 @@ def upsert_ficha(id: int, data: FichaUpdate, request: Request):
                 (id,),
             )
             if patch:
-                set_clause = ", ".join(f"{k} = ?" for k in patch)
+                set_clause = ", ".join(f"{k} = %s" for k in patch)
                 set_clause += ", updated_at = CURRENT_TIMESTAMP"
                 conn.execute(
                     f"UPDATE equipo_fichas SET {set_clause} WHERE equipo_id = %s",

@@ -182,9 +182,9 @@ def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
     require_admin(request)
     sets, vals = [], []
     if patch.nombre is not None:
-        sets.append("nombre = ?"); vals.append(patch.nombre.strip())
+        sets.append("nombre = %s"); vals.append(patch.nombre.strip())
     if patch.prioridad is not None:
-        sets.append("prioridad = ?"); vals.append(int(patch.prioridad))
+        sets.append("prioridad = %s"); vals.append(int(patch.prioridad))
     if patch.set_parent_null:
         sets.append("parent_id = NULL")
     elif patch.parent_id is not None:
@@ -205,7 +205,7 @@ def admin_update_etiqueta(eid: int, patch: EtiquetaPatch, request: Request):
             ).fetchone()
             if chrow:
                 raise HTTPException(400, "Esta etiqueta tiene hijos; no puede convertirse en hija")
-        sets.append("parent_id = ?"); vals.append(int(patch.parent_id))
+        sets.append("parent_id = %s"); vals.append(int(patch.parent_id))
     if not sets:
         raise HTTPException(400, "Sin cambios")
     with get_db() as conn:
@@ -569,15 +569,15 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
         nuevo_nombre = patch.nombre.strip()
         if not nuevo_nombre:
             raise HTTPException(400, "El nombre no puede estar vacío")
-        sets.append("nombre = ?"); vals.append(nuevo_nombre)
+        sets.append("nombre = %s"); vals.append(nuevo_nombre)
     if patch.prioridad is not None:
-        sets.append("prioridad = ?"); vals.append(int(patch.prioridad))
+        sets.append("prioridad = %s"); vals.append(int(patch.prioridad))
     if patch.visible is not None:
-        sets.append("visible = ?"); vals.append(bool(patch.visible))
+        sets.append("visible = %s"); vals.append(bool(patch.visible))
     if patch.nombre_publico_template is not None:
         # String vacío se guarda como NULL para distinguir "sin template".
         tpl = patch.nombre_publico_template.strip()
-        sets.append("nombre_publico_template = ?"); vals.append(tpl or None)
+        sets.append("nombre_publico_template = %s"); vals.append(tpl or None)
     if patch.set_parent_null:
         sets.append("parent_id = NULL")
     elif patch.parent_id is not None:
@@ -637,7 +637,7 @@ def admin_update_categoria(cid: int, patch: CategoriaPatch, request: Request):
                     q.append(ch["id"])
             if patch.parent_id in descendants:
                 raise HTTPException(400, "No se puede mover bajo un descendiente (ciclo)")
-        sets.append("parent_id = ?"); vals.append(int(patch.parent_id))
+        sets.append("parent_id = %s"); vals.append(int(patch.parent_id))
     if not sets:
         raise HTTPException(400, "Sin cambios")
 

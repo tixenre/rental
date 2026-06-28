@@ -259,7 +259,7 @@ def actualizar_asignacion(template_id: int, payload: SpecAssignmentUpdate, reque
             ).fetchone()
             if not existing:
                 raise HTTPException(404, "Asignación no existe")
-            set_clause = ", ".join(f"{k} = ?" for k in updates)
+            set_clause = ", ".join(f"{k} = %s" for k in updates)
             conn.execute(
                 f"UPDATE categoria_spec_templates SET {set_clause} WHERE id = %s",
                 list(updates.values()) + [template_id],

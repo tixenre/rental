@@ -189,28 +189,28 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
         n = data.nombre.strip()
         if not n:
             raise HTTPException(400, "El nombre no puede estar vacío")
-        sets.append("nombre = ?"); vals.append(n)
+        sets.append("nombre = %s"); vals.append(n)
     if data.apellido is not None:
-        sets.append("apellido = ?"); vals.append(data.apellido.strip())
+        sets.append("apellido = %s"); vals.append(data.apellido.strip())
     if data.telefono is not None:
-        sets.append("telefono = ?"); vals.append(data.telefono.strip())
+        sets.append("telefono = %s"); vals.append(data.telefono.strip())
     if data.direccion is not None:
-        sets.append("direccion = ?"); vals.append(data.direccion.strip())
+        sets.append("direccion = %s"); vals.append(data.direccion.strip())
     if data.cuit is not None:
-        sets.append("cuit = ?"); vals.append(data.cuit.strip() or None)
+        sets.append("cuit = %s"); vals.append(data.cuit.strip() or None)
     if data.apodo is not None:
-        sets.append("apodo = ?"); vals.append(data.apodo.strip() or None)
+        sets.append("apodo = %s"); vals.append(data.apodo.strip() or None)
     if data.perfil_impuestos is not None:
         p = data.perfil_impuestos.strip()
         if p not in ("consumidor_final", "responsable_inscripto", "monotributo", "exento"):
             raise HTTPException(400, "Perfil impositivo inválido")
-        sets.append("perfil_impuestos = ?"); vals.append(p)
+        sets.append("perfil_impuestos = %s"); vals.append(p)
     if data.razon_social is not None:
-        sets.append("razon_social = ?"); vals.append(data.razon_social.strip() or None)
+        sets.append("razon_social = %s"); vals.append(data.razon_social.strip() or None)
     if data.domicilio_fiscal is not None:
-        sets.append("domicilio_fiscal = ?"); vals.append(data.domicilio_fiscal.strip() or None)
+        sets.append("domicilio_fiscal = %s"); vals.append(data.domicilio_fiscal.strip() or None)
     if data.email_facturacion is not None:
-        sets.append("email_facturacion = ?")
+        sets.append("email_facturacion = %s")
         vals.append(data.email_facturacion.strip().lower() or None)
 
     if not sets:

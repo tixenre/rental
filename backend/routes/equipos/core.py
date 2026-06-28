@@ -603,7 +603,7 @@ def _check_serie_unica(conn, serie: Optional[str], exclude_id: Optional[int] = N
     """
     params: list = [serie_norm]
     if exclude_id is not None:
-        query += " AND id != ?"
+        query += " AND id != %s"
         params.append(exclude_id)
     query += " LIMIT 1"
     existing = conn.execute(query, tuple(params)).fetchone()
@@ -736,7 +736,7 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
                 and "precio_jornada_manual" not in updates
             ):
                 updates["precio_jornada_manual"] = "roi_pct" not in updates
-            set_clause = ", ".join(f"{k} = ?" for k in updates)
+            set_clause = ", ".join(f"{k} = %s" for k in updates)
             set_clause += ", updated_at = CURRENT_TIMESTAMP"
             conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = %s",
                          list(updates.values()) + [id])
