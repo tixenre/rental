@@ -73,6 +73,13 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
      contradice a la vieja).
    Siempre lo **proponés** en tu salida; **no editás** — el dueño aprueba. Ver decisión
    *2026-05-26 — Curación de la memoria*.
+6. **Principios (filosofía de trabajo)** — ¿el lote **confirma, tensiona o suma** a alguno de los principios
+   de `CLAUDE.md` (sección "Filosofía de trabajo")? Distinguí:
+   - **Excepción puntual** — el dueño fue en contra una vez, con su confirmación (ej. un hotfix que no suele
+     querer): **no propongas nada**, el principio sigue intacto. No lo trates como ley rígida.
+   - **Drift recurrente / cambio de criterio explícito** — el patrón se repite o el dueño dijo "cambié de
+     criterio": ahí **proponé mutar** el principio en "Propuestas de memoria". Ver
+     *2026-06-27 — Filosofía de trabajo derivada*.
 
 ## Clasificación de tamaño (para el modo de merge)
 

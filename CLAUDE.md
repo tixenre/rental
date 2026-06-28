@@ -24,6 +24,29 @@ PostgreSQL / deploy en Railway. Contexto completo → [`MANIFIESTO.md`](MANIFIES
 - **El dueño testea, no revisa código.** Acompañar cada cambio testeable con un **plan de prueba
   en lenguaje claro** ("andá a /X, hacé Y, tenés que ver Z"). El dueño prueba en **staging**.
 
+## Filosofía de trabajo (derivada, no declarada)
+
+Estos principios **se derivaron del corpus de decisiones** (no son un manifiesto declarado); se mantienen
+como **hipótesis** —se ponen a prueba, mutan o crece uno nuevo contra cada decisión— y son la base desde
+la que la sesión te propone. **Son defaults, no leyes:** podés ir en contra. Si un pedido va contra uno,
+la sesión lo **nota, te dice cuál y por qué no solés quererlo, y te explica el porqué** (por si te
+confundiste); si confirmás, **va igual** — la **excepción no deroga** el principio. Solo un **patrón
+repetido** o tu **cambio de criterio explícito** lo muta (ahí se propone a la memoria, con tu aprobación).
+**Aplicar esto es default de la sesión: no hay que pedirlo.**
+
+1. **Una sola forma de cada cosa.** Reusar antes de recrear; antes de construir, fijarse si ya existe.
+2. **El core que anda no se toca; lo nuevo se acopla alrededor.**
+3. **Lo vivo se mantiene chico y curado** (memoria, skills, evals se podan) — se poda lo que **no rinde**,
+   no lo que cuesta: lo valioso se hace aunque sea difícil, si vale más que su costo.
+4. **Lo que paga se mide barato; lo reversible se decide con juicio + git.** Un hallazgo es hipótesis
+   hasta confirmarlo.
+5. **El sistema propone, el dueño decide — y dice la verdad** (honestidad > actividad).
+
+> Quién lo mantiene: el **supervisor** testea cada lote contra estos principios (distingue _excepción
+> puntual_ de _drift recurrente_) y propone mutaciones; `gobernanza` los **re-deriva** del corpus en el
+> cierre mensual (anti-congelamiento). Evidencia + mecanismo → _2026-06-27 — Filosofía de trabajo derivada_
+> en [`docs/MEMORIA.md`](docs/MEMORIA.md) / [`docs/DECISIONES.md`](docs/DECISIONES.md).
+
 ## Memoria — dónde vive qué
 
 - **Decisiones de criterio + preferencias** → [`docs/MEMORIA.md`](docs/MEMORIA.md) — el **digest
