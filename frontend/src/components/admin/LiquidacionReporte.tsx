@@ -40,6 +40,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/design-system/ui/dialog";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 export function LiquidacionReporte() {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -47,6 +48,7 @@ export function LiquidacionReporte() {
   const [anchor, setAnchor] = useState(() => new Date());
   const [downloading, setDownloading] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
+  const confirm = useConfirm();
 
   const y = anchor.getFullYear();
   const m = anchor.getMonth();
@@ -99,15 +101,14 @@ export function LiquidacionReporte() {
     onError: (e: Error) => toast.error(e.message),
   });
   const cierreBusy = cerrarM.isPending || reabrirM.isPending;
-  const onReabrir = () => {
-    if (
-      window.confirm(
-        `¿Reabrir ${mesLabel}? El reporte vuelve a calcularse en vivo y la foto ` +
-          `congelada se descarta. Vas a poder cerrarlo de nuevo cuando termines de corregir.`,
-      )
-    ) {
-      reabrirM.mutate();
-    }
+  const onReabrir = async () => {
+    const ok = await confirm({
+      title: `¿Reabrir ${mesLabel}?`,
+      description:
+        "El reporte vuelve a calcularse en vivo y la foto congelada se descarta. Vas a poder cerrarlo de nuevo cuando termines de corregir.",
+      confirmLabel: "Reabrir",
+    });
+    if (ok) reabrirM.mutate();
   };
   const cerradoAtLabel = mes?.cerrado_at
     ? new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" }).format(

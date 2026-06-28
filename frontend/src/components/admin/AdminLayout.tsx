@@ -9,6 +9,7 @@ import { Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { ConfirmProvider } from "@/components/admin/useConfirm";
 import { SidebarProvider, SidebarTrigger } from "@/design-system/ui/sidebar";
 
 type Session = { email?: string; name?: string; is_admin?: boolean };
@@ -54,19 +55,21 @@ export function AdminLayout() {
   if (!session) return <Outlet />;
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
-        <AdminSidebar email={session.email ?? ""} />
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* En mobile el sidebar está oculto, así que el trigger vive acá */}
-          <header className="md:hidden h-12 flex items-center border-b hairline px-3 bg-background sticky top-0 z-10">
-            <SidebarTrigger aria-label="Abrir menú" />
-          </header>
-          <main className="flex-1 min-w-0">
-            <Outlet />
-          </main>
+    <ConfirmProvider>
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-background">
+          <AdminSidebar email={session.email ?? ""} />
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* En mobile el sidebar está oculto, así que el trigger vive acá */}
+            <header className="md:hidden h-12 flex items-center border-b hairline px-3 bg-background sticky top-0 z-10">
+              <SidebarTrigger aria-label="Abrir menú" />
+            </header>
+            <main className="flex-1 min-w-0">
+              <Outlet />
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </ConfirmProvider>
   );
 }
