@@ -11,6 +11,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminTable } from "@/components/admin/AdminTable";
 import { adminApi, type CuentaSaldo } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -84,38 +85,47 @@ function ReporteMensualPage() {
 
             {/* Por socio: devengado vs percibido + movimientos del mes */}
             <Section titulo="Por socio">
-              <div className="overflow-x-auto rounded-lg border hairline">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
-                      <th className="px-3 py-2 font-medium">Socio</th>
-                      <th className="px-3 py-2 font-medium text-right">Su parte</th>
-                      <th className="px-3 py-2 font-medium text-right">Cobró</th>
-                      <th className="px-3 py-2 font-medium text-right">Le cargué</th>
-                      <th className="px-3 py-2 font-medium text-right">Me pagó</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {["Pablo", "Tincho", "Rambla"].map((s) => (
-                      <tr key={s} className="border-b hairline last:border-0">
-                        <td className="px-3 py-2 font-medium text-ink">{s}</td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">
-                          {formatARS(r.devengado.por_socio[s] ?? 0)}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">
-                          {formatARS(r.cobrado.por_socio[s] ?? 0)}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
-                          {socios.includes(s) ? formatARS(r.socios_mes.cargos[s] ?? 0) : "—"}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
-                          {socios.includes(s) ? formatARS(r.socios_mes.pagos[s] ?? 0) : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <AdminTable<string>
+                rows={["Pablo", "Tincho", "Rambla"]}
+                getRowKey={(s) => s}
+                columns={[
+                  {
+                    header: "Socio",
+                    headClassName: "text-xs uppercase tracking-wider",
+                    className: "font-medium text-ink",
+                    cell: (s) => s,
+                  },
+                  {
+                    header: "Su parte",
+                    align: "right",
+                    headClassName: "text-xs uppercase tracking-wider",
+                    className: "font-mono tabular-nums",
+                    cell: (s) => formatARS(r.devengado.por_socio[s] ?? 0),
+                  },
+                  {
+                    header: "Cobró",
+                    align: "right",
+                    headClassName: "text-xs uppercase tracking-wider",
+                    className: "font-mono tabular-nums",
+                    cell: (s) => formatARS(r.cobrado.por_socio[s] ?? 0),
+                  },
+                  {
+                    header: "Le cargué",
+                    align: "right",
+                    headClassName: "text-xs uppercase tracking-wider",
+                    className: "font-mono tabular-nums text-muted-foreground",
+                    cell: (s) =>
+                      socios.includes(s) ? formatARS(r.socios_mes.cargos[s] ?? 0) : "—",
+                  },
+                  {
+                    header: "Me pagó",
+                    align: "right",
+                    headClassName: "text-xs uppercase tracking-wider",
+                    className: "font-mono tabular-nums text-muted-foreground",
+                    cell: (s) => (socios.includes(s) ? formatARS(r.socios_mes.pagos[s] ?? 0) : "—"),
+                  },
+                ]}
+              />
               <p className="text-xs text-muted-foreground">
                 <strong>Su parte</strong> es lo que se ganó y le toca (devengado).{" "}
                 <strong>Cobró</strong> es la plata que entró a su nombre (percibido). Son cosas

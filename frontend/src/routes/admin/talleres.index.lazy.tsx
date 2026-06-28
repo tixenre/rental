@@ -42,6 +42,7 @@ import {
 } from "@/design-system/ui/dialog";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
 
 export const Route = createLazyFileRoute("/admin/talleres/")({
   component: TalleresAdminPage,
@@ -964,86 +965,91 @@ function InscripcionesSection({
     );
   }
 
-  const insTable = (rows: Inscripcion[], showConfirmar: boolean) => (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="text-left text-xs text-muted-foreground border-b border-border/60">
-            <th className="pb-2 pr-4 font-medium">Nombre</th>
-            <th className="pb-2 pr-4 font-medium">Email</th>
-            <th className="pb-2 pr-4 font-medium hidden sm:table-cell">Teléfono</th>
-            <th className="pb-2 pr-4 font-medium hidden lg:table-cell">Experiencia</th>
-            <th className="pb-2 pr-4 font-medium">Comp.</th>
-            <th className="pb-2 pr-4 font-medium">Fecha</th>
-            <th className="pb-2 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((ins) => (
-            <tr key={ins.id} className="border-b border-border/40 hover:bg-muted/20 transition">
-              <td className="py-2.5 pr-4 font-medium text-ink">{ins.nombre}</td>
-              <td className="py-2.5 pr-4 text-muted-foreground">
-                <a href={`mailto:${ins.email}`} className="hover:text-ink transition">
-                  {ins.email}
-                </a>
-              </td>
-              <td className="py-2.5 pr-4 text-muted-foreground hidden sm:table-cell">
-                {ins.telefono}
-              </td>
-              <td className="py-2.5 pr-4 text-muted-foreground hidden lg:table-cell max-w-[180px] truncate">
-                {ins.experiencia || "—"}
-              </td>
-              <td className="py-2.5 pr-4">
-                {ins.comprobante_url ? (
-                  <a
-                    href={ins.comprobante_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-ink hover:text-ink transition"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5 text-verde-ink" strokeWidth={1.5} />
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                ) : (
-                  <span className="text-muted-foreground/50 text-xs">—</span>
-                )}
-              </td>
-              <td className="py-2.5 pr-4 text-muted-foreground text-xs">
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {fmtDate(ins.created_at)}
-                </span>
-              </td>
-              <td className="py-2.5">
-                <div className="flex items-center gap-1">
-                  {showConfirmar && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      disabled={confirmarMut.isPending}
-                      onClick={() => confirmarMut.mutate(ins.id)}
-                    >
-                      Confirmar
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                    disabled={eliminarMut.isPending}
-                    onClick={() => handleEliminar(ins)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const insTable = (rows: Inscripcion[], showConfirmar: boolean) => {
+    const columns: Column<Inscripcion>[] = [
+      {
+        header: "Nombre",
+        cell: (ins) => ins.nombre,
+        className: "font-medium text-ink",
+      },
+      {
+        header: "Email",
+        cell: (ins) => (
+          <a href={`mailto:${ins.email}`} className="hover:text-ink transition">
+            {ins.email}
+          </a>
+        ),
+        className: "text-muted-foreground",
+      },
+      {
+        header: "Teléfono",
+        cell: (ins) => ins.telefono,
+        className: "text-muted-foreground hidden sm:table-cell",
+        headClassName: "hidden sm:table-cell",
+      },
+      {
+        header: "Experiencia",
+        cell: (ins) => ins.experiencia || "—",
+        className: "text-muted-foreground hidden lg:table-cell max-w-[180px] truncate",
+        headClassName: "hidden lg:table-cell",
+      },
+      {
+        header: "Comp.",
+        cell: (ins) =>
+          ins.comprobante_url ? (
+            <a
+              href={ins.comprobante_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-ink hover:text-ink transition"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 text-verde-ink" strokeWidth={1.5} />
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : (
+            <span className="text-muted-foreground/50 text-xs">—</span>
+          ),
+      },
+      {
+        header: "Fecha",
+        cell: (ins) => (
+          <span className="inline-flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {fmtDate(ins.created_at)}
+          </span>
+        ),
+        className: "text-muted-foreground text-xs",
+      },
+      {
+        header: "",
+        cell: (ins) => (
+          <div className="flex items-center gap-1">
+            {showConfirmar && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={confirmarMut.isPending}
+                onClick={() => confirmarMut.mutate(ins.id)}
+              >
+                Confirmar
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+              disabled={eliminarMut.isPending}
+              onClick={() => handleEliminar(ins)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+      },
+    ];
+    return <AdminTable columns={columns} rows={rows} getRowKey={(ins) => ins.id} />;
+  };
 
   return (
     <>

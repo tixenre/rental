@@ -14,6 +14,7 @@ import { formatARS, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
 import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/pagos")({
@@ -41,6 +42,60 @@ function PagosLogPage() {
 
   const pagos = q.data?.pagos ?? [];
   const total = q.data?.total ?? 0;
+
+  const columns: Column<(typeof pagos)[number]>[] = [
+    {
+      header: "Fecha",
+      cell: (p) => formatFechaDisplay(p.fecha),
+      className: "whitespace-nowrap text-muted-foreground",
+    },
+    {
+      header: "Pedido",
+      cell: (p) => (
+        <Link
+          to="/admin/pedidos/$id"
+          params={{ id: String(p.pedido_id) }}
+          className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber font-mono"
+        >
+          #{p.numero_pedido ?? p.pedido_id}
+        </Link>
+      ),
+      className: "whitespace-nowrap",
+    },
+    {
+      header: "Cliente",
+      cell: (p) => p.cliente_nombre ?? "—",
+      className: "max-w-[180px] truncate",
+    },
+    {
+      header: "Concepto",
+      cell: (p) => p.concepto ?? "—",
+      className: "text-muted-foreground",
+    },
+    {
+      header: "Cobró",
+      cell: (p) =>
+        p.destinatario ? (
+          <Badge variant="secondary" className="capitalize">
+            {p.destinatario}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      className: "whitespace-nowrap",
+    },
+    {
+      header: "Método",
+      cell: (p) => p.metodo ?? "—",
+      className: "whitespace-nowrap capitalize text-muted-foreground",
+    },
+    {
+      header: "Monto",
+      cell: (p) => formatARS(p.monto),
+      align: "right",
+      className: "font-mono tabular-nums",
+    },
+  ];
 
   return (
     <AdminPage
@@ -125,58 +180,7 @@ function PagosLogPage() {
           </div>
         )}
 
-        {pagos.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border hairline">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">Fecha</th>
-                  <th className="px-3 py-2 font-medium">Pedido</th>
-                  <th className="px-3 py-2 font-medium">Cliente</th>
-                  <th className="px-3 py-2 font-medium">Concepto</th>
-                  <th className="px-3 py-2 font-medium">Cobró</th>
-                  <th className="px-3 py-2 font-medium">Método</th>
-                  <th className="px-3 py-2 font-medium text-right">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagos.map((p) => (
-                  <tr key={p.id} className="border-b hairline last:border-0 hover:bg-muted/30">
-                    <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                      {formatFechaDisplay(p.fecha)}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <Link
-                        to="/admin/pedidos/$id"
-                        params={{ id: String(p.pedido_id) }}
-                        className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber font-mono"
-                      >
-                        #{p.numero_pedido ?? p.pedido_id}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 max-w-[180px] truncate">{p.cliente_nombre ?? "—"}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{p.concepto ?? "—"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {p.destinatario ? (
-                        <Badge variant="secondary" className="capitalize">
-                          {p.destinatario}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap capitalize text-muted-foreground">
-                      {p.metodo ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
-                      {formatARS(p.monto)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {pagos.length > 0 && <AdminTable columns={columns} rows={pagos} getRowKey={(p) => p.id} />}
       </div>
     </AdminPage>
   );

@@ -21,6 +21,7 @@ import {
   type TipoMovimiento,
 } from "@/lib/admin/api";
 import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
@@ -115,6 +116,100 @@ function MovimientosPage() {
     filas.sort((a, b) => b.fecha.localeCompare(a.fecha));
   }
 
+  const columns: Column<Fila>[] = [
+    {
+      header: "Fecha",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          formatFechaDisplay(f.mov.fecha)
+        ) : (
+          <span className="capitalize">{mesLabel(f.cobro.mes)}</span>
+        ),
+      className: "whitespace-nowrap text-muted-foreground",
+    },
+    {
+      header: "Tipo",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          <TipoMovimientoBadge tipo={f.mov.tipo} />
+        ) : (
+          <Badge variant="secondary">Cobros</Badge>
+        ),
+    },
+    {
+      header: "Detalle",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          <>
+            <span className={cn(f.mov.anulado && "line-through")}>{descMovimiento(f.mov)}</span>
+            {f.mov.beneficiario && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setBeneficiarioFiltro(f.mov.beneficiario!)}
+                  className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+                  title="Ver el historial de este beneficiario"
+                >
+                  {f.mov.beneficiario}
+                </button>
+              </div>
+            )}
+            {f.mov.nota && <div className="text-xs text-muted-foreground">{f.mov.nota}</div>}
+            {f.mov.anulado && f.mov.anulado_motivo && (
+              <div className="text-xs text-destructive">Anulado: {f.mov.anulado_motivo}</div>
+            )}
+            {f.mov.comprobante_url && (
+              <a
+                href={f.mov.comprobante_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+              >
+                Ver comprobante
+              </a>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="capitalize text-ink">Cobro alquileres · {mesLabel(f.cobro.mes)}</span>
+            <div className="text-xs text-muted-foreground">
+              {f.cobro.cantidad} pago(s) ·{" "}
+              <Link
+                to="/admin/pagos"
+                className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+              >
+                ver detalle
+              </Link>
+            </div>
+          </>
+        ),
+    },
+    {
+      header: "Monto",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          <span className={montoClass(direccionMov(f.mov))}>
+            {montoSigno(direccionMov(f.mov))}
+            {formatMoney(f.mov.monto, f.mov.moneda)}
+          </span>
+        ) : (
+          <span className="text-verde-ink">+ {formatMoney(f.cobro.monto, "ARS")}</span>
+        ),
+      align: "right",
+      className: "font-mono tabular-nums",
+    },
+    {
+      header: "Acciones",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          <AnularMovimiento mov={f.mov} onChanged={invalidar} />
+        ) : (
+          <span className="text-xs text-muted-foreground">automático</span>
+        ),
+      align: "right",
+    },
+  ];
+
   return (
     <AdminPage
       title="Movimientos"
@@ -180,48 +275,21 @@ function MovimientosPage() {
         )}
 
         {filas.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border hairline">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">Fecha</th>
-                  <th className="px-3 py-2 font-medium">Tipo</th>
-                  <th className="px-3 py-2 font-medium">Detalle</th>
-                  <th className="px-3 py-2 font-medium text-right">Monto</th>
-                  <th className="px-3 py-2 font-medium text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filas.map((f) =>
-                  f.kind === "mov" ? (
-                    <MovimientoRow
-                      key={`m${f.mov.id}`}
-                      mov={f.mov}
-                      onChanged={invalidar}
-                      onBeneficiario={setBeneficiarioFiltro}
-                    />
-                  ) : (
-                    <CobroRow key={`c${f.cobro.mes}`} cobro={f.cobro} />
-                  ),
-                )}
-              </tbody>
-            </table>
-          </div>
+          <AdminTable
+            columns={columns}
+            rows={filas}
+            getRowKey={(f) => (f.kind === "mov" ? `m${f.mov.id}` : `c${f.cobro.mes}`)}
+            rowClassName={(f) =>
+              f.kind === "mov" ? cn(f.mov.anulado && "opacity-50") : "bg-muted/10"
+            }
+          />
         )}
       </div>
     </AdminPage>
   );
 }
 
-function MovimientoRow({
-  mov,
-  onChanged,
-  onBeneficiario,
-}: {
-  mov: Movimiento;
-  onChanged: () => void;
-  onBeneficiario: (b: string) => void;
-}) {
+function AnularMovimiento({ mov, onChanged }: { mov: Movimiento; onChanged: () => void }) {
   const anular = useMutation({
     mutationFn: (motivo: string) => adminApi.anularMovimiento(mov.id, motivo),
     onSuccess: () => {
@@ -231,94 +299,20 @@ function MovimientoRow({
     onError: (e) => toast.error("No se pudo anular", { description: (e as Error).message }),
   });
 
-  const dir = direccionMov(mov);
+  if (mov.anulado) return null;
 
   return (
-    <tr className={cn("border-b hairline last:border-0", mov.anulado && "opacity-50")}>
-      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-        {formatFechaDisplay(mov.fecha)}
-      </td>
-      <td className="px-3 py-2">
-        <TipoMovimientoBadge tipo={mov.tipo} />
-      </td>
-      <td className="px-3 py-2">
-        <span className={cn(mov.anulado && "line-through")}>{descMovimiento(mov)}</span>
-        {mov.beneficiario && (
-          <div>
-            <button
-              type="button"
-              onClick={() => onBeneficiario(mov.beneficiario!)}
-              className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
-              title="Ver el historial de este beneficiario"
-            >
-              {mov.beneficiario}
-            </button>
-          </div>
-        )}
-        {mov.nota && <div className="text-xs text-muted-foreground">{mov.nota}</div>}
-        {mov.anulado && mov.anulado_motivo && (
-          <div className="text-xs text-destructive">Anulado: {mov.anulado_motivo}</div>
-        )}
-        {mov.comprobante_url && (
-          <a
-            href={mov.comprobante_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
-          >
-            Ver comprobante
-          </a>
-        )}
-      </td>
-      <td className={cn("px-3 py-2 text-right font-mono tabular-nums", montoClass(dir))}>
-        {montoSigno(dir)}
-        {formatMoney(mov.monto, mov.moneda)}
-      </td>
-      <td className="px-3 py-2 text-right">
-        {!mov.anulado && (
-          <button
-            type="button"
-            onClick={() => {
-              const motivo = window.prompt("Motivo de la anulación:");
-              if (motivo && motivo.trim()) anular.mutate(motivo.trim());
-            }}
-            disabled={anular.isPending}
-            className="text-xs text-muted-foreground hover:text-destructive underline"
-          >
-            Anular
-          </button>
-        )}
-      </td>
-    </tr>
-  );
-}
-
-function CobroRow({ cobro }: { cobro: CobroMensual }) {
-  return (
-    <tr className="border-b hairline last:border-0 bg-muted/10">
-      <td className="px-3 py-2 whitespace-nowrap capitalize text-muted-foreground">
-        {mesLabel(cobro.mes)}
-      </td>
-      <td className="px-3 py-2">
-        <Badge variant="secondary">Cobros</Badge>
-      </td>
-      <td className="px-3 py-2">
-        <span className="capitalize text-ink">Cobro alquileres · {mesLabel(cobro.mes)}</span>
-        <div className="text-xs text-muted-foreground">
-          {cobro.cantidad} pago(s) ·{" "}
-          <Link
-            to="/admin/pagos"
-            className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
-          >
-            ver detalle
-          </Link>
-        </div>
-      </td>
-      <td className="px-3 py-2 text-right font-mono tabular-nums text-verde-ink">
-        + {formatMoney(cobro.monto, "ARS")}
-      </td>
-      <td className="px-3 py-2 text-right text-xs text-muted-foreground">automático</td>
-    </tr>
+    <button
+      type="button"
+      onClick={() => {
+        const motivo = window.prompt("Motivo de la anulación:");
+        if (motivo && motivo.trim()) anular.mutate(motivo.trim());
+      }}
+      disabled={anular.isPending}
+      className="text-xs text-muted-foreground hover:text-destructive underline"
+    >
+      Anular
+    </button>
   );
 }
 
