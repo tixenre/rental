@@ -1,8 +1,16 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Trash2, AlertCircle, Calendar as CalendarIcon, ShoppingBag } from "lucide-react";
+import {
+  X,
+  Trash2,
+  AlertCircle,
+  Calendar as CalendarIcon,
+  ShoppingBag,
+  ChevronDown,
+} from "lucide-react";
 import { Button } from "@/design-system/ui/button";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { IncludesLine } from "./equipment/shared/IncludesLine";
+import { KitSection } from "./KitSection";
 import { EmptyState } from "./EmptyState";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -59,6 +67,10 @@ export function CartDrawer({
   const [notas, setNotas] = useState("");
   const [showNotas, setShowNotas] = useState(false);
   const [dateModalOpen, setDateModalOpen] = useState(false);
+  // Por-ítem: qué kits/combos tienen el desglose "qué incluye" abierto en el
+  // carrito. La data (`it.includes`) ya viaja en el equipo — misma fuente que
+  // el catálogo y los documentos (la puerta de contenido). No se fetchea nada.
+  const [openKits, setOpenKits] = useState<Record<string, boolean>>({});
 
   // Refs para focus trap + restauración de foco
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -422,11 +434,48 @@ export function CartDrawer({
                                 <div className="line-clamp-2 font-sans text-sm font-bold leading-tight">
                                   {it.name}
                                 </div>
-                                <IncludesLine
-                                  includes={it.includes}
-                                  label="Incluye:"
-                                  className="mt-0.5 text-2xs"
-                                />
+                                {it.includes && it.includes.length > 0 ? (
+                                  <div className="mt-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setOpenKits((p) => ({ ...p, [it.id]: !p[it.id] }))
+                                      }
+                                      aria-expanded={!!openKits[it.id]}
+                                      aria-label={
+                                        openKits[it.id] ? "Ocultar qué incluye" : "Ver qué incluye"
+                                      }
+                                      className="group flex w-full items-center gap-1 text-left focus:outline-none focus-visible:underline"
+                                    >
+                                      <ChevronDown
+                                        className={cn(
+                                          "h-3 w-3 shrink-0 text-muted-foreground transition-transform group-hover:text-ink",
+                                          openKits[it.id] && "rotate-180",
+                                        )}
+                                      />
+                                      <IncludesLine
+                                        includes={it.includes}
+                                        label="Incluye:"
+                                        className="text-2xs group-hover:text-ink"
+                                      />
+                                    </button>
+                                    <AnimatePresence initial={false}>
+                                      {openKits[it.id] && (
+                                        <motion.div
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{ height: "auto", opacity: 1 }}
+                                          exit={{ height: 0, opacity: 0 }}
+                                          transition={{ duration: 0.2, ease: "easeOut" }}
+                                          className="overflow-hidden"
+                                        >
+                                          <div className="mt-2">
+                                            <KitSection item={it} />
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </div>
+                                ) : null}
                                 {noDisponible && (
                                   <div className="mt-1 flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-1 text-2xs font-semibold text-destructive uppercase tracking-wide">

@@ -453,8 +453,8 @@ function Index() {
     if (deferredQuery.trim()) {
       // Motor de búsqueda compartido (espejo del backend): sin tildes, sin
       // guiones, multi-palabra y ORDENADO por relevancia (mejor match primero).
-      // `nombre` pondera el ranking; el resto (marca/categoría/specs/descripción)
-      // entra al match como contexto.
+      // `nombre` pondera el ranking; el resto (marca/categoría/specs/descripción/
+      // contenido) entra al match como contexto.
       list = filtrarOrdenar(list, deferredQuery, (e) => ({
         nombre: e.name,
         extra: [
@@ -462,6 +462,10 @@ function Index() {
           e.category,
           e.description ?? "",
           (e.specs ?? []).map((s) => `${s.label} ${s.value}`).join(" "),
+          // Buscar por contenido: un kit/combo matchea por el nombre de sus
+          // componentes ("todos los kits con trípode"). `includes` ya viaja en
+          // el equipo desde la puerta de contenido — misma fuente única.
+          (e.includes ?? []).map((i) => i.name).join(" "),
         ].join(" "),
       }));
     }
