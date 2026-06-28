@@ -7,8 +7,6 @@
 
 import { Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Menu } from "lucide-react";
-
 import { authedFetch } from "@/lib/authedFetch";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { SidebarProvider, SidebarTrigger } from "@/design-system/ui/sidebar";
@@ -60,10 +58,9 @@ export function AdminLayout() {
       <div className="min-h-screen flex w-full bg-background">
         <AdminSidebar email={session.email ?? ""} />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-12 flex items-center gap-2 border-b hairline px-3 md:px-4 bg-background sticky top-0 z-10">
-            <SidebarTrigger aria-label="Alternar sidebar">
-              <Menu className="h-4 w-4" />
-            </SidebarTrigger>
+          {/* En mobile el sidebar está oculto, así que el trigger vive acá */}
+          <header className="md:hidden h-12 flex items-center border-b hairline px-3 bg-background sticky top-0 z-10">
+            <SidebarTrigger aria-label="Abrir menú" />
           </header>
           <main className="flex-1 min-w-0">
             <Outlet />

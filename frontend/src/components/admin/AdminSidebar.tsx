@@ -45,6 +45,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarTrigger,
   useSidebar,
 } from "@/design-system/ui/sidebar";
 import { authedFetch } from "@/lib/authedFetch";
@@ -312,6 +313,12 @@ export function AdminSidebar({ email }: { email: string }) {
               <LogOut className="h-4 w-4 shrink-0" />
               {!collapsed && <span>{isSigningOut ? "Cerrando…" : "Cerrar sesión"}</span>}
             </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarTrigger
+              className="w-full"
+              tooltip={collapsed ? "Expandir sidebar" : undefined}
+            />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
