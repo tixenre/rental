@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Send, Eye, Pencil, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
 
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { Button } from "@/design-system/ui/button";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Input } from "@/design-system/ui/input";
@@ -382,24 +383,12 @@ function EmailsLog() {
       )}
 
       {items.length > 0 && (
-        <div className="overflow-x-auto rounded-md border hairline">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/30 text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">Fecha</th>
-                <th className="px-3 py-2 text-left font-medium">Estado</th>
-                <th className="px-3 py-2 text-left font-medium">Plantilla</th>
-                <th className="px-3 py-2 text-left font-medium">Destinatario</th>
-                <th className="px-3 py-2 text-left font-medium">Detalle</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y hairline">
-              {items.map((e) => (
-                <EmailLogRow key={e.id} entry={e} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <AdminTable
+          columns={EMAIL_LOG_COLUMNS}
+          rows={items}
+          getRowKey={(e) => e.id}
+          rowClassName={() => "align-top"}
+        />
       )}
 
       {total > PAGE && (
@@ -431,23 +420,27 @@ function EmailsLog() {
   );
 }
 
-function EmailLogRow({ entry }: { entry: EmailLogEntry }) {
-  const meta = TEMPLATE_META[entry.template_key];
-  const ok = entry.status === "sent";
-  const failed = entry.status === "failed";
-  return (
-    <tr className="align-top">
-      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-muted-foreground">
-        {entry.sent_at
-          ? new Date(entry.sent_at).toLocaleString("es-AR", {
-              day: "2-digit",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "—"}
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">
+const EMAIL_LOG_COLUMNS: Column<EmailLogEntry>[] = [
+  {
+    header: "Fecha",
+    className: "whitespace-nowrap font-mono text-xs text-muted-foreground",
+    cell: (entry) =>
+      entry.sent_at
+        ? new Date(entry.sent_at).toLocaleString("es-AR", {
+            day: "2-digit",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "—",
+  },
+  {
+    header: "Estado",
+    className: "whitespace-nowrap",
+    cell: (entry) => {
+      const ok = entry.status === "sent";
+      const failed = entry.status === "failed";
+      return (
         <span
           className={`inline-block rounded-full px-2 py-0.5 text-2xs font-medium ${
             ok
@@ -459,22 +452,32 @@ function EmailLogRow({ entry }: { entry: EmailLogEntry }) {
         >
           {entry.status}
         </span>
-      </td>
-      <td className="px-3 py-2">{meta?.label ?? entry.template_key}</td>
-      <td className="px-3 py-2 font-mono text-xs">{entry.to_addr}</td>
-      <td className="px-3 py-2 text-muted-foreground">
-        {entry.error ? (
-          <span className="text-destructive">{entry.error}</span>
-        ) : (
-          <span className="font-mono text-xs text-muted-foreground/70">
-            {entry.provider}
-            {entry.provider_id ? ` · ${entry.provider_id}` : ""}
-          </span>
-        )}
-      </td>
-    </tr>
-  );
-}
+      );
+    },
+  },
+  {
+    header: "Plantilla",
+    cell: (entry) => TEMPLATE_META[entry.template_key]?.label ?? entry.template_key,
+  },
+  {
+    header: "Destinatario",
+    className: "font-mono text-xs",
+    cell: (entry) => entry.to_addr,
+  },
+  {
+    header: "Detalle",
+    className: "text-muted-foreground",
+    cell: (entry) =>
+      entry.error ? (
+        <span className="text-destructive">{entry.error}</span>
+      ) : (
+        <span className="font-mono text-xs text-muted-foreground/70">
+          {entry.provider}
+          {entry.provider_id ? ` · ${entry.provider_id}` : ""}
+        </span>
+      ),
+  },
+];
 
 // ── Banner de estado del canal ───────────────────────────────────────────────
 

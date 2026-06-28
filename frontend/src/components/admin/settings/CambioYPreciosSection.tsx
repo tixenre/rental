@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
 
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { adminApi } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
 
@@ -285,6 +286,79 @@ function PreciosManualesPanel({ onRecalcSelected }: { onRecalcSelected: (ids: nu
 
   const fmtPrecio = (n: number | null) => (n == null ? "—" : formatARS(n));
 
+  const headClass = "text-2xs uppercase tracking-wide px-3 py-1.5";
+  const columns: Column<(typeof items)[number]>[] = [
+    {
+      header: "",
+      headClassName: headClass + " w-8",
+      className: "px-3 py-1.5",
+      cell: (it) => {
+        const cambia = it.delta != null && it.delta !== 0;
+        return (
+          <input
+            type="checkbox"
+            checked={selected.has(it.id)}
+            disabled={!cambia}
+            onChange={() => toggleOne(it.id)}
+            className="cursor-pointer"
+          />
+        );
+      },
+    },
+    {
+      header: "Equipo",
+      headClassName: headClass,
+      className: "px-3 py-1.5 text-ink",
+      cell: (it) => (
+        <>
+          {it.nombre}
+          {(it.marca || it.modelo) && (
+            <span className="text-muted-foreground">
+              {" "}
+              — {[it.marca, it.modelo].filter(Boolean).join(" / ")}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      header: "Actual",
+      align: "right",
+      headClassName: headClass,
+      className: "px-3 py-1.5 tabular-nums",
+      cell: (it) => fmtPrecio(it.precio_actual),
+    },
+    {
+      header: "Si recalcula",
+      align: "right",
+      headClassName: headClass,
+      className: "px-3 py-1.5 tabular-nums text-muted-foreground",
+      cell: (it) => fmtPrecio(it.precio_calculado),
+    },
+    {
+      header: "Δ",
+      align: "right",
+      headClassName: headClass,
+      className: "px-3 py-1.5 tabular-nums",
+      cell: (it) => {
+        const cambia = it.delta != null && it.delta !== 0;
+        return (
+          <span
+            className={
+              cambia
+                ? it.delta! > 0
+                  ? "text-verde-ink"
+                  : "text-destructive"
+                : "text-muted-foreground"
+            }
+          >
+            {cambia ? `${it.delta! > 0 ? "+" : ""}${fmtPrecio(it.delta).slice(1)}` : "—"}
+          </span>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="border-t hairline pt-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -332,62 +406,12 @@ function PreciosManualesPanel({ onRecalcSelected }: { onRecalcSelected: (ids: nu
               </Button>
             </div>
           )}
-          <table className="w-full text-xs">
-            <thead className="text-2xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="text-left px-3 py-1.5 w-8"></th>
-                <th className="text-left px-3 py-1.5">Equipo</th>
-                <th className="text-right px-3 py-1.5">Actual</th>
-                <th className="text-right px-3 py-1.5">Si recalcula</th>
-                <th className="text-right px-3 py-1.5">Δ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => {
-                const cambia = it.delta != null && it.delta !== 0;
-                return (
-                  <tr key={it.id} className="border-t hairline">
-                    <td className="px-3 py-1.5">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(it.id)}
-                        disabled={!cambia}
-                        onChange={() => toggleOne(it.id)}
-                        className="cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-3 py-1.5 text-ink">
-                      {it.nombre}
-                      {(it.marca || it.modelo) && (
-                        <span className="text-muted-foreground">
-                          {" "}
-                          — {[it.marca, it.modelo].filter(Boolean).join(" / ")}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums">
-                      {fmtPrecio(it.precio_actual)}
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                      {fmtPrecio(it.precio_calculado)}
-                    </td>
-                    <td
-                      className={
-                        "px-3 py-1.5 text-right tabular-nums " +
-                        (cambia
-                          ? it.delta! > 0
-                            ? "text-verde-ink"
-                            : "text-destructive"
-                          : "text-muted-foreground")
-                      }
-                    >
-                      {cambia ? `${it.delta! > 0 ? "+" : ""}${fmtPrecio(it.delta).slice(1)}` : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <AdminTable
+            className="rounded-none border-0 overflow-visible text-xs"
+            columns={columns}
+            rows={items}
+            getRowKey={(it) => it.id}
+          />
         </div>
       )}
     </div>
