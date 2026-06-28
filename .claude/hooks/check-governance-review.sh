@@ -34,6 +34,7 @@ sig="$(printf '%s|%s' "$skills_hit" "$digest_hit" | cksum 2>/dev/null | cut -d' 
 echo "⚠ Gobernanza — esta rama tiene cambios sin validar con el harness (scripts/evals/README.md):"
 if [ -n "$digest_hit" ]; then
   echo "  • Tocaste el digest (docs/MEMORIA|DECISIONES) → corré la SEÑAL B (catch del supervisor vs fixtures/*.diff) antes del PR."
+  echo "  • ¿Toca un principio? (CLAUDE.md → Filosofía de trabajo) confirma/tensiona/suma → proponelo. Excepción puntual = no muta; patrón repetido o cambio de criterio = sí."
   node scripts/evals/context-size.mjs 2>/dev/null | tail -4 || true
 fi
 [ -n "$skills_hit" ] && echo "  • Tocaste la capa de skills → corré la SEÑAL C (routing-judge vs routing-cases.jsonl) + considerá /gobernanza."
