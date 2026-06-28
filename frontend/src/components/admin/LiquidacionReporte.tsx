@@ -372,6 +372,7 @@ function MesAMesTabla({
   };
   return (
     <div className="overflow-x-auto">
+      {/* eslint-disable-next-line no-restricted-syntax -- tabla mes-a-mes con columnas dinámicas por beneficiario; AdminTable es de columnas fijas */}
       <table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-muted-foreground">

@@ -79,6 +79,12 @@ const RAW_FORM_RESTRICTED = [
     selector: "JSXOpeningElement[name.name='textarea']",
     message: "Usá <Textarea> del DS en vez de <textarea> nativo.",
   },
+  {
+    selector: "JSXOpeningElement[name.name='table']",
+    message:
+      "Usá <AdminTable columns rows> (@/components/admin/AdminTable) en vez de <table> nativo. " +
+      "Excepción (tabla de edición inline / columnas dinámicas / layout key-value): eslint-disable-next-line no-restricted-syntax + motivo.",
+  },
 ];
 
 export default tseslint.config(

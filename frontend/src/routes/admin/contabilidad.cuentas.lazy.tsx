@@ -82,6 +82,7 @@ function CuentasPage() {
           <section className="space-y-3">
             <div className="t-eyebrow">Cajas · Plata del negocio</div>
             <div className="overflow-x-auto rounded-lg border hairline">
+              {/* eslint-disable-next-line no-restricted-syntax -- tabla de edición inline (CajaRow con estado propio + totales en tfoot), no es tabla de display; AdminTable no aplica */}
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">

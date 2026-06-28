@@ -76,6 +76,7 @@ function MarcaPage() {
 
         <Section title="Assets canónicos">
           <div className="rounded-xl border border-border overflow-hidden">
+            {/* eslint-disable-next-line no-restricted-syntax -- tabla key/value de layout (label↔valor), no es data-table; AdminTable no aplica */}
             <table className="w-full text-sm">
               <tbody>
                 {[
