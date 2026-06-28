@@ -8,6 +8,7 @@
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Receipt } from "lucide-react";
 
 import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
@@ -16,6 +17,9 @@ import { Badge } from "@/design-system/ui/badge";
 import { Input } from "@/design-system/ui/input";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
+import { QueryState } from "@/components/admin/QueryState";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { EmptyState } from "@/components/rental/EmptyState";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/pagos")({
@@ -158,20 +162,20 @@ function PagosLogPage() {
           </span>
         </div>
 
-        {q.isLoading && <div className="text-sm text-muted-foreground">Cargando pagos…</div>}
-        {q.isError && (
-          <div className="text-sm text-destructive">
-            Error cargando los pagos. {(q.error as Error)?.message}
-          </div>
-        )}
-
-        {!q.isLoading && !q.isError && pagos.length === 0 && (
-          <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
-            No hay pagos para los filtros elegidos.
-          </div>
-        )}
-
-        {pagos.length > 0 && <AdminTable columns={columns} rows={pagos} getRowKey={(p) => p.id} />}
+        <QueryState
+          query={q}
+          isEmpty={(d) => (d.pagos ?? []).length === 0}
+          skeleton={<TableSkeleton rows={6} cols={7} />}
+          empty={
+            <EmptyState
+              icon={<Receipt className="h-6 w-6" />}
+              title="No hay pagos"
+              sub="No hay pagos para los filtros elegidos."
+            />
+          }
+        >
+          {() => <AdminTable columns={columns} rows={pagos} getRowKey={(p) => p.id} />}
+        </QueryState>
       </div>
     </AdminPage>
   );

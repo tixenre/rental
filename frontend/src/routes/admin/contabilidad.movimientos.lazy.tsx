@@ -11,7 +11,7 @@
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -25,6 +25,9 @@ import {
 } from "@/lib/admin/api";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
+import { QueryState } from "@/components/admin/QueryState";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { EmptyState } from "@/components/rental/EmptyState";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
@@ -249,15 +252,6 @@ function MovimientosPage() {
           ))}
         </div>
 
-        {movsQ.isLoading && (
-          <div className="text-sm text-muted-foreground">Cargando movimientos…</div>
-        )}
-        {movsQ.isError && (
-          <div className="text-sm text-destructive">
-            Error cargando los movimientos. {(movsQ.error as Error)?.message}
-          </div>
-        )}
-
         {beneficiarioFiltro && (
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Beneficiario:</span>
@@ -274,28 +268,39 @@ function MovimientosPage() {
           </div>
         )}
 
-        {movsQ.data && filas.length === 0 && (
-          <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
-            Todavía no hay movimientos para este filtro.
-          </div>
-        )}
-
-        {filas.length > 0 && (
-          <AdminTable
-            columns={columns}
-            rows={filas}
-            getRowKey={(f) => (f.kind === "mov" ? `m${f.mov.id}` : `c${f.cobro.mes}`)}
-            rowClassName={(f) =>
-              f.kind === "mov" ? cn("cursor-default", f.mov.anulado && "opacity-50") : "bg-muted/10"
-            }
-            onRowClick={(f) => {
-              if (f.kind === "cobro")
-                setExpandedMes((m) => (m === f.cobro.mes ? null : f.cobro.mes));
-            }}
-            isExpanded={(f) => f.kind === "cobro" && expandedMes === f.cobro.mes}
-            renderExpanded={(f) => (f.kind === "cobro" ? <CobroDetalle mes={f.cobro.mes} /> : null)}
-          />
-        )}
+        <QueryState
+          query={movsQ}
+          isEmpty={(d) => d.movimientos.length === 0 && (d.cobros ?? []).length === 0}
+          skeleton={<TableSkeleton rows={6} cols={5} />}
+          empty={
+            <EmptyState
+              icon={<Wallet className="h-6 w-6" />}
+              title="No hay movimientos"
+              sub="Todavía no hay movimientos para este filtro."
+            />
+          }
+        >
+          {() => (
+            <AdminTable
+              columns={columns}
+              rows={filas}
+              getRowKey={(f) => (f.kind === "mov" ? `m${f.mov.id}` : `c${f.cobro.mes}`)}
+              rowClassName={(f) =>
+                f.kind === "mov"
+                  ? cn("cursor-default", f.mov.anulado && "opacity-50")
+                  : "bg-muted/10"
+              }
+              onRowClick={(f) => {
+                if (f.kind === "cobro")
+                  setExpandedMes((m) => (m === f.cobro.mes ? null : f.cobro.mes));
+              }}
+              isExpanded={(f) => f.kind === "cobro" && expandedMes === f.cobro.mes}
+              renderExpanded={(f) =>
+                f.kind === "cobro" ? <CobroDetalle mes={f.cobro.mes} /> : null
+              }
+            />
+          )}
+        </QueryState>
       </div>
     </AdminPage>
   );
