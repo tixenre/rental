@@ -57,6 +57,7 @@ import { whatsappLink } from "@/lib/whatsapp";
 import { MODIFICAR_PEDIDOS_HABILITADO } from "@/lib/features";
 import { useCart } from "@/lib/cart-store";
 import { rearmarCarrito } from "@/lib/rearmar-carrito";
+import { GuardarComoListaButton } from "@/components/rental/GuardarComoListaButton";
 import { cn } from "@/lib/utils";
 import {
   fmt,
@@ -728,6 +729,15 @@ export function PedidoCard({
                   Armamos tu carrito con estos equipos para que reserves de nuevo. Elegís las fechas
                   y se recalcula el precio con la disponibilidad actual.
                 </p>
+                {/* Guardar esta composición como lista reutilizable (#1092). */}
+                <div className="mt-3 max-w-xs">
+                  <GuardarComoListaButton
+                    items={itemsRepetibles.map((it) => ({
+                      equipo_id: it.equipo_id as number,
+                      cantidad: it.cantidad,
+                    }))}
+                  />
+                </div>
               </section>
             )}
 

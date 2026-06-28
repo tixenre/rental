@@ -26,6 +26,7 @@ import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequ
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { RentalDateModal } from "./RentalDateModal";
+import { GuardarComoListaButton } from "./GuardarComoListaButton";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
 import { cn } from "@/lib/utils";
@@ -693,6 +694,16 @@ export function CartDrawer({
                         setIniciandoVerif(false);
                       }
                     }}
+                  />
+                )}
+
+                {/* Guardar como lista — solo logueado (las listas son server-only). */}
+                {clienteSession && list.length > 0 && (
+                  <GuardarComoListaButton
+                    items={list.map(({ it, qty }) => ({
+                      equipo_id: it._backendId ?? Number(it.id),
+                      cantidad: qty,
+                    }))}
                   />
                 )}
 

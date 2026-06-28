@@ -29,6 +29,7 @@ import {
   Bell,
   User,
   Package,
+  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,8 @@ import {
   PerfilSection,
 } from "./ClientePortalHelpers";
 import { PedidoEmpty, PedidoCard, DocAvailablePopup } from "./ClientePortalPedido";
+import { ListasSection } from "./ClientePortalListas";
+import { useListas } from "@/hooks/useListas";
 
 export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mis pedidos — Rambla Rental" }] }),
@@ -84,6 +87,16 @@ export default function ClientePortal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depende de fav.items (los datos), no de fav.has (método recreado por render)
     [allEquipos, fav.items],
   );
+  // Listas / kits personales (#1092). El hook se iza acá (no dentro de
+  // ListasSection) para que el badge del sidebar/bottom-nav y la vista compartan
+  // una sola instancia de estado: las mutaciones se reflejan en ambos a la vez.
+  const {
+    listas,
+    loading: listasLoading,
+    renombrar: renombrarLista,
+    quitarItem: quitarItemLista,
+    borrar: borrarLista,
+  } = useListas();
 
   // Estado del portal
   const [activeTab, setActiveTab] = useState<PortalTab>("pedidos");
@@ -381,6 +394,13 @@ export default function ClientePortal() {
               onClick={() => setActiveTab("pedidos")}
             />
             <SidebarNavItem
+              icon={<ClipboardList className="h-4 w-4" />}
+              label="Mis listas"
+              count={listas.length}
+              active={activeTab === "listas"}
+              onClick={() => setActiveTab("listas")}
+            />
+            <SidebarNavItem
               icon={<Bell className="h-4 w-4" />}
               label="Notificaciones"
               active={activeTab === "notificaciones"}
@@ -587,6 +607,18 @@ export default function ClientePortal() {
             </div>
           )}
 
+          {/* TAB: MIS LISTAS */}
+          {activeTab === "listas" && (
+            <ListasSection
+              listas={listas}
+              loading={listasLoading}
+              allEquipos={allEquipos}
+              onRename={renombrarLista}
+              onRemoveItem={quitarItemLista}
+              onDelete={borrarLista}
+            />
+          )}
+
           {/* TAB: NOTIFICACIONES */}
           {activeTab === "notificaciones" && <NotificacionesSection />}
 
@@ -610,12 +642,18 @@ export default function ClientePortal() {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label="Navegación del portal"
       >
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           <BottomNavItem
             icon={<Package className="h-5 w-5" />}
             label="Pedidos"
             active={activeTab === "pedidos"}
             onClick={() => setActiveTab("pedidos")}
+          />
+          <BottomNavItem
+            icon={<ClipboardList className="h-5 w-5" />}
+            label="Listas"
+            active={activeTab === "listas"}
+            onClick={() => setActiveTab("listas")}
           />
           <BottomNavItem
             icon={<Bell className="h-5 w-5" />}

@@ -83,7 +83,7 @@ export type Pedido = {
   cantidad_jornadas?: number;
 };
 
-export type PortalTab = "pedidos" | "notificaciones" | "perfil";
+export type PortalTab = "pedidos" | "listas" | "notificaciones" | "perfil";
 export type DocTipo = "remito" | "contrato" | "albaran";
 export type Filtro = "todos" | "activos" | "historial";
 
