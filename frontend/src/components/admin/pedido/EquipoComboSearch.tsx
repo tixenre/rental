@@ -41,7 +41,9 @@ export function EquipoComboSearch({
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [focusedIdx, setFocusedIdx] = useState(-1);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   // Cerrar al clickear afuera (el dropdown se mantiene abierto mientras se
   // agregan equipos, así que no alcanza con onBlur del input).
@@ -53,6 +55,16 @@ export function EquipoComboSearch({
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [open]);
+
+  // Reset del foco al cambiar la búsqueda.
+  useEffect(() => setFocusedIdx(-1), [q]);
+
+  // Scroll al ítem enfocado.
+  useEffect(() => {
+    if (focusedIdx < 0 || !listRef.current) return;
+    const item = listRef.current.children[focusedIdx] as HTMLElement;
+    item?.scrollIntoView({ block: "nearest" });
+  }, [focusedIdx]);
 
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", "all"],
@@ -80,6 +92,24 @@ export function EquipoComboSearch({
     return max - (inCart?.cantidad ?? 0);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!open) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setFocusedIdx((i) => Math.min(i + 1, visibles.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setFocusedIdx((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const eq = visibles[focusedIdx];
+      if (eq && disponibleDe(eq) > 0) onAdd(eq);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setFocusedIdx(-1);
+    }
+  };
+
   return (
     <div ref={wrapRef} className={cn("relative", className)}>
       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -90,8 +120,10 @@ export function EquipoComboSearch({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className="pl-9 text-base sm:text-sm"
+        aria-activedescendant={focusedIdx >= 0 ? `equipo-opt-${focusedIdx}` : undefined}
       />
 
       {open && (
@@ -103,12 +135,13 @@ export function EquipoComboSearch({
               {q.trim() ? `Sin resultados para "${q.trim()}".` : "No hay equipos."}
             </div>
           ) : (
-            <ul className="divide-y hairline">
-              {visibles.map((eq) => {
+            <ul ref={listRef} className="divide-y hairline">
+              {visibles.map((eq, idx) => {
                 const disponible = disponibleDe(eq);
                 const sinStock = disponible <= 0;
+                const isFocused = idx === focusedIdx;
                 return (
-                  <li key={eq.id}>
+                  <li key={eq.id} id={`equipo-opt-${idx}`}>
                     <button
                       type="button"
                       disabled={sinStock}
@@ -121,6 +154,7 @@ export function EquipoComboSearch({
                       className={cn(
                         "flex w-full items-center gap-3 px-3 py-2 text-left transition-colors",
                         sinStock ? "cursor-not-allowed opacity-50" : "hover:bg-amber-soft",
+                        isFocused && !sinStock && "bg-amber-soft",
                       )}
                     >
                       <EquipoThumb

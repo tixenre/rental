@@ -451,21 +451,34 @@ export function BarChart({
   if (!data.length) return <div className="text-sm text-muted-foreground">Sin datos</div>;
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
-    <div className="flex items-end gap-1 h-32">
-      {data.map((d) => (
-        <div key={d.label} className="flex-1 flex flex-col items-center gap-1 group">
-          <div className="text-3xs font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
-            {valueFormat(d.value)}
+    <div className="space-y-1">
+      {/* Área del gráfico — altura fija para que % de las barras resuelva */}
+      <div className="relative flex items-end gap-1 h-28">
+        {data.map((d) => (
+          <div key={d.label} className="relative flex-1 h-full group">
+            <div
+              className="absolute bottom-0 left-0 right-0 bg-ink/80 hover:bg-ink rounded-sm transition-colors"
+              style={{ height: `${Math.max((d.value / max) * 100, d.value > 0 ? 2 : 0)}%` }}
+            >
+              {/* Tooltip de valor al hover */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 whitespace-nowrap text-3xs font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums pointer-events-none">
+                {valueFormat(d.value)}
+              </div>
+            </div>
           </div>
+        ))}
+      </div>
+      {/* Etiquetas debajo, en fila separada */}
+      <div className="flex gap-1">
+        {data.map((d) => (
           <div
-            className="w-full bg-ink/80 hover:bg-ink rounded-sm transition-colors min-h-[2px]"
-            style={{ height: `${(d.value / max) * 100}%` }}
-          />
-          <div className="text-3xs font-mono text-muted-foreground truncate w-full text-center">
+            key={d.label}
+            className="flex-1 text-3xs font-mono text-muted-foreground truncate text-center"
+          >
             {labelFn(d.label)}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
