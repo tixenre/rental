@@ -22,6 +22,7 @@ import { authedFetch, authedJson } from "@/lib/authedFetch";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Pill, type PillTone } from "@/design-system/kit/Pill";
 import { Spinner } from "@/design-system/ui/spinner";
 import { Switch } from "@/design-system/ui/switch";
 import {
@@ -127,32 +128,22 @@ function updateConceptoInCache(qc: QueryClient, updated: TallerConcepto) {
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-function badgeEstadoEdicion(edicion: EdicionAdmin): { label: string; className: string } {
+function badgeEstadoEdicion(edicion: EdicionAdmin): { label: string; tone: PillTone } {
   const today = new Date().toISOString().slice(0, 10);
-  if (!edicion.activo) return { label: "INACTIVA", className: "bg-muted/40 text-muted-foreground" };
-  if (edicion.frozen_at)
-    return { label: "CONGELADA", className: "bg-muted/60 text-muted-foreground" };
-  if (edicion.fecha_inicio > today)
-    return { label: "PRÓXIMAMENTE", className: "bg-amber/20 text-ink" };
-  if (edicion.fecha_fin >= today)
-    return { label: "EN CURSO", className: "bg-verde/20 text-verde-ink" };
-  return { label: "FINALIZADA", className: "bg-muted/40 text-muted-foreground" };
+  if (!edicion.activo) return { label: "INACTIVA", tone: "neutral" };
+  if (edicion.frozen_at) return { label: "CONGELADA", tone: "neutral" };
+  if (edicion.fecha_inicio > today) return { label: "PRÓXIMAMENTE", tone: "warning" };
+  if (edicion.fecha_fin >= today) return { label: "EN CURSO", tone: "success" };
+  return { label: "FINALIZADA", tone: "neutral" };
 }
 
 function CuposPill({ confirmados, total }: { confirmados: number; total: number }) {
   const ratio = total > 0 ? confirmados / total : 0;
-  const cls =
-    ratio >= 1
-      ? "bg-destructive/10 text-destructive border-destructive/20"
-      : ratio >= 0.8
-        ? "bg-amber/15 text-ink border-amber/20"
-        : "bg-verde/10 text-verde-ink border-verde/20";
+  const tone: PillTone = ratio >= 1 ? "danger" : ratio >= 0.8 ? "warning" : "success";
   return (
-    <span
-      className={`shrink-0 rounded-full border px-2 py-0.5 text-2xs font-semibold font-mono tabular-nums ${cls}`}
-    >
+    <Pill tone={tone} className="font-mono font-semibold tabular-nums">
       {confirmados}/{total}
-    </span>
+    </Pill>
   );
 }
 
@@ -1231,11 +1222,9 @@ function EdicionSubRow({
         <span className="shrink-0 text-xs font-mono font-semibold text-muted-foreground">
           #{edicion.numero_edicion}
         </span>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold font-mono uppercase tracking-wider ${badge.className}`}
-        >
+        <Pill tone={badge.tone} className="font-mono uppercase tracking-wider">
           {badge.label}
-        </span>
+        </Pill>
 
         {/* Date range */}
         {edicion.fecha_inicio && (

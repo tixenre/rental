@@ -29,6 +29,7 @@ import {
 
 import { adminApi } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
+import { Monto } from "@/components/admin/Monto";
 
 const fmtMoneda = (n: number | null | undefined) => {
   if (n == null) return "—";
@@ -405,9 +406,7 @@ export function DashboardUsoDialog({
                             </Badge>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-xs tabular-nums font-medium text-ink">
-                              {fmtMoneda(p.pendiente)}
-                            </div>
+                            <Monto value={p.pendiente} tone="debt" className="text-xs" />
                             <div className="text-2xs text-muted-foreground tabular-nums">
                               de {fmtMoneda(p.monto_total)}
                             </div>
@@ -459,8 +458,8 @@ export function DashboardUsoDialog({
                             <TableCell className="text-right tabular-nums text-xs">
                               {fmtMoneda(p.monto_total)}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums text-xs font-medium text-ink">
-                              {fmtMoneda(p.pendiente)}
+                            <TableCell className="text-right">
+                              <Monto value={p.pendiente} tone="debt" className="text-xs" />
                             </TableCell>
                           </TableRow>
                         ))}
