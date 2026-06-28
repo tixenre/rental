@@ -564,17 +564,16 @@ def import_equipo_fichas(
             INSERT INTO equipo_fichas (
                 equipo_id, descripcion, notas,
                 keywords_json, nombre_publico_template,
-                incluye_json, conectividad_json,
+                conectividad_json,
                 compatible_con_json, video_url, precio_bh_usd, fuente_url,
                 fuente_titulo, enriquecido_at, enriquecido_fuente
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (equipo_id) DO UPDATE SET
                 descripcion = EXCLUDED.descripcion,
                 notas = EXCLUDED.notas,
                 keywords_json = EXCLUDED.keywords_json,
                 nombre_publico_template = EXCLUDED.nombre_publico_template,
-                incluye_json = EXCLUDED.incluye_json,
                 conectividad_json = EXCLUDED.conectividad_json,
                 compatible_con_json = EXCLUDED.compatible_con_json,
                 video_url = EXCLUDED.video_url,
@@ -589,7 +588,7 @@ def import_equipo_fichas(
             (
                 equipo_id, f.descripcion, f.notas,
                 f.keywords_json, f.nombre_publico_template,
-                f.incluye_json, f.conectividad_json,
+                f.conectividad_json,
                 f.compatible_con_json, f.video_url, f.precio_bh_usd,
                 f.fuente_url, f.fuente_titulo, f.enriquecido_at,
                 f.enriquecido_fuente,

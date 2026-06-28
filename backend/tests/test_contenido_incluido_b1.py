@@ -142,7 +142,6 @@ def _make_ficha_row(equipo_id: int, contenido_incluido_json=None):
         "notas": None,
         "keywords_json": None,
         "nombre_publico_template": None,
-        "incluye_json": None,
         "conectividad_json": None,
         "compatible_con_json": None,
         "video_url": None,

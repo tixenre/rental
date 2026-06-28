@@ -83,8 +83,8 @@ export type Ficha = {
   notas: string | null;
   keywords_json: string | null;
   nombre_publico_template?: string | null;
-  // Listas / multimedia del enriquecimiento (no son specs estructuradas)
-  incluye_json?: string | null;
+  // Listas / multimedia del enriquecimiento (no son specs estructuradas).
+  // `incluye_json` (legacy) dropeado: el "qué incluye" deriva de la receta real.
   conectividad_json?: string | null;
   compatible_con_json?: string | null;
   video_url?: string | null;

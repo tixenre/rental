@@ -30,6 +30,7 @@ from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de, parientes_de
 from routes.auth import get_session
 from admin_guard import require_admin
+from services.contenido import contenido_de
 from services.nombre_service import actualizar_nombres_de
 # `delete_equipo` limpia el blob HTML scrapeado en R2 al borrar un equipo; los
 # endpoints de fotos viven en `routes.equipos.fotos` (importan estos mismos
@@ -550,13 +551,17 @@ def get_equipo(id_or_slug: str):
         # `equipo.specs` (dict keyed por spec_key) en vez de las columnas
         # legacy de equipo_fichas. Mantenemos `ficha` para back-compat.
         equipo = attach_specs_estructuradas(conn, [equipo])[0]
-        kit = conn.execute(f"""
-            SELECT kc.componente_id, kc.cantidad, kc.descuento_pct, kc.esencial,
-                   e.nombre, {MARCA_SUBQUERY}, e.foto_url
-            FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id
-            WHERE kc.equipo_id = %s  ORDER BY kc.orden ASC, e.nombre ASC
-        """, (actual_id,)).fetchall()
-        equipo["kit"] = [row_to_dict(r) for r in kit]
+        # Componentes vía la puerta única (services.contenido). `solo_activos=False`:
+        # preserva el comportamiento previo de la ficha (no filtraba soft-deleted).
+        equipo["kit"] = [{
+            "componente_id": c["componente_id"],
+            "cantidad":      c["cantidad"],
+            "descuento_pct": c["descuento_pct"],
+            "esencial":      c["esencial"],
+            "nombre":        c["nombre"],
+            "marca":         c["marca"],
+            "foto_url":      c["foto_url"],
+        } for c in contenido_de(conn, actual_id, solo_activos=False)]
         # Galería multi-foto (#125): el catálogo público expone las fotos de
         # `equipo_fotos` (principal primero) para que la ficha muestre la galería,
         # no solo `foto_url`. Shape liviano (url + es_principal) — sin internals.

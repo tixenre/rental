@@ -8,8 +8,9 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 
 from admin_guard import require_admin
-from database import MARCA_SUBQUERY, get_db, row_to_dict
+from database import get_db
 from routes.equipos.core import router
+from services.contenido import contenido_de
 
 
 class KitItem(BaseModel):
@@ -30,16 +31,23 @@ def get_kit(id: int):
     with get_db() as conn:
         if not conn.execute("SELECT id FROM equipos WHERE id=%s", (id,)).fetchone():
             raise HTTPException(404, "Equipo no encontrado")
-        rows = conn.execute(f"""
-            SELECT kc.id, kc.componente_id, kc.cantidad, kc.orden,
-                   kc.descuento_pct, kc.esencial,
-                   e.nombre, {MARCA_SUBQUERY}, e.modelo, e.foto_url, e.visible_catalogo
-            FROM kit_componentes kc
-            JOIN equipos e ON e.id = kc.componente_id
-            WHERE kc.equipo_id = %s
-            ORDER BY kc.orden ASC, e.nombre ASC
-        """, (id,)).fetchall()
-        return [row_to_dict(r) for r in rows]
+        # Componentes vía la puerta única (services.contenido) — fuente única del
+        # "qué incluye" derivada de kit_componentes. `solo_activos=False`: el editor
+        # de kit del admin muestra TODOS los componentes (incluso retirados) para
+        # poder gestionarlos — preserva el comportamiento previo (no filtraba).
+        return [{
+            "id":               c["kc_id"],
+            "componente_id":    c["componente_id"],
+            "cantidad":         c["cantidad"],
+            "orden":            c["orden"],
+            "descuento_pct":    c["descuento_pct"],
+            "esencial":         c["esencial"],
+            "nombre":           c["nombre"],
+            "marca":            c["marca"],
+            "modelo":           c["modelo"],
+            "foto_url":         c["foto_url"],
+            "visible_catalogo": c["visible_catalogo"],
+        } for c in contenido_de(conn, id, solo_activos=False)]
 
 
 def _crea_ciclo_kit(conn, equipo_id: int, componente_id: int) -> bool:
