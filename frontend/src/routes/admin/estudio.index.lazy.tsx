@@ -581,6 +581,7 @@ function SlotForm({
         </Field>
       </div>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
+        {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
         <input type="checkbox" {...register("activo")} className="h-4 w-4 rounded" />
         Activo
       </label>
@@ -721,6 +722,7 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
       {/* ── Pack ── */}
       <Section title="Pack Todo Incluido">
         <label className="flex items-center gap-2 text-sm cursor-pointer">
+          {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
           <input type="checkbox" {...register("pack_activo")} className="h-4 w-4 rounded" />
           Pack activo (se muestra en la página pública)
         </label>
@@ -1290,6 +1292,7 @@ function TrabajoDialog({
                 ))}
               </div>
             )}
+            {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
             <input
               ref={fotoInputRef}
               type="file"
@@ -1404,6 +1407,7 @@ function TrabajoDialog({
                         <Image className="h-5 w-5 text-muted-foreground/40" />
                       </div>
                     )}
+                    {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
                     <input
                       ref={logoInputRef}
                       type="file"

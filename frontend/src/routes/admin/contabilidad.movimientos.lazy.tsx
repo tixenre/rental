@@ -579,6 +579,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
           />
         </Field>
         <Field label="Comprobante (opcional)">
+          {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
           <input
             type="file"
             accept="application/pdf,image/*"

@@ -1090,6 +1090,7 @@ export function EquipoFormDialogV2({
           </Button>
           {isEdit && (
             <>
+              {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
               <input
                 ref={htmlInputRef}
                 type="file"

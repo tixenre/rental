@@ -567,6 +567,7 @@ function Toggle({
 }) {
   return (
     <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+      {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
       <input
         type="checkbox"
         checked={checked}

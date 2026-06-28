@@ -103,6 +103,7 @@ export function HorariosSection() {
             return (
               <div key={key} className="flex items-center gap-3">
                 <label className="flex items-center gap-2 w-40 shrink-0 text-sm">
+                  {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
                   <input
                     type="checkbox"
                     checked={d.abierto}

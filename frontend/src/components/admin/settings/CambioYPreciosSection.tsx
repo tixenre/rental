@@ -295,6 +295,7 @@ function PreciosManualesPanel({ onRecalcSelected }: { onRecalcSelected: (ids: nu
       cell: (it) => {
         const cambia = it.delta != null && it.delta !== 0;
         return (
+          // eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API)
           <input
             type="checkbox"
             checked={selected.has(it.id)}

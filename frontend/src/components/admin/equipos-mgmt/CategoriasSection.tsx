@@ -310,6 +310,7 @@ export function CategoriasSection() {
           </p>
         </div>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none cursor-pointer shrink-0">
+          {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
           <input
             type="checkbox"
             checked={hideEmpty}

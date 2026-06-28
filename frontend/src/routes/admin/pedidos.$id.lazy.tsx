@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import { Skeleton } from "@/design-system/ui/skeleton";
 import {
   AlertDialog,
@@ -595,11 +596,11 @@ function PedidoEditorPage() {
 
           {/* Notas */}
           <Section icon={FileText} title="Notas internas">
-            <textarea
+            <Textarea
               value={datos.notas}
               placeholder="Notas para el equipo de Rambla…"
               onChange={(e) => setDatos((d) => d && { ...d, notas: e.target.value })}
-              className="w-full min-h-[88px] rounded-md border hairline bg-surface-elevated px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+              className="min-h-[88px] resize-y"
             />
           </Section>
         </div>
@@ -634,10 +635,10 @@ function PedidoEditorPage() {
                 <div className="space-y-1.5">
                   <p className="text-xs text-muted-foreground">Mandá este link al cliente:</p>
                   <div className="flex items-center gap-2">
-                    <input
+                    <Input
                       readOnly
                       value={linkVerif}
-                      className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-xs text-ink outline-none truncate"
+                      className="flex-1 font-mono text-xs truncate"
                     />
                     <button
                       type="button"

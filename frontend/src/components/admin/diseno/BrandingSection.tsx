@@ -168,6 +168,7 @@ export function BrandingSection() {
           </div>
 
           <div className="flex-1 space-y-2">
+            {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
             <input
               ref={fileRef}
               type="file"

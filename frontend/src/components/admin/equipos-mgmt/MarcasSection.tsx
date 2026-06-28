@@ -285,6 +285,7 @@ export function MarcasSection() {
           className="h-9 max-w-xs"
         />
         <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+          {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
           <input
             type="checkbox"
             checked={onlyDestacadas}
@@ -435,6 +436,7 @@ export function MarcasSection() {
         </div>
       )}
 
+      {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
       <input
         ref={fileInputRef}
         type="file"

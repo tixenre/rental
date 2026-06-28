@@ -707,6 +707,7 @@ function FotoSection({ concepto }: { concepto: TallerConcepto }) {
           JPG, PNG o WebP · máx. 8 MB. Se muestra en la sección "Sobre" de la landing del workshop.
         </p>
         <div>
+          {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
           <input
             ref={fileRef}
             type="file"

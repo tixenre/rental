@@ -119,6 +119,7 @@ function Uploader({ kind }: { kind: Kind }) {
             )}
             {mut.isPending ? "Procesando…" : masterUrl ? "Reemplazar SVG" : "Subir SVG"}
           </Button>
+          {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
           <input
             ref={inputRef}
             type="file"

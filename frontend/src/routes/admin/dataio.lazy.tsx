@@ -418,6 +418,7 @@ function GroupCard({
         </div>
       </div>
 
+      {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
       <input
         ref={inputRef}
         type="file"

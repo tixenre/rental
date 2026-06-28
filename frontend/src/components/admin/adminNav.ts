@@ -32,6 +32,7 @@ import {
   HardDriveDownload,
   Settings,
   AlertTriangle,
+  Blocks,
   type LucideIcon,
 } from "lucide-react";
 
@@ -113,6 +114,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: "Sistema",
     defaultOpen: false,
     items: [
+      { title: "Design System", url: "/admin/ds", icon: Blocks },
       { title: "Assets y diseño", url: "/admin/diseno", icon: Palette },
       { title: "Marca", url: "/admin/marca", icon: Megaphone },
       { title: "Novedades", url: "/admin/novedades", icon: Sparkles },

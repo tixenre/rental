@@ -98,6 +98,7 @@ export function AdminCommandPalette() {
         <DialogTitle className="sr-only">Buscar en el back-office</DialogTitle>
         <div className="flex items-center gap-2 border-b hairline px-3">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          {/* eslint-disable-next-line no-restricted-syntax -- input custom borderless dentro de wrapper con border-b (command palette) */}
           <input
             autoFocus
             value={q}
