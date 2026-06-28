@@ -116,29 +116,20 @@ export function AdminSidebar({ email }: { email: string }) {
   });
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
-  // Estado open/closed de cada grupo, persistido en localStorage para que el
-  // dueño no tenga que re-abrir el inventario cada vez que entra.
+  // Grupos abiertos: solo el que contiene la ruta actual. No se persiste —
+  // cada carga arranca limpia y el grupo activo se abre solo.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    const fallback: Record<string, boolean> = {};
-    if (typeof window === "undefined") return fallback;
-    try {
-      const raw = window.localStorage.getItem("admin-sidebar:openGroups");
-      if (raw) return { ...fallback, ...(JSON.parse(raw) as Record<string, boolean>) };
-    } catch {
-      /* ignored */
+    const path = typeof window !== "undefined" ? window.location.pathname : "";
+    const initial: Record<string, boolean> = {};
+    for (const item of items) {
+      if (item.children?.some((c) => path === c.url || path.startsWith(c.url + "/"))) {
+        initial[item.url] = true;
+      }
     }
-    return fallback;
+    return initial;
   });
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("admin-sidebar:openGroups", JSON.stringify(openGroups));
-    } catch {
-      /* ignored */
-    }
-  }, [openGroups]);
-
-  // Cuando navego a una sub-ruta, auto-expandir el grupo padre
+  // Al navegar a una sub-ruta, abrir el grupo padre (sin cerrar otros).
   useEffect(() => {
     for (const item of items) {
       if (item.children?.some((c) => isActive(c.url, false))) {
@@ -232,7 +223,7 @@ export function AdminSidebar({ email }: { email: string }) {
                     <SidebarMenuItem key={item.url}>
                       <SidebarMenuButton
                         onClick={() => toggleGroup(item.url)}
-                        isActive={active && isActive(item.url, true)}
+                        isActive={active}
                         className="cursor-pointer"
                       >
                         <item.icon className="h-4 w-4 shrink-0" />
