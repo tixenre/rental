@@ -10,6 +10,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { adminApi, type CuentaSaldo } from "@/lib/admin/api";
 import { AdminPage } from "@/components/admin/AdminPage";
+import { CardGridSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 import { formatARS, formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
@@ -41,12 +43,8 @@ function ContabilidadTablero() {
       }
     >
       <div className="space-y-6">
-        {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-        {q.isError && (
-          <div className="text-sm text-destructive">
-            Error cargando el tablero. {(q.error as Error)?.message}
-          </div>
-        )}
+        {q.isLoading && <CardGridSkeleton count={4} />}
+        {q.isError && <ErrorState error={q.error} onRetry={q.refetch} />}
 
         {data && (
           <>

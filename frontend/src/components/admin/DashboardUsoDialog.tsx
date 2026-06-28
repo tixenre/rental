@@ -30,6 +30,8 @@ import {
 import { adminApi } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
 import { Monto } from "@/components/admin/Monto";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 
 const fmtMoneda = (n: number | null | undefined) => {
   if (n == null) return "—";
@@ -84,13 +86,9 @@ export function DashboardUsoDialog({
           </p>
         </DialogHeader>
 
-        {dataQ.isLoading && <p className="text-sm text-muted-foreground py-6">Cargando…</p>}
+        {dataQ.isLoading && <TableSkeleton rows={6} className="py-6" />}
 
-        {dataQ.error && (
-          <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            Error: {(dataQ.error as Error).message}
-          </div>
-        )}
+        {dataQ.error && <ErrorState error={dataQ.error} onRetry={() => dataQ.refetch()} />}
 
         {dataQ.data && (
           <div className="space-y-5">

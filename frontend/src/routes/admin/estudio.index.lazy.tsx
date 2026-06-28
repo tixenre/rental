@@ -60,6 +60,9 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminSection } from "@/components/admin/AdminSection";
 import { useConfirm } from "@/components/admin/useConfirm";
+import { ListSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { EmptyState } from "@/components/rental/EmptyState";
 
 export const Route = createLazyFileRoute("/admin/estudio/")({
   component: EstudioAdminPage,
@@ -161,24 +164,22 @@ function EstudioAdminPage() {
   useDocumentTitle("Estudio · Back Office");
   const qc = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin", "estudio"],
     queryFn: () => estudioAdminApi.get(),
   });
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <ListSkeleton />;
   }
 
   if (isError || !data) {
     return (
-      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-        Error cargando configuración del estudio.
-      </div>
+      <ErrorState
+        title="No se pudo cargar el estudio"
+        sub="Hubo un error al traer la configuración del estudio. Probá de nuevo."
+        onRetry={() => refetch()}
+      />
     );
   }
 
@@ -325,9 +326,13 @@ function PackSection() {
       {/* Lista actual */}
       <div className="mt-4 space-y-2">
         {isLoading ? (
-          <div className="text-sm text-muted-foreground">Cargando…</div>
+          <ListSkeleton rows={3} />
         ) : pack.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Todavía no hay equipos en el pack.</p>
+          <EmptyState
+            icon={<Package className="h-6 w-6" />}
+            title="Sin equipos en el pack"
+            sub="Buscá un equipo arriba para sumarlo al pack."
+          />
         ) : (
           pack.map((p) => (
             <div
@@ -431,11 +436,15 @@ function SlotsSection() {
       </p>
 
       {isLoading ? (
-        <div className="py-4 text-sm text-muted-foreground">Cargando…</div>
+        <ListSkeleton rows={3} />
       ) : (
         <div className="space-y-2">
           {slots.length === 0 && (
-            <p className="text-sm text-muted-foreground">Todavía no hay slots fijos.</p>
+            <EmptyState
+              icon={<Plus className="h-6 w-6" />}
+              title="Sin slots fijos"
+              sub="Creá un slot recurrente con el botón de abajo."
+            />
           )}
           {slots.map((s) => (
             <div
@@ -1677,9 +1686,11 @@ function TrabajosSection({
         </DndContext>
 
         {trabajos.length === 0 && (
-          <p className="text-sm text-center text-muted-foreground py-4">
-            No hay trabajos cargados todavía.
-          </p>
+          <EmptyState
+            icon={<Film className="h-6 w-6" />}
+            title="Sin trabajos cargados"
+            sub="Agregá un trabajo con el botón de abajo."
+          />
         )}
 
         <Button variant="outline" size="sm" onClick={openCreate}>

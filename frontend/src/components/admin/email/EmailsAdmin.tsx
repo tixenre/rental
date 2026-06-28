@@ -13,9 +13,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Send, Eye, Pencil, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import {
+  Send,
+  Eye,
+  Pencil,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Mail,
+} from "lucide-react";
 
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
+import { EmptyState } from "@/components/rental/EmptyState";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { ListSkeleton, TableSkeleton } from "@/components/admin/skeletons";
 import { Button } from "@/design-system/ui/button";
 import { Pill } from "@/design-system/kit/Pill";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
@@ -114,19 +126,23 @@ export function EmailsAdmin() {
           </p>
         </div>
 
-        {listQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+        {listQ.isLoading && <ListSkeleton rows={5} />}
 
         {!listQ.isLoading && items.length === 0 && (
-          <div className="rounded-md border hairline bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-            No hay templates. Si recién corriste la migración, refrescá.
-          </div>
+          <EmptyState
+            icon={<Mail className="h-6 w-6" />}
+            title="No hay templates"
+            sub="Si recién corriste la migración, refrescá."
+          />
         )}
 
-        <div className="divide-y hairline border hairline rounded-md overflow-hidden">
-          {items.map((t) => (
-            <TemplateRow key={t.key} tpl={t} onEdit={() => setEditingKey(t.key)} />
-          ))}
-        </div>
+        {!listQ.isLoading && items.length > 0 && (
+          <div className="divide-y hairline border hairline rounded-md overflow-hidden">
+            {items.map((t) => (
+              <TemplateRow key={t.key} tpl={t} onEdit={() => setEditingKey(t.key)} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Recordatorio de retiro */}
@@ -373,18 +389,18 @@ function EmailsLog() {
         ))}
       </div>
 
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-      {q.isError && (
-        <div className="text-sm text-destructive">Error: {(q.error as Error).message}</div>
+      {q.isLoading && <TableSkeleton rows={6} cols={5} />}
+      {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
+
+      {!q.isLoading && !q.isError && items.length === 0 && (
+        <EmptyState
+          icon={<Send className="h-6 w-6" />}
+          title="No hay envíos registrados todavía"
+          sub="Cuando se mande un mail va a aparecer acá."
+        />
       )}
 
-      {!q.isLoading && items.length === 0 && (
-        <div className="rounded-md border hairline bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-          No hay envíos registrados todavía.
-        </div>
-      )}
-
-      {items.length > 0 && (
+      {!q.isError && items.length > 0 && (
         <AdminTable
           columns={EMAIL_LOG_COLUMNS}
           rows={items}

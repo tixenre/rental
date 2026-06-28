@@ -16,7 +16,6 @@ import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  Loader2,
   GripVertical,
   AlertTriangle,
   ArrowRight,
@@ -73,6 +72,8 @@ import {
   DropdownMenuSeparator,
 } from "@/design-system/ui/dropdown-menu";
 import { adminApi, type MarcaAdmin } from "@/lib/admin/api";
+import { ListSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { InlineSvg } from "@/design-system/ui/InlineSvg";
 import { isSvgUrl } from "@/design-system/ui/inline-svg-utils";
@@ -296,13 +297,9 @@ export function MarcasSection() {
         </label>
       </div>
 
-      {listQ.isLoading && (
-        <div className="py-6 text-sm text-muted-foreground flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
-        </div>
-      )}
+      {listQ.isLoading && <ListSkeleton rows={6} className="py-2" />}
       {listQ.error && (
-        <div className="text-sm text-destructive">Error: {(listQ.error as Error).message}</div>
+        <ErrorState error={listQ.error} onRetry={() => listQ.refetch()} className="py-6" />
       )}
 
       {!listQ.isLoading && duplicateGroups.length > 0 && (

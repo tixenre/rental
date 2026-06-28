@@ -44,6 +44,9 @@ import {
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
+import { ListSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { EmptyState } from "@/components/rental/EmptyState";
 
 export const Route = createLazyFileRoute("/admin/talleres/")({
   component: TalleresAdminPage,
@@ -957,14 +960,10 @@ function InscripcionesSection({
     eliminarMut.mutate(ins.id);
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Cargando inscripciones…</p>;
+  if (loading) return <ListSkeleton rows={4} />;
 
   if (inscripciones.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border/60 py-12 text-center text-sm text-muted-foreground">
-        No hay inscripciones todavía.
-      </div>
-    );
+    return <EmptyState icon={<Users className="h-6 w-6" />} title="No hay inscripciones todavía" />;
   }
 
   const insTable = (rows: Inscripcion[], showConfirmar: boolean) => {
@@ -1827,7 +1826,13 @@ function TalleresAdminPage() {
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [nuevaEdicionConcepto, setNuevaEdicionConcepto] = useState<TallerConcepto | null>(null);
 
-  const { data: conceptos = [], isLoading } = useQuery({
+  const {
+    data: conceptos = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["admin", "talleres"],
     queryFn: () => authedJson<TallerConcepto[]>("/api/admin/talleres"),
     staleTime: 1000 * 60,
@@ -1880,23 +1885,10 @@ function TalleresAdminPage() {
       </div>
 
       {/* Loading skeleton */}
-      {isLoading && (
-        <div className="flex flex-col gap-2">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-border/60 px-4 py-3.5 flex items-center gap-3 animate-pulse"
-            >
-              <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                <div className="h-4 w-40 rounded bg-muted/60" />
-                <div className="h-3 w-28 rounded bg-muted/40" />
-              </div>
-              <div className="h-5 w-20 rounded-full bg-muted/40 shrink-0 hidden md:block" />
-              <div className="h-4 w-4 rounded bg-muted/30 shrink-0" />
-            </div>
-          ))}
-        </div>
-      )}
+      {isLoading && <ListSkeleton rows={3} />}
+
+      {/* Error */}
+      {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {/* Lista */}
       {conceptos.length > 0 && (
@@ -1913,20 +1905,17 @@ function TalleresAdminPage() {
         </div>
       )}
 
-      {conceptos.length === 0 && !isLoading && (
-        <div className="rounded-xl border border-dashed border-border/60 py-16 text-center flex flex-col items-center gap-4">
-          <Users className="h-8 w-8 text-muted-foreground/40" />
-          <div>
-            <p className="text-sm font-medium text-ink">No hay talleres todavía</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Creá el primero para que aparezca en la web.
-            </p>
-          </div>
+      {conceptos.length === 0 && !isLoading && !isError && (
+        <EmptyState
+          icon={<Users className="h-6 w-6" />}
+          title="No hay talleres todavía"
+          sub="Creá el primero para que aparezca en la web."
+        >
           <Button size="sm" onClick={() => setNuevoOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
             Crear el primero
           </Button>
-        </div>
+        </EmptyState>
       )}
 
       <NuevoConceptoDialog

@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { fmtArs } from "@/lib/format";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { Kpi, Section, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
+import { CardGridSkeleton, TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 
 export const Route = createLazyFileRoute("/admin/estadisticas")({
   component: EstadisticasPage,
@@ -46,12 +48,8 @@ function EstadisticasPage() {
           Solo se contabilizan pedidos confirmados, retirados y finalizados.
         </p>
 
-        {statsQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-        {statsQ.error && (
-          <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            Error: {(statsQ.error as Error).message}
-          </div>
-        )}
+        {statsQ.isLoading && <CardGridSkeleton count={4} className="md:grid-cols-4" />}
+        {statsQ.error && <ErrorState error={statsQ.error} onRetry={statsQ.refetch} />}
 
         {data && (
           <>
@@ -263,12 +261,8 @@ function BusquedasSection() {
         </div>
       </div>
 
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-      {q.error && (
-        <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          Error: {(q.error as Error).message}
-        </div>
-      )}
+      {q.isLoading && <TableSkeleton rows={5} cols={2} />}
+      {q.error && <ErrorState error={q.error} onRetry={q.refetch} />}
 
       {data && (
         <div className="grid gap-4 md:grid-cols-2">

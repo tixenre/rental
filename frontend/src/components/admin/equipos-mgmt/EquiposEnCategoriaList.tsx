@@ -13,10 +13,13 @@
 
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, X, ChevronRight, Plus } from "lucide-react";
+import { X, ChevronRight, Plus, PackageOpen } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { Button } from "@/design-system/ui/button";
+import { ListSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { EmptyState } from "@/components/rental/EmptyState";
 import { cn } from "@/lib/utils";
 
 // ── Toggle ─────────────────────────────────────────────────────────────
@@ -122,15 +125,17 @@ export function EquiposPanel({
           <Plus className="h-3 w-3" /> Agregar equipos
         </button>
       )}
-      {equiposQ.isLoading && (
-        <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
-        </div>
+      {equiposQ.isLoading && <ListSkeleton rows={3} className="py-1" />}
+      {equiposQ.isError && (
+        <ErrorState error={equiposQ.error} onRetry={() => equiposQ.refetch()} className="py-4" />
       )}
       {equiposQ.isSuccess && equiposDirectos.length === 0 && (
-        <div className="py-1 text-xs text-muted-foreground italic">
-          Sin equipos directos. Los que cuenta esta categoría vienen de sus subcategorías.
-        </div>
+        <EmptyState
+          icon={<PackageOpen className="h-6 w-6" />}
+          title="Sin equipos directos"
+          sub="Los que cuenta esta categoría vienen de sus subcategorías."
+          className="py-4"
+        />
       )}
       {equiposDirectos.length > 0 && (
         <ul className="space-y-0.5">

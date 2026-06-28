@@ -15,6 +15,8 @@ import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { CalendarioWidget } from "@/components/admin/CalendarioWidget";
+import { CardGridSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/")({
@@ -23,7 +25,7 @@ export const Route = createLazyFileRoute("/admin/")({
 
 function AdminDashboard() {
   useDocumentTitle("Dashboard · Back Office");
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["admin", "dashboard"],
     queryFn: () => adminApi.dashboard(),
     staleTime: 60_000,
@@ -39,22 +41,11 @@ function AdminDashboard() {
   return (
     <AdminPage title="Dashboard" maxW="max-w-6xl">
       {isLoading && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="min-h-[5.5rem] rounded-xl border hairline bg-surface animate-pulse"
-            />
-          ))}
-        </div>
+        <CardGridSkeleton count={4} className="grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" />
       )}
 
       {isError && (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-6 text-sm text-destructive">
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] mb-2">Error</div>
-          <div>{(error as Error)?.message ?? "No se pudo cargar el dashboard"}</div>
-          <div className="mt-2 text-xs opacity-80">Verificá que el backend esté corriendo.</div>
-        </div>
+        <ErrorState error={error} title="No se pudo cargar el dashboard" onRetry={refetch} />
       )}
 
       {data && (

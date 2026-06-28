@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -36,6 +36,8 @@ import { Input } from "@/design-system/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/design-system/ui/dialog";
 
 import { adminApi } from "@/lib/admin/api";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { AddEquiposToCategoriaDialog } from "./AddEquiposToCategoriaDialog";
 import { SpecTemplatesSection } from "@/components/admin/specs/SpecTemplatesSection";
@@ -321,13 +323,9 @@ export function CategoriasSection() {
         </label>
       </div>
 
-      {listQ.isLoading && (
-        <div className="py-6 text-sm text-muted-foreground flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
-        </div>
-      )}
+      {listQ.isLoading && <TableSkeleton rows={6} cols={3} className="py-2" />}
       {listQ.error && (
-        <div className="text-sm text-destructive">Error: {(listQ.error as Error).message}</div>
+        <ErrorState error={listQ.error} onRetry={() => listQ.refetch()} className="py-6" />
       )}
 
       {displayRoots.length > 0 && (

@@ -8,7 +8,6 @@ import {
   FileText,
   Tag,
   Folder,
-  AlertCircle,
   ArrowRight,
   Lightbulb,
   Loader2,
@@ -24,6 +23,7 @@ import {
   type Sugerencia,
 } from "@/lib/admin/api";
 import { AdminPage } from "@/components/admin/AdminPage";
+import { QueryState } from "@/components/admin/QueryState";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/calidad")({
@@ -32,7 +32,7 @@ export const Route = createLazyFileRoute("/admin/equipos/calidad")({
 
 function CalidadPage() {
   useDocumentTitle("Calidad · Back Office");
-  const { data, isLoading, isError, error } = useQuery({
+  const calidadQ = useQuery({
     queryKey: ["admin", "inventario", "calidad"],
     queryFn: () => adminApi.getCalidadInventario(),
     staleTime: 60_000,
@@ -44,18 +44,13 @@ function CalidadPage() {
       maxW="max-w-3xl"
       description="Qué equipos tienen datos faltantes. Solo lectura — los CTAs para completar llegan en una segunda iteración (#350)."
     >
-      {isLoading && <Skeleton />}
-
-      {isError && (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-6 text-sm text-destructive">
-          <div className="flex items-center gap-2 font-mono text-2xs uppercase tracking-[0.2em] mb-2">
-            <AlertCircle className="h-3.5 w-3.5" /> Error
-          </div>
-          <div>{(error as Error)?.message ?? "No se pudo cargar la calidad del inventario."}</div>
-        </div>
-      )}
-
-      {data && <CalidadView data={data} />}
+      <QueryState
+        query={calidadQ}
+        skeleton={<Skeleton />}
+        errorTitle="No se pudo cargar la calidad del inventario"
+      >
+        {(data) => <CalidadView data={data} />}
+      </QueryState>
 
       <SugerenciasSection />
     </AdminPage>
@@ -219,7 +214,7 @@ function CalidadView({ data }: { data: CalidadInventario }) {
           <div className="text-sm text-muted-foreground">equipos activos</div>
         </div>
         <ProgressBar pct={data.completos_pct} />
-        <div className="mt-2 flex items-center gap-2 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+        <div className="mt-2 flex items-center gap-2 t-eyebrow">
           <span className="tabular text-ink">{data.completos_pct}%</span>
           <span>completos</span>
         </div>
@@ -249,11 +244,9 @@ function CalidadView({ data }: { data: CalidadInventario }) {
                         <span className="font-display text-base tabular text-ink">{n}</span>{" "}
                         <span className="text-muted-foreground">{label}</span>
                       </div>
-                      <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
-                        {pct}% del inventario
-                      </div>
+                      <div className="t-eyebrow">{pct}% del inventario</div>
                     </div>
-                    <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-widest text-muted-foreground transition group-hover:text-ink">
+                    <span className="t-eyebrow inline-flex items-center gap-1 transition group-hover:text-ink">
                       Completar
                       <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
                     </span>

@@ -7,6 +7,7 @@ import { adminApi } from "@/lib/admin/api";
 import type { GcResult } from "@/lib/admin/api";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { CardGridSkeleton } from "@/components/admin/skeletons";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
@@ -136,7 +137,7 @@ function MediaDashboardPage() {
 
       {/* Stats */}
       {isLoading ? (
-        <div className="text-sm text-muted-foreground animate-pulse">Cargando stats…</div>
+        <CardGridSkeleton count={6} />
       ) : stats ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatCard label="Assets" value={stats.total_assets} />
@@ -239,10 +240,7 @@ function RederiveForm() {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label
-          htmlFor="asset-id"
-          className="text-2xs font-mono uppercase tracking-widest text-muted-foreground"
-        >
+        <label htmlFor="asset-id" className="t-eyebrow">
           Asset ID
         </label>
         <Input

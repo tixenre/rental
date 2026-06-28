@@ -15,6 +15,8 @@ import { toast } from "sonner";
 
 import { adminApi, type CuentaSaldo, type TipoCuenta } from "@/lib/admin/api";
 import { AdminPage } from "@/components/admin/AdminPage";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -53,12 +55,8 @@ function CuentasPage() {
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
     >
       <div className="space-y-8">
-        {q.isLoading && <div className="text-sm text-muted-foreground">Cargando cuentas…</div>}
-        {q.isError && (
-          <div className="text-sm text-destructive">
-            Error cargando las cuentas. {(q.error as Error)?.message}
-          </div>
-        )}
+        {q.isLoading && <TableSkeleton rows={5} cols={5} />}
+        {q.isError && <ErrorState error={q.error} onRetry={q.refetch} />}
 
         {/* Socios · Cuenta corriente */}
         {socios.length > 0 && (

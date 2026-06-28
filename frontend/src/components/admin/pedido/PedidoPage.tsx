@@ -33,6 +33,8 @@ import { Textarea } from "@/design-system/ui/textarea";
 import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 import { Pill } from "@/design-system/kit/Pill";
 import { ActionMenu } from "@/components/mobile";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -318,19 +320,11 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
   });
 
   if (pedidoQ.isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[60vh] text-muted-foreground gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" /> Cargando pedido…
-      </div>
-    );
+    return <TableSkeleton rows={8} className="p-6" />;
   }
 
   if (pedidoQ.error || !pedido || !draft.datos || !draft.items) {
-    return (
-      <div className="p-6 text-sm text-destructive">
-        Error: {(pedidoQ.error as Error | undefined)?.message ?? "no se pudo cargar el pedido"}
-      </div>
-    );
+    return <ErrorState error={pedidoQ.error} onRetry={() => pedidoQ.refetch()} />;
   }
 
   const jornadas = jornadasEntre(draft.datos.fecha_desde, draft.datos.fecha_hasta);

@@ -10,9 +10,13 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Receipt } from "lucide-react";
 
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminTable } from "@/components/admin/AdminTable";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { EmptyState } from "@/components/rental/EmptyState";
 import { adminApi, type CuentaSaldo } from "@/lib/admin/api";
 import { Input } from "@/design-system/ui/input";
 import { formatARS } from "@/lib/format";
@@ -54,12 +58,8 @@ function ReporteMensualPage() {
       }
     >
       <div className="space-y-6">
-        {q.isLoading && <div className="text-sm text-muted-foreground">Cargando reporte…</div>}
-        {q.isError && (
-          <div className="text-sm text-destructive">
-            Error cargando el reporte. {(q.error as Error)?.message}
-          </div>
-        )}
+        {q.isLoading && <TableSkeleton rows={5} cols={5} />}
+        {q.isError && <ErrorState error={q.error} onRetry={q.refetch} />}
 
         {r && (
           <>
@@ -153,9 +153,11 @@ function ReporteMensualPage() {
             {/* Gastos por categoría */}
             <Section titulo="Gastos del mes">
               {r.gastos.por_categoria.length === 0 ? (
-                <div className="text-sm text-muted-foreground">
-                  No hay gastos cargados este mes.
-                </div>
+                <EmptyState
+                  icon={<Receipt className="h-6 w-6" />}
+                  title="Sin gastos este mes"
+                  sub="No hay gastos cargados para el período seleccionado."
+                />
               ) : (
                 <div className="rounded-lg border hairline divide-y divide-[var(--hairline)]">
                   {r.gastos.por_categoria.map((g) => (
