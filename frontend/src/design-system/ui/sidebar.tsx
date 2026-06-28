@@ -264,11 +264,13 @@ Sidebar.displayName = "Sidebar";
 
 const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
-  React.ComponentProps<typeof Button>
->(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar();
+  React.ComponentProps<typeof Button> & {
+    tooltip?: string | React.ComponentProps<typeof TooltipContent>;
+  }
+>(({ className, onClick, tooltip, ...props }, ref) => {
+  const { toggleSidebar, state, isMobile } = useSidebar();
 
-  return (
+  const button = (
     <Button
       ref={ref}
       data-sidebar="trigger"
@@ -284,6 +286,27 @@ const SidebarTrigger = React.forwardRef<
       <PanelLeft />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
+  );
+
+  if (!tooltip) {
+    return button;
+  }
+
+  if (typeof tooltip === "string") {
+    tooltip = { children: tooltip };
+  }
+
+  // Mismo patrón que SidebarMenuButton: el tooltip solo se muestra colapsado.
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent
+        side="right"
+        align="center"
+        hidden={state !== "collapsed" || isMobile}
+        {...tooltip}
+      />
+    </Tooltip>
   );
 });
 SidebarTrigger.displayName = "SidebarTrigger";
