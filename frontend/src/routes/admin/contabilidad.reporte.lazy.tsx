@@ -69,23 +69,34 @@ function ReporteMensualPage() {
             )}
 
             {/* Cascada del mes: facturado − comisiones a dueños − gastos = ganancia */}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Kpi
-                label="Facturado (devengado)"
-                value={formatARS(r.devengado.total)}
-                sub={`${r.devengado.pedidos} pedido(s) saldado(s)`}
-              />
-              <Kpi
-                label="Comisiones a dueños"
-                value={`− ${formatARS(r.comisiones_duenos)}`}
-                sub="Parte de los dueños de los equipos"
-              />
-              <Kpi label="Gastos del mes" value={`− ${formatARS(r.gastos.total)}`} />
-              <Kpi
+            <div className="max-w-xl rounded-xl border hairline bg-surface-elevated p-5 sm:p-6">
+              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                El mes de Rambla
+              </div>
+              <div className="mt-3 space-y-0.5">
+                <CascadaRow
+                  label="Facturado"
+                  note={`devengado · ${r.devengado.pedidos} pedido(s) saldado(s)`}
+                  value={formatARS(r.devengado.total)}
+                />
+                <CascadaRow
+                  label="Comisiones a dueños"
+                  note="Pablo, Tincho, terceros"
+                  value={`− ${formatARS(r.comisiones_duenos)}`}
+                  cost
+                />
+                <CascadaRow
+                  label="Gastos operativos"
+                  value={`− ${formatARS(r.gastos.total)}`}
+                  cost
+                />
+              </div>
+              <div className="my-3 border-t-2 border-ink/15" />
+              <CascadaRow
                 label="Ganancia de Rambla"
                 value={formatARS(r.ganancia_neta)}
-                tone={r.ganancia_neta >= 0 ? "ink" : "destructive"}
-                sub="Facturado − comisiones − gastos"
+                total
+                negative={r.ganancia_neta < 0}
               />
             </div>
 
@@ -181,30 +192,40 @@ function ReporteMensualPage() {
   );
 }
 
-function Kpi({
+/** Una línea de la cascada: label (+ nota) a la izquierda, monto a la derecha.
+ *  `cost` = renglón que resta (muted); `total` = el resultado, resaltado. */
+function CascadaRow({
   label,
+  note,
   value,
-  sub,
-  tone = "ink",
+  cost,
+  total,
+  negative,
 }: {
   label: string;
+  note?: string;
   value: string;
-  sub?: string;
-  tone?: "ink" | "destructive";
+  cost?: boolean;
+  total?: boolean;
+  negative?: boolean;
 }) {
   return (
-    <div className="rounded-xl border hairline bg-surface-elevated p-5">
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
+    <div className="flex items-baseline justify-between gap-4">
+      <div className="min-w-0">
+        <div className={total ? "font-display text-lg text-ink" : "text-sm text-ink"}>{label}</div>
+        {note && <div className="text-2xs text-muted-foreground">{note}</div>}
       </div>
       <div
-        className={`font-mono text-3xl font-semibold tabular-nums mt-1 ${
-          tone === "destructive" ? "text-destructive" : "text-ink"
-        }`}
+        className={
+          total
+            ? `shrink-0 font-mono text-2xl font-semibold tabular-nums ${negative ? "text-destructive" : "text-ink"}`
+            : cost
+              ? "shrink-0 font-mono text-sm tabular-nums text-muted-foreground"
+              : "shrink-0 font-mono text-sm font-medium tabular-nums text-ink"
+        }
       >
         {value}
       </div>
-      {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
     </div>
   );
 }
