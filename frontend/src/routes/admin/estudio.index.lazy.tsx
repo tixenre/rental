@@ -349,11 +349,7 @@ function PackSection() {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                {p.marca && (
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    {p.marca}
-                  </div>
-                )}
+                {p.marca && <div className="t-eyebrow">{p.marca}</div>}
                 <div className="truncate text-ink">{p.nombre}</div>
               </div>
               <button
@@ -1112,9 +1108,7 @@ function TrabajoDialog({
           {/* Links — campo primario, auto-fetch en el primero. Varios links =
               varias diapositivas del carrusel público. */}
           <div className="space-y-2">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground block">
-              Links (YouTube / Instagram)
-            </label>
+            <label className="t-eyebrow block">Links (YouTube / Instagram)</label>
             <div className="space-y-3">
               {links.map((url, idx) => {
                 const tipo = linkTipo(url);
@@ -1185,7 +1179,7 @@ function TrabajoDialog({
 
           {/* Título — auto-rellenado */}
           <div className="space-y-1">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <label className="t-eyebrow">
               Título{" "}
               <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
             </label>
@@ -1198,7 +1192,7 @@ function TrabajoDialog({
 
           {/* Realizador — auto-rellenado */}
           <div className="space-y-1">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <label className="t-eyebrow">
               Realizador / Productora{" "}
               <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
             </label>
@@ -1211,7 +1205,7 @@ function TrabajoDialog({
 
           {/* Categorías (tags) — multi-select */}
           <div className="space-y-2">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <label className="t-eyebrow">
               Categorías{" "}
               <span className="normal-case tracking-normal font-sans opacity-50">
                 (opcional — podés elegir varias)
@@ -1269,7 +1263,7 @@ function TrabajoDialog({
 
           {/* Fotos */}
           <div className="space-y-2">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <label className="t-eyebrow">
               Fotos{" "}
               {fotos.length > 0 ? (
                 `(${fotos.length})`
@@ -1369,9 +1363,7 @@ function TrabajoDialog({
             {showExtra && (
               <div className="space-y-4 mt-4">
                 <div className="space-y-1">
-                  <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    Descripción breve
-                  </label>
+                  <label className="t-eyebrow">Descripción breve</label>
                   <Textarea
                     value={descripcion}
                     onChange={(e) => setDescripcion(e.target.value)}
@@ -1381,9 +1373,7 @@ function TrabajoDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                      Instagram del realizador
-                    </label>
+                    <label className="t-eyebrow">Instagram del realizador</label>
                     <Input
                       value={instagram}
                       onChange={(e) => setInstagram(e.target.value)}
@@ -1391,9 +1381,7 @@ function TrabajoDialog({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                      Web
-                    </label>
+                    <label className="t-eyebrow">Web</label>
                     <Input
                       value={web}
                       onChange={(e) => setWeb(e.target.value)}
@@ -1402,9 +1390,7 @@ function TrabajoDialog({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    Logo del realizador
-                  </label>
+                  <label className="t-eyebrow">Logo del realizador</label>
                   <div className="flex items-center gap-3">
                     {logoUrl ? (
                       <img
@@ -1818,9 +1804,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </label>
+      <label className="t-eyebrow">{label}</label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}

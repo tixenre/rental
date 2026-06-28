@@ -192,7 +192,7 @@ export function EquipoComboSearch({
                 );
               })}
               {overflow > 0 && (
-                <li className="px-3 py-2 text-center font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                <li className="px-3 py-2 text-center t-eyebrow">
                   +{overflow} más · seguí escribiendo para afinar
                 </li>
               )}

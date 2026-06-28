@@ -725,9 +725,7 @@ function EquiposPage() {
                   </TableCell>
                   <TableCell>
                     {eq.marca && (
-                      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground font-semibold leading-none mb-0.5">
-                        {eq.marca}
-                      </div>
+                      <div className="t-eyebrow font-semibold leading-none mb-0.5">{eq.marca}</div>
                     )}
                     <div className="flex items-center gap-1.5 font-medium text-ink leading-tight">
                       <span>{eq.nombre}</span>

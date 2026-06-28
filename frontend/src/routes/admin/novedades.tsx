@@ -37,9 +37,7 @@ function EntryCard({ entry }: { entry: ChangelogEntry }) {
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-base text-ink leading-snug">{entry.title}</h2>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                {fmtDate(entry.date)}
-              </span>
+              <span className="t-eyebrow">{fmtDate(entry.date)}</span>
               {entry.labels?.map((l) => (
                 <Badge key={l} variant="outline" className="text-2xs py-0 h-5">
                   {l}
@@ -47,9 +45,7 @@ function EntryCard({ entry }: { entry: ChangelogEntry }) {
               ))}
             </div>
           </div>
-          <span className="shrink-0 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            #{entry.number}
-          </span>
+          <span className="shrink-0 t-eyebrow">#{entry.number}</span>
         </header>
         {entry.body && (
           <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{entry.body}</p>

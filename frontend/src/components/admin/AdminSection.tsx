@@ -70,9 +70,7 @@ export function AdminSection({
             !open && "-rotate-90",
           )}
         />
-        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          {title}
-        </span>
+        <span className="t-eyebrow">{title}</span>
         {badge && (
           <span className="ml-auto text-xs text-muted-foreground/80 truncate">{badge}</span>
         )}

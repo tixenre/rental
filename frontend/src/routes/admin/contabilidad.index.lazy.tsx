@@ -55,9 +55,7 @@ function ContabilidadTablero() {
             {/* KPIs: disponible · ganancia del mes (la rendición vive en la cuenta corriente) */}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border hairline bg-surface-elevated p-5">
-                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                  Plata disponible
-                </div>
+                <div className="t-eyebrow">Plata disponible</div>
                 <div className="font-mono text-3xl font-semibold tabular-nums text-ink mt-1">
                   {formatMoney(data.disponible.totales.ARS ?? 0, "ARS")}
                 </div>
@@ -72,9 +70,7 @@ function ContabilidadTablero() {
               </div>
 
               <div className="rounded-xl border hairline bg-surface-elevated p-5">
-                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                  Ganancia neta · {data.ganancia_mes.mes}
-                </div>
+                <div className="t-eyebrow">Ganancia neta · {data.ganancia_mes.mes}</div>
                 <div
                   className={`font-mono text-3xl font-semibold tabular-nums mt-1 ${
                     data.ganancia_mes.neta >= 0 ? "text-ink" : "text-destructive"
@@ -92,9 +88,7 @@ function ContabilidadTablero() {
             {/* Socios · Cuenta corriente */}
             {(data.disponible.socios?.length ?? 0) > 0 && (
               <div>
-                <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                  Socios · Cuenta corriente
-                </div>
+                <div className="t-eyebrow mb-2">Socios · Cuenta corriente</div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {data.disponible.socios.map((s) => (
                     <SocioCard key={s.id} socio={s} />
@@ -105,9 +99,7 @@ function ContabilidadTablero() {
 
             {/* Por caja */}
             <div>
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                Por caja
-              </div>
+              <div className="t-eyebrow mb-2">Por caja</div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {data.disponible.cajas.map((c) => (
                   <CajaCard key={c.id} cuenta={c} />
@@ -165,9 +157,7 @@ function ReconciliacionPanel() {
         r.ok ? "hairline bg-muted/10" : "border-destructive/40 bg-destructive/5"
       }`}
     >
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
-        Reconciliación
-      </div>
+      <div className="t-eyebrow mb-1">Reconciliación</div>
       {r.ok ? (
         <div className="text-sm text-ink">✓ Todo cuadra.</div>
       ) : (

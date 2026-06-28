@@ -124,9 +124,7 @@ function GlosarioPage() {
 function Bloque({ titulo, items }: { titulo: string; items: Item[] }) {
   return (
     <section className="space-y-3">
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {titulo}
-      </div>
+      <div className="t-eyebrow">{titulo}</div>
       <dl className="space-y-3">
         {items.map((it) => (
           <div key={it.t} className="rounded-lg border hairline p-4">

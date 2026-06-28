@@ -198,9 +198,7 @@ function PedidosPage() {
       <div className="px-4 md:px-6 pt-3 md:pt-5 pb-2 md:pb-3 shrink-0">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Operaciones · Pedidos
-            </div>
+            <div className="t-eyebrow">Operaciones · Pedidos</div>
             <h1 className="font-display text-2xl md:text-3xl text-ink">Pedidos</h1>
             <p className="hidden md:block text-sm text-muted-foreground mt-1 max-w-[540px]">
               Reservas activas y solicitudes de cambio de tus clientes.{" "}
@@ -282,7 +280,7 @@ function PedidosPage() {
         >
           {/* Barra del listado: contador + acciones (eliminar el seleccionado · ancho del panel) */}
           <div className="flex items-center gap-1 px-3 py-2 border-b hairline bg-surface-elevated shrink-0">
-            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="t-eyebrow">
               {items.length} pedido{items.length !== 1 ? "s" : ""}
             </span>
             <div className="flex-1" />
@@ -374,9 +372,7 @@ function PedidosPage() {
           <AdminCard key={p.id} onClick={() => openEditor(p.id)}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <div className="mb-0.5 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                  #{p.numero_pedido ?? p.id}
-                </div>
+                <div className="mb-0.5 t-eyebrow">#{p.numero_pedido ?? p.id}</div>
                 <div className="truncate font-medium text-ink">
                   {p.cliente_nombre || "Sin cliente"}
                 </div>
@@ -632,9 +628,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         {/* Siguiente paso — ejecuta la transición acá mismo (compacto, sin aire muerto) */}
         {ns && (
           <div className="flex w-fit items-center gap-3 rounded-lg border border-amber bg-amber-soft py-2 pl-3.5 pr-2">
-            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Siguiente paso
-            </span>
+            <span className="t-eyebrow">Siguiente paso</span>
             <Button
               variant={ns.blocked ? "outline" : "amber"}
               size="sm"
@@ -652,9 +646,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         {/* Fechas + total */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Fechas
-            </div>
+            <div className="t-eyebrow">Fechas</div>
             <div className="mt-1 text-ink font-medium tabular-nums">
               {fechaDia(p.fecha_desde)} → {fechaDia(p.fecha_hasta)}
             </div>
@@ -663,9 +655,7 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
             </div>
           </div>
           <div className="rounded-xl border hairline bg-surface-elevated px-4 py-3">
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Total neto
-            </div>
+            <div className="t-eyebrow">Total neto</div>
             <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-ink">
               {fmtArs(total)}
             </div>
@@ -682,14 +672,8 @@ function PreviewPane({ id, onOpen }: { id: number | null; onOpen: (id: number) =
         {/* Equipos */}
         <div className="rounded-xl border hairline bg-surface-elevated">
           <div className="flex items-center justify-between px-4 py-2.5 border-b hairline">
-            <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Equipos · {nItems}
-            </span>
-            {nItems > 0 && (
-              <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                precio / jornada
-              </span>
-            )}
+            <span className="t-eyebrow">Equipos · {nItems}</span>
+            {nItems > 0 && <span className="t-eyebrow">precio / jornada</span>}
           </div>
           <ul className="divide-y hairline">
             {(p.items ?? []).map((it) => (

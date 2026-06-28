@@ -109,9 +109,7 @@ function SugerenciasSection() {
     <section className="mt-8 rounded-2xl border hairline bg-surface">
       <header className="flex items-center gap-2 px-5 pt-4 pb-3 border-b hairline">
         <Lightbulb className="h-4 w-4 text-ink" />
-        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Sugerencias del sistema · {data.total}
-        </span>
+        <span className="t-eyebrow">Sugerencias del sistema · {data.total}</span>
       </header>
       <ul className="divide-y hairline">
         {data.items.map((s, i) => {
@@ -215,9 +213,7 @@ function CalidadView({ data }: { data: CalidadInventario }) {
   return (
     <>
       <section className="rounded-2xl border hairline bg-surface p-6 mb-6">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
-          Inventario
-        </div>
+        <div className="t-eyebrow mb-2">Inventario</div>
         <div className="flex items-baseline gap-3 mb-4">
           <div className="font-display text-4xl text-ink tabular">{data.total}</div>
           <div className="text-sm text-muted-foreground">equipos activos</div>
@@ -230,9 +226,7 @@ function CalidadView({ data }: { data: CalidadInventario }) {
       </section>
 
       <section className="rounded-2xl border hairline bg-surface">
-        <header className="px-5 pt-4 pb-3 border-b hairline font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Faltantes por campo
-        </header>
+        <header className="px-5 pt-4 pb-3 border-b hairline t-eyebrow">Faltantes por campo</header>
         <ul>
           {filas
             .sort((a, b) => data.faltantes[b.key] - data.faltantes[a.key])

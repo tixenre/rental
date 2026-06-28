@@ -71,9 +71,7 @@ function ReporteMensualPage() {
 
             {/* Cascada del mes: facturado − comisiones a dueños − gastos = ganancia */}
             <div className="max-w-xl rounded-xl border hairline bg-surface-elevated p-5 sm:p-6">
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                El mes de Rambla
-              </div>
+              <div className="t-eyebrow">El mes de Rambla</div>
               <div className="mt-3 space-y-0.5">
                 <CascadaRow
                   label="Facturado"
@@ -234,9 +232,7 @@ function CascadaRow({
 function Section({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {titulo}
-      </div>
+      <div className="t-eyebrow">{titulo}</div>
       {children}
     </section>
   );

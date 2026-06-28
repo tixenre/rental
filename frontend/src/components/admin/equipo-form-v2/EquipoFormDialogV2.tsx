@@ -1800,9 +1800,7 @@ ${fotoTag}
       <>
         <div className="px-4 md:px-6 py-6 pb-28 max-w-6xl mx-auto">
           <header className="mb-6">
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Inventario · Equipos
-            </div>
+            <div className="t-eyebrow">Inventario · Equipos</div>
             <h1 className="font-display text-3xl text-ink">{titleText}</h1>
             {publicHint}
           </header>
@@ -1838,25 +1836,19 @@ ${fotoTag}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    $ / jornada
-                  </div>
+                  <div className="t-eyebrow">$ / jornada</div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
                     ${kpiFmt(form.watch("precio_jornada"))}
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    % día
-                  </div>
+                  <div className="t-eyebrow">% día</div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
                     {kpiFmt(form.watch("roi_pct"))}%
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5 col-span-2">
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    Valor reposición
-                  </div>
+                  <div className="t-eyebrow">Valor reposición</div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
                     ${kpiFmt(form.watch("valor_reposicion"))}
                   </div>

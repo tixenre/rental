@@ -482,9 +482,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
       }}
       className="rounded-lg border hairline p-4 space-y-3"
     >
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        Nuevo movimiento
-      </div>
+      <div className="t-eyebrow">Nuevo movimiento</div>
 
       {/* Tipo */}
       <div className="flex flex-wrap gap-1">
@@ -628,9 +626,7 @@ function CuentaSelect({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="space-y-1">
-      <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </span>
+      <span className="block t-eyebrow">{label}</span>
       {children}
     </label>
   );

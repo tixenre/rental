@@ -662,9 +662,7 @@ function EditTab({
         </div>
       </div>
       <aside className="border-l hairline pl-4">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
-          Variables
-        </div>
+        <div className="t-eyebrow mb-2">Variables</div>
         <ul className="space-y-1.5 text-xs">
           {AVAILABLE_VARS.map((v) => (
             <li key={v.name}>

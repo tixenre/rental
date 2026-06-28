@@ -106,9 +106,7 @@ function AdminDashboard() {
           {/* Movimientos del día */}
           <div className="mt-10">
             <div className="mb-4">
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Movimiento de equipos
-              </div>
+              <div className="t-eyebrow">Movimiento de equipos</div>
               <h2 className="font-display text-xl text-ink mt-0.5">Hoy y mañana</h2>
             </div>
 
@@ -138,9 +136,7 @@ function AdminDashboard() {
           {/* Calendario full — antes vivía en /admin/calendario */}
           <div className="mt-10">
             <div className="mb-4">
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Vista mensual
-              </div>
+              <div className="t-eyebrow">Vista mensual</div>
               <h2 className="font-display text-xl text-ink mt-0.5">Calendario</h2>
             </div>
 
@@ -195,9 +191,7 @@ function Stat({
       }`}
     >
       <div className="flex items-center justify-between">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          {label}
-        </div>
+        <div className="t-eyebrow">{label}</div>
         <div className="text-muted-foreground">{icon}</div>
       </div>
       <div
@@ -226,9 +220,7 @@ function PedidosCard({
       <div className="px-4 py-3 border-b hairline flex items-center gap-2">
         <span className="text-muted-foreground">{icon}</span>
         <h2 className="font-display text-base text-ink">{title}</h2>
-        <span className="ml-auto font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          {pedidos.length}
-        </span>
+        <span className="ml-auto t-eyebrow">{pedidos.length}</span>
       </div>
       {pedidos.length === 0 ? (
         <div className="px-4 py-6 text-sm text-muted-foreground">{empty}</div>
@@ -243,7 +235,7 @@ function PedidosCard({
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-ink truncate">{p.cliente_nombre}</div>
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="t-eyebrow">
                     #{p.id} · {formatARS(Number(p.monto_total ?? 0))}
                   </div>
                 </div>
@@ -275,9 +267,7 @@ function EquiposAfueraCard({
           <AlertCircle className="h-4 w-4" />
         </span>
         <h2 className="font-display text-base text-ink">Equipos afuera</h2>
-        <span className="ml-auto font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          {items.length}
-        </span>
+        <span className="ml-auto t-eyebrow">{items.length}</span>
       </div>
       {items.length === 0 ? (
         <div className="px-4 py-6 text-sm text-muted-foreground">
@@ -296,7 +286,7 @@ function EquiposAfueraCard({
                   ×{it.cantidad}
                 </span>
               </div>
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground truncate">
+              <div className="t-eyebrow truncate">
                 {it.cliente_nombre} · vuelve {it.fecha_hasta?.slice(0, 10)}
               </div>
             </li>

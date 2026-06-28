@@ -61,9 +61,7 @@ function CuentasPage() {
         {/* Socios · Cuenta corriente */}
         {socios.length > 0 && (
           <section className="space-y-3">
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Socios · Cuenta corriente
-            </div>
+            <div className="t-eyebrow">Socios · Cuenta corriente</div>
             <div className="grid gap-3 sm:grid-cols-2">
               {socios.map((s) => (
                 <SocioCard key={s.id} socio={s} cajas={cajas} onChanged={invalidar} />
@@ -80,9 +78,7 @@ function CuentasPage() {
         {/* Cajas · Plata del negocio */}
         {q.data && (
           <section className="space-y-3">
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Cajas · Plata del negocio
-            </div>
+            <div className="t-eyebrow">Cajas · Plata del negocio</div>
             <div className="overflow-x-auto rounded-lg border hairline">
               <table className="w-full text-sm">
                 <thead>
@@ -516,14 +512,10 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
       }}
       className="rounded-lg border hairline p-4 space-y-3"
     >
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        Nueva caja
-      </div>
+      <div className="t-eyebrow">Nueva caja</div>
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1">
-          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Nombre
-          </span>
+          <span className="block t-eyebrow">Nombre</span>
           <Input
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
@@ -532,9 +524,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           />
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Tipo
-          </span>
+          <span className="block t-eyebrow">Tipo</span>
           <select
             value={tipo}
             onChange={(e) => setTipo(e.target.value as TipoCuenta)}
@@ -548,9 +538,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Moneda
-          </span>
+          <span className="block t-eyebrow">Moneda</span>
           <select
             value={moneda}
             onChange={(e) => setMoneda(e.target.value)}
@@ -561,9 +549,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Saldo inicial
-          </span>
+          <span className="block t-eyebrow">Saldo inicial</span>
           <Input
             type="number"
             value={saldoInicial}

@@ -557,9 +557,7 @@ function Info({
 }) {
   return (
     <div className={className}>
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </div>
+      <div className="t-eyebrow">{label}</div>
       <div className="text-ink">{value}</div>
     </div>
   );

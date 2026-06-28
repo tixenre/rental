@@ -25,9 +25,7 @@ function MarcaPage() {
         <Section title="Quiénes somos">
           <div className="space-y-3">
             <div className="rounded-xl border border-border bg-surface px-4 py-3">
-              <p className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
-                Tagline
-              </p>
+              <p className="t-eyebrow mb-1">Tagline</p>
               <p className="font-display text-2xl text-ink">Renovamos el alquiler.</p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -129,11 +127,7 @@ function Section({
     <section className="space-y-3">
       <div>
         <h2 className="font-display text-xl text-ink">{title}</h2>
-        {subtitle && (
-          <p className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            {subtitle}
-          </p>
-        )}
+        {subtitle && <p className="t-eyebrow">{subtitle}</p>}
       </div>
       {children}
     </section>
@@ -143,9 +137,7 @@ function Section({
 function TaglineCard({ text }: { text: string }) {
   return (
     <div className="rounded-xl border border-border bg-surface px-4 py-3">
-      <p className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-0.5">
-        Tagline
-      </p>
+      <p className="t-eyebrow mb-0.5">Tagline</p>
       <p className="font-display text-lg text-ink">{text}</p>
     </div>
   );
