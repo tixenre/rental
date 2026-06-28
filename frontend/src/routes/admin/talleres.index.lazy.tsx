@@ -22,6 +22,7 @@ import { authedFetch, authedJson } from "@/lib/authedFetch";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import { Pill, type PillTone } from "@/design-system/kit/Pill";
 import { Spinner } from "@/design-system/ui/spinner";
 import { Switch } from "@/design-system/ui/switch";
@@ -816,11 +817,11 @@ function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
           onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
         />
       ) : (
-        <textarea
+        <Textarea
           rows={opts?.rows}
           value={form[key] as string}
           onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+          className="resize-y"
         />
       )}
     </div>
@@ -1108,12 +1109,12 @@ function InscripcionesSection({
               <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                 Mensaje (opcional)
               </label>
-              <textarea
+              <Textarea
                 rows={4}
                 value={notifMsg}
                 onChange={(e) => setNotifMsg(e.target.value)}
                 placeholder="Ej: Cambiamos el horario a las 10 hs."
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                className="resize-none"
               />
             </div>
           </div>

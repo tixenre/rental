@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { adminApi, type CuentaSaldo } from "@/lib/admin/api";
+import { Input } from "@/design-system/ui/input";
 import { formatARS } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
@@ -44,11 +45,11 @@ function ReporteMensualPage() {
       description="El mes de Rambla, completo: lo facturado, lo que se llevan los dueños de los equipos, los gastos, y lo que realmente le queda a Rambla. Todo sale del mismo motor — no hay un peso sumado dos veces."
       backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
       actions={
-        <input
+        <Input
           type="month"
           value={mes}
           onChange={(e) => setMes(e.target.value)}
-          className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+          className="w-auto"
         />
       }
     >

@@ -30,6 +30,7 @@ import { GripVertical, Star, FileText, Filter, Info, X } from "lucide-react";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 
 import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 import { Switch } from "@/design-system/ui/switch";
 import { Badge } from "@/design-system/ui/badge";
 import { Pill } from "@/design-system/kit/Pill";
@@ -571,7 +572,7 @@ function NombreTemplateEditor({
           <code className="bg-muted px-1 rounded font-mono">{`{Nombre}`}</code> también funcionan.
         </div>
 
-        <input
+        <Input
           type="text"
           value={value}
           onChange={(e) => {
@@ -579,7 +580,7 @@ function NombreTemplateEditor({
             setIsDirty(true);
           }}
           placeholder={`Ej: {Marca} {Modelo} {spec:${specsEnNombre[0]?.label ?? "Lens mount"}}`}
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+          className="font-mono"
         />
 
         {specsEnNombre.length > 0 && (
@@ -693,7 +694,7 @@ function NameFormatEditor({ spec }: { spec: Spec }) {
         <code className="bg-muted px-1 rounded font-mono">{`{unidad}`}</code>.
       </div>
 
-      <input
+      <Input
         type="text"
         value={value}
         onChange={(e) => {
@@ -701,7 +702,7 @@ function NameFormatEditor({ spec }: { spec: Spec }) {
           setIsDirty(true);
         }}
         placeholder={`Ej: Potencia {value} ${spec.unidad ?? "unidades"}`}
-        className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+        className="font-mono"
       />
 
       <div className="text-xs">

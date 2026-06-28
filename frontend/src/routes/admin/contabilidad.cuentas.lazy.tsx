@@ -19,6 +19,7 @@ import { useConfirm } from "@/components/admin/useConfirm";
 import { formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { Input } from "@/design-system/ui/input";
 import { cn } from "@/lib/utils";
 
 // El socio se crea desde el sistema (seed); acá solo cajas/cuentas genéricas.
@@ -232,11 +233,11 @@ function SocioCard({
       </div>
       {editando ? (
         <div className="flex items-center gap-1 pt-1">
-          <input
+          <Input
             type="number"
             value={arranque}
             onChange={(e) => setArranque(e.target.value)}
-            className="h-8 w-32 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            className="w-32 text-right tabular-nums"
             aria-label="Arranque"
           />
           <button
@@ -303,12 +304,12 @@ function SocioCard({
               : `Rambla puso plata por ${socio.nombre} (ej. le compró algo) → sube su deuda y sale de la caja.`}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <input
+            <Input
               type="number"
               value={montoMov}
               onChange={(e) => setMontoMov(e.target.value)}
               placeholder="Monto"
-              className="h-8 w-28 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+              className="w-28 text-right tabular-nums"
             />
             <select
               value={cajaId}
@@ -323,11 +324,10 @@ function SocioCard({
               ))}
             </select>
           </div>
-          <input
+          <Input
             value={notaMov}
             onChange={(e) => setNotaMov(e.target.value)}
             placeholder="Nota (ej. adaptador de lente)"
-            className="h-8 w-full rounded-md border hairline bg-surface-elevated px-2 text-sm"
           />
           <div className="flex items-center gap-1">
             <button
@@ -394,11 +394,7 @@ function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => 
     <tr className="border-b hairline last:border-0">
       <td className="px-3 py-2 font-medium text-ink">
         {editando ? (
-          <input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            className="h-8 w-44 rounded-md border hairline bg-surface-elevated px-2 text-sm"
-          />
+          <Input value={nombre} onChange={(e) => setNombre(e.target.value)} className="w-44" />
         ) : (
           cuenta.nombre
         )}
@@ -410,11 +406,11 @@ function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => 
       </td>
       <td className="px-3 py-2 text-right">
         {editando ? (
-          <input
+          <Input
             type="number"
             value={valor}
             onChange={(e) => setValor(e.target.value)}
-            className="h-8 w-28 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            className="w-28 text-right tabular-nums"
           />
         ) : (
           <span className="font-mono tabular-nums">
@@ -528,11 +524,11 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Nombre
           </span>
-          <input
+          <Input
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             placeholder="Ej. Mercado Pago"
-            className="h-9 w-48 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+            className="w-48"
           />
         </label>
         <label className="space-y-1">
@@ -568,11 +564,11 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
             Saldo inicial
           </span>
-          <input
+          <Input
             type="number"
             value={saldoInicial}
             onChange={(e) => setSaldoInicial(e.target.value)}
-            className="h-9 w-32 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            className="w-32 text-right tabular-nums"
           />
         </label>
         <button

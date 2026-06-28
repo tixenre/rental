@@ -13,6 +13,7 @@ import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { Input } from "@/design-system/ui/input";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { cn } from "@/lib/utils";
@@ -127,21 +128,11 @@ function PagosLogPage() {
           />
           <div className="space-y-1">
             <FieldLabel>Desde</FieldLabel>
-            <input
-              type="date"
-              value={desde}
-              onChange={(e) => setDesde(e.target.value)}
-              className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
-            />
+            <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
           </div>
           <div className="space-y-1">
             <FieldLabel>Hasta</FieldLabel>
-            <input
-              type="date"
-              value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
-              className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
-            />
+            <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
           </div>
           {(destinatario || metodo || desde || hasta) && (
             <button

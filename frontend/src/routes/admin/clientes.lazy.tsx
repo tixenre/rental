@@ -441,10 +441,10 @@ function ClienteHistorialSheet({
                       Mandále este link al cliente (WhatsApp, mail, etc.):
                     </p>
                     <div className="flex items-center gap-2">
-                      <input
+                      <Input
                         readOnly
                         value={linkVerif}
-                        className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-xs text-ink outline-none truncate"
+                        className="flex-1 truncate font-mono text-xs text-ink"
                       />
                       <button
                         type="button"

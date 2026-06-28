@@ -28,6 +28,7 @@ import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { Input } from "@/design-system/ui/input";
 import { TipoMovimientoBadge, TIPO_MOVIMIENTO_META } from "@/components/admin/badges";
 import { cn } from "@/lib/utils";
 
@@ -506,11 +507,11 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
 
       <div className="flex flex-wrap items-end gap-3">
         <Field label="Monto">
-          <input
+          <Input
             type="number"
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
-            className="h-9 w-32 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            className="w-32 text-right tabular-nums"
           />
         </Field>
 
@@ -552,23 +553,18 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </Field>
         <Field label="Fecha">
-          <input
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
-          />
+          <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </Field>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <Field label="Beneficiario (opcional)">
-          <input
+          <Input
             value={beneficiario}
             onChange={(e) => setBeneficiario(e.target.value)}
             list="benef-list"
             placeholder="Ej. Jimena (CM)"
-            className="h-9 w-56 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+            className="w-56"
           />
           <datalist id="benef-list">
             {beneficiarios.map((b) => (
@@ -577,11 +573,11 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
           </datalist>
         </Field>
         <Field label="Nota (opcional)">
-          <input
+          <Input
             value={nota}
             onChange={(e) => setNota(e.target.value)}
             placeholder="Ej. factura 0001-…"
-            className="h-9 w-64 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+            className="w-64"
           />
         </Field>
         <Field label="Comprobante (opcional)">

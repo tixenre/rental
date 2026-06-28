@@ -5,6 +5,7 @@ import { Database, RefreshCw, Trash2, RotateCcw, AlertCircle } from "lucide-reac
 
 import { adminApi } from "@/lib/admin/api";
 import type { GcResult } from "@/lib/admin/api";
+import { Input } from "@/design-system/ui/input";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
@@ -244,17 +245,14 @@ function RederiveForm() {
         >
           Asset ID
         </label>
-        <input
+        <Input
           id="asset-id"
           type="number"
           min={1}
           value={assetId}
           onChange={(e) => setAssetId(e.target.value)}
           placeholder="ej: 42"
-          className={cn(
-            "h-9 w-32 rounded border hairline px-3 text-sm font-mono",
-            "bg-background focus:outline-none focus:ring-1 focus:ring-primary",
-          )}
+          className="w-32 font-mono"
         />
       </div>
       <button

@@ -19,6 +19,7 @@ import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { Button } from "@/design-system/ui/button";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import { Label } from "@/design-system/ui/label";
 import { Switch } from "@/design-system/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/design-system/ui/tabs";
@@ -641,21 +642,21 @@ function EditTab({
         </div>
         <div>
           <Label className="text-xs">Body HTML</Label>
-          <textarea
+          <Textarea
             value={form.body_html}
             onChange={(e) => setForm({ ...form, body_html: e.target.value })}
             rows={12}
-            className="w-full rounded-md border hairline bg-surface px-3 py-2 text-xs font-mono leading-relaxed focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none"
+            className="text-xs font-mono leading-relaxed"
             placeholder="<p>Hola {{ cliente_nombre }}…</p>"
           />
         </div>
         <div>
           <Label className="text-xs">Body texto plano</Label>
-          <textarea
+          <Textarea
             value={form.body_text}
             onChange={(e) => setForm({ ...form, body_text: e.target.value })}
             rows={8}
-            className="w-full rounded-md border hairline bg-surface px-3 py-2 text-xs font-mono leading-relaxed focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none"
+            className="text-xs font-mono leading-relaxed"
             placeholder="Hola {{ cliente_nombre }}…"
           />
         </div>
