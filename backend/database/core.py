@@ -109,10 +109,19 @@ def get_connection_params():
 # threadpool a `pool_max()` menos un margen para workers de fondo (scheduler,
 # init, webhooks async): así los requests de más hacen cola en vez de explotar.
 # Ambos valores se tunean por env (DB_POOL_MIN / DB_POOL_MAX) sin tocar código.
+#
+# `DB_POOL_TIMEOUT` (segundos): tope que `getconn()` espera por una conexión
+# libre. Default 30s en prod a propósito (ver arriba: los requests de más hacen
+# cola en vez de explotar). En el job `python-tests` de CI NO hay Postgres y los
+# tests de contrato golpean handlers reales a propósito (verifican ruteo/guards,
+# aceptan un 500) → sin este knob cada request colgaba los 30s del timeout antes
+# de devolver el 500, y eran ~150 requests = ~38 min. conftest.py lo baja a 1s
+# cuando no hay DATABASE_URL (job sin DB real): el 500 sale igual, pero al toque.
 import os as _os
 
 _POOL_MIN = int(_os.getenv("DB_POOL_MIN", "2"))
 _POOL_MAX = int(_os.getenv("DB_POOL_MAX", "25"))
+_POOL_TIMEOUT = float(_os.getenv("DB_POOL_TIMEOUT", "30"))
 
 _pool: ConnectionPool | None = None
 
@@ -131,6 +140,7 @@ def _get_pool() -> ConnectionPool:
             DATABASE_URL,
             min_size=_POOL_MIN,
             max_size=_POOL_MAX,
+            timeout=_POOL_TIMEOUT,
             kwargs={"cursor_factory": psycopg.ClientCursor},
             open=True,
         )
