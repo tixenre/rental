@@ -353,8 +353,10 @@ def _init_db_schema(conn):
     # Las specs físicas (peso/dimensiones/alimentacion/montura/formato/
     # resolucion) viven en equipo_specs desde Fase F. Acá quedan solo
     # las listas y multimedia que aún no son specs estructuradas.
-    # Listas estructuradas (TEXT con JSON, igual que keywords_json)
-    conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS incluye_json TEXT")          # ["Cuerpo", "Tapa", "Cargador", "Correa"]
+    # Listas estructuradas (TEXT con JSON, igual que keywords_json).
+    # `incluye_json` (legacy enriquecimiento IA) fue DROPEADO (F5): el "qué incluye"
+    # deriva de kit_componentes vía la puerta única `services.contenido`. La columna
+    # se elimina en su migración Alembic; acá ya no se crea en BDs nuevas.
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS conectividad_json TEXT")    # ["USB-C", "HDMI Type-A", "XLR x2"]
     conn.execute("ALTER TABLE equipo_fichas ADD COLUMN IF NOT EXISTS compatible_con_json TEXT")  # ["Sony E-mount", "Full-frame"]
     # Multimedia y referencias

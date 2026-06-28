@@ -106,7 +106,7 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     cur.execute(f"""
         SELECT equipo_id, descripcion, notas,
                keywords_json, nombre_publico_template,
-               incluye_json, conectividad_json, compatible_con_json,
+               conectividad_json, compatible_con_json,
                video_url, precio_bh_usd, fuente_url, fuente_titulo,
                enriquecido_at, enriquecido_fuente,
                contenido_incluido_json
@@ -117,7 +117,7 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     _ficha_keys = (
         "descripcion", "notas",
         "keywords_json", "nombre_publico_template",
-        "incluye_json", "conectividad_json", "compatible_con_json",
+        "conectividad_json", "compatible_con_json",
         "video_url", "precio_bh_usd", "fuente_url", "fuente_titulo",
         "enriquecido_at", "enriquecido_fuente",
         "contenido_incluido_json",

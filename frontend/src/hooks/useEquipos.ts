@@ -390,7 +390,8 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
       return [];
     }
   };
-  const parsedIncluye = parseStringList(ficha?.incluye_json);
+  // `incluye_json` (legacy) dropeado: el "qué incluye" sale de la receta real
+  // (e.kit → includes), no del descriptivo. Ver services.contenido (backend).
   const parsedConectividad = parseStringList(ficha?.conectividad_json);
   const parsedCompatibleCon = parseStringList(ficha?.compatible_con_json);
 
@@ -467,7 +468,6 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
     formato: specByKey("formato"),
     resolucion: specByKey("resolucion_max"),
     alimentacion: specByKey("alimentacion"),
-    incluye: parsedIncluye,
     conectividad: parsedConectividad,
     compatibleCon: parsedCompatibleCon,
     contenidoIncluido: parsedContenidoIncluido,

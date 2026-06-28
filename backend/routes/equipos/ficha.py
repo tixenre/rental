@@ -24,8 +24,8 @@ class FichaUpdate(BaseModel):
     notas:         Optional[str] = None
     keywords_json: Optional[str] = None
     nombre_publico_template: Optional[str] = None
-    # Listas y multimedia del enriquecimiento (no son specs estructuradas)
-    incluye_json:        Optional[str]   = None
+    # Listas y multimedia del enriquecimiento (no son specs estructuradas).
+    # `incluye_json` dropeado (F5): el "qué incluye" deriva de kit_componentes.
     conectividad_json:   Optional[str]   = None
     compatible_con_json: Optional[str]   = None
     video_url:           Optional[str]   = None
