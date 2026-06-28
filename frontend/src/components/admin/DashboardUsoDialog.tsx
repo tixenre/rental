@@ -277,11 +277,7 @@ export function DashboardUsoDialog({
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-xs tabular-nums font-medium">
-                            {e.valor_reposicion
-                              ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}`
-                              : "—"}
-                          </div>
+                          <Monto value={e.valor_reposicion} moneda="USD" className="text-xs" />
                           <div className="text-2xs text-muted-foreground tabular-nums">
                             {e.total_alquileres} total
                           </div>
@@ -355,10 +351,8 @@ export function DashboardUsoDialog({
                           <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
                             {e.total_alquileres}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums text-xs">
-                            {e.valor_reposicion
-                              ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}`
-                              : "—"}
+                          <TableCell className="text-right">
+                            <Monto value={e.valor_reposicion} moneda="USD" className="text-xs" />
                           </TableCell>
                         </TableRow>
                       );

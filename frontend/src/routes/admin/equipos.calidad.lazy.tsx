@@ -23,6 +23,7 @@ import {
   type Sugerencia,
 } from "@/lib/admin/api";
 import { AdminPage } from "@/components/admin/AdminPage";
+import { PrecioJornada } from "@/components/admin/Monto";
 import { QueryState } from "@/components/admin/QueryState";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
@@ -178,7 +179,7 @@ function SugerenciasSection() {
                   <ul className="ml-3 mt-1 space-y-0.5">
                     {s.equipos.slice(0, 10).map((e) => (
                       <li key={e.id} className="font-mono tabular">
-                        {e.marca} {e.nombre} · ${e.precio_jornada.toLocaleString("es-AR")}/jornada
+                        {e.marca} {e.nombre} · <PrecioJornada value={e.precio_jornada} />
                       </li>
                     ))}
                     {s.equipos.length > 10 && (

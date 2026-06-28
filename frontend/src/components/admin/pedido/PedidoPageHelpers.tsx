@@ -195,7 +195,7 @@ export function ItemRow({
               className="h-9 rounded-md border hairline bg-surface-elevated px-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
               aria-label="Modo de cobro"
             >
-              <option value="jornada">/día</option>
+              <option value="jornada">/jornada</option>
               <option value="fijo">fijo</option>
             </select>
           ) : (

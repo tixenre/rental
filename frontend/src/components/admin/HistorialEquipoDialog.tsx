@@ -121,7 +121,7 @@ export function HistorialEquipoDialog({
                       <TableHead>Fechas</TableHead>
                       <TableHead className="text-right">Cant.</TableHead>
                       <TableHead className="text-right">Días</TableHead>
-                      <TableHead className="text-right">Precio/día</TableHead>
+                      <TableHead className="text-right">Precio/jornada</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>

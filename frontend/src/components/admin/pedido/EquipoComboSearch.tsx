@@ -18,8 +18,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/design-system/ui/input";
 import { cn } from "@/lib/utils";
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { fmtArs } from "@/lib/format";
 import { filtrarOrdenar } from "@/lib/search/normalize";
+import { PrecioJornada } from "@/components/admin/Monto";
 import { EquipoThumb } from "./EquipoThumb";
 import type { DraftItem } from "./usePedidoDraft";
 
@@ -168,7 +168,14 @@ export function EquipoComboSearch({
                         </div>
                         <div className="font-mono text-xs text-muted-foreground truncate">
                           {[eq.marca, eq.modelo].filter(Boolean).join(" / ")}
-                          {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
+                          {eq.precio_jornada ? (
+                            <>
+                              {" · "}
+                              <PrecioJornada value={eq.precio_jornada} />
+                            </>
+                          ) : (
+                            ""
+                          )}
                         </div>
                       </div>
                       <span

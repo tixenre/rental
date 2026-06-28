@@ -72,6 +72,7 @@ import { uploadEquipoFotoFromUrl } from "@/lib/equipment/equipoFotos";
 import { PhotoGallery } from "@/components/common/PhotoGallery";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
+import { Monto, PrecioJornada } from "@/components/admin/Monto";
 import { KitEditor } from "./KitEditor";
 import { ComboEditor } from "./ComboEditor";
 import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
@@ -1339,7 +1340,7 @@ export function EquipoFormDialogV2({
           <Field label="% día">
             <Input type="number" step="0.1" {...form.register("roi_pct")} />
           </Field>
-          <Field label={precioJornadaManual ? "Precio/día (manual)" : "Precio/día (auto)"}>
+          <Field label={precioJornadaManual ? "Precio/jornada (manual)" : "Precio/jornada (auto)"}>
             <div className="flex gap-1">
               <Input
                 type="number"
@@ -1841,7 +1842,7 @@ ${fotoTag}
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
                   <div className="t-eyebrow">$ / jornada</div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
-                    ${kpiFmt(form.watch("precio_jornada"))}
+                    <PrecioJornada value={form.watch("precio_jornada")} />
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
@@ -1853,7 +1854,7 @@ ${fotoTag}
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5 col-span-2">
                   <div className="t-eyebrow">Valor reposición</div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
-                    ${kpiFmt(form.watch("valor_reposicion"))}
+                    <Monto value={form.watch("valor_reposicion")} moneda="USD" />
                   </div>
                 </div>
               </div>

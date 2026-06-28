@@ -17,7 +17,7 @@ import { Badge } from "@/design-system/ui/badge";
 import { Pill } from "@/design-system/kit/Pill";
 import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 import { Field } from "@/design-system/kit/Field";
-import { Monto } from "@/components/admin/Monto";
+import { Monto, PrecioJornada } from "@/components/admin/Monto";
 import { EmptyState } from "@/components/rental/EmptyState";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { TableSkeleton } from "@/components/admin/skeletons";
@@ -189,16 +189,26 @@ export function DsCatalog() {
       </Section>
 
       {/* ── Plata ────────────────────────────────────────────────────── */}
-      <Section title="Plata" hint="<Monto> — jerarquía única de la plata (formatARS + tono).">
-        <Row>
-          <Monto value={97500} />
-          <span className="text-muted-foreground">·</span>
-          <Monto value={0} />
-          <span className="text-muted-foreground">·</span>
-          <Monto value={45000} tone="debt" />
-          <span className="text-muted-foreground">·</span>
-          <Monto value={250000} tone="strong" />
-        </Row>
+      <Section
+        title="Plata"
+        hint="Un componente por tipo de plata: <Monto> (montos, con tono y moneda) y <PrecioJornada> (precio de alquiler)."
+      >
+        <div className="space-y-3">
+          <Row>
+            <Monto value={97500} />
+            <span className="text-muted-foreground">·</span>
+            <Monto value={0} />
+            <span className="text-muted-foreground">·</span>
+            <Monto value={45000} tone="debt" />
+            <span className="text-muted-foreground">·</span>
+            <Monto value={250000} tone="strong" />
+            <span className="text-muted-foreground">·</span>
+            <Monto value={1200} moneda="USD" />
+          </Row>
+          <Row>
+            <PrecioJornada value={12000} />
+          </Row>
+        </div>
       </Section>
 
       {/* ── Estados ──────────────────────────────────────────────────── */}
