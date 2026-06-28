@@ -7,8 +7,11 @@
 
 import { Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Search } from "lucide-react";
+
 import { authedFetch } from "@/lib/authedFetch";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminCommandPalette } from "@/components/admin/AdminCommandPalette";
 import { ConfirmProvider } from "@/components/admin/useConfirm";
 import { SidebarProvider, SidebarTrigger } from "@/design-system/ui/sidebar";
 
@@ -60,15 +63,24 @@ export function AdminLayout() {
         <div className="min-h-screen flex w-full bg-background">
           <AdminSidebar email={session.email ?? ""} />
           <div className="flex-1 flex flex-col min-w-0">
-            {/* En mobile el sidebar está oculto, así que el trigger vive acá */}
-            <header className="md:hidden h-12 flex items-center border-b hairline px-3 bg-background sticky top-0 z-10">
+            {/* En mobile el sidebar está oculto, así que los triggers viven acá */}
+            <header className="md:hidden h-12 flex items-center justify-between border-b hairline px-3 bg-background sticky top-0 z-10">
               <SidebarTrigger aria-label="Abrir menú" />
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("admin:cmdk"))}
+                className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-ink"
+                aria-label="Buscar"
+              >
+                <Search className="h-4 w-4" />
+              </button>
             </header>
             <main className="flex-1 min-w-0">
               <Outlet />
             </main>
           </div>
         </div>
+        <AdminCommandPalette />
       </SidebarProvider>
     </ConfirmProvider>
   );

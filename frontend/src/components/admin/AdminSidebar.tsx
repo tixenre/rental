@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { LogOut, ChevronRight, PanelLeft } from "lucide-react";
+import { LogOut, ChevronRight, PanelLeft, Search } from "lucide-react";
 
 import {
   Sidebar,
@@ -109,6 +109,30 @@ export function AdminSidebar({ email }: { email: string }) {
       </SidebarHeader>
 
       <SidebarContent>
+        {/* Buscador global ⌘K — despacha el evento que abre el command palette. */}
+        <SidebarGroup className="pb-0">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => window.dispatchEvent(new Event("admin:cmdk"))}
+                  tooltip={collapsed ? "Buscar (⌘K)" : undefined}
+                >
+                  <Search className="h-4 w-4 shrink-0" />
+                  {!collapsed && (
+                    <>
+                      <span className="text-muted-foreground">Buscar…</span>
+                      <kbd className="ml-auto rounded border hairline px-1.5 py-0.5 font-mono text-2xs text-muted-foreground">
+                        ⌘K
+                      </kbd>
+                    </>
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         {collapsed
           ? // Modo icon-rail: todo plano como iconos, sin labels de grupo.
             ADMIN_NAV.map((g) => (
