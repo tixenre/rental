@@ -24,6 +24,16 @@ os.environ.setdefault("ADMIN_EMAILS", "admin@test.com")
 # (start_scheduler) y sondea la DB en runtime; en tests no queremos un thread
 # tocando Postgres. Los tests del scheduler borran esta env para probar el arranque.
 os.environ.setdefault("REMINDERS_SCHEDULER_DISABLED", "1")
+# Pool de DB: cuánto espera `getconn()` por una conexión libre. El job
+# `python-tests` corre SIN Postgres (no setea DATABASE_URL) y sus tests de
+# contrato golpean handlers reales a propósito (verifican ruteo/guards; aceptan
+# un 500). Sin acotar el timeout, cada request colgaba los 30s default del pool
+# antes del 500 → ~150 requests = ~38 min. Cuando NO hay DATABASE_URL (= sin DB
+# real) lo bajamos a 1s: el 500 sale igual, pero al toque. El job de integración
+# SÍ setea DATABASE_URL → ahí no tocamos nada (queda en 30s, comportamiento
+# idéntico al de hoy). Prod tampoco (conftest no corre). Override explícito gana.
+if not os.environ.get("DATABASE_URL"):
+    os.environ.setdefault("DB_POOL_TIMEOUT", "1")
 
 
 @pytest.fixture(autouse=True)
