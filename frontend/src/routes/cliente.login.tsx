@@ -5,6 +5,8 @@ import { TopBar } from "@/components/rental/TopBar";
 import { useBusinessPhone } from "@/lib/business";
 import { whatsappLink } from "@/lib/whatsapp";
 import { authedFetch } from "@/lib/authedFetch";
+import { loginWithPasskey, passkeyErrorMessage, passkeySupported } from "@/lib/passkey";
+import { KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/cliente/login")({
   head: () => ({
@@ -28,6 +30,8 @@ const ERROR_MESSAGES: Record<string, string> = {
 function ClienteLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [devMode, setDevMode] = useState(false);
+  const [supported] = useState(() => passkeySupported());
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const businessPhone = useBusinessPhone();
   const waHref = whatsappLink({
     phone: businessPhone,
@@ -58,6 +62,19 @@ function ClienteLoginPage() {
 
   function handleDevLogin() {
     window.location.href = "/auth/dev-login-cliente";
+  }
+
+  async function handlePasskeyLogin() {
+    if (passkeyBusy) return;
+    setError(null);
+    setPasskeyBusy(true);
+    try {
+      await loginWithPasskey();
+      window.location.href = "/cliente/portal";
+    } catch (e) {
+      setError(passkeyErrorMessage(e));
+      setPasskeyBusy(false);
+    }
   }
 
   return (
@@ -102,6 +119,17 @@ function ClienteLoginPage() {
             <GoogleIcon />
             Entrar con Google
           </button>
+
+          {supported && (
+            <button
+              onClick={handlePasskeyLogin}
+              disabled={passkeyBusy}
+              className="flex items-center justify-center gap-2.5 rounded-md border-[1.5px] hairline bg-card py-[13px] font-sans text-sm font-semibold text-ink transition hover:border-ink hover:bg-background disabled:opacity-60"
+            >
+              <KeyRound className="h-4 w-4" />
+              {passkeyBusy ? "Verificando…" : "Entrar con passkey"}
+            </button>
+          )}
 
           <div className="flex items-center gap-3 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground before:content-[''] before:flex-1 before:h-px before:bg-[var(--hairline)] after:content-[''] after:flex-1 after:h-px after:bg-[var(--hairline)]">
             o

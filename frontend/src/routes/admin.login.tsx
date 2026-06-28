@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { Logo } from "@/components/rental/Logo";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
+import { loginWithPasskey, passkeyErrorMessage, passkeySupported } from "@/lib/passkey";
+import { KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({
@@ -25,6 +27,8 @@ function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [devMode, setDevMode] = useState(false);
   const [googleEnabled, setGoogleEnabled] = useState(true);
+  const [supported] = useState(() => passkeySupported());
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -61,6 +65,19 @@ function AdminLoginPage() {
 
   function handleDevLogin() {
     window.location.href = "/auth/dev-login";
+  }
+
+  async function handlePasskeyLogin() {
+    if (passkeyBusy) return;
+    setError(null);
+    setPasskeyBusy(true);
+    try {
+      await loginWithPasskey();
+      window.location.href = "/admin";
+    } catch (e) {
+      setError(passkeyErrorMessage(e));
+      setPasskeyBusy(false);
+    }
   }
 
   return (
@@ -104,6 +121,17 @@ function AdminLoginPage() {
             >
               <GoogleIcon />
               Entrar con Google
+            </button>
+          )}
+
+          {supported && (
+            <button
+              onClick={handlePasskeyLogin}
+              disabled={passkeyBusy}
+              className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98] disabled:opacity-60"
+            >
+              <KeyRound className="h-4 w-4" />
+              {passkeyBusy ? "Verificando…" : "Entrar con passkey"}
             </button>
           )}
         </div>
