@@ -196,6 +196,18 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_reservas_concurrency_db.py tests/test_reservas_nested_db.py -v --tb=short -m integration
+      - name: Puerta única de contenido contra Postgres real (services/contenido)
+        run: |
+          cd backend
+          # Clava que la puerta de display (contenido_de) deriva de la MISMA tabla
+          # kit_componentes que el gate (== componentes_de, restringido a equipos no
+          # eliminados) y que el display es 1 nivel (no la expansión recursiva del
+          # stock). Garantía estructural: lo mostrado no se desincroniza de lo reservado.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_contenido_puerta_db.py -v --tb=short -m integration
       - name: Calendario recursivo vía compuestos contra Postgres real (#934)
         run: |
           cd backend
