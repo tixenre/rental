@@ -104,7 +104,7 @@ def actualizar_unidad(unidad_id: int, payload: UnidadUpdate, request: Request):
         ).fetchone()
         if not existing:
             raise HTTPException(404, "Unidad no existe")
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        set_clause = ", ".join(f"{k} = %s" for k in updates)
         try:
             conn.execute(
                 f"UPDATE unidades SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = %s",

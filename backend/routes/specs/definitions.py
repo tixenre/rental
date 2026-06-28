@@ -322,7 +322,7 @@ def actualizar_spec_definition(def_id: int, payload: SpecDefinitionUpdate, reque
                         f"No se puede cambiar el tipo: hay {count['n']} equipos con valores cargados. "
                         "Borralos primero o creá una spec nueva.",
                     )
-            set_clause = ", ".join(f"{k} = ?" for k in updates)
+            set_clause = ", ".join(f"{k} = %s" for k in updates)
             try:
                 conn.execute(
                     f"UPDATE spec_definitions SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = %s",

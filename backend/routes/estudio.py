@@ -1821,7 +1821,7 @@ def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
             estudio = _get_estudio_row(conn)
             if not estudio["equipo_id"]:
                 raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
-            conn.execute("SELECT pg_advisory_xact_lock(?, ?)", (_ADVISORY_NS_ESTUDIO, 1))
+            conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
             if merged.get("activo", True):
                 verificar_sesiones_disponibles(
                     conn, estudio, _sesiones_de_slot(merged),
@@ -1829,7 +1829,7 @@ def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
                 )
             if updates:
                 updates["updated_at"] = now_ar()
-                set_parts = ", ".join(f"{k} = ?" for k in updates)
+                set_parts = ", ".join(f"{k} = %s" for k in updates)
                 conn.execute(
                     f"UPDATE estudio_slots_fijos SET {set_parts} WHERE id = %s",
                     (*updates.values(), slot_id),

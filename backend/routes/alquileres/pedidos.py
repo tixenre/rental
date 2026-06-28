@@ -82,10 +82,10 @@ def list_pedidos(
 
     with get_db() as conn:
         if estado:
-            where += " AND p.estado = ?"
+            where += " AND p.estado = %s"
             params.append(estado)
         if fuente:
-            where += " AND p.fuente = ?"
+            where += " AND p.fuente = %s"
             params.append(fuente)
         if q:
             like = f"%{q}%"
