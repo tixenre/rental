@@ -100,6 +100,8 @@ function PagosLogPage() {
   return (
     <AdminPage
       title="Cobros de pedidos"
+      eyebrow="Finanzas"
+      backTo={{ to: "/admin/contabilidad/movimientos", label: "Movimientos" }}
       maxW="max-w-5xl"
       description={
         <>

@@ -2,13 +2,16 @@
  * contabilidad.movimientos.lazy.tsx — Libro de movimientos (#809, Fase 2/3).
  *
  * Registra y lista los movimientos manuales de plata: gastos, transferencias
- * entre cajas, retiros y aportes de socios. Los cobros de clientes NO van acá
- * (entran solos desde Pagos). La plata nunca se borra: anular deja el registro
- * tachado con su motivo.
+ * entre cajas, retiros y aportes de socios. Los cobros de pedidos aparecen como
+ * una línea mensual read-only (derivan de los pagos de alquiler, no se cargan a
+ * mano) que se DESPLIEGA para ver los pagos individuales del mes inline — misma
+ * fuente única que /admin/pagos (el "ver ledger completo"). La plata nunca se
+ * borra: anular deja el registro tachado con su motivo.
  */
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -89,6 +92,8 @@ function MovimientosPage() {
   const qc = useQueryClient();
   const [tipoFiltro, setTipoFiltro] = useState<string>("");
   const [beneficiarioFiltro, setBeneficiarioFiltro] = useState<string>("");
+  // Mes del cobro expandido (muestra los pagos individuales inline). Uno a la vez.
+  const [expandedMes, setExpandedMes] = useState<string | null>(null);
 
   const invalidar = () => qc.invalidateQueries({ queryKey: ["admin", "contabilidad"] });
 
@@ -172,14 +177,14 @@ function MovimientosPage() {
         ) : (
           <>
             <span className="capitalize text-ink">Cobro alquileres · {mesLabel(f.cobro.mes)}</span>
-            <div className="text-xs text-muted-foreground">
-              {f.cobro.cantidad} pago(s) ·{" "}
-              <Link
-                to="/admin/pagos"
-                className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
-              >
-                ver detalle
-              </Link>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <ChevronDown
+                className={cn(
+                  "h-3.5 w-3.5 transition-transform",
+                  expandedMes === f.cobro.mes && "rotate-180",
+                )}
+              />
+              {f.cobro.cantidad} pago(s) — {expandedMes === f.cobro.mes ? "ocultar" : "ver detalle"}
             </div>
           </>
         ),
@@ -280,12 +285,79 @@ function MovimientosPage() {
             rows={filas}
             getRowKey={(f) => (f.kind === "mov" ? `m${f.mov.id}` : `c${f.cobro.mes}`)}
             rowClassName={(f) =>
-              f.kind === "mov" ? cn(f.mov.anulado && "opacity-50") : "bg-muted/10"
+              f.kind === "mov" ? cn("cursor-default", f.mov.anulado && "opacity-50") : "bg-muted/10"
             }
+            onRowClick={(f) => {
+              if (f.kind === "cobro")
+                setExpandedMes((m) => (m === f.cobro.mes ? null : f.cobro.mes));
+            }}
+            isExpanded={(f) => f.kind === "cobro" && expandedMes === f.cobro.mes}
+            renderExpanded={(f) => (f.kind === "cobro" ? <CobroDetalle mes={f.cobro.mes} /> : null)}
           />
         )}
       </div>
     </AdminPage>
+  );
+}
+
+/** Detalle desplegable de un cobro mensual: los pagos individuales de ese mes,
+ *  traídos del ledger único de pagos (read-only, misma fuente que Cobros). */
+function CobroDetalle({ mes }: { mes: string }) {
+  const desde = `${mes}-01`;
+  const hasta = finDeMes(mes);
+  const q = useQuery({
+    queryKey: ["admin", "pagos", "mes", mes],
+    queryFn: () => adminApi.listPagosLog({ desde, hasta }),
+  });
+
+  if (q.isLoading) {
+    return <div className="px-4 py-3 text-xs text-muted-foreground">Cargando pagos…</div>;
+  }
+  if (q.isError) {
+    return (
+      <div className="px-4 py-3 text-xs text-destructive">No se pudieron cargar los pagos.</div>
+    );
+  }
+  const pagos = q.data?.pagos ?? [];
+  if (pagos.length === 0) {
+    return <div className="px-4 py-3 text-xs text-muted-foreground">Sin pagos en el mes.</div>;
+  }
+
+  return (
+    <div className="space-y-1.5 px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="t-eyebrow">Pagos del mes</div>
+        <Link
+          to="/admin/pagos"
+          className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+        >
+          ver ledger completo →
+        </Link>
+      </div>
+      <div className="divide-y hairline rounded-md border hairline bg-surface-elevated">
+        {pagos.map((p) => (
+          <div key={p.id} className="flex items-center gap-3 px-3 py-1.5 text-xs">
+            <span className="whitespace-nowrap text-muted-foreground">
+              {formatFechaDisplay(p.fecha)}
+            </span>
+            <Link
+              to="/admin/pedidos/$id"
+              params={{ id: String(p.pedido_id) }}
+              className="whitespace-nowrap font-mono text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+            >
+              #{p.numero_pedido ?? p.pedido_id}
+            </Link>
+            <span className="flex-1 truncate text-muted-foreground">{p.cliente_nombre ?? "—"}</span>
+            <span className="whitespace-nowrap capitalize text-muted-foreground">
+              {p.metodo ?? "—"}
+            </span>
+            <span className="whitespace-nowrap font-mono tabular-nums text-ink">
+              {formatMoney(p.monto, "ARS")}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

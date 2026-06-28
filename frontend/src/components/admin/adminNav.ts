@@ -22,7 +22,6 @@ import {
   Database,
   Ruler,
   Wallet,
-  ArrowDownToLine,
   BarChart3,
   Calculator,
   TrendingUp,
@@ -99,8 +98,9 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     defaultOpen: true,
     items: [
       { title: "Tablero", url: "/admin/contabilidad", icon: LayoutDashboard, exact: true },
+      // Los cobros de pedidos viven dentro de Movimientos (fila mensual desplegable);
+      // /admin/pagos sigue accesible como "ver ledger completo" desde ese detalle.
       { title: "Movimientos", url: "/admin/contabilidad/movimientos", icon: ClipboardList },
-      { title: "Cobros de pedidos", url: "/admin/pagos", icon: ArrowDownToLine },
       { title: "Cuentas", url: "/admin/contabilidad/cuentas", icon: Wallet },
       { title: "Reporte mensual", url: "/admin/contabilidad/reporte", icon: BarChart3 },
       { title: "Liquidación", url: "/admin/contabilidad/liquidacion", icon: Calculator },

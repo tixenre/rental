@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import {
   Table,
@@ -38,6 +38,8 @@ export function AdminTable<T>({
   onRowClick,
   rowClassName,
   className,
+  isExpanded,
+  renderExpanded,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -45,6 +47,10 @@ export function AdminTable<T>({
   onRowClick?: (row: T) => void;
   rowClassName?: (row: T) => string | undefined;
   className?: string;
+  /** Si la fila está expandida (muestra `renderExpanded` debajo, a todo el ancho). */
+  isExpanded?: (row: T) => boolean;
+  /** Contenido del detalle desplegable de una fila. */
+  renderExpanded?: (row: T) => ReactNode;
 }) {
   const alignClass = (a?: Column<T>["align"]) =>
     a === "right" ? "text-right" : a === "center" ? "text-center" : undefined;
@@ -63,17 +69,25 @@ export function AdminTable<T>({
         </TableHeader>
         <TableBody>
           {rows.map((row, index) => (
-            <TableRow
-              key={getRowKey(row, index)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={cn(onRowClick && "cursor-pointer", rowClassName?.(row))}
-            >
-              {columns.map((c, i) => (
-                <TableCell key={i} className={cn(alignClass(c.align), c.className)}>
-                  {c.cell(row, index)}
-                </TableCell>
-              ))}
-            </TableRow>
+            <Fragment key={getRowKey(row, index)}>
+              <TableRow
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={cn(onRowClick && "cursor-pointer", rowClassName?.(row))}
+              >
+                {columns.map((c, i) => (
+                  <TableCell key={i} className={cn(alignClass(c.align), c.className)}>
+                    {c.cell(row, index)}
+                  </TableCell>
+                ))}
+              </TableRow>
+              {isExpanded?.(row) && renderExpanded && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={columns.length} className="bg-muted/15 p-0">
+                    {renderExpanded(row)}
+                  </TableCell>
+                </TableRow>
+              )}
+            </Fragment>
           ))}
         </TableBody>
       </Table>
