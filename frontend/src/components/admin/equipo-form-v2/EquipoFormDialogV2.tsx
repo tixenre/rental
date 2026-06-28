@@ -1597,8 +1597,11 @@ export function EquipoFormDialogV2({
               afecta reservas ni stock.
             </p>
             {contenidoIncluido.length > 0 && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
                 onClick={() => {
                   const nombre = initial.nombre ?? "Equipo";
                   const marca = initial.marca ?? "";
@@ -1652,11 +1655,10 @@ ${fotoTag}
                     w.document.close();
                   }
                 }}
-                className="shrink-0 inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground border hairline hover:text-ink hover:bg-muted/50 transition"
               >
-                <Printer className="h-3 w-3" />
+                <Printer className="h-3 w-3 mr-1" />
                 Imprimir contenido
-              </button>
+              </Button>
             )}
           </div>
           <ContenidoIncluidoEditor

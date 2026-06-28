@@ -19,7 +19,9 @@ import { useConfirm } from "@/components/admin/useConfirm";
 import { formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Pill, type PillTone } from "@/design-system/kit/Pill";
 import { cn } from "@/lib/utils";
 
 // El socio se crea desde el sistema (seed); acá solo cajas/cuentas genéricas.
@@ -198,25 +200,16 @@ function SocioCard({
         : "text-ink";
   const tag =
     socio.estado === "deudor" ? "Deudor" : socio.estado === "acreedor" ? "Acreedor" : "Saldado";
-  const tagColor =
-    socio.estado === "deudor"
-      ? "bg-destructive/10 text-destructive"
-      : socio.estado === "acreedor"
-        ? "bg-verde/10 text-verde-ink"
-        : "bg-muted text-muted-foreground";
+  const tagTone: PillTone =
+    socio.estado === "deudor" ? "danger" : socio.estado === "acreedor" ? "success" : "neutral";
 
   return (
     <div className="rounded-lg border hairline p-4 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <div className="font-medium text-ink">{socio.nombre}</div>
-        <span
-          className={cn(
-            "font-mono text-2xs uppercase tracking-wider px-2 py-0.5 rounded-full",
-            tagColor,
-          )}
-        >
+        <Pill tone={tagTone} className="font-mono uppercase tracking-wider">
           {tag}
-        </span>
+        </Pill>
       </div>
       <div className={cn("font-mono text-2xl font-semibold tabular-nums", color)}>
         {formatMoney(abs, socio.moneda)}
@@ -236,24 +229,26 @@ function SocioCard({
             className="w-32 text-right tabular-nums"
             aria-label="Arranque"
           />
-          <button
+          <Button
             type="button"
+            variant="primary"
+            size="sm"
             onClick={() => guardar.mutate()}
             disabled={guardar.isPending}
-            className="h-8 rounded-md bg-ink px-2 text-xs text-background disabled:opacity-50"
           >
             Guardar
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => {
               setEditando(false);
               setArranque(String(socio.saldo_inicial));
             }}
-            className="h-8 rounded-md border hairline px-2 text-xs"
           >
             Cancelar
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="flex items-center gap-3">
@@ -326,21 +321,18 @@ function SocioCard({
             placeholder="Nota (ej. adaptador de lente)"
           />
           <div className="flex items-center gap-1">
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="sm"
               onClick={() => registrarMov.mutate()}
               disabled={registrarMov.isPending || !(Number(montoMov) > 0) || !cajaId}
-              className="h-8 rounded-md bg-ink px-3 text-xs text-background disabled:opacity-50"
             >
               Registrar
-            </button>
-            <button
-              type="button"
-              onClick={cerrarMov}
-              className="h-8 rounded-md border hairline px-2 text-xs"
-            >
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={cerrarMov}>
               Cancelar
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -420,21 +412,18 @@ function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => 
       <td className="px-3 py-2 text-right">
         {editando ? (
           <div className="flex items-center justify-end gap-1">
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="sm"
               onClick={() => guardar.mutate()}
               disabled={guardar.isPending || !nombre.trim()}
-              className="h-8 rounded-md bg-ink px-2 text-xs text-background disabled:opacity-50"
             >
               Guardar
-            </button>
-            <button
-              type="button"
-              onClick={cerrar}
-              className="h-8 rounded-md border hairline px-2 text-xs"
-            >
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={cerrar}>
               Cancelar
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="flex items-center justify-end gap-3">
@@ -557,13 +546,9 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
             className="w-32 text-right tabular-nums"
           />
         </label>
-        <button
-          type="submit"
-          disabled={crear.isPending || !nombre.trim()}
-          className="h-9 rounded-md bg-ink px-4 text-sm text-background disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" disabled={crear.isPending || !nombre.trim()}>
           {crear.isPending ? "Creando…" : "Crear"}
-        </button>
+        </Button>
       </div>
     </form>
   );

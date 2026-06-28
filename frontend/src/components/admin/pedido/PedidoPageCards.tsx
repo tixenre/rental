@@ -23,6 +23,7 @@ import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Badge } from "@/design-system/ui/badge";
+import { Pill } from "@/design-system/kit/Pill";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -125,16 +126,9 @@ export function ItemsCard({
                   <div className="text-xs text-muted-foreground">
                     {it.marca ?? "—"}
                     {stock && (
-                      <span
-                        className={cn(
-                          "ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-2xs",
-                          disponible <= 0
-                            ? "bg-destructive/10 text-destructive"
-                            : "bg-muted text-muted-foreground",
-                        )}
-                      >
+                      <Pill tone={disponible <= 0 ? "danger" : "neutral"} className="ml-1.5">
                         {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
-                      </span>
+                      </Pill>
                     )}
                   </div>
                 </div>
@@ -395,14 +389,9 @@ export function PagosSidebar({
   return (
     <div className="space-y-3">
       {/* Badge estado + importes */}
-      <div
-        className={cn(
-          "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-          estadoPago === "pagado" ? "bg-verde/10 text-verde-ink" : "bg-amber/15 text-ink",
-        )}
-      >
+      <Pill tone={estadoPago === "pagado" ? "success" : "warning"} className="px-3 py-1 text-xs">
         {estadoPago === "pagado" ? "Pagado" : "Pago pendiente"}
-      </div>
+      </Pill>
       <div className="text-sm space-y-1">
         <div className="flex justify-between text-muted-foreground">
           <span>Pagado</span>

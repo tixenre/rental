@@ -39,6 +39,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
+import { Pill } from "@/design-system/kit/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -1536,9 +1537,9 @@ function SortableTrabajoCard({
       </div>
 
       {/* Cantidad de medios */}
-      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground">
+      <Pill tone="neutral" className="font-mono uppercase tracking-[0.1em]">
         {trabajo.media.length} {trabajo.media.length === 1 ? "medio" : "medios"}
-      </span>
+      </Pill>
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0">

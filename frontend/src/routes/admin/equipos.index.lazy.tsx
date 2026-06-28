@@ -790,12 +790,9 @@ function EquiposPage() {
                   <TableCell className="hidden md:table-cell">
                     <div className="flex flex-wrap gap-1 max-w-[180px]">
                       {(eq.etiquetas ?? []).slice(0, 2).map((t) => (
-                        <span
-                          key={t}
-                          className="inline-flex items-center rounded-full border hairline bg-surface px-2 py-0.5 text-2xs font-medium text-ink whitespace-nowrap"
-                        >
+                        <Pill key={t} className="hairline bg-surface text-ink whitespace-nowrap">
                           {t}
-                        </span>
+                        </Pill>
                       ))}
                       {(eq.etiquetas ?? []).length > 2 && (
                         <span className="text-2xs text-muted-foreground">

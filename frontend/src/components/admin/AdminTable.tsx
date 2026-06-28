@@ -4,6 +4,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -40,6 +41,7 @@ export function AdminTable<T>({
   className,
   isExpanded,
   renderExpanded,
+  footer,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -51,6 +53,8 @@ export function AdminTable<T>({
   isExpanded?: (row: T) => boolean;
   /** Contenido del detalle desplegable de una fila. */
   renderExpanded?: (row: T) => ReactNode;
+  /** Filas de pie de tabla (totales). Pasá `<TableRow>`s; usá `colSpan` en las celdas. */
+  footer?: ReactNode;
 }) {
   const alignClass = (a?: Column<T>["align"]) =>
     a === "right" ? "text-right" : a === "center" ? "text-center" : undefined;
@@ -90,6 +94,7 @@ export function AdminTable<T>({
             </Fragment>
           ))}
         </TableBody>
+        {footer && <TableFooter>{footer}</TableFooter>}
       </Table>
     </div>
   );

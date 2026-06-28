@@ -31,6 +31,7 @@ import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Textarea } from "@/design-system/ui/textarea";
 import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
+import { Pill } from "@/design-system/kit/Pill";
 import { ActionMenu } from "@/components/mobile";
 import {
   DropdownMenu,
@@ -766,9 +767,9 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
 
           {!isCliente && pedido.fuente && pedido.fuente !== "historico" && (
             <SidebarSection title="Etiquetas" badge={1} defaultOpen>
-              <span className="inline-flex items-center gap-1.5 rounded bg-muted px-2.5 py-1 text-xs font-medium text-ink">
+              <Pill tone="neutral" className="gap-1.5 px-2.5 py-1 text-xs text-ink">
                 {pedido.fuente.toUpperCase()}
-              </span>
+              </Pill>
             </SidebarSection>
           )}
         </div>

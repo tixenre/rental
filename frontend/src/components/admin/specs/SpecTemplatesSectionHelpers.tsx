@@ -12,6 +12,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
+import { Pill } from "@/design-system/kit/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import {
@@ -113,10 +114,7 @@ function Badge({
   children: React.ReactNode;
   tone?: "default" | "amber";
 }) {
-  const cls = tone === "amber" ? "bg-amber/15 text-ink" : "bg-muted text-muted-foreground";
-  return (
-    <span className={`inline-flex items-center rounded px-1.5 py-0.5 ${cls}`}>{children}</span>
-  );
+  return <Pill tone={tone === "amber" ? "warning" : "neutral"}>{children}</Pill>;
 }
 
 export function SortableSpecRow({

@@ -328,7 +328,9 @@ export function MarcasSection() {
                       {src.nombre} <span className="text-muted-foreground">({src.total})</span>
                     </span>
                     <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                    <button
+                    <Button
+                      variant="destructive"
+                      size="sm"
                       onClick={async () => {
                         if (
                           await confirm({
@@ -342,10 +344,10 @@ export function MarcasSection() {
                         }
                       }}
                       disabled={mergeMut.isPending}
-                      className="rounded-md border hairline bg-background px-2 py-1 text-2xs font-mono uppercase tracking-wider text-ink hover:bg-amber-soft transition disabled:opacity-50"
+                      className="text-2xs font-mono uppercase tracking-wider"
                     >
                       Fusionar
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>

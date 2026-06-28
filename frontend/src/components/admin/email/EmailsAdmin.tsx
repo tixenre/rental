@@ -17,6 +17,7 @@ import { Send, Eye, Pencil, Loader2, CheckCircle2, AlertTriangle, RefreshCw } fr
 
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { Button } from "@/design-system/ui/button";
+import { Pill } from "@/design-system/kit/Pill";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Input } from "@/design-system/ui/input";
 import { Textarea } from "@/design-system/ui/textarea";
@@ -439,21 +440,9 @@ const EMAIL_LOG_COLUMNS: Column<EmailLogEntry>[] = [
     header: "Estado",
     className: "whitespace-nowrap",
     cell: (entry) => {
-      const ok = entry.status === "sent";
-      const failed = entry.status === "failed";
-      return (
-        <span
-          className={`inline-block rounded-full px-2 py-0.5 text-2xs font-medium ${
-            ok
-              ? "bg-verde/10 text-verde-ink border border-verde/30"
-              : failed
-                ? "bg-destructive/10 text-destructive border border-destructive/30"
-                : "bg-muted/40 text-muted-foreground border hairline"
-          }`}
-        >
-          {entry.status}
-        </span>
-      );
+      const tone =
+        entry.status === "sent" ? "success" : entry.status === "failed" ? "danger" : "neutral";
+      return <Pill tone={tone}>{entry.status}</Pill>;
     },
   },
   {

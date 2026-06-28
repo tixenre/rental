@@ -142,39 +142,43 @@ export function LiquidacionReporte() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => shiftMonth(-1)}
-            className="rounded-md border hairline p-1.5 text-ink hover:bg-ink/5 transition"
             aria-label="Mes anterior"
           >
             <ChevronLeft className="h-4 w-4" />
-          </button>
+          </Button>
           <span className="font-display text-lg text-ink capitalize min-w-[9rem] text-center">
             {mesLabel}
           </span>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => shiftMonth(1)}
-            className="rounded-md border hairline p-1.5 text-ink hover:bg-ink/5 transition"
             aria-label="Mes siguiente"
           >
             <ChevronRight className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
         <div className="flex items-center gap-2">
           {cerrado ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onReabrir}
               disabled={cierreBusy}
-              className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+              className="gap-1.5"
             >
               <LockOpen className="h-4 w-4" /> {reabrirM.isPending ? "Reabriendo…" : "Reabrir mes"}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => cerrarM.mutate()}
               disabled={cierreBusy || !mes || mes.resumen.pedidos === 0}
               title={
@@ -182,26 +186,28 @@ export function LiquidacionReporte() {
                   ? "No hay pedidos saldados este mes para cerrar"
                   : "Congelar la foto de este mes"
               }
-              className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+              className="gap-1.5"
             >
               <Lock className="h-4 w-4" /> {cerrarM.isPending ? "Cerrando…" : "Cerrar mes"}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => setMailOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+            className="gap-1.5"
           >
             <Mail className="h-4 w-4" /> Enviar por mail
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={descargarCsv}
             disabled={downloading}
-            className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+            className="gap-1.5"
           >
             <Download className="h-4 w-4" /> {downloading ? "Generando…" : "Exportar CSV"}
-          </button>
+          </Button>
         </div>
       </div>
 

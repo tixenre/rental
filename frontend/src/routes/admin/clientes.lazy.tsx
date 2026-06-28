@@ -446,14 +446,16 @@ function ClienteHistorialSheet({
                         value={linkVerif}
                         className="flex-1 truncate font-mono text-xs text-ink"
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           navigator.clipboard.writeText(linkVerif);
                           setCopiado(true);
                           setTimeout(() => setCopiado(false), 2000);
                         }}
-                        className="flex items-center gap-1 rounded-md border hairline bg-surface px-2.5 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors shrink-0 h-[30px]"
+                        className="shrink-0"
                       >
                         {copiado ? (
                           <Check className="h-3.5 w-3.5 text-verde-ink" />
@@ -461,12 +463,14 @@ function ClienteHistorialSheet({
                           <Copy className="h-3.5 w-3.5" />
                         )}
                         {copiado ? "Copiado" : "Copiar"}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={generando}
                     onClick={async () => {
                       if (!cliente) return;
@@ -480,11 +484,10 @@ function ClienteHistorialSheet({
                         setGenerando(false);
                       }
                     }}
-                    className="flex items-center gap-1.5 rounded-md border hairline bg-surface px-3 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors disabled:opacity-50 h-[30px]"
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
                     {generando ? "Generando…" : "Generar link de verificación"}
-                  </button>
+                  </Button>
                 )}
               </div>
             )}

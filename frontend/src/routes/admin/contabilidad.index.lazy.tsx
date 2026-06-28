@@ -13,6 +13,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { formatARS, formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { Button } from "@/design-system/ui/button";
 
 export const Route = createLazyFileRoute("/admin/contabilidad/")({
   component: ContabilidadTablero,
@@ -34,12 +35,9 @@ function ContabilidadTablero() {
       maxW="max-w-5xl"
       description="Cuánta plata hay y dónde. Los cobros de clientes ya entran solos a la caja de quien los cobró."
       actions={
-        <Link
-          to="/admin/contabilidad/cuentas"
-          className="shrink-0 h-9 rounded-md border hairline px-3 text-sm flex items-center hover:bg-muted/40"
-        >
-          Administrar cuentas
-        </Link>
+        <Button asChild variant="outline" className="shrink-0">
+          <Link to="/admin/contabilidad/cuentas">Administrar cuentas</Link>
+        </Button>
       }
     >
       <div className="space-y-6">
