@@ -28,6 +28,7 @@ import {
   MessageCircle,
   Search,
   CircleCheckBig,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -54,6 +55,8 @@ import { useBusinessPhone } from "@/lib/business";
 import { jornadasFromISO as jornadasEntre } from "@/lib/rental-dates";
 import { whatsappLink } from "@/lib/whatsapp";
 import { MODIFICAR_PEDIDOS_HABILITADO } from "@/lib/features";
+import { useCart } from "@/lib/cart-store";
+import { rearmarCarrito } from "@/lib/rearmar-carrito";
 import { cn } from "@/lib/utils";
 import {
   fmt,
@@ -333,6 +336,36 @@ export function PedidoCard({
   }
 
   const [askCancel, setAskCancel] = useState(false);
+
+  // Repetir pedido: rearma el carrito con los equipos de catálogo de este pedido
+  // y lleva a elegir nuevas fechas. Re-resuelve precio y disponibilidad ACTUALES
+  // (no reusa el snapshot del pedido — ver lib/rearmar-carrito.ts). Las líneas
+  // personalizadas (#805, sin equipo_id) no se pueden repetir → se omiten.
+  const [askRepetir, setAskRepetir] = useState(false);
+  const itemsRepetibles = pedido.items.filter((it) => it.equipo_id != null);
+  function repetirPedido() {
+    setAskRepetir(false);
+    rearmarCarrito(
+      itemsRepetibles.map((it) => ({ equipoId: it.equipo_id as number, cantidad: it.cantidad })),
+    );
+    toast.success(
+      "Armamos tu carrito con los equipos de este pedido. Elegí las fechas para reservar.",
+    );
+    navigate({ to: "/", search: { openCarrito: true } });
+  }
+  function handleRepetirClick() {
+    if (itemsRepetibles.length === 0) {
+      toast.info("Este pedido no tiene equipos del catálogo para repetir.");
+      return;
+    }
+    // Solo molestamos con la confirmación si hay algo que pisar en el carrito.
+    if (useCart.getState().totalItems() > 0) {
+      setAskRepetir(true);
+      return;
+    }
+    repetirPedido();
+  }
+
   const pendiente = (pedido.solicitudes ?? []).find((s) => s.estado === "pendiente");
   // Última solicitud que el cliente debe ver: aprobada, rechazada, o
   // cancelada por el sistema (cuando el pedido cambia de estado). Las
@@ -680,6 +713,24 @@ export function PedidoCard({
                 </section>
               )}
 
+            {itemsRepetibles.length > 0 && (
+              <section>
+                <Button
+                  type="button"
+                  variant="primary"
+                  shape="pill"
+                  onClick={handleRepetirClick}
+                  className="min-h-[44px] px-5"
+                >
+                  <RotateCcw /> Repetir pedido
+                </Button>
+                <p className="mt-2 font-sans text-xs text-muted-foreground">
+                  Armamos tu carrito con estos equipos para que reserves de nuevo. Elegís las fechas
+                  y se recalcula el precio con la disponibilidad actual.
+                </p>
+              </section>
+            )}
+
             {(() => {
               const waHref = whatsappLink({
                 phone: businessPhone,
@@ -842,6 +893,22 @@ export function PedidoCard({
           </aside>
         </div>
       )}
+
+      <AlertDialog open={askRepetir} onOpenChange={setAskRepetir}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reemplazar el carrito</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ya tenés equipos en el carrito. Si repetís este pedido, los vamos a reemplazar por los
+              de acá. ¿Seguimos?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction onClick={repetirPedido}>Reemplazar y repetir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={askCancel} onOpenChange={setAskCancel}>
         <AlertDialogContent>

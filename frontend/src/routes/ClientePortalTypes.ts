@@ -36,6 +36,9 @@ export type Perfil = {
 
 export type Item = {
   id?: number;
+  /** ID del equipo del catálogo (clave del carrito). `null` en líneas
+   *  personalizadas (#805), que no se pueden volver a agregar al carrito. */
+  equipo_id?: number | null;
   nombre: string;
   marca: string;
   modelo?: string | null;
