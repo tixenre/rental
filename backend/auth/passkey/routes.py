@@ -1,9 +1,9 @@
-"""routes/auth_passkey.py — endpoints de login con passkey (WebAuthn/FIDO2).
+"""auth/passkey/routes.py — endpoints de login con passkey (WebAuthn/FIDO2).
 
-**Transporte** del motor `services/passkeys/`: registro (usuario YA logueado por
+**Transporte** del motor `auth/passkey/`: registro (usuario YA logueado por
 Google registra una passkey), login discoverable (entrar con la passkey), y
 gestión (listar/borrar/renombrar). Aditivo a Google OAuth — la sesión que se
-mintea al loguear es la MISMA cookie firmada (`routes.auth._make_session_response`),
+mintea al loguear es la MISMA cookie firmada (`auth.session._make_session_response`),
 no una sesión paralela.
 
 Recuperación de cuenta: trivial — Google es el anchor (registrar passkey exige

@@ -1,10 +1,10 @@
 """Ceremonias WebAuthn (registro + autenticación) — lógica sobre py_webauthn.
 
-No toca HTTP ni cookies (eso es transporte, en `routes/auth_passkey.py`): acá
+No toca HTTP ni cookies (eso es transporte, en `auth/passkey/routes.py`): acá
 viven el armado de opciones, la verificación de la respuesta del autenticador, y
 la firma del **challenge**. El challenge se guarda firmado con `itsdangerous`
 (mismo `SECRET_KEY`, salt propio) en una cookie de corta vida — sin infra extra
-(ni Redis ni tabla), espejando cómo `routes/auth.py` firma el `oauth_state`.
+(ni Redis ni tabla), espejando cómo `auth/google.py` firma el `oauth_state`.
 """
 import hashlib
 import json

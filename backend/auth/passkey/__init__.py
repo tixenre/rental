@@ -1,6 +1,6 @@
 """Motor único de passkeys (WebAuthn/FIDO2) — aditivo a Google OAuth.
 
-Aísla la integración WebAuthn del transporte HTTP (`routes/auth_passkey.py`),
+Aísla la integración WebAuthn del transporte HTTP (`auth/passkey/routes.py`),
 como `services/didit/` aísla la verificación de identidad. Tres piezas:
 
 - `config`     → `rp_id` / origins derivados por ambiente (fuente única).
