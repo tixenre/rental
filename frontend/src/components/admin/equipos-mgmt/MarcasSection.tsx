@@ -16,7 +16,6 @@ import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  Loader2,
   GripVertical,
   AlertTriangle,
   ArrowRight,
@@ -73,11 +72,15 @@ import {
   DropdownMenuSeparator,
 } from "@/design-system/ui/dropdown-menu";
 import { adminApi, type MarcaAdmin } from "@/lib/admin/api";
+import { ListSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { InlineSvg } from "@/design-system/ui/InlineSvg";
 import { isSvgUrl } from "@/design-system/ui/inline-svg-utils";
 
 export function MarcasSection() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const listQ = useQuery({
     queryKey: ["admin", "marcas"],
@@ -283,6 +286,7 @@ export function MarcasSection() {
           className="h-9 max-w-xs"
         />
         <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+          {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
           <input
             type="checkbox"
             checked={onlyDestacadas}
@@ -293,19 +297,15 @@ export function MarcasSection() {
         </label>
       </div>
 
-      {listQ.isLoading && (
-        <div className="py-6 text-sm text-muted-foreground flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
-        </div>
-      )}
+      {listQ.isLoading && <ListSkeleton rows={6} className="py-2" />}
       {listQ.error && (
-        <div className="text-sm text-destructive">Error: {(listQ.error as Error).message}</div>
+        <ErrorState error={listQ.error} onRetry={() => listQ.refetch()} className="py-6" />
       )}
 
       {!listQ.isLoading && duplicateGroups.length > 0 && (
         <div className="rounded-md border border-amber/40 bg-amber-soft/50 p-3 space-y-2">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber" />
+            <AlertTriangle className="h-4 w-4 text-ink" />
             <span className="text-sm font-medium text-ink">
               Marcas posiblemente duplicadas ({duplicateGroups.length})
             </span>
@@ -326,21 +326,26 @@ export function MarcasSection() {
                       {src.nombre} <span className="text-muted-foreground">({src.total})</span>
                     </span>
                     <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                    <button
-                      onClick={() => {
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={async () => {
                         if (
-                          confirm(
-                            `¿Fusionar "${src.nombre}" en "${target.nombre}"? Los ${src.total} equipos pasarán a "${target.nombre}" y "${src.nombre}" se borrará.`,
-                          )
+                          await confirm({
+                            title: `¿Fusionar "${src.nombre}" en "${target.nombre}"?`,
+                            description: `Los ${src.total} equipos pasarán a "${target.nombre}" y "${src.nombre}" se borrará.`,
+                            danger: true,
+                            confirmLabel: "Fusionar",
+                          })
                         ) {
                           mergeMut.mutate({ sourceId: src.id, targetId: target.id });
                         }
                       }}
                       disabled={mergeMut.isPending}
-                      className="rounded-md border hairline bg-background px-2 py-1 text-2xs font-mono uppercase tracking-wider text-ink hover:bg-amber-soft transition disabled:opacity-50"
+                      className="text-2xs font-mono uppercase tracking-wider"
                     >
                       Fusionar
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -428,6 +433,7 @@ export function MarcasSection() {
         </div>
       )}
 
+      {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
       <input
         ref={fileInputRef}
         type="file"
@@ -595,7 +601,7 @@ function SortableMarcaRow(props: RowProps) {
         disabled={disabled}
         className={`h-8 w-8 grid place-items-center rounded-md transition disabled:opacity-50 shrink-0 ${
           marca.destacada
-            ? "text-amber hover:bg-amber-soft"
+            ? "text-ink hover:bg-amber-soft"
             : "text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted"
         }`}
         title={marca.destacada ? "Quitar de destacadas" : "Destacar en home"}

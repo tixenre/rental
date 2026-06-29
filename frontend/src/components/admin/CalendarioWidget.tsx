@@ -186,10 +186,7 @@ export function CalendarioWidget({
       <div className="rounded-lg border hairline overflow-hidden bg-background">
         <div className="grid grid-cols-7 border-b hairline">
           {DIAS.map((d) => (
-            <div
-              key={d}
-              className="px-2 py-1.5 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground text-center"
-            >
+            <div key={d} className="px-2 py-1.5 t-eyebrow text-center">
               {d}
             </div>
           ))}

@@ -201,6 +201,7 @@ export function ComboBuilderDialog({
                 <label className="flex flex-col items-center justify-center w-24 h-24 rounded border hairline border-dashed cursor-pointer hover:bg-accent transition-colors bg-muted/20">
                   <Upload className="h-5 w-5 text-muted-foreground mb-1" />
                   <span className="text-xs text-muted-foreground">Subir</span>
+                  {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
                   <input
                     type="file"
                     accept="image/*"

@@ -140,7 +140,7 @@ export function BrandingSection() {
       {/* OG image */}
       <div className="rounded-lg border hairline bg-background p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <ImageIcon className="h-4 w-4 text-amber" />
+          <ImageIcon className="h-4 w-4 text-muted-foreground" />
           <h2 className="font-display text-lg text-ink">Imagen para compartir</h2>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -168,6 +168,7 @@ export function BrandingSection() {
           </div>
 
           <div className="flex-1 space-y-2">
+            {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
             <input
               ref={fileRef}
               type="file"
@@ -206,7 +207,7 @@ export function BrandingSection() {
       {/* WhatsApp phone */}
       <div className="rounded-lg border hairline bg-background p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <MessageCircle className="h-4 w-4 text-verde" />
+          <MessageCircle className="h-4 w-4 text-verde-ink" />
           <h2 className="font-display text-lg text-ink">WhatsApp del negocio</h2>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -254,7 +255,7 @@ export function BrandingSection() {
       {/* Hero taglines */}
       <div className="rounded-lg border hairline bg-background p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <Type className="h-4 w-4 text-amber" />
+          <Type className="h-4 w-4 text-muted-foreground" />
           <h2 className="font-display text-lg text-ink">Taglines del hero</h2>
         </div>
         <p className="text-xs text-muted-foreground">

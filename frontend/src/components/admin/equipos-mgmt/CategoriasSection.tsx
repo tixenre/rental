@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -36,6 +36,9 @@ import { Input } from "@/design-system/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/design-system/ui/dialog";
 
 import { adminApi } from "@/lib/admin/api";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { AddEquiposToCategoriaDialog } from "./AddEquiposToCategoriaDialog";
 import { SpecTemplatesSection } from "@/components/admin/specs/SpecTemplatesSection";
 import { NombreTemplateDialog } from "./NombreTemplateDialog";
@@ -43,6 +46,7 @@ import { type RowItem, type DragData, SortableRootItem } from "./CategoriasSecti
 
 export function CategoriasSection() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const listQ = useQuery({
     queryKey: ["admin", "categorias"],
     queryFn: () => adminApi.adminListCategorias(),
@@ -308,6 +312,7 @@ export function CategoriasSection() {
           </p>
         </div>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none cursor-pointer shrink-0">
+          {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
           <input
             type="checkbox"
             checked={hideEmpty}
@@ -318,13 +323,9 @@ export function CategoriasSection() {
         </label>
       </div>
 
-      {listQ.isLoading && (
-        <div className="py-6 text-sm text-muted-foreground flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
-        </div>
-      )}
+      {listQ.isLoading && <TableSkeleton rows={6} cols={3} className="py-2" />}
       {listQ.error && (
-        <div className="text-sm text-destructive">Error: {(listQ.error as Error).message}</div>
+        <ErrorState error={listQ.error} onRetry={() => listQ.refetch()} className="py-6" />
       )}
 
       {displayRoots.length > 0 && (
@@ -346,8 +347,15 @@ export function CategoriasSection() {
                     isOpen={isOpen}
                     onToggle={() => setExpanded((s) => ({ ...s, [root.id]: !isOpen }))}
                     onRename={(n) => updateMut.mutate({ id: root.id, nombre: n })}
-                    onDelete={() => {
-                      if (confirm(`Eliminar "${root.nombre}" y desvincular sus hijos?`)) {
+                    onDelete={async () => {
+                      if (
+                        await confirm({
+                          title: `¿Eliminar "${root.nombre}"?`,
+                          description: "Se desvincularán sus hijos.",
+                          danger: true,
+                          confirmLabel: "Eliminar",
+                        })
+                      ) {
                         deleteMut.mutate(root.id);
                       }
                     }}
@@ -374,16 +382,30 @@ export function CategoriasSection() {
                         pid === null ? { id, set_parent_null: true } : { id, parent_id: pid },
                       )
                     }
-                    onDeleteChild={(id, name) => {
-                      if (confirm(`Eliminar subcategoría "${name}"?`)) deleteMut.mutate(id);
+                    onDeleteChild={async (id, name) => {
+                      if (
+                        await confirm({
+                          title: `¿Eliminar subcategoría "${name}"?`,
+                          danger: true,
+                          confirmLabel: "Eliminar",
+                        })
+                      )
+                        deleteMut.mutate(id);
                     }}
                     grandchildrenOf={(childId) => childrenOfDisplay(childId)}
                     onCreateGrandchild={(parentId, name) =>
                       createMut.mutate({ nombre: name, parent_id: parentId })
                     }
                     onRenameGrandchild={(id, n) => updateMut.mutate({ id, nombre: n })}
-                    onDeleteGrandchild={(id, name) => {
-                      if (confirm(`Eliminar nieto "${name}"?`)) deleteMut.mutate(id);
+                    onDeleteGrandchild={async (id, name) => {
+                      if (
+                        await confirm({
+                          title: `¿Eliminar nieto "${name}"?`,
+                          danger: true,
+                          confirmLabel: "Eliminar",
+                        })
+                      )
+                        deleteMut.mutate(id);
                     }}
                   />
                 );

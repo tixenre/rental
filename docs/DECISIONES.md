@@ -1415,3 +1415,24 @@ cancel-in-progress` ya cancela corridas viejas.
   en código nuevo, `%` literal en SQL, reimplementación/bypass del DAL, o un CTA de adoptar ORM/async sin que
   cambien las condiciones de revisita (equipo >10 / multi-DB / tiempo-real). Implementación en el plan.
 - **Estado (2026-06-27):** Fases 0-6 (`?`→`%s` + shim retirado) + `lastrowid`→`RETURNING` (7 usos) completadas en PR #1075.
+
+### 2026-06-28 — La ganancia de Rambla descuenta la comisión de los dueños (es costo, no ganancia)
+
+- **Contexto.** El Reporte mensual (P&L, `backend/contabilidad/pyl.py`) calculaba `ganancia_neta = ingresos −
+  gastos` con `ingresos = resumen["total"]` de la liquidación = el **total facturado bruto**. El reparto de
+  comisiones se calculaba en paralelo (`por_beneficiario`) pero **no se restaba** de la ganancia.
+- **Problema.** La comisión que se llevan los dueños de los equipos (Pablo/Tincho/terceros) se contaba como
+  ganancia de Rambla. Ejemplo (modelo default): equipo de Pablo factura $100k → Pablo 50% / Rambla 45% / Tincho
+  5%. La ganancia tomaba los $100k enteros, inflándola en $55k (la plata que Rambla les debe a los dueños).
+- **Decisión (dueño, 2026-06-28).** La **ganancia de Rambla = parte de Rambla − gastos**. La comisión de los
+  dueños es un **costo**, no ganancia. El P&L muestra la cascada completa: **facturado − comisiones a dueños −
+  gastos = ganancia**. `comisiones_duenos = facturado − parte_rambla` (= todo lo facturado que no es de Rambla;
+  robusto a cualquier beneficiario, incl. terceros). La parte de Rambla ya la calcula el reparto
+  (`reportes/comisiones`); `pyl.py` solo la usa en lugar del total. Reemplaza el criterio viejo del docstring de
+  `pyl.py` (ingreso = total devengado "para que coincida con la liquidación").
+- **Consecuencias.** Cambian `pyl.py::ganancia_neta` (nuevo desglose `facturado`/`comisiones_duenos`) y
+  `reporte_mensual.py` (expone `comisiones_duenos`); el front muestra los 4 KPIs de la cascada. Funciona igual
+  para meses cerrados (la foto guarda `por_beneficiario`). Solo afecta cuando hay equipos de dueños ≠ Rambla
+  (equipo propio = 100% de Rambla, sin diferencia). NO toca el reparto de la liquidación ni la rendición (ya
+  estaban bien). Regresión: `test_reporte_ganancia_descuenta_comision_de_duenos` (Pablo $100k → ganancia $45k,
+  no $100k). Los tests existentes (delta de gasto/cargo) siguen pasando.

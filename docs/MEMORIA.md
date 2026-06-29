@@ -404,6 +404,16 @@ aportaría algo solo en CRUD simple aislado, que ya está hecho). Revisita solo 
 necesidad de ORM o tiempo-real. El supervisor marca: `?` nuevo en código nuevo, `%` literal en SQL, y
 reimplementación o bypass del DAL.
 
+### 2026-06-28 — La ganancia de Rambla descuenta la comisión de los dueños (es costo, no ganancia)
+
+La **ganancia neta** del Reporte mensual es **la parte de Rambla − gastos**, NO el total facturado − gastos. La
+comisión que se llevan los dueños de los equipos (Pablo/Tincho/terceros, del reparto de la liquidación) es un
+**costo**, no ganancia de Rambla. El P&L muestra la cascada: **facturado − comisiones a dueños − gastos =
+ganancia**, con `comisiones_duenos = facturado − parte_rambla` (robusto a cualquier beneficiario). Corrige el
+criterio viejo (ingreso = total devengado, en `pyl.py`) que inflaba la ganancia con plata que Rambla les debe a
+los dueños. Solo afecta cuando hay equipos de dueños ≠ Rambla. No toca el reparto/rendición (ya estaban bien).
+Regresión: `test_reporte_ganancia_descuenta_comision_de_duenos`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

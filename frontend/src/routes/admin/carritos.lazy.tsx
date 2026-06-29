@@ -22,6 +22,7 @@ import { fmtArs, formatFechaCorta } from "@/lib/format";
 import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 import { Pill } from "@/design-system/kit/Pill";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { Kpi, Section, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
 
 export const Route = createLazyFileRoute("/admin/carritos")({
@@ -64,167 +65,161 @@ function CarritosPage() {
   }, [carritos, filtro, orden]);
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-6xl mx-auto">
-      <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
+    <AdminPage
+      title="Carritos activos"
+      maxW="max-w-6xl"
+      description="Clientes armando pedidos ahora mismo. Se actualiza cada 30 segundos."
+      actions={
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span
+            className={cn(
+              "inline-block h-2 w-2 rounded-full",
+              isLoading ? "bg-amber animate-pulse" : "bg-verde",
+            )}
+          />
+          {dataUpdatedAt
+            ? `Actualizado ${formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: es })}`
+            : "Cargando…"}
         </div>
-        <div className="flex items-end justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="font-display text-3xl text-ink">Carritos activos</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Clientes armando pedidos ahora mismo. Se actualiza cada 30 segundos.
+      }
+    >
+      <div className="space-y-6">
+        {isLoading && <div className="text-sm text-muted-foreground">Cargando carritos…</div>}
+
+        {isError && (
+          <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            Error: {(error as Error).message}
+          </div>
+        )}
+
+        {/* KPIs del funnel */}
+        {stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Kpi icon={ShoppingCart} label="Carritos activos" value={String(stats.activos)} />
+            <Kpi
+              icon={DollarSign}
+              label="En juego"
+              value={fmtArs(stats.pipeline_ars)}
+              sub="Pipeline estimado"
+            />
+            <Kpi
+              icon={TrendingUp}
+              label="Conversión 7d"
+              value={`${stats.conversion_pct}%`}
+              sub={`${stats.confirmados_7d}/${stats.creados_7d} confirmados`}
+            />
+            <Kpi
+              icon={Users}
+              label="Identificados"
+              value={String(stats.identificados)}
+              sub={`${stats.anonimos} anónimos`}
+            />
+          </div>
+        )}
+
+        {/* Alertas accionables */}
+        {stats && stats.abandonados > 0 && (
+          <div className="flex items-center gap-2 rounded-md border hairline border-amber/40 bg-amber/10 px-3 py-2 text-sm text-ink">
+            <Clock className="h-4 w-4 shrink-0" />
+            {stats.abandonados} carrito{stats.abandonados !== 1 ? "s" : ""} abandonado
+            {stats.abandonados !== 1 ? "s" : ""} (sin actividad hace +24h) — buena oportunidad para
+            recuperarlos por WhatsApp.
+          </div>
+        )}
+        {/* Insights: demanda + serie por día */}
+        {(demanda.length > 0 || porDia.length > 0) && (
+          <div className="grid lg:grid-cols-2 gap-6">
+            {demanda.length > 0 && (
+              <Section title="Interés latente" subtitle="Equipos más presentes en carritos activos">
+                <RankList
+                  items={demanda.map((d) => ({
+                    primary: d.nombre,
+                    secondary: `en ${d.carritos} carrito${d.carritos !== 1 ? "s" : ""}`,
+                    value: `${d.unidades}u`,
+                  }))}
+                  icon={Package}
+                />
+              </Section>
+            )}
+            {porDia.length > 0 && (
+              <Section title="Carritos por día" subtitle="Creados · últimos 14 días">
+                <BarChart
+                  data={porDia.map((d) => ({ label: d.dia, value: d.creados }))}
+                  labelFn={(l) => l.slice(8)}
+                  valueFormat={(n) => String(n)}
+                />
+              </Section>
+            )}
+          </div>
+        )}
+
+        {/* Toolbar: filtro + orden */}
+        {carritos.length > 0 && (
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  ["todos", "Todos"],
+                  ["identificados", "Identificados"],
+                  ["anonimos", "Anónimos"],
+                ] as [Filtro, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setFiltro(key)}
+                  className={cn(
+                    "h-11 rounded-full border hairline px-3 text-xs font-medium transition",
+                    filtro === key
+                      ? "bg-ink text-background border-ink"
+                      : "text-muted-foreground hover:text-ink",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  ["actividad", "Última actividad"],
+                  ["monto", "Monto"],
+                ] as [Orden, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setOrden(key)}
+                  className={cn(
+                    "h-11 rounded-full border hairline px-3 text-xs font-medium transition",
+                    orden === key
+                      ? "bg-ink text-background border-ink"
+                      : "text-muted-foreground hover:text-ink",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isLoading && !isError && carritos.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
+            <ShoppingCart className="h-10 w-10 text-muted-foreground/40" />
+            <p className="text-muted-foreground text-sm">
+              No hay carritos activos en las últimas 72 horas.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span
-              className={cn(
-                "inline-block h-2 w-2 rounded-full",
-                isLoading ? "bg-amber animate-pulse" : "bg-verde",
-              )}
-            />
-            {dataUpdatedAt
-              ? `Actualizado ${formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: es })}`
-              : "Cargando…"}
-          </div>
-        </div>
-      </header>
+        )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Cargando carritos…</div>}
-
-      {isError && (
-        <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          Error: {(error as Error).message}
-        </div>
-      )}
-
-      {/* KPIs del funnel */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Kpi icon={ShoppingCart} label="Carritos activos" value={String(stats.activos)} />
-          <Kpi
-            icon={DollarSign}
-            label="En juego"
-            value={fmtArs(stats.pipeline_ars)}
-            sub="Pipeline estimado"
-          />
-          <Kpi
-            icon={TrendingUp}
-            label="Conversión 7d"
-            value={`${stats.conversion_pct}%`}
-            sub={`${stats.confirmados_7d}/${stats.creados_7d} confirmados`}
-          />
-          <Kpi
-            icon={Users}
-            label="Identificados"
-            value={String(stats.identificados)}
-            sub={`${stats.anonimos} anónimos`}
-          />
-        </div>
-      )}
-
-      {/* Alertas accionables */}
-      {stats && stats.abandonados > 0 && (
-        <div className="flex items-center gap-2 rounded-md border hairline border-amber/40 bg-amber/10 px-3 py-2 text-sm text-ink">
-          <Clock className="h-4 w-4 shrink-0" />
-          {stats.abandonados} carrito{stats.abandonados !== 1 ? "s" : ""} abandonado
-          {stats.abandonados !== 1 ? "s" : ""} (sin actividad hace +24h) — buena oportunidad para
-          recuperarlos por WhatsApp.
-        </div>
-      )}
-      {/* Insights: demanda + serie por día */}
-      {(demanda.length > 0 || porDia.length > 0) && (
-        <div className="grid lg:grid-cols-2 gap-6">
-          {demanda.length > 0 && (
-            <Section title="Interés latente" subtitle="Equipos más presentes en carritos activos">
-              <RankList
-                items={demanda.map((d) => ({
-                  primary: d.nombre,
-                  secondary: `en ${d.carritos} carrito${d.carritos !== 1 ? "s" : ""}`,
-                  value: `${d.unidades}u`,
-                }))}
-                icon={Package}
-              />
-            </Section>
-          )}
-          {porDia.length > 0 && (
-            <Section title="Carritos por día" subtitle="Creados · últimos 14 días">
-              <BarChart
-                data={porDia.map((d) => ({ label: d.dia, value: d.creados }))}
-                labelFn={(l) => l.slice(8)}
-                valueFormat={(n) => String(n)}
-              />
-            </Section>
-          )}
-        </div>
-      )}
-
-      {/* Toolbar: filtro + orden */}
-      {carritos.length > 0 && (
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-1">
-            {(
-              [
-                ["todos", "Todos"],
-                ["identificados", "Identificados"],
-                ["anonimos", "Anónimos"],
-              ] as [Filtro, string][]
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setFiltro(key)}
-                className={cn(
-                  "h-11 rounded-full border hairline px-3 text-xs font-medium transition",
-                  filtro === key
-                    ? "bg-ink text-background border-ink"
-                    : "text-muted-foreground hover:text-ink",
-                )}
-              >
-                {label}
-              </button>
+        {visibles.length > 0 && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {visibles.map((c) => (
+              <CarritoCard key={c.id} carrito={c} />
             ))}
           </div>
-          <div className="flex items-center gap-1">
-            {(
-              [
-                ["actividad", "Última actividad"],
-                ["monto", "Monto"],
-              ] as [Orden, string][]
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setOrden(key)}
-                className={cn(
-                  "h-11 rounded-full border hairline px-3 text-xs font-medium transition",
-                  orden === key
-                    ? "bg-ink text-background border-ink"
-                    : "text-muted-foreground hover:text-ink",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!isLoading && !isError && carritos.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
-          <ShoppingCart className="h-10 w-10 text-muted-foreground/40" />
-          <p className="text-muted-foreground text-sm">
-            No hay carritos activos en las últimas 72 horas.
-          </p>
-        </div>
-      )}
-
-      {visibles.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {visibles.map((c) => (
-            <CarritoCard key={c.id} carrito={c} />
-          ))}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </AdminPage>
   );
 }
 
@@ -278,7 +273,7 @@ function CarritoCard({ carrito: c }: { carrito: Carrito }) {
               href={wasaLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-verde hover:bg-verde/10 transition"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-verde-ink hover:bg-verde/10 transition"
               title="Escribir por WhatsApp"
             >
               <MessageCircle className="h-4 w-4" />

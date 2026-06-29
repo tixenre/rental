@@ -19,7 +19,10 @@ import { adminApi } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
 import { fmtArs } from "@/lib/format";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { Kpi, Section, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
+import { CardGridSkeleton, TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 
 export const Route = createLazyFileRoute("/admin/estadisticas")({
   component: EstadisticasPage,
@@ -35,28 +38,18 @@ function EstadisticasPage() {
   const data = statsQ.data;
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-7xl mx-auto">
-      <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
-        </div>
-        <h1 className="font-display text-3xl text-ink">Estadísticas</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Métricas del negocio. El reporte de liquidación ahora vive en Finanzas.
-        </p>
-      </header>
-
+    <AdminPage
+      title="Estadísticas"
+      maxW="max-w-7xl"
+      description="Métricas del negocio. El reporte de liquidación ahora vive en Finanzas."
+    >
       <div className="space-y-6">
         <p className="text-xs text-muted-foreground">
           Solo se contabilizan pedidos confirmados, retirados y finalizados.
         </p>
 
-        {statsQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-        {statsQ.error && (
-          <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            Error: {(statsQ.error as Error).message}
-          </div>
-        )}
+        {statsQ.isLoading && <CardGridSkeleton count={4} className="md:grid-cols-4" />}
+        {statsQ.error && <ErrorState error={statsQ.error} onRetry={statsQ.refetch} />}
 
         {data && (
           <>
@@ -223,7 +216,7 @@ function EstadisticasPage() {
 
         <BusquedasSection />
       </div>
-    </div>
+    </AdminPage>
   );
 }
 
@@ -268,12 +261,8 @@ function BusquedasSection() {
         </div>
       </div>
 
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-      {q.error && (
-        <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          Error: {(q.error as Error).message}
-        </div>
-      )}
+      {q.isLoading && <TableSkeleton rows={5} cols={2} />}
+      {q.error && <ErrorState error={q.error} onRetry={q.refetch} />}
 
       {data && (
         <div className="grid gap-4 md:grid-cols-2">

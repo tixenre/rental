@@ -2,14 +2,12 @@ import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  Sparkles,
   Hash,
   DollarSign,
   Camera,
   FileText,
   Tag,
   Folder,
-  AlertCircle,
   ArrowRight,
   Lightbulb,
   Loader2,
@@ -24,6 +22,9 @@ import {
   type FaltaField,
   type Sugerencia,
 } from "@/lib/admin/api";
+import { AdminPage } from "@/components/admin/AdminPage";
+import { PrecioUnidad } from "@/components/admin/Monto";
+import { QueryState } from "@/components/admin/QueryState";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/equipos/calidad")({
@@ -32,43 +33,28 @@ export const Route = createLazyFileRoute("/admin/equipos/calidad")({
 
 function CalidadPage() {
   useDocumentTitle("Calidad · Back Office");
-  const { data, isLoading, isError, error } = useQuery({
+  const calidadQ = useQuery({
     queryKey: ["admin", "inventario", "calidad"],
     queryFn: () => adminApi.getCalidadInventario(),
     staleTime: 60_000,
   });
 
   return (
-    <div className="px-4 md:px-8 py-6 md:py-10 max-w-3xl mx-auto">
-      <header className="mb-8">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office › Equipos
-        </div>
-        <h1 className="font-display text-3xl md:text-4xl text-ink flex items-center gap-2">
-          <Sparkles className="h-7 w-7 text-amber" />
-          Calidad del inventario
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Qué equipos tienen datos faltantes. Solo lectura — los CTAs para completar llegan en una
-          segunda iteración (#350).
-        </p>
-      </header>
-
-      {isLoading && <Skeleton />}
-
-      {isError && (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-6 text-sm text-destructive">
-          <div className="flex items-center gap-2 font-mono text-2xs uppercase tracking-[0.2em] mb-2">
-            <AlertCircle className="h-3.5 w-3.5" /> Error
-          </div>
-          <div>{(error as Error)?.message ?? "No se pudo cargar la calidad del inventario."}</div>
-        </div>
-      )}
-
-      {data && <CalidadView data={data} />}
+    <AdminPage
+      title="Calidad del inventario"
+      maxW="max-w-3xl"
+      description="Qué equipos tienen datos faltantes. Solo lectura — los CTAs para completar llegan en una segunda iteración (#350)."
+    >
+      <QueryState
+        query={calidadQ}
+        skeleton={<Skeleton />}
+        errorTitle="No se pudo cargar la calidad del inventario"
+      >
+        {(data) => <CalidadView data={data} />}
+      </QueryState>
 
       <SugerenciasSection />
-    </div>
+    </AdminPage>
   );
 }
 
@@ -118,10 +104,8 @@ function SugerenciasSection() {
   return (
     <section className="mt-8 rounded-2xl border hairline bg-surface">
       <header className="flex items-center gap-2 px-5 pt-4 pb-3 border-b hairline">
-        <Lightbulb className="h-4 w-4 text-amber" />
-        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Sugerencias del sistema · {data.total}
-        </span>
+        <Lightbulb className="h-4 w-4 text-ink" />
+        <span className="t-eyebrow">Sugerencias del sistema · {data.total}</span>
       </header>
       <ul className="divide-y hairline">
         {data.items.map((s, i) => {
@@ -182,7 +166,7 @@ function SugerenciasSection() {
                         {" "}
                         · id={m.id} · {m.equipos} equipos · {m.cant_pedidos} pedidos
                       </span>
-                      {idx === 0 && <span className="ml-2 text-amber">(canonical)</span>}
+                      {idx === 0 && <span className="ml-2 text-ink">(canonical)</span>}
                     </li>
                   ))}
                 </ul>
@@ -195,7 +179,7 @@ function SugerenciasSection() {
                   <ul className="ml-3 mt-1 space-y-0.5">
                     {s.equipos.slice(0, 10).map((e) => (
                       <li key={e.id} className="font-mono tabular">
-                        {e.marca} {e.nombre} · ${e.precio_jornada.toLocaleString("es-AR")}/jornada
+                        {e.marca} {e.nombre} · <PrecioUnidad value={e.precio_jornada} />
                       </li>
                     ))}
                     {s.equipos.length > 10 && (
@@ -225,24 +209,20 @@ function CalidadView({ data }: { data: CalidadInventario }) {
   return (
     <>
       <section className="rounded-2xl border hairline bg-surface p-6 mb-6">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
-          Inventario
-        </div>
+        <div className="t-eyebrow mb-2">Inventario</div>
         <div className="flex items-baseline gap-3 mb-4">
           <div className="font-display text-4xl text-ink tabular">{data.total}</div>
           <div className="text-sm text-muted-foreground">equipos activos</div>
         </div>
         <ProgressBar pct={data.completos_pct} />
-        <div className="mt-2 flex items-center gap-2 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+        <div className="mt-2 flex items-center gap-2 t-eyebrow">
           <span className="tabular text-ink">{data.completos_pct}%</span>
           <span>completos</span>
         </div>
       </section>
 
       <section className="rounded-2xl border hairline bg-surface">
-        <header className="px-5 pt-4 pb-3 border-b hairline font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Faltantes por campo
-        </header>
+        <header className="px-5 pt-4 pb-3 border-b hairline t-eyebrow">Faltantes por campo</header>
         <ul>
           {filas
             .sort((a, b) => data.faltantes[b.key] - data.faltantes[a.key])
@@ -265,11 +245,9 @@ function CalidadView({ data }: { data: CalidadInventario }) {
                         <span className="font-display text-base tabular text-ink">{n}</span>{" "}
                         <span className="text-muted-foreground">{label}</span>
                       </div>
-                      <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
-                        {pct}% del inventario
-                      </div>
+                      <div className="t-eyebrow">{pct}% del inventario</div>
                     </div>
-                    <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-widest text-muted-foreground transition group-hover:text-ink">
+                    <span className="t-eyebrow inline-flex items-center gap-1 transition group-hover:text-ink">
                       Completar
                       <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
                     </span>

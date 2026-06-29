@@ -1,39 +1,59 @@
-"""Ganancia neta del mes (#809) — ingresos − gastos.
+"""Ganancia neta del mes (#809) — la parte de Rambla menos los gastos.
 
-Criterio de ingreso (decisión del dueño, documentada): el P&L usa el **ingreso
-devengado** = total del reporte de liquidación del mes (pedidos 100% pagados,
-atribuidos al día en que se saldaron). Así "ganancia del mes" coincide con el
-reporte que el dueño ya conoce. OJO: es una base distinta a la del **saldo de
-caja** (que se mueve por plata entrante, incluidas señas). La dualidad
-devengado vs percibido es a propósito.
+Criterio (decisión del dueño): la **ganancia de Rambla** es lo que le toca a
+Rambla de los alquileres MENOS los gastos operativos. La comisión que se llevan
+los dueños de los equipos (Pablo, Tincho, terceros) **NO es ganancia de Rambla**:
+es un costo — plata facturada que se les debe. Por eso el P&L muestra el desglose:
 
-Si el mes está cerrado (#721) el ingreso sale de la foto congelada.
+    facturado (devengado total)  −  comisiones a dueños  −  gastos  =  ganancia
+
+donde `comisiones a dueños = facturado − parte de Rambla` (todo lo facturado que
+no es de Rambla, según el reparto de la liquidación). La parte de Rambla ya la
+calcula el reparto (`reportes/comisiones`); acá solo se compone.
+
+OJO: la base de ingreso (devengado) es distinta a la del **saldo de caja** (que se
+mueve por plata entrante, incluidas señas). La dualidad devengado vs percibido es
+a propósito. Si el mes está cerrado (#721) el devengado sale de la foto congelada.
 """
 
 from reportes.cierres import rango_mes, snapshot_de
 from reportes.liquidacion import liquidar
 
 
-def ingresos_devengados(conn, mes: str) -> int:
-    """Total del reporte de liquidación del mes (foto si está cerrado)."""
+def _resumen_devengado(conn, mes: str) -> dict:
+    """Resumen de la liquidación del mes (foto si está cerrado): `total` + `por_beneficiario`."""
     desde, hasta = rango_mes(mes)
     snap = snapshot_de(conn, mes)
     data = snap if snap is not None else liquidar(conn, desde, hasta)
-    return int(data["resumen"]["total"])
+    return data["resumen"]
+
+
+def ingresos_devengados(conn, mes: str) -> int:
+    """Total facturado (devengado) del mes — bruto, antes del reparto (foto si está cerrado)."""
+    return int(_resumen_devengado(conn, mes)["total"])
 
 
 def ganancia_neta(conn, mes: str) -> dict:
-    """Ingresos devengados − gastos del mes. Incluye el desglose de gastos."""
+    """Ganancia de Rambla del mes = **parte de Rambla − gastos**. Expone el desglose
+    completo: facturado (devengado total), comisiones a dueños y gastos por categoría.
+
+    La comisión de los dueños NO se cuenta como ganancia de Rambla: se descuenta
+    (vía usar la parte de Rambla en lugar del total facturado).
+    """
     from contabilidad.movimientos import gastos_por_categoria
 
     desde, hasta = rango_mes(mes)
-    ingresos = ingresos_devengados(conn, mes)
+    resumen = _resumen_devengado(conn, mes)
+    facturado = int(resumen["total"])
+    parte_rambla = int(resumen["por_beneficiario"].get("Rambla", 0))
+    comisiones_duenos = facturado - parte_rambla
     por_categoria = gastos_por_categoria(conn, desde, hasta)
     gastos = sum(int(g["monto"]) for g in por_categoria)
     return {
         "mes": mes,
-        "ingresos": ingresos,
+        "facturado": facturado,
+        "comisiones_duenos": comisiones_duenos,
         "gastos": gastos,
-        "ganancia_neta": ingresos - gastos,
+        "ganancia_neta": parte_rambla - gastos,
         "gastos_por_categoria": por_categoria,
     }

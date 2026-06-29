@@ -5,6 +5,10 @@ import { Database, RefreshCw, Trash2, RotateCcw, AlertCircle } from "lucide-reac
 
 import { adminApi } from "@/lib/admin/api";
 import type { GcResult } from "@/lib/admin/api";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { CardGridSkeleton } from "@/components/admin/skeletons";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +88,7 @@ function MediaDashboardPage() {
   useDocumentTitle("Media · Back Office");
 
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [gcResult, setGcResult] = useState<GcResult | null>(null);
 
   const {
@@ -119,18 +124,20 @@ function MediaDashboardPage() {
           <Database className="h-5 w-5 text-muted-foreground" />
           <h1 className="text-xl font-display font-semibold text-ink">Media</h1>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => refetch()}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-ink transition-colors"
+          className="gap-1.5 text-muted-foreground hover:text-ink"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Actualizar
-        </button>
+        </Button>
       </div>
 
       {/* Stats */}
       {isLoading ? (
-        <div className="text-sm text-muted-foreground animate-pulse">Cargando stats…</div>
+        <CardGridSkeleton count={6} />
       ) : stats ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <StatCard label="Assets" value={stats.total_assets} />
@@ -157,13 +164,12 @@ function MediaDashboardPage() {
           estudio, marcas).
         </p>
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => gcDryRun.mutate()}
             disabled={isGcRunning}
-            className={cn(
-              "inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded border hairline",
-              "hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-            )}
+            className="gap-1.5"
           >
             {gcDryRun.isPending ? (
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -171,19 +177,24 @@ function MediaDashboardPage() {
               <AlertCircle className="h-3.5 w-3.5" />
             )}
             Detectar (dry-run)
-          </button>
-          <button
-            onClick={() => {
-              if (confirm("¿Ejecutar GC real? Esta acción borra assets y keys de R2.")) {
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={async () => {
+              if (
+                await confirm({
+                  title: "¿Ejecutar GC real?",
+                  description: "Esta acción borra assets y keys de R2.",
+                  danger: true,
+                  confirmLabel: "Ejecutar",
+                })
+              ) {
                 gcRun.mutate();
               }
             }}
             disabled={isGcRunning}
-            className={cn(
-              "inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded border",
-              "border-destructive/40 text-destructive hover:bg-destructive/5 transition-colors",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
-            )}
+            className="gap-1.5"
           >
             {gcRun.isPending ? (
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -191,7 +202,7 @@ function MediaDashboardPage() {
               <Trash2 className="h-3.5 w-3.5" />
             )}
             Ejecutar GC real
-          </button>
+          </Button>
         </div>
 
         {gcResult && <GcResultView result={gcResult} />}
@@ -229,32 +240,24 @@ function RederiveForm() {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col gap-1">
-        <label
-          htmlFor="asset-id"
-          className="text-2xs font-mono uppercase tracking-widest text-muted-foreground"
-        >
+        <label htmlFor="asset-id" className="t-eyebrow">
           Asset ID
         </label>
-        <input
+        <Input
           id="asset-id"
           type="number"
           min={1}
           value={assetId}
           onChange={(e) => setAssetId(e.target.value)}
           placeholder="ej: 42"
-          className={cn(
-            "h-9 w-32 rounded border hairline px-3 text-sm font-mono",
-            "bg-background focus:outline-none focus:ring-1 focus:ring-primary",
-          )}
+          className="w-32 font-mono"
         />
       </div>
-      <button
+      <Button
+        variant="outline"
         onClick={() => mutate()}
         disabled={isPending || !assetId || isNaN(parseInt(assetId, 10))}
-        className={cn(
-          "inline-flex items-center gap-1.5 h-9 text-xs px-3 rounded border hairline",
-          "hover:bg-muted/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-        )}
+        className="gap-1.5 px-3"
       >
         {isPending ? (
           <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -262,7 +265,7 @@ function RederiveForm() {
           <RotateCcw className="h-3.5 w-3.5" />
         )}
         Re-derivar
-      </button>
+      </Button>
       {result && <span className="text-xs text-muted-foreground">{result}</span>}
       {isError && (
         <span className="text-xs text-destructive">

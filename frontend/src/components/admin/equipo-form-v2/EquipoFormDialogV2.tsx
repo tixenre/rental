@@ -63,6 +63,7 @@ import {
 } from "@/design-system/ui/select";
 import { DUENOS, isCanonicalDueno } from "@/lib/admin/duenos";
 import { MonthYearPicker } from "@/components/admin/MonthYearPicker";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 import { adminApi, type Equipo, type EquipoInput } from "@/lib/admin/api";
 import type { ContenidoIncluidoItem } from "@/data/equipment";
@@ -71,6 +72,7 @@ import { uploadEquipoFotoFromUrl } from "@/lib/equipment/equipoFotos";
 import { PhotoGallery } from "@/components/common/PhotoGallery";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
+import { Monto, PrecioUnidad } from "@/components/admin/Monto";
 import { KitEditor } from "./KitEditor";
 import { ComboEditor } from "./ComboEditor";
 import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
@@ -122,6 +124,7 @@ export function EquipoFormDialogV2({
 }) {
   const isEdit = !!initial;
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const { rate: usdRate } = useUsdRate();
   const roiDefault = useRoiPctDefault();
 
@@ -223,7 +226,7 @@ export function EquipoFormDialogV2({
   }, [watchedTipo, form]);
 
   // ── Manual override del precio/día ─────────────────────────────────
-  const [precioJornadaManual, setPrecioJornadaManual] = useState(false);
+  const [precioJornadaManual, setPrecioUnidadManual] = useState(false);
   const watchedUsd = form.watch("precio_usd");
   const watchedRoi = form.watch("roi_pct");
   useEffect(() => {
@@ -759,11 +762,17 @@ export function EquipoFormDialogV2({
               (e.serie ?? "").trim().toLowerCase() === serieTrim.toLowerCase(),
           );
           if (dups.length > 0) {
-            const ok = window.confirm(
-              `Ya hay otro equipo con la serie "${serieTrim}":\n  • ${dups[0].nombre}` +
-                (dups.length > 1 ? ` (+${dups.length - 1} más)` : "") +
-                `\n\n¿Guardar igual?`,
-            );
+            const ok = await confirm({
+              title: "¿Guardar con serie duplicada?",
+              description: (
+                <>
+                  Ya hay otro equipo con la serie "{serieTrim}":
+                  <br />• {dups[0].nombre}
+                  {dups.length > 1 ? ` (+${dups.length - 1} más)` : ""}
+                </>
+              ),
+              confirmLabel: "Guardar igual",
+            });
             if (!ok) return;
           }
         } catch {
@@ -1082,6 +1091,7 @@ export function EquipoFormDialogV2({
           </Button>
           {isEdit && (
             <>
+              {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
               <input
                 ref={htmlInputRef}
                 type="file"
@@ -1330,12 +1340,12 @@ export function EquipoFormDialogV2({
           <Field label="% día">
             <Input type="number" step="0.1" {...form.register("roi_pct")} />
           </Field>
-          <Field label={precioJornadaManual ? "Precio/día (manual)" : "Precio/día (auto)"}>
+          <Field label={precioJornadaManual ? "Precio/jornada (manual)" : "Precio/jornada (auto)"}>
             <div className="flex gap-1">
               <Input
                 type="number"
                 {...form.register("precio_jornada", {
-                  onChange: () => setPrecioJornadaManual(true),
+                  onChange: () => setPrecioUnidadManual(true),
                 })}
               />
               {precioJornadaManual && (
@@ -1344,7 +1354,7 @@ export function EquipoFormDialogV2({
                   size="icon"
                   variant="ghost"
                   title="Recalcular automático"
-                  onClick={() => setPrecioJornadaManual(false)}
+                  onClick={() => setPrecioUnidadManual(false)}
                 >
                   ↺
                 </Button>
@@ -1589,8 +1599,11 @@ export function EquipoFormDialogV2({
               afecta reservas ni stock.
             </p>
             {contenidoIncluido.length > 0 && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
                 onClick={() => {
                   const nombre = initial.nombre ?? "Equipo";
                   const marca = initial.marca ?? "";
@@ -1644,11 +1657,10 @@ ${fotoTag}
                     w.document.close();
                   }
                 }}
-                className="shrink-0 inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground border hairline hover:text-ink hover:bg-muted/50 transition"
               >
-                <Printer className="h-3 w-3" />
+                <Printer className="h-3 w-3 mr-1" />
                 Imprimir contenido
-              </button>
+              </Button>
             )}
           </div>
           <ContenidoIncluidoEditor
@@ -1792,9 +1804,7 @@ ${fotoTag}
       <>
         <div className="px-4 md:px-6 py-6 pb-28 max-w-6xl mx-auto">
           <header className="mb-6">
-            <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-              Inventario · Equipos
-            </div>
+            <div className="t-eyebrow">Inventario · Equipos</div>
             <h1 className="font-display text-3xl text-ink">{titleText}</h1>
             {publicHint}
           </header>
@@ -1830,27 +1840,21 @@ ${fotoTag}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    $ / jornada
-                  </div>
+                  <div className="t-eyebrow">$ / jornada</div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
-                    ${kpiFmt(form.watch("precio_jornada"))}
+                    <PrecioUnidad value={form.watch("precio_jornada")} />
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    % día
-                  </div>
+                  <div className="t-eyebrow">% día</div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
                     {kpiFmt(form.watch("roi_pct"))}%
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5 col-span-2">
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    Valor reposición
-                  </div>
+                  <div className="t-eyebrow">Valor reposición</div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
-                    ${kpiFmt(form.watch("valor_reposicion"))}
+                    <Monto value={form.watch("valor_reposicion")} moneda="USD" />
                   </div>
                 </div>
               </div>

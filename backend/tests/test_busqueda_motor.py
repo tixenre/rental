@@ -46,11 +46,13 @@ def test_construir_sin_campos_inactivo():
 
 
 def _contar_placeholders(sql: str) -> int:
-    return sql.count("?")
+    # psycopg3: el placeholder es `%s` (la migración ?→%s, #1084). El único `%s`
+    # en estas queries es placeholder (los literales del regexp no lo contienen).
+    return sql.count("%s")
 
 
 def test_construir_invariante_de_params():
-    """Cada `?` del WHERE/score debe tener su param correspondiente, en orden."""
+    """Cada `%s` del WHERE/score debe tener su param correspondiente, en orden."""
     pred = construir(["e.nombre", "e.modelo"], "sony fx3")
     assert pred.activo is True
     assert _contar_placeholders(pred.where) == len(pred.where_params)

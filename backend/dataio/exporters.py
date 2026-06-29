@@ -358,7 +358,6 @@ def export_equipo_fichas(conn) -> list[dict]:
                 notas=r["notas"],
                 keywords_json=r["keywords_json"],
                 nombre_publico_template=r["nombre_publico_template"],
-                incluye_json=r["incluye_json"],
                 conectividad_json=r["conectividad_json"],
                 compatible_con_json=r["compatible_con_json"],
                 video_url=r["video_url"],

@@ -8,7 +8,9 @@ import { AlertTriangle, ChevronDown, ChevronRight, RefreshCw } from "lucide-reac
 import { adminApi } from "@/lib/admin/api";
 import type { ServerError } from "@/lib/admin/api/errores";
 import { useDocumentTitle } from "@/lib/use-document-title";
-import { cn } from "@/lib/utils";
+import { QueryState } from "@/components/admin/QueryState";
+import { ListSkeleton } from "@/components/admin/skeletons";
+import { EmptyState } from "@/components/rental/EmptyState";
 
 export const Route = createLazyFileRoute("/admin/errores")({
   component: ErroresPage,
@@ -70,14 +72,14 @@ function ErrorRow({ e }: { e: ServerError }) {
 function ErroresPage() {
   useDocumentTitle("Errores del servidor · Back Office");
 
-  const { data, isLoading, isError, error, refetch, dataUpdatedAt } = useQuery({
+  const query = useQuery({
     queryKey: ["admin", "server-errors"],
     queryFn: () => adminApi.listServerErrors(),
     refetchInterval: 5 * 60_000,
     staleTime: 60_000,
   });
 
-  const errores = data?.errores ?? [];
+  const { data, refetch, dataUpdatedAt } = query;
   const updatedAt = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   return (
@@ -109,25 +111,26 @@ function ErroresPage() {
         </p>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground animate-pulse">Cargando…</div>}
-
-      {isError && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          Error al cargar: {error instanceof Error ? error.message : String(error)}
-        </div>
-      )}
-
-      {!isLoading && !isError && errores.length === 0 && (
-        <div className="rounded-lg border hairline p-8 text-center text-muted-foreground text-sm">
-          Sin errores registrados. Todo bien.
-        </div>
-      )}
-
-      <div className={cn("space-y-2", isLoading && "opacity-50 pointer-events-none")}>
-        {errores.map((e) => (
-          <ErrorRow key={e.id} e={e} />
-        ))}
-      </div>
+      <QueryState
+        query={query}
+        isEmpty={(d) => d.errores.length === 0}
+        skeleton={<ListSkeleton rows={6} />}
+        empty={
+          <EmptyState
+            icon={<AlertTriangle className="h-6 w-6" />}
+            title="Sin errores registrados"
+            sub="Todo bien."
+          />
+        }
+      >
+        {(d) => (
+          <div className="space-y-2">
+            {d.errores.map((e) => (
+              <ErrorRow key={e.id} e={e} />
+            ))}
+          </div>
+        )}
+      </QueryState>
     </div>
   );
 }

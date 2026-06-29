@@ -52,6 +52,8 @@ import {
 
 import { adminApi, type Equipo, type EquipoInput, type FaltaField } from "@/lib/admin/api";
 import { stashEquiposReturnSearch } from "@/lib/admin/equiposReturnSearch";
+import { AdminPage } from "@/components/admin/AdminPage";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { ActionMenu } from "@/components/mobile";
 import { MantenimientoEquipoDialog } from "@/components/admin/MantenimientoEquipoDialog";
 import { HistorialEquipoDialog } from "@/components/admin/HistorialEquipoDialog";
@@ -89,6 +91,7 @@ type EquiposSearch = {
 function EquiposPage() {
   useDocumentTitle("Equipos · Back Office");
   const qc = useQueryClient();
+  const confirm = useConfirm();
 
   const search = useSearch({ strict: false }) as EquiposSearch;
   const navigate = useNavigate();
@@ -311,18 +314,12 @@ function EquiposPage() {
   );
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-7xl mx-auto">
-      <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-        <div>
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Back-office
-          </div>
-          <h1 className="font-display text-3xl text-ink">Equipos</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {equiposQ.isLoading ? "Cargando…" : `${total} equipos`}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-1.5 md:justify-end">
+    <AdminPage
+      title="Equipos"
+      maxW="max-w-7xl"
+      description={equiposQ.isLoading ? "Cargando…" : `${total} equipos`}
+      actions={
+        <>
           <Button
             variant="outline"
             onClick={() => setOpenDashboard(true)}
@@ -341,648 +338,665 @@ function EquiposPage() {
           >
             <Plus className="h-4 w-4 mr-1" /> Nuevo equipo
           </Button>
-        </div>
-      </header>
-
-      {/* KPI strip (handoff): inventario de un vistazo. */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <KpiCard label="Total" value={kpisQ.data?.total ?? total} meta="equipos en catálogo" />
-        <KpiCard
-          label="En uso hoy"
-          value={kpisQ.data?.en_uso_hoy ?? 0}
-          meta="unidades alquiladas ahora"
-        />
-        <KpiCard
-          label="Mantenimiento"
-          value={kpisQ.data?.mantenimiento ?? 0}
-          meta="bloqueando stock hoy"
-          warn={(kpisQ.data?.mantenimiento ?? 0) > 0}
-        />
-      </div>
-
-      {falta && (
-        <FaltaBanner
-          falta={falta}
-          total={total}
-          loading={equiposQ.isLoading}
-          onClear={() => updateFilters({ falta: undefined })}
-        />
-      )}
-
-      <div className="flex flex-col md:flex-row md:flex-wrap gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
-            className="pl-9 text-base sm:text-sm"
+        </>
+      }
+    >
+      <div className="space-y-6">
+        {/* KPI strip (handoff): inventario de un vistazo. */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <KpiCard label="Total" value={kpisQ.data?.total ?? total} meta="equipos en catálogo" />
+          <KpiCard
+            label="En uso hoy"
+            value={kpisQ.data?.en_uso_hoy ?? 0}
+            meta="unidades alquiladas ahora"
+          />
+          <KpiCard
+            label="Mantenimiento"
+            value={kpisQ.data?.mantenimiento ?? 0}
+            meta="bloqueando stock hoy"
+            warn={(kpisQ.data?.mantenimiento ?? 0) > 0}
           />
         </div>
-        <Select
-          value={categoria || "__all"}
-          onValueChange={(v) => setCategoria(v === "__all" ? "" : v)}
-        >
-          <SelectTrigger className="md:w-44">
-            <SelectValue placeholder="Todas las categorías" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all">Todas las categorías</SelectItem>
-            {categoriasOpts.map((c) => (
-              <SelectItem key={c.nombre} value={c.nombre}>
-                {c.nombre} {c.total ? `(${c.total})` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={marca || "__all"} onValueChange={(v) => setMarca(v === "__all" ? "" : v)}>
-          <SelectTrigger className="md:w-40">
-            <SelectValue placeholder="Todas las marcas" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all">Todas las marcas</SelectItem>
-            {marcasOpts.map((m) => (
-              <SelectItem key={m.id} value={m.nombre}>
-                {m.nombre} {m.total ? `(${m.total})` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={etiqueta || "__all"}
-          onValueChange={(v) => setEtiqueta(v === "__all" ? "" : v)}
-        >
-          <SelectTrigger className="md:w-44">
-            <SelectValue placeholder="Todas las etiquetas" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all">Todas las etiquetas</SelectItem>
-            {etiquetasOpts.map((e) => (
-              <SelectItem key={e.nombre} value={e.nombre}>
-                {e.nombre} {e.total ? `(${e.total})` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          type="button"
-          variant={soloIncompletos ? "default" : "outline"}
-          size="sm"
-          onClick={() => setSoloIncompletos((v) => !v)}
-          title="Filtrar equipos cuya ficha aún no marcaste como completa"
-          className="md:w-auto"
-        >
-          {soloIncompletos ? "✓ Solo incompletos" : "Solo incompletos"}
-        </Button>
-        <Button
-          type="button"
-          variant={vistaPapelera ? "destructive" : "outline"}
-          size="sm"
-          onClick={() => setVistaPapelera((v) => !v)}
-          title="Ver equipos dados de baja (soft-deleted)"
-          className="md:w-auto"
-        >
-          {vistaPapelera ? (
-            <>
-              <Trash2 className="h-3.5 w-3.5 mr-1" /> Papelera
-            </>
-          ) : (
-            "Papelera"
-          )}
-        </Button>
-        {(q || etiqueta || categoria || marca || soloIncompletos || falta) && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              updateFilters({
-                q: "",
-                etiqueta: "",
-                categoria: "",
-                marca: "",
-                solo_incompletos: false,
-                falta: undefined,
-              })
-            }
-            title="Limpiar todos los filtros (mantiene papelera)"
-            className="md:w-auto text-muted-foreground hover:text-ink"
-          >
-            Limpiar filtros
-          </Button>
+
+        {falta && (
+          <FaltaBanner
+            falta={falta}
+            total={total}
+            loading={equiposQ.isLoading}
+            onClear={() => updateFilters({ falta: undefined })}
+          />
         )}
-      </div>
 
-      {equiposQ.error && (
-        <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          Error: {(equiposQ.error as Error).message}
-        </div>
-      )}
-
-      {/* Banner: equipos sin serie cargada (calidad inventario, issue #91) */}
-      {sinSerieQ.data && sinSerieQ.data.total > 0 && (
-        <div className="flex items-start gap-2.5 rounded-md border hairline border-amber/40 bg-amber-soft/30 px-3 py-2 text-sm">
-          <AlertCircle className="h-4 w-4 mt-0.5 text-amber shrink-0" />
-          <div className="flex-1">
-            <span className="font-medium text-ink">
-              {sinSerieQ.data.total} equipo
-              {sinSerieQ.data.total === 1 ? "" : "s"} sin número de serie
-            </span>
-            <span className="text-muted-foreground">
-              {" "}
-              · cargá la serie desde el form de cada equipo (botón{" "}
-              <span className="font-mono">N/A</span> si no aplica).
-            </span>
+        <div className="flex flex-col md:flex-row md:flex-wrap gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar (nombre, marca, modelo, serie, specs, keywords…)"
+              className="pl-9 text-base sm:text-sm"
+            />
           </div>
-        </div>
-      )}
-
-      {/* Barra flotante de bulk actions */}
-      {selectedIds.size > 0 && (
-        <div className="sticky top-0 z-10 flex items-center gap-2 rounded-md border hairline bg-ink text-background px-3 py-2 shadow-md">
-          <span className="text-sm font-medium flex-1">
-            {selectedIds.size} seleccionado{selectedIds.size === 1 ? "" : "s"}
-          </span>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() =>
-              bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: true })
-            }
-            disabled={bulkMut.isPending}
-          >
-            <Eye className="h-3.5 w-3.5 mr-1" /> Mostrar
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() =>
-              bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: false })
-            }
-            disabled={bulkMut.isPending}
-          >
-            <EyeOff className="h-3.5 w-3.5 mr-1" /> Ocultar
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() =>
-              bulkMut.mutate({
-                ids: [...selectedIds],
-                action: "set_ficha_completa",
-                ficha_completa: true,
-              })
-            }
-            disabled={bulkMut.isPending}
-            title="Marcar fichas como completas"
-          >
-            ✓ Completas
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() =>
-              bulkMut.mutate({
-                ids: [...selectedIds],
-                action: "set_ficha_completa",
-                ficha_completa: false,
-              })
-            }
-            disabled={bulkMut.isPending}
-            title="Marcar fichas como pendientes"
-          >
-            ☐ Pendientes
-          </Button>
-          {/* Set categoría (#231): asigna categoría a los seleccionados.
-              Reemplaza las categorías existentes (backend hace DELETE + INSERT
-              + regenerate_auto_tags). */}
           <Select
-            value=""
-            onValueChange={(v) => {
-              const categoria_id = Number(v);
-              if (!Number.isFinite(categoria_id)) return;
-              bulkMut.mutate({
-                ids: [...selectedIds],
-                action: "set_categoria",
-                categoria_id,
-              });
-            }}
-            disabled={bulkMut.isPending || !categoriasQ.data?.length}
+            value={categoria || "__all"}
+            onValueChange={(v) => setCategoria(v === "__all" ? "" : v)}
           >
-            <SelectTrigger className="h-8 w-44 bg-secondary text-secondary-foreground border-0">
-              <SelectValue placeholder="Asignar categoría…" />
+            <SelectTrigger className="md:w-44">
+              <SelectValue placeholder="Todas las categorías" />
             </SelectTrigger>
             <SelectContent>
-              {(categoriasQ.data ?? []).map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>
-                  {c.nombre}
+              <SelectItem value="__all">Todas las categorías</SelectItem>
+              {categoriasOpts.map((c) => (
+                <SelectItem key={c.nombre} value={c.nombre}>
+                  {c.nombre} {c.total ? `(${c.total})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={marca || "__all"} onValueChange={(v) => setMarca(v === "__all" ? "" : v)}>
+            <SelectTrigger className="md:w-40">
+              <SelectValue placeholder="Todas las marcas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all">Todas las marcas</SelectItem>
+              {marcasOpts.map((m) => (
+                <SelectItem key={m.id} value={m.nombre}>
+                  {m.nombre} {m.total ? `(${m.total})` : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={etiqueta || "__all"}
+            onValueChange={(v) => setEtiqueta(v === "__all" ? "" : v)}
+          >
+            <SelectTrigger className="md:w-44">
+              <SelectValue placeholder="Todas las etiquetas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all">Todas las etiquetas</SelectItem>
+              {etiquetasOpts.map((e) => (
+                <SelectItem key={e.nombre} value={e.nombre}>
+                  {e.nombre} {e.total ? `(${e.total})` : ""}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Button
+            type="button"
+            variant={soloIncompletos ? "default" : "outline"}
             size="sm"
-            variant="destructive"
-            onClick={() => {
-              // En papelera, "Eliminar" hace hard delete (delete_permanent).
-              // En vista normal, soft delete (delete). #punto4
-              const permanent = vistaPapelera;
-              const msg = permanent
-                ? `Eliminar PERMANENTEMENTE ${selectedIds.size} equipo${selectedIds.size === 1 ? "" : "s"} de la papelera?\n\nEsta acción no se puede deshacer y borra ficha, kit, categorías y etiquetas asociadas.`
-                : `Eliminar ${selectedIds.size} equipo${selectedIds.size === 1 ? "" : "s"}? Quedan en la papelera y se pueden restaurar.`;
-              if (confirm(msg)) {
-                bulkMut.mutate({
-                  ids: [...selectedIds],
-                  action: permanent ? "delete_permanent" : "delete",
-                });
-              }
-            }}
-            disabled={bulkMut.isPending}
+            onClick={() => setSoloIncompletos((v) => !v)}
+            title="Filtrar equipos cuya ficha aún no marcaste como completa"
+            className="md:w-auto"
           >
-            <Trash2 className="h-3.5 w-3.5 mr-1" />
-            {vistaPapelera ? "Eliminar permanente" : "Eliminar"}
+            {soloIncompletos ? "✓ Solo incompletos" : "Solo incompletos"}
           </Button>
           <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelectedIds(new Set())}
-            className="text-background hover:text-background/70"
-          >
-            Cancelar
-          </Button>
-        </div>
-      )}
-
-      {/* Sub-tabs (handoff): filtros rápidos. */}
-      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none border-b hairline pb-px">
-        {(
-          [
-            ["todos", "Todos"],
-            ["destacados", "Destacados"],
-            ["nuevos", "Nuevos"],
-            ["sin-foto", "Sin foto"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
             type="button"
-            onClick={() => setTab(id)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-sm whitespace-nowrap transition",
-              tab === id
-                ? "bg-muted font-bold text-ink"
-                : "font-medium text-muted-foreground hover:text-ink",
-            )}
+            variant={vistaPapelera ? "destructive" : "outline"}
+            size="sm"
+            onClick={() => setVistaPapelera((v) => !v)}
+            title="Ver equipos dados de baja (soft-deleted)"
+            className="md:w-auto"
           >
-            {label}
-            <span className="font-mono text-2xs tabular-nums opacity-70">{tabCounts[id]}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="rounded-lg border hairline overflow-hidden bg-background">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
-                <Checkbox
-                  checked={items.length > 0 && selectedIds.size === items.length}
-                  onCheckedChange={() => toggleSelectAll(items)}
-                  aria-label="Seleccionar todos"
-                />
-              </TableHead>
-              <TableHead className="w-14"></TableHead>
-              <TableHead>Equipo</TableHead>
-              <TableHead className="hidden lg:table-cell">Categoría</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Stock</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">$ / jornada</TableHead>
-              <TableHead
-                className="text-right hidden sm:table-cell w-24"
-                title="% del valor del equipo cobrado por día (nombre tentativo)"
-              >
-                % día
-              </TableHead>
-              <TableHead className="hidden md:table-cell">Etiquetas</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.length === 0 && !equiposQ.isLoading && (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
-                  Sin equipos.{" "}
-                  {(q || etiqueta) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQ("");
-                        setEtiqueta("");
-                      }}
-                      className="underline hover:text-ink"
-                    >
-                      Limpiar filtros
-                    </button>
-                  )}
-                </TableCell>
-              </TableRow>
-            )}
-            {items.map((eq) => (
-              <TableRow key={eq.id} className={eq.visible_catalogo ? "" : "opacity-60"}>
-                <TableCell>
-                  <Checkbox
-                    checked={selectedIds.has(eq.id)}
-                    onCheckedChange={() => toggleSelect(eq.id)}
-                    aria-label={`Seleccionar ${eq.nombre}`}
-                  />
-                </TableCell>
-                <TableCell>
-                  {eq.foto_url ? (
-                    <img
-                      src={eq.foto_url}
-                      alt=""
-                      loading="lazy"
-                      className="h-10 w-10 rounded object-cover bg-muted/30"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.opacity = "0.2";
-                      }}
-                    />
-                  ) : (
-                    <div className="h-10 w-10 rounded bg-muted/40 grid place-items-center text-2xs text-muted-foreground">
-                      —
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {eq.marca && (
-                    <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground font-semibold leading-none mb-0.5">
-                      {eq.marca}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1.5 font-medium text-ink leading-tight">
-                    <span>{eq.nombre}</span>
-                    {esNuevo(eq) && (
-                      <span className="text-2xs font-bold uppercase tracking-wide bg-ink text-amber px-1.5 py-0.5 rounded shrink-0">
-                        Nuevo
-                      </span>
-                    )}
-                    {esDestacado(eq) && (
-                      <span className="text-amber shrink-0" title="Destacado">
-                        ★
-                      </span>
-                    )}
-                    {!eq.ficha_completa && (
-                      <span
-                        className="text-2xs text-amber bg-amber-soft/40 px-1 py-0.5 rounded shrink-0"
-                        title="Ficha pendiente — marcala como completa en el form cuando termines de cargarla"
-                      >
-                        pendiente
-                      </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                  {eq.categorias?.[0]?.nombre ?? "—"}
-                </TableCell>
-                <TableCell>
-                  {eq.visible_catalogo ? (
-                    <Pill tone="success" className="font-mono font-bold uppercase tracking-[0.1em]">
-                      Visible
-                    </Pill>
-                  ) : (
-                    <Pill tone="neutral" className="font-mono font-bold uppercase tracking-[0.1em]">
-                      Oculto
-                    </Pill>
-                  )}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  <StockInline
-                    equipo={eq}
-                    onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
-                  />
-                </TableCell>
-                <TableCell className="text-right hidden sm:table-cell w-32">
-                  <PrecioJornadaInline
-                    equipo={eq}
-                    onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
-                  />
-                </TableCell>
-                <TableCell className="text-right hidden sm:table-cell w-24">
-                  <RoiInline
-                    equipo={eq}
-                    onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
-                  />
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  <div className="flex flex-wrap gap-1 max-w-[180px]">
-                    {(eq.etiquetas ?? []).slice(0, 2).map((t) => (
-                      <span
-                        key={t}
-                        className="inline-flex items-center rounded-full border hairline bg-surface px-2 py-0.5 text-2xs font-medium text-ink whitespace-nowrap"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                    {(eq.etiquetas ?? []).length > 2 && (
-                      <span className="text-2xs text-muted-foreground">
-                        +{(eq.etiquetas ?? []).length - 2}
-                      </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  {/* Mobile: un botón → ActionMenu */}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="sm:hidden"
-                    aria-label="Más acciones"
-                    onClick={() => setMenuEquipo(eq)}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                  {/* Desktop: botones individuales */}
-                  <div className="hidden sm:inline-flex gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      title={eq.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo"}
-                      onClick={() => toggleVisibleMut.mutate(eq)}
-                    >
-                      {eq.visible_catalogo ? (
-                        <Eye className="h-4 w-4" />
-                      ) : (
-                        <EyeOff className="h-4 w-4" />
-                      )}
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      title="Historial de alquileres"
-                      onClick={() => setHistorialEquipo(eq)}
-                    >
-                      <History className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      title="Mantenimiento"
-                      onClick={() => setMantenimientoEquipo(eq)}
-                    >
-                      <Wrench className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      title="Editar"
-                      onClick={() => {
-                        stashReturnSearch();
-                        navigate({
-                          to: "/admin/equipos/$id/editar",
-                          params: { id: String(eq.id) },
-                        });
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      title="Duplicar (clona ficha, categorías y kit — serie vacía)"
-                      onClick={() => duplicateMut.mutate(eq.id)}
-                      disabled={duplicateMut.isPending}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    {eq.eliminado_at ? (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title="Restaurar"
-                        onClick={() => restoreMut.mutate(eq.id)}
-                        disabled={restoreMut.isPending}
-                      >
-                        <RotateCcw className="h-4 w-4 text-amber" />
-                      </Button>
-                    ) : (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label="Eliminar equipo"
-                        onClick={() => setDeleting(eq)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <ActionMenu
-        open={!!menuEquipo}
-        onOpenChange={(v) => {
-          if (!v) setMenuEquipo(null);
-        }}
-        title={menuEquipo?.nombre}
-        actions={[
-          {
-            label: menuEquipo?.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo",
-            icon: menuEquipo?.visible_catalogo ? (
-              <EyeOff className="h-4 w-4" />
+            {vistaPapelera ? (
+              <>
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Papelera
+              </>
             ) : (
-              <Eye className="h-4 w-4" />
-            ),
-            onClick: () => toggleVisibleMut.mutate(menuEquipo!),
-          },
-          {
-            label: "Historial de alquileres",
-            icon: <History className="h-4 w-4" />,
-            onClick: () => setHistorialEquipo(menuEquipo!),
-          },
-          {
-            label: "Mantenimiento",
-            icon: <Wrench className="h-4 w-4" />,
-            onClick: () => setMantenimientoEquipo(menuEquipo!),
-          },
-          {
-            label: "Editar",
-            icon: <Pencil className="h-4 w-4" />,
-            onClick: () => {
-              if (!menuEquipo) return;
-              stashReturnSearch();
-              navigate({
-                to: "/admin/equipos/$id/editar",
-                params: { id: String(menuEquipo.id) },
-              });
-            },
-          },
-          {
-            label: "Duplicar equipo",
-            icon: <Copy className="h-4 w-4" />,
-            onClick: () => duplicateMut.mutate(menuEquipo!.id),
-          },
-          {
-            label: "Eliminar equipo",
-            icon: <Trash2 className="h-4 w-4" />,
-            variant: "destructive" as const,
-            onClick: () => setDeleting(menuEquipo!),
-          },
-        ]}
-      />
-
-      {mantenimientoEquipo && (
-        <MantenimientoEquipoDialog
-          equipo={mantenimientoEquipo}
-          open={!!mantenimientoEquipo}
-          onOpenChange={(v) => {
-            if (!v) setMantenimientoEquipo(null);
-          }}
-        />
-      )}
-
-      {historialEquipo && (
-        <HistorialEquipoDialog
-          equipo={historialEquipo}
-          open={!!historialEquipo}
-          onOpenChange={(v) => {
-            if (!v) setHistorialEquipo(null);
-          }}
-        />
-      )}
-
-      {openDashboard && <DashboardUsoDialog open={openDashboard} onOpenChange={setOpenDashboard} />}
-
-      <ComboBuilderDialog open={openComboBuilder} onOpenChange={setOpenComboBuilder} />
-
-      <AlertDialog
-        open={!!deleting}
-        onOpenChange={(v) => {
-          if (!v) setDeleting(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar “{deleting?.nombre}”</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Si el equipo tiene pedidos históricos, mejor marcalo
-              como “Fuera de servicio” en lugar de borrarlo.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleting && deleteMut.mutate(deleting.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              "Papelera"
+            )}
+          </Button>
+          {(q || etiqueta || categoria || marca || soloIncompletos || falta) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                updateFilters({
+                  q: "",
+                  etiqueta: "",
+                  categoria: "",
+                  marca: "",
+                  solo_incompletos: false,
+                  falta: undefined,
+                })
+              }
+              title="Limpiar todos los filtros (mantiene papelera)"
+              className="md:w-auto text-muted-foreground hover:text-ink"
             >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+
+        {equiposQ.error && (
+          <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            Error: {(equiposQ.error as Error).message}
+          </div>
+        )}
+
+        {/* Banner: equipos sin serie cargada (calidad inventario, issue #91) */}
+        {sinSerieQ.data && sinSerieQ.data.total > 0 && (
+          <div className="flex items-start gap-2.5 rounded-md border hairline border-amber/40 bg-amber-soft/30 px-3 py-2 text-sm">
+            <AlertCircle className="h-4 w-4 mt-0.5 text-ink shrink-0" />
+            <div className="flex-1">
+              <span className="font-medium text-ink">
+                {sinSerieQ.data.total} equipo
+                {sinSerieQ.data.total === 1 ? "" : "s"} sin número de serie
+              </span>
+              <span className="text-muted-foreground">
+                {" "}
+                · cargá la serie desde el form de cada equipo (botón{" "}
+                <span className="font-mono">N/A</span> si no aplica).
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Barra flotante de bulk actions */}
+        {selectedIds.size > 0 && (
+          <div className="sticky top-0 z-10 flex items-center gap-2 rounded-md border hairline bg-ink text-background px-3 py-2 shadow-md">
+            <span className="text-sm font-medium flex-1">
+              {selectedIds.size} seleccionado{selectedIds.size === 1 ? "" : "s"}
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: true })
+              }
+              disabled={bulkMut.isPending}
+            >
+              <Eye className="h-3.5 w-3.5 mr-1" /> Mostrar
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                bulkMut.mutate({ ids: [...selectedIds], action: "set_visible", visible: false })
+              }
+              disabled={bulkMut.isPending}
+            >
+              <EyeOff className="h-3.5 w-3.5 mr-1" /> Ocultar
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                bulkMut.mutate({
+                  ids: [...selectedIds],
+                  action: "set_ficha_completa",
+                  ficha_completa: true,
+                })
+              }
+              disabled={bulkMut.isPending}
+              title="Marcar fichas como completas"
+            >
+              ✓ Completas
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() =>
+                bulkMut.mutate({
+                  ids: [...selectedIds],
+                  action: "set_ficha_completa",
+                  ficha_completa: false,
+                })
+              }
+              disabled={bulkMut.isPending}
+              title="Marcar fichas como pendientes"
+            >
+              ☐ Pendientes
+            </Button>
+            {/* Set categoría (#231): asigna categoría a los seleccionados.
+              Reemplaza las categorías existentes (backend hace DELETE + INSERT
+              + regenerate_auto_tags). */}
+            <Select
+              value=""
+              onValueChange={(v) => {
+                const categoria_id = Number(v);
+                if (!Number.isFinite(categoria_id)) return;
+                bulkMut.mutate({
+                  ids: [...selectedIds],
+                  action: "set_categoria",
+                  categoria_id,
+                });
+              }}
+              disabled={bulkMut.isPending || !categoriasQ.data?.length}
+            >
+              <SelectTrigger className="h-8 w-44 bg-secondary text-secondary-foreground border-0">
+                <SelectValue placeholder="Asignar categoría…" />
+              </SelectTrigger>
+              <SelectContent>
+                {(categoriasQ.data ?? []).map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={async () => {
+                // En papelera, "Eliminar" hace hard delete (delete_permanent).
+                // En vista normal, soft delete (delete). #punto4
+                const permanent = vistaPapelera;
+                const n = selectedIds.size;
+                const plural = n === 1 ? "" : "s";
+                const ok = permanent
+                  ? await confirm({
+                      title: `¿Eliminar permanentemente ${n} equipo${plural}?`,
+                      description: `Esta acción no se puede deshacer y borra ficha, kit, categorías y etiquetas asociadas.`,
+                      danger: true,
+                      confirmLabel: "Eliminar",
+                    })
+                  : await confirm({
+                      title: `¿Eliminar ${n} equipo${plural}?`,
+                      description: `Quedan en la papelera y se pueden restaurar.`,
+                      danger: true,
+                      confirmLabel: "Eliminar",
+                    });
+                if (ok) {
+                  bulkMut.mutate({
+                    ids: [...selectedIds],
+                    action: permanent ? "delete_permanent" : "delete",
+                  });
+                }
+              }}
+              disabled={bulkMut.isPending}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              {vistaPapelera ? "Eliminar permanente" : "Eliminar"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedIds(new Set())}
+              className="text-background hover:text-background/70"
+            >
+              Cancelar
+            </Button>
+          </div>
+        )}
+
+        {/* Sub-tabs (handoff): filtros rápidos. */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none border-b hairline pb-px">
+          {(
+            [
+              ["todos", "Todos"],
+              ["destacados", "Destacados"],
+              ["nuevos", "Nuevos"],
+              ["sin-foto", "Sin foto"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-sm whitespace-nowrap transition",
+                tab === id
+                  ? "bg-muted font-bold text-ink"
+                  : "font-medium text-muted-foreground hover:text-ink",
+              )}
+            >
+              {label}
+              <span className="font-mono text-2xs tabular-nums opacity-70">{tabCounts[id]}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="rounded-lg border hairline overflow-hidden bg-background">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={items.length > 0 && selectedIds.size === items.length}
+                    onCheckedChange={() => toggleSelectAll(items)}
+                    aria-label="Seleccionar todos"
+                  />
+                </TableHead>
+                <TableHead className="w-14"></TableHead>
+                <TableHead>Equipo</TableHead>
+                <TableHead className="hidden lg:table-cell">Categoría</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Stock</TableHead>
+                <TableHead className="text-right hidden sm:table-cell">$ / jornada</TableHead>
+                <TableHead
+                  className="text-right hidden sm:table-cell w-24"
+                  title="% del valor del equipo cobrado por día (nombre tentativo)"
+                >
+                  % día
+                </TableHead>
+                <TableHead className="hidden md:table-cell">Etiquetas</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.length === 0 && !equiposQ.isLoading && (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
+                    Sin equipos.{" "}
+                    {(q || etiqueta) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQ("");
+                          setEtiqueta("");
+                        }}
+                        className="underline hover:text-ink"
+                      >
+                        Limpiar filtros
+                      </button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )}
+              {items.map((eq) => (
+                <TableRow key={eq.id} className={eq.visible_catalogo ? "" : "opacity-60"}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(eq.id)}
+                      onCheckedChange={() => toggleSelect(eq.id)}
+                      aria-label={`Seleccionar ${eq.nombre}`}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {eq.foto_url ? (
+                      <img
+                        src={eq.foto_url}
+                        alt=""
+                        loading="lazy"
+                        className="h-10 w-10 rounded object-cover bg-muted/30"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.opacity = "0.2";
+                        }}
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded bg-muted/40 grid place-items-center text-2xs text-muted-foreground">
+                        —
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {eq.marca && (
+                      <div className="t-eyebrow font-semibold leading-none mb-0.5">{eq.marca}</div>
+                    )}
+                    <div className="flex items-center gap-1.5 font-medium text-ink leading-tight">
+                      <span>{eq.nombre}</span>
+                      {esNuevo(eq) && (
+                        <span className="text-2xs font-bold uppercase tracking-wide bg-ink text-amber px-1.5 py-0.5 rounded shrink-0">
+                          Nuevo
+                        </span>
+                      )}
+                      {esDestacado(eq) && (
+                        <span className="text-ink shrink-0" title="Destacado">
+                          ★
+                        </span>
+                      )}
+                      {!eq.ficha_completa && (
+                        <span
+                          className="inline-flex shrink-0"
+                          title="Ficha pendiente — marcala como completa en el form cuando termines de cargarla"
+                        >
+                          <Pill tone="warning">pendiente</Pill>
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
+                    {eq.categorias?.[0]?.nombre ?? "—"}
+                  </TableCell>
+                  <TableCell>
+                    {eq.visible_catalogo ? (
+                      <Pill
+                        tone="success"
+                        className="font-mono font-bold uppercase tracking-[0.1em]"
+                      >
+                        Visible
+                      </Pill>
+                    ) : (
+                      <Pill
+                        tone="neutral"
+                        className="font-mono font-bold uppercase tracking-[0.1em]"
+                      >
+                        Oculto
+                      </Pill>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <StockInline
+                      equipo={eq}
+                      onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right hidden sm:table-cell w-32">
+                    <PrecioJornadaInline
+                      equipo={eq}
+                      onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right hidden sm:table-cell w-24">
+                    <RoiInline
+                      equipo={eq}
+                      onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
+                    />
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <div className="flex flex-wrap gap-1 max-w-[180px]">
+                      {(eq.etiquetas ?? []).slice(0, 2).map((t) => (
+                        <Pill key={t} className="hairline bg-surface text-ink whitespace-nowrap">
+                          {t}
+                        </Pill>
+                      ))}
+                      {(eq.etiquetas ?? []).length > 2 && (
+                        <span className="text-2xs text-muted-foreground">
+                          +{(eq.etiquetas ?? []).length - 2}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {/* Mobile: un botón → ActionMenu */}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="sm:hidden"
+                      aria-label="Más acciones"
+                      onClick={() => setMenuEquipo(eq)}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                    {/* Desktop: botones individuales */}
+                    <div className="hidden sm:inline-flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title={eq.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo"}
+                        onClick={() => toggleVisibleMut.mutate(eq)}
+                      >
+                        {eq.visible_catalogo ? (
+                          <Eye className="h-4 w-4" />
+                        ) : (
+                          <EyeOff className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Historial de alquileres"
+                        onClick={() => setHistorialEquipo(eq)}
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Mantenimiento"
+                        onClick={() => setMantenimientoEquipo(eq)}
+                      >
+                        <Wrench className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Editar"
+                        onClick={() => {
+                          stashReturnSearch();
+                          navigate({
+                            to: "/admin/equipos/$id/editar",
+                            params: { id: String(eq.id) },
+                          });
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Duplicar (clona ficha, categorías y kit — serie vacía)"
+                        onClick={() => duplicateMut.mutate(eq.id)}
+                        disabled={duplicateMut.isPending}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      {eq.eliminado_at ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Restaurar"
+                          onClick={() => restoreMut.mutate(eq.id)}
+                          disabled={restoreMut.isPending}
+                        >
+                          <RotateCcw className="h-4 w-4 text-ink" />
+                        </Button>
+                      ) : (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Eliminar equipo"
+                          onClick={() => setDeleting(eq)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <ActionMenu
+          open={!!menuEquipo}
+          onOpenChange={(v) => {
+            if (!v) setMenuEquipo(null);
+          }}
+          title={menuEquipo?.nombre}
+          actions={[
+            {
+              label: menuEquipo?.visible_catalogo ? "Ocultar del catálogo" : "Mostrar en catálogo",
+              icon: menuEquipo?.visible_catalogo ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              ),
+              onClick: () => toggleVisibleMut.mutate(menuEquipo!),
+            },
+            {
+              label: "Historial de alquileres",
+              icon: <History className="h-4 w-4" />,
+              onClick: () => setHistorialEquipo(menuEquipo!),
+            },
+            {
+              label: "Mantenimiento",
+              icon: <Wrench className="h-4 w-4" />,
+              onClick: () => setMantenimientoEquipo(menuEquipo!),
+            },
+            {
+              label: "Editar",
+              icon: <Pencil className="h-4 w-4" />,
+              onClick: () => {
+                if (!menuEquipo) return;
+                stashReturnSearch();
+                navigate({
+                  to: "/admin/equipos/$id/editar",
+                  params: { id: String(menuEquipo.id) },
+                });
+              },
+            },
+            {
+              label: "Duplicar equipo",
+              icon: <Copy className="h-4 w-4" />,
+              onClick: () => duplicateMut.mutate(menuEquipo!.id),
+            },
+            {
+              label: "Eliminar equipo",
+              icon: <Trash2 className="h-4 w-4" />,
+              variant: "destructive" as const,
+              onClick: () => setDeleting(menuEquipo!),
+            },
+          ]}
+        />
+
+        {mantenimientoEquipo && (
+          <MantenimientoEquipoDialog
+            equipo={mantenimientoEquipo}
+            open={!!mantenimientoEquipo}
+            onOpenChange={(v) => {
+              if (!v) setMantenimientoEquipo(null);
+            }}
+          />
+        )}
+
+        {historialEquipo && (
+          <HistorialEquipoDialog
+            equipo={historialEquipo}
+            open={!!historialEquipo}
+            onOpenChange={(v) => {
+              if (!v) setHistorialEquipo(null);
+            }}
+          />
+        )}
+
+        {openDashboard && (
+          <DashboardUsoDialog open={openDashboard} onOpenChange={setOpenDashboard} />
+        )}
+
+        <ComboBuilderDialog open={openComboBuilder} onOpenChange={setOpenComboBuilder} />
+
+        <AlertDialog
+          open={!!deleting}
+          onOpenChange={(v) => {
+            if (!v) setDeleting(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminar “{deleting?.nombre}”</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Si el equipo tiene pedidos históricos, mejor
+                marcalo como “Fuera de servicio” en lugar de borrarlo.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleting && deleteMut.mutate(deleting.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </AdminPage>
   );
 }

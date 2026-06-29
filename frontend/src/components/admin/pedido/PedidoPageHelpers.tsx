@@ -195,7 +195,7 @@ export function ItemRow({
               className="h-9 rounded-md border hairline bg-surface-elevated px-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
               aria-label="Modo de cobro"
             >
-              <option value="jornada">/día</option>
+              <option value="jornada">/jornada</option>
               <option value="fijo">fijo</option>
             </select>
           ) : (
@@ -286,9 +286,7 @@ export function FieldLabel({
 }) {
   return (
     <label className={cn("block", className)}>
-      <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-1">
-        {label}
-      </span>
+      <span className="block t-eyebrow mb-1">{label}</span>
       {children}
     </label>
   );
@@ -297,9 +295,7 @@ export function FieldLabel({
 export function RailSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
-        {label}
-      </div>
+      <div className="t-eyebrow mb-2">{label}</div>
       <div className="space-y-2">{children}</div>
     </div>
   );

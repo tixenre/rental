@@ -41,8 +41,8 @@ export type BackendFicha = {
   notas: string | null;
   keywords_json: string | null;
   nombre_publico_template?: string | null;
-  // Listas estructuradas que aún no son specs (Fase G migración futura)
-  incluye_json?: string | null;
+  // Listas estructuradas que aún no son specs. `incluye_json` (legacy) dropeado:
+  // el "qué incluye" sale de la receta real (kit), no del descriptivo.
   conectividad_json?: string | null;
   compatible_con_json?: string | null;
   // Multimedia y referencias (no son specs estructuradas)

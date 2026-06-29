@@ -2,9 +2,9 @@
 
 Helpers `attach_*` que, dado un lote de equipos (list[dict]), les adjuntan en vivo
 sus tags, kit, categorías, ficha y specs (destacadas + estructuradas). Move-verbatim
-desde `database.py`; usan el fragmento canónico de marca del spine (`core`).
+desde `database.py`. `attach_kit` deriva el contenido de la puerta única
+`services.contenido` (fuente única del "qué incluye").
 """
-from database.core import MARCA_SUBQUERY
 
 
 def attach_tags(conn, equipos: list[dict]) -> list[dict]:
@@ -38,42 +38,28 @@ def attach_tags(conn, equipos: list[dict]) -> list[dict]:
 
 
 def attach_kit(conn, equipos: list[dict]) -> list[dict]:
-    """Agrega componentes de kit a la lista de equipos."""
+    """Agrega componentes de kit a cada equipo, vía la puerta única
+    `services.contenido` (fuente única del "qué incluye"). `solo_activos=True`:
+    el catálogo NO muestra componentes soft-deleted — preserva el criterio previo
+    de esta función. Import lazy para evitar el ciclo database↔services."""
     if not equipos:
         return equipos
 
+    from services.contenido import contenido_de_batch
+
     ids = [e["id"] for e in equipos]
-    placeholders = ",".join(["%s"] * len(ids))
-
-    cur = conn.cursor()
-    cur.execute(f"""
-        SELECT kc.equipo_id, kc.componente_id, kc.cantidad,
-               kc.descuento_pct, kc.esencial,
-               e.nombre, {MARCA_SUBQUERY}, e.foto_url
-        FROM kit_componentes kc
-        JOIN equipos e ON e.id = kc.componente_id AND e.eliminado_at IS NULL
-        WHERE kc.equipo_id IN ({placeholders})
-        ORDER BY kc.equipo_id, kc.orden ASC, e.nombre ASC
-    """, ids)
-
-    rows = cur.fetchall()
-    kit_map: dict[int, list] = {e["id"]: [] for e in equipos}
-
-    for r in rows:
-        kit_map[r["equipo_id"]].append({
-            "componente_id": r["componente_id"],
-            "nombre":        r["nombre"],
-            "marca":         r["marca"],
-            "foto_url":      r["foto_url"],
-            "cantidad":      r["cantidad"],
-            "descuento_pct": r["descuento_pct"],
-            "esencial":      r["esencial"],
-        })
-
+    por_equipo = contenido_de_batch(conn, ids, solo_activos=True)
     for e in equipos:
-        e["kit"] = kit_map[e["id"]]
+        e["kit"] = [{
+            "componente_id": c["componente_id"],
+            "nombre":        c["nombre"],
+            "marca":         c["marca"],
+            "foto_url":      c["foto_url"],
+            "cantidad":      c["cantidad"],
+            "descuento_pct": c["descuento_pct"],
+            "esencial":      c["esencial"],
+        } for c in por_equipo.get(e["id"], [])]
 
-    cur.close()
     return equipos
 
 
@@ -120,7 +106,7 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     cur.execute(f"""
         SELECT equipo_id, descripcion, notas,
                keywords_json, nombre_publico_template,
-               incluye_json, conectividad_json, compatible_con_json,
+               conectividad_json, compatible_con_json,
                video_url, precio_bh_usd, fuente_url, fuente_titulo,
                enriquecido_at, enriquecido_fuente,
                contenido_incluido_json
@@ -131,7 +117,7 @@ def attach_ficha(conn, equipos: list[dict]) -> list[dict]:
     _ficha_keys = (
         "descripcion", "notas",
         "keywords_json", "nombre_publico_template",
-        "incluye_json", "conectividad_json", "compatible_con_json",
+        "conectividad_json", "compatible_con_json",
         "video_url", "precio_bh_usd", "fuente_url", "fuente_titulo",
         "enriquecido_at", "enriquecido_fuente",
         "contenido_incluido_json",

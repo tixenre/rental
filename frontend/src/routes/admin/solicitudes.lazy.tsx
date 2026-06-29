@@ -11,6 +11,7 @@ import {
   Plus,
   Minus,
   RotateCcw,
+  Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,6 +23,9 @@ import { Badge } from "@/design-system/ui/badge";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Textarea } from "@/design-system/ui/textarea";
+import { QueryState } from "@/components/admin/QueryState";
+import { ListSkeleton } from "@/components/admin/skeletons";
+import { EmptyState } from "@/components/rental/EmptyState";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -127,49 +131,62 @@ function SolicitudesPage() {
   return (
     <div className="space-y-6 p-4 md:p-6 max-w-4xl mx-auto">
       <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Operaciones · Solicitudes
-        </div>
+        <div className="t-eyebrow">Operaciones · Solicitudes</div>
         <h1 className="font-display text-3xl text-ink">Solicitudes</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Cambios pedidos por clientes en pedidos confirmados.
         </p>
       </header>
 
-      {listQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+      <QueryState
+        query={listQ}
+        isEmpty={(d) => d.length === 0}
+        skeleton={<ListSkeleton rows={4} />}
+        empty={
+          <EmptyState
+            icon={<Inbox className="h-6 w-6" />}
+            title="No hay solicitudes"
+            sub="Los cambios que pidan los clientes en pedidos confirmados aparecen acá."
+          />
+        }
+      >
+        {() => (
+          <>
+            {pendientes.length === 0 && (
+              <div className="rounded-md border border-dashed hairline px-6 py-10 text-center text-sm text-muted-foreground">
+                No hay solicitudes pendientes.
+              </div>
+            )}
 
-      {!listQ.isLoading && pendientes.length === 0 && (
-        <div className="rounded-md border border-dashed hairline px-6 py-10 text-center text-sm text-muted-foreground">
-          No hay solicitudes pendientes.
-        </div>
-      )}
+            {pendientes.length > 0 && (
+              <section className="space-y-3">
+                <h2 className="text-sm font-medium text-ink">Pendientes ({pendientes.length})</h2>
+                {pendientes.map((s) => (
+                  <SolicitudCard
+                    key={s.id}
+                    solicitud={s}
+                    onResolve={resolverMut.mutate}
+                    isPending={resolverMut.isPending}
+                  />
+                ))}
+              </section>
+            )}
 
-      {pendientes.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-ink">Pendientes ({pendientes.length})</h2>
-          {pendientes.map((s) => (
-            <SolicitudCard
-              key={s.id}
-              solicitud={s}
-              onResolve={resolverMut.mutate}
-              isPending={resolverMut.isPending}
-            />
-          ))}
-        </section>
-      )}
-
-      {resueltas.length > 0 && (
-        <section className="space-y-3 pt-6 border-t hairline">
-          <h2 className="text-sm font-medium text-muted-foreground">
-            Resueltas ({resueltas.length})
-          </h2>
-          <div className="space-y-2">
-            {resueltas.map((s) => (
-              <ResueltaRow key={s.id} solicitud={s} />
-            ))}
-          </div>
-        </section>
-      )}
+            {resueltas.length > 0 && (
+              <section className="space-y-3 pt-6 border-t hairline">
+                <h2 className="text-sm font-medium text-muted-foreground">
+                  Resueltas ({resueltas.length})
+                </h2>
+                <div className="space-y-2">
+                  {resueltas.map((s) => (
+                    <ResueltaRow key={s.id} solicitud={s} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </QueryState>
     </div>
   );
 }
@@ -462,7 +479,7 @@ function SolicitudCard({
                 return (
                   <li key={equipo_id} className="px-3 py-1.5 flex items-center gap-2">
                     <span className="flex-1 text-ink truncate text-sm">{nombre}</span>
-                    {dirty && <span className="text-2xs text-amber">cliente: {original}</span>}
+                    {dirty && <span className="text-2xs text-ink">cliente: {original}</span>}
                     <div className="flex items-center gap-0.5">
                       <Button
                         size="icon"

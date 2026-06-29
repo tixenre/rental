@@ -36,16 +36,16 @@ export function TallerCalendario({ sesiones, horario }: TallerCalendarioProps) {
   return (
     <div className="flex flex-col gap-3">
       {/* Calendario en card con tinte rosa */}
-      <div className="rounded-2xl bg-rosa/5 border border-rosa/20 overflow-hidden pointer-events-none select-none flex justify-center">
+      <div className="rounded-2xl bg-rosa/5 border border-rosa/20 overflow-hidden pointer-events-none select-none flex justify-center py-2">
         <Calendar
           locale={es}
-          defaultMonth={defaultMonth}
+          month={defaultMonth}
           numberOfMonths={numberOfMonths}
           modifiers={{ sesion: sesionDates }}
           modifiersClassNames={{
             sesion: "bg-rosa text-ink font-bold !opacity-100 rounded-full",
           }}
-          className="[--cell-size:2.5rem] sm:[--cell-size:3rem]"
+          className="[--cell-size:2.75rem]"
         />
       </div>
 

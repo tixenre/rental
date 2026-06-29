@@ -192,10 +192,10 @@ def list_emails_log(
     where = []
     params: list[Any] = []
     if status:
-        where.append("status = ?")
+        where.append("status = %s")
         params.append(status)
     if template_key:
-        where.append("template_key = ?")
+        where.append("template_key = %s")
         params.append(template_key)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     with get_db() as conn:

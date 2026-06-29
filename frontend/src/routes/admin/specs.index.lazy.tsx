@@ -15,6 +15,7 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { Badge } from "@/design-system/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/design-system/ui/tabs";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -46,63 +47,58 @@ function SpecsConsolidadasPage() {
   const currentTab = activeTab || defaultTab;
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-6xl mx-auto">
-      <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office · Inventario
-        </div>
-        <h1 className="font-display text-3xl text-ink">Specs</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Definiciones de specs por categoría raíz. Marcá favoritos para que aparezcan en card,
-          mini-ficha, lateral y pills de la ficha. Arrastrá para reordenar.
-        </p>
-      </header>
-
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando specs…</div>}
-      {q.isError && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
-          <div className="text-sm font-medium text-destructive">Error cargando specs.</div>
-          <div className="text-xs text-destructive/80 font-mono break-all">
-            {(q.error as Error)?.message ?? "Error desconocido"}
+    <AdminPage
+      title="Specs"
+      maxW="max-w-6xl"
+      description="Definiciones de specs por categoría raíz. Marcá favoritos para que aparezcan en card, mini-ficha, lateral y pills de la ficha. Arrastrá para reordenar."
+    >
+      <div className="space-y-6">
+        {q.isLoading && <div className="text-sm text-muted-foreground">Cargando specs…</div>}
+        {q.isError && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
+            <div className="text-sm font-medium text-destructive">Error cargando specs.</div>
+            <div className="text-xs text-destructive/80 font-mono break-all">
+              {(q.error as Error)?.message ?? "Error desconocido"}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Si el deploy es reciente, esperá un minuto y refrescá. Si persiste, revisá que la
+              migración
+              <code className="mx-1 bg-muted px-1 rounded">e5a7b9d2c4f1_spec_def_flags</code>
+              haya corrido en producción.
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            Si el deploy es reciente, esperá un minuto y refrescá. Si persiste, revisá que la
-            migración
-            <code className="mx-1 bg-muted px-1 rounded">e5a7b9d2c4f1_spec_def_flags</code>
-            haya corrido en producción.
+        )}
+
+        {!q.isLoading && !q.isError && categorias.length === 0 && (
+          <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
+            No hay specs sembradas todavía.
           </div>
-        </div>
-      )}
+        )}
 
-      {!q.isLoading && !q.isError && categorias.length === 0 && (
-        <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
-          No hay specs sembradas todavía.
-        </div>
-      )}
-
-      {categorias.length > 0 && (
-        <Tabs value={currentTab} onValueChange={setActiveTab}>
-          <TabsList className="flex flex-wrap h-auto gap-1">
+        {categorias.length > 0 && (
+          <Tabs value={currentTab} onValueChange={setActiveTab}>
+            <TabsList className="flex flex-wrap h-auto gap-1">
+              {categorias.map((cat) => (
+                <TabsTrigger key={cat.id} value={String(cat.id)} className="gap-2">
+                  {cat.nombre}
+                  <Badge variant="secondary" className="text-2xs px-1.5 py-0">
+                    {cat.specs.length}
+                  </Badge>
+                </TabsTrigger>
+              ))}
+            </TabsList>
             {categorias.map((cat) => (
-              <TabsTrigger key={cat.id} value={String(cat.id)} className="gap-2">
-                {cat.nombre}
-                <Badge variant="secondary" className="text-2xs px-1.5 py-0">
-                  {cat.specs.length}
-                </Badge>
-              </TabsTrigger>
+              <TabsContent key={cat.id} value={String(cat.id)} className="mt-4">
+                <CategoriaPanel categoria={cat} onSelectSpec={(s) => setSelectedSpec(s)} />
+              </TabsContent>
             ))}
-          </TabsList>
-          {categorias.map((cat) => (
-            <TabsContent key={cat.id} value={String(cat.id)} className="mt-4">
-              <CategoriaPanel categoria={cat} onSelectSpec={(s) => setSelectedSpec(s)} />
-            </TabsContent>
-          ))}
-        </Tabs>
-      )}
+          </Tabs>
+        )}
 
-      {selectedSpec && (
-        <SpecDetailDrawer spec={selectedSpec} onClose={() => setSelectedSpec(null)} />
-      )}
-    </div>
+        {selectedSpec && (
+          <SpecDetailDrawer spec={selectedSpec} onClose={() => setSelectedSpec(null)} />
+        )}
+      </div>
+    </AdminPage>
   );
 }

@@ -23,6 +23,7 @@ import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Badge } from "@/design-system/ui/badge";
+import { Pill } from "@/design-system/kit/Pill";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -125,16 +126,9 @@ export function ItemsCard({
                   <div className="text-xs text-muted-foreground">
                     {it.marca ?? "—"}
                     {stock && (
-                      <span
-                        className={cn(
-                          "ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-2xs",
-                          disponible <= 0
-                            ? "bg-destructive/10 text-destructive"
-                            : "bg-muted text-muted-foreground",
-                        )}
-                      >
+                      <Pill tone={disponible <= 0 ? "danger" : "neutral"} className="ml-1.5">
                         {disponible <= 0 ? `${disponible} restante` : `${disponible} libres`}
-                      </span>
+                      </Pill>
                     )}
                   </div>
                 </div>
@@ -395,14 +389,9 @@ export function PagosSidebar({
   return (
     <div className="space-y-3">
       {/* Badge estado + importes */}
-      <div
-        className={cn(
-          "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-          estadoPago === "pagado" ? "bg-verde/10 text-verde-ink" : "bg-amber/15 text-ink",
-        )}
-      >
+      <Pill tone={estadoPago === "pagado" ? "success" : "warning"} className="px-3 py-1 text-xs">
         {estadoPago === "pagado" ? "Pagado" : "Pago pendiente"}
-      </div>
+      </Pill>
       <div className="text-sm space-y-1">
         <div className="flex justify-between text-muted-foreground">
           <span>Pagado</span>
@@ -605,9 +594,7 @@ export function HistorialModificaciones({ items }: { items: PedidoHistorialItem[
               {isDirecto && (
                 <span className="text-2xs uppercase tracking-wide text-muted-foreground">Auto</span>
               )}
-              {overrideAplicado && (
-                <span className="text-2xs text-amber">modificada al aprobar</span>
-              )}
+              {overrideAplicado && <span className="text-2xs text-ink">modificada al aprobar</span>}
               <span className="ml-auto text-2xs text-muted-foreground tabular-nums">
                 {fmtFecha(h.created_at)}
               </span>
@@ -623,7 +610,7 @@ export function HistorialModificaciones({ items }: { items: PedidoHistorialItem[
               </div>
             )}
             {overrideAplicado && a && (
-              <div className="text-xs text-amber mt-1 tabular-nums">
+              <div className="text-xs text-ink mt-1 tabular-nums">
                 Aplicado: {fmtFecha(a.fecha_desde ?? "")} → {fmtFecha(a.fecha_hasta ?? "")}
                 {a.items && ` · ${a.items.length} item${a.items.length !== 1 ? "s" : ""}`}
               </div>

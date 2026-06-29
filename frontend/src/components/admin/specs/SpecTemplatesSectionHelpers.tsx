@@ -12,6 +12,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
+import { Pill } from "@/design-system/kit/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import {
@@ -96,7 +97,7 @@ export function DestacadasCounter({ items }: { items: SpecTemplate[] }) {
   const over = total > max;
   return (
     <div
-      className={`flex items-center gap-2 text-xs ${over ? "text-amber" : "text-muted-foreground"}`}
+      className={`flex items-center gap-2 text-xs ${over ? "text-ink" : "text-muted-foreground"}`}
     >
       <span className="font-mono uppercase tracking-widest">
         Ficha técnica destacada: {total}/{max}
@@ -113,10 +114,7 @@ function Badge({
   children: React.ReactNode;
   tone?: "default" | "amber";
 }) {
-  const cls = tone === "amber" ? "bg-amber/15 text-ink" : "bg-muted text-muted-foreground";
-  return (
-    <span className={`inline-flex items-center rounded px-1.5 py-0.5 ${cls}`}>{children}</span>
-  );
+  return <Pill tone={tone === "amber" ? "warning" : "neutral"}>{children}</Pill>;
 }
 
 export function SortableSpecRow({
@@ -416,7 +414,7 @@ export function SpecTemplateFormModal({
                 />
                 <p className="text-2xs text-muted-foreground mt-1">
                   Las specs validadas aparecen arriba. Si no encontrás la que buscás,{" "}
-                  <a href="/admin/gear-compatibility" className="text-amber underline">
+                  <a href="/admin/gear-compatibility" className="text-ink underline">
                     creala en Gear Compatibility →
                   </a>
                 </p>
@@ -485,7 +483,7 @@ export function SpecTemplateFormModal({
               )}
               <a
                 href="/admin/gear-compatibility"
-                className="text-2xs text-amber underline inline-block"
+                className="text-2xs text-ink underline inline-block"
               >
                 Editar la definición global →
               </a>
@@ -569,6 +567,7 @@ function Toggle({
 }) {
   return (
     <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
+      {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
       <input
         type="checkbox"
         checked={checked}

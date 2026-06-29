@@ -40,6 +40,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/design-system/ui/dialog";
+import { useConfirm } from "@/components/admin/useConfirm";
 
 export function LiquidacionReporte() {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -47,6 +48,7 @@ export function LiquidacionReporte() {
   const [anchor, setAnchor] = useState(() => new Date());
   const [downloading, setDownloading] = useState(false);
   const [mailOpen, setMailOpen] = useState(false);
+  const confirm = useConfirm();
 
   const y = anchor.getFullYear();
   const m = anchor.getMonth();
@@ -99,15 +101,14 @@ export function LiquidacionReporte() {
     onError: (e: Error) => toast.error(e.message),
   });
   const cierreBusy = cerrarM.isPending || reabrirM.isPending;
-  const onReabrir = () => {
-    if (
-      window.confirm(
-        `¿Reabrir ${mesLabel}? El reporte vuelve a calcularse en vivo y la foto ` +
-          `congelada se descarta. Vas a poder cerrarlo de nuevo cuando termines de corregir.`,
-      )
-    ) {
-      reabrirM.mutate();
-    }
+  const onReabrir = async () => {
+    const ok = await confirm({
+      title: `¿Reabrir ${mesLabel}?`,
+      description:
+        "El reporte vuelve a calcularse en vivo y la foto congelada se descarta. Vas a poder cerrarlo de nuevo cuando termines de corregir.",
+      confirmLabel: "Reabrir",
+    });
+    if (ok) reabrirM.mutate();
   };
   const cerradoAtLabel = mes?.cerrado_at
     ? new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" }).format(
@@ -141,39 +142,43 @@ export function LiquidacionReporte() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => shiftMonth(-1)}
-            className="rounded-md border hairline p-1.5 text-ink hover:bg-ink/5 transition"
             aria-label="Mes anterior"
           >
             <ChevronLeft className="h-4 w-4" />
-          </button>
+          </Button>
           <span className="font-display text-lg text-ink capitalize min-w-[9rem] text-center">
             {mesLabel}
           </span>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => shiftMonth(1)}
-            className="rounded-md border hairline p-1.5 text-ink hover:bg-ink/5 transition"
             aria-label="Mes siguiente"
           >
             <ChevronRight className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
         <div className="flex items-center gap-2">
           {cerrado ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onReabrir}
               disabled={cierreBusy}
-              className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+              className="gap-1.5"
             >
               <LockOpen className="h-4 w-4" /> {reabrirM.isPending ? "Reabriendo…" : "Reabrir mes"}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => cerrarM.mutate()}
               disabled={cierreBusy || !mes || mes.resumen.pedidos === 0}
               title={
@@ -181,26 +186,28 @@ export function LiquidacionReporte() {
                   ? "No hay pedidos saldados este mes para cerrar"
                   : "Congelar la foto de este mes"
               }
-              className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+              className="gap-1.5"
             >
               <Lock className="h-4 w-4" /> {cerrarM.isPending ? "Cerrando…" : "Cerrar mes"}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => setMailOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+            className="gap-1.5"
           >
             <Mail className="h-4 w-4" /> Enviar por mail
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             onClick={descargarCsv}
             disabled={downloading}
-            className="inline-flex items-center gap-1.5 rounded-md border hairline px-3 py-1.5 text-sm text-ink hover:bg-ink/5 disabled:opacity-50 transition"
+            className="gap-1.5"
           >
             <Download className="h-4 w-4" /> {downloading ? "Generando…" : "Exportar CSV"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -242,7 +249,7 @@ export function LiquidacionReporte() {
       {recon && !recon.ok && (
         <div className="rounded-md border hairline border-amber/40 bg-amber/5 px-3 py-2 text-sm text-ink space-y-1">
           <div className="flex items-center gap-2 font-medium">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber" />
+            <AlertTriangle className="h-4 w-4 shrink-0 text-ink" />
             Revisá estos datos — pueden afectar los números del reporte:
           </div>
           <ul className="list-disc pl-6 text-xs text-muted-foreground space-y-0.5">
@@ -365,6 +372,7 @@ function MesAMesTabla({
   };
   return (
     <div className="overflow-x-auto">
+      {/* eslint-disable-next-line no-restricted-syntax -- tabla mes-a-mes con columnas dinámicas por beneficiario; AdminTable es de columnas fijas */}
       <table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-muted-foreground">
@@ -451,21 +459,34 @@ export function BarChart({
   if (!data.length) return <div className="text-sm text-muted-foreground">Sin datos</div>;
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
-    <div className="flex items-end gap-1 h-32">
-      {data.map((d) => (
-        <div key={d.label} className="flex-1 flex flex-col items-center gap-1 group">
-          <div className="text-3xs font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums">
-            {valueFormat(d.value)}
+    <div className="space-y-1">
+      {/* Área del gráfico — altura fija para que % de las barras resuelva */}
+      <div className="relative flex items-end gap-1 h-28">
+        {data.map((d) => (
+          <div key={d.label} className="relative flex-1 h-full group">
+            <div
+              className="absolute bottom-0 left-0 right-0 bg-ink/80 hover:bg-ink rounded-sm transition-colors"
+              style={{ height: `${Math.max((d.value / max) * 100, d.value > 0 ? 2 : 0)}%` }}
+            >
+              {/* Tooltip de valor al hover */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 whitespace-nowrap text-3xs font-mono text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity tabular-nums pointer-events-none">
+                {valueFormat(d.value)}
+              </div>
+            </div>
           </div>
+        ))}
+      </div>
+      {/* Etiquetas debajo, en fila separada */}
+      <div className="flex gap-1">
+        {data.map((d) => (
           <div
-            className="w-full bg-ink/80 hover:bg-ink rounded-sm transition-colors min-h-[2px]"
-            style={{ height: `${(d.value / max) * 100}%` }}
-          />
-          <div className="text-3xs font-mono text-muted-foreground truncate w-full text-center">
+            key={d.label}
+            className="flex-1 text-3xs font-mono text-muted-foreground truncate text-center"
+          >
             {labelFn(d.label)}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

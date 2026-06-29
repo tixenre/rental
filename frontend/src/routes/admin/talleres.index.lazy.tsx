@@ -22,6 +22,8 @@ import { authedFetch, authedJson } from "@/lib/authedFetch";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
+import { Pill, type PillTone } from "@/design-system/kit/Pill";
 import { Spinner } from "@/design-system/ui/spinner";
 import { Switch } from "@/design-system/ui/switch";
 import {
@@ -40,6 +42,11 @@ import {
   DialogClose,
 } from "@/design-system/ui/dialog";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
+import { useConfirm } from "@/components/admin/useConfirm";
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
+import { ListSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { EmptyState } from "@/components/rental/EmptyState";
 
 export const Route = createLazyFileRoute("/admin/talleres/")({
   component: TalleresAdminPage,
@@ -126,32 +133,22 @@ function updateConceptoInCache(qc: QueryClient, updated: TallerConcepto) {
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-function badgeEstadoEdicion(edicion: EdicionAdmin): { label: string; className: string } {
+function badgeEstadoEdicion(edicion: EdicionAdmin): { label: string; tone: PillTone } {
   const today = new Date().toISOString().slice(0, 10);
-  if (!edicion.activo) return { label: "INACTIVA", className: "bg-muted/40 text-muted-foreground" };
-  if (edicion.frozen_at)
-    return { label: "CONGELADA", className: "bg-muted/60 text-muted-foreground" };
-  if (edicion.fecha_inicio > today)
-    return { label: "PRÓXIMAMENTE", className: "bg-amber/20 text-amber" };
-  if (edicion.fecha_fin >= today)
-    return { label: "EN CURSO", className: "bg-verde/20 text-verde-ink" };
-  return { label: "FINALIZADA", className: "bg-muted/40 text-muted-foreground" };
+  if (!edicion.activo) return { label: "INACTIVA", tone: "neutral" };
+  if (edicion.frozen_at) return { label: "CONGELADA", tone: "neutral" };
+  if (edicion.fecha_inicio > today) return { label: "PRÓXIMAMENTE", tone: "warning" };
+  if (edicion.fecha_fin >= today) return { label: "EN CURSO", tone: "success" };
+  return { label: "FINALIZADA", tone: "neutral" };
 }
 
 function CuposPill({ confirmados, total }: { confirmados: number; total: number }) {
   const ratio = total > 0 ? confirmados / total : 0;
-  const cls =
-    ratio >= 1
-      ? "bg-destructive/10 text-destructive border-destructive/20"
-      : ratio >= 0.8
-        ? "bg-amber/15 text-amber border-amber/20"
-        : "bg-verde/10 text-verde-ink border-verde/20";
+  const tone: PillTone = ratio >= 1 ? "danger" : ratio >= 0.8 ? "warning" : "success";
   return (
-    <span
-      className={`shrink-0 rounded-full border px-2 py-0.5 text-2xs font-semibold font-mono tabular-nums ${cls}`}
-    >
+    <Pill tone={tone} className="font-mono font-semibold tabular-nums">
       {confirmados}/{total}
-    </span>
+    </Pill>
   );
 }
 
@@ -554,7 +551,7 @@ function PreciosSection({ edicion }: { edicion: EdicionAdmin }) {
   return (
     <div className="flex flex-col gap-4">
       {edicion.cupos_confirmados >= edicion.cupos_total && (
-        <div className="rounded-lg bg-amber/10 border border-amber/30 px-4 py-3 text-sm text-amber">
+        <div className="rounded-lg bg-amber/10 border border-amber/30 px-4 py-3 text-sm text-ink">
           ⚠ Edición completa — {edicion.cupos_confirmados}/{edicion.cupos_total} cupos ocupados
         </div>
       )}
@@ -713,6 +710,7 @@ function FotoSection({ concepto }: { concepto: TallerConcepto }) {
           JPG, PNG o WebP · máx. 8 MB. Se muestra en la sección "Sobre" de la landing del workshop.
         </p>
         <div>
+          {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
           <input
             ref={fileRef}
             type="file"
@@ -823,11 +821,11 @@ function ContenidoSection({ concepto }: { concepto: TallerConcepto }) {
           onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
         />
       ) : (
-        <textarea
+        <Textarea
           rows={opts?.rows}
           value={form[key] as string}
           onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+          className="resize-y"
         />
       )}
     </div>
@@ -880,6 +878,7 @@ function InscripcionesSection({
   loading: boolean;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [notifMsg, setNotifMsg] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -947,102 +946,111 @@ function InscripcionesSection({
     }
   }
 
-  function handleEliminar(ins: Inscripcion) {
+  async function handleEliminar(ins: Inscripcion) {
     const label = ins.en_lista_espera ? "de lista de espera" : "confirmada";
-    if (!window.confirm(`Eliminar inscripción ${label} de ${ins.nombre}?`)) return;
+    if (
+      !(await confirm({
+        title: "¿Eliminar inscripción?",
+        description: `Se eliminará la inscripción ${label} de ${ins.nombre}.`,
+        danger: true,
+        confirmLabel: "Eliminar",
+      }))
+    )
+      return;
     eliminarMut.mutate(ins.id);
   }
 
-  if (loading) return <p className="text-sm text-muted-foreground">Cargando inscripciones…</p>;
+  if (loading) return <ListSkeleton rows={4} />;
 
   if (inscripciones.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-border/60 py-12 text-center text-sm text-muted-foreground">
-        No hay inscripciones todavía.
-      </div>
-    );
+    return <EmptyState icon={<Users className="h-6 w-6" />} title="No hay inscripciones todavía" />;
   }
 
-  const insTable = (rows: Inscripcion[], showConfirmar: boolean) => (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="text-left text-xs text-muted-foreground border-b border-border/60">
-            <th className="pb-2 pr-4 font-medium">Nombre</th>
-            <th className="pb-2 pr-4 font-medium">Email</th>
-            <th className="pb-2 pr-4 font-medium hidden sm:table-cell">Teléfono</th>
-            <th className="pb-2 pr-4 font-medium hidden lg:table-cell">Experiencia</th>
-            <th className="pb-2 pr-4 font-medium">Comp.</th>
-            <th className="pb-2 pr-4 font-medium">Fecha</th>
-            <th className="pb-2 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((ins) => (
-            <tr key={ins.id} className="border-b border-border/40 hover:bg-muted/20 transition">
-              <td className="py-2.5 pr-4 font-medium text-ink">{ins.nombre}</td>
-              <td className="py-2.5 pr-4 text-muted-foreground">
-                <a href={`mailto:${ins.email}`} className="hover:text-ink transition">
-                  {ins.email}
-                </a>
-              </td>
-              <td className="py-2.5 pr-4 text-muted-foreground hidden sm:table-cell">
-                {ins.telefono}
-              </td>
-              <td className="py-2.5 pr-4 text-muted-foreground hidden lg:table-cell max-w-[180px] truncate">
-                {ins.experiencia || "—"}
-              </td>
-              <td className="py-2.5 pr-4">
-                {ins.comprobante_url ? (
-                  <a
-                    href={ins.comprobante_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-ink hover:text-amber transition"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5 text-verde" strokeWidth={1.5} />
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                ) : (
-                  <span className="text-muted-foreground/50 text-xs">—</span>
-                )}
-              </td>
-              <td className="py-2.5 pr-4 text-muted-foreground text-xs">
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {fmtDate(ins.created_at)}
-                </span>
-              </td>
-              <td className="py-2.5">
-                <div className="flex items-center gap-1">
-                  {showConfirmar && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      disabled={confirmarMut.isPending}
-                      onClick={() => confirmarMut.mutate(ins.id)}
-                    >
-                      Confirmar
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                    disabled={eliminarMut.isPending}
-                    onClick={() => handleEliminar(ins)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const insTable = (rows: Inscripcion[], showConfirmar: boolean) => {
+    const columns: Column<Inscripcion>[] = [
+      {
+        header: "Nombre",
+        cell: (ins) => ins.nombre,
+        className: "font-medium text-ink",
+      },
+      {
+        header: "Email",
+        cell: (ins) => (
+          <a href={`mailto:${ins.email}`} className="hover:text-ink transition">
+            {ins.email}
+          </a>
+        ),
+        className: "text-muted-foreground",
+      },
+      {
+        header: "Teléfono",
+        cell: (ins) => ins.telefono,
+        className: "text-muted-foreground hidden sm:table-cell",
+        headClassName: "hidden sm:table-cell",
+      },
+      {
+        header: "Experiencia",
+        cell: (ins) => ins.experiencia || "—",
+        className: "text-muted-foreground hidden lg:table-cell max-w-[180px] truncate",
+        headClassName: "hidden lg:table-cell",
+      },
+      {
+        header: "Comp.",
+        cell: (ins) =>
+          ins.comprobante_url ? (
+            <a
+              href={ins.comprobante_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-ink hover:text-ink transition"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 text-verde-ink" strokeWidth={1.5} />
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          ) : (
+            <span className="text-muted-foreground/50 text-xs">—</span>
+          ),
+      },
+      {
+        header: "Fecha",
+        cell: (ins) => (
+          <span className="inline-flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {fmtDate(ins.created_at)}
+          </span>
+        ),
+        className: "text-muted-foreground text-xs",
+      },
+      {
+        header: "",
+        cell: (ins) => (
+          <div className="flex items-center gap-1">
+            {showConfirmar && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={confirmarMut.isPending}
+                onClick={() => confirmarMut.mutate(ins.id)}
+              >
+                Confirmar
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+              disabled={eliminarMut.isPending}
+              onClick={() => handleEliminar(ins)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ),
+      },
+    ];
+    return <AdminTable columns={columns} rows={rows} getRowKey={(ins) => ins.id} />;
+  };
 
   return (
     <>
@@ -1101,12 +1109,12 @@ function InscripcionesSection({
               <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
                 Mensaje (opcional)
               </label>
-              <textarea
+              <Textarea
                 rows={4}
                 value={notifMsg}
                 onChange={(e) => setNotifMsg(e.target.value)}
                 placeholder="Ej: Cambiamos el horario a las 10 hs."
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                className="resize-none"
               />
             </div>
           </div>
@@ -1141,6 +1149,7 @@ function EdicionSubRow({
   onDelete: (edicionId: number) => void;
 }) {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const badge = badgeEstadoEdicion(edicion);
   const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<"clases" | "precios" | "inscripciones">("clases");
@@ -1176,23 +1185,32 @@ function EdicionSubRow({
     onError: (e) => toast.error((e as Error).message),
   });
 
-  function handleToggleActivo(v: boolean) {
+  async function handleToggleActivo(v: boolean) {
     if (!v && edicion.cupos_confirmados > 0) {
-      const ok = window.confirm(
-        `¿Desactivar la edición #${edicion.numero_edicion}?\n\n` +
-          `Hay ${edicion.cupos_confirmados} inscriptos confirmados. ¿Confirmar?`,
-      );
+      const ok = await confirm({
+        title: `¿Desactivar la edición #${edicion.numero_edicion}?`,
+        description: `Hay ${edicion.cupos_confirmados} inscriptos confirmados.`,
+        danger: true,
+        confirmLabel: "Desactivar",
+      });
       if (!ok) return;
     }
     toggleActivoMut.mutate(v);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (edicion.cupos_confirmados > 0) {
       toast.error(`No se puede eliminar: hay ${edicion.cupos_confirmados} inscriptos confirmados`);
       return;
     }
-    if (!window.confirm(`¿Eliminar la edición #${edicion.numero_edicion} de "${concepto.nombre}"?`))
+    if (
+      !(await confirm({
+        title: `¿Eliminar la edición #${edicion.numero_edicion}?`,
+        description: `Se eliminará la edición de "${concepto.nombre}".`,
+        danger: true,
+        confirmLabel: "Eliminar",
+      }))
+    )
       return;
     deleteMut.mutate();
   }
@@ -1211,11 +1229,9 @@ function EdicionSubRow({
         <span className="shrink-0 text-xs font-mono font-semibold text-muted-foreground">
           #{edicion.numero_edicion}
         </span>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold font-mono uppercase tracking-wider ${badge.className}`}
-        >
+        <Pill tone={badge.tone} className="font-mono uppercase tracking-wider">
           {badge.label}
-        </span>
+        </Pill>
 
         {/* Date range */}
         {edicion.fecha_inicio && (
@@ -1810,7 +1826,13 @@ function TalleresAdminPage() {
   const [nuevoOpen, setNuevoOpen] = useState(false);
   const [nuevaEdicionConcepto, setNuevaEdicionConcepto] = useState<TallerConcepto | null>(null);
 
-  const { data: conceptos = [], isLoading } = useQuery({
+  const {
+    data: conceptos = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["admin", "talleres"],
     queryFn: () => authedJson<TallerConcepto[]>("/api/admin/talleres"),
     staleTime: 1000 * 60,
@@ -1863,23 +1885,10 @@ function TalleresAdminPage() {
       </div>
 
       {/* Loading skeleton */}
-      {isLoading && (
-        <div className="flex flex-col gap-2">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-border/60 px-4 py-3.5 flex items-center gap-3 animate-pulse"
-            >
-              <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                <div className="h-4 w-40 rounded bg-muted/60" />
-                <div className="h-3 w-28 rounded bg-muted/40" />
-              </div>
-              <div className="h-5 w-20 rounded-full bg-muted/40 shrink-0 hidden md:block" />
-              <div className="h-4 w-4 rounded bg-muted/30 shrink-0" />
-            </div>
-          ))}
-        </div>
-      )}
+      {isLoading && <ListSkeleton rows={3} />}
+
+      {/* Error */}
+      {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {/* Lista */}
       {conceptos.length > 0 && (
@@ -1896,20 +1905,17 @@ function TalleresAdminPage() {
         </div>
       )}
 
-      {conceptos.length === 0 && !isLoading && (
-        <div className="rounded-xl border border-dashed border-border/60 py-16 text-center flex flex-col items-center gap-4">
-          <Users className="h-8 w-8 text-muted-foreground/40" />
-          <div>
-            <p className="text-sm font-medium text-ink">No hay talleres todavía</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Creá el primero para que aparezca en la web.
-            </p>
-          </div>
+      {conceptos.length === 0 && !isLoading && !isError && (
+        <EmptyState
+          icon={<Users className="h-6 w-6" />}
+          title="No hay talleres todavía"
+          sub="Creá el primero para que aparezca en la web."
+        >
           <Button size="sm" onClick={() => setNuevoOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
             Crear el primero
           </Button>
-        </div>
+        </EmptyState>
       )}
 
       <NuevoConceptoDialog

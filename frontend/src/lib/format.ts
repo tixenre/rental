@@ -52,14 +52,31 @@ export function countJornadas(start?: Date, end?: Date): number {
 }
 
 /**
- * Pluraliza "jornada/jornadas" para chrome de UI. Fuente única del label —
- * reemplaza los "N jornada/s" inline repetidos por la app.
+ * Unidades de precio del negocio — fuente única del término y sus formas.
+ * `jornada` = alquiler (rental); `hora` = estudio. Cada una con singular, plural
+ * y abreviatura (para el modo compacto/mobile: "/j", "/h").
+ */
+export const UNIDADES = {
+  jornada: { singular: "jornada", plural: "jornadas", abbr: "j" },
+  hora: { singular: "hora", plural: "horas", abbr: "h" },
+} as const;
+
+export type Unidad = keyof typeof UNIDADES;
+
+/**
+ * Pluraliza una cantidad con su unidad. Fuente única del label de duración —
+ * reemplaza los "N jornada/s" / "N hora/s" inline repetidos por la app.
  *
  * @example
- *   jornadaLabel(1) // → "1 jornada"
- *   jornadaLabel(3) // → "3 jornadas"
+ *   unidadLabel(1) // → "1 jornada"
+ *   unidadLabel(3) // → "3 jornadas"
+ *   unidadLabel(2, "hora") // → "2 horas"
  */
-export const jornadaLabel = (n: number) => `${n} ${n === 1 ? "jornada" : "jornadas"}`;
+export const unidadLabel = (n: number, unidad: Unidad = "jornada") =>
+  `${n} ${n === 1 ? UNIDADES[unidad].singular : UNIDADES[unidad].plural}`;
+
+/** Atajo histórico: `unidadLabel(n, "jornada")`. */
+export const jornadaLabel = (n: number) => unidadLabel(n, "jornada");
 
 /**
  * Formatea una fecha ISO string como "31 may" — para tablas del admin y

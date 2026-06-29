@@ -108,7 +108,7 @@ def update_mantenimiento(id: int, log_id: int, data: MantenimientoUpdate, reques
             for k in ("fecha_hasta", "proxima_revision"):
                 if k in updates and not updates[k]:
                     updates[k] = None
-            set_clause = ", ".join(f"{k} = ?" for k in updates)
+            set_clause = ", ".join(f"{k} = %s" for k in updates)
             conn.execute(
                 f"UPDATE equipo_mantenimiento SET {set_clause} WHERE id = %s",
                 list(updates.values()) + [log_id],

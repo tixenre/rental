@@ -2,13 +2,16 @@
  * contabilidad.movimientos.lazy.tsx — Libro de movimientos (#809, Fase 2/3).
  *
  * Registra y lista los movimientos manuales de plata: gastos, transferencias
- * entre cajas, retiros y aportes de socios. Los cobros de clientes NO van acá
- * (entran solos desde Pagos). La plata nunca se borra: anular deja el registro
- * tachado con su motivo.
+ * entre cajas, retiros y aportes de socios. Los cobros de pedidos aparecen como
+ * una línea mensual read-only (derivan de los pagos de alquiler, no se cargan a
+ * mano) que se DESPLIEGA para ver los pagos individuales del mes inline — misma
+ * fuente única que /admin/pagos (el "ver ledger completo"). La plata nunca se
+ * borra: anular deja el registro tachado con su motivo.
  */
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -20,22 +23,21 @@ import {
   type MovimientoInput,
   type TipoMovimiento,
 } from "@/lib/admin/api";
+import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
+import { QueryState } from "@/components/admin/QueryState";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { EmptyState } from "@/components/rental/EmptyState";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { Input } from "@/design-system/ui/input";
+import { TipoMovimientoBadge, TIPO_MOVIMIENTO_META } from "@/components/admin/badges";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/contabilidad/movimientos")({
   component: MovimientosPage,
 });
-
-const TIPO_LABEL: Record<TipoMovimiento, string> = {
-  gasto: "Gasto",
-  transferencia: "Transferencia",
-  retiro: "Retiro",
-  aporte: "Aporte",
-  ajuste: "Ajuste",
-};
 
 function descMovimiento(m: Movimiento): string {
   const o = m.cuenta_origen_nombre ?? "—";
@@ -94,6 +96,8 @@ function MovimientosPage() {
   const qc = useQueryClient();
   const [tipoFiltro, setTipoFiltro] = useState<string>("");
   const [beneficiarioFiltro, setBeneficiarioFiltro] = useState<string>("");
+  // Mes del cobro expandido (muestra los pagos individuales inline). Uno a la vez.
+  const [expandedMes, setExpandedMes] = useState<string | null>(null);
 
   const invalidar = () => qc.invalidateQueries({ queryKey: ["admin", "contabilidad"] });
 
@@ -121,125 +125,249 @@ function MovimientosPage() {
     filas.sort((a, b) => b.fecha.localeCompare(a.fecha));
   }
 
-  return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Back-office · Finanzas
-          </div>
-          <h1 className="font-display text-3xl text-ink">Movimientos</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Toda la plata de las cajas: los cobros de pedidos (que entran solos, una línea por mes)
-            más los gastos, transferencias, retiros y aportes.
-          </p>
-        </div>
-        <Link
-          to="/admin/contabilidad"
-          className="shrink-0 h-9 rounded-md border hairline px-3 text-sm flex items-center hover:bg-muted/40"
-        >
-          ← Tablero
-        </Link>
-      </header>
-
-      <NuevoMovimientoForm onCreated={invalidar} />
-
-      {/* Filtro por tipo */}
-      <div className="flex flex-wrap gap-1">
-        {[
-          ["", "Todos"],
-          ["cobro", "Cobros"],
-          ...TIPOS_MOVIMIENTO.map((t) => [t, TIPO_LABEL[t]] as [string, string]),
-        ].map(([val, lbl]) => (
-          <button
-            key={val}
-            type="button"
-            onClick={() => setTipoFiltro(val)}
-            className={cn(
-              "rounded-md border px-2.5 py-1.5 text-xs font-medium transition",
-              tipoFiltro === val
-                ? "border-ink bg-ink text-background"
-                : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
+  const columns: Column<Fila>[] = [
+    {
+      header: "Fecha",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          formatFechaDisplay(f.mov.fecha)
+        ) : (
+          <span className="capitalize">{mesLabel(f.cobro.mes)}</span>
+        ),
+      className: "whitespace-nowrap text-muted-foreground",
+    },
+    {
+      header: "Tipo",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          <TipoMovimientoBadge tipo={f.mov.tipo} />
+        ) : (
+          <Badge variant="secondary">Cobros</Badge>
+        ),
+    },
+    {
+      header: "Detalle",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          <>
+            <span className={cn(f.mov.anulado && "line-through")}>{descMovimiento(f.mov)}</span>
+            {f.mov.beneficiario && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setBeneficiarioFiltro(f.mov.beneficiario!)}
+                  className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+                  title="Ver el historial de este beneficiario"
+                >
+                  {f.mov.beneficiario}
+                </button>
+              </div>
             )}
-          >
-            {lbl}
-          </button>
+            {f.mov.nota && <div className="text-xs text-muted-foreground">{f.mov.nota}</div>}
+            {f.mov.anulado && f.mov.anulado_motivo && (
+              <div className="text-xs text-destructive">Anulado: {f.mov.anulado_motivo}</div>
+            )}
+            {f.mov.comprobante_url && (
+              <a
+                href={f.mov.comprobante_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+              >
+                Ver comprobante
+              </a>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="capitalize text-ink">Cobro alquileres · {mesLabel(f.cobro.mes)}</span>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <ChevronDown
+                className={cn(
+                  "h-3.5 w-3.5 transition-transform",
+                  expandedMes === f.cobro.mes && "rotate-180",
+                )}
+              />
+              {f.cobro.cantidad} pago(s) — {expandedMes === f.cobro.mes ? "ocultar" : "ver detalle"}
+            </div>
+          </>
+        ),
+    },
+    {
+      header: "Monto",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          <span className={montoClass(direccionMov(f.mov))}>
+            {montoSigno(direccionMov(f.mov))}
+            {formatMoney(f.mov.monto, f.mov.moneda)}
+          </span>
+        ) : (
+          <span className="text-verde-ink">+ {formatMoney(f.cobro.monto, "ARS")}</span>
+        ),
+      align: "right",
+      className: "font-mono tabular-nums",
+    },
+    {
+      header: "Acciones",
+      cell: (f) =>
+        f.kind === "mov" ? (
+          <AnularMovimiento mov={f.mov} onChanged={invalidar} />
+        ) : (
+          <span className="text-xs text-muted-foreground">automático</span>
+        ),
+      align: "right",
+    },
+  ];
+
+  return (
+    <AdminPage
+      title="Movimientos"
+      maxW="max-w-5xl"
+      description="Toda la plata de las cajas: los cobros de pedidos (que entran solos, una línea por mes) más los gastos, transferencias, retiros y aportes."
+      backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
+    >
+      <div className="space-y-6">
+        <NuevoMovimientoForm onCreated={invalidar} />
+
+        {/* Filtro por tipo */}
+        <div className="flex flex-wrap gap-1">
+          {[
+            ["", "Todos"],
+            ["cobro", "Cobros"],
+            ...TIPOS_MOVIMIENTO.map((t) => [t, TIPO_MOVIMIENTO_META[t].label] as [string, string]),
+          ].map(([val, lbl]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setTipoFiltro(val)}
+              className={cn(
+                "rounded-md border px-2.5 py-1.5 text-xs font-medium transition",
+                tipoFiltro === val
+                  ? "border-ink bg-ink text-background"
+                  : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
+              )}
+            >
+              {lbl}
+            </button>
+          ))}
+        </div>
+
+        {beneficiarioFiltro && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Beneficiario:</span>
+            <span className="rounded-md bg-ink px-2 py-0.5 text-xs text-background">
+              {beneficiarioFiltro}
+            </span>
+            <button
+              type="button"
+              onClick={() => setBeneficiarioFiltro("")}
+              className="text-xs text-muted-foreground hover:text-ink underline"
+            >
+              quitar
+            </button>
+          </div>
+        )}
+
+        <QueryState
+          query={movsQ}
+          isEmpty={(d) => d.movimientos.length === 0 && (d.cobros ?? []).length === 0}
+          skeleton={<TableSkeleton rows={6} cols={5} />}
+          empty={
+            <EmptyState
+              icon={<Wallet className="h-6 w-6" />}
+              title="No hay movimientos"
+              sub="Todavía no hay movimientos para este filtro."
+            />
+          }
+        >
+          {() => (
+            <AdminTable
+              columns={columns}
+              rows={filas}
+              getRowKey={(f) => (f.kind === "mov" ? `m${f.mov.id}` : `c${f.cobro.mes}`)}
+              rowClassName={(f) =>
+                f.kind === "mov"
+                  ? cn("cursor-default", f.mov.anulado && "opacity-50")
+                  : "bg-muted/10"
+              }
+              onRowClick={(f) => {
+                if (f.kind === "cobro")
+                  setExpandedMes((m) => (m === f.cobro.mes ? null : f.cobro.mes));
+              }}
+              isExpanded={(f) => f.kind === "cobro" && expandedMes === f.cobro.mes}
+              renderExpanded={(f) =>
+                f.kind === "cobro" ? <CobroDetalle mes={f.cobro.mes} /> : null
+              }
+            />
+          )}
+        </QueryState>
+      </div>
+    </AdminPage>
+  );
+}
+
+/** Detalle desplegable de un cobro mensual: los pagos individuales de ese mes,
+ *  traídos del ledger único de pagos (read-only, misma fuente que Cobros). */
+function CobroDetalle({ mes }: { mes: string }) {
+  const desde = `${mes}-01`;
+  const hasta = finDeMes(mes);
+  const q = useQuery({
+    queryKey: ["admin", "pagos", "mes", mes],
+    queryFn: () => adminApi.listPagosLog({ desde, hasta }),
+  });
+
+  if (q.isLoading) {
+    return <div className="px-4 py-3 text-xs text-muted-foreground">Cargando pagos…</div>;
+  }
+  if (q.isError) {
+    return (
+      <div className="px-4 py-3 text-xs text-destructive">No se pudieron cargar los pagos.</div>
+    );
+  }
+  const pagos = q.data?.pagos ?? [];
+  if (pagos.length === 0) {
+    return <div className="px-4 py-3 text-xs text-muted-foreground">Sin pagos en el mes.</div>;
+  }
+
+  return (
+    <div className="space-y-1.5 px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="t-eyebrow">Pagos del mes</div>
+        <Link
+          to="/admin/pagos"
+          className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+        >
+          ver ledger completo →
+        </Link>
+      </div>
+      <div className="divide-y hairline rounded-md border hairline bg-surface-elevated">
+        {pagos.map((p) => (
+          <div key={p.id} className="flex items-center gap-3 px-3 py-1.5 text-xs">
+            <span className="whitespace-nowrap text-muted-foreground">
+              {formatFechaDisplay(p.fecha)}
+            </span>
+            <Link
+              to="/admin/pedidos/$id"
+              params={{ id: String(p.pedido_id) }}
+              className="whitespace-nowrap font-mono text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
+            >
+              #{p.numero_pedido ?? p.pedido_id}
+            </Link>
+            <span className="flex-1 truncate text-muted-foreground">{p.cliente_nombre ?? "—"}</span>
+            <span className="whitespace-nowrap capitalize text-muted-foreground">
+              {p.metodo ?? "—"}
+            </span>
+            <span className="whitespace-nowrap font-mono tabular-nums text-ink">
+              {formatMoney(p.monto, "ARS")}
+            </span>
+          </div>
         ))}
       </div>
-
-      {movsQ.isLoading && (
-        <div className="text-sm text-muted-foreground">Cargando movimientos…</div>
-      )}
-      {movsQ.isError && (
-        <div className="text-sm text-destructive">
-          Error cargando los movimientos. {(movsQ.error as Error)?.message}
-        </div>
-      )}
-
-      {beneficiarioFiltro && (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Beneficiario:</span>
-          <span className="rounded-md bg-ink px-2 py-0.5 text-xs text-background">
-            {beneficiarioFiltro}
-          </span>
-          <button
-            type="button"
-            onClick={() => setBeneficiarioFiltro("")}
-            className="text-xs text-muted-foreground hover:text-ink underline"
-          >
-            quitar
-          </button>
-        </div>
-      )}
-
-      {movsQ.data && filas.length === 0 && (
-        <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
-          Todavía no hay movimientos para este filtro.
-        </div>
-      )}
-
-      {filas.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border hairline">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Fecha</th>
-                <th className="px-3 py-2 font-medium">Tipo</th>
-                <th className="px-3 py-2 font-medium">Detalle</th>
-                <th className="px-3 py-2 font-medium text-right">Monto</th>
-                <th className="px-3 py-2 font-medium text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map((f) =>
-                f.kind === "mov" ? (
-                  <MovimientoRow
-                    key={`m${f.mov.id}`}
-                    mov={f.mov}
-                    onChanged={invalidar}
-                    onBeneficiario={setBeneficiarioFiltro}
-                  />
-                ) : (
-                  <CobroRow key={`c${f.cobro.mes}`} cobro={f.cobro} />
-                ),
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
 
-function MovimientoRow({
-  mov,
-  onChanged,
-  onBeneficiario,
-}: {
-  mov: Movimiento;
-  onChanged: () => void;
-  onBeneficiario: (b: string) => void;
-}) {
+function AnularMovimiento({ mov, onChanged }: { mov: Movimiento; onChanged: () => void }) {
   const anular = useMutation({
     mutationFn: (motivo: string) => adminApi.anularMovimiento(mov.id, motivo),
     onSuccess: () => {
@@ -249,94 +377,20 @@ function MovimientoRow({
     onError: (e) => toast.error("No se pudo anular", { description: (e as Error).message }),
   });
 
-  const dir = direccionMov(mov);
+  if (mov.anulado) return null;
 
   return (
-    <tr className={cn("border-b hairline last:border-0", mov.anulado && "opacity-50")}>
-      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-        {formatFechaDisplay(mov.fecha)}
-      </td>
-      <td className="px-3 py-2">
-        <Badge variant="secondary">{TIPO_LABEL[mov.tipo]}</Badge>
-      </td>
-      <td className="px-3 py-2">
-        <span className={cn(mov.anulado && "line-through")}>{descMovimiento(mov)}</span>
-        {mov.beneficiario && (
-          <div>
-            <button
-              type="button"
-              onClick={() => onBeneficiario(mov.beneficiario!)}
-              className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
-              title="Ver el historial de este beneficiario"
-            >
-              {mov.beneficiario}
-            </button>
-          </div>
-        )}
-        {mov.nota && <div className="text-xs text-muted-foreground">{mov.nota}</div>}
-        {mov.anulado && mov.anulado_motivo && (
-          <div className="text-xs text-destructive">Anulado: {mov.anulado_motivo}</div>
-        )}
-        {mov.comprobante_url && (
-          <a
-            href={mov.comprobante_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
-          >
-            Ver comprobante
-          </a>
-        )}
-      </td>
-      <td className={cn("px-3 py-2 text-right font-mono tabular-nums", montoClass(dir))}>
-        {montoSigno(dir)}
-        {formatMoney(mov.monto, mov.moneda)}
-      </td>
-      <td className="px-3 py-2 text-right">
-        {!mov.anulado && (
-          <button
-            type="button"
-            onClick={() => {
-              const motivo = window.prompt("Motivo de la anulación:");
-              if (motivo && motivo.trim()) anular.mutate(motivo.trim());
-            }}
-            disabled={anular.isPending}
-            className="text-xs text-muted-foreground hover:text-destructive underline"
-          >
-            Anular
-          </button>
-        )}
-      </td>
-    </tr>
-  );
-}
-
-function CobroRow({ cobro }: { cobro: CobroMensual }) {
-  return (
-    <tr className="border-b hairline last:border-0 bg-muted/10">
-      <td className="px-3 py-2 whitespace-nowrap capitalize text-muted-foreground">
-        {mesLabel(cobro.mes)}
-      </td>
-      <td className="px-3 py-2">
-        <Badge variant="secondary">Cobros</Badge>
-      </td>
-      <td className="px-3 py-2">
-        <span className="capitalize text-ink">Cobro alquileres · {mesLabel(cobro.mes)}</span>
-        <div className="text-xs text-muted-foreground">
-          {cobro.cantidad} pago(s) ·{" "}
-          <Link
-            to="/admin/pagos"
-            className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber"
-          >
-            ver detalle
-          </Link>
-        </div>
-      </td>
-      <td className="px-3 py-2 text-right font-mono tabular-nums text-verde-ink">
-        + {formatMoney(cobro.monto, "ARS")}
-      </td>
-      <td className="px-3 py-2 text-right text-xs text-muted-foreground">automático</td>
-    </tr>
+    <button
+      type="button"
+      onClick={() => {
+        const motivo = window.prompt("Motivo de la anulación:");
+        if (motivo && motivo.trim()) anular.mutate(motivo.trim());
+      }}
+      disabled={anular.isPending}
+      className="text-xs text-muted-foreground hover:text-destructive underline"
+    >
+      Anular
+    </button>
   );
 }
 
@@ -433,9 +487,7 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
       }}
       className="rounded-lg border hairline p-4 space-y-3"
     >
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        Nuevo movimiento
-      </div>
+      <div className="t-eyebrow">Nuevo movimiento</div>
 
       {/* Tipo */}
       <div className="flex flex-wrap gap-1">
@@ -451,18 +503,18 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
                 : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
             )}
           >
-            {TIPO_LABEL[t]}
+            {TIPO_MOVIMIENTO_META[t].label}
           </button>
         ))}
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <Field label="Monto">
-          <input
+          <Input
             type="number"
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
-            className="h-9 w-32 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            className="w-32 text-right tabular-nums"
           />
         </Field>
 
@@ -504,23 +556,18 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </Field>
         <Field label="Fecha">
-          <input
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
-          />
+          <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </Field>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <Field label="Beneficiario (opcional)">
-          <input
+          <Input
             value={beneficiario}
             onChange={(e) => setBeneficiario(e.target.value)}
             list="benef-list"
             placeholder="Ej. Jimena (CM)"
-            className="h-9 w-56 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+            className="w-56"
           />
           <datalist id="benef-list">
             {beneficiarios.map((b) => (
@@ -529,14 +576,15 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
           </datalist>
         </Field>
         <Field label="Nota (opcional)">
-          <input
+          <Input
             value={nota}
             onChange={(e) => setNota(e.target.value)}
             placeholder="Ej. factura 0001-…"
-            className="h-9 w-64 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+            className="w-64"
           />
         </Field>
         <Field label="Comprobante (opcional)">
+          {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
           <input
             type="file"
             accept="application/pdf,image/*"
@@ -584,9 +632,7 @@ function CuentaSelect({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="space-y-1">
-      <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </span>
+      <span className="block t-eyebrow">{label}</span>
       {children}
     </label>
   );

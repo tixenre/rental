@@ -47,6 +47,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import { Skeleton } from "@/design-system/ui/skeleton";
 import {
   AlertDialog,
@@ -378,7 +379,7 @@ function PedidoEditorPage() {
           {/* Banner solicitud pendiente (deferido — solo aviso read-only) */}
           {p.tiene_solicitud_pendiente && (
             <div className="flex items-start gap-2 rounded-lg border border-amber/40 bg-amber/5 px-3 py-2.5 text-sm">
-              <Info className="h-4 w-4 text-amber shrink-0 mt-0.5" />
+              <Info className="h-4 w-4 text-ink shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <span className="font-medium text-ink">Hay una solicitud de cambio pendiente.</span>{" "}
                 <Link to="/admin/solicitudes" className="underline text-muted-foreground">
@@ -524,7 +525,7 @@ function PedidoEditorPage() {
                     <span className="font-mono text-base font-semibold leading-none">
                       {jornadas}
                     </span>
-                    <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground ml-1">
+                    <span className="t-eyebrow ml-1">
                       {jornadas === 1 ? "jornada" : "jornadas"}
                     </span>
                   </span>
@@ -595,11 +596,11 @@ function PedidoEditorPage() {
 
           {/* Notas */}
           <Section icon={FileText} title="Notas internas">
-            <textarea
+            <Textarea
               value={datos.notas}
               placeholder="Notas para el equipo de Rambla…"
               onChange={(e) => setDatos((d) => d && { ...d, notas: e.target.value })}
-              className="w-full min-h-[88px] rounded-md border hairline bg-surface-elevated px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+              className="min-h-[88px] resize-y"
             />
           </Section>
         </div>
@@ -626,7 +627,7 @@ function PedidoEditorPage() {
           {/* Identidad del cliente (solo cuando tiene ficha vinculada sin verificar) */}
           {clienteSinVerificar && (
             <RailSection label="Identidad del cliente">
-              <div className="flex items-center gap-1.5 text-amber text-sm mb-2">
+              <div className="flex items-center gap-1.5 text-ink text-sm mb-2">
                 <ShieldAlert className="h-4 w-4 shrink-0" />
                 <span>Sin verificar</span>
               </div>
@@ -634,10 +635,10 @@ function PedidoEditorPage() {
                 <div className="space-y-1.5">
                   <p className="text-xs text-muted-foreground">Mandá este link al cliente:</p>
                   <div className="flex items-center gap-2">
-                    <input
+                    <Input
                       readOnly
                       value={linkVerif}
-                      className="flex-1 rounded-md border hairline bg-surface px-2.5 py-1.5 font-mono text-xs text-ink outline-none truncate"
+                      className="flex-1 font-mono text-xs truncate"
                     />
                     <button
                       type="button"
@@ -649,7 +650,7 @@ function PedidoEditorPage() {
                       className="flex items-center gap-1 rounded-md border hairline bg-surface px-2.5 py-1.5 text-xs text-ink hover:bg-accent/30 transition-colors shrink-0 h-[30px]"
                     >
                       {copiadoLink ? (
-                        <Check className="h-3.5 w-3.5 text-verde" />
+                        <Check className="h-3.5 w-3.5 text-verde-ink" />
                       ) : (
                         <Copy className="h-3.5 w-3.5" />
                       )}
@@ -823,9 +824,7 @@ function PedidoEditorPage() {
       {/* Barra inferior sticky (mobile) */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 flex items-center gap-2 px-4 py-2.5 border-t hairline bg-surface-elevated safe-b">
         <div>
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Total
-          </div>
+          <div className="t-eyebrow">Total</div>
           <div className="font-mono text-base font-semibold tabular-nums">{fmtArs(total)}</div>
         </div>
         <SaveIndicator status={saveStatus} />
@@ -874,7 +873,7 @@ function PedidoEditorPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-amber shrink-0" />
+              <ShieldAlert className="h-4 w-4 text-ink shrink-0" />
               Cliente sin identidad verificada
             </AlertDialogTitle>
             <AlertDialogDescription>

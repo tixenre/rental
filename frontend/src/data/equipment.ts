@@ -87,7 +87,6 @@ export type Equipment = {
   formato?: string | null;
   resolucion?: string | null;
   alimentacion?: string | null;
-  incluye?: string[];
   conectividad?: string[];
   compatibleCon?: string[];
   /** B1 #635 — contenido incluido (dim. 3): lista estructurada de lo que trae la caja. */

@@ -16,7 +16,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -55,6 +55,9 @@ import {
 } from "@/design-system/ui/alert-dialog";
 
 import { adminApi, type CategoriaAdmin, type SpecTemplate } from "@/lib/admin/api";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { EmptyState } from "@/components/rental/EmptyState";
 import { NombreTemplateBuilder } from "./NombreTemplateBuilder";
 import {
   OrphansPanel,
@@ -280,13 +283,23 @@ export function SpecTemplatesSection({
       )}
 
       {catId != null && templatesQ.isLoading && (
-        <div className="text-sm text-muted-foreground">Cargando…</div>
+        <TableSkeleton rows={5} cols={4} className="py-2" />
       )}
 
-      {catId != null && !templatesQ.isLoading && items.length === 0 && (
-        <div className="rounded-md border hairline border-dashed p-6 text-center text-sm text-muted-foreground">
-          Esta categoría no tiene specs definidas. Agregá la primera con el botón "+".
-        </div>
+      {catId != null && templatesQ.isError && (
+        <ErrorState
+          error={templatesQ.error}
+          onRetry={() => templatesQ.refetch()}
+          className="py-6"
+        />
+      )}
+
+      {catId != null && !templatesQ.isLoading && !templatesQ.isError && items.length === 0 && (
+        <EmptyState
+          icon={<ListChecks className="h-6 w-6" />}
+          title="Sin specs definidas"
+          sub='Esta categoría no tiene specs todavía. Agregá la primera con el botón "+".'
+        />
       )}
 
       {items.length > 0 && <DestacadasCounter items={items} />}

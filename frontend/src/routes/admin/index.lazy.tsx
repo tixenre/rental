@@ -13,7 +13,10 @@ import {
 import { adminApi, type PedidoResumen } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { CalendarioWidget } from "@/components/admin/CalendarioWidget";
+import { CardGridSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
 export const Route = createLazyFileRoute("/admin/")({
@@ -22,7 +25,7 @@ export const Route = createLazyFileRoute("/admin/")({
 
 function AdminDashboard() {
   useDocumentTitle("Dashboard · Back Office");
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["admin", "dashboard"],
     queryFn: () => adminApi.dashboard(),
     staleTime: 60_000,
@@ -36,31 +39,13 @@ function AdminDashboard() {
   const conSaldo = saldoQ.data?.total ?? 0;
 
   return (
-    <div className="px-4 md:px-8 py-6 md:py-10 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
-        </div>
-        <h1 className="font-display text-3xl md:text-4xl text-ink">Dashboard</h1>
-      </div>
-
+    <AdminPage title="Dashboard" maxW="max-w-6xl">
       {isLoading && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="min-h-[5.5rem] rounded-xl border hairline bg-surface animate-pulse"
-            />
-          ))}
-        </div>
+        <CardGridSkeleton count={4} className="grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" />
       )}
 
       {isError && (
-        <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-6 text-sm text-destructive">
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] mb-2">Error</div>
-          <div>{(error as Error)?.message ?? "No se pudo cargar el dashboard"}</div>
-          <div className="mt-2 text-xs opacity-80">Verificá que el backend esté corriendo.</div>
-        </div>
+        <ErrorState error={error} title="No se pudo cargar el dashboard" onRetry={refetch} />
       )}
 
       {data && (
@@ -112,9 +97,7 @@ function AdminDashboard() {
           {/* Movimientos del día */}
           <div className="mt-10">
             <div className="mb-4">
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Movimiento de equipos
-              </div>
+              <div className="t-eyebrow">Movimiento de equipos</div>
               <h2 className="font-display text-xl text-ink mt-0.5">Hoy y mañana</h2>
             </div>
 
@@ -144,9 +127,7 @@ function AdminDashboard() {
           {/* Calendario full — antes vivía en /admin/calendario */}
           <div className="mt-10">
             <div className="mb-4">
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                Vista mensual
-              </div>
+              <div className="t-eyebrow">Vista mensual</div>
               <h2 className="font-display text-xl text-ink mt-0.5">Calendario</h2>
             </div>
 
@@ -154,7 +135,7 @@ function AdminDashboard() {
           </div>
         </>
       )}
-    </div>
+    </AdminPage>
   );
 }
 
@@ -201,9 +182,7 @@ function Stat({
       }`}
     >
       <div className="flex items-center justify-between">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          {label}
-        </div>
+        <div className="t-eyebrow">{label}</div>
         <div className="text-muted-foreground">{icon}</div>
       </div>
       <div
@@ -232,9 +211,7 @@ function PedidosCard({
       <div className="px-4 py-3 border-b hairline flex items-center gap-2">
         <span className="text-muted-foreground">{icon}</span>
         <h2 className="font-display text-base text-ink">{title}</h2>
-        <span className="ml-auto font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          {pedidos.length}
-        </span>
+        <span className="ml-auto t-eyebrow">{pedidos.length}</span>
       </div>
       {pedidos.length === 0 ? (
         <div className="px-4 py-6 text-sm text-muted-foreground">{empty}</div>
@@ -249,7 +226,7 @@ function PedidosCard({
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-ink truncate">{p.cliente_nombre}</div>
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="t-eyebrow">
                     #{p.id} · {formatARS(Number(p.monto_total ?? 0))}
                   </div>
                 </div>
@@ -281,9 +258,7 @@ function EquiposAfueraCard({
           <AlertCircle className="h-4 w-4" />
         </span>
         <h2 className="font-display text-base text-ink">Equipos afuera</h2>
-        <span className="ml-auto font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          {items.length}
-        </span>
+        <span className="ml-auto t-eyebrow">{items.length}</span>
       </div>
       {items.length === 0 ? (
         <div className="px-4 py-6 text-sm text-muted-foreground">
@@ -302,7 +277,7 @@ function EquiposAfueraCard({
                   ×{it.cantidad}
                 </span>
               </div>
-              <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground truncate">
+              <div className="t-eyebrow truncate">
                 {it.cliente_nombre} · vuelve {it.fecha_hasta?.slice(0, 10)}
               </div>
             </li>

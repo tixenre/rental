@@ -83,8 +83,8 @@ export type Ficha = {
   notas: string | null;
   keywords_json: string | null;
   nombre_publico_template?: string | null;
-  // Listas / multimedia del enriquecimiento (no son specs estructuradas)
-  incluye_json?: string | null;
+  // Listas / multimedia del enriquecimiento (no son specs estructuradas).
+  // `incluye_json` (legacy) dropeado: el "qué incluye" deriva de la receta real.
   conectividad_json?: string | null;
   compatible_con_json?: string | null;
   video_url?: string | null;
@@ -766,6 +766,8 @@ export interface ReporteMensual {
   devengado: { total: number; pedidos: number; por_socio: Record<string, number> };
   cobrado: { por_socio: Record<string, number>; total: number };
   gastos: { total: number; por_categoria: { categoria: string; monto: number }[] };
+  /** Lo facturado que NO es de Rambla (parte de los dueños): un costo, no ganancia. */
+  comisiones_duenos: number;
   ganancia_neta: number;
   socios_mes: {
     cargos: Record<string, number>;

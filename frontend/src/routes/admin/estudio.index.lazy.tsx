@@ -39,6 +39,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
+import { Pill } from "@/design-system/kit/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -56,7 +57,12 @@ import {
 } from "@/lib/admin/api";
 import { uploadStudioFile } from "@/lib/studio/photos";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminSection } from "@/components/admin/AdminSection";
+import { useConfirm } from "@/components/admin/useConfirm";
+import { ListSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { EmptyState } from "@/components/rental/EmptyState";
 
 export const Route = createLazyFileRoute("/admin/estudio/")({
   component: EstudioAdminPage,
@@ -158,58 +164,52 @@ function EstudioAdminPage() {
   useDocumentTitle("Estudio · Back Office");
   const qc = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin", "estudio"],
     queryFn: () => estudioAdminApi.get(),
   });
 
   if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <ListSkeleton />;
   }
 
   if (isError || !data) {
     return (
-      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-        Error cargando configuración del estudio.
-      </div>
+      <ErrorState
+        title="No se pudo cargar el estudio"
+        sub="Hubo un error al traer la configuración del estudio. Probá de nuevo."
+        onRetry={() => refetch()}
+      />
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-6 py-6 space-y-8">
-      <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office
-        </div>
-        <h1 className="font-display text-3xl text-ink">Estudio</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configuración del espacio, precios y galería de fotos.
-        </p>
-      </header>
+    <AdminPage
+      title="Estudio"
+      maxW="max-w-3xl"
+      description="Configuración del espacio, precios y galería de fotos."
+    >
+      <div className="space-y-8">
+        <ConfigForm
+          config={data}
+          onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
+        />
 
-      <ConfigForm
-        config={data}
-        onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
-      />
+        <PackSection />
 
-      <PackSection />
+        <GaleriaSection
+          fotos={data.fotos}
+          onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
+        />
 
-      <GaleriaSection
-        fotos={data.fotos}
-        onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
-      />
+        <TrabajosSection
+          trabajos={data.trabajos ?? []}
+          onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
+        />
 
-      <TrabajosSection
-        trabajos={data.trabajos ?? []}
-        onChanged={() => qc.invalidateQueries({ queryKey: ["admin", "estudio"] })}
-      />
-
-      <SlotsSection />
-    </div>
+        <SlotsSection />
+      </div>
+    </AdminPage>
   );
 }
 
@@ -326,9 +326,13 @@ function PackSection() {
       {/* Lista actual */}
       <div className="mt-4 space-y-2">
         {isLoading ? (
-          <div className="text-sm text-muted-foreground">Cargando…</div>
+          <ListSkeleton rows={3} />
         ) : pack.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Todavía no hay equipos en el pack.</p>
+          <EmptyState
+            icon={<Package className="h-6 w-6" />}
+            title="Sin equipos en el pack"
+            sub="Buscá un equipo arriba para sumarlo al pack."
+          />
         ) : (
           pack.map((p) => (
             <div
@@ -351,11 +355,7 @@ function PackSection() {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                {p.marca && (
-                  <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    {p.marca}
-                  </div>
-                )}
+                {p.marca && <div className="t-eyebrow">{p.marca}</div>}
                 <div className="truncate text-ink">{p.nombre}</div>
               </div>
               <button
@@ -403,6 +403,7 @@ type SlotFormValues = z.infer<typeof slotSchema>;
 
 function SlotsSection() {
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [editando, setEditando] = useState<EstudioSlotFijo | null>(null);
   const [creando, setCreando] = useState(false);
 
@@ -435,11 +436,15 @@ function SlotsSection() {
       </p>
 
       {isLoading ? (
-        <div className="py-4 text-sm text-muted-foreground">Cargando…</div>
+        <ListSkeleton rows={3} />
       ) : (
         <div className="space-y-2">
           {slots.length === 0 && (
-            <p className="text-sm text-muted-foreground">Todavía no hay slots fijos.</p>
+            <EmptyState
+              icon={<Plus className="h-6 w-6" />}
+              title="Sin slots fijos"
+              sub="Creá un slot recurrente con el botón de abajo."
+            />
           )}
           {slots.map((s) => (
             <div
@@ -464,11 +469,14 @@ function SlotsSection() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      confirm(
-                        `¿Borrar el slot de ${s.cliente}? Se eliminan los pedidos futuros impagos.`,
-                      )
+                      await confirm({
+                        title: `¿Borrar el slot de ${s.cliente}?`,
+                        description: "Se eliminan los pedidos futuros impagos.",
+                        danger: true,
+                        confirmLabel: "Eliminar",
+                      })
                     )
                       delMut.mutate(s.id);
                   }}
@@ -582,6 +590,7 @@ function SlotForm({
         </Field>
       </div>
       <label className="flex items-center gap-2 text-sm cursor-pointer">
+        {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
         <input type="checkbox" {...register("activo")} className="h-4 w-4 rounded" />
         Activo
       </label>
@@ -722,6 +731,7 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
       {/* ── Pack ── */}
       <Section title="Pack Todo Incluido">
         <label className="flex items-center gap-2 text-sm cursor-pointer">
+          {/* eslint-disable-next-line no-restricted-syntax -- checkbox nativo: el DS Checkbox es Radix (otra API) */}
           <input type="checkbox" {...register("pack_activo")} className="h-4 w-4 rounded" />
           Pack activo (se muestra en la página pública)
         </label>
@@ -1110,9 +1120,7 @@ function TrabajoDialog({
           {/* Links — campo primario, auto-fetch en el primero. Varios links =
               varias diapositivas del carrusel público. */}
           <div className="space-y-2">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground block">
-              Links (YouTube / Instagram)
-            </label>
+            <label className="t-eyebrow block">Links (YouTube / Instagram)</label>
             <div className="space-y-3">
               {links.map((url, idx) => {
                 const tipo = linkTipo(url);
@@ -1183,7 +1191,7 @@ function TrabajoDialog({
 
           {/* Título — auto-rellenado */}
           <div className="space-y-1">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <label className="t-eyebrow">
               Título{" "}
               <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
             </label>
@@ -1196,7 +1204,7 @@ function TrabajoDialog({
 
           {/* Realizador — auto-rellenado */}
           <div className="space-y-1">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <label className="t-eyebrow">
               Realizador / Productora{" "}
               <span className="normal-case tracking-normal font-sans opacity-50">(opcional)</span>
             </label>
@@ -1209,7 +1217,7 @@ function TrabajoDialog({
 
           {/* Categorías (tags) — multi-select */}
           <div className="space-y-2">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <label className="t-eyebrow">
               Categorías{" "}
               <span className="normal-case tracking-normal font-sans opacity-50">
                 (opcional — podés elegir varias)
@@ -1267,7 +1275,7 @@ function TrabajoDialog({
 
           {/* Fotos */}
           <div className="space-y-2">
-            <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+            <label className="t-eyebrow">
               Fotos{" "}
               {fotos.length > 0 ? (
                 `(${fotos.length})`
@@ -1293,6 +1301,7 @@ function TrabajoDialog({
                 ))}
               </div>
             )}
+            {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
             <input
               ref={fotoInputRef}
               type="file"
@@ -1367,9 +1376,7 @@ function TrabajoDialog({
             {showExtra && (
               <div className="space-y-4 mt-4">
                 <div className="space-y-1">
-                  <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    Descripción breve
-                  </label>
+                  <label className="t-eyebrow">Descripción breve</label>
                   <Textarea
                     value={descripcion}
                     onChange={(e) => setDescripcion(e.target.value)}
@@ -1379,9 +1386,7 @@ function TrabajoDialog({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                      Instagram del realizador
-                    </label>
+                    <label className="t-eyebrow">Instagram del realizador</label>
                     <Input
                       value={instagram}
                       onChange={(e) => setInstagram(e.target.value)}
@@ -1389,9 +1394,7 @@ function TrabajoDialog({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                      Web
-                    </label>
+                    <label className="t-eyebrow">Web</label>
                     <Input
                       value={web}
                       onChange={(e) => setWeb(e.target.value)}
@@ -1400,9 +1403,7 @@ function TrabajoDialog({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-                    Logo del realizador
-                  </label>
+                  <label className="t-eyebrow">Logo del realizador</label>
                   <div className="flex items-center gap-3">
                     {logoUrl ? (
                       <img
@@ -1415,6 +1416,7 @@ function TrabajoDialog({
                         <Image className="h-5 w-5 text-muted-foreground/40" />
                       </div>
                     )}
+                    {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
                     <input
                       ref={logoInputRef}
                       type="file"
@@ -1548,9 +1550,9 @@ function SortableTrabajoCard({
       </div>
 
       {/* Cantidad de medios */}
-      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground">
+      <Pill tone="neutral" className="font-mono uppercase tracking-[0.1em]">
         {trabajo.media.length} {trabajo.media.length === 1 ? "medio" : "medios"}
-      </span>
+      </Pill>
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0">
@@ -1684,9 +1686,11 @@ function TrabajosSection({
         </DndContext>
 
         {trabajos.length === 0 && (
-          <p className="text-sm text-center text-muted-foreground py-4">
-            No hay trabajos cargados todavía.
-          </p>
+          <EmptyState
+            icon={<Film className="h-6 w-6" />}
+            title="Sin trabajos cargados"
+            sub="Agregá un trabajo con el botón de abajo."
+          />
         )}
 
         <Button variant="outline" size="sm" onClick={openCreate}>
@@ -1816,9 +1820,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <label className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </label>
+      <label className="t-eyebrow">{label}</label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}

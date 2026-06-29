@@ -227,6 +227,7 @@ export function PhotoCard({
       </div>
 
       <div className="flex flex-col gap-1">
+        {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
         <input
           ref={fileRef}
           type="file"
@@ -311,12 +312,12 @@ export function CategoriasPicker({
   return (
     <div className="space-y-2 mt-1">
       <div className="relative">
-        <input
+        <Input
           type="text"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar categoría…"
-          className="w-full text-sm rounded-md border hairline px-3 py-1.5 pr-7 outline-none focus:ring-1 focus:ring-ring bg-background"
+          className="w-full pr-7"
         />
         {q && (
           <button

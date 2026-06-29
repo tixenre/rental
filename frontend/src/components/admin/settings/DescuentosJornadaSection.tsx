@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { descuentosJornadaApi } from "@/lib/admin/api";
 import { interpolarDescuento } from "@/lib/api";
 
@@ -38,6 +39,46 @@ export function DescuentosJornadaSection() {
 
   const sorted = [...puntos].sort((a, b) => a.jornadas - b.jornadas);
 
+  const columns: Column<(typeof sorted)[number]>[] = [
+    {
+      header: "Jornadas",
+      className: "tabular-nums font-medium",
+      cell: (p) => (
+        <>
+          {p.jornadas} {p.jornadas === 1 ? "día" : "días"}
+        </>
+      ),
+    },
+    {
+      header: "Descuento",
+      className: "tabular-nums text-verde-ink font-medium",
+      cell: (p) => `${p.pct}%`,
+    },
+    {
+      header: <span className="text-xs">Ej. interpol.</span>,
+      className: "text-xs text-muted-foreground",
+      cell: (p, i) => {
+        const siguiente = sorted[i + 1];
+        const medio = siguiente ? Math.round((p.jornadas + siguiente.jornadas) / 2) : null;
+        const pctMedio = medio ? interpolarDescuento(sorted, medio) : null;
+        return pctMedio !== null ? `${medio} días → ${pctMedio}%` : "—";
+      },
+    },
+    {
+      header: "",
+      headClassName: "w-10",
+      cell: (p) => (
+        <button
+          onClick={() => borrar.mutate(p.id)}
+          className="text-muted-foreground hover:text-destructive"
+          disabled={borrar.isPending}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      ),
+    },
+  ];
+
   return (
     <section className="rounded-lg border hairline bg-background p-4 space-y-4">
       <div>
@@ -55,47 +96,7 @@ export function DescuentosJornadaSection() {
           Sin descuentos configurados. Todos los alquileres aplican 0%.
         </p>
       ) : (
-        <div className="border hairline rounded-md overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Jornadas</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Descuento</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground text-xs">
-                  Ej. interpol.
-                </th>
-                <th className="px-3 py-2 w-10" />
-              </tr>
-            </thead>
-            <tbody className="divide-y hairline">
-              {sorted.map((p, i) => {
-                const siguiente = sorted[i + 1];
-                const medio = siguiente ? Math.round((p.jornadas + siguiente.jornadas) / 2) : null;
-                const pctMedio = medio ? interpolarDescuento(sorted, medio) : null;
-                return (
-                  <tr key={p.id}>
-                    <td className="px-3 py-2 tabular-nums font-medium">
-                      {p.jornadas} {p.jornadas === 1 ? "día" : "días"}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums text-verde-ink font-medium">{p.pct}%</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {pctMedio !== null ? `${medio} días → ${pctMedio}%` : "—"}
-                    </td>
-                    <td className="px-3 py-2">
-                      <button
-                        onClick={() => borrar.mutate(p.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                        disabled={borrar.isPending}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <AdminTable columns={columns} rows={sorted} getRowKey={(p) => p.id} />
       )}
 
       {/* Agregar punto */}

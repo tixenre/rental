@@ -11,8 +11,8 @@ import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { BottomSheet } from "@/components/mobile";
 import { adminApi, type Equipo } from "@/lib/admin/api";
-import { fmtArs } from "@/lib/format";
 import { filtrarOrdenar } from "@/lib/search/normalize";
+import { PrecioUnidad } from "@/components/admin/Monto";
 import { EquipoThumb } from "./EquipoThumb";
 import type { DraftItem } from "./usePedidoDraft";
 
@@ -125,7 +125,14 @@ export function EquipoSearchSheet({
                         <span className={disponible <= 0 ? "text-destructive" : ""}>
                           {disponible} libres
                         </span>
-                        {eq.precio_jornada ? ` · ${fmtArs(eq.precio_jornada)}/día` : ""}
+                        {eq.precio_jornada ? (
+                          <>
+                            {" · "}
+                            <PrecioUnidad value={eq.precio_jornada} />
+                          </>
+                        ) : (
+                          ""
+                        )}
                       </div>
                     </div>
                     <Button

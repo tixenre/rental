@@ -8,15 +8,22 @@
  *  - **Cajas · Plata del negocio** (Efectivo/Banco/Fondo Rambla/Dólares…): plata
  *    real; suben/bajan con movimientos. Se pueden crear, editar y dar de baja.
  */
-import { createLazyFileRoute, Link } from "@tanstack/react-router";
+import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { adminApi, type CuentaSaldo, type TipoCuenta } from "@/lib/admin/api";
+import { AdminPage } from "@/components/admin/AdminPage";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { useConfirm } from "@/components/admin/useConfirm";
 import { formatMoney } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
+import { Pill, type PillTone } from "@/design-system/kit/Pill";
 import { cn } from "@/lib/utils";
 
 // El socio se crea desde el sistema (seed); acá solo cajas/cuentas genéricas.
@@ -41,96 +48,77 @@ function CuentasPage() {
   const cajas = q.data?.cajas ?? [];
 
   return (
-    <div className="px-4 md:px-6 py-6 space-y-8 max-w-4xl mx-auto">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Back-office · Finanzas
-          </div>
-          <h1 className="font-display text-3xl text-ink">Cuentas</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            La cuenta corriente de cada socio (quién le debe a quién) y las cajas con la plata real
-            del negocio.
-          </p>
-        </div>
-        <Link
-          to="/admin/contabilidad"
-          className="shrink-0 h-9 rounded-md border hairline px-3 text-sm flex items-center hover:bg-muted/40"
-        >
-          ← Tablero
-        </Link>
-      </header>
+    <AdminPage
+      title="Cuentas"
+      maxW="max-w-4xl"
+      description="La cuenta corriente de cada socio (quién le debe a quién) y las cajas con la plata real del negocio."
+      backTo={{ to: "/admin/contabilidad", label: "Tablero" }}
+    >
+      <div className="space-y-8">
+        {q.isLoading && <TableSkeleton rows={5} cols={5} />}
+        {q.isError && <ErrorState error={q.error} onRetry={q.refetch} />}
 
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando cuentas…</div>}
-      {q.isError && (
-        <div className="text-sm text-destructive">
-          Error cargando las cuentas. {(q.error as Error)?.message}
-        </div>
-      )}
+        {/* Socios · Cuenta corriente */}
+        {socios.length > 0 && (
+          <section className="space-y-3">
+            <div className="t-eyebrow">Socios · Cuenta corriente</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {socios.map((s) => (
+                <SocioCard key={s.id} socio={s} cajas={cajas} onChanged={invalidar} />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              El <strong>arranque</strong> es lo que cobró antes del sistema. Se va saldando con{" "}
+              <strong>su parte</strong> de lo que se alquila: cuando llega a cero están a mano, y si
+              se da vuelta, Rambla le debe a él.
+            </p>
+          </section>
+        )}
 
-      {/* Socios · Cuenta corriente */}
-      {socios.length > 0 && (
-        <section className="space-y-3">
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Socios · Cuenta corriente
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {socios.map((s) => (
-              <SocioCard key={s.id} socio={s} cajas={cajas} onChanged={invalidar} />
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            El <strong>arranque</strong> es lo que cobró antes del sistema. Se va saldando con{" "}
-            <strong>su parte</strong> de lo que se alquila: cuando llega a cero están a mano, y si
-            se da vuelta, Rambla le debe a él.
-          </p>
-        </section>
-      )}
-
-      {/* Cajas · Plata del negocio */}
-      {q.data && (
-        <section className="space-y-3">
-          <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Cajas · Plata del negocio
-          </div>
-          <div className="overflow-x-auto rounded-lg border hairline">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">Caja</th>
-                  <th className="px-3 py-2 font-medium">Tipo</th>
-                  <th className="px-3 py-2 font-medium text-right">Saldo inicial</th>
-                  <th className="px-3 py-2 font-medium text-right">Saldo actual</th>
-                  <th className="px-3 py-2 font-medium text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cajas.map((c) => (
-                  <CajaRow key={c.id} cuenta={c} onChanged={invalidar} />
-                ))}
-              </tbody>
-              <tfoot>
-                {Object.entries(q.data.totales)
-                  .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b)))
-                  .map(([moneda, total]) => (
-                    <tr key={moneda} className="border-t hairline">
-                      <td className="px-3 py-2 font-medium" colSpan={3}>
-                        Total disponible {moneda !== "ARS" ? `(${moneda})` : ""}
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
-                        {formatMoney(total, moneda)}
-                      </td>
-                      <td />
-                    </tr>
+        {/* Cajas · Plata del negocio */}
+        {q.data && (
+          <section className="space-y-3">
+            <div className="t-eyebrow">Cajas · Plata del negocio</div>
+            <div className="overflow-x-auto rounded-lg border hairline">
+              {/* eslint-disable-next-line no-restricted-syntax -- tabla de edición inline (CajaRow con estado propio + totales en tfoot), no es tabla de display; AdminTable no aplica */}
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2 font-medium">Caja</th>
+                    <th className="px-3 py-2 font-medium">Tipo</th>
+                    <th className="px-3 py-2 font-medium text-right">Saldo inicial</th>
+                    <th className="px-3 py-2 font-medium text-right">Saldo actual</th>
+                    <th className="px-3 py-2 font-medium text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cajas.map((c) => (
+                    <CajaRow key={c.id} cuenta={c} onChanged={invalidar} />
                   ))}
-              </tfoot>
-            </table>
-          </div>
-        </section>
-      )}
+                </tbody>
+                <tfoot>
+                  {Object.entries(q.data.totales)
+                    .sort(([a], [b]) => (a === "ARS" ? -1 : b === "ARS" ? 1 : a.localeCompare(b)))
+                    .map(([moneda, total]) => (
+                      <tr key={moneda} className="border-t hairline">
+                        <td className="px-3 py-2 font-medium" colSpan={3}>
+                          Total disponible {moneda !== "ARS" ? `(${moneda})` : ""}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums">
+                          {formatMoney(total, moneda)}
+                        </td>
+                        <td />
+                      </tr>
+                    ))}
+                </tfoot>
+              </table>
+            </div>
+          </section>
+        )}
 
-      <NuevaCuentaForm onCreated={invalidar} />
-    </div>
+        <NuevaCuentaForm onCreated={invalidar} />
+      </div>
+    </AdminPage>
   );
 }
 
@@ -211,25 +199,16 @@ function SocioCard({
         : "text-ink";
   const tag =
     socio.estado === "deudor" ? "Deudor" : socio.estado === "acreedor" ? "Acreedor" : "Saldado";
-  const tagColor =
-    socio.estado === "deudor"
-      ? "bg-destructive/10 text-destructive"
-      : socio.estado === "acreedor"
-        ? "bg-verde/10 text-verde-ink"
-        : "bg-muted text-muted-foreground";
+  const tagTone: PillTone =
+    socio.estado === "deudor" ? "danger" : socio.estado === "acreedor" ? "success" : "neutral";
 
   return (
     <div className="rounded-lg border hairline p-4 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <div className="font-medium text-ink">{socio.nombre}</div>
-        <span
-          className={cn(
-            "font-mono text-2xs uppercase tracking-wider px-2 py-0.5 rounded-full",
-            tagColor,
-          )}
-        >
+        <Pill tone={tagTone} className="font-mono uppercase tracking-wider">
           {tag}
-        </span>
+        </Pill>
       </div>
       <div className={cn("font-mono text-2xl font-semibold tabular-nums", color)}>
         {formatMoney(abs, socio.moneda)}
@@ -242,45 +221,47 @@ function SocioCard({
       </div>
       {editando ? (
         <div className="flex items-center gap-1 pt-1">
-          <input
+          <Input
             type="number"
             value={arranque}
             onChange={(e) => setArranque(e.target.value)}
-            className="h-8 w-32 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            className="w-32 text-right tabular-nums"
             aria-label="Arranque"
           />
-          <button
+          <Button
             type="button"
+            variant="primary"
+            size="sm"
             onClick={() => guardar.mutate()}
             disabled={guardar.isPending}
-            className="h-8 rounded-md bg-ink px-2 text-xs text-background disabled:opacity-50"
           >
             Guardar
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => {
               setEditando(false);
               setArranque(String(socio.saldo_inicial));
             }}
-            className="h-8 rounded-md border hairline px-2 text-xs"
           >
             Cancelar
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => setMovAbierto((v) => !v)}
-            className="text-xs text-ink underline hover:text-amber"
+            className="text-xs text-ink underline hover:text-ink"
           >
             Registrar movimiento
           </button>
           <button
             type="button"
             onClick={() => setEditando(true)}
-            className="text-xs text-muted-foreground underline hover:text-amber"
+            className="text-xs text-muted-foreground underline hover:text-ink"
             title="Editar el arranque (lo que cobró antes del sistema)"
           >
             Editar arranque
@@ -313,12 +294,12 @@ function SocioCard({
               : `Rambla puso plata por ${socio.nombre} (ej. le compró algo) → sube su deuda y sale de la caja.`}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <input
+            <Input
               type="number"
               value={montoMov}
               onChange={(e) => setMontoMov(e.target.value)}
               placeholder="Monto"
-              className="h-8 w-28 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+              className="w-28 text-right tabular-nums"
             />
             <select
               value={cajaId}
@@ -333,28 +314,24 @@ function SocioCard({
               ))}
             </select>
           </div>
-          <input
+          <Input
             value={notaMov}
             onChange={(e) => setNotaMov(e.target.value)}
             placeholder="Nota (ej. adaptador de lente)"
-            className="h-8 w-full rounded-md border hairline bg-surface-elevated px-2 text-sm"
           />
           <div className="flex items-center gap-1">
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="sm"
               onClick={() => registrarMov.mutate()}
               disabled={registrarMov.isPending || !(Number(montoMov) > 0) || !cajaId}
-              className="h-8 rounded-md bg-ink px-3 text-xs text-background disabled:opacity-50"
             >
               Registrar
-            </button>
-            <button
-              type="button"
-              onClick={cerrarMov}
-              className="h-8 rounded-md border hairline px-2 text-xs"
-            >
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={cerrarMov}>
               Cancelar
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -363,6 +340,7 @@ function SocioCard({
 }
 
 function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => void }) {
+  const confirm = useConfirm();
   const [editando, setEditando] = useState(false);
   const [nombre, setNombre] = useState(cuenta.nombre);
   const [valor, setValor] = useState(String(cuenta.saldo_inicial));
@@ -403,11 +381,7 @@ function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => 
     <tr className="border-b hairline last:border-0">
       <td className="px-3 py-2 font-medium text-ink">
         {editando ? (
-          <input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            className="h-8 w-44 rounded-md border hairline bg-surface-elevated px-2 text-sm"
-          />
+          <Input value={nombre} onChange={(e) => setNombre(e.target.value)} className="w-44" />
         ) : (
           cuenta.nombre
         )}
@@ -419,11 +393,11 @@ function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => 
       </td>
       <td className="px-3 py-2 text-right">
         {editando ? (
-          <input
+          <Input
             type="number"
             value={valor}
             onChange={(e) => setValor(e.target.value)}
-            className="h-8 w-28 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            className="w-28 text-right tabular-nums"
           />
         ) : (
           <span className="font-mono tabular-nums">
@@ -437,39 +411,39 @@ function CajaRow({ cuenta, onChanged }: { cuenta: CuentaSaldo; onChanged: () => 
       <td className="px-3 py-2 text-right">
         {editando ? (
           <div className="flex items-center justify-end gap-1">
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="sm"
               onClick={() => guardar.mutate()}
               disabled={guardar.isPending || !nombre.trim()}
-              className="h-8 rounded-md bg-ink px-2 text-xs text-background disabled:opacity-50"
             >
               Guardar
-            </button>
-            <button
-              type="button"
-              onClick={cerrar}
-              className="h-8 rounded-md border hairline px-2 text-xs"
-            >
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={cerrar}>
               Cancelar
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => setEditando(true)}
-              className="text-xs text-muted-foreground underline hover:text-amber"
+              className="text-xs text-muted-foreground underline hover:text-ink"
               title="Editar nombre y saldo inicial"
             >
               Editar
             </button>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (
-                  window.confirm(
-                    `¿Dar de baja "${cuenta.nombre}"? Solo se puede si su saldo es cero.`,
-                  )
+                  await confirm({
+                    title: `¿Dar de baja "${cuenta.nombre}"?`,
+                    description: "Solo se puede si su saldo es cero.",
+                    danger: true,
+                    confirmLabel: "Dar de baja",
+                  })
                 )
                   baja.mutate();
               }}
@@ -526,25 +500,19 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
       }}
       className="rounded-lg border hairline p-4 space-y-3"
     >
-      <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-        Nueva caja
-      </div>
+      <div className="t-eyebrow">Nueva caja</div>
       <div className="flex flex-wrap items-end gap-3">
         <label className="space-y-1">
-          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Nombre
-          </span>
-          <input
+          <span className="block t-eyebrow">Nombre</span>
+          <Input
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             placeholder="Ej. Mercado Pago"
-            className="h-9 w-48 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+            className="w-48"
           />
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Tipo
-          </span>
+          <span className="block t-eyebrow">Tipo</span>
           <select
             value={tipo}
             onChange={(e) => setTipo(e.target.value as TipoCuenta)}
@@ -558,9 +526,7 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Moneda
-          </span>
+          <span className="block t-eyebrow">Moneda</span>
           <select
             value={moneda}
             onChange={(e) => setMoneda(e.target.value)}
@@ -571,23 +537,17 @@ function NuevaCuentaForm({ onCreated }: { onCreated: () => void }) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-            Saldo inicial
-          </span>
-          <input
+          <span className="block t-eyebrow">Saldo inicial</span>
+          <Input
             type="number"
             value={saldoInicial}
             onChange={(e) => setSaldoInicial(e.target.value)}
-            className="h-9 w-32 rounded-md border hairline bg-surface-elevated px-2 text-right text-sm tabular-nums"
+            className="w-32 text-right tabular-nums"
           />
         </label>
-        <button
-          type="submit"
-          disabled={crear.isPending || !nombre.trim()}
-          className="h-9 rounded-md bg-ink px-4 text-sm text-background disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" disabled={crear.isPending || !nombre.trim()}>
           {crear.isPending ? "Creando…" : "Crear"}
-        </button>
+        </Button>
       </div>
     </form>
   );

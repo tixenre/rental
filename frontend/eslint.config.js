@@ -30,6 +30,63 @@ const MAGIC_SIZE_MSG =
   "Usá utilidades del DS en vez de tamaños mágicos: text-3xs/text-2xs/text-xs/text-sm/text-15/text-base/text-22… " +
   "Tamaño sin equivalente → eslint-disable-line + comentario del por qué.";
 
+// Guardrail de contraste (solo back-office): prohíbe los tokens de marca/status
+// como COLOR DE TEXTO (`text-amber`, `text-verde`, `text-rosa`…). Son tokens de
+// FONDO/acento: sobre bone/blanco dan 1.7-2.9:1 (fallan WCAG AA). El texto sobre
+// tints usa los tokens `-ink` (`text-verde-ink`/`text-azul-ink`) o el primitivo
+// `Pill`/`EstadoBadge`. El lookahead `(?![\w-])` deja pasar `-ink`/`-soft`/`-hot`.
+// El `(?!.*bg-ink)` permite el "inverted badge" (amber sobre bg-ink oscuro pasa
+// contraste — ej. filtro activo, badge "Nuevo"). El `\/` escapa la opacidad
+// (text-amber/70) para no cerrar la regex de esquery. Scope admin: el lado
+// público usa estos tokens como accent de marca de área.
+// Ver docs/DESIGN_SYSTEM.md → Filosofía de diseño (contraste real).
+const BRAND_TEXT_RE =
+  "^(?!.*bg-ink).*text-(?:amber|verde|azul|rosa|naranja|estudio)(?:\\/[0-9]+)?(?![\\w-])";
+const BRAND_TEXT_MSG =
+  "No uses tokens de marca/status como color de TEXTO (text-amber/verde/rosa…): fallan contraste WCAG sobre fondo claro. " +
+  "Usá text-ink, los tokens -ink (text-verde-ink/text-azul-ink) o el primitivo Pill/EstadoBadge. " +
+  "Para énfasis cromático: bg-amber/15 + text-ink. Ver docs/DESIGN_SYSTEM.md → contraste.";
+
+// Selectores base (aplican a toda la app).
+const BASE_RESTRICTED = [
+  { selector: `Literal[value=/${GENERIC_COLOR_RE}/]`, message: GENERIC_COLOR_MSG },
+  { selector: `TemplateElement[value.raw=/${GENERIC_COLOR_RE}/]`, message: GENERIC_COLOR_MSG },
+  { selector: `Literal[value=/${MAGIC_SIZE_RE}/]`, message: MAGIC_SIZE_MSG },
+  { selector: `TemplateElement[value.raw=/${MAGIC_SIZE_RE}/]`, message: MAGIC_SIZE_MSG },
+];
+// Selectores extra solo-admin (contraste).
+const BRAND_TEXT_RESTRICTED = [
+  { selector: `Literal[value=/${BRAND_TEXT_RE}/]`, message: BRAND_TEXT_MSG },
+  { selector: `TemplateElement[value.raw=/${BRAND_TEXT_RE}/]`, message: BRAND_TEXT_MSG },
+];
+
+// Guardrail de "reusar no recrear" (solo back-office): obliga a usar los
+// componentes del DS en vez de campos de formulario nativos. El DS es la fuente
+// única — un <input>/<textarea> a mano se desvía (pierde foco/altura/16px-mobile
+// + no lo alcanza el futuro editor de temas). Excepciones legítimas (input file,
+// custom borderless) van con: eslint-disable-next-line no-restricted-syntax + motivo.
+// (No se prohíbe <select> —el picker nativo es mejor UX en mobile— ni <button>
+// —demasiados usos legítimos: toggles, icon-only, action-links—; esos los cuida
+// el supervisor / skill design-system.) Ver docs/DESIGN_SYSTEM.md.
+const RAW_FORM_RESTRICTED = [
+  {
+    selector: "JSXOpeningElement[name.name='input']",
+    message:
+      "Usá <Input> del DS (o <Checkbox> para checkbox) en vez de <input> nativo. " +
+      "Excepción (file / custom borderless): eslint-disable-next-line no-restricted-syntax + motivo.",
+  },
+  {
+    selector: "JSXOpeningElement[name.name='textarea']",
+    message: "Usá <Textarea> del DS en vez de <textarea> nativo.",
+  },
+  {
+    selector: "JSXOpeningElement[name.name='table']",
+    message:
+      "Usá <AdminTable columns rows> (@/components/admin/AdminTable) en vez de <table> nativo. " +
+      "Excepción (tabla de edición inline / columnas dinámicas / layout key-value): eslint-disable-next-line no-restricted-syntax + motivo.",
+  },
+];
+
 export default tseslint.config(
   { ignores: ["dist", ".output", ".vinxi", "docs/**"] },
   {
@@ -65,18 +122,19 @@ export default tseslint.config(
       "react-hooks/exhaustive-deps": "error",
       "react-refresh/only-export-components": ["error", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      "no-restricted-syntax": ["error", ...BASE_RESTRICTED],
+    },
+  },
+  {
+    // Guardrail de contraste — solo back-office: a los selectores base les suma
+    // la prohibición de tokens de marca/status como color de texto (ver arriba).
+    files: ["src/routes/admin/**/*.{ts,tsx}", "src/components/admin/**/*.{ts,tsx}"],
+    rules: {
       "no-restricted-syntax": [
         "error",
-        { selector: `Literal[value=/${GENERIC_COLOR_RE}/]`, message: GENERIC_COLOR_MSG },
-        {
-          selector: `TemplateElement[value.raw=/${GENERIC_COLOR_RE}/]`,
-          message: GENERIC_COLOR_MSG,
-        },
-        { selector: `Literal[value=/${MAGIC_SIZE_RE}/]`, message: MAGIC_SIZE_MSG },
-        {
-          selector: `TemplateElement[value.raw=/${MAGIC_SIZE_RE}/]`,
-          message: MAGIC_SIZE_MSG,
-        },
+        ...BASE_RESTRICTED,
+        ...BRAND_TEXT_RESTRICTED,
+        ...RAW_FORM_RESTRICTED,
       ],
     },
   },

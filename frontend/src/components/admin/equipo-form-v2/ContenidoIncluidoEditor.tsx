@@ -132,6 +132,7 @@ function ContenidoItemRow({
           </div>
         )}
       </button>
+      {/* eslint-disable-next-line no-restricted-syntax -- input file: no hay componente DS */}
       <input
         ref={fileRef}
         type="file"

@@ -8,11 +8,18 @@
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Receipt } from "lucide-react";
 
 import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { Input } from "@/design-system/ui/input";
+import { AdminPage } from "@/components/admin/AdminPage";
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
+import { QueryState } from "@/components/admin/QueryState";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { EmptyState } from "@/components/rental/EmptyState";
 import { cn } from "@/lib/utils";
 
 export const Route = createLazyFileRoute("/admin/pagos")({
@@ -41,152 +48,141 @@ function PagosLogPage() {
   const pagos = q.data?.pagos ?? [];
   const total = q.data?.total ?? 0;
 
+  const columns: Column<(typeof pagos)[number]>[] = [
+    {
+      header: "Fecha",
+      cell: (p) => formatFechaDisplay(p.fecha),
+      className: "whitespace-nowrap text-muted-foreground",
+    },
+    {
+      header: "Pedido",
+      cell: (p) => (
+        <Link
+          to="/admin/pedidos/$id"
+          params={{ id: String(p.pedido_id) }}
+          className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber font-mono"
+        >
+          #{p.numero_pedido ?? p.pedido_id}
+        </Link>
+      ),
+      className: "whitespace-nowrap",
+    },
+    {
+      header: "Cliente",
+      cell: (p) => p.cliente_nombre ?? "—",
+      className: "max-w-[180px] truncate",
+    },
+    {
+      header: "Concepto",
+      cell: (p) => p.concepto ?? "—",
+      className: "text-muted-foreground",
+    },
+    {
+      header: "Cobró",
+      cell: (p) =>
+        p.destinatario ? (
+          <Badge variant="secondary" className="capitalize">
+            {p.destinatario}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      className: "whitespace-nowrap",
+    },
+    {
+      header: "Método",
+      cell: (p) => p.metodo ?? "—",
+      className: "whitespace-nowrap capitalize text-muted-foreground",
+    },
+    {
+      header: "Monto",
+      cell: (p) => formatARS(p.monto),
+      align: "right",
+      className: "font-mono tabular-nums",
+    },
+  ];
+
   return (
-    <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
-      <header>
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Back-office · Finanzas
-        </div>
-        <h1 className="font-display text-3xl text-ink">Cobros de pedidos</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+    <AdminPage
+      title="Cobros de pedidos"
+      eyebrow="Finanzas"
+      backTo={{ to: "/admin/contabilidad/movimientos", label: "Movimientos" }}
+      maxW="max-w-5xl"
+      description={
+        <>
           Registro de todos los cobros de pedidos (la fuente única de "pagado"). Cada cobro lleva a
           quién se cobró y el método. El resumen por mes también aparece en Movimientos.
-        </p>
-      </header>
-
-      {/* Filtros */}
-      <div className="flex flex-wrap items-end gap-3">
-        <Segment
-          label="Destinatario"
-          value={destinatario}
-          onChange={setDestinatario}
-          options={[["", "Todos"], ...DESTINATARIOS_PAGO.map((d) => [d, d] as [string, string])]}
-        />
-        <Segment
-          label="Método"
-          value={metodo}
-          onChange={setMetodo}
-          options={[["", "Todos"], ...METODOS_PAGO.map((m) => [m, m] as [string, string])]}
-        />
-        <div className="space-y-1">
-          <FieldLabel>Desde</FieldLabel>
-          <input
-            type="date"
-            value={desde}
-            onChange={(e) => setDesde(e.target.value)}
-            className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+        </>
+      }
+    >
+      <div className="space-y-6">
+        {/* Filtros */}
+        <div className="flex flex-wrap items-end gap-3">
+          <Segment
+            label="Destinatario"
+            value={destinatario}
+            onChange={setDestinatario}
+            options={[["", "Todos"], ...DESTINATARIOS_PAGO.map((d) => [d, d] as [string, string])]}
           />
-        </div>
-        <div className="space-y-1">
-          <FieldLabel>Hasta</FieldLabel>
-          <input
-            type="date"
-            value={hasta}
-            onChange={(e) => setHasta(e.target.value)}
-            className="h-9 rounded-md border hairline bg-surface-elevated px-2 text-sm"
+          <Segment
+            label="Método"
+            value={metodo}
+            onChange={setMetodo}
+            options={[["", "Todos"], ...METODOS_PAGO.map((m) => [m, m] as [string, string])]}
           />
+          <div className="space-y-1">
+            <FieldLabel>Desde</FieldLabel>
+            <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel>Hasta</FieldLabel>
+            <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+          </div>
+          {(destinatario || metodo || desde || hasta) && (
+            <button
+              type="button"
+              onClick={() => {
+                setDestinatario("");
+                setMetodo("");
+                setDesde("");
+                setHasta("");
+              }}
+              className="h-9 text-xs text-muted-foreground hover:text-ink underline"
+            >
+              Limpiar
+            </button>
+          )}
         </div>
-        {(destinatario || metodo || desde || hasta) && (
-          <button
-            type="button"
-            onClick={() => {
-              setDestinatario("");
-              setMetodo("");
-              setDesde("");
-              setHasta("");
-            }}
-            className="h-9 text-xs text-muted-foreground hover:text-ink underline"
-          >
-            Limpiar
-          </button>
-        )}
+
+        {/* Total del subconjunto */}
+        <div className="flex items-baseline gap-2">
+          <span className="t-eyebrow">Total {q.data ? `(${q.data.count})` : ""}</span>
+          <span className="font-mono text-xl font-semibold tabular-nums text-ink">
+            {formatARS(total)}
+          </span>
+        </div>
+
+        <QueryState
+          query={q}
+          isEmpty={(d) => (d.pagos ?? []).length === 0}
+          skeleton={<TableSkeleton rows={6} cols={7} />}
+          empty={
+            <EmptyState
+              icon={<Receipt className="h-6 w-6" />}
+              title="No hay pagos"
+              sub="No hay pagos para los filtros elegidos."
+            />
+          }
+        >
+          {() => <AdminTable columns={columns} rows={pagos} getRowKey={(p) => p.id} />}
+        </QueryState>
       </div>
-
-      {/* Total del subconjunto */}
-      <div className="flex items-baseline gap-2">
-        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-          Total {q.data ? `(${q.data.count})` : ""}
-        </span>
-        <span className="font-mono text-xl font-semibold tabular-nums text-ink">
-          {formatARS(total)}
-        </span>
-      </div>
-
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando pagos…</div>}
-      {q.isError && (
-        <div className="text-sm text-destructive">
-          Error cargando los pagos. {(q.error as Error)?.message}
-        </div>
-      )}
-
-      {!q.isLoading && !q.isError && pagos.length === 0 && (
-        <div className="text-sm text-muted-foreground border rounded-lg p-6 text-center">
-          No hay pagos para los filtros elegidos.
-        </div>
-      )}
-
-      {pagos.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border hairline">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b hairline text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Fecha</th>
-                <th className="px-3 py-2 font-medium">Pedido</th>
-                <th className="px-3 py-2 font-medium">Cliente</th>
-                <th className="px-3 py-2 font-medium">Concepto</th>
-                <th className="px-3 py-2 font-medium">Cobró</th>
-                <th className="px-3 py-2 font-medium">Método</th>
-                <th className="px-3 py-2 font-medium text-right">Monto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagos.map((p) => (
-                <tr key={p.id} className="border-b hairline last:border-0 hover:bg-muted/30">
-                  <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                    {formatFechaDisplay(p.fecha)}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <Link
-                      to="/admin/pedidos/$id"
-                      params={{ id: String(p.pedido_id) }}
-                      className="text-ink underline decoration-amber/60 underline-offset-2 hover:decoration-amber font-mono"
-                    >
-                      #{p.numero_pedido ?? p.pedido_id}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 max-w-[180px] truncate">{p.cliente_nombre ?? "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{p.concepto ?? "—"}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {p.destinatario ? (
-                      <Badge variant="secondary" className="capitalize">
-                        {p.destinatario}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap capitalize text-muted-foreground">
-                    {p.metodo ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono tabular-nums">
-                    {formatARS(p.monto)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+    </AdminPage>
   );
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <label className="block font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
-      {children}
-    </label>
-  );
+  return <label className="block t-eyebrow">{children}</label>;
 }
 
 function Segment({

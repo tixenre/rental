@@ -29,6 +29,9 @@ import {
 
 import { adminApi } from "@/lib/admin/api";
 import { formatARS } from "@/lib/format";
+import { Monto } from "@/components/admin/Monto";
+import { TableSkeleton } from "@/components/admin/skeletons";
+import { ErrorState } from "@/components/admin/ErrorState";
 
 const fmtMoneda = (n: number | null | undefined) => {
   if (n == null) return "—";
@@ -83,13 +86,9 @@ export function DashboardUsoDialog({
           </p>
         </DialogHeader>
 
-        {dataQ.isLoading && <p className="text-sm text-muted-foreground py-6">Cargando…</p>}
+        {dataQ.isLoading && <TableSkeleton rows={6} className="py-6" />}
 
-        {dataQ.error && (
-          <div className="rounded-md border hairline border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            Error: {(dataQ.error as Error).message}
-          </div>
-        )}
+        {dataQ.error && <ErrorState error={dataQ.error} onRetry={() => dataQ.refetch()} />}
 
         {dataQ.data && (
           <div className="space-y-5">
@@ -226,7 +225,7 @@ export function DashboardUsoDialog({
             {/* Sin uso */}
             <section>
               <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                <AlertCircle className="h-4 w-4 text-amber" />
+                <AlertCircle className="h-4 w-4 text-ink" />
                 Sin movimiento hace +{dataQ.data.dias_sin_uso_threshold} días
                 <span className="text-xs text-muted-foreground font-normal">
                   · candidatos a revisar/vender
@@ -278,11 +277,7 @@ export function DashboardUsoDialog({
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-xs tabular-nums font-medium">
-                            {e.valor_reposicion
-                              ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}`
-                              : "—"}
-                          </div>
+                          <Monto value={e.valor_reposicion} moneda="USD" className="text-xs" />
                           <div className="text-2xs text-muted-foreground tabular-nums">
                             {e.total_alquileres} total
                           </div>
@@ -356,10 +351,8 @@ export function DashboardUsoDialog({
                           <TableCell className="text-right tabular-nums text-muted-foreground text-xs">
                             {e.total_alquileres}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums text-xs">
-                            {e.valor_reposicion
-                              ? `USD ${e.valor_reposicion.toLocaleString("es-AR")}`
-                              : "—"}
+                          <TableCell className="text-right">
+                            <Monto value={e.valor_reposicion} moneda="USD" className="text-xs" />
                           </TableCell>
                         </TableRow>
                       );
@@ -372,7 +365,7 @@ export function DashboardUsoDialog({
             {/* Cuentas por cobrar */}
             <section>
               <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 text-amber" /> Por cobrar
+                <DollarSign className="h-4 w-4 text-ink" /> Por cobrar
                 <span className="text-xs text-muted-foreground font-normal">
                   · pedidos confirmados con monto pendiente
                 </span>
@@ -405,9 +398,7 @@ export function DashboardUsoDialog({
                             </Badge>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-xs tabular-nums font-medium text-amber">
-                              {fmtMoneda(p.pendiente)}
-                            </div>
+                            <Monto value={p.pendiente} tone="debt" className="text-xs" />
                             <div className="text-2xs text-muted-foreground tabular-nums">
                               de {fmtMoneda(p.monto_total)}
                             </div>
@@ -459,8 +450,8 @@ export function DashboardUsoDialog({
                             <TableCell className="text-right tabular-nums text-xs">
                               {fmtMoneda(p.monto_total)}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums text-xs font-medium text-amber">
-                              {fmtMoneda(p.pendiente)}
+                            <TableCell className="text-right">
+                              <Monto value={p.pendiente} tone="debt" className="text-xs" />
                             </TableCell>
                           </TableRow>
                         ))}

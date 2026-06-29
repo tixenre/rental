@@ -13,11 +13,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Send, Eye, Pencil, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import {
+  Send,
+  Eye,
+  Pencil,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Mail,
+} from "lucide-react";
 
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
+import { EmptyState } from "@/components/rental/EmptyState";
+import { ErrorState } from "@/components/admin/ErrorState";
+import { ListSkeleton, TableSkeleton } from "@/components/admin/skeletons";
 import { Button } from "@/design-system/ui/button";
+import { Pill } from "@/design-system/kit/Pill";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Input } from "@/design-system/ui/input";
+import { Textarea } from "@/design-system/ui/textarea";
 import { Label } from "@/design-system/ui/label";
 import { Switch } from "@/design-system/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/design-system/ui/tabs";
@@ -111,19 +126,23 @@ export function EmailsAdmin() {
           </p>
         </div>
 
-        {listQ.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
+        {listQ.isLoading && <ListSkeleton rows={5} />}
 
         {!listQ.isLoading && items.length === 0 && (
-          <div className="rounded-md border hairline bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-            No hay templates. Si recién corriste la migración, refrescá.
-          </div>
+          <EmptyState
+            icon={<Mail className="h-6 w-6" />}
+            title="No hay templates"
+            sub="Si recién corriste la migración, refrescá."
+          />
         )}
 
-        <div className="divide-y hairline border hairline rounded-md overflow-hidden">
-          {items.map((t) => (
-            <TemplateRow key={t.key} tpl={t} onEdit={() => setEditingKey(t.key)} />
-          ))}
-        </div>
+        {!listQ.isLoading && items.length > 0 && (
+          <div className="divide-y hairline border hairline rounded-md overflow-hidden">
+            {items.map((t) => (
+              <TemplateRow key={t.key} tpl={t} onEdit={() => setEditingKey(t.key)} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Recordatorio de retiro */}
@@ -370,36 +389,24 @@ function EmailsLog() {
         ))}
       </div>
 
-      {q.isLoading && <div className="text-sm text-muted-foreground">Cargando…</div>}
-      {q.isError && (
-        <div className="text-sm text-destructive">Error: {(q.error as Error).message}</div>
+      {q.isLoading && <TableSkeleton rows={6} cols={5} />}
+      {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
+
+      {!q.isLoading && !q.isError && items.length === 0 && (
+        <EmptyState
+          icon={<Send className="h-6 w-6" />}
+          title="No hay envíos registrados todavía"
+          sub="Cuando se mande un mail va a aparecer acá."
+        />
       )}
 
-      {!q.isLoading && items.length === 0 && (
-        <div className="rounded-md border hairline bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-          No hay envíos registrados todavía.
-        </div>
-      )}
-
-      {items.length > 0 && (
-        <div className="overflow-x-auto rounded-md border hairline">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/30 text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 text-left font-medium">Fecha</th>
-                <th className="px-3 py-2 text-left font-medium">Estado</th>
-                <th className="px-3 py-2 text-left font-medium">Plantilla</th>
-                <th className="px-3 py-2 text-left font-medium">Destinatario</th>
-                <th className="px-3 py-2 text-left font-medium">Detalle</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y hairline">
-              {items.map((e) => (
-                <EmailLogRow key={e.id} entry={e} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {!q.isError && items.length > 0 && (
+        <AdminTable
+          columns={EMAIL_LOG_COLUMNS}
+          rows={items}
+          getRowKey={(e) => e.id}
+          rowClassName={() => "align-top"}
+        />
       )}
 
       {total > PAGE && (
@@ -431,50 +438,52 @@ function EmailsLog() {
   );
 }
 
-function EmailLogRow({ entry }: { entry: EmailLogEntry }) {
-  const meta = TEMPLATE_META[entry.template_key];
-  const ok = entry.status === "sent";
-  const failed = entry.status === "failed";
-  return (
-    <tr className="align-top">
-      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-muted-foreground">
-        {entry.sent_at
-          ? new Date(entry.sent_at).toLocaleString("es-AR", {
-              day: "2-digit",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "—"}
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">
-        <span
-          className={`inline-block rounded-full px-2 py-0.5 text-2xs font-medium ${
-            ok
-              ? "bg-verde/10 text-verde-ink border border-verde/30"
-              : failed
-                ? "bg-destructive/10 text-destructive border border-destructive/30"
-                : "bg-muted/40 text-muted-foreground border hairline"
-          }`}
-        >
-          {entry.status}
+const EMAIL_LOG_COLUMNS: Column<EmailLogEntry>[] = [
+  {
+    header: "Fecha",
+    className: "whitespace-nowrap font-mono text-xs text-muted-foreground",
+    cell: (entry) =>
+      entry.sent_at
+        ? new Date(entry.sent_at).toLocaleString("es-AR", {
+            day: "2-digit",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "—",
+  },
+  {
+    header: "Estado",
+    className: "whitespace-nowrap",
+    cell: (entry) => {
+      const tone =
+        entry.status === "sent" ? "success" : entry.status === "failed" ? "danger" : "neutral";
+      return <Pill tone={tone}>{entry.status}</Pill>;
+    },
+  },
+  {
+    header: "Plantilla",
+    cell: (entry) => TEMPLATE_META[entry.template_key]?.label ?? entry.template_key,
+  },
+  {
+    header: "Destinatario",
+    className: "font-mono text-xs",
+    cell: (entry) => entry.to_addr,
+  },
+  {
+    header: "Detalle",
+    className: "text-muted-foreground",
+    cell: (entry) =>
+      entry.error ? (
+        <span className="text-destructive">{entry.error}</span>
+      ) : (
+        <span className="font-mono text-xs text-muted-foreground/70">
+          {entry.provider}
+          {entry.provider_id ? ` · ${entry.provider_id}` : ""}
         </span>
-      </td>
-      <td className="px-3 py-2">{meta?.label ?? entry.template_key}</td>
-      <td className="px-3 py-2 font-mono text-xs">{entry.to_addr}</td>
-      <td className="px-3 py-2 text-muted-foreground">
-        {entry.error ? (
-          <span className="text-destructive">{entry.error}</span>
-        ) : (
-          <span className="font-mono text-xs text-muted-foreground/70">
-            {entry.provider}
-            {entry.provider_id ? ` · ${entry.provider_id}` : ""}
-          </span>
-        )}
-      </td>
-    </tr>
-  );
-}
+      ),
+  },
+];
 
 // ── Banner de estado del canal ───────────────────────────────────────────────
 
@@ -487,7 +496,7 @@ function EmailChannelBanner({ status }: { status: EmailChannelStatus }) {
   if (!status.activo) {
     return (
       <div className="rounded-md border border-amber/40 bg-amber/10 p-4 flex items-start gap-3">
-        <AlertTriangle className="h-5 w-5 text-amber shrink-0 mt-0.5" />
+        <AlertTriangle className="h-5 w-5 text-ink shrink-0 mt-0.5" />
         <div className="text-sm">
           <div className="font-display text-ink">El canal de mail está apagado</div>
           <p className="text-muted-foreground mt-0.5">
@@ -502,7 +511,7 @@ function EmailChannelBanner({ status }: { status: EmailChannelStatus }) {
   }
   return (
     <div className="rounded-md border border-verde/30 bg-verde/10 p-4 flex items-start gap-3">
-      <CheckCircle2 className="h-5 w-5 text-verde shrink-0 mt-0.5" />
+      <CheckCircle2 className="h-5 w-5 text-verde-ink shrink-0 mt-0.5" />
       <div className="text-sm">
         <div className="font-display text-ink">
           Canal de mail activo · {provLabel[status.provider] ?? status.provider}
@@ -638,29 +647,27 @@ function EditTab({
         </div>
         <div>
           <Label className="text-xs">Body HTML</Label>
-          <textarea
+          <Textarea
             value={form.body_html}
             onChange={(e) => setForm({ ...form, body_html: e.target.value })}
             rows={12}
-            className="w-full rounded-md border hairline bg-surface px-3 py-2 text-xs font-mono leading-relaxed focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none"
+            className="text-xs font-mono leading-relaxed"
             placeholder="<p>Hola {{ cliente_nombre }}…</p>"
           />
         </div>
         <div>
           <Label className="text-xs">Body texto plano</Label>
-          <textarea
+          <Textarea
             value={form.body_text}
             onChange={(e) => setForm({ ...form, body_text: e.target.value })}
             rows={8}
-            className="w-full rounded-md border hairline bg-surface px-3 py-2 text-xs font-mono leading-relaxed focus:border-amber focus:ring-[3px] focus:ring-amber/20 focus:outline-none"
+            className="text-xs font-mono leading-relaxed"
             placeholder="Hola {{ cliente_nombre }}…"
           />
         </div>
       </div>
       <aside className="border-l hairline pl-4">
-        <div className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
-          Variables
-        </div>
+        <div className="t-eyebrow mb-2">Variables</div>
         <ul className="space-y-1.5 text-xs">
           {AVAILABLE_VARS.map((v) => (
             <li key={v.name}>
