@@ -91,3 +91,42 @@ def test_precios_combo_batch_sin_ids_no_consulta():
     from services.precios import precios_combo_batch
 
     assert precios_combo_batch(_FakeConn([]), []) == {}
+
+
+# ── Candado de PREVENCIÓN: batch (catálogo) == single (ficha/cotizar) ───────────
+
+
+class _DualFakeConn:
+    """Responde el SELECT single de `precio_combo` (sin `equipo_id` en las filas) Y el
+    batch de `precios_combo_batch` (con `equipo_id`) con los MISMOS componentes — para
+    verificar que ambos caminos dan idéntico precio de combo (no pueden divergir)."""
+
+    def __init__(self, combo_id, componentes):
+        self._id = combo_id
+        self._comps = componentes
+
+    def execute(self, sql, params=None):
+        if "ANY" in sql:  # batch: filas con equipo_id
+            ids = set(params[0]) if params else set()
+            rows = (
+                [{**c, "equipo_id": self._id} for c in self._comps]
+                if self._id in ids else []
+            )
+        else:  # single (precio_combo): filas sin equipo_id
+            rows = list(self._comps)
+        return _FakeCursor(rows)
+
+
+def test_batch_y_single_dan_el_mismo_precio_de_combo():
+    """Prevención: el precio de combo del catálogo (`precios_combo_batch`) y el de la
+    ficha/carrito (`precio_combo`) tienen que coincidir SIEMPRE — los dos derivan de
+    `_precio_combo_calc`. Si alguien cambia una fórmula y no la otra, esto falla y el
+    drift catálogo≠cobrado no puede volver."""
+    from services.precios import precio_combo, precios_combo_batch
+
+    comps = [
+        {"precio_jornada": 1000, "cantidad": 2, "descuento_pct": 10},
+        {"precio_jornada": 500, "cantidad": 1, "descuento_pct": 70},
+    ]
+    conn = _DualFakeConn(42, comps)
+    assert precios_combo_batch(conn, [42])[42] == precio_combo(conn, 42)
