@@ -25,6 +25,9 @@ import { crearCompartido, type CompartirItem } from "@/lib/compartir";
 import { shareLink } from "@/lib/share";
 import { cn } from "@/lib/utils";
 
+/** Texto que acompaña al link, para no mandar un link pelado (mobile share + copia desktop). */
+const MENSAJE_COMPARTIR = "Te comparto este listado de equipos para armar un pedido 👇";
+
 export function CompartirComposicionButton({
   items,
   className,
@@ -48,9 +51,9 @@ export function CompartirComposicionButton({
     setBusy(true);
     try {
       const { url } = await crearCompartido(items, null);
-      const res = await shareLink(url);
-      if (res === "copied") toast.success("Copiamos el link para compartir.");
-      else if (res === "shared") toast.success("¡Link listo para compartir!");
+      const res = await shareLink(url, undefined, MENSAJE_COMPARTIR);
+      if (res === "copied") toast.success("Copiamos el mensaje para compartir.");
+      else if (res === "shared") toast.success("¡Listo para compartir!");
       // "cancelled" (cerró la hoja de compartir nativa) → sin toast, no es error.
     } catch (e) {
       toast.error((e as Error).message || "No se pudo crear el link.");
