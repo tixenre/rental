@@ -123,6 +123,14 @@ El **anchor de identidad** (y la recuperación: perdés el dispositivo → entr�
 Flujo login: `login/begin` (challenge) → el browser firma → `login/complete` (verifica, chequea replay,
 revalida `is_admin_email` si es admin) → `_make_session_response`. **Rate-limit por IP** en begin+complete.
 
+Flujo **alta passwordless** (signup, estilo Vercel — **solo cliente**): `signup/begin` (challenge con flag
+`signup`) → el browser **crea** la passkey → `signup/complete` (verifica el registro y, en **una transacción
+atómica**, inserta una **cuenta liviana** + su passkey) → `_make_session_response`. La cuenta nace solo con
+`id` + passkey (sin nombre/mail/datos: los campos base de `clientes` se relajaron a NULL y la passkey lleva
+`owner_email=''`); `cuenta_estado='liviana'`. **No requiere sesión previa** (la crea) y queda **inerte** —
+`require_cliente_verificado` la bloquea hasta que Didit complete la identidad/contacto al primer pedido.
+Rate-limit por IP (anti-spam); `409` si la passkey ya existía. El **admin no tiene signup** (allowlist).
+
 ### Staging-login — `auth/staging.py`
 Para que la **sesión automatizada pruebe flujos logueados en staging** (no solo el camino 401).
 - `GET /auth/dev-login[-cliente]` — solo dev (`ADMIN_BYPASS_AUTH`, nunca Railway).
@@ -167,6 +175,7 @@ el guard del handler sigue siendo el chequeo fino).
 | `GET`·`POST /auth/logout` | `google.py` | Logout (revoca el jti + borra cookie). |
 | `GET /auth/me` · `/auth/config` | `google.py` | Estado de sesión / config pública del login. |
 | `POST /auth/passkey/login/begin`·`/complete` | `passkey/routes.py` | Login discoverable (admin + cliente). |
+| `POST /auth/passkey/signup/begin`·`/complete` | `passkey/routes.py` | **Alta passwordless** (solo cliente): crea cuenta liviana + passkey + sesión, **sin sesión previa**. |
 | `POST /auth/passkey/register/begin`·`/complete` | `passkey/routes.py` | Registrar passkey (admin). |
 | `…/cliente/auth/passkey/register/…` · `…/credentials[...]` | `passkey/routes.py` | Registro + gestión de passkeys del cliente. |
 | `GET·DELETE·PATCH /auth/passkey/credentials[/{id}]` | `passkey/routes.py` | Gestión de passkeys del admin. |
@@ -207,10 +216,13 @@ el guard del handler sigue siendo el chequeo fino).
   exento) → **siempre** poner el guard `require_cliente` in-handler (como passkey y sesiones).
 - **Punto único de minteo:** cualquier login nuevo debe pasar por `_make_session_response` (así obtiene
   `jti` + queda revocable). El supervisor marca un `set_cookie("session", …)` crudo por fuera.
+- **Cuentas livianas (alta passwordless):** la cuenta nace sin datos (`clientes` base NULL, `owner_email=''`
+  en la passkey, `cuenta_estado='liviana'`); el minteo tolera email/nombre NULL. Inerte hasta Didit
+  (`require_cliente_verificado`). _(Fase 4 de #1098; el criterio está pendiente de promover a MEMORIA — owner-gated.)_
 
-> Las decisiones de fondo de este módulo (**auth multi-método**, **consolidación en `auth/`**, **revocación
-> con jti**) todavía no están en `MEMORIA.md` — el supervisor propuso un ADR "Auth multi-método". Se
-> promueven a la memoria con aprobación del dueño; mientras tanto, el registro son los PR #1095/#1100/#1102/#1103.
+> Las decisiones de fondo de este módulo ya viven en MEMORIA/DECISIONES: **`backend/auth/` = motor único de
+> autenticación** y **revocación de sesión con `jti` + allowlist** (ambas _2026-06-29_). Historia: PR
+> #1095/#1100/#1102/#1103.
 
 ---
 
