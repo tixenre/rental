@@ -58,7 +58,7 @@ export function AccessMethods() {
   const addPasskeyMut = useMutation({
     mutationFn: () => registerPasskey("cliente"),
     onSuccess: () => {
-      toast.success("Passkey agregada");
+      toast.success("Clave de acceso agregada");
       qc.invalidateQueries({ queryKey: QUERY_KEY });
     },
     onError: (e) => toast.error(passkeyErrorMessage(e)),
@@ -71,8 +71,8 @@ export function AccessMethods() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground leading-relaxed">
-        Estas son tus formas de entrar. Tené al menos dos —una passkey y tu Google— para no quedarte
-        afuera si perdés un dispositivo.
+        Estas son tus formas de entrar. Tené al menos dos —una clave de acceso y tu Google— para no
+        quedarte afuera si perdés un dispositivo.
       </p>
 
       {q.isLoading ? (
@@ -98,7 +98,7 @@ export function AccessMethods() {
             loading={addPasskeyMut.isPending}
             disabled={addPasskeyMut.isPending}
           >
-            <KeyRound /> Agregar passkey
+            <KeyRound /> Agregar clave de acceso
           </Button>
         )}
         <Button
@@ -192,7 +192,7 @@ function AccessKeyRow({ k, isOnly }: { k: AccessKey; isOnly: boolean }) {
           <>
             <div className="truncate text-sm font-medium text-ink">{k.label}</div>
             <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
-              {fmtFecha(k.created_at, k.last_used_at)}
+              {typeLabel(k.kind)} · {fmtFecha(k.created_at, k.last_used_at)}
             </div>
           </>
         )}
@@ -236,6 +236,14 @@ function AccessKeyRow({ k, isOnly }: { k: AccessKey; isOnly: boolean }) {
       )}
     </li>
   );
+}
+
+/** Tipo de la llave en claro — para que una passkey con nombre raro (un mail viejo) no
+ * se confunda con la cuenta de Google. */
+function typeLabel(kind: AccessKey["kind"]): string {
+  if (kind === "google") return "Google";
+  if (kind === "email") return "Mail";
+  return "Clave de acceso";
 }
 
 function fmtFecha(created: string | null, lastUsed: string | null): string {

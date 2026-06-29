@@ -1,9 +1,10 @@
 /**
  * ClientePortalHelpers.tsx — Componentes de navegación y secciones del portal.
  *
- * Extraído de cliente.portal.tsx (move-verbatim, sin cambios de lógica).
- * Contiene: SidebarNavItem, BottomNavItem, NotificacionesSection,
- * IdentidadSection, PerfilSection.
+ * Extraído de cliente.portal.tsx. Contiene: SidebarNavItem, BottomNavItem,
+ * NotificacionesSection, IdentidadSection, PerfilSection (+ DatosForm, Field).
+ * PerfilSection unifica toda la cuenta del cliente (datos editables, identidad,
+ * métodos de acceso y sesiones) — antes repartida con la página /cliente/perfil.
  */
 
 import { useState } from "react";
@@ -15,9 +16,6 @@ import {
   LogOut,
   Lock,
   MapPin,
-  Mail,
-  Phone,
-  Building2,
   Receipt,
   FileText,
   Clock,
@@ -25,12 +23,15 @@ import {
   BadgeCheck,
   ShieldAlert,
   ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { nombreCliente } from "@/lib/cliente-nombre";
-import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { formatARS } from "@/lib/format";
 import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
+import { AccessMethods } from "@/components/rental/AccessMethods";
+import { SessionManager } from "@/components/rental/SessionManager";
+import { invalidateClienteSession } from "@/lib/iva";
 import type { Perfil } from "./ClientePortalTypes";
 
 // ── Navegación: sidebar item ──────────────────────────────────────────────────
@@ -423,8 +424,9 @@ export function PerfilSection({
         mi perfil.
       </h2>
 
-      {/* Avatar + nombre */}
-      <div className="flex items-center gap-4 mb-6">
+      {/* Avatar + nombre. Las llaves de acceso reales se muestran abajo (Métodos de
+          acceso), por eso no va un badge fijo de Google acá (puede ser passkey-only). */}
+      <div className="flex items-center gap-4 mb-8">
         <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-amber">
           <span className="font-display font-black text-xl text-ink leading-none">{initial}</span>
         </div>
@@ -436,57 +438,15 @@ export function PerfilSection({
               {memberSince}
             </div>
           )}
-          {/* Badge Google (siempre OAuth) */}
-          <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border hairline px-2 py-0.5">
-            <GoogleIcon size={12} />
-            <span className="font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground">
-              Google
-            </span>
-          </div>
         </div>
       </div>
 
-      {/* Datos de contacto */}
-      <div className="rounded-lg border hairline bg-card divide-y divide-hairline mb-4">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="font-sans text-sm text-ink flex-1 min-w-0 truncate">{perfil.email}</span>
-          <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground">
-            <Lock className="h-2.5 w-2.5" /> Verificado
-          </span>
-        </div>
-        {perfil.telefono && (
-          <div className="flex items-center gap-3 px-4 py-3">
-            <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="font-sans text-sm text-ink flex-1">{perfil.telefono}</span>
-            <span className="inline-flex items-center gap-1 font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground">
-              <Lock className="h-2.5 w-2.5" /> Verificado
-            </span>
-          </div>
-        )}
-        {perfil.direccion && (
-          <div className="flex items-center gap-3 px-4 py-3">
-            <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="font-sans text-sm text-ink flex-1 min-w-0 truncate">
-              {perfil.direccion}
-            </span>
-          </div>
-        )}
-        {perfil.cuit && (
-          <div className="flex items-center gap-3 px-4 py-3">
-            <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="font-sans text-sm text-ink">CUIT {perfil.cuit}</span>
-          </div>
-        )}
-      </div>
-
-      <p className="font-sans text-xs text-muted-foreground mb-6 leading-[1.5]">
-        Estos datos son los que usamos para los contratos y remitos. Si necesitás actualizarlos,
-        contactanos por WhatsApp.
-      </p>
+      {/* Datos (editables): contacto + facturación. Reemplaza la card read-only —
+          antes se editaban en la página /cliente/perfil aparte, ahora viven acá. */}
+      <DatosForm perfil={perfil} onPerfilChange={onPerfilChange} />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 mb-6">
+      <div className="grid grid-cols-2 gap-2 mt-8 mb-6">
         <div className="rounded-lg border hairline bg-card px-4 py-3 text-center">
           {/* eslint-disable-next-line no-restricted-syntax -- stat number display: entre text-2xl (24px) y text-3xl (30px) */}
           <div className="font-sans font-extrabold text-[26px] text-ink leading-none tabular-nums">
@@ -519,6 +479,22 @@ export function PerfilSection({
         />
       </div>
 
+      {/* Métodos de acceso (passkeys + Google) — antes vivían en /cliente/perfil */}
+      <div className="border-t hairline pt-6 mb-6">
+        <h3 className="font-display text-lg font-black text-ink tracking-[-0.01em] mb-4">
+          métodos de acceso.
+        </h3>
+        <AccessMethods />
+      </div>
+
+      {/* Sesiones activas — antes vivían en /cliente/perfil */}
+      <div className="border-t hairline pt-6 mb-6">
+        <h3 className="font-display text-lg font-black text-ink tracking-[-0.01em] mb-4">
+          sesiones activas.
+        </h3>
+        <SessionManager scope="cliente" />
+      </div>
+
       {/* Logout */}
       <button
         type="button"
@@ -527,6 +503,209 @@ export function PerfilSection({
       >
         <LogOut className="h-4 w-4" /> Cerrar sesión
       </button>
+    </div>
+  );
+}
+
+// ── Form de datos editables (contacto + facturación) ──────────────────────────
+// Movido de la página /cliente/perfil (ahora redirige acá). Identidad (nombre legal /
+// DNI / CUIL de RENAPER) NO se edita acá — eso es solo lectura en IdentidadSection.
+
+type PerfilImpuestos = "consumidor_final" | "responsable_inscripto" | "monotributo" | "exento";
+
+function DatosForm({
+  perfil,
+  onPerfilChange,
+}: {
+  perfil: Perfil;
+  onPerfilChange: (p: Perfil) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<Partial<Perfil>>({
+    nombre: perfil.nombre,
+    apellido: perfil.apellido,
+    telefono: perfil.telefono,
+    direccion: perfil.direccion,
+    cuit: perfil.cuit ?? "",
+    perfil_impuestos: perfil.perfil_impuestos ?? "consumidor_final",
+    razon_social: perfil.razon_social ?? "",
+    domicilio_fiscal: perfil.domicilio_fiscal ?? "",
+    email_facturacion: perfil.email_facturacion ?? "",
+  });
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await authedFetch("/api/cliente/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.detail ?? `Error ${res.status}`);
+      }
+      const updated = (await res.json()) as Perfil;
+      onPerfilChange({ ...perfil, ...updated });
+      // Refresca el perfil impositivo compartido (catálogo / carrito / ficha).
+      invalidateClienteSession();
+      toast.success("Perfil actualizado");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave} className="space-y-5">
+      <Field label="Email" hint="No se puede modificar acá">
+        <input
+          type="email"
+          value={perfil.email}
+          disabled
+          className="w-full rounded-md border hairline bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+        />
+      </Field>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Nombre">
+          <input
+            type="text"
+            value={form.nombre ?? ""}
+            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+            className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+            required
+          />
+        </Field>
+        <Field label="Apellido">
+          <input
+            type="text"
+            value={form.apellido ?? ""}
+            onChange={(e) => setForm({ ...form, apellido: e.target.value })}
+            className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+          />
+        </Field>
+      </div>
+
+      <Field label="Teléfono">
+        <input
+          type="tel"
+          value={form.telefono ?? ""}
+          onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+          placeholder="+54 9 223 ..."
+          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+        />
+      </Field>
+
+      <Field label="Dirección">
+        <input
+          type="text"
+          value={form.direccion ?? ""}
+          onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+          placeholder="Calle, número, ciudad"
+          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+        />
+      </Field>
+
+      <Field label="CUIT/CUIL" hint="Opcional — para facturación">
+        <input
+          type="text"
+          value={form.cuit ?? ""}
+          onChange={(e) => setForm({ ...form, cuit: e.target.value })}
+          placeholder="20-12345678-9"
+          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+        />
+      </Field>
+
+      <Field label="Perfil impositivo" hint="Determina cómo se discrimina el IVA en tus facturas">
+        <select
+          value={form.perfil_impuestos ?? "consumidor_final"}
+          onChange={(e) =>
+            setForm({ ...form, perfil_impuestos: e.target.value as PerfilImpuestos })
+          }
+          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+        >
+          <option value="consumidor_final">Consumidor final</option>
+          <option value="responsable_inscripto">Responsable inscripto (Factura A)</option>
+          <option value="monotributo">Monotributo</option>
+          <option value="exento">Exento</option>
+        </select>
+      </Field>
+
+      {/* Datos para Factura A — sólo visibles si el cliente es RI */}
+      {form.perfil_impuestos === "responsable_inscripto" && (
+        <div className="rounded-md border border-dashed hairline bg-amber-soft/40 p-4 space-y-3">
+          <div className="text-xs font-semibold text-ink uppercase tracking-wider">
+            Datos para Factura A
+          </div>
+          <Field label="Razón social" hint="Nombre legal de tu empresa">
+            <input
+              type="text"
+              value={form.razon_social ?? ""}
+              onChange={(e) => setForm({ ...form, razon_social: e.target.value })}
+              placeholder="Productora SA"
+              className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+            />
+          </Field>
+          <Field label="Domicilio fiscal" hint="Si difiere del domicilio de entrega">
+            <input
+              type="text"
+              value={form.domicilio_fiscal ?? ""}
+              onChange={(e) => setForm({ ...form, domicilio_fiscal: e.target.value })}
+              placeholder="Av. Siempre Viva 123, Mar del Plata"
+              className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+            />
+          </Field>
+          <Field label="Email de facturación" hint="Si querés que la factura llegue a otro email">
+            <input
+              type="email"
+              value={form.email_facturacion ?? ""}
+              onChange={(e) => setForm({ ...form, email_facturacion: e.target.value })}
+              placeholder="facturacion@empresa.com"
+              className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+            />
+          </Field>
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={saving}
+        className="w-full inline-flex items-center justify-center gap-2 rounded-[10px] bg-ink h-[46px] font-sans text-15 font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-50"
+      >
+        {saving ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" /> Guardando…
+          </>
+        ) : (
+          "Guardar cambios"
+        )}
+      </button>
+    </form>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block">
+        <span className="font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground">
+          {label}
+        </span>
+        {hint && <span className="block text-xs text-muted-foreground/80 mt-0.5">{hint}</span>}
+      </label>
+      {children}
     </div>
   );
 }

@@ -29,5 +29,5 @@ export async function removeAccessKey(kind: "passkey" | "identity", id: number):
 }
 
 /** Inicia el OAuth de Google en link-mode (vincular a la cuenta logueada). El
- * callback vuelve a /cliente/perfil?keys=<estado>. */
+ * callback vuelve a /cliente/portal?tab=perfil&keys=<estado>. */
 export const GOOGLE_LINK_URL = "/cliente/auth/google/link";

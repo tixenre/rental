@@ -38,7 +38,7 @@ export function PasskeyManager({ scope }: { scope: PasskeyScope }) {
   const addMut = useMutation({
     mutationFn: () => registerPasskey(scope),
     onSuccess: () => {
-      toast.success("Passkey agregada");
+      toast.success("Clave de acceso agregada");
       qc.invalidateQueries({ queryKey });
     },
     onError: (e) => toast.error(passkeyErrorMessage(e)),
@@ -55,7 +55,7 @@ export function PasskeyManager({ scope }: { scope: PasskeyScope }) {
 
       {!supported ? (
         <div className="rounded-md border border-amber/30 bg-amber/10 px-3 py-2 text-xs text-ink">
-          Tu navegador no soporta passkeys. Probá con Chrome, Safari o Edge actualizados.
+          Tu navegador no soporta claves de acceso. Probá con Chrome, Safari o Edge actualizados.
         </div>
       ) : (
         <>
@@ -63,7 +63,7 @@ export function PasskeyManager({ scope }: { scope: PasskeyScope }) {
             <div className="text-sm text-muted-foreground">Cargando…</div>
           ) : creds.length === 0 ? (
             <div className="rounded-md border border-dashed hairline px-3 py-4 text-sm text-muted-foreground">
-              Todavía no registraste ninguna passkey.
+              Todavía no registraste ninguna clave de acceso.
             </div>
           ) : (
             <ul className="space-y-2">
@@ -80,7 +80,7 @@ export function PasskeyManager({ scope }: { scope: PasskeyScope }) {
             loading={addMut.isPending}
             disabled={addMut.isPending}
           >
-            <KeyRound /> Agregar passkey
+            <KeyRound /> Agregar clave de acceso
           </Button>
         </>
       )}
@@ -99,7 +99,7 @@ function PasskeyRow({
 }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(cred.device_name ?? "Passkey");
+  const [name, setName] = useState(cred.device_name ?? "Clave de acceso");
   const [confirmDel, setConfirmDel] = useState(false);
 
   const renameMut = useMutation({
@@ -115,7 +115,7 @@ function PasskeyRow({
   const delMut = useMutation({
     mutationFn: () => deletePasskey(scope, cred.id),
     onSuccess: () => {
-      toast.success("Passkey eliminada");
+      toast.success("Clave de acceso eliminada");
       qc.invalidateQueries({ queryKey });
     },
     onError: (e) => toast.error(passkeyErrorMessage(e)),
@@ -149,7 +149,7 @@ function PasskeyRow({
               variant="ghost"
               onClick={() => {
                 setEditing(false);
-                setName(cred.device_name ?? "Passkey");
+                setName(cred.device_name ?? "Clave de acceso");
               }}
             >
               Cancelar
@@ -158,7 +158,7 @@ function PasskeyRow({
         ) : (
           <>
             <div className="truncate text-sm font-medium text-ink">
-              {cred.device_name || "Passkey"}
+              {cred.device_name || "Clave de acceso"}
             </div>
             <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
               {fmtFecha(cred.created_at, cred.last_used_at)}
@@ -193,7 +193,7 @@ function PasskeyRow({
               size="sm"
               variant="ghost"
               onClick={() => setConfirmDel(true)}
-              aria-label="Eliminar passkey"
+              aria-label="Eliminar clave de acceso"
             >
               <Trash2 />
             </Button>

@@ -599,7 +599,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                 {isCliente && (
                   <div className="text-xs text-muted-foreground">
                     Para actualizar tus datos, andá a{" "}
-                    <Link to="/cliente/perfil" className="underline">
+                    <Link to="/cliente/portal" search={{ tab: "perfil" }} className="underline">
                       tu perfil
                     </Link>
                     .
