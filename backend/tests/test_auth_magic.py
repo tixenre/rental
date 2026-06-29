@@ -30,6 +30,8 @@ class _Conn:
         self.calls.append((s, tuple(params)))
         if s.startswith("UPDATE auth_challenges"):
             return _Cur({"id": 1} if self.update_row else None)
+        if s.startswith("SELECT 1 FROM auth_challenges"):  # peek
+            return _Cur({"x": 1} if self.update_row else None)
         return _Cur(None)
 
     def commit(self):
@@ -52,6 +54,14 @@ def test_crear_y_consumir_roundtrip():
     c2 = _Conn(update_row=True)
     assert magic.consumir(token, purpose="invitacion", conn=c2) == {"cliente_id": 7, "email": "a@b.com"}
     assert _sql(c2, "UPDATE auth_challenges")  # marcó usado (single-use)
+
+
+def test_peek_valida_sin_consumir():
+    token = magic.crear(email="a@b.com", purpose="invitacion", cliente_id=3, conn=_Conn())
+    c = _Conn(update_row=True)  # el SELECT de peek matchea (fila sin usar)
+    assert magic.peek(token, purpose="invitacion", conn=c) == {"cliente_id": 3, "email": "a@b.com"}
+    assert _sql(c, "SELECT 1 FROM auth_challenges")  # leyó…
+    assert not _sql(c, "UPDATE")  # …NO consumió
 
 
 def test_consumir_purpose_distinto_no_toca_la_tabla():

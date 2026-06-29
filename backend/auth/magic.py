@@ -49,6 +49,30 @@ def crear(*, email: str, purpose: str, cliente_id: int | None = None, conn=None)
     return token
 
 
+def peek(token: str, *, purpose: str, conn=None) -> dict | None:
+    """Valida SIN consumir (para previsualizar la invitación en el landing). Devuelve
+    `{cliente_id, email}` o `None` (firma inválida/vencida, purpose distinto, o ya
+    usado/vencido en la tabla). El single-use real lo hace `consumir` al reclamar."""
+    try:
+        data = signer.loads(token, max_age=int(TTL.total_seconds()))
+    except (BadSignature, SignatureExpired):
+        return None
+    if data.get("p") != purpose:
+        return None
+    own = conn is None
+    conn = conn or get_db()
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM auth_challenges "
+            "WHERE token_hash = %s AND used_at IS NULL AND expires_at > %s",
+            (_hash(data.get("k", "")), now_ar()),
+        ).fetchone()
+        return {"cliente_id": data.get("cid"), "email": data.get("email")} if row else None
+    finally:
+        if own:
+            conn.close()
+
+
 def consumir(token: str, *, purpose: str, conn=None) -> dict | None:
     """Valida Y CONSUME (single-use) un magic-link. Devuelve `{cliente_id, email}` o `None`.
     `None` si: firma inválida/vencida, `purpose` distinto, o el nonce ya fue usado /

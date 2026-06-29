@@ -7,9 +7,13 @@ from typing import Optional
 from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
 
+from urllib.parse import quote
+
 from database import get_db, row_to_dict
 from auth.guards import require_admin
+from auth import magic
 from busqueda import construir
+from config import settings
 from identity import merge
 
 router = APIRouter()
@@ -180,6 +184,46 @@ def merge_clientes(body: MergeClientesIn, request: Request):
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"ok": True, "merged_into": body.target}
+
+
+class InvitarClienteIn(BaseModel):
+    email: str
+    nombre: Optional[str] = None
+    telefono: Optional[str] = None
+
+
+@router.post("/clientes/invitar")
+def invitar_cliente(body: InvitarClienteIn, request: Request):
+    """Crea (o reusa) una cuenta por email y devuelve un LINK de invitación single-use
+    para que el cliente la reclame (active la cuenta + registre su passkey). El admin lo
+    manda por donde quiera — mismo patrón que el link de verificación (no se manda mail
+    desde acá: el motor de mail es por plantilla; el admin copia el link). El email se
+    valida/locked recién con Didit; el nombre/teléfono del admin son provisionales."""
+    require_admin(request)
+    email = (body.email or "").strip().lower()
+    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+        raise HTTPException(400, "Email inválido")
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
+        ).fetchone()
+        if row:
+            cliente_id, ya_existia = row["id"], True
+        else:
+            cliente_id = conn.insert_returning(
+                "INSERT INTO clientes (email, nombre, telefono, cuenta_estado) "
+                "VALUES (%s, %s, %s, 'liviana')",
+                (email, (body.nombre or "").strip() or None, (body.telefono or "").strip() or None),
+            )
+            conn.commit()
+            ya_existia = False
+    token = magic.crear(email=email, purpose="invitacion", cliente_id=cliente_id)
+    return {
+        "ok": True,
+        "cliente_id": cliente_id,
+        "ya_existia": ya_existia,
+        "url": f"{settings.SITE_URL}/cliente/claim?t={quote(token, safe='')}",
+    }
 
 
 @router.get("/clientes/{id}")
