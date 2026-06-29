@@ -1,0 +1,144 @@
+"""identity/kyc.py — orquestación del KYC sobre Didit.
+
+Es el ÚNICO lugar que escribe la identidad validada de un cliente (nombre legal, DNI,
+CUIL, dirección oficial → columnas `*_renaper`) y el ancla CUIL. Recibe los datos ya
+NORMALIZADOS de `services/didit/` (DatosRenaper, ContactosVerificados); nunca ve el
+payload crudo de Didit. Movido desde `routes/didit.py` (que queda fino).
+
+Idempotente y scopeado al `didit_session_id` (defensa en profundidad anti vendor_data
+forjado, sobre la firma HMAC que ya validó el webhook). Re-verificación: el COALESCE
+deja entrar el dato nuevo de RENAPER (no pisa con NULL, ni con input del usuario).
+"""
+import logging
+
+from database import get_db, now_ar, row_to_dict
+from services.didit.decision import DatosRenaper
+
+from identity.anchor import cuil_valido, normalizar_cuil
+from identity.contacts import guardar_contactos_didit
+
+logger = logging.getLogger(__name__)
+
+
+def registrar_evento(conn, cliente_id, evento, detalle=None, session_id=None):
+    """Bitácora de auditoría del KYC. SOLO texto (Ley 25.326): `detalle` es para
+    diagnóstico (presencia de campos), nunca valores sensibles."""
+    conn.execute(
+        "INSERT INTO kyc_events (cliente_id, evento, detalle, session_id) VALUES (%s, %s, %s, %s)",
+        (cliente_id, evento, detalle, session_id),
+    )
+
+
+def registrar_consentimiento(cliente_id, *, conn=None):
+    """Marca el consentimiento del KYC (el cliente aceptó verificarse + el guardado).
+    Idempotente (no pisa la fecha original)."""
+    own = conn is None
+    conn = conn or get_db()
+    try:
+        with conn.transaction():
+            conn.execute(
+                "UPDATE clientes SET kyc_consent_at=COALESCE(kyc_consent_at, %s) WHERE id=%s",
+                (now_ar(), cliente_id),
+            )
+            registrar_evento(conn, cliente_id, "consent")
+    finally:
+        if own:
+            conn.close()
+
+
+def _presencia(datos: DatosRenaper) -> str:
+    """Detalle del evento: presencia de cada campo (bool), nunca el valor."""
+    return (
+        f"dni={bool(datos.dni)} cuil={bool(datos.cuil)} "
+        f"nombre={bool(datos.nombre_completo or datos.nombre)} "
+        f"direccion={bool(datos.direccion)}"
+    )
+
+
+def _session_coincide(conn, cliente_id, session_id) -> bool:
+    row = conn.execute(
+        "SELECT didit_session_id FROM clientes WHERE id=%s", (cliente_id,)
+    ).fetchone()
+    return row is not None and row_to_dict(row).get("didit_session_id") == session_id
+
+
+def aprobar(*, cliente_id, session_id, datos, contactos=None, conn=None) -> bool:
+    """Persiste una verificación Didit APROBADA: identidad RENAPER (COALESCE, única
+    pluma) + ancla CUIL (validado mod-11) + contactos verificados + evento. Atómico.
+    Devuelve False si el `session_id` no coincide (vendor_data forjado / carrera)."""
+    own = conn is None
+    conn = conn or get_db()
+    try:
+        if not _session_coincide(conn, cliente_id, session_id):
+            logger.warning("identity: session_id no coincide cliente_id=%s — no se aplica", cliente_id)
+            return False
+
+        cuil = normalizar_cuil(datos.cuil)
+        if cuil and not cuil_valido(cuil):
+            logger.warning("identity: CUIL mal formado de Didit cliente_id=%s (no se ancla)", cliente_id)
+            cuil = None  # mod-11 falló → no anclamos basura (COALESCE con None conserva)
+
+        ahora = now_ar()
+        with conn.transaction():
+            conn.execute(
+                """UPDATE clientes SET
+                       dni=COALESCE(%s, dni),
+                       cuil=COALESCE(%s, cuil),
+                       dni_validado_at=%s,
+                       dni_verificacion_estado='verificado',
+                       dni_verificacion_motivo=NULL,
+                       nombre_renaper=COALESCE(%s, nombre_renaper),
+                       apellido_renaper=COALESCE(%s, apellido_renaper),
+                       nombre_completo_renaper=COALESCE(%s, nombre_completo_renaper),
+                       fecha_nacimiento_renaper=COALESCE(%s, fecha_nacimiento_renaper),
+                       direccion_renaper=COALESCE(%s, direccion_renaper),
+                       genero_renaper=COALESCE(%s, genero_renaper),
+                       nacionalidad_renaper=COALESCE(%s, nacionalidad_renaper),
+                       lugar_nacimiento_renaper=COALESCE(%s, lugar_nacimiento_renaper),
+                       vencimiento_documento_renaper=COALESCE(%s, vencimiento_documento_renaper),
+                       emision_documento_renaper=COALESCE(%s, emision_documento_renaper),
+                       tipo_documento_renaper=COALESCE(%s, tipo_documento_renaper),
+                       estado_civil_renaper=COALESCE(%s, estado_civil_renaper),
+                       updated_at=%s
+                   WHERE id=%s AND didit_session_id=%s""",
+                (datos.dni, cuil, ahora,
+                 datos.nombre, datos.apellido, datos.nombre_completo,
+                 datos.fecha_nacimiento, datos.direccion,
+                 datos.genero, datos.nacionalidad, datos.lugar_nacimiento,
+                 datos.vencimiento_documento, datos.emision_documento,
+                 datos.tipo_documento, datos.estado_civil,
+                 ahora, cliente_id, session_id),
+            )
+            if contactos is not None:
+                guardar_contactos_didit(conn, cliente_id, contactos)
+            registrar_evento(conn, cliente_id, "approved", _presencia(datos), session_id)
+        # Log de PRESENCIA (bool), nunca valores (Ley 25.326).
+        logger.info("identity: cliente_id=%s verificado (%s) session_id=%s",
+                    cliente_id, _presencia(datos), session_id)
+        return True
+    finally:
+        if own:
+            conn.close()
+
+
+def actualizar_estado(*, cliente_id, session_id, estado, motivo=None, conn=None) -> bool:
+    """Persiste un estado intermedio de verificación (rechazado / en_revision) +
+    evento. Scopeado al `session_id`."""
+    own = conn is None
+    conn = conn or get_db()
+    try:
+        if not _session_coincide(conn, cliente_id, session_id):
+            logger.warning("identity: session_id no coincide cliente_id=%s — no se aplica", cliente_id)
+            return False
+        with conn.transaction():
+            conn.execute(
+                """UPDATE clientes SET dni_verificacion_estado=%s, dni_verificacion_motivo=%s,
+                       updated_at=%s WHERE id=%s AND didit_session_id=%s""",
+                (estado, motivo, now_ar(), cliente_id, session_id),
+            )
+            registrar_evento(conn, cliente_id, estado, None, session_id)
+        logger.info("identity: cliente_id=%s estado=%s session_id=%s", cliente_id, estado, session_id)
+        return True
+    finally:
+        if own:
+            conn.close()
