@@ -712,6 +712,7 @@ export function CartDrawer({
                     no pide sesión), así un gaffer le pasa el carrito a un productor sin cuenta. */}
                 {list.length > 0 && (
                   <CompartirComposicionButton
+                    label="Compartir pedido"
                     items={list.map(({ it, qty }) => ({
                       equipo_id: it._backendId ?? Number(it.id),
                       cantidad: qty,

@@ -9,6 +9,10 @@
  * opcional y la preview ya describe el listado, así que no lo pedimos — el gesto
  * es directo, como cualquier botón de "compartir" estándar.
  *
+ * Es un botón visible (variante `outline` del DS): secundario al CTA de confirmar,
+ * pero claramente clickeable. El `label` lo da el caller según el contexto
+ * ("Compartir pedido" en el carrito, "Compartir lista" en una lista).
+ *
  * Es PÚBLICO: anda logueado o anónimo (la puerta `/api/public/compartir` no pide
  * sesión). Guarda SOLO la composición (`equipo_id` + `cantidad`); el destinatario
  * la resuelve en vivo contra el catálogo y la rearma con `rearmarCarrito`.
@@ -16,6 +20,7 @@
 import { useState } from "react";
 import { Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/design-system/ui/button";
 import { crearCompartido, type CompartirItem } from "@/lib/compartir";
 import { shareLink } from "@/lib/share";
 import { cn } from "@/lib/utils";
@@ -23,10 +28,13 @@ import { cn } from "@/lib/utils";
 export function CompartirComposicionButton({
   items,
   className,
+  label = "Compartir",
 }: {
   /** Composición a compartir (equipo_id + cantidad). El backend dedup/clampa/filtra. */
   items: CompartirItem[];
   className?: string;
+  /** Texto del botón según el contexto (default "Compartir"). */
+  label?: string;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -52,17 +60,16 @@ export function CompartirComposicionButton({
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
       onClick={compartir}
-      disabled={vacio || busy}
-      className={cn(
-        "inline-flex w-full items-center justify-center gap-1.5 text-xs text-muted-foreground transition hover:text-ink focus:outline-none focus-visible:underline disabled:opacity-40",
-        className,
-      )}
+      disabled={vacio}
+      loading={busy}
+      className={cn("w-full", className)}
     >
-      <Share2 className="h-3.5 w-3.5" />
-      Compartir
-    </button>
+      {!busy && <Share2 />}
+      {label}
+    </Button>
   );
 }

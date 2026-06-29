@@ -394,7 +394,7 @@ function ListaCard({
             ya es {equipo_id, cantidad} → CompartirItem; el destinatario la rearma. */}
         {lista.items.length > 0 && (
           <div className="mt-3 max-w-xs">
-            <CompartirComposicionButton items={lista.items} />
+            <CompartirComposicionButton items={lista.items} label="Compartir lista" />
           </div>
         )}
       </div>

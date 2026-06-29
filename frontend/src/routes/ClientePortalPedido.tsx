@@ -739,6 +739,7 @@ export function PedidoCard({
                     }))}
                   />
                   <CompartirComposicionButton
+                    label="Compartir pedido"
                     items={itemsRepetibles.map((it) => ({
                       equipo_id: it.equipo_id as number,
                       cantidad: it.cantidad,
