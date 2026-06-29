@@ -17,7 +17,8 @@ import { Badge } from "@/design-system/ui/badge";
 import { Pill } from "@/design-system/kit/Pill";
 import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 import { Field } from "@/design-system/kit/Field";
-import { Monto, PrecioJornada } from "@/components/admin/Monto";
+import { Monto, PrecioUnidad } from "@/components/admin/Monto";
+import { unidadLabel } from "@/lib/format";
 import { EmptyState } from "@/components/rental/EmptyState";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { TableSkeleton } from "@/components/admin/skeletons";
@@ -191,7 +192,7 @@ export function DsCatalog() {
       {/* ── Plata ────────────────────────────────────────────────────── */}
       <Section
         title="Plata"
-        hint="Un componente por tipo de plata: <Monto> (montos, con tono y moneda) y <PrecioJornada> (precio de alquiler)."
+        hint="Un componente por tipo de plata: <Monto> (montos, con tono y moneda) y <PrecioUnidad> (precio de alquiler)."
       >
         <div className="space-y-3">
           <Row>
@@ -206,7 +207,20 @@ export function DsCatalog() {
             <Monto value={1200} moneda="USD" />
           </Row>
           <Row>
-            <PrecioJornada value={12000} />
+            <PrecioUnidad value={12000} />
+            <span className="text-muted-foreground">·</span>
+            <PrecioUnidad value={8000} unidad="hora" />
+            <span className="text-muted-foreground">·</span>
+            <PrecioUnidad value={12000} compact />
+            <span className="text-muted-foreground">·</span>
+            <PrecioUnidad value={8000} unidad="hora" compact />
+          </Row>
+          <Row>
+            <span className="text-sm text-ink">{unidadLabel(1)}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-sm text-ink">{unidadLabel(3)}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-sm text-ink">{unidadLabel(2, "hora")}</span>
           </Row>
         </div>
       </Section>

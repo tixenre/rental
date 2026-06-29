@@ -12,7 +12,7 @@ import { Input } from "@/design-system/ui/input";
 import { BottomSheet } from "@/components/mobile";
 import { adminApi, type Equipo } from "@/lib/admin/api";
 import { filtrarOrdenar } from "@/lib/search/normalize";
-import { PrecioJornada } from "@/components/admin/Monto";
+import { PrecioUnidad } from "@/components/admin/Monto";
 import { EquipoThumb } from "./EquipoThumb";
 import type { DraftItem } from "./usePedidoDraft";
 
@@ -128,7 +128,7 @@ export function EquipoSearchSheet({
                         {eq.precio_jornada ? (
                           <>
                             {" · "}
-                            <PrecioJornada value={eq.precio_jornada} />
+                            <PrecioUnidad value={eq.precio_jornada} />
                           </>
                         ) : (
                           ""

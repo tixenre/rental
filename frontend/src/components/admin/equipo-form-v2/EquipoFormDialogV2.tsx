@@ -72,7 +72,7 @@ import { uploadEquipoFotoFromUrl } from "@/lib/equipment/equipoFotos";
 import { PhotoGallery } from "@/components/common/PhotoGallery";
 import { authedJson } from "@/lib/authedFetch";
 import { useUsdRate, useRoiPctDefault, calcularPrecioJornada } from "@/hooks/useSettings";
-import { Monto, PrecioJornada } from "@/components/admin/Monto";
+import { Monto, PrecioUnidad } from "@/components/admin/Monto";
 import { KitEditor } from "./KitEditor";
 import { ComboEditor } from "./ComboEditor";
 import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
@@ -226,7 +226,7 @@ export function EquipoFormDialogV2({
   }, [watchedTipo, form]);
 
   // ── Manual override del precio/día ─────────────────────────────────
-  const [precioJornadaManual, setPrecioJornadaManual] = useState(false);
+  const [precioJornadaManual, setPrecioUnidadManual] = useState(false);
   const watchedUsd = form.watch("precio_usd");
   const watchedRoi = form.watch("roi_pct");
   useEffect(() => {
@@ -1345,7 +1345,7 @@ export function EquipoFormDialogV2({
               <Input
                 type="number"
                 {...form.register("precio_jornada", {
-                  onChange: () => setPrecioJornadaManual(true),
+                  onChange: () => setPrecioUnidadManual(true),
                 })}
               />
               {precioJornadaManual && (
@@ -1354,7 +1354,7 @@ export function EquipoFormDialogV2({
                   size="icon"
                   variant="ghost"
                   title="Recalcular automático"
-                  onClick={() => setPrecioJornadaManual(false)}
+                  onClick={() => setPrecioUnidadManual(false)}
                 >
                   ↺
                 </Button>
@@ -1842,7 +1842,7 @@ ${fotoTag}
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">
                   <div className="t-eyebrow">$ / jornada</div>
                   <div className="font-display text-xl font-black text-ink tabular-nums mt-0.5">
-                    <PrecioJornada value={form.watch("precio_jornada")} />
+                    <PrecioUnidad value={form.watch("precio_jornada")} />
                   </div>
                 </div>
                 <div className="rounded-lg border hairline bg-card px-3 py-2.5">

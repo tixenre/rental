@@ -1,11 +1,12 @@
-import { formatARS, formatMoney } from "@/lib/format";
+import { formatARS, formatMoney, UNIDADES, type Unidad } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
  * Familia de componentes de plata del back-office — una sola forma por TIPO de
  * plata (no un solo componente para todo). Cada uno encapsula su formato + jerarquía:
  *  - <Monto>          monto suelto (ARS por defecto; `moneda` para USD/otras).
- *  - <PrecioJornada>  el precio de alquiler con su unidad ("$X/jornada").
+ *  - <PrecioUnidad>   el precio con su unidad: "$X/jornada" (rental) o "$X/hora"
+ *                     (estudio); `compact` para mobile ("$X/j", "$X/h").
  */
 
 /**
@@ -51,26 +52,36 @@ export function Monto({
 }
 
 /**
- * PrecioJornada — el precio de alquiler con su unidad: "$12.000/jornada". Fuente
- * única del precio inline en el back-office (combo de equipos, búsquedas, calidad…),
- * para no repetir `${fmtArs(x)}/jornada` a mano. Usa "jornada" (el término del
- * negocio, igual que el catálogo público y `jornadaLabel`), NO "/día". El catálogo
- * público usa `PriceBlock`, más rico. Si no hay precio, muestra "—".
+ * PrecioUnidad — el precio inline con su unidad. Fuente única del precio en el
+ * back-office (combo de equipos, búsquedas, calidad, estudio…), para no repetir
+ * `${fmtArs(x)}/jornada` a mano y mantener el término consistente:
+ *  - `unidad="jornada"` (default, rental) → "$12.000/jornada"
+ *  - `unidad="hora"` (estudio)            → "$8.000/hora"
+ *  - `compact` (mobile)                   → "$12.000/j" · "$8.000/h"
+ * El término sale de `UNIDADES` (mismo del catálogo público y `unidadLabel`).
+ * Para el bloque rico del catálogo público (total del período, plural) usar
+ * `PriceBlock`. Si no hay precio, muestra "—".
  */
-export function PrecioJornada({
+export function PrecioUnidad({
   value,
+  unidad = "jornada",
+  compact = false,
   className,
 }: {
   value: number | null | undefined;
+  unidad?: Unidad;
+  /** Mobile: abrevia la unidad ("/j", "/h"). */
+  compact?: boolean;
   className?: string;
 }) {
   if (value === null || value === undefined) {
     return <span className={cn("text-muted-foreground", className)}>—</span>;
   }
+  const suf = compact ? UNIDADES[unidad].abbr : UNIDADES[unidad].singular;
   return (
     <span className={cn("tabular-nums", className)}>
       {formatARS(value)}
-      <span className="text-muted-foreground">/jornada</span>
+      <span className="text-muted-foreground">/{suf}</span>
     </span>
   );
 }
