@@ -10,7 +10,6 @@ import { PagoBadge } from "@/design-system/kit/PagoBadge";
 import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
 import { TipoMovimientoBadge } from "@/components/admin/badges";
 import { Badge } from "@/design-system/ui/badge";
-import { Avatar, AvatarFallback } from "@/design-system/ui/avatar";
 import type { EstadoPedido } from "@/design-system/kit/types";
 
 const ESTADOS: EstadoPedido[] = [
@@ -106,29 +105,10 @@ export const badgesSection: CatalogSection = {
       ),
     },
     {
-      name: "Avatar",
-      files: ["design-system/ui/avatar.tsx"],
-      blurb: "Primitivo: imagen circular con fallback de iniciales. Tamaño por className.",
-      render: () => (
-        <Row className="gap-4">
-          <Sample label="default">
-            <Avatar>
-              <AvatarFallback>RR</AvatarFallback>
-            </Avatar>
-          </Sample>
-          <Sample label="h-12 w-12">
-            <Avatar className="h-12 w-12">
-              <AvatarFallback>AB</AvatarFallback>
-            </Avatar>
-          </Sample>
-        </Row>
-      ),
-    },
-    {
       name: "ClienteAvatar",
       files: ["design-system/kit/ClienteAvatar.tsx"],
       blurb:
-        "Iniciales + color determinístico por hash del nombre (mismo nombre → mismo color). Reconocimiento rápido en listas.",
+        "Foto (opcional) o iniciales con color determinístico por hash del nombre. Mismo nombre → mismo color. Reconocimiento rápido en listas.",
       render: () => (
         <Row className="gap-3">
           {["Pablo Ferrari", "Tincho Rambla", "María González", "Juan Pérez", "Lucía Díaz"].map(

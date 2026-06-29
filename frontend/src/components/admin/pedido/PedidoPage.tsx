@@ -31,6 +31,7 @@ import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Textarea } from "@/design-system/ui/textarea";
 import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
+import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
 import { Pill } from "@/design-system/kit/Pill";
 import { ActionMenu } from "@/components/mobile";
 import { TableSkeleton } from "@/components/admin/skeletons";
@@ -76,47 +77,6 @@ import {
 const fmtFecha = (s: string) => formatFechaDisplay(s);
 
 // ── Avatar ────────────────────────────────────────────────────────────────
-
-// Tier 3 (categórico): paleta de avatares — colores distinguibles entre sí
-// para identidad visual, no semánticos. Off-brand a propósito. Ver
-// docs/DESIGN_SYSTEM.md → Tiers de color.
-/* eslint-disable no-restricted-syntax */
-const AVATAR_COLORS = [
-  "bg-blue-500",
-  "bg-violet-500",
-  "bg-emerald-500",
-  "bg-amber-600",
-  "bg-rose-500",
-  "bg-cyan-600",
-  "bg-orange-500",
-  "bg-teal-600",
-];
-/* eslint-enable no-restricted-syntax */
-
-function avatarBg(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
-}
-
-function nameInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
-
-function ClienteAvatar({ name }: { name: string }) {
-  return (
-    <div
-      className={cn(
-        "h-10 w-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0",
-        avatarBg(name),
-      )}
-    >
-      {nameInitials(name)}
-    </div>
-  );
-}
 
 // ── Sidebar collapsible section ────────────────────────────────────────────
 
@@ -524,7 +484,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                 <h2 className="font-medium text-sm">Cliente</h2>
                 {clienteNombre !== "Sin cliente" && (
                   <div className="flex items-center gap-3 rounded-md border hairline bg-muted/20 px-3 py-2.5">
-                    <ClienteAvatar name={clienteNombre} />
+                    <ClienteAvatar nombre={clienteNombre} className="h-10 w-10 text-sm" />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-ink truncate">{clienteNombre}</div>
                       {draft.datos.cliente_email && (
