@@ -212,14 +212,16 @@ def equipos_afuera():
 @router.get("/equipos/kpis")
 def equipos_kpis(request: Request):
     """KPIs del inventario para el header de /admin/equipos:
-    - total: equipos activos (no eliminados).
+    - total: equipos FÍSICOS del catálogo (no eliminados). Excluye los combos: un
+      combo es un bundle (sin stock propio, precio derivado), no un equipo distinto.
     - en_uso_hoy: unidades en pedidos retirados que solapan hoy.
     - mantenimiento: equipos con mantenimiento que bloquea stock activo hoy.
     """
     require_admin(request)
     with get_db() as conn:
         total = conn.execute(
-            "SELECT COUNT(*) FROM equipos WHERE eliminado_at IS NULL AND es_recurso_interno = FALSE"
+            "SELECT COUNT(*) FROM equipos "
+            "WHERE eliminado_at IS NULL AND es_recurso_interno = FALSE AND tipo != 'combo'"
         ).fetchone()[0]
         en_uso_hoy = conn.execute("""
             SELECT COALESCE(SUM(pi.cantidad), 0)

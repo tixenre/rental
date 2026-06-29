@@ -327,7 +327,7 @@ function EquiposPage() {
     <AdminPage
       title="Equipos"
       maxW="max-w-7xl"
-      description={equiposQ.isLoading ? "Cargando…" : `${total} equipos`}
+      description={equiposQ.isLoading ? "Cargando…" : `${kpisQ.data?.total ?? total} equipos`}
       actions={
         <>
           <Button
