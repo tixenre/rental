@@ -508,6 +508,18 @@ llaves no se une** (crear passkey → desloguear → volver por Google ≠ misma
 hasta Didit; de cualquier forma, al primer pedido Didit ancla por CUIL y unifica). El supervisor marca un merge sin
 el guard de absorbible, o un auto-merge de dos cuentas con datos. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); #1098 Fase 1B.
 
+### 2026-06-29 — Step-up con passkey ("confirmá que sos vos") para operaciones sensibles del cliente
+
+Antes de una **operación sensible** del cliente (hoy: **quitar un método de acceso**; reusable a futuro: confirmar
+un pedido) se exige un **step-up**: una assertion WebAuthn **fresca** (passkey de ESTA cuenta) que deja la cookie
+firmada **`stepup`** (~5 min), que el guard **`require_recent_auth`** (`auth/stepup.py` = `require_cliente` +
+`stepup` fresca y owner-scopeada) exige. **No es un login** (no mintea sesión; reusa la ceremonia de
+`auth/passkey/`, scopeada: la passkey tiene que ser de la cuenta). El front dispara `stepUpWithPasskey()` antes de
+la acción y reintenta. **Primitivo único** — no recrear un "confirmá con passkey" ad-hoc por endpoint. El supervisor
+marca una operación sensible del cliente sin `require_recent_auth`, o un step-up que acepte una passkey de otra
+cuenta. Base del step-up de **Fase 3** (operaciones sensibles) y se conecta con la **firma con passkey (Fase 5)**.
+Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); #1098 Fase 1B.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

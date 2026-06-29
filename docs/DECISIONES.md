@@ -1665,3 +1665,26 @@ cancel-in-progress` ya cancela corridas viejas.
   `test_linking::TestMergePorGoogle` (las 3 ramas: actual absorbible → entra a la real; otra absorbible → la
   absorbe; ninguna → "taken"). El supervisor marca un merge sin el guard de absorbible o un auto-merge de dos
   cuentas con datos. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → commits del lote en `dev`; #1098 Fase 1B.
+
+### 2026-06-29 — Step-up con passkey ("confirmá que sos vos") para operaciones sensibles del cliente
+
+- **Contexto.** El dueño, probando, pidió poder **usar la passkey para confirmar cosas sensibles** — "como borrar
+  algo, o hacer un pedido". Borrar un método de acceso es sensible: alguien con una sesión robada podría quitarte
+  tus otras llaves y dejarte afuera. Confirmar con una prueba fresca de identidad lo frena.
+- **Decisión.** Un **primitivo de step-up** reusable: `POST /cliente/auth/passkey/stepup/{begin,complete}` corre
+  una assertion WebAuthn (la misma del login, pero **scopeada**: la passkey TIENE que ser de esta cuenta) y, si
+  pasa, deja una cookie firmada `stepup` de corta vida (~5 min, owner-scopeada). El guard **`require_recent_auth`**
+  (`auth/stepup.py`) = `require_cliente` + `stepup` fresca; lo usa el `DELETE /cliente/auth/keys/...`. **No es un
+  login** (no mintea sesión). El front (`stepUpWithPasskey()`) dispara la confirmación antes de la acción.
+- **Why.** El **link/assertion autenticado es prueba fresca** de control — más fuerte que un simple confirm. Se
+  hace **un primitivo** (no un "confirmá con passkey" ad-hoc por endpoint) para reusarlo: hoy el borrado de llaves;
+  mañana, **confirmar un pedido** (mismo guard al confirmar) y la base de la **firma con passkey (Fase 5)**. Reusa
+  la ceremonia de `auth/passkey/` (cero motor nuevo) + `itsdangerous` para la marca (sin Redis ni tabla). Es el
+  `require_recent_auth` que el plan tenía para la **Fase 3** (step-up transversal), aterrizado en su primer uso.
+- **Consecuencias.** Quitar un método de acceso ahora exige confirmar con passkey (el front lo dispara y reintenta;
+  si cancelás, no borra). **Pendiente:** aplicarlo a **confirmar un pedido** (toca el flujo de pedidos + decidir el
+  fallback para quien no tiene passkey — Google-only) y la firma criptográfica del contrato (Fase 5). Candados:
+  `test_passkey::TestStepup` (la passkey tiene que ser de la cuenta → 401 si es de otra) + `test_linking`
+  (el borrado sin `stepup` da 401; con `stepup` fresco procede). El supervisor marca una operación sensible del
+  cliente sin `require_recent_auth`, o un step-up que acepte una passkey de otra cuenta. Cómo →
+  [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → commits del lote en `dev`; #1098 Fase 1B.
