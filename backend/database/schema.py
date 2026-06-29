@@ -2267,4 +2267,24 @@ def _init_db_schema(conn):
         )
     """)
 
+    # ── Aceptaciones de Términos y Condiciones (checkout portero) ─────────────
+    # Registro inmutable de qué versión de T&C aceptó cada cliente y cuándo.
+    # La versión actual es `TYC_VERSION_ACTUAL` en `services/checkout/tyc.py`;
+    # sube junto al texto cuando cambian. ON CONFLICT DO NOTHING → idempotente.
+    # Esquema en dos capas (MEMORIA 2026-06-03): también en la migración
+    # b1a2c3d4e5f6_checkout_aceptaciones_tyc.py.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS aceptaciones_tyc (
+            id          SERIAL PRIMARY KEY,
+            cliente_id  INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            version     TEXT NOT NULL,
+            aceptado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (cliente_id, version)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aceptaciones_tyc_cliente "
+        "ON aceptaciones_tyc(cliente_id)"
+    )
+
     conn.commit()
