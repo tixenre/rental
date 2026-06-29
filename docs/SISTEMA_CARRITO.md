@@ -4,15 +4,16 @@
 > _porqué_ viven en `MEMORIA.md`/`DECISIONES.md` y se **linkean**, no se copian.
 > Índice maestro en `MANIFIESTO.md` §8.
 >
-> **Estado:** este manual describe el **estado-target** del módulo (epic #1110). Las
-> secciones marcadas **[YA-CIERTO]** describen lo que el repo hace hoy; las marcadas
-> **[TARGET]** describen lo que el epic consolida. Se actualiza fase por fase.
+> **Estado:** describe el módulo tal como quedó tras el epic #1110 (FASE 1 bug-prod,
+> FASE 2 drift de combos, FASE 5 selección única + readiness). Lo que el epic dejó
+> **fuera a propósito** (display de plata del front, split del god-module
+> `alquileres/core.py`, features de FASE 6) está marcado al final como **pendiente**.
 
 ## Qué resuelve
 
 Un **único lugar** para la **lógica** del carrito: la intención del cliente —"esto es
 lo que quiero reservar"— desde que arma la selección hasta el handoff a la creación de
-la reserva. Antes esa lógica estaba dispersa y **duplicada** (el `normalizar_items` vivía
+la reserva. Antes esa lógica estaba dispersa y **duplicada** (el `_normalizar_items` vivía
 byte-por-byte en `routes/compartir.py` y `routes/cliente_portal/listas.py`, con los caps
 copiados; el precio de un combo se cotizaba con `precio_combo()` pero se **persistía** con
 `equipos.precio_jornada` crudo → total mostrado ≠ cobrado). El módulo cierra ese drift por
@@ -32,18 +33,15 @@ gate discrepan, **gana el gate** — el carrito es una propuesta hasta que el ga
 
 Patrón del repo: **route = transporte, service = lógica** (como `routes/alquileres` ↔
 `backend/reservas`, `routes/* ↔ backend/contabilidad`/`reportes`/`services.contenido`).
-`routes/carritos.py`, `routes/compartir.py` y `routes/cliente_portal/listas.py` quedan
-**finos** (parsean, autentican, arman la respuesta HTTP) sobre el módulo. Submódulos:
+Submódulos construidos:
 
-| Submódulo | Owna | Estado |
-| --- | --- | --- |
-| `modelos.py` | La **forma** del dato: `SeleccionItem` (Pydantic `{equipo_id:int, cantidad:int}`) + caps únicos `CANTIDAD_MAX=99` / `MAX_ITEMS=200`. Sin lógica (recibe-conn, espeja `contenido/modelos.py`). | [TARGET] |
-| `seleccion.py` | El `normalizar_seleccion(conn, items)` **único** (dedup por `equipo_id` última-cantidad-gana, clamp `1..CANTIDAD_MAX`, filtro a equipos existentes vía `SELECT id ... WHERE id = ANY(%s)`, cap `MAX_ITEMS`, preserva orden) + helpers de proyección a `items_json` (dicts) y a tuplas `(eid, cant)` para los INSERT de listas. | [TARGET] |
-| `activos.py` | Carritos activos/abandonados: heartbeat upsert por `session_id`, enrichment de ítems + monto estimado, estampado de abandono (`ABANDONO_HORAS`), `marcar_confirmado`, y las agregaciones del dashboard admin (stats/demanda/por-día). Casa de la futura recuperación (#1111). | [TARGET] |
-| `compartido.py` | Lógica de compartir link/snapshot (crear con token único, traer-para-rearmar, sumar vista, `clean_titulo`). Mantiene su tabla `carritos_compartidos`. | [TARGET] |
-| `listas.py` | Lógica de listas/kits guardados del cliente (CRUD + proyección canónica, scope por `cliente_id`, cap `MAX_LISTAS`). Mantiene sus tablas `cliente_listas`/`cliente_listas_items`. | [TARGET] |
-| `readiness.py` | Orquesta "carrito listo para reservar": validar items + fechas + **pedir** disponibilidad (a `reservas`) + **pedir** precio (a `precios`) + **handoff** a `create_pedido_retry`. Puerta única del gate "el cliente no decide precio" + "solo `visible_catalogo`". | [TARGET] |
-| `__init__.py` | API pública (fachada). Único punto de import para los routes. | [TARGET] |
+| Submódulo | Owna |
+| --- | --- |
+| `modelos.py` | La **forma** del dato: `SeleccionItem` (Pydantic `{equipo_id:int, cantidad:int}`) + caps únicos `CANTIDAD_MAX=99` / `MAX_ITEMS=200`. Sin lógica. |
+| `seleccion.py` | El `normalizar_seleccion(conn, items)` **único** (dedup por `equipo_id` última-cantidad-gana, clamp `1..CANTIDAD_MAX`, filtro a equipos existentes vía `SELECT id ... WHERE id = ANY(%s)`, cap `MAX_ITEMS`, preserva orden) + helpers de proyección a `items_json` (dicts) y a tuplas `(eid, cant)` para los INSERT de listas. |
+| `activos.py` | Carritos activos/abandonados: heartbeat upsert por `session_id`, enrichment de ítems + monto estimado, estampado de abandono (`ABANDONO_HORAS=24`), `marcar_confirmado`, y las agregaciones del dashboard admin (stats/demanda/por-día). Casa de la futura recuperación (#1111). |
+| `readiness.py` | "Carrito listo para reservar" (lado plata): `precios_catalogo_para_reserva(conn, items)` resuelve el precio de cada ítem con el gate de seguridad (solo `visible_catalogo`, el cliente no decide el precio) vía el resolutor único; **404** si un ítem no es del catálogo. **No crea** la reserva — el route hace el handoff a `create_pedido_retry` con esos precios. |
+| `__init__.py` | API pública (fachada). Único punto de import para los routes. |
 
 - **Solo lectura sobre lo sagrado.** El módulo emite SELECTs de su propio estado y
   **lee** disponibilidad/precio/contenido; no toma los locks de reservas ni reimplementa
@@ -54,49 +52,52 @@ Patrón del repo: **route = transporte, service = lógica** (como `routes/alquil
 **OWNA** (vive acá, fuente única):
 
 1. **La SELECCIÓN canónica** `{equipo_id, cantidad}` + el `normalizar_seleccion` único +
-   los caps + los helpers de `items_json`. Consolida las TRES formas hoy divergentes
-   (`CartItem`, `CompartirItemIn`, `ListaItemIn`). **[TARGET]**
+   los caps + los helpers de `items_json`. Consolida las formas hoy divergentes
+   (`CartItem`, `CompartirItemIn`, `ListaItemIn`) en una sola forma de ítem.
 2. **Carritos activos/abandonados**: heartbeat, enrichment, abandono, funnel admin,
-   `marcar_confirmado`, y la futura recuperación #1111. **[TARGET]**
-3. **Compartir** (link/snapshot) — lógica; mantiene su tabla. **[TARGET]**
-4. **Listas/kits guardados** — lógica; mantiene sus tablas. **[TARGET]**
-5. **Readiness** "carrito listo para reservar": orquestar validación + disponibilidad +
-   precio y el **handoff** a `create_pedido_retry` (NO se come la creación). **[TARGET]**
+   `marcar_confirmado`, y la futura recuperación #1111.
+3. **Readiness** "carrito listo para reservar" (lado plata): resolver el precio de cada
+   ítem con el gate (`visible_catalogo` + el cliente no decide el precio) antes del
+   **handoff** a `create_pedido_retry` (NO se come la creación).
 
 **REFERENCIA** (usa, NO owna ni reimplementa):
 
 | Motor | Para qué | Frontera |
 | --- | --- | --- |
-| `backend/reservas/` (`calcular_disponibilidad`, `validar_stock`, `semantics`) | Stock / disponibilidad / overlap. **SAGRADO.** | Solo se **lee**. El conflicto de stock del dashboard y el chequeo de readiness lo piden; no lo reimplementan. Candado AST `test_gate_not_bypassed` intacto. |
-| `backend/services/precios` (`calcular_total`, `precio_combo`, `precio_jornada_efectivo`, `jornadas_periodo`, `bruto_linea`) | Toda la plata. El carrito **pide** el total/precio, no lo calcula. | El **switch** `tipo=='combo' → precio_combo() else precio_jornada` vive en **precios** como `precio_jornada_efectivo(conn, equipo_id)`; carrito y cotizar lo **consumen**. El TOTAL canónico (`cotizacion.py`) NO se reabre. |
+| `backend/reservas/` (`calcular_disponibilidad`, `validar_stock`, `semantics`) | Stock / disponibilidad / overlap. **SAGRADO.** | Solo se **lee**. El conflicto de stock del dashboard se lo pide; no lo reimplementa. Candado AST `test_gate_not_bypassed` intacto. |
+| `backend/services/precios` (`calcular_total`, `precio_combo`, `precio_jornada_efectivo`, `jornadas_periodo`, `bruto_linea`) | Toda la plata. El carrito **pide** el total/precio, no lo calcula. | El **switch** `tipo=='combo' → precio_combo() else precio_jornada` vive en **precios** como `precio_jornada_efectivo(conn, equipo_id)`; readiness y cotizar lo **consumen**. El TOTAL canónico (`cotizacion.py`) NO se reabre. |
 | `backend/services/contenido/` (`contenido_de`, `ComponenteContenido`) | Qué incluye un kit/combo para mostrar. | Vecino, no se mezcla: el carrito muestra contenido **pidiéndoselo** a la puerta, no derivando `kit_componentes`. |
-| `create_pedido` / `create_pedido_retry` (`routes/alquileres/core.py:697,803`) | La creación REAL de la reserva con advisory-lock. | El readiness hace el **handoff** (arma `PedidoCreate` con precios resueltos y delega); NO copia ni toca el `FOR UPDATE`/advisory-lock. `_recalcular_total_pedido`/`_apply_pedido_items` quedan donde están. |
+| `create_pedido` / `create_pedido_retry` (`routes/alquileres/core.py`) | La creación REAL de la reserva con advisory-lock. | El route hace el **handoff** (arma `PedidoCreate` con los precios que devuelve readiness y delega); NADIE copia ni toca el `FOR UPDATE`/advisory-lock. `_recalcular_total_pedido`/`_apply_pedido_items` quedan donde están. |
 
 ### Invariante de plata: cotizado == cobrado (la corrección de combo)
 
-**[TARGET]** El precio por jornada de un ítem lo resuelve **una sola función**,
+El precio por jornada de un ítem lo resuelve **una sola función**,
 `precios.precio_jornada_efectivo(conn, equipo_id)` (combo → `precio_combo()`; kit/simple →
-`equipos.precio_jornada`). Los **tres** caminos client-facing la consumen: **cotizar**
-(`cotizacion.py`), **crear** (`cliente_crear_pedido`) y **modificar**
-(`cliente_modificar_pedido` vía el reemplazo de `_equipo_precio_catalogo`). **[YA-CIERTO]**
-hoy solo `cotizar` deriva el combo; `crear` y `modificar` persisten el `precio_jornada`
-crudo → el total mostrado no coincide con el cobrado en combos. Tras el fix: **lo que el
-carrito cotiza es lo que se persiste**, en los tres caminos.
+`equipos.precio_jornada`; `None` si no existe). Los **tres** caminos que ponen la plata que
+se persiste la consumen: **cotizar** (`cotizacion.py`), **crear**
+(`readiness.precios_catalogo_para_reserva`, que usa `cliente_crear_pedido`) y **modificar**
+(`cliente_modificar_pedido` vía `_equipo_precio_catalogo`). Antes solo `cotizar` derivaba el
+combo; `crear` y `modificar` persistían el `precio_jornada` crudo → el total mostrado no
+coincidía con el cobrado en combos. Ahora **lo que el carrito cotiza es lo que se persiste**,
+en los tres caminos.
 
 ## Consumidores (routes finos)
 
-| Route | Queda como transporte; delega en | Qué BAJA al módulo |
+| Route | Delega en | Qué BAJÓ al módulo |
 | --- | --- | --- |
-| `routes/carritos.py` | `heartbeat_upsert`, `listar_carritos_admin`, `marcar_confirmado` | upsert SQL, enrichment, abandono, stats/demanda/por-día |
-| `routes/compartir.py` | `crear_compartido`, `get_compartido` (servicio) | `_normalizar_items` (**se elimina**), `_clean_titulo` |
-| `routes/cliente_portal/listas.py` | los 6 endpoints → servicio | `_normalizar_items` (**se elimina**), `_clean_nombre`, `_fetch_lista` |
-| `routes/cliente_portal/pedidos.py` | `readiness.preparar_para_reserva` + handoff | resolución de precios + gate `visible_catalogo` (con `precio_jornada_efectivo`) |
-| `routes/cliente_portal/solicitudes.py` | `_equipo_precio_catalogo` → `precio_jornada_efectivo` | la resolución de precio del path de **modificación** (fix combo #2) |
-| `routes/alquileres/cotizacion.py` | `precio_jornada_efectivo` para la rama combo | nada más (el TOTAL no se reabre) |
+| `routes/carritos.py` | `heartbeat_upsert`, `listar_carritos_admin`, `marcar_confirmado` (`activos`) | upsert SQL, enrichment, abandono, stats/demanda/por-día |
+| `routes/compartir.py` | `normalizar_seleccion`, `a_items_json`, `desde_items_json` (`seleccion`) | el `_normalizar_items` propio (**eliminado**) + los caps |
+| `routes/cliente_portal/listas.py` | `normalizar_seleccion`, `a_tuplas` (`seleccion`) | el `_normalizar_items` propio (**eliminado**) + los caps |
+| `routes/cliente_portal/pedidos.py` | `precios_catalogo_para_reserva` (`readiness`) + handoff a `create_pedido_retry` | la resolución de precios + el gate `visible_catalogo` |
+| `routes/cliente_portal/solicitudes.py` | `precio_jornada_efectivo` (`precios`) en `_equipo_precio_catalogo` | la resolución de precio del path de **modificación** (fix combo #2) |
+| `routes/alquileres/cotizacion.py` | `precio_jornada_efectivo` (`precios`) para la rama combo | nada más (el TOTAL no se reabre) |
 
-Los **caps de negocio** propios de cada superficie quedan en su route/servicio:
-`TITULO_MAX`/`TOKEN_BYTES` (compartir), `NOMBRE_MAX`/`MAX_LISTAS` (listas), notas 500 /
-rango 120 días (límites del cliente, en la capa cliente, no en `create_pedido`).
+`compartir.py` y `listas.py` adoptan la **forma única del ítem** (el normalizador), pero
+**conservan su propia lógica** de token/snapshot (compartir) y CRUD/scope (listas) y sus
+**tablas propias** — no se unifican (ciclos de vida distintos; decisión del epic). Los **caps
+de negocio** propios de cada superficie quedan en su route: `TITULO_MAX`/`TOKEN_BYTES`
+(compartir), `NOMBRE_MAX`/`MAX_LISTAS` (listas), notas 500 / rango 120 días (límites del
+cliente, en la capa cliente, no en `create_pedido`).
 
 ## Fronteras (qué NO toca)
 
@@ -121,17 +122,33 @@ rango 120 días (límites del cliente, en la capa cliente, no en `create_pedido`
 - `backend/services/carrito/__init__.py` — API pública.
 - `backend/services/carrito/seleccion.py` — `normalizar_seleccion` + helpers `items_json`.
 - `backend/services/carrito/activos.py` — heartbeat / abandono / funnel.
-- `backend/services/carrito/readiness.py` — orquestación + handoff.
+- `backend/services/carrito/readiness.py` — `precios_catalogo_para_reserva` (gate + handoff).
 - `backend/services/precios.py::precio_jornada_efectivo` — resolutor único de precio por ítem.
 
 ## Candados
 
+- `tests/test_carrito_seleccion.py` (unit, sin DB): dedup / clamp / filtro / cap / orden +
+  las proyecciones del normalizador único.
 - `tests/test_carrito_normalizar_safety.py` (unit): los consumidores migrados (compartir,
-  listas) **no** redefinen el normalizador ni arman la validación canónica inline.
-- `tests/test_carrito_combo_paridad_db.py` (integración, Postgres real): para un combo, el
-  precio por jornada de **cotizar** == el de **persistir**, en **crear Y modificar**.
-- `tests/test_carrito_reservas_safety.py` (unit, liviano): readiness no reimplementa
-  disponibilidad/stock — delega en `reservas`.
+  listas) **no** redefinen el normalizador ni arman el SQL del filtro de equipos inline.
+- `tests/test_carrito_precio_efectivo.py` (unit): el resolutor (combo/simple/inexistente/
+  nulo) **+ source-scan** de que los tres caminos de plata persistida usan
+  `precio_jornada_efectivo` y ninguno re-inlinea `precio_combo()` ni el SELECT de la rama de
+  combo. La paridad **cotizado == cobrado** queda garantizada **por construcción** (un solo
+  resolutor) — no hace falta un test de DB que compare "la misma función con la misma función".
+
+## Pendiente (fuera de este epic, a tomar como trabajo propio)
+
+- **FASE 3 — display de plata (front).** El `CartDrawer` y los teasers inline recalculan el
+  estimado por jornada a mano (redondeo propio) en vez de derivarlo del desglose de
+  `/api/cotizar`. Consolidar en un helper único `lib/pricing.ts`. Es del **front** (el módulo
+  es backend-only); no reabre el invariante de plata, solo unifica el **display**.
+- **Split de `routes/alquileres/core.py`** (god-module ~1057 líneas) en cortes move-verbatim
+  de piezas **periféricas** (emails, enriquecer), 1 PR por corte, **sin tocar**
+  create_pedido/advisory-lock. Es higiene de god-module (territorio `mantenimiento`),
+  separable del objetivo de fuente-única del carrito → su propio PR, con el supervisor.
+- **FASE 6 — features** (recuperación de abandonado #1111, unificar agregar-vs-reemplazar
+  #1108): definir alcance con el dueño antes de construir.
 
 ---
 
