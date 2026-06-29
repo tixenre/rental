@@ -1,10 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
 import { useState, type ReactNode } from "react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { Calendar as CalendarIcon, ShoppingBag } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
 import { RentalDateModal } from "./RentalDateModal";
+import { DatePill } from "./DatePill";
 import { Logo } from "./Logo";
 import { LogoMark } from "./LogoMark";
 import { AreaMenu } from "./AreaMenu";
@@ -178,29 +177,17 @@ function RentalTopBar() {
   const { startDate, endDate, startTime, endTime, setDrawerOpen, totalItems, days } = useCart();
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const count = totalItems();
-  const hasDates = !!(startDate && endDate);
   const jornadas = days();
 
   const datesPill = (
-    <button
+    <DatePill
+      startDate={startDate}
+      endDate={endDate}
+      startTime={startTime}
+      endTime={endTime}
+      jornadas={jornadas}
       onClick={() => setDateModalOpen(true)}
-      className="inline-flex items-center justify-center gap-2 rounded-full border border-background/70 bg-background px-5 py-2 text-ink shadow-sm transition hover:bg-background/90"
-      aria-label={hasDates ? "Editar fechas y horarios" : "Elegir fechas"}
-    >
-      <CalendarIcon className="h-4 w-4 shrink-0 text-amber" />
-      {hasDates ? (
-        <span className="text-sm font-semibold tabular-nums truncate">
-          {format(startDate!, "EEE dd MMM", { locale: es })} {startTime}
-          <span className="mx-1.5 opacity-50">→</span>
-          {format(endDate!, "EEE dd MMM", { locale: es })} {endTime}
-          <span className="ml-2 font-mono text-2xs uppercase tracking-wider text-ink/60">
-            · {jornadas} {jornadas === 1 ? "jornada" : "jornadas"}
-          </span>
-        </span>
-      ) : (
-        <span className="text-sm font-semibold">Elegir fechas</span>
-      )}
-    </button>
+    />
   );
 
   const actions = (

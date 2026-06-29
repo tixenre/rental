@@ -23,7 +23,7 @@
   --color-ink-pure: #000000; /* hero display + print only */
 
   /* ── Backgrounds / surfaces ────────────────────────────── */
-  --color-background: oklch(0.985 0.005 90); /* bone — page bg */
+  --color-background: oklch(0.985 0.012 90); /* bone — page bg (más chroma para distinguirse) */
   --color-surface: oklch(0.97 0.008 85); /* cards, panels */
   --color-surface-elevated: oklch(1 0 0); /* inputs, modales */
 
@@ -41,7 +41,7 @@
   --color-primary-foreground: oklch(0.985 0.005 90);
   --color-secondary: oklch(0.94 0.008 85);
   --color-secondary-foreground: oklch(0.18 0.01 60);
-  --color-muted: oklch(0.94 0.008 85);
+  --color-muted: oklch(0.88 0.006 85); /* más distinguible del surface en la vitrina */
   --color-accent: #fab428;
   --color-accent-foreground: oklch(0.18 0.01 60);
   /* L 0.55 (no 0.62) para cumplir AA: texto-sobre-claro 3.87→~5.2:1 y botón
@@ -63,7 +63,7 @@
   /* ── Status palette (secundaria — SOLO order states & charts) ── */
   --color-rosa: #ed7bad; /* Pantone 211 C  — Devuelto */
   --color-azul: #1097db; /* Pantone 299 C  — Presupuesto / info */
-  --color-naranja: #e9552f; /* Pantone 172 C  — Aviso (status) · mismo hue que --color-estudio, tokens separados */
+  --color-naranja: #f97316; /* orange-500 — Aviso (status) · distinto del rojo-naranja de estudio */
   --color-verde: #009971; /* Pantone 7724 C — Confirmado / éxito */
   /* Verde más oscuro SOLO para TEXTO sobre tints de estado (badge Confirmado,
      Disponible): el --color-verde brillante sobre bg-verde/10-20 da ~3.2:1

@@ -38,7 +38,7 @@ import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
 import { BUSINESS_PHONE } from "@/lib/business";
 import { useClienteSession, aplicaIva } from "@/lib/iva";
 import { toLocalISO } from "@/lib/rental-dates";
-import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
+import { useCotizacion, descuentoLabel, lineaPorEquipo } from "@/lib/cotizacion";
 import { EquipoFoto } from "@/components/rental/EquipoFoto";
 
 function fmtDate(d: Date | null): string {
@@ -247,13 +247,17 @@ function CartItem({
   qty,
   fechaDesde,
   jornadas,
-  jornadasEfectivas,
+  precioJornada,
+  periodTotal,
 }: {
   eq: Equipment;
   qty: number;
   fechaDesde: Date | null;
   jornadas: number;
-  jornadasEfectivas: number;
+  // Precio efectivo por jornada + total del período, YA resueltos por el backend
+  // (FASE 3: el front muestra, no calcula; combo-aware).
+  precioJornada: number;
+  periodTotal: number;
 }) {
   return (
     <div className="flex items-center gap-3 px-5 py-3.5 border-b border-hairline last:border-b-0">
@@ -277,8 +281,8 @@ function CartItem({
         </div>
         <div className="font-mono text-2xs text-muted-foreground mt-0.5">
           {fechaDesde
-            ? `${qty} × ${formatARS(eq.pricePerDay)} / jorn.`
-            : `${formatARS(eq.pricePerDay)} / jornada`}
+            ? `${qty} × ${formatARS(precioJornada)} / jorn.`
+            : `${formatARS(precioJornada)} / jornada`}
         </div>
       </div>
       <div className="shrink-0 text-right">
@@ -286,7 +290,7 @@ function CartItem({
           className="font-mono text-sm font-bold text-ink"
           style={{ fontVariantNumeric: "tabular-nums" }}
         >
-          {formatARS(eq.pricePerDay * qty * jornadasEfectivas)}
+          {formatARS(periodTotal)}
         </div>
         <div className="font-mono text-xs tracking-[0.1em] text-muted-foreground mt-0.5">
           {fechaDesde ? `${jornadas} jorn.` : "/ jorn."}
@@ -530,16 +534,22 @@ export function CartSheet({
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarWidth: "none" }}>
           {/* Items */}
-          {entries.map(({ eq, qty }) => (
-            <CartItem
-              key={eq.id}
-              eq={eq}
-              qty={qty}
-              fechaDesde={fechaDesde}
-              jornadas={jornadas}
-              jornadasEfectivas={totales.jornadas}
-            />
-          ))}
+          {entries.map(({ eq, qty }) => {
+            // Precio/total desde el backend (FASE 3); placeholder transitorio
+            // (precio catálogo) solo hasta que llega la cotización.
+            const linea = lineaPorEquipo(totales, eq._backendId ?? Number(eq.id));
+            return (
+              <CartItem
+                key={eq.id}
+                eq={eq}
+                qty={qty}
+                fechaDesde={fechaDesde}
+                jornadas={jornadas}
+                precioJornada={linea?.precioJornada ?? eq.pricePerDay}
+                periodTotal={linea?.bruto ?? eq.pricePerDay * qty * totales.jornadas}
+              />
+            );
+          })}
 
           {/* Totals — auto margin pushes to bottom when few items */}
           <div className="border-t border-hairline mt-auto">

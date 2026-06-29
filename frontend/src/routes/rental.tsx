@@ -369,12 +369,12 @@ function Index() {
   const { data: clienteSession } = useClienteSession();
   const isLogged = !!clienteSession;
 
-  // Reabre el drawer tras login exitoso si el parámetro ?openCarrito=1 está
-  // presente y hay items en el carrito + usuario logueado. (Declarado acá,
-  // después de search/navigate/isLogged — antes vivía arriba del componente y
-  // rompía el typecheck por usar las vars antes de declararlas.)
+  // Reabre el drawer al volver con ?openCarrito: tras login/verificación, o tras
+  // rearmar el carrito desde compartir/repetir/lista. NO exige login — un
+  // destinatario anónimo de un link compartido también tiene que ver su carrito
+  // (el carrito es local; el login recién se pide al confirmar).
   useEffect(() => {
-    if (search.openCarrito && isLogged && Object.keys(items).length > 0) {
+    if (search.openCarrito && Object.keys(items).length > 0) {
       setDrawerOpen(true);
       // Limpiar el param de la URL para no reabrir en cada render
       navigate({
@@ -386,7 +386,7 @@ function Index() {
         replace: true,
       });
     }
-  }, [search.openCarrito, isLogged, items, setDrawerOpen, navigate]);
+  }, [search.openCarrito, items, setDrawerOpen, navigate]);
   // `spyCat` resalta el tab de la categoría en viewport (scroll-spy) en modo
   // browse, sin filtrar.
   const [spyCat, setSpyCat] = useState<string | null>(null);

@@ -51,7 +51,9 @@ class FakeConn:
         self._pending_eq_id = None
         if eq_id is None or eq_id not in self._precios:
             return None
-        return FakeRow(precio_jornada=self._precios[eq_id])
+        # `tipo` lo lee `precio_jornada_efectivo` (resuelve combo vs. precio propio).
+        # Equipo simple → toma su `precio_jornada` tal cual (el del catálogo).
+        return FakeRow(precio_jornada=self._precios[eq_id], tipo="simple")
 
     def fetchall(self):
         return []

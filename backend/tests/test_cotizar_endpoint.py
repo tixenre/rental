@@ -382,3 +382,42 @@ class TestConexion:
         with pytest.raises(Exception):
             cotizar(bad, FakeReq())
         assert conn.closed == 1, "aún ante error, cotizar debe devolver la conexión"
+
+
+class TestLineasPorEquipo:
+    """Desglose POR LÍNEA (`lineas`) — el front lo MUESTRA, no lo calcula (FASE 3).
+
+    Cada línea trae `subtotal_por_jornada` (el "$X/día" del ítem), y `bruto`/`neto`
+    del período. Así el caján/teasers renderizan números del backend en vez de
+    multiplicar `precio × cantidad × jornadas × (1-desc)` a mano.
+    """
+
+    def test_sin_fechas_subtotal_por_jornada_por_linea(self, patch_db):
+        patch_db(FakeConn(precios={7: 10000, 9: 5000}), session=None)
+        out = cotizar(_req([(7, 2), (9, 1)]), FakeReq())
+
+        lineas = {l["equipo_id"]: l for l in out["lineas"]}
+        # 7: 10000 × 2 = 20000/jornada; sin fechas (1 jornada, sin desc) → bruto=neto=20000.
+        assert lineas[7]["subtotal_por_jornada"] == 20000
+        assert lineas[7]["bruto"] == 20000
+        assert lineas[7]["neto"] == 20000
+        assert lineas[7]["cantidad"] == 2
+        assert lineas[9]["subtotal_por_jornada"] == 5000
+        # La suma de subtotales por jornada coincide con el agregado top-level.
+        assert sum(l["subtotal_por_jornada"] for l in out["lineas"]) == out["subtotal_por_jornada"]
+
+    def test_con_fechas_y_descuento_neto_por_linea(self, patch_db):
+        # Cliente con 10% de descuento, 7 jornadas.
+        patch_db(
+            FakeConn(precios={7: 10000}, descuento=10),
+            session={"role": "cliente", "cliente_id": 42},
+        )
+        out = cotizar(
+            _req([(7, 1)], "2026-06-01T10:00:00", "2026-06-08T10:00:00"),
+            FakeReq(),
+        )
+        linea = out["lineas"][0]
+        # bruto = 10000 × 1 × 7 = 70000; neto = 70000 − 10% = 63000.
+        assert linea["bruto"] == 70000
+        assert linea["neto"] == 63000
+        assert out["descuento_pct"] == 10

@@ -143,6 +143,48 @@ def precio_combo(conn, equipo_id: int) -> int:
     return _precio_combo_calc(rows)
 
 
+def precios_combo_batch(conn, equipo_ids) -> dict[int, int]:
+    """Precio efectivo por jornada de varios COMBOS en UNA sola query (evita N+1 en
+    el catálogo). Devuelve `{equipo_id: precio_efectivo}` para los ids que tengan
+    componentes vivos; un combo sin componentes no aparece (el caller cae a 0). Mismo
+    cálculo que `precio_combo` (reusa `_precio_combo_calc`)."""
+    ids = list(equipo_ids)
+    if not ids:
+        return {}
+    rows = conn.execute(
+        "SELECT kc.equipo_id, e.precio_jornada, kc.cantidad, kc.descuento_pct "
+        "FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id "
+        "WHERE kc.equipo_id = ANY(%s) AND e.eliminado_at IS NULL",
+        (ids,),
+    ).fetchall()
+    por_combo: dict[int, list] = {}
+    for r in rows:
+        por_combo.setdefault(r["equipo_id"], []).append(r)
+    return {eid: _precio_combo_calc(comps) for eid, comps in por_combo.items()}
+
+
+def precio_jornada_efectivo(conn, equipo_id: int) -> Optional[int]:
+    """Precio por jornada EFECTIVO de un equipo, resuelto en UN solo lugar: para un
+    COMBO se deriva en vivo de sus componentes (`precio_combo`, C3 #635); un kit/simple
+    usa su `precio_jornada` propio. `None` si el equipo no existe (o está soft-deleted).
+
+    Fuente ÚNICA de "qué precio por jornada toma este equipo": la consumen `cotizar`,
+    `cliente_crear_pedido` y `cliente_modificar_pedido` → lo que el carrito COTIZA es lo
+    que se PERSISTE (cierra el drift de combos cotizado≠cobrado). El gate de seguridad
+    "solo equipos de catálogo / el cliente no decide el precio" vive en cada consumidor,
+    no acá — esto solo resuelve plata.
+    """
+    row = conn.execute(
+        "SELECT precio_jornada, tipo FROM equipos WHERE id = %s AND eliminado_at IS NULL",
+        (equipo_id,),
+    ).fetchone()
+    if not row:
+        return None
+    if row["tipo"] == "combo":
+        return precio_combo(conn, equipo_id)
+    return int(row["precio_jornada"] or 0)
+
+
 def bruto_linea(it: ItemPrecio, jornadas: int) -> int:
     """Bruto (neto sin descuento) de UNA línea — fuente única del subtotal por línea.
 

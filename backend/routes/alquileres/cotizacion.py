@@ -14,7 +14,12 @@ from database import get_db, to_datetime
 from rate_limit import limiter
 from auth.guards import is_admin_email
 from auth.session import get_session
-from services.precios import calcular_total, jornadas_periodo, precio_combo
+from services.precios import (
+    bruto_linea,
+    calcular_total,
+    jornadas_periodo,
+    precio_jornada_efectivo,
+)
 from routes.alquileres.core import router, _get_descuento_jornadas
 
 
@@ -88,18 +93,11 @@ def cotizar(data: CotizarRequest, request: Request):
                     "cobro_modo": it.cobro_modo or "jornada",
                 })
                 continue
-            row = conn.execute(
-                "SELECT precio_jornada, tipo FROM equipos WHERE id=%s AND eliminado_at IS NULL",
-                (it.equipo_id,),
-            ).fetchone()
-            if not row:
+            # Precio efectivo por jornada (combo → derivado de componentes C3 #635;
+            # kit/simple → su precio propio), resuelto en la fuente única.
+            precio = precio_jornada_efectivo(conn, it.equipo_id)
+            if precio is None:
                 continue
-            # C3 #635: el precio de un COMBO se deriva en vivo de sus componentes
-            # (Σ × descuento por línea); kits y simples usan su precio propio.
-            if row["tipo"] == "combo":
-                precio = precio_combo(conn, it.equipo_id)
-            else:
-                precio = row["precio_jornada"] or 0
             items_para_total.append({
                 "equipo_id": it.equipo_id,
                 "cantidad": it.cantidad,
@@ -156,9 +154,31 @@ def cotizar(data: CotizarRequest, request: Request):
         else:
             descuento_origen = "jornadas"
 
+        # Desglose POR LÍNEA para que el front MUESTRE (no calcule) el detalle por
+        # equipo: `subtotal_por_jornada` (siempre, el "$X/día" del ítem) + `bruto`/`neto`
+        # del período (cuando hay fechas). El neto por línea reparte el descuento ganado
+        # con el mismo redondeo por línea que usaba el front; la suma de netos por línea
+        # puede diferir del neto total por unos pesos (redondeo independiente por línea)
+        # → el TOTAL autoritativo es `neto` (top-level), las líneas son detalle de display.
+        # `equipo_id` None = línea personalizada (#805).
+        pct_aplicado = desglose["descuento_pct"]
+        lineas = []
+        for it in items_para_total:
+            bruto = bruto_linea(it, jornadas)
+            dto = int(round(bruto * pct_aplicado / 100))
+            lineas.append({
+                "equipo_id": it["equipo_id"],
+                "cantidad": it["cantidad"],
+                "precio_jornada": it["precio_jornada"],
+                "subtotal_por_jornada": it["precio_jornada"] * it["cantidad"],
+                "bruto": bruto,
+                "neto": bruto - dto,
+            })
+
         return {
             "jornadas": jornadas,
             "subtotal_por_jornada": int(subtotal_por_jornada),
             "descuento_origen": descuento_origen,
+            "lineas": lineas,
             **desglose,
         }
