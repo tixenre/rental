@@ -20,6 +20,10 @@ const LINK_RESULT: Record<string, { ok: boolean; msg: string }> = {
   ok: { ok: true, msg: "Vinculaste tu cuenta de Google." },
   ya: { ok: true, msg: "Esa cuenta de Google ya estaba vinculada." },
   merged: { ok: true, msg: "Unimos tus cuentas en una sola." },
+  ya_google: {
+    ok: false,
+    msg: "Ya tenés una cuenta de Google vinculada. Quitá la actual primero si querés cambiarla.",
+  },
   taken: { ok: false, msg: "Esa cuenta de Google ya está en uso por otra cuenta." },
   error: { ok: false, msg: "No se pudo vincular Google. Probá de nuevo." },
 };
