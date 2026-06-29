@@ -29,7 +29,7 @@ from reservas import (
 from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de, parientes_de
 from auth.session import get_session
-from auth.guards import require_admin, is_admin_email
+from auth.guards import require_admin
 from services.contenido import contenido_de
 from services.nombre_service import actualizar_nombres_de
 # `delete_equipo` limpia el blob HTML scrapeado en R2 al borrar un equipo; los
@@ -543,7 +543,7 @@ def list_equipos(
 
 
 @router.get("/equipos/{id_or_slug}")
-def get_equipo(id_or_slug: str, request: Request):
+def get_equipo(id_or_slug: str):
     """Devuelve el detalle de un equipo.
 
     Acepta tanto ID numérico puro (`47`) como slug-id mixto al estilo
@@ -600,14 +600,12 @@ def get_equipo(id_or_slug: str, request: Request):
         equipo["fotos"] = [
             {"url": r["url"], "es_principal": bool(r["es_principal"])} for r in fotos
         ]
-        # Combo: el precio mostrado es el EFECTIVO (derivado de componentes), igual que
-        # en el listado y que lo que el carrito cotiza/cobra (el front muestra, no
-        # calcula — FASE 3). EXCEPTO el ADMIN: el form de edición usa este endpoint y
-        # necesita el `precio_jornada` CRUDO (editable); el efectivo es derivado. Un
-        # cliente logueado NO es admin → igual ve el efectivo.
-        _sess = get_session(request)
-        es_admin = bool(_sess and is_admin_email(_sess.get("email")))
-        if equipo.get("tipo") == "combo" and not es_admin:
+        # Combo: el precio mostrado es el EFECTIVO (derivado de componentes), igual en
+        # TODAS las superficies — listado, ficha pública, form de edición del admin y lo
+        # que el carrito cotiza/cobra (el front muestra, no calcula — FASE 3). El precio
+        # del combo es AUTO/derivado (no se edita a mano), así que mostrar el efectivo es
+        # lo correcto también en el back-office (no hay un crudo editable que proteger).
+        if equipo.get("tipo") == "combo":
             from services.precios import precio_combo
             equipo["precio_jornada"] = precio_combo(conn, actual_id)
         return equipo
