@@ -205,9 +205,19 @@ def invitar_cliente(body: InvitarClienteIn, request: Request):
         raise HTTPException(400, "Email inválido")
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
+            "SELECT id, dni_validado_at FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
         ).fetchone()
         if row:
+            # Anti-takeover: una cuenta YA verificada (identidad + pagos) NO se invita por
+            # link — si se filtra, quien lo abra entra con todo adentro. Esas se recuperan
+            # por Didit/CUIL (Fase 3, no se puede falsificar). Sí se invita lo no-verificado
+            # (incluso clientes viejos con pedidos pero sin Didit → caso de migración).
+            if row["dni_validado_at"] is not None:
+                raise HTTPException(
+                    400,
+                    "Esa cuenta ya está verificada — el cliente la recupera por su identidad "
+                    "(Didit), no por un link de invitación.",
+                )
             cliente_id, ya_existia = row["id"], True
         else:
             cliente_id = conn.insert_returning(

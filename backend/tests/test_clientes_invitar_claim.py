@@ -27,13 +27,16 @@ class _Cur:
 
 
 class _InvitarConn:
-    """Fake de `with get_db() as conn` para invitar (execute + insert_returning)."""
+    """Fake de `with get_db() as conn` para invitar (execute + insert_returning).
+    `verificado`: dni_validado_at de la cuenta existente (None = sin verificar)."""
 
-    def __init__(self, existing_id=None, new_id=99):
-        self.existing_id, self.new_id = existing_id, new_id
+    def __init__(self, existing_id=None, new_id=99, verificado=None):
+        self.existing_id, self.new_id, self.verificado = existing_id, new_id, verificado
 
     def execute(self, sql, params=()):
-        return _Cur({"id": self.existing_id} if self.existing_id else None)
+        if self.existing_id:
+            return _Cur({"id": self.existing_id, "dni_validado_at": self.verificado})
+        return _Cur(None)
 
     def insert_returning(self, sql, params=(), **kw):
         return self.new_id
@@ -75,12 +78,23 @@ def test_invitar_crea_cuenta_nueva(monkeypatch):
     assert "TOK" in res["url"] and "/cliente/claim?t=" in res["url"]
 
 
-def test_invitar_reusa_cuenta_existente(monkeypatch):
+def test_invitar_reusa_cuenta_sin_verificar(monkeypatch):
     monkeypatch.setattr("routes.clientes.require_admin", lambda request: None)
-    monkeypatch.setattr("routes.clientes.get_db", lambda: _InvitarConn(existing_id=7))
+    monkeypatch.setattr("routes.clientes.get_db", lambda: _InvitarConn(existing_id=7, verificado=None))
     monkeypatch.setattr("routes.clientes.magic.crear", lambda **kw: "T")
     res = invitar_cliente(InvitarClienteIn(email="ya@x.com"), request=object())
-    assert res["cliente_id"] == 7 and res["ya_existia"] is True  # no duplica
+    assert res["cliente_id"] == 7 and res["ya_existia"] is True  # no duplica; sin verificar → OK
+
+
+def test_invitar_cuenta_verificada_se_rechaza(monkeypatch):
+    # Anti-takeover: una cuenta ya verificada NO se invita por link (se recupera por Didit).
+    monkeypatch.setattr("routes.clientes.require_admin", lambda request: None)
+    monkeypatch.setattr(
+        "routes.clientes.get_db", lambda: _InvitarConn(existing_id=7, verificado="2026-06-29T12:00:00")
+    )
+    with pytest.raises(HTTPException) as ei:
+        invitar_cliente(InvitarClienteIn(email="verificado@x.com"), request=object())
+    assert ei.value.status_code == 400 and "verificada" in ei.value.detail
 
 
 def test_invitar_email_invalido_400(monkeypatch):
