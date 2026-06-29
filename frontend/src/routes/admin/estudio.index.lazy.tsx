@@ -38,6 +38,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
+import { IconButton } from "@/design-system/ui/icon-button";
 import { Spinner } from "@/design-system/ui/spinner";
 import { Pill } from "@/design-system/kit/Pill";
 import { Input } from "@/design-system/ui/input";
@@ -764,13 +765,14 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
                 className="w-36 shrink-0"
               />
               <Input {...register(`features.${i}.value`)} placeholder="— m²" />
-              <button
-                type="button"
+              <IconButton
+                aria-label="Eliminar característica"
+                size="xs"
                 onClick={() => featuresArr.remove(i)}
-                className="mt-2 text-muted-foreground hover:text-destructive"
+                className="mt-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-4 w-4" />
-              </button>
+              </IconButton>
             </div>
           ))}
         </div>
@@ -792,13 +794,14 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
             <div key={f.id} className="rounded-xl border hairline p-3 space-y-2">
               <div className="flex items-start gap-2">
                 <Input {...register(`faq.${i}.q`)} placeholder="Pregunta" className="flex-1" />
-                <button
-                  type="button"
+                <IconButton
+                  aria-label="Eliminar pregunta"
+                  size="xs"
                   onClick={() => faqArr.remove(i)}
-                  className="mt-2 text-muted-foreground hover:text-destructive"
+                  className="mt-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-4 w-4" />
-                </button>
+                </IconButton>
               </div>
               <Textarea {...register(`faq.${i}.a`)} placeholder="Respuesta" rows={2} />
             </div>
@@ -829,13 +832,14 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
                   placeholder="Autor (ej. Productora X)"
                   className="flex-1"
                 />
-                <button
-                  type="button"
+                <IconButton
+                  aria-label="Eliminar testimonio"
+                  size="xs"
                   onClick={() => testimoniosArr.remove(i)}
-                  className="mt-2 text-muted-foreground hover:text-destructive"
+                  className="mt-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-4 w-4" />
-                </button>
+                </IconButton>
               </div>
               <Textarea
                 {...register(`testimonios.${i}.texto`)}
@@ -1107,13 +1111,14 @@ function TrabajoDialog({
           <h2 className="font-display text-lg text-ink">
             {isEdit ? "Editar trabajo" : "Nuevo trabajo"}
           </h2>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1.5 hover:bg-muted transition-colors"
+          <IconButton
             aria-label="Cerrar"
+            size="sm"
+            onClick={onClose}
+            className="rounded-full text-muted-foreground hover:bg-muted"
           >
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
+            <X className="h-4 w-4" />
+          </IconButton>
         </div>
 
         <div className="p-5 space-y-5">
@@ -1141,14 +1146,14 @@ function TrabajoDialog({
                         autoFocus={!isEdit && idx === 0}
                       />
                       {(links.length > 1 || url) && (
-                        <button
-                          type="button"
-                          onClick={() => removeLinkRow(idx)}
-                          className="shrink-0 rounded-full p-1.5 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
+                        <IconButton
                           aria-label="Quitar link"
+                          size="sm"
+                          onClick={() => removeLinkRow(idx)}
+                          className="shrink-0 rounded-full text-muted-foreground/50 hover:text-foreground hover:bg-muted"
                         >
                           <X className="h-4 w-4" />
-                        </button>
+                        </IconButton>
                       )}
                     </div>
                     {tipo && (
@@ -1291,12 +1296,14 @@ function TrabajoDialog({
                     className="relative aspect-square rounded-lg overflow-hidden border hairline group"
                   >
                     <img src={f.url_sm ?? f.url} alt="" className="h-full w-full object-cover" />
-                    <button
+                    <IconButton
+                      aria-label="Eliminar foto"
+                      size="xs"
                       onClick={() => handleDeleteFoto(idx)}
-                      className="absolute top-1 right-1 rounded-full bg-black/70 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 rounded-full bg-black/70 text-white opacity-0 group-hover:opacity-100 hover:bg-black/90"
                     >
-                      <Trash2 className="h-3 w-3 text-white" />
-                    </button>
+                      <Trash2 className="h-3 w-3" />
+                    </IconButton>
                   </div>
                 ))}
               </div>
@@ -1556,31 +1563,34 @@ function SortableTrabajoCard({
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0">
-        <button
+        <IconButton
+          aria-label={trabajo.activo ? "Ocultar" : "Publicar"}
+          size="xs"
           onClick={() => onToggleActivo(trabajo.id, !trabajo.activo)}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-          title={trabajo.activo ? "Ocultar" : "Publicar"}
+          className="rounded-lg hover:bg-muted"
         >
           {trabajo.activo ? (
             <Eye className="h-3.5 w-3.5 text-muted-foreground" />
           ) : (
             <EyeOff className="h-3.5 w-3.5 text-muted-foreground/40" />
           )}
-        </button>
-        <button
+        </IconButton>
+        <IconButton
+          aria-label="Editar"
+          size="xs"
           onClick={() => onEdit(trabajo)}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-          title="Editar"
+          className="rounded-lg hover:bg-muted"
         >
           <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
+          aria-label="Eliminar"
+          size="xs"
           onClick={() => onDelete(trabajo.id)}
-          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
-          title="Eliminar"
+          className="rounded-lg hover:bg-muted text-destructive/70 hover:text-destructive hover:bg-destructive/10"
         >
-          <Trash2 className="h-3.5 w-3.5 text-destructive/70" />
-        </button>
+          <Trash2 className="h-3.5 w-3.5" />
+        </IconButton>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
+import { IconButton } from "@/design-system/ui/icon-button";
 import { Input } from "@/design-system/ui/input";
 import { cn } from "@/lib/utils";
 import { adminApi } from "@/lib/admin/api";
@@ -37,15 +38,15 @@ export function PagoRow({
       </span>
       <div className="flex items-center gap-1">
         <span className="font-mono">{formatARS(pago.monto)}</span>
-        <button
-          type="button"
+        <IconButton
+          aria-label="Eliminar pago"
+          size="xs"
           onClick={() => delMut.mutate()}
           disabled={delMut.isPending}
-          className="rounded p-1 text-muted-foreground hover:text-destructive transition"
-          aria-label="Eliminar pago"
+          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
         >
           <X className="h-3 w-3" />
-        </button>
+        </IconButton>
       </div>
     </div>
   );
@@ -90,15 +91,15 @@ export function ItemRow({
     >
       {/* Identidad: grip + foto + nombre/meta (crece y ocupa el ancho sobrante) */}
       <div className="flex min-w-[200px] flex-1 items-center gap-2">
-        <button
-          type="button"
+        <IconButton
           aria-label="Reordenar línea"
-          className="inline-flex h-11 w-9 -ml-2 shrink-0 items-center justify-center text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
+          size="lg"
+          className="-ml-2 w-9 shrink-0 text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
           <GripVertical className="h-4 w-4" />
-        </button>
+        </IconButton>
         {esLibre ? (
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-dashed hairline text-muted-foreground/60">
             <Tag className="h-4 w-4" />
@@ -209,14 +210,13 @@ export function ItemRow({
         </div>
 
         {/* Quitar */}
-        <button
-          type="button"
-          onClick={() => removeItem(it.uid)}
+        <IconButton
           aria-label="Quitar línea"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
+          onClick={() => removeItem(it.uid)}
+          className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
         >
           <X className="h-4 w-4" />
-        </button>
+        </IconButton>
       </div>
     </li>
   );
