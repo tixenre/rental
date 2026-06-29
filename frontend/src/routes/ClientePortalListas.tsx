@@ -30,6 +30,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/design-system/ui/button";
+import { CompartirComposicionButton } from "@/components/rental/CompartirComposicionButton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -388,6 +389,13 @@ function ListaCard({
             {noDisponibles > 1 ? "n" : ""} en el catálogo y no se cargará
             {noDisponibles > 1 ? "n" : ""}.
           </p>
+        )}
+        {/* Compartir esta lista por link público (#1092 feature #4). `lista.items`
+            ya es {equipo_id, cantidad} → CompartirItem; el destinatario la rearma. */}
+        {lista.items.length > 0 && (
+          <div className="mt-3 max-w-xs">
+            <CompartirComposicionButton items={lista.items} />
+          </div>
         )}
       </div>
 

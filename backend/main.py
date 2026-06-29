@@ -75,6 +75,7 @@ from routes.estudio          import router as estudio_router
 from routes.didit            import router as didit_router
 from routes.talleres         import router as talleres_router
 from routes.carritos         import router as carritos_router
+from routes.compartir        import router as compartir_router
 from routes.errores_admin    import router as errores_admin_router
 from routes.media_api        import router as media_api_router
 from routes.media_admin      import router as media_admin_router
@@ -324,6 +325,7 @@ app.include_router(estudio_router,        prefix="/api")
 app.include_router(didit_router,          prefix="/api")
 app.include_router(talleres_router,       prefix="/api")
 app.include_router(carritos_router,       prefix="/api")
+app.include_router(compartir_router,      prefix="/api")  # /api/public/compartir (sin auth)
 app.include_router(errores_admin_router,  prefix="/api")
 app.include_router(media_api_router,      prefix="/api")
 app.include_router(media_admin_router,    prefix="/api")
@@ -844,6 +846,94 @@ def equipo_page(id_or_slug: str):
         return HTMLResponse(content=html_text)
     except Exception:
         logger.warning("OG injection falló para /equipo/%s — sirvo index plano", id_or_slug, exc_info=True)
+        return _serve_frontend("index.html")
+
+@app.get("/c/{token}", include_in_schema=False)
+def compartido_page(token: str):
+    """Sirve el SPA para un carrito compartido (/c/<token>) inyectando los meta
+    OG/Twitter server-side, para que la preview de WhatsApp/redes (que NO ejecuta
+    JS) muestre el título y los equipos reales del link (feature #4, #1092).
+
+    La composición se resuelve EN VIVO contra el catálogo (nombre/foto actuales),
+    consistente con el rearmado del carrito. Ante cualquier error o token
+    inexistente cae al index.html plano — el SPA (`c.$token.tsx`) maneja el
+    "link no encontrado" con su propia UI.
+    """
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT titulo, items_json FROM carritos_compartidos WHERE token = %s",
+                (token,),
+            ).fetchone()
+            if not row:
+                return _serve_frontend("index.html")
+            raw = row["items_json"]
+            items = raw if isinstance(raw, list) else json.loads(raw or "[]")
+            ids = [int(it["equipo_id"]) for it in items if it.get("equipo_id") is not None]
+            titulo = (row["titulo"] or "").strip()
+            equipos: dict = {}
+            primer_img = ""
+            if ids:
+                # alias `e` + MARCA_SUBQUERY por convención de queries de equipos (MEMORIA 2026-05-26)
+                filas = conn.execute(
+                    f"SELECT e.id, e.nombre, e.nombre_publico, e.foto_url, {MARCA_SUBQUERY}"
+                    " FROM equipos e WHERE e.id = ANY(%s)",
+                    (ids,),
+                ).fetchall()
+                equipos = {f["id"]: row_to_dict(f) for f in filas}
+                # Foto OG (jpg) del primer equipo presente — la que WhatsApp renderiza.
+                primer_id = next((i for i in ids if i in equipos), None)
+                if primer_id is not None:
+                    og = conn.execute(
+                        "SELECT mv.url FROM equipo_fotos ef"
+                        " JOIN media_variants mv ON mv.asset_id = ef.media_id"
+                        " WHERE ef.equipo_id = %s AND mv.name = 'og'"
+                        " ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC LIMIT 1",
+                        (primer_id,),
+                    ).fetchone()
+                    primer_img = (og["url"] if og else "") or ""
+        finally:
+            conn.close()
+
+        def _nombre(d: dict) -> str:
+            n = (d.get("nombre_publico") or "").strip()
+            if n:
+                return n
+            marca = (d.get("marca") or "").strip()
+            base = (d.get("nombre") or "").strip()
+            return f"{marca} {base}".strip() if marca and marca.lower() not in base.lower() else base
+
+        nombres = [_nombre(equipos[i]) for i in ids if i in equipos]
+        title = f"{titulo} — Rambla Rental" if titulo else "Equipos para tu producción — Rambla Rental"
+        if nombres:
+            shown = ", ".join(nombres[:3])
+            extra = len(nombres) - 3
+            if extra > 0:
+                shown += f" y {extra} más"
+            desc = f"{shown} · Reservá en Rambla Rental, Mar del Plata."
+        else:
+            desc = "Una selección de equipos para alquilar en Rambla Rental, Mar del Plata."
+        if len(desc) > 200:
+            desc = desc[:197].rstrip() + "…"
+        # Imagen: foto OG del primer equipo; fallback a su foto_url (webp); luego el icono.
+        if primer_img.startswith("http"):
+            image = primer_img
+        else:
+            primer_id = next((i for i in ids if i in equipos), None)
+            foto = (equipos[primer_id].get("foto_url") or "").strip() if primer_id is not None else ""
+            image = foto if foto.startswith("http") else (f"{SITE_URL}{foto}" if foto else f"{SITE_URL}/icon-512.png")
+        url = f"{SITE_URL}/c/{token}"
+        html_text = _inject_og_meta(
+            index_file.read_text(encoding="utf-8"),
+            title=title, description=desc, image=image, url=url,
+        )
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("OG injection falló para /c/%s — sirvo index plano", token, exc_info=True)
         return _serve_frontend("index.html")
 
 @app.get("/cliente", include_in_schema=False)

@@ -27,6 +27,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { RentalDateModal } from "./RentalDateModal";
 import { GuardarComoListaButton } from "./GuardarComoListaButton";
+import { CompartirComposicionButton } from "./CompartirComposicionButton";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
 import { cn } from "@/lib/utils";
@@ -700,6 +701,17 @@ export function CartDrawer({
                 {/* Guardar como lista — solo logueado (las listas son server-only). */}
                 {clienteSession && list.length > 0 && (
                   <GuardarComoListaButton
+                    items={list.map(({ it, qty }) => ({
+                      equipo_id: it._backendId ?? Number(it.id),
+                      cantidad: qty,
+                    }))}
+                  />
+                )}
+
+                {/* Compartir — público: anda logueado o anónimo (la puerta /api/public/compartir
+                    no pide sesión), así un gaffer le pasa el carrito a un productor sin cuenta. */}
+                {list.length > 0 && (
+                  <CompartirComposicionButton
                     items={list.map(({ it, qty }) => ({
                       equipo_id: it._backendId ?? Number(it.id),
                       cantidad: qty,

@@ -58,6 +58,7 @@ import { MODIFICAR_PEDIDOS_HABILITADO } from "@/lib/features";
 import { useCart } from "@/lib/cart-store";
 import { rearmarCarrito } from "@/lib/rearmar-carrito";
 import { GuardarComoListaButton } from "@/components/rental/GuardarComoListaButton";
+import { CompartirComposicionButton } from "@/components/rental/CompartirComposicionButton";
 import { cn } from "@/lib/utils";
 import {
   fmt,
@@ -729,9 +730,15 @@ export function PedidoCard({
                   Armamos tu carrito con estos equipos para que reserves de nuevo. Elegís las fechas
                   y se recalcula el precio con la disponibilidad actual.
                 </p>
-                {/* Guardar esta composición como lista reutilizable (#1092). */}
-                <div className="mt-3 max-w-xs">
+                {/* Guardar como lista reutilizable + compartir por link público (#1092). */}
+                <div className="mt-3 flex max-w-xs flex-col gap-2">
                   <GuardarComoListaButton
+                    items={itemsRepetibles.map((it) => ({
+                      equipo_id: it.equipo_id as number,
+                      cantidad: it.cantidad,
+                    }))}
+                  />
+                  <CompartirComposicionButton
                     items={itemsRepetibles.map((it) => ({
                       equipo_id: it.equipo_id as number,
                       cantidad: it.cantidad,
