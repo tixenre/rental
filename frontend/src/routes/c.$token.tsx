@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
-import { Button } from "@/design-system/ui/button";
+import { Button, buttonVariants } from "@/design-system/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
-import { rearmarCarrito } from "@/lib/rearmar-carrito";
+import { rearmarCarrito, agregarAlCarrito } from "@/lib/rearmar-carrito";
 import { useCart } from "@/lib/cart-store";
 import { useEquipos } from "@/hooks/useEquipos";
 import { getCompartido, type CompartidoData, type CompartirItem } from "@/lib/compartir";
@@ -109,12 +109,19 @@ function CompartidoBody({
     0,
   );
 
-  function armarCarrito() {
+  function armar(modo: "reemplazar" | "agregar") {
     setAskReemplazar(false);
-    rearmarCarrito(
-      reservables.map((r) => ({ equipoId: r.item.equipo_id, cantidad: r.item.cantidad })),
-    );
-    toast.success("Armamos tu carrito con esta selección. Elegí las fechas para reservar.");
+    const comp = reservables.map((r) => ({
+      equipoId: r.item.equipo_id,
+      cantidad: r.item.cantidad,
+    }));
+    if (modo === "agregar") {
+      agregarAlCarrito(comp);
+      toast.success("Agregamos esta selección a tu carrito. Elegí las fechas para reservar.");
+    } else {
+      rearmarCarrito(comp);
+      toast.success("Armamos tu carrito con esta selección. Elegí las fechas para reservar.");
+    }
     navigate({ to: "/", search: { openCarrito: true } });
   }
   function handleArmarClick() {
@@ -122,12 +129,12 @@ function CompartidoBody({
       toast.info("Esta selección no tiene equipos disponibles para reservar.");
       return;
     }
-    // Solo confirmamos si hay algo que pisar en el carrito.
+    // Carrito con equipos → preguntamos agregar vs reemplazar. Vacío → armamos directo.
     if (useCart.getState().totalItems() > 0) {
       setAskReemplazar(true);
       return;
     }
-    armarCarrito();
+    armar("reemplazar");
   }
 
   return (
@@ -275,15 +282,23 @@ function CompartidoBody({
       <AlertDialog open={askReemplazar} onOpenChange={setAskReemplazar}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reemplazar el carrito</AlertDialogTitle>
+            <AlertDialogTitle>Ya tenés equipos en el carrito</AlertDialogTitle>
             <AlertDialogDescription>
-              Ya tenés equipos en el carrito. Si armás esta selección, los vamos a reemplazar por
-              los de este link. ¿Seguimos?
+              ¿Querés agregar esta selección a lo que ya tenés, o reemplazar el carrito por los
+              equipos de este link?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Volver</AlertDialogCancel>
-            <AlertDialogAction onClick={armarCarrito}>Reemplazar y armar</AlertDialogAction>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "outline" })}
+              onClick={() => armar("reemplazar")}
+            >
+              Reemplazar
+            </AlertDialogAction>
+            <AlertDialogAction onClick={() => armar("agregar")}>
+              Agregar al carrito
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

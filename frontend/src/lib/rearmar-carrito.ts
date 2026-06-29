@@ -33,3 +33,26 @@ export function rearmarCarrito(composicion: ComposicionItem[]): number {
   }
   return cargados;
 }
+
+/**
+ * Variante "agregar" (merge): SUMA la composición a lo que ya hay en el carrito en
+ * vez de pisarlo — acumula cantidades sobre las existentes. Misma fuente de verdad
+ * y mismo respeto por "plata/ítems congelados" que `rearmarCarrito` (no arrastra
+ * fechas ni precios; el carrito recotiza contra el catálogo actual). La usa el link
+ * compartido cuando el destinatario ya tiene equipos y elige sumar en vez de pisar.
+ *
+ * @returns cuántas líneas de la composición se aplicaron (cantidad > 0).
+ */
+export function agregarAlCarrito(composicion: ComposicionItem[]): number {
+  const { setQty } = useCart.getState();
+  let cargados = 0;
+  for (const { equipoId, cantidad } of composicion) {
+    if (cantidad > 0) {
+      const id = String(equipoId);
+      const actual = useCart.getState().items[id] ?? 0;
+      setQty(id, actual + cantidad);
+      cargados += 1;
+    }
+  }
+  return cargados;
+}
