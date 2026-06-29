@@ -188,6 +188,13 @@ export const pedidosMethods = {
   mergeClientes: (source: number, target: number) =>
     authedPostJson<{ ok: boolean; merged_into: number }>(`/api/clientes/merge`, { source, target }),
 
+  // clientes — invitación (white-glove): crea/reusa la cuenta + link de activación
+  invitarCliente: (email: string, nombre?: string, telefono?: string) =>
+    authedPostJson<{ ok: boolean; cliente_id: number; ya_existia: boolean; url: string }>(
+      `/api/clientes/invitar`,
+      { email, nombre, telefono },
+    ),
+
   // calendario
   getCalendario: (desde: string, hasta: string) => {
     const sp = new URLSearchParams({ desde, hasta });

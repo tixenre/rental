@@ -13,6 +13,7 @@ import {
   Copy,
   Check,
   Users,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,6 +47,7 @@ import { TableSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/components/rental/EmptyState";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { ClientesDuplicadosDialog } from "@/components/admin/ClientesDuplicadosDialog";
+import { InvitarClienteDialog } from "@/components/admin/InvitarClienteDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
@@ -76,6 +78,7 @@ function ClientesPage() {
   const [deleting, setDeleting] = useState<Cliente | null>(null);
   const [menuCliente, setMenuCliente] = useState<Cliente | null>(null);
   const [showDuplicados, setShowDuplicados] = useState(false);
+  const [showInvitar, setShowInvitar] = useState(false);
 
   const listQ = useQuery({
     queryKey: ["admin", "clientes", { q: debouncedQ }],
@@ -103,6 +106,9 @@ function ClientesPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setShowDuplicados(true)}>
             <Users className="h-4 w-4 mr-1" /> Duplicados
+          </Button>
+          <Button variant="outline" onClick={() => setShowInvitar(true)}>
+            <UserPlus className="h-4 w-4 mr-1" /> Invitar
           </Button>
           <Button onClick={() => setCreating(true)}>
             <Plus className="h-4 w-4 mr-1" /> Nuevo cliente
@@ -254,6 +260,7 @@ function ClientesPage() {
 
         <ClienteFormDialog open={creating} onOpenChange={setCreating} cliente={null} />
         <ClientesDuplicadosDialog open={showDuplicados} onOpenChange={setShowDuplicados} />
+        <InvitarClienteDialog open={showInvitar} onOpenChange={setShowInvitar} />
         <ClienteFormDialog
           open={!!editing}
           onOpenChange={(v) => {
