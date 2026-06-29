@@ -494,6 +494,20 @@ Google). En el front, el login del cliente lidera con "Crear cuenta con passkey"
 El supervisor marca un alta que escriba identidad en los campos base en vez de esperar a Didit, o un signup fuera
 de la transacción atómica / del punto único de minteo. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); tracking #1098 (Fase 4).
 
+### 2026-06-29 — Merge de cuentas por link autenticado (unir cuando es la misma persona + una es absorbible)
+
+Cuando un cliente logueado en la cuenta A vincula una llave (hoy Google) que ya es de la cuenta B, el sistema
+**une las dos** en vez de rechazar: estar logueado en A (probó una llave de A) **+** completar el OAuth de B (probó
+una llave de B) **es prueba de que A y B son la misma persona** → se mergean. **Guardrail:** solo si una de las dos
+es **absorbible** (`account_is_absorbable`: liviana + sin verificar + sin pedidos → no tiene datos que perder); se
+mueven sus llaves a la otra y se borra (`auth/account_merge.merge_accounts`, transaccional; todas las FKs a
+`clientes` son CASCADE/SET NULL → borrar es seguro). Si **ambas tienen datos**, NO se auto-mergea (→ "taken"): el
+merge general con reasignación de pedidos/contabilidad + dedup por CUIL es **Fase 2** (`identity/merge`). Cuando se
+absorbe la cuenta donde estabas, se re-mintea sesión en la sobreviviente por el punto único. **Sin prueba de ambas
+llaves no se une** (crear passkey → desloguear → volver por Google ≠ misma persona _conocida_ → quedan separadas
+hasta Didit; de cualquier forma, al primer pedido Didit ancla por CUIL y unifica). El supervisor marca un merge sin
+el guard de absorbible, o un auto-merge de dos cuentas con datos. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); #1098 Fase 1B.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

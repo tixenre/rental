@@ -1634,3 +1634,34 @@ cancel-in-progress` ya cancela corridas viejas.
   vez de esperar a Didit, o un signup fuera de la transacción atómica / del punto único de minteo. Es la **Fase 4**
   de la iniciativa de identidad (#1098); quedan dentro de la fase la invitación white-glove del admin. Cómo →
   [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); juicio → `consejo/BITACORA.md` (2026-06-29); historia → commits del lote en `dev`.
+
+### 2026-06-29 — Merge de cuentas por link autenticado (unir cuando es la misma persona + una es absorbible)
+
+- **Contexto.** Probando en staging, el dueño hizo el alta con passkey (cuenta liviana nueva) y desde el perfil
+  quiso **Vincular Google** con su Google de siempre → chocó con "ese Google ya está en uso por otra cuenta" (su
+  cuenta real). Quedó con **dos cuentas** y un dead-end. **Insight del dueño:** "si se crea una con passkey y
+  después quiere vincular Google desde su perfil, deberían vincularse o mergear, porque sabemos que las dos cuentas
+  son la misma persona". Y la contraparte, que él mismo marcó: si crea la passkey, se desloguea y vuelve por Google
+  **sin esa prueba**, no hay forma de saber que es la misma → quedan separadas (entiende la diferencia).
+- **Decisión.** **Merge-on-link.** Al vincular una llave (Google) que ya es de otra cuenta B estando logueado en A,
+  se **unen** A y B en vez de rechazar — porque estar logueado en A prueba control de una llave de A, y completar el
+  OAuth prueba control de una llave de B → **misma persona**. **Guardrail:** se mergea solo si una de las dos es
+  **absorbible** (`auth/account_merge.account_is_absorbable`: liviana + `dni_validado_at` NULL + sin pedidos). Se
+  mueven sus llaves (passkeys + `login_identities`, respetando el `UNIQUE`) a la otra y se borra (`merge_accounts`,
+  transaccional). Si la absorbida es la cuenta donde estabas, se re-mintea sesión en la sobreviviente por
+  `_make_session_response`. Si **ninguna** es absorbible (ambas con datos) → no se auto-mergea, vuelve "taken". Va
+  por la URL `?keys=merged|taken|...` que el perfil convierte en toast.
+- **Why.** El **link autenticado es la prueba** de control de ambas cuentas — más fuerte que matchear por mail
+  (SIM-swappeable) y disponible sin Didit. Absorber **solo lo vacío** mantiene el merge trivial y seguro (no hay
+  datos que reasignar; todas las FKs a `clientes` son CASCADE/SET NULL → el DELETE nunca falla por una referencia
+  colgada). El merge **general** de dos cuentas con datos (reasignar pedidos/contabilidad, diagnóstico de duplicados,
+  dedup por CUIL verificado) es la parte delicada → se difiere a **Fase 2** (`identity/merge`), como pide el plan
+  ("nunca auto-merge de datos sin cuidado"). La red última sigue siendo Didit: al primer pedido el CUIL ancla y
+  unifica aunque el merge-on-link no haya disparado.
+- **Consecuencias.** Saca el dead-end que encontró el dueño: un usuario que ya tiene Google y prueba el alta-passkey
+  termina con **una** cuenta (su real + la passkey nueva), no dos. La sesión vieja de la cuenta absorbida muere con
+  el `DELETE` (cascade de `auth_sessions`) y se re-mintea en la sobreviviente. Candados:
+  `test_clientes_livianas_db::test_merge_absorbe_*` (DB real: mueve llaves, borra el source, respeta el guard) +
+  `test_linking::TestMergePorGoogle` (las 3 ramas: actual absorbible → entra a la real; otra absorbible → la
+  absorbe; ninguna → "taken"). El supervisor marca un merge sin el guard de absorbible o un auto-merge de dos
+  cuentas con datos. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → commits del lote en `dev`; #1098 Fase 1B.
