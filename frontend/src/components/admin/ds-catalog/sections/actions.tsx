@@ -5,9 +5,11 @@
 import { type CatalogSection } from "../types";
 import { Caption, Row, Sample, Stack } from "../catalog-kit";
 import { Button } from "@/design-system/ui/button";
+import { IconButton } from "@/design-system/ui/icon-button";
 import { Spinner } from "@/design-system/ui/spinner";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { InlineSvg } from "@/design-system/ui/InlineSvg";
+import { X, Trash2, Search, Plus } from "lucide-react";
 
 // SVG inline (data URI) con fill=currentColor → InlineSvg lo tiñe con el text-* del padre.
 const STAR_SVG =
@@ -100,6 +102,31 @@ export const actionsSection: CatalogSection = {
           </Sample>
           <Sample label="lg">
             <Spinner size="lg" />
+          </Sample>
+        </Row>
+      ),
+    },
+    {
+      name: "IconButton",
+      files: ["design-system/ui/icon-button.tsx"],
+      blurb:
+        "Wrapper de buttonVariants con aria-label obligatorio (TypeScript lo fuerza). 4 tamaños calibrados para HIG (lg = 44px tap target). No usar <button> crudo para icon-buttons.",
+      render: () => (
+        <Row className="gap-4 items-end">
+          <Sample label="xs (h-7)">
+            <IconButton aria-label="Cerrar" size="xs"><X /></IconButton>
+          </Sample>
+          <Sample label="sm (h-8)">
+            <IconButton aria-label="Eliminar" size="sm"><Trash2 /></IconButton>
+          </Sample>
+          <Sample label="md (h-9, default)">
+            <IconButton aria-label="Buscar"><Search /></IconButton>
+          </Sample>
+          <Sample label="lg (h-11, HIG tap)">
+            <IconButton aria-label="Agregar" size="lg"><Plus /></IconButton>
+          </Sample>
+          <Sample label="variant outline">
+            <IconButton aria-label="Agregar" variant="outline"><Plus /></IconButton>
           </Sample>
         </Row>
       ),
