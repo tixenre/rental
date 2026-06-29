@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from database import get_db, row_to_dict
-from admin_guard import require_admin
+from auth.guards import require_admin
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -27,7 +27,7 @@ from webauthn.helpers.structs import (
 )
 
 from config import settings
-from services.passkeys import config as rpcfg
+from auth.passkey import config as rpcfg
 
 # El challenge vive ~5 min: suficiente para completar la ceremonia, corto para
 # limitar el reuso. La firma + max_age los hace cumplir itsdangerous.

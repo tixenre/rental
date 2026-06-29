@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import Request, HTTPException, Query, BackgroundTasks
 
 from database import get_db, row_to_dict, to_datetime
-from admin_guard import require_admin
+from auth.guards import require_admin
 from services.email import send_email
 from reservas import validar_stock as _check_stock
 from routes.alquileres.core import (

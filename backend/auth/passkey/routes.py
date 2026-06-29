@@ -17,11 +17,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import psycopg.errors
 
-from admin_guard import is_admin_email, require_admin
+from auth.guards import is_admin_email, require_admin
 from database import get_db
-from routes.auth import COOKIE_SECURE, _make_session_response
-from routes.cliente_portal import require_cliente
-from services.passkeys import ceremonies, store
+from auth.session import COOKIE_SECURE, _make_session_response
+from auth.guards import require_cliente
+from auth.passkey import ceremonies, store
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

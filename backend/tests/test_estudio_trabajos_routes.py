@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
-from routes.auth import signer
+from auth.session import signer
 
 pytestmark = pytest.mark.unit
 

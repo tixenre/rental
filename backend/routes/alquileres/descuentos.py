@@ -8,7 +8,7 @@ from fastapi import Request, HTTPException
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
-from admin_guard import require_admin
+from auth.guards import require_admin
 from routes.alquileres.core import router
 
 

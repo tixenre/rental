@@ -16,7 +16,7 @@ from pydantic import BaseModel
 # que exista una sesión. Una copia local que solo chequeara `if not session`
 # dejaba pasar a cualquier logueado —incluido un CLIENTE del portal, que mintea la
 # misma cookie `session`— → escalada de privilegios. Regresión: test_admin_guard_canonico.
-from admin_guard import require_admin as _require_admin  # noqa: F401  (re-export: lo consumen los submódulos del paquete specs)
+from auth.guards import require_admin as _require_admin  # noqa: F401  (re-export: lo consumen los submódulos del paquete specs)
 
 
 router = APIRouter()

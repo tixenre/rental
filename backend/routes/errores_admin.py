@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def listar_server_errors(request: Request, limite: int = 200):
     """Lista los últimos errores no manejados capturados por el handler global."""
     try:
-        from admin_guard import require_admin
+        from auth.guards import require_admin
         require_admin(request)
 
         limite = max(1, min(limite, 500))

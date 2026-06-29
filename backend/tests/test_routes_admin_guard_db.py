@@ -42,7 +42,7 @@ pytestmark = [
 ]
 
 import main  # noqa: E402 — importado después del gating, igual que en test_routes_contract_admin
-from routes.auth import signer
+from auth.session import signer
 
 # Sesión válida pero NO-admin: pasa el middleware, la rechaza require_admin.
 _COOKIE_NO_ADMIN = (

@@ -17,7 +17,7 @@ from database import get_db, row_to_dict
 # Guard CANÓNICO reexportado bajo el nombre del paquete (`_require_admin`): valida
 # email ∈ ADMIN_EMAILS (→ 403), no solo que exista sesión. Una copia local débil
 # dejaba pasar a cualquier logueado, incluido un cliente del portal.
-from admin_guard import require_admin as _require_admin
+from auth.guards import require_admin as _require_admin
 
 
 router = APIRouter()

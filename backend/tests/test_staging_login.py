@@ -13,7 +13,9 @@ import pytest
 from fastapi import HTTPException
 
 import config
-import routes.auth as auth
+import auth.staging as auth
+from auth.ratelimit import _failures as _rl_failures
+from auth.session import get_session
 
 pytestmark = pytest.mark.unit
 
@@ -42,7 +44,7 @@ def _env(monkeypatch, railway_env, secret=None):
         monkeypatch.delenv("STAGING_LOGIN_SECRET", raising=False)
     else:
         monkeypatch.setenv("STAGING_LOGIN_SECRET", secret)
-    auth._failures.clear()  # aislar el rate-limit entre tests
+    _rl_failures.clear()  # aislar el rate-limit entre tests
 
 
 # ── staging_login_enabled: la doble llave ────────────────────────────────────
@@ -100,7 +102,7 @@ class TestEndpoint:
         set_cookie = res.headers.get("set-cookie", "")
         assert "session=" in set_cookie
         token = set_cookie.split("session=", 1)[1].split(";", 1)[0]
-        session = auth.get_session(_FakeRequest(cookies={"session": token}))
+        session = get_session(_FakeRequest(cookies={"session": token}))
         assert session is not None
         assert session["email"] == auth.STAGING_LOGIN_EMAIL
 
@@ -108,12 +110,12 @@ class TestEndpoint:
         """El login mintea sesión, pero la admin-ness la sigue resolviendo
         `is_admin_email` (fuente única): un email fuera del allowlist NO es admin
         aunque consiga sesión por este endpoint."""
-        from admin_guard import is_admin_email
+        from auth.guards import is_admin_email
         monkeypatch.setattr(auth, "STAGING_LOGIN_EMAIL", "no-admin@rambla.local")
         _env(monkeypatch, "dev", "s3cr3t")
         res = auth.auth_staging_login(auth.StagingLoginInput(secret="s3cr3t"), _FakeRequest())
         token = res.headers.get("set-cookie", "").split("session=", 1)[1].split(";", 1)[0]
-        session = auth.get_session(_FakeRequest(cookies={"session": token}))
+        session = get_session(_FakeRequest(cookies={"session": token}))
         assert session["email"] == "no-admin@rambla.local"
         assert is_admin_email(session["email"]) is False
 
@@ -122,7 +124,7 @@ class TestEndpoint:
         _env(monkeypatch, "dev", "s3cr3t")
         res = auth.auth_staging_login(auth.StagingLoginInput(secret="s3cr3t"), _FakeRequest())
         token = res.headers.get("set-cookie", "").split("session=", 1)[1].split(";", 1)[0]
-        session = auth.get_session(_FakeRequest(cookies={"session": token}))
+        session = get_session(_FakeRequest(cookies={"session": token}))
         assert session["email"] == auth.STAGING_LOGIN_EMAIL
         assert "role" not in session  # NO es sesión de cliente
 
@@ -150,18 +152,18 @@ class TestClienteTarget:
             auth.StagingLoginInput(secret="s3cr3t", target="cliente"), _FakeRequest()
         )
         token = res.headers.get("set-cookie", "").split("session=", 1)[1].split(";", 1)[0]
-        session = auth.get_session(_FakeRequest(cookies={"session": token}))
+        session = get_session(_FakeRequest(cookies={"session": token}))
         assert session["role"] == "cliente"
         assert session["cliente_id"] == 77
         assert session["email"] == "cli@rambla.local"
 
         # Regresión real: la sesión minteada pasa el guard del portal.
-        from routes.cliente_portal.core import require_cliente
+        from auth.guards import require_cliente
         ok = require_cliente(_FakeRequest(cookies={"session": token}))
         assert ok["cliente_id"] == 77
 
         # Boundary admin≠cliente (bug #31/#55): la sesión de cliente NO es admin.
-        from admin_guard import require_admin
+        from auth.guards import require_admin
         with pytest.raises(HTTPException) as exc:
             require_admin(_FakeRequest(cookies={"session": token}))
         assert exc.value.status_code == 403

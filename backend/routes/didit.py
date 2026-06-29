@@ -34,7 +34,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from config import settings
 from database import get_db, now_ar
 from routes.cliente_portal import require_cliente

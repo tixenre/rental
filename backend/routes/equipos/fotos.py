@@ -17,7 +17,7 @@ from typing import Optional
 from fastapi import File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import get_db
 from routes.equipos.core import router
 

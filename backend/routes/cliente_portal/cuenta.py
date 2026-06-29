@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from itsdangerous import BadSignature, SignatureExpired
 
 from database import get_db, row_to_dict
-from routes.auth import signer, COOKIE_SECURE, SESSION_MAX_AGE
+from auth.session import signer, COOKIE_SECURE, SESSION_MAX_AGE
 from services.precios import es_responsable_inscripto
 from rate_limit import limiter
 from routes.cliente_portal.core import router, require_cliente, cliente_verificado

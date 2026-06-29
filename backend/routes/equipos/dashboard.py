@@ -7,7 +7,7 @@ importan tests (test_estudio) vía el `__init__` del paquete (re-export).
 """
 from fastapi import Request
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import MARCA_SUBQUERY, get_db, row_to_dict
 from routes.equipos.core import router
 

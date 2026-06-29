@@ -23,7 +23,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
-from routes.auth import signer
+from auth.session import signer
 
 pytestmark = pytest.mark.unit
 
@@ -63,7 +63,7 @@ def _ids(pares):
 
 def test_guards_son_el_canonico():
     """Los 4 módulos reexportan el guard canónico, no una copia local débil."""
-    import admin_guard
+    import auth.guards as admin_guard
     import routes.specs.core as specs_core
     import routes.settings as settings_mod
     import routes.unidades as unidades_mod

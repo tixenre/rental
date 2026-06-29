@@ -16,7 +16,7 @@ from fastapi import BackgroundTasks, Request, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 from database import get_db, row_to_dict, to_datetime, now_ar
-from admin_guard import require_admin
+from auth.guards import require_admin
 from routes.cliente_portal.core import (
     router,
     require_cliente,

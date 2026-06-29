@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import HTTPException, Query, Request
 from pydantic import BaseModel
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import (
     get_db, row_to_dict, attach_tags, attach_categorias,
     regenerate_auto_tags, regenerate_auto_tags_batch, MARCA_SUBQUERY,

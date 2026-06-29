@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
-from admin_guard import require_admin
+from auth.guards import require_admin
 from busqueda import construir
 
 router = APIRouter()

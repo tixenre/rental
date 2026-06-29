@@ -28,7 +28,7 @@ from pathlib import Path
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import get_db
 from dataio import orchestrator
 from dataio.csv_exporters import CSV_EXPORTERS

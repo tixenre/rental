@@ -10,11 +10,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from routes.auth import signer
-from routes.auth_passkey import router
-from services.passkeys import ceremonies
-from services.passkeys import config as cfg
-from services.passkeys import store
+from auth.session import signer
+from auth import auth_passkey_router as router
+from auth.passkey import ceremonies
+from auth.passkey import config as cfg
+from auth.passkey import store
 
 pytestmark = pytest.mark.unit
 
@@ -160,7 +160,7 @@ class TestLoginComplete:
             def execute(self, sql, params=()): return self
             def fetchone(self): return {"id": 42, "email": "c@x.com", "nombre": "Cli", "apellido": "Ente"}
 
-        monkeypatch.setattr("routes.auth_passkey.get_db", lambda: _Ctx())
+        monkeypatch.setattr("auth.passkey.routes.get_db", lambda: _Ctx())
         c = _client()
         c.cookies.set("wa_chal_auth", ceremonies.sign_challenge("chal"))
         r = c.post("/auth/passkey/login/complete", json={"credential": {"id": "credid"}})

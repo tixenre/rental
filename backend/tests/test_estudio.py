@@ -135,7 +135,7 @@ class TestEstudioAdminGuards:
 
     def test_patch_estudio_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         from routes.estudio import patch_estudio, EstudioUpdate
 
@@ -145,7 +145,7 @@ class TestEstudioAdminGuards:
 
     def test_delete_foto_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         from routes.estudio import delete_foto
 
@@ -155,7 +155,7 @@ class TestEstudioAdminGuards:
 
     def test_reorder_fotos_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         from routes.estudio import reorder_fotos, ReorderBody
 
@@ -165,7 +165,7 @@ class TestEstudioAdminGuards:
 
     def test_upload_from_url_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         from routes.estudio import upload_foto_from_url, UploadFromUrlBody
 
@@ -175,7 +175,7 @@ class TestEstudioAdminGuards:
 
     def test_listar_pack_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
         from routes.estudio import listar_pack
 
         with pytest.raises(HTTPException) as exc:
@@ -184,7 +184,7 @@ class TestEstudioAdminGuards:
 
     def test_agregar_pack_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
         from routes.estudio import agregar_pack_equipo, PackEquipoCreate
 
         with pytest.raises(HTTPException) as exc:
@@ -193,7 +193,7 @@ class TestEstudioAdminGuards:
 
     def test_quitar_pack_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
         from routes.estudio import quitar_pack_equipo
 
         with pytest.raises(HTTPException) as exc:

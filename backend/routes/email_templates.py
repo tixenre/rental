@@ -15,7 +15,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import get_db, row_to_dict
 from services.email import branding as _eb, render_template, send_email
 
