@@ -40,3 +40,9 @@
 - Qué se decidió: sync + psycopg3 + wrapper fino idiomático + guardas; sin ORM, sin async. (La raíz de la consulta del dueño: el wrapper EMULA formas peores —`lastrowid` vía `lastval()`, `?`— cuando hay nativas mejores; el plan saca cada emulación, deja solo infra genuina.)
 - ¿Coincidieron?: sí en casi todo — el dueño llegó a la misma conclusión tras entender cada tradeoff (proceso largo, no acatamiento). Divergió en psycopg3 (consejo: diferir; dueño: hacerlo sync ahora — override consciente, costo bajo, por el driver al día).
 - Calibrar: revisitar ORMs/async si el equipo crece >10, aparece multi-DB, o tiempo-real/escala. ¿El supervisor usa la entrada de MEMORIA para marcar `?` nuevo y CTAs de ORM?
+
+### 2026-06-29 — Alta passwordless: ¿passkey-pura sin contacto, o capturar un mail?
+- Veredicto del consejo (Nivel 1): AVANZAR CON CAMBIOS — passkey-first signup SÍ (es el norte del dueño), pero NO passkey-pura-contactless. El golpe: cuenta **huérfana pre-Didit** (sin contacto para avisar/recuperar). Lo desinfla que las passkeys **sincronizan** (iCloud/Google → "perder el device" ≠ perder la passkey) + Didit devuelve mail/tel al primer pedido. Condiciones: prompt de mail **suave/skippeable**, recuperación = sync+Didit (device-bound sin backup → pedir contacto), rate-limit + livianas **inertes hasta Didit** + cleanup de stale, lifecycle claro (liviana→Didit→completa). Prior art: Vercel/GitHub agregan passkey a cuenta-con-mail (no puro); bancos anclan identidad fuerte+temprano → Rambla en el medio.
+- Qué se decidió: <pendiente — recomendé opción A (mail skippeable, contacto fuerte vía Didit); el dueño decide A/B/C>
+- ¿Coincidieron?: <pendiente>
+- Calibrar: ¿cuántas cuentas livianas quedan sin verificar/sin contacto en la práctica? ¿el UX "crear vs entrar con passkey" deja de confundir (probado en device real)? ¿la ventana huérfana pre-pedido pega de verdad?
