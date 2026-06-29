@@ -48,12 +48,14 @@ def _loop() -> None:
     # Import perezoso: evita cargar el job (y sus imports de routes) al importar
     # este módulo, y rompe cualquier ciclo de importación al arrancar.
     from jobs.recordatorios import enviar_recordatorios_retiro
+    from jobs.cleanup_livianas import purgar_cuentas_livianas_stale
 
-    ultima_fecha = None
+    ultima_fecha = None      # recordatorios de retiro
+    ultima_limpieza = None   # cleanup de cuentas livianas (independiente)
     while True:
+        ahora = now_ar()
         try:
             cfg = resolve()  # env > settings > default, en cada ciclo
-            ahora = now_ar()
             if (
                 cfg["enabled"]
                 and ahora.hour >= cfg["hora"]
@@ -63,6 +65,15 @@ def _loop() -> None:
                 enviar_recordatorios_retiro(dias_antes=cfg["dias_antes"])
         except Exception:  # nunca dejar morir el thread por un error puntual
             logger.exception("Falló el barrido de recordatorios de retiro")
+        try:
+            # Cleanup de cuentas livianas stale: 1×/día, independiente del recordatorio
+            # (no comparte su on/off ni su hora). Idempotente → un reinicio puede
+            # re-correrlo sin daño. El kill-switch del thread lo apaga junto con todo.
+            if ahora.date() != ultima_limpieza:
+                ultima_limpieza = ahora.date()
+                purgar_cuentas_livianas_stale()
+        except Exception:
+            logger.exception("Falló el cleanup de cuentas livianas")
         time.sleep(_CHECK_EVERY_S)
 
 
