@@ -21,6 +21,14 @@ pero en la app de Mac (esta sesión) el `gh` CLI **sí está disponible y funcio
 listé labels, todo con `gh`). Proponer: cambiar la nota a "usá `gh` CLI cuando esté disponible (app de
 Mac/terminal); caé a `mcp__github__*` solo si no lo está" · Por qué: la nota actual desorienta — manda a
 usar MCP cuando `gh` es más directo y ya funciona; primer uso real del skill lo destapó.
+  ↳ 2026-06-29 · corroboración (retro de iniciativa) · una sesión en la **web/nube** confirma la otra
+    mitad: acá `gh` **no** está disponible y hay que caer a `mcp__github__*` sí o sí → la verdad es
+    **dependiente del entorno**, lo que valida el wording **condicional** por sobre cualquier absoluto.
+
+2026-06-29 · mantenimiento · La lista "**nunca se borra**" de motores únicos (sección 2, "Respetar la MEMORIA":
+`backend/{reservas,reportes,busqueda,services/branding}/`) quedó atrás de la familia: **omite `contabilidad`
+(2026-06-07) y `services/contenido` (2026-06-29)**. Proponer agregarlos · Por qué: lo cazó el barrido de
+cross-refs del **retro de iniciativa**; una lista incompleta podría no frenar el borrado de un módulo vivo.
 
 2026-06-25 · gobernanza · Agregar un check de **"staleness por divergencia" de los manuales de sistema**
 (`docs/SISTEMA_*.md`, convención _2026-06-25 — Manuales técnicos por sistema_): detectar si un manual no se
