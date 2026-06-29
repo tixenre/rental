@@ -291,7 +291,7 @@ function CompartidoBody({
           <AlertDialogFooter>
             <AlertDialogCancel>Volver</AlertDialogCancel>
             <AlertDialogAction
-              className={buttonVariants({ variant: "outline" })}
+              className={cn(buttonVariants({ variant: "outline" }), "text-ink")}
               onClick={() => armar("reemplazar")}
             >
               Reemplazar
