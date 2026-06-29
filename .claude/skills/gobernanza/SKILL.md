@@ -1,9 +1,9 @@
 ---
 name: gobernanza
-description: El go-to para AUDITAR Y CURAR la capa de skills y docs de gobernanza — el meta-nivel del sistema de trabajo. Dashboard "/skills" (qué hay, último uso, staleness, propuestas), auditoría de drift/overlap/bloat/routing, consumo del buzón de propuestas y el ledger de uso, consolidación en modo dry-run (propone, archiva-no-borra), cierre periódico mensual, y el **retro de iniciativa** (al cerrar una implementación o bug grande: analiza qué rindió y qué no, y reparte cada aprendizaje a su destino — buzón de skills, memoria, SISTEMA_*, principios). Úsalo cuando el dueño pida "cómo están los skills", "qué skills tenemos", "revisá la gobernanza", "hay skills solapados?", "qué se usó", "propuestas pendientes", "cierre mensual de gobernanza", "cerré una implementación / bug grande — ¿qué aprendimos?", "corré el retro / repartí los aprendizajes", o cuando el sistema mismo proponga una revisión. El corazón es el ciclo LEER-PROPONER-APROBAR: el skill lee (ledger + buzón + check-docs), razona, propone cambios en lenguaje claro — el dueño aprueba, la sesión aplica. NO aplica cambios sin aprobación, NO toca código de la app, NO administra issues de GitHub (eso es `pendientes`), NO decide la memoria (la propone).
+description: El go-to para AUDITAR Y CURAR la capa de skills y docs de gobernanza — el meta-nivel del sistema de trabajo. Dashboard "/skills" (qué hay, último uso, staleness, propuestas), auditoría de drift/overlap/bloat/routing, consumo del buzón de propuestas y el ledger de uso, consolidación en modo dry-run (propone, archiva-no-borra), cierre de gobernanza por volumen del buzón, y el **retro de iniciativa** (al cerrar una implementación o bug grande: analiza qué rindió y qué no, y reparte cada aprendizaje a su destino — buzón de skills, memoria, SISTEMA_*, principios). Úsalo cuando el dueño pida "cómo están los skills", "qué skills tenemos", "revisá la gobernanza", "hay skills solapados?", "qué se usó", "propuestas pendientes", "cierre de gobernanza", "el buzón está lleno", "cerré una implementación / bug grande — ¿qué aprendimos?", "corré el retro / repartí los aprendizajes", o cuando el sistema mismo proponga una revisión. El corazón es el ciclo LEER-PROPONER-APROBAR: el skill lee (ledger + buzón + check-docs), razona, propone cambios en lenguaje claro — el dueño aprueba, la sesión aplica. NO aplica cambios sin aprobación, NO toca código de la app, NO administra issues de GitHub (eso es `pendientes`), NO decide la memoria (la propone).
 model: opus
 last-reviewed: 2026-06-29
-version: 1.1
+version: 1.2
 ---
 
 # gobernanza — auditar y curar la capa de skills
@@ -117,15 +117,21 @@ Si la auditoría detecta un skill redundante o sin uso:
   reversible). El linter ignora `.archive/` (los dirs con `.` al inicio).
 - El dueño aprueba, la sesión ejecuta el `git mv`.
 
-### 6 · Cierre de gobernanza periódico (mensual)
+### 6 · Cierre de gobernanza (disparado por volumen del buzón)
 
-El ritual que convierte "tengo telemetría" en "el sistema aprende con el tiempo". Producir un digest:
+El ritual que convierte "tengo telemetría" en "el sistema aprende con el tiempo". **No por calendario
+— por volumen:** se dispara cuando el buzón (`docs/PROPUESTAS_SKILLS.md`) junta **≥ 5 propuestas
+pendientes** (constante tuneable en el hook; se afina con el ritmo real). Lo **surfacea solo** el hook
+`check-buzon.sh` (SessionStart, terminal/desktop) → la sesión te pregunta si corrés el cierre; vos sos
+el gate. **No hay piso de tiempo:** buzón quieto = nada que triagear = correcto (el resto —staleness de
+manuales, skills > 120 días— ya tiene su propia red: supervisor + `check-docs`). Ver _2026-06-29 —
+Cierre de gobernanza por volumen_. Producir un digest:
 
 ```
-Cierre de gobernanza — <mes YYYY>
+Cierre de gobernanza — <fecha>
 ──────────────────────────────────
 Skills activos: N  |  Archivados: M  |  Nuevos: P
-Uso en el mes (del ledger): <ranking por skill>
+Uso (del ledger): <ranking por skill>
 Staleness: <skills > 120 días sin revisar>
 Buzón: <propuestas pendientes / aplicadas / descartadas>
 Drift detectado por check-docs: <errores / warnings>
@@ -136,16 +142,17 @@ El dueño revisa y aprueba. Lo que se aprueba: aplicar propuestas del buzón, ar
 `model:`, actualizar `last-reviewed`. **Todo va a memoria + DECISIONES en paridad** si es una
 decisión de criterio nueva.
 
-**Re-derivar los principios (anti-congelamiento).** En el cierre, releé el corpus de decisiones del período
-y preguntá: ¿algún principio de `CLAUDE.md` (sección "Filosofía de trabajo") **mutó, se reforzó, o apareció
-uno nuevo**? Los principios son hipótesis, no dogma — se mantienen vivos re-derivándolos del corpus, no
+**Re-derivar los principios (anti-congelamiento) — cada 2 cierres, no en cada uno.** Re-derivar sobre poco
+corpus agrega ruido en vez de señal, así que esta parte va en un beat más lento: cada **segundo** cierre,
+releé el corpus de decisiones del período y preguntá: ¿algún principio de `CLAUDE.md` (sección "Filosofía
+de trabajo") **mutó, se reforzó, o apareció uno nuevo**? Los principios son hipótesis, no dogma — se mantienen vivos re-derivándolos del corpus, no
 declarándolos. Proponé el ajuste (el dueño aprueba; memoria + DECISIONES en paridad). Ver
 _2026-06-27 — Filosofía de trabajo derivada_.
 
 ### 7 · Retro de iniciativa (al cerrar algo importante, repartir lo aprendido)
 
-El análogo **per-iniciativa** del cierre mensual (§6), extendido a repartir aprendizajes de **código de
-producto**, no solo de skills. Responde la pregunta del dueño después de implementar algo grande: **"¿qué
+El análogo **per-iniciativa** del cierre de gobernanza (§6), extendido a repartir aprendizajes de **código
+de producto**, no solo de skills. Responde la pregunta del dueño después de implementar algo grande: **"¿qué
 nos sirvió y qué no — y que no se evapore?"**. Lo dispara el hook `check-retro.sh` (gemelo de
 `check-governance-review.sh`) cuando una rama tocó producto (`backend/`/`frontend/src/`) de forma
 sustancial; también es invocable a demanda. Ver _2026-06-29 — Retro de iniciativa_ en la memoria.
@@ -230,9 +237,9 @@ Consolidación (dry-run):
   → proponer archivar skills sin uso: git mv .claude/skills/X/ .claude/skills/.archive/X/
   → el dueño aprueba, la sesión ejecuta
 
-Cierre mensual:
+Cierre de gobernanza (lo dispara check-buzon.sh cuando el buzón junta ≥5 pendientes · o a demanda):
   → digest (uso / staleness / buzón / drift) → dueño revisa → aplica lo aprobado
-  → si hay decisión nueva: memoria + DECISIONES en paridad
+  → si hay decisión nueva: memoria + DECISIONES en paridad · principios: re-derivar cada 2 cierres
 
 Retro de iniciativa (al cerrar algo grande · lo dispara check-retro.sh · o a demanda):
   → preguntá sí/no → con OK analizá qué rindió/qué no → reparto ítem-por-ítem (el dueño aprueba c/u)

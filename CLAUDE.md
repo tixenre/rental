@@ -44,7 +44,7 @@ repetido** o tu **cambio de criterio explícito** lo muta (ahí se propone a la 
 
 > Quién lo mantiene: el **supervisor** testea cada lote contra estos principios (distingue _excepción
 > puntual_ de _drift recurrente_) y propone mutaciones; `gobernanza` los **re-deriva** del corpus en el
-> cierre mensual (anti-congelamiento). Evidencia + mecanismo → _2026-06-27 — Filosofía de trabajo derivada_
+> cierre de gobernanza (anti-congelamiento). Evidencia + mecanismo → _2026-06-27 — Filosofía de trabajo derivada_
 > en [`docs/MEMORIA.md`](docs/MEMORIA.md) / [`docs/DECISIONES.md`](docs/DECISIONES.md).
 
 ## Memoria — dónde vive qué
@@ -91,7 +91,7 @@ repetido** o tu **cambio de criterio explícito** lo muta (ahí se propone a la 
 | [`pulido-frontend`](.claude/skills/pulido-frontend/SKILL.md) | "esta pantalla está rara / pulí la UX-UI" → diagnosticar y mejorar una pantalla que **ya existe** | `opus` |
 | [`design-system`](.claude/skills/design-system/SKILL.md) | "auditá el DS", "el DS está drifting", "cómo está el DS", "buscá reimplementaciones/colores hardcodeados/violaciones a los 11 principios", "mantenimiento del DS" → gobernador del DS: auditoría sistémica + dashboard `/ds` + propone issues; `pulido-frontend` aplica | `opus` |
 | [`gear-compatibility`](.claude/skills/gear-compatibility/SKILL.md) | "generá compatibilidades entre equipos" → razonar sobre specs (vía API; propuestas encolan para aprobación humana) | `sonnet` |
-| [`gobernanza`](.claude/skills/gobernanza/SKILL.md) | "¿cómo están los skills?", "qué skills tenemos", "revisá la gobernanza", "hay skills solapados?", "propuestas pendientes", "cierre mensual", "cerré una implementación / bug grande — ¿qué aprendimos?", "corré el retro / repartí los aprendizajes" → auditar y curar la capa de skills + **retro de iniciativa** (dashboard `/skills`, auditoría, buzón, ledger, consolidación dry-run, reparto de aprendizajes) | `opus` |
+| [`gobernanza`](.claude/skills/gobernanza/SKILL.md) | "¿cómo están los skills?", "qué skills tenemos", "revisá la gobernanza", "hay skills solapados?", "propuestas pendientes", "cierre de gobernanza", "el buzón está lleno", "cerré una implementación / bug grande — ¿qué aprendimos?", "corré el retro / repartí los aprendizajes" → auditar y curar la capa de skills + **cierre por volumen del buzón** + **retro de iniciativa** (dashboard `/skills`, auditoría, buzón, ledger, consolidación dry-run, reparto de aprendizajes) | `opus` |
 | [`calidad-codigo`](.claude/skills/calidad-codigo/SKILL.md) | "el código está bien escrito?", "hay anti-patrones?", "qué tan escalable está el repo?", "auditá la calidad del código", "hay duplicación lógica?", "los patterns de React están bien usados?" → evalúa TypeScript, patterns React, duplicación lógica, naming, complejidad; propone issues | `opus` |
 | [`auditoria-seguridad`](.claude/skills/auditoria-seguridad/SKILL.md) | "auditá la seguridad", "hay vulnerabilidades?", "está seguro el auth?", "revisá CORS/headers", "qué tan vulnerable está?", "OWASP", "revisá las dependencias" → auditoría sistemática: auth, CORS, headers HTTP, inputs, secretos, deps | `opus` |
 | [`performance`](.claude/skills/performance/SKILL.md) | "está lenta la app?", "el bundle es muy pesado?", "hay N+1?", "Core Web Vitals", "qué tan rápido carga?", "auditá la performance", "hay queries lentas?" → bundle, code splitting, re-renders, N+1, caching | `opus` |
