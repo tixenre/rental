@@ -15,18 +15,21 @@ from auth import auth_passkey_router as router
 from auth.passkey import ceremonies
 from auth.passkey import config as cfg
 from auth.passkey import store
+from auth.ratelimit import _failures as _rl_failures
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture(autouse=True)
 def _stub_sessions_store(monkeypatch):
-    """El login con passkey mintea la sesión vía `_make_session_response`, que ahora
-    registra una fila server-side (allowlist `auth_sessions`). Stubbeamos el store
-    para no tocar la DB en estos tests unitarios (el passkey store ya se mockea aparte)."""
+    """El login con passkey mintea la sesión vía `_make_session_response` (registra
+    fila server-side) y ahora pasa por el rate-limit por IP. Stubbeamos el store de
+    sesiones (sin DB) y limpiamos el contador de rate-limit entre tests (estado
+    global compartido con OAuth/staging)."""
     monkeypatch.setattr("auth.sessions_store.create_session", lambda **kw: "stub-jti")
     monkeypatch.setattr("auth.sessions_store.is_active",
                         lambda jti: {"jti": jti} if jti else None)
+    _rl_failures.clear()
 
 
 # ── Piezas puras ──────────────────────────────────────────────────────────────
@@ -183,6 +186,21 @@ class TestLoginComplete:
         # La sesión minteada lleva role=cliente + cliente_id (la lee get_session).
         sess = signer.loads(r.cookies["session"])
         assert sess["role"] == "cliente" and sess["cliente_id"] == 42
+
+
+class TestRateLimit:
+    def test_demasiados_fallos_cortan_con_429(self, monkeypatch):
+        # Cada intento falla (credencial desconocida → 401) y suma al contador por IP.
+        # _RATE_MAX=10 → los primeros 10 fallan 401; el 11º lo corta el rate-limit (429).
+        monkeypatch.setattr(store, "get_by_credential_id", lambda cid: None)
+        c = _client()
+        c.cookies.set("wa_chal_auth", ceremonies.sign_challenge("chal"))
+        codes = [
+            c.post("/auth/passkey/login/complete", json={"credential": {"id": "x"}}).status_code
+            for _ in range(11)
+        ]
+        assert codes[:10] == [401] * 10
+        assert codes[10] == 429
 
 
 class TestRegisterGuards:

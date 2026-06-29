@@ -22,6 +22,8 @@ from database import get_db
 from auth.session import COOKIE_SECURE, _make_session_response
 from auth.guards import require_cliente
 from auth.passkey import ceremonies, store
+from auth.ratelimit import _check_rate, _record_fail
+from net_utils import get_client_ip
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -140,7 +142,8 @@ def cliente_register_complete(body: RegisterCompleteIn, request: Request):
 # ── Login (begin/complete) — discoverable, un solo flujo para admin y cliente ─
 
 @router.post("/auth/passkey/login/begin")
-def login_begin():
+def login_begin(request: Request):
+    _check_rate(get_client_ip(request))  # comparte el bucket por-IP con OAuth/staging
     options, challenge_b64 = ceremonies.build_authentication_options()
     res = JSONResponse(options)
     _set_challenge(res, _AUTH_COOKIE, ceremonies.sign_challenge(challenge_b64))
@@ -149,14 +152,19 @@ def login_begin():
 
 @router.post("/auth/passkey/login/complete")
 def login_complete(body: LoginCompleteIn, request: Request):
+    ip = get_client_ip(request)
+    _check_rate(ip)  # DoS: el verify WebAuthn es caro → acota intentos por IP
     data = ceremonies.read_challenge(request.cookies.get(_AUTH_COOKIE) or "")
     if not data:
+        _record_fail(ip)
         raise HTTPException(400, "Challenge inválido o expirado. Reintentá.")
     cred_id = body.credential.get("id") or body.credential.get("rawId")
     if not cred_id:
+        _record_fail(ip)
         raise HTTPException(400, "Credencial inválida.")
     row = store.get_by_credential_id(cred_id)
     if not row:
+        _record_fail(ip)
         raise HTTPException(401, "Passkey no reconocida.")
     try:
         new_count = ceremonies.verify_authentication(
@@ -164,9 +172,11 @@ def login_complete(body: LoginCompleteIn, request: Request):
             public_key_b64=row["public_key"], current_sign_count=row["sign_count"],
         )
     except Exception as e:  # noqa: BLE001
+        _record_fail(ip)
         logger.warning("passkey auth verify falló: %s", e)
         raise HTTPException(401, "No se pudo verificar la passkey.")
     if ceremonies.es_replay(row["sign_count"], new_count):
+        _record_fail(ip)
         logger.warning("passkey replay/clonación id=%s stored=%s new=%s",
                        row["id"], row["sign_count"], new_count)
         raise HTTPException(401, "Passkey rechazada (contador inválido).")

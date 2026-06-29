@@ -246,6 +246,14 @@ async def security_headers(request, call_next):
     # pise de vuelta a DENY.
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # HSTS solo en prod: fuerza HTTPS por 1 año (incluye subdominios). NO en
+    # dev/staging (no pinear sus dominios a HTTPS). `is_production` falla-a-prod ante
+    # un env desconocido → del lado seguro (todo Railway es HTTPS; sobre HTTP el header
+    # se ignora). Sin `preload` (compromiso difícil de revertir, requiere alta manual).
+    if settings.is_production:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
     # CSP solo en el HTML del SPA (lo único que ejecuta scripts/estilos). Report-Only
     # → reporta, no bloquea: cero riesgo de romper prod mientras se mapean las fuentes.
     if response.headers.get("content-type", "").startswith("text/html"):
