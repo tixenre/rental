@@ -12,21 +12,22 @@ import { type CatalogSection } from "../types";
 import { Caption, Row, Stack } from "../catalog-kit";
 import { Button } from "@/design-system/ui/button";
 import { DatePill } from "@/components/rental/DatePill";
+import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
 import { CartMiniBarView, type CartPreviewItem } from "@/components/rental/CartMiniBarView";
 import { type Equipment } from "@/data/equipment";
+import { computeJornadas } from "@/lib/rental-dates";
 
-// ── DatePill ───────────────────────────────────────────────────────────────────
-// Demo funcional del DatePill: estado mock local, cero contacto con el carrito real.
-function DatePillDemo() {
+// ── Fechas: pill + selector (flujo completo) ─────────────────────────────────────
+// El DatePill abre el DateRangePickerModal REAL (el core controlado por props que
+// la app cablea a useCart vía RentalDateModal). Acá lo manejamos con estado mock:
+// elegís fechas en el selector y el pill se actualiza — flujo end-to-end, sin carrito.
+function DateFlowDemo() {
   const [range, setRange] = useState<{ start?: Date; end?: Date }>({});
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("09:00");
+  const [open, setOpen] = useState(false);
   const hasDates = !!(range.start && range.end);
-
-  const pick = () => {
-    const start = new Date();
-    const end = new Date();
-    end.setDate(end.getDate() + 3);
-    setRange({ start, end });
-  };
+  const jornadas = hasDates ? computeJornadas(range.start, range.end, startTime, endTime) : 0;
 
   return (
     <Stack className="gap-3">
@@ -35,17 +36,25 @@ function DatePillDemo() {
         <DatePill
           startDate={range.start}
           endDate={range.end}
-          startTime="09:00"
-          endTime="09:00"
-          jornadas={4}
-          onClick={hasDates ? () => setRange({}) : pick}
+          startTime={startTime}
+          endTime={endTime}
+          jornadas={jornadas}
+          onClick={() => setOpen(true)}
         />
       </div>
-      <Caption>
-        {hasDates
-          ? 'clic → limpia (simula "cambiar fechas")'
-          : "clic → elige un rango mock · en la app abre el selector real"}
-      </Caption>
+      <Caption>clic en el pill → abre el selector real · elegí fechas y mirá actualizarse</Caption>
+      <DateRangePickerModal
+        open={open}
+        onOpenChange={setOpen}
+        startDate={range.start}
+        endDate={range.end}
+        startTime={startTime}
+        endTime={endTime}
+        onDatesChange={(start, end) => setRange({ start, end })}
+        onStartTimeChange={setStartTime}
+        onEndTimeChange={setEndTime}
+        options={{ respectHorarios: false, allowPast: true, itemsParam: "" }}
+      />
     </Stack>
   );
 }
@@ -147,11 +156,11 @@ export const flujosSection: CatalogSection = {
   hint: "Los módulos compuestos con estado e interacción. Acá los probás con data mock; la app usa la MISMA pieza desde el store del carrito — una sola fuente de verdad del diseño. (En construcción por fases.)",
   specimens: [
     {
-      name: "DatePill",
-      files: ["components/rental/DatePill.tsx"],
+      name: "Fechas (pill + selector)",
+      files: ["components/rental/DatePill.tsx", "components/rental/DateRangePickerModal.tsx"],
       blurb:
-        "El pill central de fechas del rental. Shell presentacional: el TopBar le pasa el store; acá, estado mock. Cliqueá para alternar vacío ↔ con fechas.",
-      render: () => <DatePillDemo />,
+        "El flujo de fechas del rental: el DatePill abre el DateRangePickerModal (el core controlado por props que la app cablea a useCart). Cliqueá el pill, elegí un rango y mirá el pill actualizarse.",
+      render: () => <DateFlowDemo />,
     },
     {
       name: "CartMiniBar (mobile)",
