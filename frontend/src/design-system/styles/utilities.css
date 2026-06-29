@@ -268,6 +268,21 @@
   }
 }
 
+/* ── Portal gutter responsive ──────────────────────────────
+   Gutter estándar de las cards del portal cliente y c.$token.
+   px-4 (16px) en mobile → 18px en ≥ sm. Usen .px-portal en vez
+   de repetir sm:px-[18px] en cada contenedor. */
+@layer utilities {
+  .px-portal {
+    padding-inline: 1rem;
+  }
+  @media (min-width: 640px) {
+    .px-portal {
+      padding-inline: 1.125rem;
+    }
+  }
+}
+
 /* ── Keyframes ─────────────────────────────────────────────── */
 /* Animaciones solo si el usuario NO pidió reduced motion */
 @media (prefers-reduced-motion: no-preference) {
