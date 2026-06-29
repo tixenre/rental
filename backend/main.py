@@ -876,7 +876,6 @@ def compartido_page(token: str):
             ids = [int(it["equipo_id"]) for it in items if it.get("equipo_id") is not None]
             titulo = (row["titulo"] or "").strip()
             equipos: dict = {}
-            primer_img = ""
             if ids:
                 # alias `e` + MARCA_SUBQUERY por convención de queries de equipos (MEMORIA 2026-05-26)
                 filas = conn.execute(
@@ -885,17 +884,12 @@ def compartido_page(token: str):
                     (ids,),
                 ).fetchall()
                 equipos = {f["id"]: row_to_dict(f) for f in filas}
-                # Foto OG (jpg) del primer equipo presente — la que WhatsApp renderiza.
-                primer_id = next((i for i in ids if i in equipos), None)
-                if primer_id is not None:
-                    og = conn.execute(
-                        "SELECT mv.url FROM equipo_fotos ef"
-                        " JOIN media_variants mv ON mv.asset_id = ef.media_id"
-                        " WHERE ef.equipo_id = %s AND mv.name = 'og'"
-                        " ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC LIMIT 1",
-                        (primer_id,),
-                    ).fetchone()
-                    primer_img = (og["url"] if og else "") or ""
+            # Imagen de marca de Rambla para la preview (la misma OG que la home): un listado
+            # compartido se presenta con la marca, no con la foto de un equipo suelto.
+            og_row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = %s", ("og_image_url",)
+            ).fetchone()
+            og_image_url = (og_row["value"].strip() if og_row and og_row["value"] else "")
         finally:
             conn.close()
 
@@ -930,13 +924,9 @@ def compartido_page(token: str):
             desc = "Te compartieron un listado de equipos para armar un pedido en Rambla Rental, Mar del Plata."
         if len(desc) > 200:
             desc = desc[:197].rstrip() + "…"
-        # Imagen: foto OG del primer equipo; fallback a su foto_url (webp); luego el icono.
-        if primer_img.startswith("http"):
-            image = primer_img
-        else:
-            primer_id = next((i for i in ids if i in equipos), None)
-            foto = (equipos[primer_id].get("foto_url") or "").strip() if primer_id is not None else ""
-            image = foto if foto.startswith("http") else (f"{SITE_URL}{foto}" if foto else f"{SITE_URL}/icon-512.png")
+        # Imagen: la imagen de marca configurada (og_image_url, la misma de la home) → la
+        # og-image.png estática como red final. Siempre la marca Rambla, nunca un equipo suelto.
+        image = og_image_url if og_image_url.startswith("http") else f"{SITE_URL}/og-image.png"
         url = f"{SITE_URL}/c/{token}"
         html_text = _inject_og_meta(
             index_file.read_text(encoding="utf-8"),
