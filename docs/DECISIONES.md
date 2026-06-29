@@ -1590,3 +1590,50 @@ cancel-in-progress` ya cancela corridas viejas.
   es el corte limpio funcionando, no un bug. El supervisor marca una sesión minteada sin pasar por
   `_make_session_response` (quedaría sin jti) o una revocación que no scopee al dueño. Cómo →
   [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §2; historia → PR #1102 (revocación) + #1103 (quick wins de seguridad).
+
+### 2026-06-29 — `backend/services/carrito/` = módulo único de la lógica del carrito (intención; el gate es la verdad)
+
+- **Contexto.** Auditoría profunda del carrito (#1110, 32 hallazgos verificados). El stock ya tenía motor único
+  (`reservas/` + candado AST) y el "qué incluye" su puerta (`contenido/`), pero la LÓGICA del carrito estaba
+  dispersa: el `_normalizar_items` vivía byte-por-byte en `routes/compartir.py` y `routes/cliente_portal/listas.py`
+  (caps copiados), el estado de carritos activos/abandonados mezclado en `routes/carritos.py`, y —la raíz— el precio
+  de un combo se **cotizaba** con `precio_combo()` pero se **persistía** con `equipos.precio_jornada` crudo: el total
+  mostrado podía no coincidir con el cobrado. Con cada feature nueva (compartir, abandonados, listas) crecía el
+  riesgo de repetir el drift del kit.
+- **Decisión.** Módulo de dominio backend `services/carrito/` (patrón route=transporte, service=lógica) que **owna**
+  la lógica propia del carrito y **referencia** (no reimplementa) los motores. Owna: (1) la **selección canónica**
+  (`SeleccionItem` + caps únicos + `normalizar_seleccion`: dedup última-cantidad-gana / clamp 1..99 / filtro a
+  equipos existentes / cap 200 / preserva orden + proyecciones items_json/tuplas); (2) **activos/abandonados**
+  (heartbeat upsert por session_id, enrichment, abandono 24h, funnel admin, `marcar_confirmado`); (3) **readiness**
+  (`precios_catalogo_para_reserva`: gate `visible_catalogo` + el cliente no decide el precio, resolviendo con el
+  resolutor único, y **handoff** a `create_pedido_retry`). Referencia: `reservas/` (stock/overlap/locks, SAGRADO,
+  solo lee — candado AST intacto), `services/precios` (toda la plata), `services/contenido/` (qué-incluye),
+  `create_pedido_retry` (creación real con advisory-lock — NO se reimplementa).
+- **Invariante de plata: cotizado == cobrado.** El precio efectivo por jornada lo resuelve UNA función,
+  `precios.precio_jornada_efectivo(conn, equipo_id) -> Optional[int]` (combo → `precio_combo` derivado de
+  componentes C3 #635; kit/simple → `equipos.precio_jornada`; `None` si no existe / soft-deleted). La consumen los
+  **tres** caminos que persisten plata: `cotizar` (cotizacion.py), `crear` (vía `readiness`), `modificar`
+  (`solicitudes._equipo_precio_catalogo`). Cada uno mantiene su **propio gate** (cotizar ignora inexistentes; crear
+  exige `visible_catalogo` y tira 404; modificar cae a 0). La paridad queda **por construcción** (un solo
+  resolutor), reforzada por source-scan — no hace falta un test de DB que compare "la misma función con sí misma".
+- **Why.** El dueño pidió **una sola fuente de verdad de la lógica del carrito** y no repetir el drift del kit. Se
+  aplica el patrón ya probado (motor único + puerta + candados + manual). El front queda separado (el módulo es
+  backend-only); el dueño lo confirmó ("el front no se mezcla").
+- **Consecuencias / fronteras.** Las 3 tablas (`carritos_activos`/`carritos_compartidos`/`cliente_listas`) **NO se
+  unifican** (ciclos de vida distintos); sí la **forma del ítem** y su validación. La línea personalizada del admin
+  (#805, `equipo_id=None`) queda fuera de la selección canónica (es del builder admin). No se toca el motor de
+  reservas, ni `create_pedido`/advisory-lock, ni el TOTAL canónico de `cotizacion.py`. **El split del god-module
+  `routes/alquileres/core.py`** (move-verbatim de emails/enriquecer) NO es parte de este módulo: es lógica de
+  **alquileres**, no del carrito (se tocan, pero es otro motor; aclaración del dueño 2026-06-29) → su propio PR, sin
+  tocar `create_pedido`.
+- **Candados.** `test_carrito_seleccion.py` (dedup/clamp/filtro/cap/orden), `test_carrito_normalizar_safety.py`
+  (compartir/listas no redefinen el normalizador ni el SQL del filtro), `test_carrito_precio_efectivo.py` (resolutor
+  unit + source-scan: los 3 caminos usan `precio_jornada_efectivo`, ninguno inlinea `precio_combo()` ni el SELECT de
+  la rama de combo, y crear delega en la puerta).
+- **Gotchas.** `marcar_confirmado` conserva su firma `(session_id, conn)` y se re-exporta desde `routes/carritos.py`
+  (lo importa `pedidos.py`). `readiness` puede lanzar `HTTPException(404)` — convención aceptada en services del
+  repo (spec_persist/media). El manual del cómo-funciona vive en [`SISTEMA_CARRITO.md`](SISTEMA_CARRITO.md); este
+  log guarda el porqué. Supervisor: APROBADO (PR #1112), sin drift.
+- **Pendiente** (fuera del lote, documentado en `SISTEMA_CARRITO.md` §Pendiente): FASE 3 (display de plata del
+  front: helper único `lib/pricing.ts`), el split de `alquileres/core.py` (alquileres, su propio PR), y FASE 6
+  (features: recuperación #1111, agregar-vs-reemplazar #1108 — definir alcance primero).

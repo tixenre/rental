@@ -145,8 +145,8 @@ cliente, en la capa cliente, no en `create_pedido`).
   es backend-only); no reabre el invariante de plata, solo unifica el **display**.
 - **Split de `routes/alquileres/core.py`** (god-module ~1057 líneas) en cortes move-verbatim
   de piezas **periféricas** (emails, enriquecer), 1 PR por corte, **sin tocar**
-  create_pedido/advisory-lock. Es higiene de god-module (territorio `mantenimiento`),
-  separable del objetivo de fuente-única del carrito → su propio PR, con el supervisor.
+  create_pedido/advisory-lock. **Es lógica de `alquileres`, no del carrito** (se tocan, pero es
+  otro motor; aclaración del dueño 2026-06-29) → su propio PR/iniciativa, con el supervisor.
 - **FASE 6 — features** (recuperación de abandonado #1111, unificar agregar-vs-reemplazar
   #1108): definir alcance con el dueño antes de construir.
 

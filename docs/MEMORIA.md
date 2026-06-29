@@ -477,6 +477,23 @@ dueño, no solo el jti → anti-IDOR), espejando `passkey/store`. Tabla en 2 cap
 (_2026-06-27_), tiempos en `now_ar()`. El supervisor marca una sesión sin pasar por `_make_session_response` (sin
 jti) o una revocación no scopeada al dueño. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → PR #1102/#1103.
 
+### 2026-06-29 — `backend/services/carrito/` = módulo único de la lógica del carrito (intención; el gate es la verdad)
+
+Toda la **lógica del carrito** —la intención "esto quiero reservar"— vive en la puerta única
+`backend/services/carrito/`: **selección** canónica (`SeleccionItem` + `normalizar_seleccion` único:
+dedup/clamp/filtro/cap, antes duplicado byte-por-byte en compartir/listas), **activos/abandonados**
+(heartbeat/funnel/`marcar_confirmado`) y **readiness** (`precios_catalogo_para_reserva`: gate `visible_catalogo`
++ el cliente no decide el precio, y **handoff** a `create_pedido_retry` — NO crea la reserva). **Referencia, no
+reimplementa** los motores: stock→`reservas` (sagrado, solo lee), plata→`services/precios`, qué-incluye→
+`services/contenido`, creación→`create_pedido_retry`. Invariante de plata **cotizado == cobrado**: el precio
+efectivo por jornada lo resuelve UNA función, `precios.precio_jornada_efectivo` (combo→`precio_combo`;
+kit/simple→propio), consumida por los 3 caminos que persisten plata (cotizar/crear/modificar) — cierra el drift de
+combos por construcción. **Las 3 tablas NO se unifican** (ciclos de vida distintos); sí la forma del ítem. El
+supervisor marca lógica de carrito ad-hoc fuera de la puerta o un precio de combo resuelto inline. Nuevo miembro de
+la familia motor-único (espeja contenido 2026-06-29). El **split de `routes/alquileres/core.py`** queda fuera: es
+lógica de **alquileres**, no del carrito (se tocan, pero es otro motor) → su propio PR. Cómo →
+[`SISTEMA_CARRITO.md`](SISTEMA_CARRITO.md); tracking #1110.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
