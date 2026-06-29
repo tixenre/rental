@@ -20,7 +20,7 @@ import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { QueryState } from "@/components/admin/QueryState";
 import { TableSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/components/rental/EmptyState";
-import { cn } from "@/lib/utils";
+import { SegmentedControl } from "@/design-system/ui/segmented-control";
 
 export const Route = createLazyFileRoute("/admin/pagos")({
   component: PagosLogPage,
@@ -118,18 +118,28 @@ function PagosLogPage() {
       <div className="space-y-6">
         {/* Filtros */}
         <div className="flex flex-wrap items-end gap-3">
-          <Segment
-            label="Destinatario"
-            value={destinatario}
-            onChange={setDestinatario}
-            options={[["", "Todos"], ...DESTINATARIOS_PAGO.map((d) => [d, d] as [string, string])]}
-          />
-          <Segment
-            label="Método"
-            value={metodo}
-            onChange={setMetodo}
-            options={[["", "Todos"], ...METODOS_PAGO.map((m) => [m, m] as [string, string])]}
-          />
+          <div className="space-y-1">
+            <FieldLabel>Destinatario</FieldLabel>
+            <SegmentedControl
+              value={destinatario}
+              onChange={setDestinatario}
+              options={[
+                { value: "", label: "Todos" },
+                ...DESTINATARIOS_PAGO.map((d) => ({ value: d, label: d })),
+              ]}
+            />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel>Método</FieldLabel>
+            <SegmentedControl
+              value={metodo}
+              onChange={setMetodo}
+              options={[
+                { value: "", label: "Todos" },
+                ...METODOS_PAGO.map((m) => ({ value: m, label: m })),
+              ]}
+            />
+          </div>
           <div className="space-y-1">
             <FieldLabel>Desde</FieldLabel>
             <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
@@ -183,39 +193,4 @@ function PagosLogPage() {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="block t-eyebrow">{children}</label>;
-}
-
-function Segment({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: [string, string][];
-}) {
-  return (
-    <div className="space-y-1">
-      <FieldLabel>{label}</FieldLabel>
-      <div className="flex gap-1">
-        {options.map(([val, lbl]) => (
-          <button
-            key={val}
-            type="button"
-            onClick={() => onChange(val)}
-            className={cn(
-              "rounded-md border px-2.5 py-1.5 text-xs font-medium capitalize transition",
-              value === val
-                ? "border-ink bg-ink text-background"
-                : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
-            )}
-          >
-            {lbl}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }

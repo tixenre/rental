@@ -11,7 +11,7 @@ import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/design-system/ui/dialog";
-import { cn } from "@/lib/utils";
+import { SegmentedControl } from "@/design-system/ui/segmented-control";
 import { adminApi, DESTINATARIOS_PAGO, METODOS_PAGO } from "@/lib/admin/api";
 import { fmtArs } from "@/lib/format";
 
@@ -121,29 +121,15 @@ export function RegistrarPagoModal({
         </div>
 
         {/* Presets */}
-        <div className="flex gap-2">
-          {(
-            [
-              ["sena", "Seña 50%"],
-              ["saldo", "Saldo total"],
-              ["otro", "Otro"],
-            ] as [Preset, string][]
-          ).map(([p, label]) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => selectPreset(p)}
-              className={cn(
-                "flex-1 rounded-md border px-2 py-1.5 text-xs font-medium transition",
-                preset === p
-                  ? "border-ink bg-ink text-background"
-                  : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={preset}
+          onChange={(v) => selectPreset(v as Preset)}
+          options={[
+            { value: "sena", label: "Seña 50%" },
+            { value: "saldo", label: "Saldo total" },
+            { value: "otro", label: "Otro" },
+          ]}
+        />
 
         {/* Monto */}
         <div className="space-y-1">
@@ -187,45 +173,21 @@ export function RegistrarPagoModal({
             <Label className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
               Cobró
             </Label>
-            <div className="flex gap-1.5">
-              {DESTINATARIOS_PAGO.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDestinatario(d)}
-                  className={cn(
-                    "flex-1 rounded-md border px-2 py-1.5 text-xs font-medium capitalize transition",
-                    destinatario === d
-                      ? "border-ink bg-ink text-background"
-                      : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
-                  )}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              value={destinatario}
+              onChange={setDestinatario}
+              options={DESTINATARIOS_PAGO.map((d) => ({ value: d, label: d }))}
+            />
           </div>
           <div className="space-y-1">
             <Label className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
               Método
             </Label>
-            <div className="flex gap-1.5">
-              {METODOS_PAGO.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMetodo(m)}
-                  className={cn(
-                    "flex-1 rounded-md border px-2 py-1.5 text-xs font-medium capitalize transition",
-                    metodo === m
-                      ? "border-ink bg-ink text-background"
-                      : "border-muted-foreground/30 text-muted-foreground hover:border-ink hover:text-ink",
-                  )}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              value={metodo}
+              onChange={setMetodo}
+              options={METODOS_PAGO.map((m) => ({ value: m, label: m }))}
+            />
           </div>
         </div>
 

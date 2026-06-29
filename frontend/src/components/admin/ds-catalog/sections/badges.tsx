@@ -5,6 +5,7 @@
 import { type CatalogSection } from "../types";
 import { Caption, Row, Sample } from "../catalog-kit";
 import { Pill } from "@/design-system/kit/Pill";
+import { CountBadge } from "@/design-system/ui/count-badge";
 import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 import { PagoBadge } from "@/design-system/kit/PagoBadge";
 import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
@@ -101,6 +102,27 @@ export const badgesSection: CatalogSection = {
           <TipoMovimientoBadge tipo="transferencia" />
           <TipoMovimientoBadge tipo="aporte" />
           <TipoMovimientoBadge tipo="ajuste" />
+        </Row>
+      ),
+    },
+    {
+      name: "CountBadge",
+      files: ["design-system/ui/count-badge.tsx"],
+      blurb:
+        "Contador circular compacto. sm = h-4 (filtros activos, tabs). md = h-5 (destacados). Oculto si count ≤ 0.",
+      render: () => (
+        <Row className="gap-6">
+          {[0, 1, 5, 12, 99, 100].map((n) => (
+            <div key={n} className="flex flex-col items-center gap-1.5">
+              <div className="relative inline-flex">
+                <div className="h-8 w-8 rounded-full border hairline bg-muted/20" />
+                <span className="absolute -right-1 -top-1">
+                  <CountBadge count={n} />
+                </span>
+              </div>
+              <span className="font-mono text-2xs text-muted-foreground">{n}</span>
+            </div>
+          ))}
         </Row>
       ),
     },

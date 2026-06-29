@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, ChevronLeft, GripVertical, Minus, Plus, Tag, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, GripVertical, Tag, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -7,6 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
 import { Input } from "@/design-system/ui/input";
+import { QtyInput } from "@/design-system/ui/qty-input";
 import { cn } from "@/lib/utils";
 import { adminApi } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
@@ -145,37 +146,12 @@ export function ItemRow({
       {/* Controles: cantidad · precio · subtotal · quitar (alineados en columna) */}
       <div className="ml-auto flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5">
         {/* Stepper de cantidad */}
-        <div className="flex items-center gap-1">
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-9 w-9"
-            aria-label="Restar uno"
-            onClick={() => updateItem(it.uid, { cantidad: Math.max(1, it.cantidad - 1) })}
-          >
-            <Minus className="h-3 w-3" />
-          </Button>
-          <Input
-            type="number"
-            min={1}
-            value={it.cantidad}
-            aria-label="Cantidad"
-            onChange={(e) => updateItem(it.uid, { cantidad: parseInt(e.target.value) || 1 })}
-            className={cn(
-              "h-9 w-11 text-center text-sm p-0",
-              overstock && "border-destructive text-destructive",
-            )}
-          />
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-9 w-9"
-            aria-label="Sumar uno"
-            onClick={() => updateItem(it.uid, { cantidad: it.cantidad + 1 })}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-        </div>
+        <QtyInput
+          value={it.cantidad}
+          onChange={(v) => updateItem(it.uid, { cantidad: v })}
+          min={1}
+          error={overstock}
+        />
 
         {/* Precio editable por jornada */}
         <div className="flex items-center gap-1">

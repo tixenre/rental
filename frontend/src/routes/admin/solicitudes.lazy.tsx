@@ -8,8 +8,6 @@ import {
   Calendar,
   Package as PackageIcon,
   Pencil,
-  Plus,
-  Minus,
   RotateCcw,
   Inbox,
 } from "lucide-react";
@@ -21,6 +19,7 @@ import { nombreCliente } from "@/lib/cliente-nombre";
 import { Button } from "@/design-system/ui/button";
 import { Badge } from "@/design-system/ui/badge";
 import { Input } from "@/design-system/ui/input";
+import { QtyInput } from "@/design-system/ui/qty-input";
 import { Label } from "@/design-system/ui/label";
 import { Textarea } from "@/design-system/ui/textarea";
 import { QueryState } from "@/components/admin/QueryState";
@@ -480,38 +479,18 @@ function SolicitudCard({
                   <li key={equipo_id} className="px-3 py-1.5 flex items-center gap-2">
                     <span className="flex-1 text-ink truncate text-sm">{nombre}</span>
                     {dirty && <span className="text-2xs text-ink">cliente: {original}</span>}
-                    <div className="flex items-center gap-0.5">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-7 w-7"
-                        onClick={() => updateOverrideCantidad(equipo_id, -1)}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={cant}
-                        onChange={(e) => {
-                          const v = parseInt(e.target.value || "0", 10);
-                          setOverrideItems((prev) => {
-                            const next = new Map(prev);
-                            next.set(equipo_id, Math.max(0, Number.isNaN(v) ? 0 : v));
-                            return next;
-                          });
-                        }}
-                        className="h-7 w-12 text-center text-sm"
-                      />
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-7 w-7"
-                        onClick={() => updateOverrideCantidad(equipo_id, +1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <QtyInput
+                      value={cant}
+                      onChange={(v) =>
+                        setOverrideItems((prev) => {
+                          const next = new Map(prev);
+                          next.set(equipo_id, v);
+                          return next;
+                        })
+                      }
+                      min={0}
+                      size="sm"
+                    />
                   </li>
                 );
               })}
