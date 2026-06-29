@@ -29,7 +29,7 @@ import { RentalDateModal } from "./RentalDateModal";
 import { GuardarComoListaButton } from "./GuardarComoListaButton";
 import { CompartirComposicionButton } from "./CompartirComposicionButton";
 import { toLocalISO } from "@/lib/rental-dates";
-import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
+import { useCotizacion, descuentoLabel, lineaPorEquipo } from "@/lib/cotizacion";
 import { cn } from "@/lib/utils";
 
 const FOCUSABLE =
@@ -403,10 +403,16 @@ export function CartDrawer({
                           const reachedMax = qty >= cap;
                           const noDisponible =
                             !!startDate && getDisponible?.(it) !== undefined && cap < qty;
-                          const lineaBruta = it.pricePerDay * qty * (d || 1);
-                          const lineaDto =
-                            descuentoPct > 0 ? Math.round((lineaBruta * descuentoPct) / 100) : 0;
-                          const lineaNeta = lineaBruta - lineaDto;
+                          // Detalle por línea desde el BACKEND (FASE 3: el front
+                          // muestra, no calcula). `subtotalDia` cae a un placeholder
+                          // transitorio (precio del catálogo × cant) solo mientras
+                          // llega la primera cotización; se corrige al instante con la
+                          // respuesta (y para combos el número bueno es el del backend).
+                          const linea = lineaPorEquipo(totales, it._backendId ?? Number(it.id));
+                          const subtotalDia = linea?.subtotalPorJornada ?? it.pricePerDay * qty;
+                          const lineaBruta = linea?.bruto ?? subtotalDia * (d || 1);
+                          const lineaNeta = linea?.neto ?? lineaBruta;
+                          const lineaDto = lineaBruta - lineaNeta;
                           return (
                             <li
                               key={it.id}
@@ -504,7 +510,7 @@ export function CartDrawer({
                                   />
                                   <div className="text-right">
                                     <div className="text-xs tabular text-ink">
-                                      {formatARS(it.pricePerDay * qty)}
+                                      {formatARS(subtotalDia)}
                                       <span className="text-muted-foreground"> /día</span>
                                     </div>
                                     {d > 0 && (

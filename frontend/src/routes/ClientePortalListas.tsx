@@ -42,6 +42,7 @@ import {
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
 import { rearmarCarrito } from "@/lib/rearmar-carrito";
+import { useCotizacion } from "@/lib/cotizacion";
 import { useCart } from "@/lib/cart-store";
 import { cn } from "@/lib/utils";
 import { fmt } from "./ClientePortalTypes";
@@ -154,10 +155,12 @@ function ListaCard({
     (r): r is { item: ListaItem; equipo: Equipment } => r.equipo !== null,
   );
   const noDisponibles = resueltos.length - reservables.length;
-  const estimadoJornada = reservables.reduce(
-    (acc, r) => acc + (r.equipo.pricePerDay ?? 0) * r.item.cantidad,
-    0,
-  );
+  // Estimado por jornada desde el BACKEND (cotizar sin fechas = 1 jornada, sin
+  // descuento/IVA; combo-aware). El front muestra, no calcula (FASE 3). Mismos ids
+  // que se mandan al reservar → el preview coincide con la cotización real.
+  const estimadoJornada = useCotizacion({
+    items: reservables.map((r) => ({ equipoId: r.item.equipo_id, cantidad: r.item.cantidad })),
+  }).data.subtotalPorJornada;
 
   function reservarLista() {
     setAskReservar(false);

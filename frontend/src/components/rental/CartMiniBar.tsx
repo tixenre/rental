@@ -8,7 +8,7 @@ import { formatARS } from "@/lib/format";
 import { EmptyImage } from "./EmptyImage";
 import { Button } from "@/design-system/ui/button";
 import { toLocalISO } from "@/lib/rental-dates";
-import { useCotizacion } from "@/lib/cotizacion";
+import { useCotizacion, lineaPorEquipo } from "@/lib/cotizacion";
 
 export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
   const items = useCart((s) => s.items);
@@ -76,7 +76,18 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
             </div>
             <div className="max-h-[240px] overflow-y-auto">
               {previewItems.map(({ equipo, qty }) => (
-                <CartPreviewRow key={equipo.id} equipo={equipo} qty={qty} days={days} />
+                <CartPreviewRow
+                  key={equipo.id}
+                  equipo={equipo}
+                  qty={qty}
+                  days={days}
+                  // Total del período desde el backend; placeholder transitorio
+                  // (precio catálogo × cant × jornadas) solo hasta que llega la cotización.
+                  periodTotal={
+                    lineaPorEquipo(totales, equipo._backendId ?? Number(equipo.id))?.bruto ??
+                    equipo.pricePerDay * qty * Math.max(days, 1)
+                  }
+                />
               ))}
             </div>
           </div>
@@ -131,8 +142,18 @@ export function CartMiniBar({ allEquipos }: { allEquipos: Equipment[] }) {
   );
 }
 
-function CartPreviewRow({ equipo, qty, days }: { equipo: Equipment; qty: number; days: number }) {
-  const periodTotal = equipo.pricePerDay * qty * Math.max(days, 1);
+function CartPreviewRow({
+  equipo,
+  qty,
+  days,
+  periodTotal,
+}: {
+  equipo: Equipment;
+  qty: number;
+  days: number;
+  // Total del período YA calculado por el backend (FASE 3: el front muestra, no calcula).
+  periodTotal: number;
+}) {
   return (
     <div className="flex items-center gap-2.5 py-1">
       <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded bg-white">
