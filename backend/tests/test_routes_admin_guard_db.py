@@ -46,8 +46,16 @@ from auth.session import signer
 
 # Sesión válida pero NO-admin: pasa el middleware, la rechaza require_admin.
 _COOKIE_NO_ADMIN = (
-    f"session={signer.dumps({'email': 'rando@test.com', 'role': 'cliente', 'cliente_id': 1})}"
+    f"session={signer.dumps({'email': 'rando@test.com', 'role': 'cliente', 'cliente_id': 1, 'jti': 'guarddb-cli'})}"
 )
+
+
+@pytest.fixture(autouse=True)
+def _sessions_active(monkeypatch):
+    """jti obligatorio: la cookie de test lleva jti pero no está en la allowlist →
+    stubbeamos is_active para darla por activa y que el request llegue al
+    require_admin del handler (que es lo que este test verifica)."""
+    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
 
 # Los mismos 53 endpoints de _ADMIN_EXIST de test_routes_contract_admin.py.
 # Se duplica la lista (no se importa) para que el test sea self-contained y pueda

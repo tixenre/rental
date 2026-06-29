@@ -14,6 +14,7 @@ import { FaqSection } from "@/components/admin/settings/FaqSection";
 import { RankingSection } from "@/components/admin/settings/RankingSection";
 import { CambioYPreciosSection } from "@/components/admin/settings/CambioYPreciosSection";
 import { PasskeysSection } from "@/components/admin/settings/PasskeysSection";
+import { SessionsSection } from "@/components/admin/settings/SessionsSection";
 
 export const Route = createLazyFileRoute("/admin/settings")({
   component: SettingsPage,
@@ -43,6 +44,10 @@ function SettingsPage() {
           defaultOpen={false}
         >
           <PasskeysSection />
+        </AdminSection>
+
+        <AdminSection title="Sesiones activas" storageKey="settings:sesiones" defaultOpen={false}>
+          <SessionsSection />
         </AdminSection>
 
         <AdminSection title="Horarios de retiro" storageKey="settings:horarios">

@@ -20,6 +20,17 @@ from auth.session import get_session
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def _stub_sessions_store(monkeypatch):
+    """El minteo de sesión ahora registra una fila server-side (allowlist
+    `auth_sessions`). En estos tests unitarios (sin DB) stubbeamos el store:
+    `create_session` da un jti fijo e `is_active` lo da por vivo — así se prueba la
+    lógica del staging-login sin tocar la DB (como ya se mockea el resto)."""
+    monkeypatch.setattr("auth.sessions_store.create_session", lambda **kw: "stub-jti")
+    monkeypatch.setattr("auth.sessions_store.is_active",
+                        lambda jti: {"jti": jti} if jti else None)
+
+
 class _FakeHeaders:
     def get(self, _key, default=""):
         return default

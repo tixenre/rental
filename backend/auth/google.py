@@ -10,15 +10,15 @@ import secrets
 
 from authlib.integrations.httpx_client import OAuth2Client
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import BadSignature, SignatureExpired
 
 from auth.ratelimit import _check_rate, _record_fail
 from auth.session import (
     COOKIE_SECURE,
-    SESSION_MAX_AGE,
     _make_session_response,
     dev_bypass_enabled,
+    get_session,
     require_session,
     signer,
 )
@@ -99,15 +99,28 @@ def auth_me(request: Request):
     return {**session, "is_admin": is_admin_email(email)}
 
 
+def _revoke_current_session(request: Request) -> None:
+    """Revoca server-side la sesión actual (logout real): mata el `jti` en la
+    allowlist para que la cookie no se pueda "revivir" si fue robada. Defensivo:
+    sin sesión / sin jti (ej. cookie vieja pre-deploy) es no-op."""
+    session = get_session(request)
+    jti = session.get("jti") if session else None
+    if jti:
+        from auth import sessions_store  # perezoso: rompe el ciclo con auth/__init__
+        sessions_store.revoke(jti)
+
+
 @router.get("/auth/logout")
-def auth_logout():
+def auth_logout(request: Request):
+    _revoke_current_session(request)
     res = RedirectResponse(f"{FRONTEND_BASE}/admin/login", status_code=303)
     res.delete_cookie("session")
     return res
 
 
 @router.post("/auth/logout")
-def auth_logout_post():
+def auth_logout_post(request: Request):
+    _revoke_current_session(request)
     res = JSONResponse({"ok": True})
     res.delete_cookie("session")
     return res
@@ -197,7 +210,7 @@ def auth_callback(request: Request):
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=not_allowed", status_code=303)
 
-    res = _make_session_response(email, name, redirect=POST_LOGIN_URL)
+    res = _make_session_response(email, name, redirect=POST_LOGIN_URL, request=request)
     # Limpiar cookie de state
     res.delete_cookie("oauth_state")
     return res
@@ -355,18 +368,14 @@ def cliente_auth_callback(request: Request):
         # Cliente conocido → crear sesión directamente. Si llegó `next` válido
         # (cookie seteada por /cliente/auth/google), volvemos ahí en vez de al
         # portal — habilita el flujo de "iniciar sesión y volver a /estudio".
-        session_data = {"email": email, "name": name, "role": "cliente", "cliente_id": row["id"]}
-        token = signer.dumps(session_data)
         next_path = _safe_next_path(request.cookies.get("oauth_next_cliente"))
         target = f"{FRONTEND_BASE}{next_path}" if next_path else f"{FRONTEND_BASE}/cliente/portal"
-        safe_url = target.replace('"', "%22")
-        res = HTMLResponse(
-            f'<!DOCTYPE html><html><head>'
-            f'<script>window.location.replace("{safe_url}")</script>'
-            f'</head><body>Redirigiendo...</body></html>'
+        # Punto único de minteo (registra la sesión server-side con `jti` → revocable),
+        # con el mismo redirect-via-JS que arma `_make_session_response`.
+        res = _make_session_response(
+            email, name, redirect=target,
+            extra={"role": "cliente", "cliente_id": row["id"]}, request=request,
         )
-        res.set_cookie("session", token, httponly=True, samesite="lax",
-                       secure=COOKIE_SECURE, max_age=SESSION_MAX_AGE)
         res.delete_cookie("oauth_state_cliente")
         res.delete_cookie("oauth_next_cliente")
         return res

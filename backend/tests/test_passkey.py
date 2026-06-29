@@ -19,6 +19,16 @@ from auth.passkey import store
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def _stub_sessions_store(monkeypatch):
+    """El login con passkey mintea la sesión vía `_make_session_response`, que ahora
+    registra una fila server-side (allowlist `auth_sessions`). Stubbeamos el store
+    para no tocar la DB en estos tests unitarios (el passkey store ya se mockea aparte)."""
+    monkeypatch.setattr("auth.sessions_store.create_session", lambda **kw: "stub-jti")
+    monkeypatch.setattr("auth.sessions_store.is_active",
+                        lambda jti: {"jti": jti} if jti else None)
+
+
 # ── Piezas puras ──────────────────────────────────────────────────────────────
 
 class TestEsReplay:
@@ -90,11 +100,15 @@ def _client() -> TestClient:
 
 
 def _admin_session() -> str:
-    return signer.dumps({"email": "admin@test.com", "name": "Admin"})
+    # jti obligatorio (get_session exige sesión en la allowlist); el stub de
+    # is_active la da por activa.
+    return signer.dumps({"email": "admin@test.com", "name": "Admin", "jti": "test-admin"})
 
 
 def _cliente_session(cliente_id: int = 42) -> str:
-    return signer.dumps({"email": "c@x.com", "name": "Cli", "role": "cliente", "cliente_id": cliente_id})
+    return signer.dumps(
+        {"email": "c@x.com", "name": "Cli", "role": "cliente", "cliente_id": cliente_id, "jti": "test-cli"}
+    )
 
 
 class TestLoginComplete:

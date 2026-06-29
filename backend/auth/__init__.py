@@ -14,6 +14,9 @@ Submódulos:
 - `google`     → rutas OAuth de Google (admin + cliente) + el `router` compartido.
 - `staging`    → dev-login / staging-login (registran sobre el router de google).
 - `passkey`    → motor WebAuthn + rutas.
+- `sessions_store` / `sessions_routes` → allowlist de sesiones + revocación (logout
+  real, "cerrar mis otras sesiones"). La cookie firmada lleva un `jti`; el store
+  decide si sigue viva.
 
 La superficie pública (símbolos + routers) se ensambla al final de este módulo.
 """
@@ -26,8 +29,10 @@ import auth.guards  # noqa: F401
 import auth.google  # noqa: F401
 import auth.staging  # noqa: F401
 import auth.passkey.routes  # noqa: F401
+import auth.sessions_routes  # noqa: F401
 
 from auth.google import router  # router compartido google + staging
 from auth.passkey.routes import router as auth_passkey_router
+from auth.sessions_routes import router as auth_sessions_router
 
-__all__ = ["router", "auth_passkey_router"]
+__all__ = ["router", "auth_passkey_router", "auth_sessions_router"]

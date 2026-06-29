@@ -46,8 +46,19 @@ client = TestClient(main.app, raise_server_exceptions=False)
 # tests) — no tocan la DB, los guards deciden por rol/email.
 #   · admin:   sesión válida con email en ADMIN_EMAILS (pasa middleware + require_admin).
 #   · cliente: sesión válida de cliente (email fuera de ADMIN_EMAILS).
-_COOKIE_ADMIN = f"session={signer.dumps({'email': 'admin@test.com', 'name': 'Admin'})}"
-_COOKIE_CLIENTE = f"session={signer.dumps({'email': 'rando@test.com', 'role': 'cliente', 'cliente_id': 1})}"
+_COOKIE_ADMIN = f"session={signer.dumps({'email': 'admin@test.com', 'name': 'Admin', 'jti': 'contract-admin'})}"
+_COOKIE_CLIENTE = f"session={signer.dumps({'email': 'rando@test.com', 'role': 'cliente', 'cliente_id': 1, 'jti': 'contract-cli'})}"
+
+
+@pytest.fixture(autouse=True)
+def _sessions_active(monkeypatch):
+    """jti obligatorio: `get_session` exige que la sesión esté viva en la allowlist.
+    Las cookies de contrato llevan jti pero no están en la tabla → stubbeamos
+    `is_active` para darlas por activas, así el request pasa el chequeo de revocación
+    y llega al routing/guard (que es lo que estos tests verifican). Sin esto,
+    `get_session` las cortaría en el middleware (401) y `test_endpoint_existe` no
+    distinguiría una ruta dropeada de una viva."""
+    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
 
 
 # ── Inventario ───────────────────────────────────────────────────────────────

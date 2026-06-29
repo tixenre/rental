@@ -24,7 +24,14 @@ pytestmark = pytest.mark.unit
 client = TestClient(main.app, raise_server_exceptions=False)
 
 # Cookie de cliente firmada con el signer real de la app (mismo SECRET_KEY de tests).
-_COOKIE_CLIENTE = f"session={signer.dumps({'email': 'x@test.com', 'role': 'cliente', 'cliente_id': 123})}"
+_COOKIE_CLIENTE = f"session={signer.dumps({'email': 'x@test.com', 'role': 'cliente', 'cliente_id': 123, 'jti': 'gate-cli'})}"
+
+
+@pytest.fixture(autouse=True)
+def _sessions_active(monkeypatch):
+    """jti obligatorio: la cookie de test lleva jti pero no está en la allowlist →
+    stubbeamos is_active para darla por activa y que el request llegue al guard."""
+    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
 
 
 # ── Fakes de DB ───────────────────────────────────────────────────────────────

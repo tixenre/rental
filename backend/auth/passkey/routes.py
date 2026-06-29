@@ -171,20 +171,21 @@ def login_complete(body: LoginCompleteIn, request: Request):
                        row["id"], row["sign_count"], new_count)
         raise HTTPException(401, "Passkey rechazada (contador inválido).")
     store.update_sign_count(row["id"], new_count)
-    res = _mint_session_for_owner(row)
+    res = _mint_session_for_owner(row, request)
     res.delete_cookie(_AUTH_COOKIE)
     return res
 
 
-def _mint_session_for_owner(row: dict):
+def _mint_session_for_owner(row: dict, request: Request):
     """Mintea la MISMA cookie de sesión que el OAuth, resolviendo el rol como
     siempre (admin por `is_admin_email`; cliente con role+cliente_id). Los datos
-    vivos (email/nombre del cliente) salen por `cliente_id` (clave estable)."""
+    vivos (email/nombre del cliente) salen por `cliente_id` (clave estable).
+    `request` aporta el user_agent para etiquetar el dispositivo en la sesión."""
     if row["owner_type"] == "admin":
         email = row["owner_email"]
         if not is_admin_email(email):
             raise HTTPException(403, "Tu cuenta ya no tiene permisos de administración.")
-        return _make_session_response(email=email, name=email)
+        return _make_session_response(email=email, name=email, request=request)
     with get_db() as conn:
         c = conn.execute(
             "SELECT id, email, nombre, apellido FROM clientes WHERE id = %s",
@@ -195,6 +196,7 @@ def _mint_session_for_owner(row: dict):
     name = f"{c['nombre'] or ''} {c['apellido'] or ''}".strip() or c["email"]
     return _make_session_response(
         email=c["email"], name=name, extra={"role": "cliente", "cliente_id": c["id"]},
+        request=request,
     )
 
 

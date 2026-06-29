@@ -287,6 +287,39 @@ def _init_db_schema(conn):
         "ON passkey_credentials(LOWER(owner_email)) WHERE owner_type = 'admin'"
     )
 
+    # ── Sesiones server-side: allowlist para revocación (logout real + "cerrar mis
+    # otras sesiones"). La cookie firmada lleva un `jti` opaco; esta tabla decide si
+    # sigue viva. Espeja `passkey_credentials` (mismo discriminador owner_type +
+    # CHECK de dos lados). `expires_at` materializa el TTL de la cookie; `revoked_at`
+    # NULL = activa. Toda sesión válida lleva `jti` y vive acá; una cookie sin jti
+    # (viejas pre-deploy) se rechaza → re-login.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+            jti           TEXT PRIMARY KEY,
+            owner_type    TEXT NOT NULL CHECK (owner_type IN ('admin', 'cliente')),
+            owner_email   TEXT NOT NULL,
+            cliente_id    INTEGER REFERENCES clientes(id) ON DELETE CASCADE,
+            user_agent    TEXT,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at    TIMESTAMP NOT NULL,
+            revoked_at    TIMESTAMP,
+            CHECK ((owner_type = 'cliente' AND cliente_id IS NOT NULL)
+                OR (owner_type = 'admin'   AND cliente_id IS NULL))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_cliente "
+        "ON auth_sessions(cliente_id) WHERE owner_type = 'cliente'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_admin "
+        "ON auth_sessions(LOWER(owner_email)) WHERE owner_type = 'admin'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires "
+        "ON auth_sessions(expires_at)"
+    )
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
             id               SERIAL PRIMARY KEY,
