@@ -12,8 +12,14 @@ import { KeyRound, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
+import { Input } from "@/design-system/ui/input";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
-import { passkeyErrorMessage, passkeySupported, registerPasskey } from "@/lib/passkey";
+import {
+  passkeyErrorMessage,
+  passkeySupported,
+  registerPasskey,
+  renamePasskey,
+} from "@/lib/passkey";
 import { listAccessKeys, removeAccessKey, GOOGLE_LINK_URL, type AccessKey } from "@/lib/accessKeys";
 
 const LINK_RESULT: Record<string, { ok: boolean; msg: string }> = {
@@ -59,6 +65,7 @@ export function AccessMethods() {
 
   const keys = q.data?.keys ?? [];
   const total = q.data?.total ?? 0;
+  const hasGoogle = keys.some((k) => k.kind === "google"); // una cuenta = un Google
 
   return (
     <div className="space-y-4">
@@ -97,6 +104,8 @@ export function AccessMethods() {
           type="button"
           size="sm"
           variant="outline"
+          disabled={hasGoogle}
+          title={hasGoogle ? "Ya tenés una cuenta de Google vinculada" : undefined}
           onClick={() => {
             window.location.href = GOOGLE_LINK_URL;
           }}
@@ -111,6 +120,8 @@ export function AccessMethods() {
 function AccessKeyRow({ k, isOnly }: { k: AccessKey; isOnly: boolean }) {
   const qc = useQueryClient();
   const [confirmDel, setConfirmDel] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(k.label);
 
   const delMut = useMutation({
     mutationFn: () => removeAccessKey(k.kind === "passkey" ? "passkey" : "identity", k.id),
@@ -119,6 +130,17 @@ function AccessKeyRow({ k, isOnly }: { k: AccessKey; isOnly: boolean }) {
       qc.invalidateQueries({ queryKey: QUERY_KEY });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "No se pudo eliminar la llave."),
+  });
+
+  // Renombrar solo aplica a passkeys (las identidades Google/mail no tienen nombre editable).
+  const renameMut = useMutation({
+    mutationFn: (n: string) => renamePasskey("cliente", k.id, n),
+    onSuccess: () => {
+      setEditing(false);
+      toast.success("Nombre actualizado");
+      qc.invalidateQueries({ queryKey: QUERY_KEY });
+    },
+    onError: (e) => toast.error(passkeyErrorMessage(e)),
   });
 
   return (
@@ -131,41 +153,82 @@ function AccessKeyRow({ k, isOnly }: { k: AccessKey; isOnly: boolean }) {
         )}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink">{k.label}</div>
-        <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
-          {fmtFecha(k.created_at, k.last_used_at)}
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        {isOnly ? (
-          <span className="text-2xs text-muted-foreground">Única llave</span>
-        ) : confirmDel ? (
-          <>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-8 text-sm"
+              maxLength={40}
+              autoFocus
+            />
             <Button
               type="button"
               size="sm"
-              variant="destructive"
-              onClick={() => delMut.mutate()}
-              loading={delMut.isPending}
+              onClick={() => renameMut.mutate(name.trim())}
+              loading={renameMut.isPending}
+              disabled={!name.trim()}
             >
-              Quitar
+              Guardar
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmDel(false)}>
-              No
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setEditing(false);
+                setName(k.label);
+              }}
+            >
+              Cancelar
             </Button>
-          </>
+          </div>
         ) : (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => setConfirmDel(true)}
-            aria-label="Quitar llave"
-          >
-            <Trash2 />
-          </Button>
+          <>
+            <div className="truncate text-sm font-medium text-ink">{k.label}</div>
+            <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
+              {fmtFecha(k.created_at, k.last_used_at)}
+            </div>
+          </>
         )}
       </div>
+      {!editing && (
+        <div className="flex shrink-0 items-center gap-1">
+          {k.kind === "passkey" && (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
+              Renombrar
+            </Button>
+          )}
+          {isOnly ? (
+            <span className="text-2xs text-muted-foreground">Única llave</span>
+          ) : confirmDel ? (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                onClick={() => delMut.mutate()}
+                loading={delMut.isPending}
+              >
+                Quitar
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setConfirmDel(false)}>
+                No
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirmDel(true)}
+              aria-label="Quitar llave"
+            >
+              <Trash2 />
+            </Button>
+          )}
+        </div>
+      )}
     </li>
   );
 }
