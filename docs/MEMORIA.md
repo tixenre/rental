@@ -414,6 +414,34 @@ criterio viejo (ingreso = total devengado, en `pyl.py`) que inflaba la ganancia 
 los dueños. Solo afecta cuando hay equipos de dueños ≠ Rambla. No toca el reparto/rendición (ya estaban bien).
 Regresión: `test_reporte_ganancia_descuenta_comision_de_duenos`.
 
+### 2026-06-29 — Retro de iniciativa: el cierre de algo importante dispara un retro que reparte aprendizajes
+
+El cierre de un cambio sustancial de producto (iniciativa o bug grande, por **tamaño de diff vs `origin/dev`**:
+≥4 archivos **o** ≥150 líneas) dispara un **retro** que analiza qué rindió/qué no (**honestidad > actividad**) y
+**reparte** cada aprendizaje a su destino: método de skill → buzón `PROPUESTAS_SKILLS.md` (autónomo); criterio/
+arquitectura → `MEMORIA`+`DECISIONES` (OK del dueño); gotcha cómo-funciona-X → `SISTEMA_*` (OK); principio →
+`CLAUDE.md` Filosofía (OK); diferido → issue vía `pendientes` (autónomo); nada → decirlo. **Hook `check-retro.sh`
+= disparador** (gemelo de `check-governance-review.sh`, filtro disjunto = código de producto; corre en terminal/
+desktop; surfacea, no despacha ni reemplaza al de gobernanza) · **skill `gobernanza` §7 = método** · **dueño =
+gate** (dos OK: ¿corro el retro? → reparto ítem por ítem). Semi-automático: el hook recuerda, la sesión juzga, el
+dueño aprueba. Propone-no-aplica salvo buzón e issues. Aplica la cláusula de retiro del harness de evals.
+
+### 2026-06-29 — `backend/services/contenido/` = puerta única de "qué incluye un producto" (display derivado de la receta real)
+
+Todo el **display** de "qué incluye un producto/kit" (vista en carrito/ficha, packing list, buscar por contenido,
+repetir pedido, listas, compartir) pasa por la **puerta única** `backend/services/contenido/`, que **deriva del
+mismo `kit_componentes`** que usa el motor de reservas → el display **no puede desincronizarse** de lo que se
+reserva. Nuevo miembro de la familia motor-único. Devuelve los componentes **directos (1 nivel)** para mostrar; el
+**gate expande recursivo** (`reservas.semantics`). **No toca el motor** (solo SELECTs de lectura, sin locks ni
+transacción — core sagrado intacto). El soft-delete lo decide el flag **`solo_activos` por superficie** (no
+incondicional): `True` catálogo/ficha (oculta retirados, default) · `False` documentos/detalle de un pedido ya
+hecho (muestra todo lo que la receta referencia) — vuelve **explícita** la diferencia que antes era drift
+accidental (`attach_kit` filtraba, `get_kit` no). La garantía no es "lista idéntica" sino **misma fuente** (puerta
+directa == `reservas.semantics`, a equipos no retirados). Candados: `test_contenido_puerta_db.py` (misma fuente
+que el gate) + `test_contenido_sql_safety.py` (prohíbe SQL inline de `kit_componentes`). El supervisor marca
+display de "qué incluye" ad-hoc fuera de la puerta. Cómo → [`SISTEMA_CONTENIDO.md`](SISTEMA_CONTENIDO.md);
+tracking #1087.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

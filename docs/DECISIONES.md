@@ -1436,3 +1436,79 @@ cancel-in-progress` ya cancela corridas viejas.
   (equipo propio = 100% de Rambla, sin diferencia). NO toca el reparto de la liquidación ni la rendición (ya
   estaban bien). Regresión: `test_reporte_ganancia_descuenta_comision_de_duenos` (Pablo $100k → ganancia $45k,
   no $100k). Los tests existentes (delta de gasto/cargo) siguen pasando.
+
+### 2026-06-29 — Retro de iniciativa: el cierre de algo importante dispara un retro que reparte aprendizajes
+
+- **Contexto.** Tras una sesión de implementación el dueño quiere saber **qué sirvió y qué no**, y que el
+  aprendizaje no se evapore. Auditoría con evidencia: el ledger (`.claude/skill-ledger.jsonl`) registra
+  **frecuencia, no eficacia**; el buzón (`docs/PROPUESTAS_SKILLS.md`) no recibió propuestas de la sesión; el loop
+  `## Auto-mejora` es **por-skill** → no cubre el ~90% del trabajo que es **código de producto** (no toca ningún
+  skill). No existía un "retro de iniciativa".
+- **Pedido del dueño (verbatim).** "algo que detecte que fue una implementación, o un bug arreglado o algo
+  importante, un hook que manda a claude a analizar lo que sirvió y lo que no, algo que aprender, y reparta donde
+  tenga que repartir, si al skill, o al sistema de gobernanza" + "no con cosas triviales".
+- **Frontera honesta (lo dejo explícito, no lo disimulo).** Un hook **no puede despachar un agente** ni
+  preguntar-y-esperar una respuesta — solo **surfacea un recordatorio**. Por eso el "manda a claude a analizar" es
+  **semi-automático** con **dos OK del dueño**: (1) el hook detecta y recuerda al cierre del turno → la sesión
+  pregunta "¿corro el retro?" (sí/no) → con el OK analiza; (2) la sesión trae el reparto **ítem por ítem** y el
+  dueño aprueba cada destino. Nada a memoria/SISTEMA/principios sin OK; lo único que escribe sola es el buzón (que
+  ya es el inbox de proponer) y los issues.
+- **Decisión.** Tres piezas, **reusando lo que ya existe** (anti-bloat _2026-06-23_; no un skill nuevo): (a) **Hook
+  `.claude/hooks/check-retro.sh`** = **gemelo** de `check-governance-review.sh` (misma mecánica: merge-base vs
+  `origin/dev`, `git diff` de rama+working+staged `| sort -u`, dedupe por firma `cksum` en `.claude/.retro-state`
+  gitignored, `exit 0` siempre), con dos diferencias: filtro **disjunto** = código de producto
+  `^(backend/|frontend/src/)` (excluye naturalmente skills/digest → cero overlap con el de gobernanza) y umbral
+  "no trivial" (≥4 archivos **o** ≥150 líneas vs `origin/dev`, en constantes arriba del script). (b) **Método** en
+  el skill `gobernanza` (§7 "Retro de iniciativa", hermana del cierre mensual §6, pero per-iniciativa y extendida
+  a aprendizajes de **producto**, no solo de skills). (c) **Reparto**: método de skill → buzón (**autónomo**);
+  criterio/arquitectura → `MEMORIA`+`DECISIONES` (OK); gotcha cómo-funciona-X → `SISTEMA_*` (OK); principio →
+  `CLAUDE.md` Filosofía (OK); trabajo diferido → issue vía `pendientes` (autónomo); nada → decirlo (no fabricar
+  churn).
+- **Consecuencias.** Roles claros: **hook = disparador · `gobernanza` = método · dueño = gate**. El recordatorio
+  es **conveniencia, no gate**: corre donde corren los hooks de Claude Code (terminal/desktop, no en el chat de
+  Mac/iPhone ni en la web/nube); donde no corra, el retro es invocable a demanda (`/gobernanza` → §7). Aplica la
+  **cláusula de retiro** del harness de evals (si gatea 0 retros útiles en N meses → se retira). Archivos:
+  `.claude/hooks/check-retro.sh` (nuevo), `.claude/settings.json` (2ª entrada `Stop`, no toca la existente),
+  `.claude/.gitignore` (+`.retro-state`), `.claude/skills/gobernanza/SKILL.md` (§7 + cheatsheet + anti-objetivo +
+  nota de scope), `CLAUDE.md` (fila de `gobernanza` con el disparador del retro), `scripts/evals/README.md` (2º
+  auto-disparador en "Auto-disparo (Nivel 1)"). **Dogfooded** sobre la iniciativa de contenido (entrada gemela
+  2026-06-29): produjo la corroboración gh-CLI al buzón (autónomo) + la entrada de memoria de la puerta.
+
+### 2026-06-29 — `backend/services/contenido/` = puerta única de "qué incluye un producto" (display derivado de la receta real)
+
+- **Contexto.** Varias features client-facing necesitan mostrar "qué incluye" un kit/combo: la vista de contenido
+  en el carrito, el packing list/checklist, buscar kits por contenido, repetir un pedido, listas personales del
+  cliente y compartir una composición (gaffer → productor). Todas leen la **misma receta** que el motor de reservas
+  usa para expandir y chequear stock (la tabla `kit_componentes`).
+- **Problema.** Sin una puerta única, cada feature reimplementaría el "qué incluye" con su propia query → el
+  display podría **desincronizarse** de lo que realmente se reserva. Además se arrastraba un **drift de
+  soft-delete**: `attach_kit` filtraba `eliminado_at IS NULL` pero `get_kit` no.
+- **Decisión.** **`backend/services/contenido/`** es la **puerta única del display** de "qué incluye", **derivada
+  de la receta real** (el mismo `kit_componentes` del motor). Nuevo miembro de la familia **motor-único** (espeja
+  `reservas`/`reportes`/`busqueda`/`contabilidad`/`branding`). Invariantes: (a) devuelve los componentes
+  **directos (1 nivel)** —es display, no la demanda de stock; la **expansión recursiva** sigue siendo del gate vía
+  `reservas.semantics`—; (b) **no toca el motor de reservas** (solo SELECTs de lectura, sin `FOR UPDATE`/
+  transacción — core sagrado intacto); (c) **expone el soft-delete vía `solo_activos` por superficie** (no lo
+  unifica incondicionalmente — ver gotcha abajo); (d) reusa
+  alias `e` + `MARCA_SUBQUERY` (_2026-05-26_) y psycopg3 `%s` (_2026-06-27_). API: `contenido_de_batch(conn,
+  equipo_ids, solo_activos=True) -> dict[int, list[dict]]` + `contenido_de(conn, equipo_id, solo_activos=True) ->
+  list[dict]`.
+- **`solo_activos` no es universal (gotcha).** `True` (default) para **catálogo/ficha/carrito** (oculta los
+  componentes soft-deleted: el cliente no debe ver lo retirado); `False` para **documentos / detalle de un pedido
+  ya hecho** (debe mostrar lo que de verdad se entregó, incluso piezas hoy retiradas). Elegir el flag **por
+  superficie**, no por reflejo: vuelve **explícita** la diferencia que antes era drift accidental (`attach_kit`
+  filtraba `eliminado_at`, `get_kit` no). El **cómo** (consumidores, tabla por superficie, fronteras, los tres
+  conceptos de "qué incluye") vive en el manual [`docs/SISTEMA_CONTENIDO.md`](SISTEMA_CONTENIDO.md); el
+  **criterio/porqué** acá — split _2026-06-25 — Manuales técnicos por sistema_.
+- **Consecuencias.** El supervisor marca display de "qué incluye un producto" reimplementado fuera de la puerta.
+  Dos candados: `test_contenido_puerta_db.py` (integración Postgres: misma fuente que el gate, granularidad 1
+  nivel, el flag `solo_activos`) + `test_contenido_sql_safety.py` (unit: falla si un consumidor migrado vuelve a
+  armar SQL inline contra `kit_componentes`). **Adopción no total (honesto):** el detalle de pedido para mails/
+  cotización (`_get_alquiler_items`/`_batch_get_alquiler_items`, superficie de plata) todavía devuelve `kc.*`
+  crudo — consolidación follow-up, documentada en el manual. Módulo:
+  `backend/services/contenido/{__init__.py, contenido.py, modelos.py}`. Iniciativa de tracking **#1087**;
+  shippeada en el lote de contenido client-facing (repetir pedido + listas + compartir + las tres "casi gratis":
+  vista en carrito, packing list, buscar por contenido). Repetir/listas/compartir reusan `rearmarCarrito`, que
+  **re-cotiza el catálogo actual** respetando la decisión snapshot _2026-06-06_ (presupuestos se recotizan;
+  confirmados conservan su snapshot). Features #3 «armá tu kit» y #5 «faltantes inteligentes» quedaron diferidas
+  (#1092).
