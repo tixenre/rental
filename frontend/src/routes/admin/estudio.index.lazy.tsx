@@ -39,6 +39,7 @@ import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Spinner } from "@/design-system/ui/spinner";
 import { Pill } from "@/design-system/kit/Pill";
 import { Input } from "@/design-system/ui/input";
@@ -1100,11 +1101,9 @@ function TrabajoDialog({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <ModalBackdrop
+      className="z-50 flex items-center justify-center bg-black/60 p-4"
+      onClose={onClose}
     >
       <div className="relative bg-surface rounded-2xl border hairline shadow-xl w-full max-w-lg max-h-[90dvh] overflow-y-auto">
         <div className="sticky top-0 bg-surface border-b hairline px-5 py-4 flex items-center justify-between">
@@ -1486,7 +1485,7 @@ function TrabajoDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 

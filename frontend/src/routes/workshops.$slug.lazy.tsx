@@ -5,6 +5,8 @@ import { Calendar, MapPin, Users, CheckCircle2, Clock, X } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
 import { Button } from "@/design-system/ui/button";
+import { IconButton } from "@/design-system/ui/icon-button";
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Logo } from "@/components/rental/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
@@ -60,19 +62,20 @@ function SoldOutModal({
   const labelActual = ordinalEdicion(currentEdicion);
   const labelProxima = ordinalEdicion(proxima.numero_edicion);
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+    <ModalBackdrop
+      className="z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
       style={{ background: "oklch(0.15 0 0 / 65%)" }}
-      onClick={(e) => e.target === e.currentTarget && onDismiss()}
+      onClose={onDismiss}
     >
       <div className="relative w-full max-w-sm rounded-2xl bg-background border border-border/60 p-7 shadow-2xl">
-        <button
-          onClick={onDismiss}
+        <IconButton
           aria-label="Cerrar"
-          className="absolute top-4 right-4 p-1.5 rounded-full text-muted-foreground hover:text-ink hover:bg-muted transition"
+          size="sm"
+          onClick={onDismiss}
+          className="absolute top-4 right-4 rounded-full text-muted-foreground hover:text-ink hover:bg-muted"
         >
           <X className="h-4 w-4" />
-        </button>
+        </IconButton>
         <p className="font-mono text-2xs tracking-[0.25em] uppercase text-rosa mb-3">
           {labelActual} edición
         </p>
@@ -101,7 +104,7 @@ function SoldOutModal({
           Cerrar
         </button>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 
