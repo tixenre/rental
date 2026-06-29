@@ -908,15 +908,26 @@ def compartido_page(token: str):
             return f"{marca} {base}".strip() if marca and marca.lower() not in base.lower() else base
 
         nombres = [_nombre(equipos[i]) for i in ids if i in equipos]
-        title = f"{titulo} — Rambla Rental" if titulo else "Equipos para tu producción — Rambla Rental"
+        n = len(nombres)
+        # El título y la descripción enmarcan QUÉ es el link —te compartieron un listado para
+        # armar un pedido—, no solo la marca ni la lista cruda de equipos. Así la preview de
+        # WhatsApp le explica el link a quien lo recibe (caso gaffer → productor: "reservá esto").
+        if titulo:
+            title = f"{titulo} — listado de equipos · Rambla Rental"
+        else:
+            title = "Te compartieron un listado de equipos · Rambla Rental"
         if nombres:
             shown = ", ".join(nombres[:3])
-            extra = len(nombres) - 3
+            extra = n - 3
             if extra > 0:
                 shown += f" y {extra} más"
-            desc = f"{shown} · Reservá en Rambla Rental, Mar del Plata."
+            unidades = "1 equipo" if n == 1 else f"{n} equipos"
+            desc = (
+                f"Te compartieron un listado para armar un pedido ({unidades}): {shown}. "
+                "Abrilo y reservalo en Rambla Rental, Mar del Plata."
+            )
         else:
-            desc = "Una selección de equipos para alquilar en Rambla Rental, Mar del Plata."
+            desc = "Te compartieron un listado de equipos para armar un pedido en Rambla Rental, Mar del Plata."
         if len(desc) > 200:
             desc = desc[:197].rstrip() + "…"
         # Imagen: foto OG del primer equipo; fallback a su foto_url (webp); luego el icono.
