@@ -143,6 +143,28 @@ def precio_combo(conn, equipo_id: int) -> int:
     return _precio_combo_calc(rows)
 
 
+def precio_jornada_efectivo(conn, equipo_id: int) -> Optional[int]:
+    """Precio por jornada EFECTIVO de un equipo, resuelto en UN solo lugar: para un
+    COMBO se deriva en vivo de sus componentes (`precio_combo`, C3 #635); un kit/simple
+    usa su `precio_jornada` propio. `None` si el equipo no existe (o está soft-deleted).
+
+    Fuente ÚNICA de "qué precio por jornada toma este equipo": la consumen `cotizar`,
+    `cliente_crear_pedido` y `cliente_modificar_pedido` → lo que el carrito COTIZA es lo
+    que se PERSISTE (cierra el drift de combos cotizado≠cobrado). El gate de seguridad
+    "solo equipos de catálogo / el cliente no decide el precio" vive en cada consumidor,
+    no acá — esto solo resuelve plata.
+    """
+    row = conn.execute(
+        "SELECT precio_jornada, tipo FROM equipos WHERE id = %s AND eliminado_at IS NULL",
+        (equipo_id,),
+    ).fetchone()
+    if not row:
+        return None
+    if row["tipo"] == "combo":
+        return precio_combo(conn, equipo_id)
+    return int(row["precio_jornada"] or 0)
+
+
 def bruto_linea(it: ItemPrecio, jornadas: int) -> int:
     """Bruto (neto sin descuento) de UNA línea — fuente única del subtotal por línea.
 

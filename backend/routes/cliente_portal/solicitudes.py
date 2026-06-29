@@ -231,10 +231,12 @@ def _precios_actuales(conn, pedido_id: int) -> dict[int, int]:
 
 
 def _equipo_precio_catalogo(conn, equipo_id: int) -> int:
-    row = conn.execute(
-        "SELECT precio_jornada FROM equipos WHERE id=%s", (equipo_id,)
-    ).fetchone()
-    return int(row["precio_jornada"] or 0) if row else 0
+    # Precio EFECTIVO desde la fuente única `precio_jornada_efectivo`: un combo se
+    # deriva en vivo de sus componentes (C3 #635), un kit/simple usa su precio propio.
+    # 0 si el equipo no existe. Mismo resolutor que `cotizar` y `cliente_crear_pedido`
+    # → lo que el carrito cotiza es lo que se persiste (sin drift de combos).
+    from services.precios import precio_jornada_efectivo
+    return int(precio_jornada_efectivo(conn, equipo_id) or 0)
 
 
 @router.post("/api/cliente/pedidos/{id}/modificacion")

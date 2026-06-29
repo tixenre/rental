@@ -14,7 +14,7 @@ from database import get_db, to_datetime
 from rate_limit import limiter
 from auth.guards import is_admin_email
 from auth.session import get_session
-from services.precios import calcular_total, jornadas_periodo, precio_combo
+from services.precios import calcular_total, jornadas_periodo, precio_jornada_efectivo
 from routes.alquileres.core import router, _get_descuento_jornadas
 
 
@@ -88,18 +88,11 @@ def cotizar(data: CotizarRequest, request: Request):
                     "cobro_modo": it.cobro_modo or "jornada",
                 })
                 continue
-            row = conn.execute(
-                "SELECT precio_jornada, tipo FROM equipos WHERE id=%s AND eliminado_at IS NULL",
-                (it.equipo_id,),
-            ).fetchone()
-            if not row:
+            # Precio efectivo por jornada (combo → derivado de componentes C3 #635;
+            # kit/simple → su precio propio), resuelto en la fuente única.
+            precio = precio_jornada_efectivo(conn, it.equipo_id)
+            if precio is None:
                 continue
-            # C3 #635: el precio de un COMBO se deriva en vivo de sus componentes
-            # (Σ × descuento por línea); kits y simples usan su precio propio.
-            if row["tipo"] == "combo":
-                precio = precio_combo(conn, it.equipo_id)
-            else:
-                precio = row["precio_jornada"] or 0
             items_para_total.append({
                 "equipo_id": it.equipo_id,
                 "cantidad": it.cantidad,

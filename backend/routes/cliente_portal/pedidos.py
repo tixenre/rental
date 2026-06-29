@@ -92,6 +92,7 @@ def cliente_crear_pedido(
 
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
     from routes.alquileres import create_pedido_retry, PedidoCreate, PedidoItem
+    from services.precios import precio_jornada_efectivo
 
     # SEGURIDAD: el cliente nunca decide el precio. Resolvemos cada
     # `precio_jornada` desde `equipos.precio_jornada` y descartamos lo
@@ -114,7 +115,11 @@ def cliente_crear_pedido(
             ).fetchone()
             if not row:
                 raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado en el catálogo")
-            precios[it.equipo_id] = int(row["precio_jornada"])
+            # El SELECT de arriba es el GATE de seguridad (visible_catalogo + precio
+            # no nulo). El precio EFECTIVO lo resuelve la fuente única
+            # `precio_jornada_efectivo` (combo → derivado de componentes C3 #635),
+            # igual que `cotizar` → lo cotizado == lo cobrado (sin drift de combos).
+            precios[it.equipo_id] = int(precio_jornada_efectivo(conn, it.equipo_id) or 0)
 
     payload = PedidoCreate(
         cliente_id=cliente_id,
