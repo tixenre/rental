@@ -18,6 +18,7 @@ from pydantic import BaseModel, field_validator, model_validator
 
 from database import get_db, row_to_dict, to_datetime, to_iso, now_ar, MARCA_SUBQUERY, marca_subquery
 from routes.clientes import nombre_completo_cliente
+from identity import nombre_validado
 from services.email import send_email, Attachment
 from services.email.service import get_admin_to
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
@@ -312,10 +313,8 @@ def _aplicar_contacto_cliente(pedido: dict, c: dict) -> None:
     si el DNI fue verificado por RENAPER, y `cliente_dni_validado_at` para que el
     back-office pueda mostrar el aviso de identidad sin verificar.
     """
-    if c.get("nombre_renaper"):
-        pedido["cliente_nombre"] = f"{c['nombre_renaper']} {c.get('apellido_renaper', '')}".strip()
-    else:
-        pedido["cliente_nombre"] = nombre_completo_cliente(c.get("nombre", ""), c.get("apellido", ""))
+    # Nombre: legal de RENAPER si está verificado (fuente única en identity), si no el base.
+    pedido["cliente_nombre"] = nombre_validado(c) or nombre_completo_cliente(c.get("nombre", ""), c.get("apellido", ""))
     if c.get("email"):
         pedido["cliente_email"] = c["email"]
     if c.get("telefono"):

@@ -95,4 +95,28 @@ def get_validated_identity(cliente_id: int, conn=None) -> "ValidatedIdentity | N
             conn.close()
 
 
-__all__ = ["ValidatedIdentity", "get_validated_identity"]
+# ── Helpers de display sobre una fila ya leída (sin N+1 en listados) ──────────
+# Fuente ÚNICA de la regla "preferí RENAPER si está verificado". Los lectores que ya
+# tienen la fila del cliente (contrato/remito, enriquecido de pedidos en vivo) la usan
+# en vez de duplicar el `if nombre_renaper …` — el supervisor marca esa duplicación.
+
+
+def nombre_validado(c: dict) -> str | None:
+    """Nombre legal de RENAPER si la identidad fue verificada; None si no (para que el
+    lector caiga a su propio fallback al nombre base). Puro, sobre una fila de clientes."""
+    if c.get("nombre_renaper"):
+        return f"{c['nombre_renaper']} {c.get('apellido_renaper') or ''}".strip()
+    return None
+
+
+def direccion_validada(c: dict) -> str | None:
+    """Dirección oficial de RENAPER si está; None si no (el lector usa la base)."""
+    return c.get("direccion_renaper") or None
+
+
+__all__ = [
+    "ValidatedIdentity",
+    "get_validated_identity",
+    "nombre_validado",
+    "direccion_validada",
+]
