@@ -5,9 +5,11 @@
  * pantalla VERDADERA (siempre actual) + cuántas instancias hay. Abajo, los bloques
  * compuestos que viven entre primitivo y página (donde más se reinventa).
  *
- * Pendiente (siguiente paso): miniatura por arquetipo generada con el harness
- * Playwright de `auditoria-profunda` (recorre 320→1920) — thumbnail sin mantener a mano.
+ * Miniaturas: las genera `scripts/ds-thumbs.mjs` (mismo patrón que el harness de
+ * auditoria-profunda) contra staging/local-con-backend → `public/ds-thumbs/<name>.png`.
+ * Si una falta, la card la oculta (onError) y cae con gracia a solo texto+link.
  */
+import { useState } from "react";
 import { ArrowUpRight, Inbox } from "lucide-react";
 
 import { type CatalogSection } from "../types";
@@ -125,8 +127,24 @@ const ARCHETYPES: Archetype[] = [
 ];
 
 function ArchetypeCard({ a }: { a: Archetype }) {
+  // Miniatura generada por `scripts/ds-thumbs.mjs` (contra staging/local-con-backend).
+  // Si falta (404) o todavía no se generó, onError la marca y la card cae con gracia
+  // a solo texto+link. Sin imágenes rotas.
+  const [thumbErr, setThumbErr] = useState(false);
+  const thumb = a.href && !thumbErr ? `/ds-thumbs/${a.name}.png` : undefined;
   return (
     <div className="flex flex-col gap-2 rounded-lg border hairline bg-surface p-4">
+      {thumb && (
+        <div className="-mx-1 -mt-1 mb-1 overflow-hidden rounded-md border hairline bg-card">
+          <img
+            src={thumb}
+            alt={`Miniatura de ${a.name}`}
+            loading="lazy"
+            className="aspect-[16/10] w-full object-cover object-top"
+            onError={() => setThumbErr(true)}
+          />
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2">
         <h4 className="font-display text-sm text-ink">{a.name}</h4>
         <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-2xs text-muted-foreground">
