@@ -6,9 +6,9 @@ import { type CatalogSection } from "../types";
 import { Caption, Row, Sample } from "../catalog-kit";
 
 const BRAND_COLORS = [
-  { cls: "bg-amber", label: "amber · rental", token: "--color-amber" },
-  { cls: "bg-estudio", label: "estudio", token: "--color-estudio" },
-  { cls: "bg-rosa", label: "rosa · workshops", token: "--color-rosa" },
+  { cls: "bg-amber", label: "amarillo rambla", token: "--color-amber" },
+  { cls: "bg-estudio", label: "naranja estudio", token: "--color-estudio" },
+  { cls: "bg-rosa", label: "rosa escuela", token: "--color-rosa" },
   { cls: "bg-ink", label: "ink · texto/UI", token: "--color-ink" },
 ];
 
