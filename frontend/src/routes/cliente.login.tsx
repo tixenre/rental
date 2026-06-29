@@ -137,7 +137,7 @@ function ClienteLoginPage() {
                 className="w-full h-auto py-[13px] text-sm font-semibold"
               >
                 {!signupBusy && <KeyRound className="h-4 w-4" />}
-                {signupBusy ? "Creando tu cuenta…" : "Crear cuenta con passkey"}
+                {signupBusy ? "Creando tu cuenta…" : "Crear cuenta con clave de acceso"}
               </Button>
               <p className="text-center font-sans text-2xs text-muted-foreground leading-[1.5]">
                 Sin contraseña — usás tu huella, Face ID o el PIN del dispositivo.
@@ -168,7 +168,7 @@ function ClienteLoginPage() {
               className="flex items-center justify-center gap-2.5 rounded-md border-[1.5px] hairline bg-card py-[13px] font-sans text-sm font-semibold text-ink transition hover:border-ink hover:bg-background disabled:opacity-60"
             >
               <KeyRound className="h-4 w-4" />
-              {passkeyBusy ? "Verificando…" : "Entrar con passkey"}
+              {passkeyBusy ? "Verificando…" : "Entrar con clave de acceso"}
             </button>
           )}
         </div>
