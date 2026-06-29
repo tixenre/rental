@@ -114,19 +114,29 @@ export const actionsSection: CatalogSection = {
       render: () => (
         <Row className="gap-4 items-end">
           <Sample label="xs (h-7)">
-            <IconButton aria-label="Cerrar" size="xs"><X /></IconButton>
+            <IconButton aria-label="Cerrar" size="xs">
+              <X />
+            </IconButton>
           </Sample>
           <Sample label="sm (h-8)">
-            <IconButton aria-label="Eliminar" size="sm"><Trash2 /></IconButton>
+            <IconButton aria-label="Eliminar" size="sm">
+              <Trash2 />
+            </IconButton>
           </Sample>
           <Sample label="md (h-9, default)">
-            <IconButton aria-label="Buscar"><Search /></IconButton>
+            <IconButton aria-label="Buscar">
+              <Search />
+            </IconButton>
           </Sample>
           <Sample label="lg (h-11, HIG tap)">
-            <IconButton aria-label="Agregar" size="lg"><Plus /></IconButton>
+            <IconButton aria-label="Agregar" size="lg">
+              <Plus />
+            </IconButton>
           </Sample>
           <Sample label="variant outline">
-            <IconButton aria-label="Agregar" variant="outline"><Plus /></IconButton>
+            <IconButton aria-label="Agregar" variant="outline">
+              <Plus />
+            </IconButton>
           </Sample>
         </Row>
       ),

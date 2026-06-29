@@ -13,15 +13,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  Send,
-  Eye,
-  Pencil,
-  CheckCircle2,
-  AlertTriangle,
-  RefreshCw,
-  Mail,
-} from "lucide-react";
+import { Send, Eye, Pencil, CheckCircle2, AlertTriangle, RefreshCw, Mail } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
 
 import { AdminTable, type Column } from "@/components/admin/AdminTable";

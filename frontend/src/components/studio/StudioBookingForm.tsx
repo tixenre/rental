@@ -3,14 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import {
-  Calendar as CalendarIcon,
-  Check,
-  Clock,
-  MessageCircle,
-  Minus,
-  Plus,
-} from "lucide-react";
+import { Calendar as CalendarIcon, Check, Clock, MessageCircle, Minus, Plus } from "lucide-react";
 import { Button } from "@/design-system/ui/button";
 import { Pill } from "@/design-system/kit/Pill";
 import { Spinner } from "@/design-system/ui/spinner";

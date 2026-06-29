@@ -12,8 +12,10 @@ const SIZE: Record<IconButtonSize, string> = {
   lg: "h-11 w-11",
 };
 
-export interface IconButtonProps
-  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+export interface IconButtonProps extends Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "children"
+> {
   /** Obligatorio: usado por screen readers en lugar del texto visible. */
   "aria-label": string;
   children: React.ReactNode;

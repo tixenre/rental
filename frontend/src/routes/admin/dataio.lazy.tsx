@@ -284,11 +284,7 @@ function DataIoPage() {
                   }}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  {resetBusy ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    <Trash2 className="size-4" />
-                  )}
+                  {resetBusy ? <Spinner size="sm" /> : <Trash2 className="size-4" />}
                   Borrar definitivamente
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -344,11 +340,7 @@ function DataIoPage() {
                 onClick={() => handleDownload("full", "Backup completo", "backup-full.zip")}
                 disabled={busy !== null}
               >
-                {busy === "full" ? (
-                  <Spinner size="sm" />
-                ) : (
-                  <Database className="size-4" />
-                )}
+                {busy === "full" ? <Spinner size="sm" /> : <Database className="size-4" />}
                 Todo en un ZIP
               </Button>
             </div>
@@ -367,11 +359,7 @@ function DataIoPage() {
                     disabled={busy !== null}
                     className="shrink-0"
                   >
-                    {busy === e.key ? (
-                      <Spinner size="sm" />
-                    ) : (
-                      <Download className="size-4" />
-                    )}
+                    {busy === e.key ? <Spinner size="sm" /> : <Download className="size-4" />}
                     JSON
                   </Button>
                 </div>
@@ -441,11 +429,7 @@ function GroupCard({
           onClick={() => onDownload(backupEntity, label, `backup-${scope}.zip`)}
           disabled={busy !== null || importing}
         >
-          {downloading ? (
-            <Spinner size="sm" />
-          ) : (
-            <Download className="size-4" />
-          )}
+          {downloading ? <Spinner size="sm" /> : <Download className="size-4" />}
           Descargar backup
         </Button>
         <Button

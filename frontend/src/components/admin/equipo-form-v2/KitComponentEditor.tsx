@@ -4,14 +4,7 @@
  */
 
 import { useEffect, useState } from "react";
-import {
-  Plus,
-  Trash2,
-  Search,
-  GripVertical,
-  ShieldAlert,
-  ShieldCheck,
-} from "lucide-react";
+import { Plus, Trash2, Search, GripVertical, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
@@ -189,7 +182,10 @@ export function KitComponentEditor({ equipoId, mode }: { equipoId: number; mode:
           className="pl-8"
         />
         {searching && (
-          <Spinner size="xs" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Spinner
+            size="xs"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
         )}
       </div>
 

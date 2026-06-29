@@ -132,11 +132,7 @@ export function DescuentosJornadaSection() {
           onClick={() => crear.mutate()}
           disabled={!dias || !pct || crear.isPending}
         >
-          {crear.isPending ? (
-            <Spinner size="xs" />
-          ) : (
-            <Plus className="w-3.5 h-3.5" />
-          )}
+          {crear.isPending ? <Spinner size="xs" /> : <Plus className="w-3.5 h-3.5" />}
           Agregar
         </Button>
       </div>

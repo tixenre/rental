@@ -676,11 +676,7 @@ export function CartSheet({
               onClick={handleSubmit}
               disabled={submitting}
             >
-              {submitting ? (
-                <Spinner size="md" className="mx-auto" />
-              ) : (
-                "Solicitar rental"
-              )}
+              {submitting ? <Spinner size="md" className="mx-auto" /> : "Solicitar rental"}
             </Button>
           )}
         </div>

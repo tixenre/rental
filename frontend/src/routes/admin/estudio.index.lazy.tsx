@@ -863,11 +863,7 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
 
       {/* ── Submit ── */}
       <div className="sticky bottom-0 bg-background border-t hairline -mx-4 md:-mx-6 px-4 md:px-6 py-3 flex justify-end gap-3">
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={mutation.isPending || !isDirty}
-        >
+        <Button type="submit" variant="primary" disabled={mutation.isPending || !isDirty}>
           {mutation.isPending ? (
             <Spinner size="sm" className="mr-2" />
           ) : (
@@ -1439,9 +1435,7 @@ function TrabajoDialog({
                       onClick={() => logoInputRef.current?.click()}
                       disabled={uploadingLogo}
                     >
-                      {uploadingLogo ? (
-                        <Spinner size="xs" className="mr-1.5" />
-                      ) : null}
+                      {uploadingLogo ? <Spinner size="xs" className="mr-1.5" /> : null}
                       {logoUrl ? "Cambiar logo" : "Subir logo"}
                     </Button>
                   </div>

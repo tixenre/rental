@@ -133,11 +133,7 @@ function FieldRow({ field }: { field: FieldDef }) {
           disabled={!changed || mut.isPending}
           onClick={() => mut.mutate(trimmed)}
         >
-          {mut.isPending ? (
-            <Spinner size="sm" />
-          ) : (
-            <Check className="h-4 w-4" />
-          )}
+          {mut.isPending ? <Spinner size="sm" /> : <Check className="h-4 w-4" />}
         </Button>
       </div>
       {field.helper && <p className="text-xs text-muted-foreground">{field.helper}</p>}

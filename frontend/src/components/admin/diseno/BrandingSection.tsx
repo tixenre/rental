@@ -12,15 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Upload,
-  MessageCircle,
-  Image as ImageIcon,
-  Check,
-  Type,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { Upload, MessageCircle, Image as ImageIcon, Check, Type, Plus, Trash2 } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 

@@ -593,7 +593,12 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
             className="text-xs"
           />
         </Field>
-        <Button type="submit" variant="primary" disabled={crear.isPending} loading={crear.isPending}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={crear.isPending}
+          loading={crear.isPending}
+        >
           {crear.isPending ? "Guardando…" : "Registrar"}
         </Button>
       </div>

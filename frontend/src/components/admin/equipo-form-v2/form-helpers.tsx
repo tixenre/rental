@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Copy,
-  ExternalLink,
-  ChevronDown,
-  Image as ImageIcon,
-  Upload,
-  X,
-} from "lucide-react";
+import { Copy, ExternalLink, ChevronDown, Image as ImageIcon, Upload, X } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 

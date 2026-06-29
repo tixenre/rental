@@ -462,12 +462,7 @@ export function PagosSidebar({
               }}
               disabled={addMut.isPending}
             >
-              {addMut.isPending ? (
-                <Spinner size="xs" />
-              ) : (
-                <Check className="h-3.5 w-3.5" />
-              )}{" "}
-              Guardar
+              {addMut.isPending ? <Spinner size="xs" /> : <Check className="h-3.5 w-3.5" />} Guardar
             </Button>
             <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>
               Cancelar

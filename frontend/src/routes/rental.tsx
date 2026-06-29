@@ -12,16 +12,7 @@ import {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CatalogoMovil } from "@/components/rental/mobile/CatalogoMovil";
-import {
-  LayoutGrid,
-  List,
-  ArrowRight,
-  Search,
-  X,
-  Check,
-  Heart,
-  SearchX,
-} from "lucide-react";
+import { LayoutGrid, List, ArrowRight, Search, X, Check, Heart, SearchX } from "lucide-react";
 import { ViewToggle } from "@/components/rental/ViewToggle";
 import { Link } from "@tanstack/react-router";
 import { PublicLayout } from "@/components/rental/PublicLayout";

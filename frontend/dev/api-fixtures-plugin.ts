@@ -290,9 +290,7 @@ export function apiFixturesPlugin(): Plugin {
       server.config.logger.info(
         "  ➜  [rambla] API fixtures de dev activos (catálogo + cotización + auth)",
       );
-      server.config.logger.info(
-        "  ➜  [rambla] Dev login: http://localhost:3000/_dev/login",
-      );
+      server.config.logger.info("  ➜  [rambla] Dev login: http://localhost:3000/_dev/login");
     },
   };
 }
