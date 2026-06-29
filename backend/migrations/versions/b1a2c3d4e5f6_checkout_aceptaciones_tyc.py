@@ -3,13 +3,13 @@
 Registro inmutable de qué versión de T&C aceptó cada cliente. La versión
 actual la controla `services.checkout.tyc.TYC_VERSION_ACTUAL` (hoy "v1").
 
-Unifica dos heads activos: e5a7c9b1d3f4 (merge auth+listas) y f2cu1lun1qx01
-(cuil unique index). El portero referencia `clientes`, que ambas ramas ya tienen.
+Parte de f2cu1lun1qx01 (cuil unique index), el head activo al momento del
+portero. El portero referencia `clientes`, que ya existía en ese head.
 
 Espejo idempotente en `database.schema._init_db_schema`. MEMORIA 2026-06-03.
 
 Revision ID: b1a2c3d4e5f6
-Revises: e5a7c9b1d3f4, f2cu1lun1qx01
+Revises: f2cu1lun1qx01
 Create Date: 2026-06-29
 """
 
@@ -18,7 +18,7 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "b1a2c3d4e5f6"
-down_revision: Union[str, Sequence[str], None] = ("e5a7c9b1d3f4", "f2cu1lun1qx01")
+down_revision: Union[str, Sequence[str], None] = "f2cu1lun1qx01"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

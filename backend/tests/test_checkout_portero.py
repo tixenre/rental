@@ -355,6 +355,30 @@ def test_registrar_idempotente():
     assert len(conn._rows) == 1
 
 
+# ── validar_checkout: camino feliz ────────────────────────────────────────────
+
+
+def test_validar_checkout_listo(monkeypatch):
+    """Cuando todo está OK el portero devuelve listo=True y faltan vacío."""
+    monkeypatch.setattr(
+        "services.checkout.validar.calcular_disponibilidad",
+        lambda *a, **k: {"1": 5},
+    )
+    monkeypatch.setattr(
+        "services.checkout.validar.precios_catalogo_para_reserva",
+        lambda *a, **k: {1: 1000},
+    )
+    monkeypatch.setattr(
+        "services.checkout.validar.email_comunicacion",
+        lambda *a, **k: "test@example.com",
+    )
+
+    conn = _conn_all_ok()
+    result = validar_checkout(conn, cliente_id=1, session_id="abc", firma_ok=True)
+    assert result["listo"] is True
+    assert result["faltan"] == []
+
+
 # ── validar_checkout: carrito no encontrado ────────────────────────────────────
 
 
