@@ -20,24 +20,47 @@ export function equipoShareUrl(item: Pick<Equipment, "id" | "brand" | "name">): 
 }
 
 /**
- * Comparte un equipo: usa el share nativo del SO (Web Share API, típico en
- * mobile) si está disponible; si no, copia el link al portapapeles. Devuelve
- * qué pasó para que el caller muestre el feedback ("Copiado").
+ * Comparte un link arbitrario (no necesariamente un equipo): usa el share nativo
+ * del SO (Web Share API, típico en mobile) si está disponible; si no, copia al
+ * portapapeles. Devuelve qué pasó para el feedback del caller.
+ *
+ * Robusto ante el gotcha de iOS/Safari: si `navigator.share` se invoca DESPUÉS de
+ * un `await` (ej. crear el link en el backend), el browser puede perder el "user
+ * gesture" y tirar `NotAllowedError`. En ese caso caemos a copiar — NO lo
+ * tratamos como cancelación. Solo `AbortError` (el usuario cerró la hoja de
+ * compartir) es "cancelled".
+ */
+export async function shareLink(url: string, title?: string, text?: string): Promise<ShareResult> {
+  if (typeof window === "undefined") return "cancelled";
+  if (navigator.share) {
+    try {
+      const data: ShareData = { url };
+      if (title) data.title = title;
+      if (text) data.text = text; // WhatsApp pre-llena el mensaje con el texto + el link.
+      await navigator.share(data);
+      return "shared";
+    } catch (e) {
+      // Hoja cerrada por el usuario → cancelado. Cualquier otro error (gesto
+      // perdido tras el await en iOS, share bloqueado) → intentamos copiar.
+      if (e instanceof DOMException && e.name === "AbortError") return "cancelled";
+    }
+  }
+  try {
+    // Sin share nativo (desktop): copiamos el mensaje + el link, no un link pelado,
+    // así al pegarlo en WhatsApp va con contexto (y la preview igual se genera).
+    await navigator.clipboard.writeText(text ? `${text}\n${url}` : url);
+    return "copied";
+  } catch {
+    return "cancelled";
+  }
+}
+
+/**
+ * Comparte un equipo (ficha + cards del catálogo). Delega en `shareLink` con la
+ * URL canónica del equipo — una sola forma de compartir en todo el front.
  */
 export async function shareEquipo(
   item: Pick<Equipment, "id" | "brand" | "name">,
 ): Promise<ShareResult> {
-  if (typeof window === "undefined") return "cancelled";
-  const url = equipoShareUrl(item);
-  try {
-    if (navigator.share) {
-      await navigator.share({ title: item.name, url });
-      return "shared";
-    }
-    await navigator.clipboard.writeText(url);
-    return "copied";
-  } catch {
-    // El usuario canceló el diálogo nativo, o el portapapeles falló.
-    return "cancelled";
-  }
+  return shareLink(equipoShareUrl(item), item.name);
 }

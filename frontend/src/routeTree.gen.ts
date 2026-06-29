@@ -33,6 +33,7 @@ import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
 import { Route as ClientePerfilRouteImport } from './routes/cliente.perfil'
 import { Route as ClienteLoginRouteImport } from './routes/cliente.login'
 import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
+import { Route as CTokenRouteImport } from './routes/c.$token'
 import { Route as AdminTalleresRouteImport } from './routes/admin/talleres'
 import { Route as AdminNovedadesRouteImport } from './routes/admin/novedades'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
@@ -311,6 +312,11 @@ const CategoriaSlugRoute = CategoriaSlugRouteImport.update({
   path: '/categoria/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CTokenRoute = CTokenRouteImport.update({
+  id: '/c/$token',
+  path: '/c/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminTalleresRoute = AdminTalleresRouteImport.update({
   id: '/talleres',
   path: '/talleres',
@@ -509,6 +515,7 @@ export interface FileRoutesByFullPath {
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
   '/admin/talleres': typeof AdminTalleresRouteWithChildren
+  '/c/$token': typeof CTokenRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
@@ -567,6 +574,7 @@ export interface FileRoutesByTo {
   '/terminos': typeof TerminosRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
+  '/c/$token': typeof CTokenRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
@@ -633,6 +641,7 @@ export interface FileRoutesById {
   '/admin/login': typeof AdminLoginRoute
   '/admin/novedades': typeof AdminNovedadesRoute
   '/admin/talleres': typeof AdminTalleresRouteWithChildren
+  '/c/$token': typeof CTokenRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
@@ -700,6 +709,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/novedades'
     | '/admin/talleres'
+    | '/c/$token'
     | '/categoria/$slug'
     | '/cliente/login'
     | '/cliente/perfil'
@@ -758,6 +768,7 @@ export interface FileRouteTypes {
     | '/terminos'
     | '/admin/login'
     | '/admin/novedades'
+    | '/c/$token'
     | '/categoria/$slug'
     | '/cliente/login'
     | '/cliente/perfil'
@@ -823,6 +834,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/admin/novedades'
     | '/admin/talleres'
+    | '/c/$token'
     | '/categoria/$slug'
     | '/cliente/login'
     | '/cliente/perfil'
@@ -884,6 +896,7 @@ export interface RootRouteChildren {
   TalleresRoute: typeof TalleresRouteWithChildren
   TerminosRoute: typeof TerminosRoute
   WorkshopsRoute: typeof WorkshopsRouteWithChildren
+  CTokenRoute: typeof CTokenRoute
   CategoriaSlugRoute: typeof CategoriaSlugRoute
   EquipoSlugRoute: typeof EquipoSlugRoute
 }
@@ -1147,6 +1160,13 @@ declare module '@tanstack/react-router' {
       path: '/categoria/$slug'
       fullPath: '/categoria/$slug'
       preLoaderRoute: typeof CategoriaSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/c/$token': {
+      id: '/c/$token'
+      path: '/c/$token'
+      fullPath: '/c/$token'
+      preLoaderRoute: typeof CTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/talleres': {
@@ -1512,6 +1532,7 @@ const rootRouteChildren: RootRouteChildren = {
   TalleresRoute: TalleresRouteWithChildren,
   TerminosRoute: TerminosRoute,
   WorkshopsRoute: WorkshopsRouteWithChildren,
+  CTokenRoute: CTokenRoute,
   CategoriaSlugRoute: CategoriaSlugRoute,
   EquipoSlugRoute: EquipoSlugRoute,
 }

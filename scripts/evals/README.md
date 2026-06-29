@@ -50,10 +50,16 @@ literal._ Tras un trim, la cifra debe **sostenerse**; una caída → el 1-liner 
 - B / C / D se corren **solo cuando su target cambia** (digest → B; capa de skills → C/D), no en cada push:
   B necesita dispatch de agente y C una llamada a modelo (caro + no determinista en CI; un gate flaky de
   gobernanza va contra el ethos anti-bloat).
-- **Auto-disparo (Nivel 1):** el hook `Stop` `.claude/hooks/check-governance-review.sh` detecta cuándo la
-  rama tocó el digest o las skills y **te surfacea la señal a correr** (una vez por cambio-set; corre el
-  `context-size` solo, el resto lo recordás). Corre en la **terminal y en el desktop de Claude Code** (local);
-  no en el chat de Mac/iPhone ni en la web/nube. Automatiza el *disparador*, no el *juicio*: vos seguís siendo el gate de aplicar.
+- **Auto-disparo (Nivel 1):** dos hooks `Stop` **gemelos** detectan cuándo hay algo que validar/aprender y
+  **te surfacean qué correr** (una vez por cambio-set; corren en la **terminal y el desktop de Claude Code**,
+  no en el chat de Mac/iPhone ni en la web/nube; automatizan el *disparador*, no el *juicio* — vos seguís
+  siendo el gate de aplicar):
+  - `.claude/hooks/check-governance-review.sh` → la rama tocó el **digest o las skills** → te surfacea la
+    señal del harness que corresponde (corre el `context-size` solo, el resto lo recordás).
+  - `.claude/hooks/check-retro.sh` → la rama tocó **código de producto** de forma sustancial (≥4 archivos o
+    ≥150 líneas vs `origin/dev`) → te recuerda preguntarle al dueño si corrés el **retro de iniciativa**
+    (`/gobernanza` → §7 "Retro de iniciativa", que reparte cada aprendizaje a su destino). Detecta y
+    surfacea, no juzga. Mismo patrón, target **disjunto** (producto vs gobernanza) → cero overlap.
 
 ## Cláusula de retiro
 
