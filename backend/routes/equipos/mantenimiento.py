@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import get_db, row_to_dict
 from routes.equipos.core import router
 

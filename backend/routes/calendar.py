@@ -24,7 +24,7 @@ from config import SITE_URL
 from database import get_db, now_ar, MARCA_NOMBRE_EXPR
 from rate_limit import limiter
 from services.ical import build_vcalendar, reserva_to_vevent
-from admin_guard import require_admin
+from auth.guards import require_admin
 
 logger = logging.getLogger(__name__)
 

@@ -10,12 +10,11 @@ import logging
 from typing import Optional
 
 from fastapi import Request, HTTPException
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from itsdangerous import BadSignature, SignatureExpired
 
 from database import get_db, row_to_dict
-from routes.auth import signer, COOKIE_SECURE, SESSION_MAX_AGE
+from auth.session import signer, _make_session_response
 from services.precios import es_responsable_inscripto
 from rate_limit import limiter
 from routes.cliente_portal.core import router, require_cliente, cliente_verificado
@@ -109,12 +108,13 @@ def cliente_registro(request: Request, data: RegistroCreate):
                 "SELECT id FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
             ).fetchone()["id"]
 
-        session_data = {"email": email, "name": name, "role": "cliente", "cliente_id": cliente_id}
-        token = signer.dumps(session_data)
-        res = JSONResponse({"ok": True})
-        res.set_cookie("session", token, httponly=True, samesite="lax",
-                       secure=COOKIE_SECURE, max_age=SESSION_MAX_AGE)
-        return res
+    # Mintea la sesión por el punto único (jti + revocación) — FUERA del `with`
+    # porque `_make_session_response` abre su propia conexión (no anidar pools).
+    return _make_session_response(
+        email, name,
+        extra={"role": "cliente", "cliente_id": cliente_id},
+        request=request,
+    )
 
 
 # ── Perfil ────────────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ Registra sus rutas en el router compartido del paquete `routes.equipos`. Tabla
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import get_db
 from routes.equipos.core import router
 from services.contenido import contenido_de

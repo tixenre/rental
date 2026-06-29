@@ -1,33 +1,34 @@
-"""
-routes/auth.py — Google OAuth 2.0 + cookie de sesión firmada.
-"""
+"""auth/google.py — login con Google OAuth 2.0 (admin + cliente) + el `router` compartido.
 
+Crea el `router` de auth (google + staging registran sus rutas sobre él, patrón
+`cliente_portal`). Movido verbatim de `routes/auth.py`; lo único que cambia son los
+imports (sesión/rate-limit/guards salen de los hermanos `auth.*`).
+"""
 import logging
 import os
 import secrets
-import time
-from collections import defaultdict
 
 from authlib.integrations.httpx_client import OAuth2Client
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse, RedirectResponse
+from itsdangerous import BadSignature, SignatureExpired
 
-from net_utils import get_client_ip
+from auth.ratelimit import _check_rate, _record_fail
+from auth.session import (
+    COOKIE_SECURE,
+    _make_session_response,
+    dev_bypass_enabled,
+    get_session,
+    require_session,
+    signer,
+)
 from config import settings
+from net_utils import get_client_ip
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # ── Config ──────────────────────────────────────────────────────────────────
-
-SECRET_KEY = settings.SECRET_KEY
-if not SECRET_KEY:
-    raise RuntimeError(
-        "SECRET_KEY no configurada — generá una con: "
-        "python3 -c \"import secrets; print(secrets.token_urlsafe(32))\""
-    )
 
 GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
@@ -59,136 +60,9 @@ ALLOWED_EMAILS: set[str] = {
     if e.strip()
 }
 
-COOKIE_SECURE = settings.cookie_secure
-SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
-
-
-def dev_bypass_enabled() -> bool:
-    """¿Está activo el bypass de auth de dev (ADMIN_BYPASS_AUTH)?
-
-    Seguridad (#503): NUNCA en producción. Bloquea cuando RAILWAY_ENVIRONMENT
-    es explícitamente 'production'; en Railway dev/staging y en local se
-    permite si ADMIN_BYPASS_AUTH=1. Falla-cerrada: si alguien pone la var en
-    prod, RAILWAY_ENVIRONMENT=production la anula.
-    Fuente única usada por `require_admin`, `/auth/dev-login`, `/auth/me`
-    y `/auth/config`.
-    """
-    if os.getenv("RAILWAY_ENVIRONMENT", "").strip().lower() == "production":
-        return False
-    return os.getenv("ADMIN_BYPASS_AUTH", "").strip().lower() in ("1", "true", "yes")
-
-
-# Cuenta de servicio para login programático en STAGING (no en prod). Email
-# dedicado y auditable: para que sea admin debe estar en `ADMIN_EMAILS` del
-# entorno dev (la admin-ness la sigue resolviendo `is_admin_email`, fuente
-# única; este login no la saltea). Override por env si hace falta otro.
-STAGING_LOGIN_EMAIL = os.getenv("STAGING_LOGIN_EMAIL", "staging-bot@rambla.local").strip().lower()
-
-# Cliente de servicio para impersonar el PORTAL DEL CLIENTE en staging (target
-# "cliente" de `/auth/staging-login`). Se busca por este email salvo que el body
-# pase un `cliente_id` puntual. Como staging es copia de prod, también sirve
-# impersonar cualquier cliente real existente por id.
-STAGING_CLIENTE_EMAIL = os.getenv("STAGING_CLIENTE_EMAIL", "staging-cliente@rambla.local").strip().lower()
-
-
-def _staging_login_secret() -> str:
-    """Secreto compartido para `/auth/staging-login` (env var, solo dev)."""
-    return os.getenv("STAGING_LOGIN_SECRET", "").strip()
-
-
-def staging_login_enabled() -> bool:
-    """¿Está disponible el login programático de staging?
-
-    Doble llave, ambas necesarias (defensa en profundidad):
-      1. NO es producción — usa `settings.is_production`, que falla hacia "sí es
-         prod" ante un nombre de entorno desconocido, así que un ambiente nuevo
-         mal nombrado queda con el login APAGADO, no abierto.
-      2. Hay un secreto configurado — sin `STAGING_LOGIN_SECRET` el endpoint no
-         existe ni siquiera en dev.
-
-    Por qué el secreto es obligatorio: la BD de staging es copia de prod (ver
-    MEMORIA / `Settings.is_production`), o sea tiene PII real de clientes. Un
-    login abierto en una URL pública de dev sería una fuga. El secreto vive solo
-    en el entorno dev de Railway, nunca en el repo, y es rotable.
-    """
-    if settings.is_production:
-        return False
-    return bool(_staging_login_secret())
-
-
 GOOGLE_AUTH_URL  = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO  = "https://www.googleapis.com/oauth2/v3/userinfo"
-
-signer = URLSafeTimedSerializer(SECRET_KEY)
-
-# ── Rate limiting (para /auth/callback) ─────────────────────────────────────
-
-_failures: dict[str, list[float]] = defaultdict(list)
-_RATE_WINDOW = 600
-_RATE_MAX = 10
-
-
-def _check_rate(ip: str) -> None:
-    now = time.time()
-    recent = [t for t in _failures[ip] if now - t < _RATE_WINDOW]
-    _failures[ip] = recent
-    if len(recent) >= _RATE_MAX:
-        raise HTTPException(429, "Demasiados intentos. Intentá en 10 minutos.")
-
-
-def _record_fail(ip: str) -> None:
-    _failures[ip].append(time.time())
-
-
-# ── Sesión ──────────────────────────────────────────────────────────────────
-
-def get_session(request: Request) -> dict | None:
-    token = request.cookies.get("session")
-    if not token:
-        return None
-    try:
-        return signer.loads(token, max_age=SESSION_MAX_AGE)
-    except (BadSignature, SignatureExpired):
-        return None
-
-
-def require_session(request: Request) -> dict:
-    session = get_session(request)
-    if not session:
-        raise HTTPException(401, "No autenticado")
-    return session
-
-
-def _make_session_response(
-    email: str, name: str, redirect: str | None = None, extra: dict | None = None
-):
-    """Mintea la cookie de sesión firmada. `extra` agrega campos a la sesión
-    (ej. `role`/`cliente_id` para una sesión de cliente); sin él, sesión de admin
-    como siempre."""
-    payload = {"email": email, "name": name}
-    if extra:
-        payload.update(extra)
-    token = signer.dumps(payload)
-    if redirect:
-        # Use 200 + JS redirect so the browser processes Set-Cookie before navigating.
-        # A 303 redirect through the Vite proxy drops Set-Cookie headers.
-        safe_url = redirect.replace('"', "%22")
-        res = HTMLResponse(
-            f'<!DOCTYPE html><html><head>'
-            f'<script>window.location.replace("{safe_url}")</script>'
-            f'</head><body>Redirigiendo...</body></html>'
-        )
-    else:
-        res = JSONResponse({"ok": True, **payload})
-    res.set_cookie(
-        "session", token,
-        httponly=True,
-        samesite="lax",
-        secure=COOKIE_SECURE,
-        max_age=SESSION_MAX_AGE,
-    )
-    return res
 
 
 # ── Helpers OAuth ────────────────────────────────────────────────────────────
@@ -215,8 +89,7 @@ def auth_me(request: Request):
     solo verifica que haya sesión válida (cualquier Google login), pero
     es admin solo si el email está en ADMIN_EMAILS.
     """
-    # Import inline para evitar ciclo (admin_guard importa de routes.auth).
-    from admin_guard import is_admin_email
+    from auth.guards import is_admin_email
 
     if dev_bypass_enabled():
         return {"email": "bypass@local", "name": "Dev Admin", "is_admin": True}
@@ -226,15 +99,28 @@ def auth_me(request: Request):
     return {**session, "is_admin": is_admin_email(email)}
 
 
+def _revoke_current_session(request: Request) -> None:
+    """Revoca server-side la sesión actual (logout real): mata el `jti` en la
+    allowlist para que la cookie no se pueda "revivir" si fue robada. Defensivo:
+    sin sesión / sin jti (ej. cookie vieja pre-deploy) es no-op."""
+    session = get_session(request)
+    jti = session.get("jti") if session else None
+    if jti:
+        from auth import sessions_store  # perezoso: rompe el ciclo con auth/__init__
+        sessions_store.revoke(jti)
+
+
 @router.get("/auth/logout")
-def auth_logout():
+def auth_logout(request: Request):
+    _revoke_current_session(request)
     res = RedirectResponse(f"{FRONTEND_BASE}/admin/login", status_code=303)
     res.delete_cookie("session")
     return res
 
 
 @router.post("/auth/logout")
-def auth_logout_post():
+def auth_logout_post(request: Request):
+    _revoke_current_session(request)
     res = JSONResponse({"ok": True})
     res.delete_cookie("session")
     return res
@@ -324,7 +210,7 @@ def auth_callback(request: Request):
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/admin/login?error=not_allowed", status_code=303)
 
-    res = _make_session_response(email, name, redirect=POST_LOGIN_URL)
+    res = _make_session_response(email, name, redirect=POST_LOGIN_URL, request=request)
     # Limpiar cookie de state
     res.delete_cookie("oauth_state")
     return res
@@ -337,127 +223,6 @@ def auth_config():
         "google_enabled": bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET),
         "dev_mode": dev_mode,
     }
-
-
-@router.get("/auth/dev-login")
-def auth_dev_login():
-    """Login directo sin OAuth — solo en dev (ADMIN_BYPASS_AUTH=1, nunca en prod)."""
-    if not dev_bypass_enabled():
-        raise HTTPException(404, "No encontrado.")
-    return _make_session_response(
-        email="dev@local",
-        name="Dev Admin",
-        redirect="/admin",
-    )
-
-
-@router.get("/auth/dev-login-cliente")
-def auth_dev_login_cliente():
-    """Login de cliente sin OAuth — solo en dev (ADMIN_BYPASS_AUTH=1, nunca en prod).
-    Impersona al primer cliente del DB (por STAGING_CLIENTE_EMAIL o el primero que exista)."""
-    if not dev_bypass_enabled():
-        raise HTTPException(404, "No encontrado.")
-    cli = _resolve_staging_cliente(None)
-    if cli is None:
-        from database import get_db
-        with get_db() as conn:
-            row = conn.execute(
-                "SELECT id, email, nombre, apellido FROM clientes ORDER BY id LIMIT 1"
-            ).fetchone()
-        if row is None:
-            raise HTTPException(503, "No hay clientes en la base de datos.")
-        cli = {"id": row["id"], "email": row["email"],
-               "name": f"{row['nombre']} {row['apellido']}".strip()}
-    return _make_session_response(
-        email=cli["email"],
-        name=cli["name"],
-        redirect="/cliente",
-        extra={"role": "cliente", "cliente_id": cli["id"]},
-    )
-
-
-def _resolve_staging_cliente(cliente_id: int | None) -> dict | None:
-    """Resuelve el cliente a impersonar en staging (target="cliente"). READ-ONLY:
-    solo lee `clientes`, nunca muta staging. Por `cliente_id` si se pasa; si no,
-    por `STAGING_CLIENTE_EMAIL`. Devuelve `{id, email, name}` o None si no existe."""
-    from database import get_db
-
-    with get_db() as conn:
-        if cliente_id is not None:
-            row = conn.execute(
-                "SELECT id, nombre, apellido, email FROM clientes WHERE id = %s",
-                (cliente_id,),
-            ).fetchone()
-        else:
-            row = conn.execute(
-                "SELECT id, nombre, apellido, email FROM clientes WHERE LOWER(email) = LOWER(%s)",
-                (STAGING_CLIENTE_EMAIL,),
-            ).fetchone()
-    if not row:
-        return None
-    nombre = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip()
-    return {"id": row["id"], "email": row["email"], "name": nombre or row["email"]}
-
-
-class StagingLoginInput(BaseModel):
-    secret: str
-    # "admin" (default, sesión de back-office) o "cliente" (sesión del portal del
-    # cliente). Backward-compatible: sin `target` se comporta como antes.
-    target: str = "admin"
-    # Solo para target="cliente": impersonar un cliente puntual por id. Si se
-    # omite, se usa el cliente de servicio `STAGING_CLIENTE_EMAIL`.
-    cliente_id: int | None = None
-
-
-@router.post("/auth/staging-login")
-def auth_staging_login(body: StagingLoginInput, request: Request):
-    """Login programático para STAGING (dev de Railway), sin el flujo OAuth de Google.
-
-    A diferencia de `/auth/dev-login` (que se apaga en CUALQUIER entorno Railway),
-    este SÍ corre en el `dev` de Railway — pero solo si `staging_login_enabled()`
-    (no-prod + secreto configurado). Mintea la misma cookie de sesión firmada que
-    el OAuth real. Devuelve JSON + `Set-Cookie` (sin redirect HTML), para que un
-    cliente automatizado capture la cookie y pruebe flujos autenticados en staging.
-
-    Dos targets (la admin-ness y la cliente-ness las siguen resolviendo
-    `is_admin_email` / `require_cliente`, fuentes únicas — este login no las saltea):
-      - "admin" (default): sesión de back-office para `STAGING_LOGIN_EMAIL`.
-      - "cliente": sesión del PORTAL para un cliente real existente (`role` +
-        `cliente_id`), resuelto por `_resolve_staging_cliente`. No crea clientes.
-
-    Seguridad: 404 si no está habilitado (que parezca inexistente en prod);
-    secreto en body comparado en tiempo constante; rate-limit por IP compartido
-    con OAuth; cada intento queda logueado.
-    """
-    if not staging_login_enabled():
-        raise HTTPException(404, "No encontrado.")
-    ip = get_client_ip(request)
-    _check_rate(ip)
-    expected = _staging_login_secret()
-    if not (body.secret and secrets.compare_digest(body.secret, expected)):
-        _record_fail(ip)
-        logger.warning("staging-login: secreto inválido ip=%s", ip)
-        raise HTTPException(401, "Secreto inválido.")
-
-    target = (body.target or "admin").strip().lower()
-    if target == "cliente":
-        cli = _resolve_staging_cliente(body.cliente_id)
-        if not cli:
-            raise HTTPException(
-                404,
-                "Cliente de staging no encontrado. Pasá un `cliente_id` existente "
-                f"o creá el cliente `{STAGING_CLIENTE_EMAIL}` en staging.",
-            )
-        logger.info("staging-login OK (cliente) ip=%s cliente_id=%s", ip, cli["id"])
-        return _make_session_response(
-            email=cli["email"], name=cli["name"],
-            extra={"role": "cliente", "cliente_id": cli["id"]},
-        )
-    if target != "admin":
-        raise HTTPException(400, "target inválido (usá 'admin' o 'cliente').")
-
-    logger.info("staging-login OK (admin) ip=%s email=%s", ip, STAGING_LOGIN_EMAIL)
-    return _make_session_response(email=STAGING_LOGIN_EMAIL, name="Staging Bot")
 
 
 @router.get("/api/public/maps-key")
@@ -603,18 +368,14 @@ def cliente_auth_callback(request: Request):
         # Cliente conocido → crear sesión directamente. Si llegó `next` válido
         # (cookie seteada por /cliente/auth/google), volvemos ahí en vez de al
         # portal — habilita el flujo de "iniciar sesión y volver a /estudio".
-        session_data = {"email": email, "name": name, "role": "cliente", "cliente_id": row["id"]}
-        token = signer.dumps(session_data)
         next_path = _safe_next_path(request.cookies.get("oauth_next_cliente"))
         target = f"{FRONTEND_BASE}{next_path}" if next_path else f"{FRONTEND_BASE}/cliente/portal"
-        safe_url = target.replace('"', "%22")
-        res = HTMLResponse(
-            f'<!DOCTYPE html><html><head>'
-            f'<script>window.location.replace("{safe_url}")</script>'
-            f'</head><body>Redirigiendo...</body></html>'
+        # Punto único de minteo (registra la sesión server-side con `jti` → revocable),
+        # con el mismo redirect-via-JS que arma `_make_session_response`.
+        res = _make_session_response(
+            email, name, redirect=target,
+            extra={"role": "cliente", "cliente_id": row["id"]}, request=request,
         )
-        res.set_cookie("session", token, httponly=True, samesite="lax",
-                       secure=COOKIE_SECURE, max_age=SESSION_MAX_AGE)
         res.delete_cookie("oauth_state_cliente")
         res.delete_cookie("oauth_next_cliente")
         return res

@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from config import SITE_URL
 from database import get_db
 from rate_limit import limiter
-from routes.auth import get_session
+from auth.session import get_session
 
 router = APIRouter(tags=["compartir"])
 

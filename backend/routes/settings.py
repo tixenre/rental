@@ -14,7 +14,7 @@ import re
 
 from fastapi import APIRouter, Request, HTTPException
 from database import get_db, MARCA_SUBQUERY
-from admin_guard import require_admin
+from auth.guards import require_admin
 from services.media.processing import _optimize_og_image
 
 logger = logging.getLogger(__name__)

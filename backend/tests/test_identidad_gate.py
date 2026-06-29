@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
-from routes.auth import signer
+from auth.session import signer
 from routes.didit import _es_path_interno_seguro
 
 pytestmark = pytest.mark.unit
@@ -24,7 +24,14 @@ pytestmark = pytest.mark.unit
 client = TestClient(main.app, raise_server_exceptions=False)
 
 # Cookie de cliente firmada con el signer real de la app (mismo SECRET_KEY de tests).
-_COOKIE_CLIENTE = f"session={signer.dumps({'email': 'x@test.com', 'role': 'cliente', 'cliente_id': 123})}"
+_COOKIE_CLIENTE = f"session={signer.dumps({'email': 'x@test.com', 'role': 'cliente', 'cliente_id': 123, 'jti': 'gate-cli'})}"
+
+
+@pytest.fixture(autouse=True)
+def _sessions_active(monkeypatch):
+    """jti obligatorio: la cookie de test lleva jti pero no está en la allowlist →
+    stubbeamos is_active para darla por activa y que el request llegue al guard."""
+    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
 
 
 # ── Fakes de DB ───────────────────────────────────────────────────────────────
@@ -88,7 +95,7 @@ _BODY_PEDIDO = {
 def test_pedido_cliente_sin_verificar_devuelve_403(monkeypatch):
     """Cliente con dni_validado_at=None → el gate corta con 403 antes de crear."""
     monkeypatch.setattr(
-        "routes.cliente_portal.core.get_db",
+        "auth.guards.get_db",
         _fake_get_db(_FakeRow(id=123, dni_validado_at=None)),
     )
     res = client.post(
@@ -101,7 +108,7 @@ def test_pedido_cliente_verificado_no_bloquea_por_identidad(monkeypatch):
     """Cliente verificado → el gate NO bloquea. Puede fallar después por otra
     validación, pero NUNCA con 403 por identidad."""
     monkeypatch.setattr(
-        "routes.cliente_portal.core.get_db",
+        "auth.guards.get_db",
         _fake_get_db(_FakeRow(id=123, dni_validado_at="2026-06-01T10:00:00")),
     )
     res = client.post(

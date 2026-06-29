@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from database import get_db, row_to_dict, MARCA_SUBQUERY
 from services.contenido import contenido_de_batch
 from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html, _render_pdf, _pedido_filename
-from admin_guard import require_admin
+from auth.guards import require_admin
 from services.email import send_email, send_raw_email, render_template, wrap_preview, Attachment
 from services.email.service import primer_nombre
 from routes.alquileres.core import (

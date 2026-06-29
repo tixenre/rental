@@ -28,8 +28,8 @@ from reservas import (
 )
 from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de, parientes_de
-from routes.auth import get_session
-from admin_guard import require_admin
+from auth.session import get_session
+from auth.guards import require_admin
 from services.contenido import contenido_de
 from services.nombre_service import actualizar_nombres_de
 # `delete_equipo` limpia el blob HTML scrapeado en R2 al borrar un equipo; los

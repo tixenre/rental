@@ -30,7 +30,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from database import get_db, row_to_dict
-from admin_guard import require_admin
+from auth.guards import require_admin
 from rate_limit import limiter
 from busqueda import MAX_LEN, normalizar_para_registro
 

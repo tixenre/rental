@@ -20,7 +20,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import get_db, now_ar
 from rate_limit import limiter
 from dataio.slug import slugify, slug_unico

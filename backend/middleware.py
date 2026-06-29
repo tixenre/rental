@@ -4,7 +4,7 @@ middleware.py — Protección de rutas con cookie de sesión.
 
 from fastapi import Request
 from fastapi.responses import RedirectResponse, JSONResponse
-from routes.auth import get_session, dev_bypass_enabled
+from auth.session import get_session, dev_bypass_enabled
 
 PUBLIC_EXACT = {"/", "/login", "/admin/login", "/cliente", "/health", "/health/migrations", "/health/frontend", "/csp-report"}
 

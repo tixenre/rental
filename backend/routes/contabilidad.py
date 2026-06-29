@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request, HTTPException, UploadFile, File
 from pydantic import BaseModel
 
 from database import get_db
-from admin_guard import require_admin
+from auth.guards import require_admin
 from contabilidad.cuentas import (
     crear_cuenta,
     desactivar_cuenta,

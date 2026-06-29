@@ -60,7 +60,9 @@ from routes.reportes         import router as reportes_router
 from routes.contabilidad     import router as contabilidad_router
 from routes.busquedas        import router as busquedas_router
 from routes.dashboard        import router as dashboard_router
-from routes.auth             import router as auth_router
+from auth import router as auth_router
+from auth import auth_passkey_router
+from auth import auth_sessions_router
 from routes.settings         import router as settings_router
 from routes.cliente_portal   import router as cliente_portal_router
 from routes.marcas           import router as marcas_router
@@ -245,6 +247,14 @@ async def security_headers(request, call_next):
     # pise de vuelta a DENY.
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # HSTS solo en prod: fuerza HTTPS por 1 año (incluye subdominios). NO en
+    # dev/staging (no pinear sus dominios a HTTPS). `is_production` falla-a-prod ante
+    # un env desconocido → del lado seguro (todo Railway es HTTPS; sobre HTTP el header
+    # se ignora). Sin `preload` (compromiso difícil de revertir, requiere alta manual).
+    if settings.is_production:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
     # CSP solo en el HTML del SPA (lo único que ejecuta scripts/estilos). Report-Only
     # → reporta, no bloquea: cero riesgo de romper prod mientras se mapean las fuentes.
     if response.headers.get("content-type", "").startswith("text/html"):
@@ -306,6 +316,8 @@ if FRONT_NEW.exists():
 # ── Routers ──────────────────────────────────────────────────────────────────
 
 app.include_router(auth_router)
+app.include_router(auth_passkey_router)  # /auth/passkey/* + /cliente/auth/passkey/* (sin prefijo /api)
+app.include_router(auth_sessions_router)  # /auth/sessions/* + /cliente/auth/sessions/* (sin prefijo /api)
 app.include_router(equipos_router,        prefix="/api")
 app.include_router(alquileres_router,     prefix="/api")
 app.include_router(clientes_router,       prefix="/api")

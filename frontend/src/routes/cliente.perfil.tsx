@@ -6,6 +6,8 @@ import { nombreCliente } from "@/lib/cliente-nombre";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { PasskeyManager } from "@/components/rental/PasskeyManager";
+import { SessionManager } from "@/components/rental/SessionManager";
 
 export const Route = createFileRoute("/cliente/perfil")({
   head: () => ({ meta: [{ title: "Mi perfil — Rambla Rental" }] }),
@@ -259,6 +261,20 @@ function PerfilPage() {
             </button>
           </div>
         </form>
+
+        <section className="mt-10 border-t hairline pt-8">
+          <h2 className="font-display text-xl text-ink">Acceso con passkey</h2>
+          <div className="mt-4">
+            <PasskeyManager scope="cliente" />
+          </div>
+        </section>
+
+        <section className="mt-10 border-t hairline pt-8">
+          <h2 className="font-display text-xl text-ink">Sesiones activas</h2>
+          <div className="mt-4">
+            <SessionManager scope="cliente" />
+          </div>
+        </section>
       </div>
     </PublicLayout>
   );

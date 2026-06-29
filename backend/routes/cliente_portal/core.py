@@ -7,11 +7,20 @@ solicitudes, documentos, favoritos) viven en submódulos que registran sus rutas
 sobre este router al importarse (ver `__init__`).
 """
 import logging
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter
 from typing import Optional
 
-from database import to_datetime, now_ar, get_db
-from routes.auth import get_session
+from database import to_datetime, now_ar
+
+# Guards de cliente: viven en auth/guards.py (motor único de auth). Se re-exportan
+# acá para que los submódulos del portal y el __init__ los importen desde el spine.
+from auth.guards import (  # noqa: F401
+    require_cliente,
+    require_cliente_verificado,
+    cliente_verificado,
+    IDENTIDAD_NO_VERIFICADA_MSG,
+)
+from auth.session import get_session  # noqa: F401  (re-exportado por __init__)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -77,44 +86,8 @@ def _documentos_disponibles(estado: str) -> dict:
     }
 
 
-# ── Auth helper ───────────────────────────────────────────────────────────────
-
-def require_cliente(request: Request) -> dict:
-    """Devuelve la sesión del cliente (cookie). 401 si no hay sesión válida."""
-    session = get_session(request)
-    if not session or session.get("role") != "cliente":
-        raise HTTPException(401, "Sesión de cliente requerida")
-    return session
-
-
-# Mensaje único del gate de identidad — la UI lo muestra tal cual si llegara a disparar.
-IDENTIDAD_NO_VERIFICADA_MSG = (
-    "Necesitás verificar tu identidad antes de hacer un pedido. "
-    "Verificá tu DNI desde tu portal — tarda menos de 2 minutos."
-)
-
-
-def cliente_verificado(conn, cliente_id: int) -> bool:
-    """True si el cliente completó la verificación de identidad (dni_validado_at).
-    Fuente única del criterio "está verificado"; usa una conexión ya abierta."""
-    row = conn.execute(
-        "SELECT dni_validado_at FROM clientes WHERE id = %s", (cliente_id,)
-    ).fetchone()
-    return bool(row and row["dni_validado_at"])
-
-
-def require_cliente_verificado(request: Request) -> dict:
-    """Como require_cliente pero además exige identidad verificada (el gate del
-    flujo de pedidos). 401 sin sesión; 404 si el cliente no existe; 403 si no
-    completó la verificación Didit. El criterio "está verificado" lo decide la
-    fuente única `cliente_verificado` (no se duplica el chequeo de `dni_validado_at`)."""
-    session = require_cliente(request)
-    cliente_id = session["cliente_id"]
-    with get_db() as conn:
-        if conn.execute("SELECT 1 FROM clientes WHERE id = %s", (cliente_id,)).fetchone() is None:
-            raise HTTPException(404, "Cliente no encontrado.")
-        if not cliente_verificado(conn, cliente_id):
-            raise HTTPException(403, IDENTIDAD_NO_VERIFICADA_MSG)
-    return session
+# (Los guards de cliente —require_cliente / require_cliente_verificado /
+# cliente_verificado / IDENTIDAD_NO_VERIFICADA_MSG— se movieron a auth/guards.py
+# y se re-exportan en el bloque de imports de arriba.)
 
 

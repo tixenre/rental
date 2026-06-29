@@ -104,7 +104,7 @@ def _admin(monkeypatch, mod):
     # `update_setting` usa el guard CANÓNICO (`admin_guard.require_admin`), que
     # resuelve la sesión vía `admin_guard.get_session` y exige email ∈ ADMIN_EMAILS
     # (admin@test.com en el entorno de tests). `mod` se mantiene por compat de firma.
-    import admin_guard
+    import auth.guards as admin_guard
 
     monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
     monkeypatch.setattr(admin_guard, "get_session", lambda request: {"email": "admin@test.com"})

@@ -253,6 +253,73 @@ def _init_db_schema(conn):
     )
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_verificacion_motivo TEXT")
 
+    # Passkeys (WebAuthn/FIDO2) — login aditivo a Google OAuth. Una sola tabla
+    # para admin (owner_email, cliente_id NULL) y
+    # cliente (cliente_id seteado), con discriminador `owner_type`. credential_id /
+    # public_key en base64url TEXT (el browser manda el id en base64url → lookup
+    # de texto directo). Esquema en dos capas (MEMORIA 2026-06-03): espejo
+    # idempotente de la migración a1f2b3c4d5e6.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS passkey_credentials (
+            id             SERIAL PRIMARY KEY,
+            owner_type     TEXT NOT NULL CHECK (owner_type IN ('admin', 'cliente')),
+            owner_email    TEXT NOT NULL,
+            cliente_id     INTEGER REFERENCES clientes(id) ON DELETE CASCADE,
+            credential_id  TEXT NOT NULL UNIQUE,
+            public_key     TEXT NOT NULL,
+            sign_count     BIGINT NOT NULL DEFAULT 0,
+            transports     TEXT,
+            aaguid         TEXT,
+            device_name    TEXT,
+            user_handle    TEXT NOT NULL,
+            created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_used_at   TIMESTAMP,
+            CHECK ((owner_type = 'cliente' AND cliente_id IS NOT NULL)
+                OR (owner_type = 'admin'   AND cliente_id IS NULL))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_passkey_cred_cliente "
+        "ON passkey_credentials(cliente_id) WHERE owner_type = 'cliente'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_passkey_cred_admin "
+        "ON passkey_credentials(LOWER(owner_email)) WHERE owner_type = 'admin'"
+    )
+
+    # ── Sesiones server-side: allowlist para revocación (logout real + "cerrar mis
+    # otras sesiones"). La cookie firmada lleva un `jti` opaco; esta tabla decide si
+    # sigue viva. Espeja `passkey_credentials` (mismo discriminador owner_type +
+    # CHECK de dos lados). `expires_at` materializa el TTL de la cookie; `revoked_at`
+    # NULL = activa. Toda sesión válida lleva `jti` y vive acá; una cookie sin jti
+    # (viejas pre-deploy) se rechaza → re-login.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+            jti           TEXT PRIMARY KEY,
+            owner_type    TEXT NOT NULL CHECK (owner_type IN ('admin', 'cliente')),
+            owner_email   TEXT NOT NULL,
+            cliente_id    INTEGER REFERENCES clientes(id) ON DELETE CASCADE,
+            user_agent    TEXT,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at    TIMESTAMP NOT NULL,
+            revoked_at    TIMESTAMP,
+            CHECK ((owner_type = 'cliente' AND cliente_id IS NOT NULL)
+                OR (owner_type = 'admin'   AND cliente_id IS NULL))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_cliente "
+        "ON auth_sessions(cliente_id) WHERE owner_type = 'cliente'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_admin "
+        "ON auth_sessions(LOWER(owner_email)) WHERE owner_type = 'admin'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires "
+        "ON auth_sessions(expires_at)"
+    )
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
             id               SERIAL PRIMARY KEY,

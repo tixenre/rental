@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 def get_media_stats(request: Request):
     """Resumen de estado del sistema de media."""
     try:
-        from admin_guard import require_admin
+        from auth.guards import require_admin
         require_admin(request)
 
         with get_db() as conn:
@@ -104,7 +104,7 @@ async def run_media_gc(request: Request):
     dry_run=true (default) solo detecta, no borra.
     """
     try:
-        from admin_guard import require_admin
+        from auth.guards import require_admin
         require_admin(request)
 
         body = await request.json() if request.headers.get("content-type") == "application/json" else {}
@@ -135,7 +135,7 @@ def rederive_asset(request: Request, asset_id: int):
     Útil cuando los derive_specs cambiaron o una variante quedó corrupta.
     """
     try:
-        from admin_guard import require_admin
+        from auth.guards import require_admin
         require_admin(request)
 
         # Verificar que R2 esté configurado (bucket requerido).
