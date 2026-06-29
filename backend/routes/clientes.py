@@ -130,6 +130,58 @@ def list_clientes(
         return {"total": total, "page": page, "per_page": per_page, "items": items}
 
 
+# ── Fusión de duplicados (Fase 2 identidad #1098) ─────────────────────────────
+# El back-office para deduplicar clientes que son la misma persona. Cablea al motor
+# `identity/merge` (transaccional, con guardas). Destructivo → require_admin.
+# ⚠️ ORDEN: la GET estática va ANTES de `/clientes/{id}` — si no, `/{id}` captura
+# "duplicados" como id y tira 422 (colisión de rutas — cazada por el supervisor; el
+# test_clientes_merge_route la clava a nivel HTTP).
+
+@router.get("/clientes/duplicados")
+def clientes_duplicados(request: Request):
+    """Grupos de clientes que comparten un CUIL verificado — candidatos a fusionar
+    (justo lo que el índice único de CUIL rechaza). Enriquece cada id con nombre,
+    contacto, estado y nº de pedidos para que el admin elija cuál conservar."""
+    require_admin(request)
+    with get_db() as conn:
+        out = []
+        for g in merge.candidatos_duplicados(conn):
+            clientes = []
+            for cid in g["ids"]:
+                row = conn.execute(
+                    """SELECT c.id, c.nombre, c.apellido, c.email, c.telefono,
+                              c.nombre_completo_renaper, c.dni_validado_at, c.created_at,
+                              (SELECT COUNT(*) FROM alquileres a WHERE a.cliente_id = c.id) AS pedidos
+                         FROM clientes c WHERE c.id = %s""",
+                    (cid,),
+                ).fetchone()
+                if row:
+                    clientes.append(row_to_dict(row))
+            out.append({"cuil": g["cuil"], "clientes": clientes})
+        return out
+
+
+class MergeClientesIn(BaseModel):
+    source: int  # se absorbe y se borra
+    target: int  # sobrevive con su identidad
+
+
+@router.post("/clientes/merge")
+def merge_clientes(body: MergeClientesIn, request: Request):
+    """Fusiona dos clientes que son la MISMA persona: mueve pedidos / datos / llaves /
+    bitácora de `source` a `target` y borra `source`. **Destructivo e irreversible** →
+    require_admin + las guardas del motor (rehúsa perder una identidad verificada o unir
+    dos personas con CUIL distinto → 400)."""
+    require_admin(request)
+    if body.source == body.target:
+        raise HTTPException(400, "No se puede fusionar un cliente consigo mismo")
+    try:
+        merge.merge_accounts(source=body.source, target=body.target)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "merged_into": body.target}
+
+
 @router.get("/clientes/{id}")
 def get_cliente(id: int, request: Request):
     require_admin(request)
@@ -221,50 +273,3 @@ def delete_cliente(id: int, request: Request):
             raise
 
 
-# ── Fusión de duplicados (Fase 2 identidad #1098) ─────────────────────────────
-# El back-office para deduplicar clientes que son la misma persona. Cablea al motor
-# `identity/merge` (transaccional, con guardas). Destructivo → require_admin.
-
-@router.get("/clientes/duplicados")
-def clientes_duplicados(request: Request):
-    """Grupos de clientes que comparten un CUIL verificado — candidatos a fusionar
-    (justo lo que el índice único de CUIL rechaza). Enriquece cada id con nombre,
-    contacto, estado y nº de pedidos para que el admin elija cuál conservar."""
-    require_admin(request)
-    with get_db() as conn:
-        out = []
-        for g in merge.candidatos_duplicados(conn):
-            clientes = []
-            for cid in g["ids"]:
-                row = conn.execute(
-                    """SELECT c.id, c.nombre, c.apellido, c.email, c.telefono,
-                              c.nombre_completo_renaper, c.dni_validado_at, c.created_at,
-                              (SELECT COUNT(*) FROM alquileres a WHERE a.cliente_id = c.id) AS pedidos
-                         FROM clientes c WHERE c.id = %s""",
-                    (cid,),
-                ).fetchone()
-                if row:
-                    clientes.append(row_to_dict(row))
-            out.append({"cuil": g["cuil"], "clientes": clientes})
-        return out
-
-
-class MergeClientesIn(BaseModel):
-    source: int  # se absorbe y se borra
-    target: int  # sobrevive con su identidad
-
-
-@router.post("/clientes/merge")
-def merge_clientes(body: MergeClientesIn, request: Request):
-    """Fusiona dos clientes que son la MISMA persona: mueve pedidos / datos / llaves /
-    bitácora de `source` a `target` y borra `source`. **Destructivo e irreversible** →
-    require_admin + las guardas del motor (rehúsa perder una identidad verificada o unir
-    dos personas con CUIL distinto → 400)."""
-    require_admin(request)
-    if body.source == body.target:
-        raise HTTPException(400, "No se puede fusionar un cliente consigo mismo")
-    try:
-        merge.merge_accounts(source=body.source, target=body.target)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    return {"ok": True, "merged_into": body.target}

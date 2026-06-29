@@ -7,10 +7,24 @@ al motor, y los 400 (self-merge + ValueError del motor → 400, no 500).
 """
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
+import main
 from routes.clientes import MergeClientesIn, merge_clientes
 
 pytestmark = pytest.mark.unit
+
+_http = TestClient(main.app, raise_server_exceptions=False)
+
+
+def test_duplicados_no_colisiona_con_clientes_id_http():
+    """Regresión de ORDEN de rutas (cazada por el supervisor): `/clientes/duplicados` se
+    declara ANTES de `/clientes/{id}`. Si no, `/{id}` captura "duplicados" como id → 422
+    (la feature entera muere). Bien ordenado, resuelve al handler → require_admin → 401.
+    Pega al HTTP real: los tests de handler directo (abajo) NO cazan esta colisión."""
+    r = _http.get("/api/clientes/duplicados")
+    assert r.status_code != 422, "/clientes/duplicados capturada por /clientes/{id} — reordenar"
+    assert r.status_code in (401, 403)  # ruta resuelta → gateó por admin (sin sesión → 401)
 
 
 def test_merge_chequea_admin_y_delega(monkeypatch):
