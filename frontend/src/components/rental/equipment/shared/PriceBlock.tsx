@@ -1,13 +1,18 @@
-import { formatARS } from "@/lib/format";
+import { formatARS, UNIDADES, unidadLabel, type Unidad } from "@/lib/format";
 import { priceBreakdown } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
 
 interface PriceBlockProps {
-  /** Precio por jornada del equipo (base, sin descuentos). */
+  /** Precio por unidad (jornada/hora) del equipo (base, sin descuentos). */
   perDay: number;
-  /** Jornadas del período seleccionado. 0 = sin fechas. */
+  /** Unidades del período seleccionado (jornadas/horas). 0 = sin fechas. */
   jornadas?: number;
-  /** Unidades en el carrito. Default 1. */
+  /**
+   * Unidad de la tarifa (default `jornada`, alquiler). `hora` para el estudio.
+   * El término y su plural salen de `UNIDADES` (fuente única) — no hardcodear.
+   */
+  unidad?: Unidad;
+  /** Cantidad en el carrito. Default 1. */
   qty?: number;
   /** Si el cliente es responsable inscripto (agrega "+IVA" al label). */
   conIva?: boolean;
@@ -43,6 +48,7 @@ interface PriceBlockProps {
 export function PriceBlock({
   perDay,
   jornadas = 0,
+  unidad = "jornada",
   qty = 1,
   conIva = false,
   align = "left",
@@ -50,6 +56,7 @@ export function PriceBlock({
   compact = false,
   className,
 }: PriceBlockProps) {
+  const unidadSingular = UNIDADES[unidad].singular;
   const showPeriodTotal = jornadas > 1;
   const { total } = priceBreakdown(perDay, jornadas, qty);
   const ivaSuffix = conIva ? " +IVA" : "";
@@ -76,13 +83,14 @@ export function PriceBlock({
 
       {/* Label secundario */}
       <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground leading-none">
-        {showPeriodTotal ? `${jornadas} jornadas` : `/ jornada${ivaSuffix}`}
+        {showPeriodTotal ? unidadLabel(jornadas, unidad) : `/ ${unidadSingular}${ivaSuffix}`}
       </span>
 
-      {/* Por-jornada cuando mostramos total del período (oculto en compact) */}
+      {/* Por-unidad cuando mostramos total del período (oculto en compact) */}
       {showPeriodTotal && !compact && (
         <span className="font-mono text-xs tabular-nums text-muted-foreground leading-none whitespace-nowrap">
-          {formatARS(perDay)} / jornada{ivaSuffix}
+          {formatARS(perDay)} / {unidadSingular}
+          {ivaSuffix}
         </span>
       )}
     </div>
