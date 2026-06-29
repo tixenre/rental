@@ -6,7 +6,6 @@ import {
   Check,
   Home,
   User,
-  Package,
   LogOut,
   HelpCircle,
   MessageCircle,
@@ -111,18 +110,12 @@ export function AreaMenu({ current }: { current?: AreaKey | "cliente" }) {
             </SheetClose>
             {isLogged ? (
               <>
+                {/* Una sola entrada de cuenta → el portal (tab Perfil). Pedidos vive
+                    como tab del portal y en el logo del topbar, no duplicado acá. */}
                 <SheetClose asChild>
                   <Link
                     to="/cliente/portal"
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink transition hover:bg-muted"
-                  >
-                    <Package className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    Mis pedidos
-                  </Link>
-                </SheetClose>
-                <SheetClose asChild>
-                  <Link
-                    to="/cliente/perfil"
+                    search={{ tab: "perfil" }}
                     className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink transition hover:bg-muted"
                   >
                     <User className="h-4 w-4 shrink-0 text-muted-foreground" />

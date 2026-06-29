@@ -18,6 +18,9 @@ export type Perfil = {
   direccion: string;
   cuit?: string | null;
   perfil_impuestos?: string | null;
+  razon_social?: string | null;
+  domicilio_fiscal?: string | null;
+  email_facturacion?: string | null;
   descuento?: number;
   direccion_maps_url?: string | null;
   created_at?: string | null;

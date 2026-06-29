@@ -348,15 +348,15 @@ def _completar_link_google(request: Request, link_cid: int, sub: str | None, ema
     vincula a una cuenta ajena aunque el state lo diga). **Una cuenta = un Google**:
     un segundo Google distinto se rechaza. Si el Google ya es de OTRA cuenta, intenta
     **unir las dos** (sabemos que es la misma persona)."""
-    base = f"{FRONTEND_BASE}/cliente/perfil"
+    base = f"{FRONTEND_BASE}/cliente/portal?tab=perfil"
     current = get_session(request)
     if not current or current.get("role") != "cliente" or current.get("cliente_id") != link_cid or not sub:
-        return RedirectResponse(f"{base}?keys=error", status_code=303)
+        return RedirectResponse(f"{base}&keys=error", status_code=303)
     from auth.identities_store import link_identity, google_identity_for_cliente  # perezoso
     # Una cuenta = un Google: si ya hay un Google distinto vinculado, no sumamos otro.
     ya = google_identity_for_cliente(link_cid)
     if ya is not None and ya["identifier"] != sub:
-        return _redirect_borrando_oauth(f"{base}?keys=ya_google")
+        return _redirect_borrando_oauth(f"{base}&keys=ya_google")
     resultado = link_identity(cliente_id=link_cid, method="google", identifier=sub,
                               email=email, verified=True)
     if resultado == "taken_by_other":
@@ -365,7 +365,7 @@ def _completar_link_google(request: Request, link_cid: int, sub: str | None, ema
         # persona → unimos las dos cuentas, si una es absorbible (liviana/vacía).
         return _merge_cuentas_por_google(request, actual=link_cid, sub=sub)
     estado = {"linked": "ok", "already_yours": "ya"}.get(resultado, "error")
-    return _redirect_borrando_oauth(f"{base}?keys={estado}")
+    return _redirect_borrando_oauth(f"{base}&keys={estado}")
 
 
 def _merge_cuentas_por_google(request: Request, *, actual: int, sub: str):
@@ -374,19 +374,19 @@ def _merge_cuentas_por_google(request: Request, *, actual: int, sub: str):
     (el merge general con reasignación de datos es Fase 2)."""
     from auth.identities_store import find_cliente_by_identity
     from auth.account_merge import account_is_absorbable, merge_accounts
-    base = f"{FRONTEND_BASE}/cliente/perfil"
+    base = f"{FRONTEND_BASE}/cliente/portal?tab=perfil"
     otra = find_cliente_by_identity("google", sub)
     if otra is None or otra == actual:
-        return _redirect_borrando_oauth(f"{base}?keys=error")  # carrera: ya no está tomado
+        return _redirect_borrando_oauth(f"{base}&keys=error")  # carrera: ya no está tomado
     if account_is_absorbable(actual):
         # Estás parado en la cuenta liviana; tu cuenta real es `otra` → unila ahí y entrá a ella.
         merge_accounts(source=actual, target=otra)
-        return _mint_session_para_cuenta(otra, request, redirect=f"{base}?keys=merged")
+        return _mint_session_para_cuenta(otra, request, redirect=f"{base}&keys=merged")
     if account_is_absorbable(otra):
         # Tu cuenta (donde estás) es la real; la del Google era vacía → absorbela acá.
         merge_accounts(source=otra, target=actual)
-        return _redirect_borrando_oauth(f"{base}?keys=merged")
-    return _redirect_borrando_oauth(f"{base}?keys=taken")  # ambas con datos → Fase 2
+        return _redirect_borrando_oauth(f"{base}&keys=merged")
+    return _redirect_borrando_oauth(f"{base}&keys=taken")  # ambas con datos → Fase 2
 
 
 def _mint_session_para_cuenta(cliente_id: int, request: Request, *, redirect: str):

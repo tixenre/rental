@@ -62,8 +62,20 @@ export const Route = createFileRoute("/cliente/portal")({
   head: () => ({ meta: [{ title: "Mis pedidos — Rambla Rental" }] }),
   validateSearch: (
     search: Record<string, unknown>,
-  ): { nuevo?: number; verificacion?: "pendiente"; return_to?: string } => {
-    const out: { nuevo?: number; verificacion?: "pendiente"; return_to?: string } = {};
+  ): {
+    nuevo?: number;
+    verificacion?: "pendiente";
+    return_to?: string;
+    tab?: PortalTab;
+    keys?: string;
+  } => {
+    const out: {
+      nuevo?: number;
+      verificacion?: "pendiente";
+      return_to?: string;
+      tab?: PortalTab;
+      keys?: string;
+    } = {};
     const n = Number(search.nuevo);
     if (Number.isFinite(n) && n > 0) out.nuevo = n;
     // Retorno del flujo Didit: el usuario vuelve con ?verificacion=pendiente.
@@ -72,6 +84,17 @@ export const Route = createFileRoute("/cliente/portal")({
     // contra la allowlist anti open-redirect (espejo del backend).
     if (typeof search.return_to === "string" && esPathInternoSeguro(search.return_to))
       out.return_to = search.return_to;
+    // Tab inicial (deep-link: menú "Mi perfil", retorno del linking de Google).
+    if (
+      search.tab === "pedidos" ||
+      search.tab === "listas" ||
+      search.tab === "notificaciones" ||
+      search.tab === "perfil"
+    )
+      out.tab = search.tab;
+    // Resultado del linking de Google (?keys=...): passthrough para que AccessMethods
+    // (en el tab Perfil) lo lea y lo limpie — el validateSearch no lo debe descartar.
+    if (typeof search.keys === "string") out.keys = search.keys;
     return out;
   },
   component: ClientePortal,
@@ -79,7 +102,7 @@ export const Route = createFileRoute("/cliente/portal")({
 
 export default function ClientePortal() {
   const navigate = useNavigate();
-  const { nuevo, verificacion, return_to } = Route.useSearch();
+  const { nuevo, verificacion, return_to, tab: initialTab } = Route.useSearch();
   const fav = useFavoritos();
   const { data: allEquipos = [] } = useEquipos();
   const favEquipos = useMemo(
@@ -99,7 +122,7 @@ export default function ClientePortal() {
   } = useListas();
 
   // Estado del portal
-  const [activeTab, setActiveTab] = useState<PortalTab>("pedidos");
+  const [activeTab, setActiveTab] = useState<PortalTab>(initialTab ?? "pedidos");
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
