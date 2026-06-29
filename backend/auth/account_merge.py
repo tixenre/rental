@@ -35,10 +35,10 @@ def account_is_absorbable(cliente_id: int) -> bool:
 
 
 def merge_accounts(*, source: int, target: int) -> None:
-    """Une `source` en `target`: mueve sus llaves (passkeys + identidades de login) a
-    `target` y borra `source`. **Solo** para `source` absorbible (sin datos) — no reasigna
-    pedidos/plata (no los tiene); el resto de FKs son CASCADE/SET NULL → el DELETE es seguro.
-    Transaccional (todo o nada)."""
+    """Une `source` en `target`: mueve sus llaves (passkeys + identidades de login) **y sus
+    listas guardadas** a `target`, y borra `source`. **Solo** para `source` absorbible (sin
+    pedidos) — no reasigna pedidos/plata (no los tiene). El resto de FKs son CASCADE/SET NULL
+    → el DELETE es seguro. Transaccional (todo o nada)."""
     if source == target:
         return
     with get_db() as conn:
@@ -58,6 +58,13 @@ def merge_accounts(*, source: int, target: int) -> None:
                        WHERE t.method = li.method AND t.identifier = li.identifier
                          AND t.cliente_id = %s)""",
                 (target, source, target),
+            )
+            # listas guardadas: contenido persistente del usuario → se mueven (no se pierden).
+            # No hay UNIQUE por cliente → sin conflicto; los items siguen por `lista_id`.
+            # (Los carritos son efímeros + client-side → su FK es SET NULL, no se mueven.)
+            conn.execute(
+                "UPDATE cliente_listas SET cliente_id = %s WHERE cliente_id = %s",
+                (target, source),
             )
             conn.execute("DELETE FROM clientes WHERE id = %s", (source,))
     logger.info("merge de cuentas: source=%s absorbida en target=%s", source, target)

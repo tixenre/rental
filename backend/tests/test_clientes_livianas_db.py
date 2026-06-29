@@ -219,6 +219,10 @@ def test_merge_absorbe_la_cuenta_liviana_y_mueve_sus_llaves():
                             sign_count, user_handle)
                        VALUES ('cliente', '', %s, %s, 'pk', 0, 'uh')""",
                     (src, cred))
+                # una lista guardada en la cuenta liviana → tiene que MUDARSE (no perderse)
+                lista_id = conn.insert_returning(
+                    "INSERT INTO cliente_listas (cliente_id, nombre) VALUES (%s, %s)",
+                    (src, "Lista de prueba merge"))
                 # target: cuenta real (completa) con identidad Google
                 tgt = conn.insert_returning(
                     """INSERT INTO clientes (cuenta_estado, nombre, apellido, email, telefono,
@@ -257,6 +261,10 @@ def test_merge_absorbe_la_cuenta_liviana_y_mueve_sus_llaves():
             assert conn.execute(
                 "SELECT 1 FROM login_identities WHERE cliente_id = %s AND method = 'google'", (tgt,)
             ).fetchone() is not None  # la real conserva su Google
+            lista = conn.execute(
+                "SELECT cliente_id FROM cliente_listas WHERE id = %s", (lista_id,)
+            ).fetchone()
+            assert lista is not None and lista["cliente_id"] == tgt  # la lista se mudó, no se perdió
     finally:
         with get_db() as conn:
             with conn.transaction():
