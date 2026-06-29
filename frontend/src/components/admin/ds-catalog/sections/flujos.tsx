@@ -3,7 +3,7 @@
  * real (no átomos: el carrito, el selector de fechas, etc.). Patrón shell+container:
  * la pieza presentacional es la fuente de verdad; el TopBar/app le pasan el store,
  * la vitrina le pasa estado MOCK local → se prueba clickeable, sin tocar el carrito
- * real. Se construye por fases: 1) DatePill · 2) carrito mini-bar · 3) modal · 4) drawer.
+ * real. Cubre: fechas (pill + selector), carrito mini-bar, carrito drawer, guardar lista.
  */
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -144,7 +144,7 @@ function CartMiniBarDemo() {
           conIva={false}
           hayFechas
           popKey={popKey}
-          onOpen={() => toast("Acá se abre el carrito (próxima fase: drawer)")}
+          onOpen={() => toast("En la app abre el CartDrawer (acá abajo, en su propio specimen)")}
         />
       </div>
       <Caption>agregá ítems → la barra actualiza count, total y el bump del ícono</Caption>
@@ -254,7 +254,7 @@ function CartDrawerDemo() {
 export const flujosSection: CatalogSection = {
   id: "flujos",
   title: "Módulos con flujo",
-  hint: "Los módulos compuestos con estado e interacción. Acá los probás con data mock; la app usa la MISMA pieza desde el store del carrito — una sola fuente de verdad del diseño. (En construcción por fases.)",
+  hint: "Los módulos compuestos con estado e interacción. Acá los probás con data mock; la app usa la MISMA pieza desde el store del carrito — una sola fuente de verdad del diseño.",
   specimens: [
     {
       name: "Fechas (pill + selector)",
