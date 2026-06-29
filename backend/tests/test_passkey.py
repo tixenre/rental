@@ -326,6 +326,23 @@ class TestSignup:
                    json={"credential": {"id": "cid", "response": {"transports": ["internal"]}}})
         assert r.status_code == 409
 
+    def test_altas_exitosas_en_rafaga_cortan_con_429(self, monkeypatch):
+        # Anti-spam: una creación EXITOSA consume cupo por-IP. Tras 10 altas ok desde
+        # la misma IP, la 11ª se corta (en el begin) con 429 aunque ninguna falle —
+        # el rate-limit frena spam de cuentas, no solo fuerza bruta.
+        monkeypatch.setattr(ceremonies, "verify_registration",
+                            lambda **kw: {"credential_id": "cid", "public_key": "pk",
+                                          "sign_count": 0, "aaguid": "aa"})
+        self._fake_db(monkeypatch, cliente_id=101)
+        c = _client()
+        for _ in range(10):
+            assert c.post("/auth/passkey/signup/begin").status_code == 200
+            r = c.post("/auth/passkey/signup/complete",
+                       json={"credential": {"id": "cid", "response": {"transports": ["internal"]}}})
+            assert r.status_code == 200
+        # 11ª: las 10 altas exitosas llenaron el bucket → el begin ya corta.
+        assert c.post("/auth/passkey/signup/begin").status_code == 429
+
 
 class TestGestionIDOR:
     def test_cliente_delete_scopeado_a_su_id(self, monkeypatch):

@@ -24,7 +24,7 @@ from database import get_db
 from auth.session import COOKIE_SECURE, _make_session_response
 from auth.guards import require_cliente
 from auth.passkey import ceremonies, store
-from auth.ratelimit import _check_rate, _record_fail
+from auth.ratelimit import _check_rate, _record_event, _record_fail
 from net_utils import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -200,6 +200,7 @@ def signup_complete(body: RegisterCompleteIn, request: Request):
     except psycopg.errors.UniqueViolation:
         # credential_id UNIQUE: esa passkey ya existe → no recreamos cuenta. Entrá con ella.
         raise HTTPException(409, "Esa passkey ya está registrada. Entrá con ella.")
+    _record_event(ip)  # anti-spam: una creación exitosa también consume cupo por-IP
     logger.info("alta passwordless: cuenta liviana creada id=%s", cliente_id)
     res = _make_session_response(
         email="", name="", extra={"role": "cliente", "cliente_id": cliente_id}, request=request,
