@@ -335,18 +335,69 @@ def _link_cliente_id_de_state(state: str | None):
     return payload.get("link_cliente_id") if isinstance(payload, dict) else None
 
 
+def _redirect_borrando_oauth(url: str):
+    res = RedirectResponse(url, status_code=303)
+    res.delete_cookie("oauth_state_cliente")
+    res.delete_cookie("oauth_next_cliente")
+    return res
+
+
 def _completar_link_google(request: Request, link_cid: int, sub: str | None):
     """Vincula el `sub` de Google a la cuenta logueada y vuelve a "métodos de acceso"
     con un estado. Defensa: la sesión actual TIENE que ser la de esa cuenta (no se
-    vincula a una cuenta ajena aunque el state lo diga)."""
-    current = get_session(request)
+    vincula a una cuenta ajena aunque el state lo diga). Si el Google ya es de OTRA
+    cuenta, intenta **unir las dos** (sabemos que es la misma persona)."""
     base = f"{FRONTEND_BASE}/cliente/perfil"
+    current = get_session(request)
     if not current or current.get("role") != "cliente" or current.get("cliente_id") != link_cid or not sub:
         return RedirectResponse(f"{base}?keys=error", status_code=303)
     from auth.identities_store import link_identity  # perezoso: evita ciclo con auth/__init__
     resultado = link_identity(cliente_id=link_cid, method="google", identifier=sub, verified=True)
-    estado = {"linked": "ok", "already_yours": "ya", "taken_by_other": "taken"}.get(resultado, "error")
-    res = RedirectResponse(f"{base}?keys={estado}", status_code=303)
+    if resultado == "taken_by_other":
+        # El Google ya es de OTRA cuenta. El usuario está logueado en `link_cid` (probó una
+        # llave de A) Y acaba de probar control de ese Google (llave de B) → es la MISMA
+        # persona → unimos las dos cuentas, si una es absorbible (liviana/vacía).
+        return _merge_cuentas_por_google(request, actual=link_cid, sub=sub)
+    estado = {"linked": "ok", "already_yours": "ya"}.get(resultado, "error")
+    return _redirect_borrando_oauth(f"{base}?keys={estado}")
+
+
+def _merge_cuentas_por_google(request: Request, *, actual: int, sub: str):
+    """El Google que se quiso vincular ya es de otra cuenta. Se unen si una de las dos es
+    **absorbible** (liviana/vacía); si ambas tienen datos, no se auto-mergea → "taken"
+    (el merge general con reasignación de datos es Fase 2)."""
+    from auth.identities_store import find_cliente_by_identity
+    from auth.account_merge import account_is_absorbable, merge_accounts
+    base = f"{FRONTEND_BASE}/cliente/perfil"
+    otra = find_cliente_by_identity("google", sub)
+    if otra is None or otra == actual:
+        return _redirect_borrando_oauth(f"{base}?keys=error")  # carrera: ya no está tomado
+    if account_is_absorbable(actual):
+        # Estás parado en la cuenta liviana; tu cuenta real es `otra` → unila ahí y entrá a ella.
+        merge_accounts(source=actual, target=otra)
+        return _mint_session_para_cuenta(otra, request, redirect=f"{base}?keys=merged")
+    if account_is_absorbable(otra):
+        # Tu cuenta (donde estás) es la real; la del Google era vacía → absorbela acá.
+        merge_accounts(source=otra, target=actual)
+        return _redirect_borrando_oauth(f"{base}?keys=merged")
+    return _redirect_borrando_oauth(f"{base}?keys=taken")  # ambas con datos → Fase 2
+
+
+def _mint_session_para_cuenta(cliente_id: int, request: Request, *, redirect: str):
+    """Mintea una sesión de cliente para `cliente_id` tras un merge que borró la cuenta en
+    la que estabas. Pasa por el punto único `_make_session_response` (jti + revocable)."""
+    from database import get_db  # perezoso: evita ciclo al importar auth
+    with get_db() as conn:
+        c = conn.execute(
+            "SELECT id, email, nombre, apellido FROM clientes WHERE id = %s", (cliente_id,)
+        ).fetchone()
+    if not c:
+        return _redirect_borrando_oauth(f"{FRONTEND_BASE}/cliente/login?error=merge")
+    name = f"{c['nombre'] or ''} {c['apellido'] or ''}".strip() or (c["email"] or "")
+    res = _make_session_response(
+        email=c["email"] or "", name=name, redirect=redirect,
+        extra={"role": "cliente", "cliente_id": c["id"]}, request=request,
+    )
     res.delete_cookie("oauth_state_cliente")
     res.delete_cookie("oauth_next_cliente")
     return res

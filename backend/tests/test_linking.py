@@ -131,12 +131,17 @@ class TestGoogleLinkHelpers:
         res = google._completar_link_google(None, 42, "sub-abc")
         assert res.status_code == 303 and "keys=ok" in res.headers["location"]
 
-    def test_completar_link_taken_by_other(self, monkeypatch):
+    def test_completar_link_taken_by_other_rutea_a_merge(self, monkeypatch):
+        # taken_by_other ya NO es un dead-end: rutea al intento de merge (misma persona).
         from auth import google
         monkeypatch.setattr(google, "get_session", lambda req: {"role": "cliente", "cliente_id": 42})
         monkeypatch.setattr("auth.identities_store.link_identity", lambda **kw: "taken_by_other")
-        res = google._completar_link_google(None, 42, "sub-abc")
-        assert "keys=taken" in res.headers["location"]
+        calls = {}
+        monkeypatch.setattr(google, "_merge_cuentas_por_google",
+                            lambda req, *, actual, sub: calls.update(actual=actual, sub=sub) or "MERGE")
+        out = google._completar_link_google(None, 42, "sub-abc")
+        assert out == "MERGE"
+        assert calls == {"actual": 42, "sub": "sub-abc"}
 
     def test_completar_link_sesion_ajena_rechazado(self, monkeypatch):
         # El state dice cuenta 42 pero la sesión actual es la 99 → no se vincula (defensa).
@@ -148,3 +153,50 @@ class TestGoogleLinkHelpers:
         res = google._completar_link_google(None, 42, "sub-abc")
         assert "keys=error" in res.headers["location"]
         assert called["n"] == 0  # nunca llamó a link_identity
+
+
+class TestMergePorGoogle:
+    """El Google ya es de otra cuenta → se unen si una es absorbible (misma persona)."""
+
+    def test_actual_absorbable_merge_y_entra_a_la_real(self, monkeypatch):
+        from auth import google
+        monkeypatch.setattr("auth.identities_store.find_cliente_by_identity", lambda m, i: 99)
+        # actual (42, la liviana) es absorbible; otra (99, la real) no
+        monkeypatch.setattr("auth.account_merge.account_is_absorbable", lambda cid: cid == 42)
+        calls = {}
+        monkeypatch.setattr("auth.account_merge.merge_accounts", lambda **kw: calls.update(merge=kw))
+        monkeypatch.setattr(
+            google, "_mint_session_para_cuenta",
+            lambda cid, req, *, redirect: calls.update(mint=(cid, redirect)) or "MINTED")
+        out = google._merge_cuentas_por_google(None, actual=42, sub="s")
+        assert out == "MINTED"
+        assert calls["merge"] == {"source": 42, "target": 99}  # absorbe la liviana en la real
+        assert calls["mint"][0] == 99 and "keys=merged" in calls["mint"][1]
+
+    def test_otra_absorbable_la_absorbe_y_se_queda(self, monkeypatch):
+        from auth import google
+        monkeypatch.setattr("auth.identities_store.find_cliente_by_identity", lambda m, i: 99)
+        # otra (99) es la liviana; actual (42) es la real donde estás
+        monkeypatch.setattr("auth.account_merge.account_is_absorbable", lambda cid: cid == 99)
+        calls = {}
+        monkeypatch.setattr("auth.account_merge.merge_accounts", lambda **kw: calls.update(merge=kw))
+        out = google._merge_cuentas_por_google(None, actual=42, sub="s")
+        assert calls["merge"] == {"source": 99, "target": 42}
+        assert out.status_code == 303 and "keys=merged" in out.headers["location"]
+
+    def test_ninguna_absorbable_no_mergea(self, monkeypatch):
+        from auth import google
+        monkeypatch.setattr("auth.identities_store.find_cliente_by_identity", lambda m, i: 99)
+        monkeypatch.setattr("auth.account_merge.account_is_absorbable", lambda cid: False)
+        called = {"n": 0}
+        monkeypatch.setattr("auth.account_merge.merge_accounts",
+                            lambda **kw: called.update(n=called["n"] + 1))
+        out = google._merge_cuentas_por_google(None, actual=42, sub="s")
+        assert "keys=taken" in out.headers["location"]
+        assert called["n"] == 0  # ambas con datos → no toca nada (Fase 2)
+
+    def test_google_ya_no_tomado_error(self, monkeypatch):
+        from auth import google
+        monkeypatch.setattr("auth.identities_store.find_cliente_by_identity", lambda m, i: None)
+        out = google._merge_cuentas_por_google(None, actual=42, sub="s")
+        assert "keys=error" in out.headers["location"]

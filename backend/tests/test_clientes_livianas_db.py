@@ -192,3 +192,75 @@ def test_cleanup_borra_solo_las_livianas_abandonadas():
                 conn.execute("DELETE FROM alquileres WHERE cliente_nombre = %s", ("Test Pedido",))
                 for cid in created:
                     conn.execute("DELETE FROM clientes WHERE id = %s", (cid,))
+
+
+def test_merge_absorbe_la_cuenta_liviana_y_mueve_sus_llaves():
+    """El merge-on-link une dos cuentas de la misma persona: mueve las llaves de la
+    cuenta liviana a la cuenta real y la borra. `account_is_absorbable` solo deja
+    absorber lo vacío (liviana, sin verificar, sin pedidos)."""
+    from database import init_db, get_db
+    from auth.account_merge import account_is_absorbable, merge_accounts
+
+    init_db()
+    cred = "cred-merge-src"
+    mail = "merge_real@test.local"
+    created: list[int] = []
+    try:
+        with get_db() as conn:
+            with conn.transaction():
+                conn.execute("DELETE FROM passkey_credentials WHERE credential_id = %s", (cred,))
+                conn.execute("DELETE FROM clientes WHERE email = %s", (mail,))
+                # source: cuenta liviana con una passkey
+                src = conn.insert_returning(
+                    "INSERT INTO clientes (cuenta_estado) VALUES (%s)", ("liviana",))
+                conn.execute(
+                    """INSERT INTO passkey_credentials
+                           (owner_type, owner_email, cliente_id, credential_id, public_key,
+                            sign_count, user_handle)
+                       VALUES ('cliente', '', %s, %s, 'pk', 0, 'uh')""",
+                    (src, cred))
+                # target: cuenta real (completa) con identidad Google
+                tgt = conn.insert_returning(
+                    """INSERT INTO clientes (cuenta_estado, nombre, apellido, email, telefono,
+                                             direccion, cuit)
+                       VALUES ('completa', %s, %s, %s, %s, %s, %s)""",
+                    ("Real", "Cuenta", mail, "-", "-", "-"))
+                conn.execute(
+                    "INSERT INTO login_identities (cliente_id, method, identifier) VALUES (%s,'google',%s)",
+                    (tgt, "sub-merge-real"))
+                # control: una liviana CON pedido y una liviana VERIFICADA → NO absorbibles
+                liv_ped = conn.insert_returning(
+                    "INSERT INTO clientes (cuenta_estado) VALUES ('liviana')")
+                conn.execute(
+                    "INSERT INTO alquileres (cliente_id, cliente_nombre) VALUES (%s, %s)",
+                    (liv_ped, "MergeCtl"))
+                liv_ver = conn.insert_returning(
+                    "INSERT INTO clientes (cuenta_estado) VALUES ('liviana')")
+                conn.execute(
+                    "UPDATE clientes SET dni_validado_at = NOW() WHERE id = %s", (liv_ver,))
+        created = [src, tgt, liv_ped, liv_ver]
+
+        assert account_is_absorbable(src) is True       # liviana, sin verificar, sin pedidos
+        assert account_is_absorbable(tgt) is False       # completa
+        assert account_is_absorbable(liv_ped) is False   # liviana pero con pedido
+        assert account_is_absorbable(liv_ver) is False   # liviana pero verificada
+
+        merge_accounts(source=src, target=tgt)
+        created = [tgt, liv_ped, liv_ver]  # src se borró
+
+        with get_db() as conn:
+            assert conn.execute("SELECT 1 FROM clientes WHERE id = %s", (src,)).fetchone() is None
+            pk = conn.execute(
+                "SELECT cliente_id FROM passkey_credentials WHERE credential_id = %s", (cred,)
+            ).fetchone()
+            assert pk is not None and pk["cliente_id"] == tgt  # la passkey se movió a la real
+            assert conn.execute(
+                "SELECT 1 FROM login_identities WHERE cliente_id = %s AND method = 'google'", (tgt,)
+            ).fetchone() is not None  # la real conserva su Google
+    finally:
+        with get_db() as conn:
+            with conn.transaction():
+                conn.execute("DELETE FROM passkey_credentials WHERE credential_id = %s", (cred,))
+                conn.execute("DELETE FROM alquileres WHERE cliente_nombre = %s", ("MergeCtl",))
+                for cid in created:
+                    conn.execute("DELETE FROM clientes WHERE id = %s", (cid,))

@@ -112,7 +112,13 @@ El **anchor de identidad** (y la recuperación: perdés el dispositivo → entr�
 - **Vincular Google (account-linking):** `GET /cliente/auth/google/link` (cliente **logueado**) → el `state`
   firmado lleva el `cliente_id`; el callback detecta el link y **vincula la identidad** (`login_identities`,
   por `sub`) en vez de mintear una sesión nueva. Defensa: la sesión actual tiene que ser la de esa cuenta
-  (no se vincula a una ajena aunque el state lo diga). Vuelve a `/cliente/perfil?keys=<ok|ya|taken|error>`.
+  (no se vincula a una ajena aunque el state lo diga). Vuelve a `/cliente/perfil?keys=<ok|ya|merged|taken|error>`.
+- **Merge-on-link (`auth/account_merge.py`):** si el Google ya es de **otra** cuenta B, el link no es un dead-end:
+  como estar logueado en A + completar el OAuth de B **prueba que A y B son la misma persona**, se **unen** — pero
+  **solo si una es absorbible** (`account_is_absorbable`: liviana + sin verificar + sin pedidos). `merge_accounts`
+  mueve sus llaves a la otra y la borra (transaccional; FKs CASCADE/SET NULL). Si la absorbida es donde estabas, se
+  re-mintea sesión en la sobreviviente (`→ ?keys=merged`). Si **ambas tienen datos**, no se auto-mergea (`→ ?keys=taken`):
+  el merge general (datos + dedup por CUIL) es Fase 2. Regla → MEMORIA _2026-06-29 — Merge de cuentas por link autenticado_.
 
 ### Passkey (WebAuthn/FIDO2) — `auth/passkey/`
 **Aditivo** a Google (no lo reemplaza). Login **discoverable** (un solo flujo resuelve admin y cliente).
