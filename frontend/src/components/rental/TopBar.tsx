@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useCart } from "@/lib/cart-store";
 import { useState, type ReactNode } from "react";
 import { ShoppingBag } from "lucide-react";
+import { Button } from "@/design-system/ui/button";
 import { RentalDateModal } from "./RentalDateModal";
 import { DatePill } from "./DatePill";
 import { Logo } from "./Logo";
@@ -193,15 +194,17 @@ function RentalTopBar() {
   const actions = (
     // Carrito solo desktop (en mobile vive en MobileStickyBar / CartMiniBar).
     // El acceso cliente se movió al menú (AreaMenu).
-    <button
+    <Button
+      variant="primary"
+      shape="pill"
       onClick={() => setDrawerOpen(true, "bottom")}
-      className="hidden md:flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-amber transition relative hover:opacity-90"
+      className="hidden md:inline-flex relative"
       aria-label={`Carrito (${count})`}
     >
       <ShoppingBag className="h-4 w-4" />
       {count > 0 && <span className="tabular-nums">{count}</span>}
       <span>{count > 0 ? (count === 1 ? "ítem" : "ítems") : "Tu rental"}</span>
-    </button>
+    </Button>
   );
 
   return (
