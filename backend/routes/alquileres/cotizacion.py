@@ -157,9 +157,10 @@ def cotizar(data: CotizarRequest, request: Request):
         # Desglose POR LÍNEA para que el front MUESTRE (no calcule) el detalle por
         # equipo: `subtotal_por_jornada` (siempre, el "$X/día" del ítem) + `bruto`/`neto`
         # del período (cuando hay fechas). El neto por línea reparte el descuento ganado
-        # con el mismo redondeo por línea que usaba el front; la suma puede diferir del
-        # neto total por ±1 peso → el TOTAL autoritativo es `neto` (top-level), las líneas
-        # son detalle de display. `equipo_id` None = línea personalizada (#805).
+        # con el mismo redondeo por línea que usaba el front; la suma de netos por línea
+        # puede diferir del neto total por unos pesos (redondeo independiente por línea)
+        # → el TOTAL autoritativo es `neto` (top-level), las líneas son detalle de display.
+        # `equipo_id` None = línea personalizada (#805).
         pct_aplicado = desglose["descuento_pct"]
         lineas = []
         for it in items_para_total:
