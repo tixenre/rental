@@ -39,7 +39,7 @@ function SettingsPage() {
         </AdminSection>
 
         <AdminSection
-          title="Passkeys (acceso sin contraseña)"
+          title="Claves de acceso (acceso sin contraseña)"
           storageKey="settings:passkeys"
           defaultOpen={false}
         >

@@ -46,7 +46,7 @@ function defaultDeviceName(): string {
   if (/CrOS/.test(ua)) return "Chromebook";
   if (/Windows/.test(ua)) return "Windows";
   if (/Linux/.test(ua)) return "Linux";
-  return "Passkey";
+  return "Clave de acceso";
 }
 
 /** Registra una passkey nueva (usuario ya logueado por Google). */
@@ -123,18 +123,18 @@ export async function renamePasskey(
 
 /** Mensaje en español para los errores típicos de WebAuthn + del backend. */
 export function passkeyErrorMessage(e: unknown): string {
-  if (!passkeySupported()) return "Tu navegador no soporta passkeys.";
+  if (!passkeySupported()) return "Tu navegador no soporta claves de acceso.";
   if (e instanceof WebAuthnError) {
     if (e.code === "ERROR_CEREMONY_ABORTED") return "Cancelaste la operación. Probá de nuevo.";
     if (e.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED")
-      return "Esa passkey ya está registrada.";
+      return "Esa clave de acceso ya está registrada.";
     if (e.code === "ERROR_AUTHENTICATOR_MISSING_DISCOVERABLE_CREDENTIAL_SUPPORT")
-      return "Tu dispositivo no puede crear passkeys.";
-    return "No se pudo completar la operación con la passkey.";
+      return "Tu dispositivo no puede crear claves de acceso.";
+    return "No se pudo completar la operación con la clave de acceso.";
   }
   if (e instanceof AuthedHttpError) return e.message;
   if (e instanceof Error && e.message) return e.message;
-  return "No se pudo completar la operación con la passkey.";
+  return "No se pudo completar la operación con la clave de acceso.";
 }
 
 /** Mensaje para fallos del LOGIN con passkey. El browser NO distingue "cancelaste"
@@ -143,7 +143,7 @@ export function passkeyErrorMessage(e: unknown): string {
  * a crear una (Google + perfil) en vez del genérico "Cancelaste". */
 export function passkeyLoginErrorMessage(e: unknown): string {
   if (e instanceof WebAuthnError && e.code === "ERROR_CEREMONY_ABORTED") {
-    return "No encontramos una passkey en este dispositivo (o cancelaste). Si es tu primera vez, entrá con Google y agregá una passkey desde tu perfil.";
+    return "No encontramos una clave de acceso en este dispositivo (o cancelaste). Si es tu primera vez, entrá con Google y agregá una clave de acceso desde tu perfil.";
   }
   return passkeyErrorMessage(e);
 }

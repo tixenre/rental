@@ -131,7 +131,7 @@ function AdminLoginPage() {
               className="w-full flex items-center justify-center gap-3 rounded-md border hairline bg-background py-2.5 text-sm font-medium text-ink transition hover:bg-surface active:scale-[0.98] disabled:opacity-60"
             >
               <KeyRound className="h-4 w-4" />
-              {passkeyBusy ? "Verificando…" : "Entrar con passkey"}
+              {passkeyBusy ? "Verificando…" : "Entrar con clave de acceso"}
             </button>
           )}
         </div>
