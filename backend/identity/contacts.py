@@ -10,7 +10,7 @@ Regla de comunicación (decisión del dueño): **el mail de Google es el preferi
 cuentas passkey-only, que no tienen Google). El teléfono NO es llave de login.
 """
 
-from database import get_db, now_ar, row_to_dict
+from database import now_ar, row_to_dict
 from services.didit.decision import ContactoVerificado, ContactosVerificados
 
 
