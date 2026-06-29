@@ -884,12 +884,6 @@ def compartido_page(token: str):
                     (ids,),
                 ).fetchall()
                 equipos = {f["id"]: row_to_dict(f) for f in filas}
-            # Imagen de marca de Rambla para la preview (la misma OG que la home): un listado
-            # compartido se presenta con la marca, no con la foto de un equipo suelto.
-            og_row = conn.execute(
-                "SELECT value FROM app_settings WHERE key = %s", ("og_image_url",)
-            ).fetchone()
-            og_image_url = (og_row["value"].strip() if og_row and og_row["value"] else "")
         finally:
             conn.close()
 
@@ -924,9 +918,10 @@ def compartido_page(token: str):
             desc = "Te compartieron un listado de equipos para armar un pedido en Rambla Rental, Mar del Plata."
         if len(desc) > 200:
             desc = desc[:197].rstrip() + "…"
-        # Imagen: la imagen de marca configurada (og_image_url, la misma de la home) → la
-        # og-image.png estática como red final. Siempre la marca Rambla, nunca un equipo suelto.
-        image = og_image_url if og_image_url.startswith("http") else f"{SITE_URL}/og-image.png"
+        # Imagen: la isologo de marca estática (og-image.png, 1200×630 ya encuadrada para OG). Un
+        # listado compartido se presenta con la marca Rambla — no la foto de un equipo suelto, ni el
+        # og_image_url de la home (un wordmark a sangre que WhatsApp recorta al centro → "MB").
+        image = f"{SITE_URL}/og-image.png"
         url = f"{SITE_URL}/c/{token}"
         html_text = _inject_og_meta(
             index_file.read_text(encoding="utf-8"),
