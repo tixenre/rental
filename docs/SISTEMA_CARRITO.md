@@ -139,10 +139,16 @@ cliente, en la capa cliente, no en `create_pedido`).
 
 ## Pendiente (fuera de este epic, a tomar como trabajo propio)
 
-- **FASE 3 — display de plata (front).** El `CartDrawer` y los teasers inline recalculan el
-  estimado por jornada a mano (redondeo propio) en vez de derivarlo del desglose de
-  `/api/cotizar`. Consolidar en un helper único `lib/pricing.ts`. Es del **front** (el módulo
-  es backend-only); no reabre el invariante de plata, solo unifica el **display**.
+- **FASE 3 — display de plata: el front NO calcula, pide y muestra.** Hoy el `CartDrawer` y los
+  teasers inline (5 superficies) **calculan** el estimado por jornada a mano (`precio × cantidad`,
+  redondeo propio). **Decisión del dueño (2026-06-29): el front no decide plata — la pide al
+  backend y solo renderiza.** El service del carrito devuelve cada precio ya resuelto (vía el
+  resolutor único `precio_jornada_efectivo`), no un helper de cálculo en el front. **Bonus:** el
+  estimado de los **combos** queda correcto (hoy el front usa el precio crudo; el service sabe el
+  efectivo). Para no pegarle al backend en cada clic del teaser, cada equipo puede traer su
+  **precio efectivo** desde el catálogo → el front **suma** lo que le dan, no aplica reglas de
+  precio. El **cómo se muestra** (lo visual) es aparte (pasada de UI del dueño). Espeja
+  _cotizar = fuente única, el front no calcula el total (#617)_.
 - **Split de `routes/alquileres/core.py`** (god-module ~1057 líneas) en cortes move-verbatim
   de piezas **periféricas** (emails, enriquecer), 1 PR por corte, **sin tocar**
   create_pedido/advisory-lock. **Es lógica de `alquileres`, no del carrito** (se tocan, pero es
