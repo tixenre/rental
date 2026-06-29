@@ -42,7 +42,7 @@ class TestListKeys:
             {"id": 1, "device_name": "iPhone", "transports": "internal",
              "created_at": "2026-01-01", "last_used_at": None}])
         monkeypatch.setattr(identities_store, "list_for_cliente", lambda cid: [
-            {"id": 5, "method": "google", "identifier": "sub-abc",
+            {"id": 5, "method": "google", "identifier": "sub-abc", "email": "tincho@gmail.com",
              "verified_at": "x", "created_at": "2026-01-02"}])
         c = _client()
         c.cookies.set("session", _cliente_session())
@@ -52,8 +52,8 @@ class TestListKeys:
         assert data["total"] == 2
         by_kind = {k["kind"]: k for k in data["keys"]}
         assert by_kind["passkey"]["label"] == "iPhone"
-        # Google muestra label genérico (el identifier es el `sub` opaco, no se expone).
-        assert by_kind["google"]["label"] == "Google"
+        # Google muestra el MAIL con que se vinculó (no el `sub` opaco, que no se expone).
+        assert by_kind["google"]["label"] == "tincho@gmail.com"
         assert "sub-abc" not in r.text
 
 
@@ -127,21 +127,36 @@ class TestGoogleLinkHelpers:
     def test_completar_link_ok(self, monkeypatch):
         from auth import google
         monkeypatch.setattr(google, "get_session", lambda req: {"role": "cliente", "cliente_id": 42})
+        monkeypatch.setattr("auth.identities_store.google_identity_for_cliente", lambda cid: None)
         monkeypatch.setattr("auth.identities_store.link_identity", lambda **kw: "linked")
-        res = google._completar_link_google(None, 42, "sub-abc")
+        res = google._completar_link_google(None, 42, "sub-abc", "e@x.com")
         assert res.status_code == 303 and "keys=ok" in res.headers["location"]
 
     def test_completar_link_taken_by_other_rutea_a_merge(self, monkeypatch):
         # taken_by_other ya NO es un dead-end: rutea al intento de merge (misma persona).
         from auth import google
         monkeypatch.setattr(google, "get_session", lambda req: {"role": "cliente", "cliente_id": 42})
+        monkeypatch.setattr("auth.identities_store.google_identity_for_cliente", lambda cid: None)
         monkeypatch.setattr("auth.identities_store.link_identity", lambda **kw: "taken_by_other")
         calls = {}
         monkeypatch.setattr(google, "_merge_cuentas_por_google",
                             lambda req, *, actual, sub: calls.update(actual=actual, sub=sub) or "MERGE")
-        out = google._completar_link_google(None, 42, "sub-abc")
+        out = google._completar_link_google(None, 42, "sub-abc", "e@x.com")
         assert out == "MERGE"
         assert calls == {"actual": 42, "sub": "sub-abc"}
+
+    def test_completar_link_segundo_google_rechazado(self, monkeypatch):
+        # Ya hay un Google distinto vinculado → no se suma un segundo (una cuenta = un Google).
+        from auth import google
+        monkeypatch.setattr(google, "get_session", lambda req: {"role": "cliente", "cliente_id": 42})
+        monkeypatch.setattr("auth.identities_store.google_identity_for_cliente",
+                            lambda cid: {"id": 1, "identifier": "OTRO-sub", "email": "x@y.com"})
+        called = {"n": 0}
+        monkeypatch.setattr("auth.identities_store.link_identity",
+                            lambda **kw: called.update(n=called["n"] + 1) or "linked")
+        res = google._completar_link_google(None, 42, "sub-nuevo", "e@x.com")
+        assert "keys=ya_google" in res.headers["location"]
+        assert called["n"] == 0  # no intentó vincular el segundo
 
     def test_completar_link_sesion_ajena_rechazado(self, monkeypatch):
         # El state dice cuenta 42 pero la sesión actual es la 99 → no se vincula (defensa).
@@ -150,7 +165,7 @@ class TestGoogleLinkHelpers:
         monkeypatch.setattr(google, "get_session", lambda req: {"role": "cliente", "cliente_id": 99})
         monkeypatch.setattr("auth.identities_store.link_identity",
                             lambda **kw: called.update(n=called["n"] + 1) or "linked")
-        res = google._completar_link_google(None, 42, "sub-abc")
+        res = google._completar_link_google(None, 42, "sub-abc", "e@x.com")
         assert "keys=error" in res.headers["location"]
         assert called["n"] == 0  # nunca llamó a link_identity
 

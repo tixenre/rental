@@ -48,15 +48,15 @@ def merge_accounts(*, source: int, target: int) -> None:
                 "UPDATE passkey_credentials SET cliente_id = %s WHERE cliente_id = %s",
                 (target, source),
             )
-            # identidades: UNIQUE(method, identifier) → mover solo las que el target NO tenga;
-            # las que chocan (target ya las tiene) se van con el DELETE del source (cascade).
+            # identidades: una cuenta = una por método (un Google, un mail) → mover la del
+            # source solo si el target NO tiene ya una de ese método; la que sobra se va con
+            # el DELETE del source (cascade). Mantiene el invariante "un Google por cuenta".
             conn.execute(
                 """UPDATE login_identities li SET cliente_id = %s
                    WHERE li.cliente_id = %s
                      AND NOT EXISTS (
                        SELECT 1 FROM login_identities t
-                       WHERE t.method = li.method AND t.identifier = li.identifier
-                         AND t.cliente_id = %s)""",
+                       WHERE t.method = li.method AND t.cliente_id = %s)""",
                 (target, source, target),
             )
             # listas guardadas: contenido persistente del usuario → se mueven (no se pierden).

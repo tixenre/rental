@@ -355,6 +355,10 @@ def _init_db_schema(conn):
         "CREATE INDEX IF NOT EXISTS idx_login_identities_cliente "
         "ON login_identities(cliente_id)"
     )
+    # `email`: el mail asociado a la identidad al vincularla (el del Google, o el del
+    # propio método 'email'). Solo display — el ancla sigue siendo `identifier` (el `sub`
+    # para Google). Nullable; espejo de la migración b8e2f4a6c1d3.
+    conn.execute("ALTER TABLE login_identities ADD COLUMN IF NOT EXISTS email TEXT")
 
     # ── Challenges de magic-link por mail (auth/otp): backing store del link de un
     # solo uso (cruza dispositivos/requests → no entra en una cookie como el challenge

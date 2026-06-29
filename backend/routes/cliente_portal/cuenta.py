@@ -115,7 +115,8 @@ def cliente_registro(request: Request, data: RegistroCreate):
     link_identity(cliente_id=cliente_id, method="email", identifier=email.lower(), verified=True)
     google_sub = payload.get("google_sub")
     if google_sub:
-        link_identity(cliente_id=cliente_id, method="google", identifier=google_sub, verified=True)
+        link_identity(cliente_id=cliente_id, method="google", identifier=google_sub,
+                      email=email.lower(), verified=True)
 
     # Mintea la sesión por el punto único (jti + revocación) — FUERA del `with`
     # porque `_make_session_response` abre su propia conexión (no anidar pools).

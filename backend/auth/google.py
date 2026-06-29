@@ -342,17 +342,23 @@ def _redirect_borrando_oauth(url: str):
     return res
 
 
-def _completar_link_google(request: Request, link_cid: int, sub: str | None):
+def _completar_link_google(request: Request, link_cid: int, sub: str | None, email: str | None):
     """Vincula el `sub` de Google a la cuenta logueada y vuelve a "métodos de acceso"
     con un estado. Defensa: la sesión actual TIENE que ser la de esa cuenta (no se
-    vincula a una cuenta ajena aunque el state lo diga). Si el Google ya es de OTRA
-    cuenta, intenta **unir las dos** (sabemos que es la misma persona)."""
+    vincula a una cuenta ajena aunque el state lo diga). **Una cuenta = un Google**:
+    un segundo Google distinto se rechaza. Si el Google ya es de OTRA cuenta, intenta
+    **unir las dos** (sabemos que es la misma persona)."""
     base = f"{FRONTEND_BASE}/cliente/perfil"
     current = get_session(request)
     if not current or current.get("role") != "cliente" or current.get("cliente_id") != link_cid or not sub:
         return RedirectResponse(f"{base}?keys=error", status_code=303)
-    from auth.identities_store import link_identity  # perezoso: evita ciclo con auth/__init__
-    resultado = link_identity(cliente_id=link_cid, method="google", identifier=sub, verified=True)
+    from auth.identities_store import link_identity, google_identity_for_cliente  # perezoso
+    # Una cuenta = un Google: si ya hay un Google distinto vinculado, no sumamos otro.
+    ya = google_identity_for_cliente(link_cid)
+    if ya is not None and ya["identifier"] != sub:
+        return _redirect_borrando_oauth(f"{base}?keys=ya_google")
+    resultado = link_identity(cliente_id=link_cid, method="google", identifier=sub,
+                              email=email, verified=True)
     if resultado == "taken_by_other":
         # El Google ya es de OTRA cuenta. El usuario está logueado en `link_cid` (probó una
         # llave de A) Y acaba de probar control de ese Google (llave de B) → es la MISMA
@@ -474,7 +480,7 @@ def cliente_auth_callback(request: Request):
     # En ese caso no minteamos sesión: vinculamos la identidad y volvemos a la cuenta.
     link_cid = _link_cliente_id_de_state(state)
     if link_cid is not None:
-        return _completar_link_google(request, link_cid, sub)
+        return _completar_link_google(request, link_cid, sub, email)
 
     cliente_id = find_or_backfill_google(sub, email)
 

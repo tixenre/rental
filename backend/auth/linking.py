@@ -47,12 +47,17 @@ def cliente_list_keys(request: Request):
         })
     for idy in identities_store.list_for_cliente(cid):
         method = idy["method"]
+        # Google: mostrar el mail con que se vinculó (el `identifier` es el `sub` opaco);
+        # si no lo tenemos (vínculos viejos), cae al genérico "Google". 'email' → el mail.
+        if method == "google":
+            label = idy["email"] or "Google"
+        else:
+            label = idy["identifier"]
         keys.append({
             "kind": method,
             "id": idy["id"],
-            # Google guarda el `sub` opaco (no el mail) → label genérico; mail muestra el mail.
-            "label": "Google" if method == "google" else idy["identifier"],
-            "detail": None,
+            "label": label,
+            "detail": "Google" if method == "google" else None,
             "created_at": idy["created_at"],
             "last_used_at": None,
         })

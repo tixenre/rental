@@ -27,12 +27,16 @@ def find_cliente_by_identity(method: str, identifier: str) -> Optional[int]:
     return r["cliente_id"] if r else None
 
 
-def link_identity(*, cliente_id: int, method: str, identifier: str, verified: bool = True) -> str:
+def link_identity(
+    *, cliente_id: int, method: str, identifier: str, email: Optional[str] = None,
+    verified: bool = True,
+) -> str:
     """Vincula una llave a la cuenta. Devuelve:
       · 'linked'         — se creó la llave.
-      · 'already_yours'  — ya era de esta cuenta (idempotente).
+      · 'already_yours'  — ya era de esta cuenta (idempotente; refresca el `email`).
       · 'taken_by_other' — la llave es de OTRA cuenta (el caller responde 409).
-    SELECT + INSERT en una transacción; el UNIQUE(method, identifier) es la red final."""
+    SELECT + INSERT en una transacción; el UNIQUE(method, identifier) es la red final.
+    `email` es solo display (el mail del Google linkeado); el ancla es `identifier`."""
     with get_db() as conn:
         with conn.transaction():
             existing = conn.execute(
@@ -40,13 +44,33 @@ def link_identity(*, cliente_id: int, method: str, identifier: str, verified: bo
                 (method, identifier),
             ).fetchone()
             if existing:
-                return "already_yours" if existing["cliente_id"] == cliente_id else "taken_by_other"
+                if existing["cliente_id"] != cliente_id:
+                    return "taken_by_other"
+                if email:  # refresca el mail de display si cambió
+                    conn.execute(
+                        "UPDATE login_identities SET email = %s "
+                        "WHERE method = %s AND identifier = %s",
+                        (email, method, identifier),
+                    )
+                return "already_yours"
             conn.execute(
-                """INSERT INTO login_identities (cliente_id, method, identifier, verified_at)
-                   VALUES (%s, %s, %s, %s)""",
-                (cliente_id, method, identifier, now_ar() if verified else None),
+                """INSERT INTO login_identities (cliente_id, method, identifier, email, verified_at)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (cliente_id, method, identifier, email, now_ar() if verified else None),
             )
     return "linked"
+
+
+def google_identity_for_cliente(cliente_id: int) -> Optional[dict]:
+    """La identidad Google de la cuenta (sub + email), o None. Para el guardrail
+    "una cuenta = un Google" (rechazar vincular un segundo Google distinto)."""
+    with get_db() as conn:
+        r = conn.execute(
+            "SELECT id, identifier, email FROM login_identities "
+            "WHERE cliente_id = %s AND method = 'google' LIMIT 1",
+            (cliente_id,),
+        ).fetchone()
+    return _row(r) if r else None
 
 
 def find_or_backfill_google(sub: Optional[str], email: str) -> Optional[int]:
@@ -67,7 +91,7 @@ def find_or_backfill_google(sub: Optional[str], email: str) -> Optional[int]:
         return None
     cid = r["id"]
     if sub:
-        link_identity(cliente_id=cid, method="google", identifier=sub, verified=True)
+        link_identity(cliente_id=cid, method="google", identifier=sub, email=email, verified=True)
     return cid
 
 
@@ -76,7 +100,7 @@ def list_for_cliente(cliente_id: int) -> list[dict]:
     une esto con las passkeys (otra tabla)."""
     with get_db() as conn:
         rows = conn.execute(
-            """SELECT id, method, identifier, verified_at, created_at
+            """SELECT id, method, identifier, email, verified_at, created_at
                FROM login_identities WHERE cliente_id = %s
                ORDER BY created_at DESC""",
             (cliente_id,),
