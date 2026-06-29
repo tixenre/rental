@@ -2015,4 +2015,59 @@ def _init_db_schema(conn):
         "ALTER TABLE estudio_trabajos ADD COLUMN IF NOT EXISTS categorias_json TEXT NOT NULL DEFAULT '[]'"
     )
 
+    # Listas / kits personales del cliente (#1092 — habilitado por la puerta de
+    # contenido). El cliente guarda una composición de equipos que alquila
+    # seguido y la reserva de un toque (rearma el carrito y RE-COTIZA contra el
+    # catálogo actual — NO es un snapshot de precios; respeta plata/ítems
+    # congelados 2026-06-06). Se guarda SOLO la composición (equipo_id +
+    # cantidad); nombre/foto/precio se resuelven en vivo desde el catálogo.
+    # Server-only (acción logueada deliberada — sin sync de localStorage, a
+    # diferencia de favoritos). Esquema en dos capas (MEMORIA 2026-06-03):
+    # también en la migración c1a5d7e9f3b2.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cliente_listas (
+            id          SERIAL PRIMARY KEY,
+            cliente_id  INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            nombre      TEXT NOT NULL,
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_cliente_listas_cliente ON cliente_listas(cliente_id)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cliente_listas_items (
+            id         SERIAL PRIMARY KEY,
+            lista_id   INTEGER NOT NULL REFERENCES cliente_listas(id) ON DELETE CASCADE,
+            equipo_id  INTEGER NOT NULL REFERENCES equipos(id) ON DELETE CASCADE,
+            cantidad   INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+            UNIQUE (lista_id, equipo_id)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_cliente_listas_items_lista ON cliente_listas_items(lista_id)"
+    )
+
+    # ── Carritos compartidos (#1092 feature #4): link gaffer → productor ───────
+    # Un cliente (logueado o anónimo) comparte una composición de equipos por un
+    # link público corto (/c/<token>). El destinatario la abre y la rearma en SU
+    # carrito (re-cotiza contra el catálogo ACTUAL — NO un snapshot de precios;
+    # respeta plata/ítems congelados 2026-06-06, igual que listas/repetir-pedido).
+    # Se guarda SOLO la composición (equipo_id + cantidad) en items_json + un
+    # título opcional. token UNIQUE = índice implícito para el lookup. cliente_id
+    # es atribución opcional (anónimo puede compartir). Esquema en dos capas
+    # (MEMORIA 2026-06-03): también en la migración d4f2a8b1c6e3.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS carritos_compartidos (
+            id          SERIAL PRIMARY KEY,
+            token       TEXT NOT NULL UNIQUE,
+            titulo      TEXT,
+            items_json  JSONB NOT NULL DEFAULT '[]',
+            cliente_id  INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
+            vistas      INTEGER NOT NULL DEFAULT 0,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+
     conn.commit()

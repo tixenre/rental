@@ -26,6 +26,7 @@ from routes.cliente_portal.solicitudes import (
 from routes.cliente_portal.pedidos import cliente_crear_pedido, CartItemIn, PedidoClienteCreate
 from routes.cliente_portal.documentos import _doc_response, _DOC_PREVIEW_HEADERS
 from routes.cliente_portal import favoritos as _favoritos  # registra sus rutas
+from routes.cliente_portal import listas as _listas  # registra sus rutas
 
 __all__ = [
     "router",
@@ -52,4 +53,4 @@ __all__ = [
 # sobre el `router` compartido; el tuple los mantiene "usados" para ruff.
 from routes.cliente_portal import cuenta as _cuenta  # registra sus rutas
 
-_SUBMODULOS = (_favoritos, _cuenta)
+_SUBMODULOS = (_favoritos, _listas, _cuenta)
