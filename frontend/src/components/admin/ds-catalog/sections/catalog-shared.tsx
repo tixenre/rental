@@ -7,6 +7,7 @@ import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { ShareButton } from "@/components/rental/equipment/shared/ShareButton";
 import { IncludesLine } from "@/components/rental/equipment/shared/IncludesLine";
 import { SpecsGrid } from "@/components/rental/equipment/shared/SpecsGrid";
+import { AddonPills } from "@/components/rental/AddonPills";
 import { type Equipment, type IncludedItem } from "@/data/equipment";
 
 /**
@@ -168,6 +169,25 @@ export const catalogSharedSection: CatalogSection = {
           </Sample>
           <Sample label="max 5 — sin desborde">
             <IncludesLine includes={includesDemo} max={5} />
+          </Sample>
+        </Stack>
+      ),
+    },
+    {
+      name: "AddonPills",
+      files: ["components/rental/AddonPills.tsx"],
+      blurb:
+        'Pills inline de los addons de un kit: ≤max con check; >max colapsa a "+N"; ×N si qty>1. Sin addons → "solo cuerpo".',
+      render: () => (
+        <Stack>
+          <Sample label="Default (max 3) → +N">
+            <AddonPills items={includesDemo} />
+          </Sample>
+          <Sample label="max 5 — todas">
+            <AddonPills items={includesDemo} max={5} />
+          </Sample>
+          <Sample label='Vacío → "solo cuerpo"'>
+            <AddonPills items={[]} />
           </Sample>
         </Stack>
       ),

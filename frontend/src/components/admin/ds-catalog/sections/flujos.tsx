@@ -15,6 +15,7 @@ import { DatePill } from "@/components/rental/DatePill";
 import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
 import { CartMiniBarView, type CartPreviewItem } from "@/components/rental/CartMiniBarView";
 import { CartDrawerView } from "@/components/rental/CartDrawerView";
+import { GuardarComoListaView } from "@/components/rental/GuardarComoListaView";
 import { type Equipment } from "@/data/equipment";
 import { computeJornadas } from "@/lib/rental-dates";
 
@@ -275,6 +276,22 @@ export const flujosSection: CatalogSection = {
       blurb:
         "El panel completo del carrito: fechas, ítems con stepper, qué incluye, totales, notas y acciones. View presentacional; la app cablea store/cotización/creación de pedido. Acá: ítems mock, Confirmar/Compartir hacen toast.",
       render: () => <CartDrawerDemo />,
+    },
+    {
+      name: "Guardar como lista",
+      files: ["components/rental/GuardarComoListaView.tsx"],
+      blurb:
+        "El gesto botón ↔ input inline para guardar el carrito como lista. View presentacional (maneja el toggle/nombre); la app cablea el guardado al backend. Cliqueá, escribí un nombre y Enter (acá hace toast).",
+      render: () => (
+        <div className="max-w-sm">
+          <GuardarComoListaView
+            onSave={async (nombre) => {
+              toast.success(`Guardamos “${nombre}” en tus listas (demo)`);
+              return true;
+            }}
+          />
+        </div>
+      ),
     },
   ],
 };
