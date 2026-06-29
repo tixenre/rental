@@ -1,8 +1,10 @@
 /**
  * Sección Contenedores & Datos — superficies que envuelven y muestran datos.
- * Card (panel con header/footer), Table (el arquetipo dominante del back-office),
- * Alert (avisos inline) y Progress (barra determinada).
+ * Card (panel con header/footer), Table (primitivo), AdminTable (shell de tabla
+ * del back-office con column-def), Alert (avisos inline) y Progress (barra determinada).
  */
+import { useState } from "react";
+
 import { type CatalogSection } from "../types";
 import { Caption, Stack } from "../catalog-kit";
 import {
@@ -26,13 +28,66 @@ import {
 import { Alert, AlertTitle, AlertDescription } from "@/design-system/ui/alert";
 import { Progress } from "@/design-system/ui/progress";
 import { Button } from "@/design-system/ui/button";
-import { Info, AlertTriangle } from "lucide-react";
+import { Info, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { AdminTable, type Column } from "@/components/admin/AdminTable";
 
 const PEDIDOS = [
   { numero: "#1042", cliente: "Pablo Ferrari", estado: "Confirmado", monto: "$ 48.500" },
   { numero: "#1043", cliente: "María González", estado: "Presupuesto", monto: "$ 12.000" },
   { numero: "#1044", cliente: "Juan Pérez", estado: "Retirado", monto: "$ 31.200" },
 ];
+
+// ── AdminTable demo ───────────────────────────────────────────────────────────
+type PedidoRow = (typeof PEDIDOS)[number];
+
+const COLUMNS: Column<PedidoRow>[] = [
+  { header: "Nº", cell: (r) => <span className="font-medium">{r.numero}</span> },
+  { header: "Cliente", cell: (r) => r.cliente },
+  { header: "Estado", cell: (r) => r.estado },
+  { header: "Monto", cell: (r) => r.monto, align: "right", className: "tabular-nums" },
+];
+
+function AdminTableDemo() {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  return (
+    <AdminTable
+      columns={[
+        ...COLUMNS,
+        {
+          header: "",
+          cell: (r) => (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((prev) => (prev === r.numero ? null : r.numero));
+              }}
+              className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:text-ink transition"
+              aria-label={expanded === r.numero ? "Colapsar" : "Expandir"}
+            >
+              {expanded === r.numero ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </button>
+          ),
+          align: "right",
+          headClassName: "w-10",
+        },
+      ]}
+      rows={PEDIDOS}
+      getRowKey={(r) => r.numero}
+      isExpanded={(r) => expanded === r.numero}
+      renderExpanded={(r) => (
+        <div className="px-4 py-3 text-sm text-muted-foreground">
+          Detalle del pedido {r.numero} — {r.cliente}. Acá irían los ítems, fechas, notas, etc.
+        </div>
+      )}
+    />
+  );
+}
 
 export const containersSection: CatalogSection = {
   id: "contenedores",
@@ -98,6 +153,21 @@ export const containersSection: CatalogSection = {
             </TableRow>
           </TableFooter>
         </Table>
+      ),
+    },
+    {
+      name: "AdminTable",
+      files: ["components/admin/AdminTable.tsx"],
+      blurb:
+        "La tabla del back-office: def de columnas + filas, alineación por columna, filas expandibles con detalle. Envuelve el primitivo Table. Clickeá la flecha para ver el detalle desplegable.",
+      render: () => (
+        <Stack>
+          <AdminTableDemo />
+          <Caption>
+            cliqueá la flecha → renderExpanded a todo el ancho. onRowClick hace la fila clickeable
+            (cursor pointer).
+          </Caption>
+        </Stack>
       ),
     },
     {

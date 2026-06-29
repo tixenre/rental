@@ -8,6 +8,7 @@ import { ShareButton } from "@/components/rental/equipment/shared/ShareButton";
 import { IncludesLine } from "@/components/rental/equipment/shared/IncludesLine";
 import { SpecsGrid } from "@/components/rental/equipment/shared/SpecsGrid";
 import { AddonPills } from "@/components/rental/AddonPills";
+import { EmptyImage } from "@/components/rental/EmptyImage";
 import { type Equipment, type IncludedItem } from "@/data/equipment";
 
 /**
@@ -190,6 +191,28 @@ export const catalogSharedSection: CatalogSection = {
             <AddonPills items={[]} />
           </Sample>
         </Stack>
+      ),
+    },
+    {
+      name: "EmptyImage",
+      files: ["components/rental/EmptyImage.tsx"],
+      blurb:
+        "Placeholder cuando un equipo no tiene foto: ilustración SVG de la categoría + textura grain + label de marca y categoría. El catálogo lo muestra donde iría el <img>.",
+      render: () => (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {(
+            [
+              { category: "camaras", brand: "Sony" },
+              { category: "opticas", brand: "Canon" },
+              { category: "iluminacion", brand: "Aputure" },
+              { category: "audio", brand: "Rode" },
+            ] as const
+          ).map(({ category, brand }) => (
+            <div key={category} className="aspect-square overflow-hidden rounded-lg">
+              <EmptyImage category={category} brand={brand} />
+            </div>
+          ))}
+        </div>
       ),
     },
     {
