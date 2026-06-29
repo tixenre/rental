@@ -180,5 +180,14 @@ export default tseslint.config(
     files: ["src/components/admin/WhatsAppButton.tsx"],
     rules: { "no-restricted-syntax": "off" },
   },
+  {
+    // Las secciones del catálogo del DS son MÓDULOS DE DATOS: cada una exporta un
+    // objeto `CatalogSection` (consumido por el manifiesto) y define componentes
+    // locales solo para las demos. No son boundaries de fast-refresh (es una vitrina
+    // admin read-only), así que la regla react-refresh no aplica acá. La vitrina y
+    // sus primitivos de layout (catalog-kit/DsCatalog) sí siguen la regla.
+    files: ["src/components/admin/ds-catalog/sections/**/*.{ts,tsx}"],
+    rules: { "react-refresh/only-export-components": "off" },
+  },
   eslintPluginPrettier,
 );
