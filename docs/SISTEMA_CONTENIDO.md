@@ -91,6 +91,7 @@ El catálogo y la ficha ya derivan de la **receta real** (`e.kit` →
 
 ---
 
-_Reglas/criterio en MEMORIA: motor único de reservas sagrado (2026-05-30/31),
+_Reglas/criterio en MEMORIA: **puerta única del display de contenido (2026-06-29)**,
+motor único de reservas sagrado (2026-05-30/31),
 plata/ítems congelados (2026-06-06), esquema en dos capas `init_db`+Alembic
 (2026-06-03), guardrail `⏰ LEGACY` (2026-06-25). Iniciativa: issue #1087._
