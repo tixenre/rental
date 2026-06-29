@@ -156,8 +156,17 @@ jornada (derivado de componentes, combo-aware) en `precio_jornada`, no el crudo 
 teasers de compartir/listas muestran el mismo precio que el carrito cotiza/cobra, **sin** pedir una
 cotización por card (suman el efectivo que ya les dieron). En el listado se resuelve en **batch**
 (`services/precios.precios_combo_batch`, una sola query — sin N+1); en la ficha, `precio_combo`.
-Caveat menor: el sort `precio_asc/desc` sigue sobre el `precio_jornada` crudo en SQL → aproximado
-para combos; el **display es exacto**.
+
+- **El ORDEN por precio también es exacto:** `precio_asc/desc` ordena los combos por su precio
+  efectivo (mismo `SUM` de componentes, vía SQL correlado solo en filas combo) → el orden coincide
+  con el número que se muestra y se cobra. No hay "aproximado".
+- **El admin recibe el CRUDO en la ficha (`get_equipo`):** el form de edición usa ese endpoint y
+  edita el `precio_jornada` real (el efectivo es derivado, no editable). Se gatea por admin real
+  (`is_admin_email`), así un **cliente logueado igual ve el efectivo**. El listado muestra el efectivo
+  a todos (es display, no edición).
+- **Combos NO se anidan** (decisión del dueño 2026-06-29): si necesitás un combo más grande, se crea
+  otro combo (con los mismos checks de stock). Por eso el precio de combo de **1 nivel** es correcto
+  por diseño, no una limitación.
 
 ## Pendiente (fuera de este epic, a tomar como trabajo propio)
 

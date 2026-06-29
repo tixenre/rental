@@ -29,7 +29,7 @@ from reservas import (
 from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de, parientes_de
 from auth.session import get_session
-from auth.guards import require_admin
+from auth.guards import require_admin, is_admin_email
 from services.contenido import contenido_de
 from services.nombre_service import actualizar_nombres_de
 # `delete_equipo` limpia el blob HTML scrapeado en R2 al borrar un equipo; los
@@ -436,6 +436,18 @@ def list_equipos(
     # Cuando hay búsqueda (`q`) y el sort es el default, ordena por relevancia
     # del match (`_score`) primero — el mejor resultado arriba, consistente.
     _RANKING = "e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC"
+    # Precio efectivo por jornada para ordenar: un combo se ordena por la SUMA de sus
+    # componentes (mismo criterio que el display, `precios_combo_batch`); el resto por su
+    # precio propio. Correlado por e.id; el subquery solo se evalúa para filas combo. Así
+    # el orden coincide con el precio que se muestra y se cobra (exacto, no aproximado).
+    _PRECIO_EFECTIVO = (
+        "CASE WHEN e.tipo = 'combo' THEN COALESCE(("
+        " SELECT ROUND(SUM(ce.precio_jornada * kc.cantidad"
+        " * (1 - COALESCE(kc.descuento_pct, 0) / 100.0)))"
+        " FROM kit_componentes kc JOIN equipos ce ON ce.id = kc.componente_id"
+        " WHERE kc.equipo_id = e.id AND ce.eliminado_at IS NULL"
+        "), 0) ELSE e.precio_jornada END"
+    )
     use_score = bool(pred and pred.activo) and sort in (None, "ranking")
     if use_score:
         order_clause = f"ORDER BY _score DESC, {_RANKING}"
@@ -444,8 +456,8 @@ def list_equipos(
             None: f"ORDER BY {_RANKING}",
             "ranking": f"ORDER BY {_RANKING}",
             "nombre": "ORDER BY COALESCE(e.nombre_publico, e.nombre) ASC",
-            "precio_asc": "ORDER BY e.precio_jornada ASC NULLS LAST, e.nombre ASC",
-            "precio_desc": "ORDER BY e.precio_jornada DESC NULLS LAST, e.nombre ASC",
+            "precio_asc": f"ORDER BY ({_PRECIO_EFECTIVO}) ASC NULLS LAST, e.nombre ASC",
+            "precio_desc": f"ORDER BY ({_PRECIO_EFECTIVO}) DESC NULLS LAST, e.nombre ASC",
             "id": "ORDER BY e.id ASC",
         }.get(sort, f"ORDER BY {_RANKING}")
 
@@ -531,7 +543,7 @@ def list_equipos(
 
 
 @router.get("/equipos/{id_or_slug}")
-def get_equipo(id_or_slug: str):
+def get_equipo(id_or_slug: str, request: Request):
     """Devuelve el detalle de un equipo.
 
     Acepta tanto ID numérico puro (`47`) como slug-id mixto al estilo
@@ -590,8 +602,12 @@ def get_equipo(id_or_slug: str):
         ]
         # Combo: el precio mostrado es el EFECTIVO (derivado de componentes), igual que
         # en el listado y que lo que el carrito cotiza/cobra (el front muestra, no
-        # calcula — FASE 3).
-        if equipo.get("tipo") == "combo":
+        # calcula — FASE 3). EXCEPTO el ADMIN: el form de edición usa este endpoint y
+        # necesita el `precio_jornada` CRUDO (editable); el efectivo es derivado. Un
+        # cliente logueado NO es admin → igual ve el efectivo.
+        _sess = get_session(request)
+        es_admin = bool(_sess and is_admin_email(_sess.get("email")))
+        if equipo.get("tipo") == "combo" and not es_admin:
             from services.precios import precio_combo
             equipo["precio_jornada"] = precio_combo(conn, actual_id)
         return equipo
