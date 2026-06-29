@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import MARCA_SUBQUERY, get_db, now_ar, to_datetime
 from routes.clientes import nombre_completo_cliente
 from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock

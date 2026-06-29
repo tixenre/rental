@@ -30,7 +30,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
-from routes.auth import signer
+from auth.session import signer
 from tests.contract_routing import route_status
 
 pytestmark = pytest.mark.unit
@@ -38,7 +38,16 @@ pytestmark = pytest.mark.unit
 client = TestClient(main.app, raise_server_exceptions=False)
 
 # Sesión válida pero NO-admin: pasa el middleware, la rechaza require_admin.
-_COOKIE_CLIENTE = f"session={signer.dumps({'email': 'rando@test.com', 'role': 'cliente', 'cliente_id': 1})}"
+_COOKIE_CLIENTE = f"session={signer.dumps({'email': 'rando@test.com', 'role': 'cliente', 'cliente_id': 1, 'jti': 'contract-cli'})}"
+
+
+@pytest.fixture(autouse=True)
+def _sessions_active(monkeypatch):
+    """jti obligatorio: `get_session` exige que la sesión esté viva en la allowlist.
+    La cookie de contrato lleva jti pero no está en la tabla → stubbeamos `is_active`
+    para darla por activa, así pasa el chequeo de revocación y llega al require_admin
+    del handler (que es lo que estos tests verifican)."""
+    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
 
 
 # ── ADMIN con guard ANTES de DB/validación: anon → 401; no-admin → 403 ────────

@@ -456,6 +456,70 @@ criterio que `check-retro.sh`: por volumen/diff, no por fecha). La **re-derivaci
 Refina —no reemplaza— la cadencia "mensual" de _2026-06-23 (Etapa 2)_ y _2026-06-27 (Filosofía derivada)_.
 El supervisor marca un cierre gateado por calendario en vez de por volumen.
 
+### 2026-06-29 — `backend/auth/` = motor único de autenticación (multi-método sobre una sesión única, aditiva)
+
+Toda la auth vive en el paquete-motor **`backend/auth/`** (sesión, guards, OAuth Google, passkey, staging,
+revocación) — como `reservas/`/`contabilidad/`. **Todos los métodos de login convergen en UNA cookie firmada**
+(`session`), que mintea el **punto único `_make_session_response`**; los guards (`require_admin`/`require_cliente`)
+solo la **leen** (agnósticos del método). Passkey es **aditivo** a Google (no lo reemplaza; Google = anchor de
+identidad + recuperación). El supervisor marca un `set_cookie("session")` crudo fuera de `_make_session_response`
+(no heredaría jti/revocación) o lógica de auth (guard/mint de sesión) recreada fuera del paquete. Cómo →
+[`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → PR #1095 (passkey) + #1100 (consolidación).
+
+### 2026-06-29 — Revocación de sesión: allowlist `auth_sessions` + `jti` obligatorio (corte limpio, anti-IDOR)
+
+La sesión es **revocable server-side**: la cookie firmada lleva un `jti` opaco y la allowlist **`auth_sessions`**
+decide si vive (`get_session` valida firma **Y** `is_active`: no revocada, no vencida). **`jti` OBLIGATORIO
+(corte limpio):** una cookie sin jti (las viejas pre-deploy, las hand-minted de tests) se **rechaza** → re-login;
+**ninguna sesión válida queda fuera de la tabla**. Logout y "cerrar mis otras sesiones" son **reales** (revocan
+el jti; `revoke_all` preserva la actual con `except_jti`). Revocaciones **owner-scoped** (el `WHERE` incluye el
+dueño, no solo el jti → anti-IDOR), espejando `passkey/store`. Tabla en 2 capas (_2026-06-03_), DAL `%s`
+(_2026-06-27_), tiempos en `now_ar()`. El supervisor marca una sesión sin pasar por `_make_session_response` (sin
+jti) o una revocación no scopeada al dueño. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → PR #1102/#1103.
+
+### 2026-06-29 — Cuentas livianas: alta passwordless con passkey (cuenta vacía hasta Didit, inerte + anti-spam)
+
+El alta con passkey (`POST /auth/passkey/signup/{begin,complete}`, motor `auth/passkey/`) crea una **cuenta
+liviana**: nace solo con `id` + passkey, SIN datos —los `NOT NULL` base de `clientes` (nombre/apellido/telefono/
+email/direccion/cuit) se relajaron, `cuenta_estado='liviana'`, `owner_email=''` en la passkey—. La
+**identidad/contacto los completa Didit al primer pedido** y van a las columnas `*_renaper` (con COALESCE),
+**NUNCA** a los campos base por el usuario; la cuenta queda **inerte** (`require_cliente_verificado` la bloquea
+hasta `dni_validado_at`). Cuenta+passkey se insertan en **una transacción atómica** (sin huérfanos) y mintea por
+`_make_session_response` (email/nombre NULL → `""`, hereda jti). **Higiene anti-spam (invisible al usuario, las 3
+patas):** rate-limit por-IP que cuenta también las altas **exitosas** (`_record_event`, no solo fallos) +
+inertidad-hasta-Didit + **cleanup diario** de livianas abandonadas (`jobs/cleanup_livianas.py` en el scheduler
+único: liviana + sin verificar + sin email + sin pedidos + > 30d → borrar; cascade limpia passkey/sesiones).
+Google sigue **co-primario**; el **admin NO se auto-crea** (allowlist — su passkey se agrega desde el perfil tras
+Google). En el front, el login del cliente lidera con "Crear cuenta con passkey" (CTA `Button variant=primary`).
+El supervisor marca un alta que escriba identidad en los campos base en vez de esperar a Didit, o un signup fuera
+de la transacción atómica / del punto único de minteo. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); tracking #1098 (Fase 4).
+
+### 2026-06-29 — Merge de cuentas por link autenticado (unir cuando es la misma persona + una es absorbible)
+
+Cuando un cliente logueado en la cuenta A vincula una llave (hoy Google) que ya es de la cuenta B, el sistema
+**une las dos** en vez de rechazar: estar logueado en A (probó una llave de A) **+** completar el OAuth de B (probó
+una llave de B) **es prueba de que A y B son la misma persona** → se mergean. **Guardrail:** solo si una de las dos
+es **absorbible** (`account_is_absorbable`: liviana + sin verificar + sin pedidos → no tiene datos que perder); se
+mueven sus llaves a la otra y se borra (`auth/account_merge.merge_accounts`, transaccional; todas las FKs a
+`clientes` son CASCADE/SET NULL → borrar es seguro). Si **ambas tienen datos**, NO se auto-mergea (→ "taken"): el
+merge general con reasignación de pedidos/contabilidad + dedup por CUIL es **Fase 2** (`identity/merge`). Cuando se
+absorbe la cuenta donde estabas, se re-mintea sesión en la sobreviviente por el punto único. **Sin prueba de ambas
+llaves no se une** (crear passkey → desloguear → volver por Google ≠ misma persona _conocida_ → quedan separadas
+hasta Didit; de cualquier forma, al primer pedido Didit ancla por CUIL y unifica). El supervisor marca un merge sin
+el guard de absorbible, o un auto-merge de dos cuentas con datos. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); #1098 Fase 1B.
+
+### 2026-06-29 — Step-up con passkey ("confirmá que sos vos") para operaciones sensibles del cliente
+
+Antes de una **operación sensible** del cliente (hoy: **quitar un método de acceso**; reusable a futuro: confirmar
+un pedido) se exige un **step-up**: una assertion WebAuthn **fresca** (passkey de ESTA cuenta) que deja la cookie
+firmada **`stepup`** (~5 min), que el guard **`require_recent_auth`** (`auth/stepup.py` = `require_cliente` +
+`stepup` fresca y owner-scopeada) exige. **No es un login** (no mintea sesión; reusa la ceremonia de
+`auth/passkey/`, scopeada: la passkey tiene que ser de la cuenta). El front dispara `stepUpWithPasskey()` antes de
+la acción y reintenta. **Primitivo único** — no recrear un "confirmá con passkey" ad-hoc por endpoint. El supervisor
+marca una operación sensible del cliente sin `require_recent_auth`, o un step-up que acepte una passkey de otra
+cuenta. Base del step-up de **Fase 3** (operaciones sensibles) y se conecta con la **firma con passkey (Fase 5)**.
+Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); #1098 Fase 1B.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

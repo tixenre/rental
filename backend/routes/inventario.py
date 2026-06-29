@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from database import get_db, MARCA_SUBQUERY
-from admin_guard import require_admin
+from auth.guards import require_admin
 
 router = APIRouter()
 

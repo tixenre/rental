@@ -18,7 +18,7 @@ from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
-from routes.auth import get_session
+from auth.session import get_session
 
 router = APIRouter(tags=["carritos"])
 logger = logging.getLogger(__name__)
@@ -178,7 +178,7 @@ def admin_listar_carritos(request: Request, horas: int = 72):
     El parámetro `horas` amplía la ventana de la lista (ej. ?horas=168 = 7 días).
     """
     try:
-        from admin_guard import require_admin
+        from auth.guards import require_admin
         from reservas.disponibilidad import calcular_disponibilidad
         require_admin(request)
 

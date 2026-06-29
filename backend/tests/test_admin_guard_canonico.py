@@ -23,7 +23,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
-from routes.auth import signer
+from auth.session import signer
 
 pytestmark = pytest.mark.unit
 
@@ -33,9 +33,17 @@ client = TestClient(main.app, raise_server_exceptions=False)
 _COOKIE_CLIENTE = (
     "session="
     + signer.dumps(
-        {"email": "rando@test.com", "name": "Rando", "role": "cliente", "cliente_id": 1}
+        {"email": "rando@test.com", "name": "Rando", "role": "cliente", "cliente_id": 1, "jti": "canonico-cli"}
     )
 )
+
+
+@pytest.fixture(autouse=True)
+def _sessions_active(monkeypatch):
+    """jti obligatorio: la cookie de test lleva jti pero no está en la allowlist →
+    stubbeamos is_active para darla por activa y que el request llegue al
+    require_admin canónico (que es lo que este test verifica: cliente → 403)."""
+    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
 
 # Endpoints admin cuyo guard (canónico) corre ANTES de tocar la DB → 403 hermético.
 # Al menos uno por cada módulo que tenía el guard local débil.
@@ -63,7 +71,7 @@ def _ids(pares):
 
 def test_guards_son_el_canonico():
     """Los 4 módulos reexportan el guard canónico, no una copia local débil."""
-    import admin_guard
+    import auth.guards as admin_guard
     import routes.specs.core as specs_core
     import routes.settings as settings_mod
     import routes.unidades as unidades_mod

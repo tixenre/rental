@@ -14,7 +14,7 @@ GET /api/media/entity/{kind}/{entity_id}
 """
 from fastapi import APIRouter, HTTPException, Request
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import get_db
 from services.media.service import validate_kind
 from services.media.errors import MediaError

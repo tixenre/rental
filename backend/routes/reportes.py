@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
 from database import get_db
-from admin_guard import require_admin
+from auth.guards import require_admin
 from reportes.liquidacion import liquidar
 from reportes.reconciliacion import reconciliar
 from reportes.cierres import (

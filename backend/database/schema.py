@@ -200,6 +200,18 @@ def _init_db_schema(conn):
     # Migration: link clientes to Supabase Auth users (Phase 1 of unified backend)
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS supabase_uid UUID UNIQUE")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_supabase_uid ON clientes(supabase_uid)")
+    # Cuentas livianas (alta passwordless con passkey): la cuenta NACE sin datos
+    # (solo id + passkey); Didit completa identidad/contacto al primer pedido —y los
+    # escribe en `*_renaper`, no en estos campos base— así que se relajan los NOT NULL.
+    # El `UNIQUE` de email se mantiene (Postgres permite múltiples NULL). `cuenta_estado`
+    # = 'liviana' marca la cuenta vacía. Espejo idempotente de la migración a7f3e1c9d2b4.
+    conn.execute("ALTER TABLE clientes ALTER COLUMN nombre DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN apellido DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN telefono DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN email DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN direccion DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN cuit DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cuenta_estado TEXT NOT NULL DEFAULT 'completa'")
     # Functional index sobre LOWER(email): el UNIQUE no se usa porque las
     # queries hacen WHERE LOWER(email) = LOWER(?) (auth.py, cliente_portal.py).
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_email_lower ON clientes(LOWER(email))")
@@ -252,6 +264,123 @@ def _init_db_schema(conn):
         "dni_verificacion_estado TEXT NOT NULL DEFAULT 'no_verificado'"
     )
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_verificacion_motivo TEXT")
+
+    # Passkeys (WebAuthn/FIDO2) — login aditivo a Google OAuth. Una sola tabla
+    # para admin (owner_email, cliente_id NULL) y
+    # cliente (cliente_id seteado), con discriminador `owner_type`. credential_id /
+    # public_key en base64url TEXT (el browser manda el id en base64url → lookup
+    # de texto directo). Esquema en dos capas (MEMORIA 2026-06-03): espejo
+    # idempotente de la migración a1f2b3c4d5e6.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS passkey_credentials (
+            id             SERIAL PRIMARY KEY,
+            owner_type     TEXT NOT NULL CHECK (owner_type IN ('admin', 'cliente')),
+            owner_email    TEXT NOT NULL,
+            cliente_id     INTEGER REFERENCES clientes(id) ON DELETE CASCADE,
+            credential_id  TEXT NOT NULL UNIQUE,
+            public_key     TEXT NOT NULL,
+            sign_count     BIGINT NOT NULL DEFAULT 0,
+            transports     TEXT,
+            aaguid         TEXT,
+            device_name    TEXT,
+            user_handle    TEXT NOT NULL,
+            created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_used_at   TIMESTAMP,
+            CHECK ((owner_type = 'cliente' AND cliente_id IS NOT NULL)
+                OR (owner_type = 'admin'   AND cliente_id IS NULL))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_passkey_cred_cliente "
+        "ON passkey_credentials(cliente_id) WHERE owner_type = 'cliente'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_passkey_cred_admin "
+        "ON passkey_credentials(LOWER(owner_email)) WHERE owner_type = 'admin'"
+    )
+
+    # ── Sesiones server-side: allowlist para revocación (logout real + "cerrar mis
+    # otras sesiones"). La cookie firmada lleva un `jti` opaco; esta tabla decide si
+    # sigue viva. Espeja `passkey_credentials` (mismo discriminador owner_type +
+    # CHECK de dos lados). `expires_at` materializa el TTL de la cookie; `revoked_at`
+    # NULL = activa. Toda sesión válida lleva `jti` y vive acá; una cookie sin jti
+    # (viejas pre-deploy) se rechaza → re-login.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+            jti           TEXT PRIMARY KEY,
+            owner_type    TEXT NOT NULL CHECK (owner_type IN ('admin', 'cliente')),
+            owner_email   TEXT NOT NULL,
+            cliente_id    INTEGER REFERENCES clientes(id) ON DELETE CASCADE,
+            user_agent    TEXT,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at    TIMESTAMP NOT NULL,
+            revoked_at    TIMESTAMP,
+            CHECK ((owner_type = 'cliente' AND cliente_id IS NOT NULL)
+                OR (owner_type = 'admin'   AND cliente_id IS NULL))
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_cliente "
+        "ON auth_sessions(cliente_id) WHERE owner_type = 'cliente'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_admin "
+        "ON auth_sessions(LOWER(owner_email)) WHERE owner_type = 'admin'"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires "
+        "ON auth_sessions(expires_at)"
+    )
+
+    # ── Identidades de login del cliente: las N llaves (Google `sub` / mail) que
+    # apuntan a UNA cuenta (clientes.id). Generaliza "método de login → cuenta".
+    # 'google' → identifier = el `sub` estable (no el mail, que cambia); 'email' →
+    # el mail (handle de magic-link). Passkey NO se escribe acá (vive en
+    # passkey_credentials con sus columnas WebAuthn); "mis llaves" une las dos en
+    # lectura. UNIQUE(method, identifier) = una llave → una sola cuenta (anti-duplicado
+    # de persona). Espejo idempotente de la migración f3b8d1a6c9e2 (MEMORIA 2026-06-03).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS login_identities (
+            id           SERIAL PRIMARY KEY,
+            cliente_id   INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            method       TEXT NOT NULL CHECK (method IN ('google', 'passkey', 'email')),
+            identifier   TEXT NOT NULL,
+            verified_at  TIMESTAMP,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (method, identifier)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_login_identities_cliente "
+        "ON login_identities(cliente_id)"
+    )
+    # `email`: el mail asociado a la identidad al vincularla (el del Google, o el del
+    # propio método 'email'). Solo display — el ancla sigue siendo `identifier` (el `sub`
+    # para Google). Nullable; espejo de la migración b8e2f4a6c1d3.
+    conn.execute("ALTER TABLE login_identities ADD COLUMN IF NOT EXISTS email TEXT")
+
+    # ── Challenges de magic-link por mail (auth/otp): backing store del link de un
+    # solo uso (cruza dispositivos/requests → no entra en una cookie como el challenge
+    # de passkey). `token_hash` = sha256 del nonce firmado (no se guarda el token
+    # crudo); `used_at` NULL = sin usar; `expires_at` materializa el TTL. Espejo
+    # idempotente de la migración f3b8d1a6c9e2.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS auth_challenges (
+            id           SERIAL PRIMARY KEY,
+            kind         TEXT NOT NULL CHECK (kind IN ('magic_link')),
+            email        TEXT NOT NULL,
+            token_hash   TEXT NOT NULL UNIQUE,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at   TIMESTAMP NOT NULL,
+            used_at      TIMESTAMP,
+            attempts     INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_challenges_email "
+        "ON auth_challenges(LOWER(email))"
+    )
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (

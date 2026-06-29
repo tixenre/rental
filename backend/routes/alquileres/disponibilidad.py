@@ -11,7 +11,7 @@ import json
 from fastapi import Request, HTTPException, Query
 
 from database import get_db, to_datetime
-from admin_guard import require_admin
+from auth.guards import require_admin
 from reservas import (
     calcular_disponibilidad as _calcular_disponibilidad,
     dias_no_disponibles as _dias_no_disponibles,

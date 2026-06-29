@@ -164,6 +164,29 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export ALEMBIC_DB_TEST=1
           python -m pytest tests/test_alembic_upgrade_db.py -v --tb=short -m integration
+      - name: Identidades de login + magic-link contra Postgres real (Fase 1 identidad)
+        run: |
+          cd backend
+          # login_identities (lookup por sub, link/unlink scopeado, backfill de Google
+          # por mail) + el backfill de la migración. Postgres real: el SQL toca UNIQUE
+          # y FKs que el FakeConn no captura.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_login_identities_db.py -v --tb=short -m integration
+      - name: Alta passwordless → cuenta liviana contra Postgres real (Fase 4 identidad)
+        run: |
+          cd backend
+          # Alta con passkey sin cuenta previa: NOT NULL relajados de clientes,
+          # UNIQUE(email) que tolera múltiples NULL, owner_email='' en la passkey, y
+          # la cuenta inerte (cliente_verificado=False) hasta Didit. El FakeConn no
+          # captura los constraints reales del esquema.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_clientes_livianas_db.py -v --tb=short -m integration
       - name: Tests de liquidación contra Postgres real (#88)
         run: |
           cd backend
@@ -251,6 +274,16 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      # Gate de lockfile bun: Railway buildea con `bun install --frozen-lockfile`
+      # (bun.lock), mientras el resto del CI usa npm (package-lock.json). Sin este
+      # check, un dep agregado a package.json sin regenerar bun.lock pasa el CI pero
+      # ROMPE el deploy de staging (cazado: #1095 sumó @simplewebauthn sin tocar
+      # bun.lock → "lockfile had changes, but lockfile is frozen"). Corre el MISMO
+      # check que Railway, en seco (sin instalar), antes del build.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13"
+      - run: bun install --frozen-lockfile --dry-run
       - uses: actions/setup-node@v4
         with:
           node-version: "20"

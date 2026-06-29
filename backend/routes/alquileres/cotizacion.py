@@ -12,8 +12,8 @@ from pydantic import BaseModel
 
 from database import get_db, to_datetime
 from rate_limit import limiter
-from admin_guard import is_admin_email
-from routes.auth import get_session
+from auth.guards import is_admin_email
+from auth.session import get_session
 from services.precios import calcular_total, jornadas_periodo, precio_combo
 from routes.alquileres.core import router, _get_descuento_jornadas
 
