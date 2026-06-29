@@ -954,7 +954,7 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
     if not payload:
         return _get_alquiler_detail(conn, id)
 
-    cols = ", ".join(f"{k}=?" for k in payload)
+    cols = ", ".join(f"{k}=%s" for k in payload)
     conn.execute(f"UPDATE alquileres SET {cols} WHERE id=%s", (*payload.values(), id))
 
     if (
