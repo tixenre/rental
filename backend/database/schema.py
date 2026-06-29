@@ -320,6 +320,52 @@ def _init_db_schema(conn):
         "ON auth_sessions(expires_at)"
     )
 
+    # ── Identidades de login del cliente: las N llaves (Google `sub` / mail) que
+    # apuntan a UNA cuenta (clientes.id). Generaliza "método de login → cuenta".
+    # 'google' → identifier = el `sub` estable (no el mail, que cambia); 'email' →
+    # el mail (handle de magic-link). Passkey NO se escribe acá (vive en
+    # passkey_credentials con sus columnas WebAuthn); "mis llaves" une las dos en
+    # lectura. UNIQUE(method, identifier) = una llave → una sola cuenta (anti-duplicado
+    # de persona). Espejo idempotente de la migración f3b8d1a6c9e2 (MEMORIA 2026-06-03).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS login_identities (
+            id           SERIAL PRIMARY KEY,
+            cliente_id   INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            method       TEXT NOT NULL CHECK (method IN ('google', 'passkey', 'email')),
+            identifier   TEXT NOT NULL,
+            verified_at  TIMESTAMP,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (method, identifier)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_login_identities_cliente "
+        "ON login_identities(cliente_id)"
+    )
+
+    # ── Challenges de magic-link por mail (auth/otp): backing store del link de un
+    # solo uso (cruza dispositivos/requests → no entra en una cookie como el challenge
+    # de passkey). `token_hash` = sha256 del nonce firmado (no se guarda el token
+    # crudo); `used_at` NULL = sin usar; `expires_at` materializa el TTL. Espejo
+    # idempotente de la migración f3b8d1a6c9e2.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS auth_challenges (
+            id           SERIAL PRIMARY KEY,
+            kind         TEXT NOT NULL CHECK (kind IN ('magic_link')),
+            email        TEXT NOT NULL,
+            token_hash   TEXT NOT NULL UNIQUE,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at   TIMESTAMP NOT NULL,
+            used_at      TIMESTAMP,
+            attempts     INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_challenges_email "
+        "ON auth_challenges(LOWER(email))"
+    )
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS alquileres (
             id               SERIAL PRIMARY KEY,

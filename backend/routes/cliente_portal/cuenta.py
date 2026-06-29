@@ -108,6 +108,15 @@ def cliente_registro(request: Request, data: RegistroCreate):
                 "SELECT id FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
             ).fetchone()["id"]
 
+    # Registrar las llaves de login de la cuenta (idempotente): el mail (handle de
+    # magic-link) y, si vino del callback de Google, su `sub` estable → la cuenta nace
+    # con sus llaves en `login_identities`.
+    from auth.identities_store import link_identity  # perezoso: evita ciclo con auth/__init__
+    link_identity(cliente_id=cliente_id, method="email", identifier=email.lower(), verified=True)
+    google_sub = payload.get("google_sub")
+    if google_sub:
+        link_identity(cliente_id=cliente_id, method="google", identifier=google_sub, verified=True)
+
     # Mintea la sesión por el punto único (jti + revocación) — FUERA del `with`
     # porque `_make_session_response` abre su propia conexión (no anidar pools).
     return _make_session_response(

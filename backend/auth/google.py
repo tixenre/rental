@@ -300,8 +300,6 @@ def cliente_auth_google(request: Request):
 @router.get("/cliente/auth/callback")
 def cliente_auth_callback(request: Request):
     """Google redirige acá. Si el cliente existe → sesión. Si no → registro."""
-    from database import get_db
-
     ip = get_client_ip(request)
     _check_rate(ip)
 
@@ -358,13 +356,15 @@ def cliente_auth_callback(request: Request):
         _record_fail(ip)
         return RedirectResponse(f"{FRONTEND_BASE}/cliente/login?error=no_email", status_code=303)
 
-    # ¿El cliente ya existe en la BD?
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
-        ).fetchone()
+    # Resolver la cuenta por el `sub` ESTABLE de Google (ancla), con fallback por mail
+    # para las cuentas previas a `login_identities` (backfillea el sub). Que el ancla
+    # sea el `sub` y no el mail = un cliente que cambió su mail en Google sigue entrando
+    # a la misma cuenta.
+    from auth.identities_store import find_or_backfill_google  # perezoso: evita ciclo con auth/__init__
+    sub = userinfo.get("sub") or userinfo.get("id")
+    cliente_id = find_or_backfill_google(sub, email)
 
-    if row:
+    if cliente_id is not None:
         # Cliente conocido → crear sesión directamente. Si llegó `next` válido
         # (cookie seteada por /cliente/auth/google), volvemos ahí en vez de al
         # portal — habilita el flujo de "iniciar sesión y volver a /estudio".
@@ -374,16 +374,16 @@ def cliente_auth_callback(request: Request):
         # con el mismo redirect-via-JS que arma `_make_session_response`.
         res = _make_session_response(
             email, name, redirect=target,
-            extra={"role": "cliente", "cliente_id": row["id"]}, request=request,
+            extra={"role": "cliente", "cliente_id": cliente_id}, request=request,
         )
         res.delete_cookie("oauth_state_cliente")
         res.delete_cookie("oauth_next_cliente")
         return res
     else:
-        # Cliente nuevo → token de registro (válido 30 min). El `next` lo
-        # descartamos: el flujo de registro lleva su propio camino y el cliente
-        # podrá navegar al destino después de completar el alta.
-        reg_token = signer.dumps({"tipo": "registro", "email": email, "name": name})
+        # Cliente nuevo → token de registro (válido 30 min). Lleva el `sub` para que el
+        # alta nazca con su llave de Google. El `next` lo descartamos: el registro lleva
+        # su propio camino y el cliente navega al destino después del alta.
+        reg_token = signer.dumps({"tipo": "registro", "email": email, "name": name, "google_sub": sub})
         redirect_url = f"{FRONTEND_BASE}/cliente/registro?t={reg_token}"
         res = RedirectResponse(redirect_url, status_code=303)
         res.delete_cookie("oauth_state_cliente")
