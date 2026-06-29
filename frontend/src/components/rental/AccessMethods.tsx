@@ -19,6 +19,7 @@ import {
   passkeySupported,
   registerPasskey,
   renamePasskey,
+  stepUpWithPasskey,
 } from "@/lib/passkey";
 import { listAccessKeys, removeAccessKey, GOOGLE_LINK_URL, type AccessKey } from "@/lib/accessKeys";
 
@@ -124,12 +125,16 @@ function AccessKeyRow({ k, isOnly }: { k: AccessKey; isOnly: boolean }) {
   const [name, setName] = useState(k.label);
 
   const delMut = useMutation({
-    mutationFn: () => removeAccessKey(k.kind === "passkey" ? "passkey" : "identity", k.id),
+    // Step-up: confirmá con passkey antes de quitar un método de acceso (acción sensible).
+    mutationFn: async () => {
+      await stepUpWithPasskey();
+      await removeAccessKey(k.kind === "passkey" ? "passkey" : "identity", k.id);
+    },
     onSuccess: () => {
       toast.success("Llave eliminada");
       qc.invalidateQueries({ queryKey: QUERY_KEY });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "No se pudo eliminar la llave."),
+    onError: (e) => toast.error(passkeyErrorMessage(e)),
   });
 
   // Renombrar solo aplica a passkeys (las identidades Google/mail no tienen nombre editable).
