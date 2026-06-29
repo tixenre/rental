@@ -39,6 +39,7 @@ TABLAS_REASIGNADAS = frozenset({
     "alquileres",               # los PEDIDOS (plata/historia) — jamás se pierden
     "solicitudes_modificacion", # atadas a los pedidos
     "cliente_listas",           # listas guardadas del usuario
+    "aceptaciones_tyc",         # UNIQUE(cliente_id, version) → dedup por version (ON CONFLICT DO NOTHING)
 })
 # FKs que NO se mueven: mueren con el DELETE del source. Las sesiones llevan el id viejo
 # en la cookie firmada → re-login; los carritos son efímeros (FK SET NULL).
@@ -126,6 +127,13 @@ def merge_accounts(*, source: int, target: int, conn=None) -> None:
                      WHERE li.cliente_id=%s
                        AND NOT EXISTS (SELECT 1 FROM login_identities t
                                         WHERE t.method=li.method AND t.cliente_id=%s)""",
+                (target, source, target),
+            )
+            conn.execute(
+                """UPDATE aceptaciones_tyc a SET cliente_id=%s
+                     WHERE a.cliente_id=%s
+                       AND NOT EXISTS (SELECT 1 FROM aceptaciones_tyc t
+                                        WHERE t.cliente_id=%s AND t.version=a.version)""",
                 (target, source, target),
             )
             # Reasignación simple (sin UNIQUE por-cuenta que pueda chocar).
