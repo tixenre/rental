@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
 import { Logo } from "@/components/rental/Logo";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
-import { loginWithPasskey, passkeyErrorMessage, passkeySupported } from "@/lib/passkey";
+import { loginWithPasskey, passkeyLoginErrorMessage, passkeySupported } from "@/lib/passkey";
 import { KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/admin/login")({
@@ -75,7 +75,7 @@ function AdminLoginPage() {
       await loginWithPasskey();
       window.location.href = "/admin";
     } catch (e) {
-      setError(passkeyErrorMessage(e));
+      setError(passkeyLoginErrorMessage(e));
       setPasskeyBusy(false);
     }
   }

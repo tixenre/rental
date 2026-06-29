@@ -108,3 +108,14 @@ export function passkeyErrorMessage(e: unknown): string {
   if (e instanceof Error && e.message) return e.message;
   return "No se pudo completar la operación con la passkey.";
 }
+
+/** Mensaje para fallos del LOGIN con passkey. El browser NO distingue "cancelaste"
+ * de "no hay passkey en este dispositivo" (ambos → ERROR_CEREMONY_ABORTED), y la
+ * causa #1 de un login fallido es no tener una passkey registrada todavía → guiamos
+ * a crear una (Google + perfil) en vez del genérico "Cancelaste". */
+export function passkeyLoginErrorMessage(e: unknown): string {
+  if (e instanceof WebAuthnError && e.code === "ERROR_CEREMONY_ABORTED") {
+    return "No encontramos una passkey en este dispositivo (o cancelaste). Si es tu primera vez, entrá con Google y agregá una passkey desde tu perfil.";
+  }
+  return passkeyErrorMessage(e);
+}

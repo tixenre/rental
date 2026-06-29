@@ -5,7 +5,7 @@ import { TopBar } from "@/components/rental/TopBar";
 import { useBusinessPhone } from "@/lib/business";
 import { whatsappLink } from "@/lib/whatsapp";
 import { authedFetch } from "@/lib/authedFetch";
-import { loginWithPasskey, passkeyErrorMessage, passkeySupported } from "@/lib/passkey";
+import { loginWithPasskey, passkeyLoginErrorMessage, passkeySupported } from "@/lib/passkey";
 import { KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/cliente/login")({
@@ -72,7 +72,7 @@ function ClienteLoginPage() {
       await loginWithPasskey();
       window.location.href = "/cliente/portal";
     } catch (e) {
-      setError(passkeyErrorMessage(e));
+      setError(passkeyLoginErrorMessage(e));
       setPasskeyBusy(false);
     }
   }
