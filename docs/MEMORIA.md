@@ -549,6 +549,10 @@ marca una operación sensible del cliente sin `require_recent_auth`, o un step-u
 cuenta. Base del step-up de **Fase 3** (operaciones sensibles) y se conecta con la **firma con passkey (Fase 5)**.
 Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); #1098 Fase 1B.
 
+### 2026-06-29 — `backend/services/checkout/` = portero único del checkout (fail-not-fast; devuelve {listo, faltan})
+
+Toda validación previa a crear un pedido pasa por la **puerta única** `backend/services/checkout/validar.py::validar_checkout(conn, cliente_id, session_id, firma_ok)`. Corre **10 checks fail-not-fast** (sin parar en el primero) y devuelve `{listo: bool, faltan: [{check, mensaje}]}` para que la UI muestre exactamente qué resolver. **No crea pedidos** — el gate de creación sigue siendo `create_pedido_retry` (`routes/alquileres/core.py`; core sagrado intacto). **2 checks cableado-apagado** (`_check_bloqueo` #1125, `_check_antelacion` #1126) retornan siempre OK hasta activarse. La **firma** admite passkey step-up (`has_recent_stepup`, ~5 min) O fallback `session_confirmed=true` ("Confirmo") para clientes sin passkey. HTTP: `POST /api/checkout/validar` + `POST /api/checkout/aceptar-tyc` (idempotente). El supervisor marca validación de checkout ad-hoc fuera de la puerta, o un check nuevo no cableado-apagado sumado fuera de `validar_checkout`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
