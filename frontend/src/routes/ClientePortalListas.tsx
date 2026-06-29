@@ -158,6 +158,8 @@ function ListaCard({
   // Estimado por jornada desde el BACKEND (cotizar sin fechas = 1 jornada, sin
   // descuento/IVA; combo-aware). El front muestra, no calcula (FASE 3). Mismos ids
   // que se mandan al reservar → el preview coincide con la cotización real.
+  // Nota: una cotización por card; si un cliente junta muchas listas el follow-up del
+  // catálogo (precio efectivo en /api/equipos) deja sumar local sin pedir por card.
   const estimadoJornada = useCotizacion({
     items: reservables.map((r) => ({ equipoId: r.item.equipo_id, cantidad: r.item.cantidad })),
   }).data.subtotalPorJornada;
