@@ -167,7 +167,7 @@ function ListaCard({
     toast.success(
       "Armamos tu carrito con los equipos de la lista. Elegí las fechas para reservar.",
     );
-    navigate({ to: "/", search: { openCarrito: true } });
+    navigate({ to: "/rental", search: { openCarrito: true } });
   }
   function handleReservarClick() {
     if (reservables.length === 0) {

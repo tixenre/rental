@@ -122,7 +122,7 @@ function CompartidoBody({
       rearmarCarrito(comp);
       toast.success("Armamos tu carrito con esta selección. Elegí las fechas para reservar.");
     }
-    navigate({ to: "/", search: { openCarrito: true } });
+    navigate({ to: "/rental", search: { openCarrito: true } });
   }
   function handleArmarClick() {
     if (reservables.length === 0) {
