@@ -88,6 +88,18 @@ export async function loginWithPasskey(): Promise<void> {
   await authedPostJson("/auth/passkey/login/complete", { credential });
 }
 
+/** Step-up: confirmá que sos vos con una passkey antes de una acción sensible (quitar
+ * una llave; futuro: confirmar un pedido). NO loguea — deja una marca de corta vida que
+ * el backend exige (`require_recent_auth`). Discoverable: el browser ofrece tus passkeys. */
+export async function stepUpWithPasskey(): Promise<void> {
+  const optionsJSON = await authedPostJson<PublicKeyCredentialRequestOptionsJSON>(
+    "/cliente/auth/passkey/stepup/begin",
+    {},
+  );
+  const credential = await startAuthentication({ optionsJSON });
+  await authedPostJson("/cliente/auth/passkey/stepup/complete", { credential });
+}
+
 export async function listPasskeys(scope: PasskeyScope): Promise<PasskeyCredential[]> {
   const data = await authedJson<{ credentials: PasskeyCredential[] }>(`${BASE[scope]}/credentials`);
   return data.credentials;

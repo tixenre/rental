@@ -24,7 +24,8 @@ from database import get_db
 from auth.session import COOKIE_SECURE, _make_session_response
 from auth.guards import require_cliente
 from auth.passkey import ceremonies, store
-from auth.ratelimit import _check_rate, _record_fail
+from auth.ratelimit import _check_rate, _record_event, _record_fail
+from auth.stepup import mark_stepup
 from net_utils import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ router = APIRouter()
 _REG_COOKIE = "wa_chal_reg"
 _AUTH_COOKIE = "wa_chal_auth"
 _SIGNUP_COOKIE = "wa_chal_signup"
+_STEPUP_COOKIE = "wa_chal_stepup"
 
 
 class RegisterCompleteIn(BaseModel):
@@ -200,6 +202,7 @@ def signup_complete(body: RegisterCompleteIn, request: Request):
     except psycopg.errors.UniqueViolation:
         # credential_id UNIQUE: esa passkey ya existe → no recreamos cuenta. Entrá con ella.
         raise HTTPException(409, "Esa passkey ya está registrada. Entrá con ella.")
+    _record_event(ip)  # anti-spam: una creación exitosa también consume cupo por-IP
     logger.info("alta passwordless: cuenta liviana creada id=%s", cliente_id)
     res = _make_session_response(
         email="", name="", extra={"role": "cliente", "cliente_id": cliente_id}, request=request,
@@ -252,6 +255,54 @@ def login_complete(body: LoginCompleteIn, request: Request):
     store.update_sign_count(row["id"], new_count)
     res = _mint_session_for_owner(row, request)
     res.delete_cookie(_AUTH_COOKIE)
+    return res
+
+
+# ── Step-up ("confirmá que sos vos") — passkey fresca para acciones sensibles ─
+# No es un login (ya hay sesión): verifica una passkey de ESTA cuenta y deja la marca
+# `stepup` (corta vida) que exige `require_recent_auth`. Hoy lo usa el borrado de llaves;
+# es reusable (futuro: confirmar un pedido).
+
+@router.post("/cliente/auth/passkey/stepup/begin")
+def cliente_stepup_begin(request: Request):
+    require_cliente(request)
+    options, challenge_b64 = ceremonies.build_authentication_options()
+    res = JSONResponse(options)
+    _set_challenge(res, _STEPUP_COOKIE, ceremonies.sign_challenge(challenge_b64))
+    return res
+
+
+@router.post("/cliente/auth/passkey/stepup/complete")
+def cliente_stepup_complete(body: LoginCompleteIn, request: Request):
+    sess = require_cliente(request)
+    ip = get_client_ip(request)
+    _check_rate(ip)
+    data = ceremonies.read_challenge(request.cookies.get(_STEPUP_COOKIE) or "")
+    if not data:
+        _record_fail(ip)
+        raise HTTPException(400, "Challenge inválido o expirado. Reintentá.")
+    cred_id = body.credential.get("id") or body.credential.get("rawId")
+    row = store.get_by_credential_id(cred_id) if cred_id else None
+    # La passkey TIENE que ser de esta cuenta (no vale la de otro) → step-up scopeado.
+    if not row or row["owner_type"] != "cliente" or row["cliente_id"] != sess["cliente_id"]:
+        _record_fail(ip)
+        raise HTTPException(401, "Passkey no reconocida.")
+    try:
+        new_count = ceremonies.verify_authentication(
+            credential=body.credential, challenge_b64=data["challenge"],
+            public_key_b64=row["public_key"], current_sign_count=row["sign_count"],
+        )
+    except Exception as e:  # noqa: BLE001
+        _record_fail(ip)
+        logger.warning("passkey stepup verify falló: %s", e)
+        raise HTTPException(401, "No se pudo verificar la passkey.")
+    if ceremonies.es_replay(row["sign_count"], new_count):
+        _record_fail(ip)
+        raise HTTPException(401, "Passkey rechazada (contador inválido).")
+    store.update_sign_count(row["id"], new_count)
+    res = JSONResponse({"ok": True})
+    res.delete_cookie(_STEPUP_COOKIE)
+    mark_stepup(res, sess["cliente_id"])  # deja la marca de step-up reciente
     return res
 
 

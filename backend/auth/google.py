@@ -297,6 +297,118 @@ def cliente_auth_google(request: Request):
     return res
 
 
+@router.get("/cliente/auth/google/link")
+def cliente_auth_google_link(request: Request):
+    """Vincular OTRA cuenta de Google a la cuenta del cliente **ya logueado**
+    (account-linking — "varias llaves"). NO es un login: el callback detecta el
+    `link_cliente_id` firmado en el state y vincula la identidad en vez de mintear una
+    sesión nueva. Requiere sesión de cliente; el `cliente_id` viaja firmado (no forjable)."""
+    sess = get_session(request)
+    if not sess or sess.get("role") != "cliente":
+        raise HTTPException(401, "Sesión de cliente requerida.")
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
+    client = OAuth2Client(
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        redirect_uri=CLIENTE_REDIRECT_URI,
+        scope="openid email profile",
+    )
+    state = signer.dumps({"nonce": secrets.token_urlsafe(16), "link_cliente_id": sess["cliente_id"]})
+    uri, _ = client.create_authorization_url(
+        GOOGLE_AUTH_URL, state=state, access_type="online", prompt="select_account",
+    )
+    res = RedirectResponse(uri, status_code=302)
+    res.set_cookie("oauth_state_cliente", state, httponly=True, samesite="lax",
+                   secure=COOKIE_SECURE, max_age=600)
+    return res
+
+
+def _link_cliente_id_de_state(state: str | None):
+    """Extrae el `link_cliente_id` del state firmado (None si no es un link o expiró)."""
+    if not state:
+        return None
+    try:
+        payload = signer.loads(state, max_age=600)
+    except (BadSignature, SignatureExpired):
+        return None
+    return payload.get("link_cliente_id") if isinstance(payload, dict) else None
+
+
+def _redirect_borrando_oauth(url: str):
+    res = RedirectResponse(url, status_code=303)
+    res.delete_cookie("oauth_state_cliente")
+    res.delete_cookie("oauth_next_cliente")
+    return res
+
+
+def _completar_link_google(request: Request, link_cid: int, sub: str | None, email: str | None):
+    """Vincula el `sub` de Google a la cuenta logueada y vuelve a "métodos de acceso"
+    con un estado. Defensa: la sesión actual TIENE que ser la de esa cuenta (no se
+    vincula a una cuenta ajena aunque el state lo diga). **Una cuenta = un Google**:
+    un segundo Google distinto se rechaza. Si el Google ya es de OTRA cuenta, intenta
+    **unir las dos** (sabemos que es la misma persona)."""
+    base = f"{FRONTEND_BASE}/cliente/perfil"
+    current = get_session(request)
+    if not current or current.get("role") != "cliente" or current.get("cliente_id") != link_cid or not sub:
+        return RedirectResponse(f"{base}?keys=error", status_code=303)
+    from auth.identities_store import link_identity, google_identity_for_cliente  # perezoso
+    # Una cuenta = un Google: si ya hay un Google distinto vinculado, no sumamos otro.
+    ya = google_identity_for_cliente(link_cid)
+    if ya is not None and ya["identifier"] != sub:
+        return _redirect_borrando_oauth(f"{base}?keys=ya_google")
+    resultado = link_identity(cliente_id=link_cid, method="google", identifier=sub,
+                              email=email, verified=True)
+    if resultado == "taken_by_other":
+        # El Google ya es de OTRA cuenta. El usuario está logueado en `link_cid` (probó una
+        # llave de A) Y acaba de probar control de ese Google (llave de B) → es la MISMA
+        # persona → unimos las dos cuentas, si una es absorbible (liviana/vacía).
+        return _merge_cuentas_por_google(request, actual=link_cid, sub=sub)
+    estado = {"linked": "ok", "already_yours": "ya"}.get(resultado, "error")
+    return _redirect_borrando_oauth(f"{base}?keys={estado}")
+
+
+def _merge_cuentas_por_google(request: Request, *, actual: int, sub: str):
+    """El Google que se quiso vincular ya es de otra cuenta. Se unen si una de las dos es
+    **absorbible** (liviana/vacía); si ambas tienen datos, no se auto-mergea → "taken"
+    (el merge general con reasignación de datos es Fase 2)."""
+    from auth.identities_store import find_cliente_by_identity
+    from auth.account_merge import account_is_absorbable, merge_accounts
+    base = f"{FRONTEND_BASE}/cliente/perfil"
+    otra = find_cliente_by_identity("google", sub)
+    if otra is None or otra == actual:
+        return _redirect_borrando_oauth(f"{base}?keys=error")  # carrera: ya no está tomado
+    if account_is_absorbable(actual):
+        # Estás parado en la cuenta liviana; tu cuenta real es `otra` → unila ahí y entrá a ella.
+        merge_accounts(source=actual, target=otra)
+        return _mint_session_para_cuenta(otra, request, redirect=f"{base}?keys=merged")
+    if account_is_absorbable(otra):
+        # Tu cuenta (donde estás) es la real; la del Google era vacía → absorbela acá.
+        merge_accounts(source=otra, target=actual)
+        return _redirect_borrando_oauth(f"{base}?keys=merged")
+    return _redirect_borrando_oauth(f"{base}?keys=taken")  # ambas con datos → Fase 2
+
+
+def _mint_session_para_cuenta(cliente_id: int, request: Request, *, redirect: str):
+    """Mintea una sesión de cliente para `cliente_id` tras un merge que borró la cuenta en
+    la que estabas. Pasa por el punto único `_make_session_response` (jti + revocable)."""
+    from database import get_db  # perezoso: evita ciclo al importar auth
+    with get_db() as conn:
+        c = conn.execute(
+            "SELECT id, email, nombre, apellido FROM clientes WHERE id = %s", (cliente_id,)
+        ).fetchone()
+    if not c:
+        return _redirect_borrando_oauth(f"{FRONTEND_BASE}/cliente/login?error=merge")
+    name = f"{c['nombre'] or ''} {c['apellido'] or ''}".strip() or (c["email"] or "")
+    res = _make_session_response(
+        email=c["email"] or "", name=name, redirect=redirect,
+        extra={"role": "cliente", "cliente_id": c["id"]}, request=request,
+    )
+    res.delete_cookie("oauth_state_cliente")
+    res.delete_cookie("oauth_next_cliente")
+    return res
+
+
 @router.get("/cliente/auth/callback")
 def cliente_auth_callback(request: Request):
     """Google redirige acá. Si el cliente existe → sesión. Si no → registro."""
@@ -362,6 +474,14 @@ def cliente_auth_callback(request: Request):
     # a la misma cuenta.
     from auth.identities_store import find_or_backfill_google  # perezoso: evita ciclo con auth/__init__
     sub = userinfo.get("sub") or userinfo.get("id")
+
+    # ¿Es un LINK (vincular Google a una cuenta ya logueada), no un login? El
+    # `link_cliente_id` viaja firmado en el state (lo puso /cliente/auth/google/link).
+    # En ese caso no minteamos sesión: vinculamos la identidad y volvemos a la cuenta.
+    link_cid = _link_cliente_id_de_state(state)
+    if link_cid is not None:
+        return _completar_link_google(request, link_cid, sub, email)
+
     cliente_id = find_or_backfill_google(sub, email)
 
     if cliente_id is not None:

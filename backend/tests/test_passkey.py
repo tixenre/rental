@@ -326,6 +326,23 @@ class TestSignup:
                    json={"credential": {"id": "cid", "response": {"transports": ["internal"]}}})
         assert r.status_code == 409
 
+    def test_altas_exitosas_en_rafaga_cortan_con_429(self, monkeypatch):
+        # Anti-spam: una creación EXITOSA consume cupo por-IP. Tras 10 altas ok desde
+        # la misma IP, la 11ª se corta (en el begin) con 429 aunque ninguna falle —
+        # el rate-limit frena spam de cuentas, no solo fuerza bruta.
+        monkeypatch.setattr(ceremonies, "verify_registration",
+                            lambda **kw: {"credential_id": "cid", "public_key": "pk",
+                                          "sign_count": 0, "aaguid": "aa"})
+        self._fake_db(monkeypatch, cliente_id=101)
+        c = _client()
+        for _ in range(10):
+            assert c.post("/auth/passkey/signup/begin").status_code == 200
+            r = c.post("/auth/passkey/signup/complete",
+                       json={"credential": {"id": "cid", "response": {"transports": ["internal"]}}})
+            assert r.status_code == 200
+        # 11ª: las 10 altas exitosas llenaron el bucket → el begin ya corta.
+        assert c.post("/auth/passkey/signup/begin").status_code == 429
+
 
 class TestGestionIDOR:
     def test_cliente_delete_scopeado_a_su_id(self, monkeypatch):
@@ -348,3 +365,35 @@ class TestGestionIDOR:
         c = _client()
         c.cookies.set("session", _cliente_session(cliente_id=42))
         assert c.delete("/cliente/auth/passkey/credentials/99").status_code == 404
+
+
+class TestStepup:
+    """Step-up ("confirmá que sos vos"): verifica una passkey de ESTA cuenta y deja la
+    marca `stepup` que `require_recent_auth` exige para acciones sensibles."""
+
+    def test_begin_sin_sesion_401(self):
+        assert _client().post("/cliente/auth/passkey/stepup/begin").status_code == 401
+
+    def test_complete_passkey_propia_marca_stepup(self, monkeypatch):
+        monkeypatch.setattr(store, "get_by_credential_id", lambda cid: {
+            "id": 1, "owner_type": "cliente", "owner_email": "", "cliente_id": 42,
+            "public_key": "pk", "sign_count": 0})
+        monkeypatch.setattr(ceremonies, "verify_authentication", lambda **kw: 0)
+        monkeypatch.setattr(store, "update_sign_count", lambda *a, **k: None)
+        c = _client()
+        c.cookies.set("session", _cliente_session(cliente_id=42))
+        c.cookies.set("wa_chal_stepup", ceremonies.sign_challenge("chal"))
+        r = c.post("/cliente/auth/passkey/stepup/complete", json={"credential": {"id": "credid"}})
+        assert r.status_code == 200
+        assert "stepup" in r.cookies  # dejó la marca de step-up reciente
+
+    def test_complete_passkey_de_otra_cuenta_401(self, monkeypatch):
+        # La passkey es del cliente 99, pero la sesión es del 42 → step-up rechazado.
+        monkeypatch.setattr(store, "get_by_credential_id", lambda cid: {
+            "id": 1, "owner_type": "cliente", "owner_email": "", "cliente_id": 99,
+            "public_key": "pk", "sign_count": 0})
+        c = _client()
+        c.cookies.set("session", _cliente_session(cliente_id=42))
+        c.cookies.set("wa_chal_stepup", ceremonies.sign_challenge("chal"))
+        r = c.post("/cliente/auth/passkey/stepup/complete", json={"credential": {"id": "credid"}})
+        assert r.status_code == 401

@@ -69,6 +69,11 @@ def test_login_identities_store_y_resolve_google():
         assert store.find_cliente_by_identity("google", sub_a) == cid_a
         assert store.find_or_backfill_google(sub_a, "mail-cambiado@test.local") == cid_a
 
+        # el backfill guardó el mail del Google + el helper "una cuenta = un Google" lo trae
+        g = store.google_identity_for_cliente(cid_a)
+        assert g is not None and g["identifier"] == sub_a and g["email"] == email_a
+        assert store.google_identity_for_cliente(cid_b) is None  # cid_b no tiene Google
+
         # cuenta inexistente → None (el callback manda a registro)
         assert store.find_or_backfill_google("google-sub-ZZZ", "nadie@test.local") is None
 

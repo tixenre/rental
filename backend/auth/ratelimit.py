@@ -22,5 +22,13 @@ def _check_rate(ip: str) -> None:
         raise HTTPException(429, "Demasiados intentos. Intentá en 10 minutos.")
 
 
-def _record_fail(ip: str) -> None:
+def _record_event(ip: str) -> None:
+    """Suma un evento costoso al bucket por-IP (lo lee `_check_rate`). Lo usan los
+    fallos de login (`_record_fail`) Y el alta passwordless para una creación
+    **exitosa** — una ráfaga de altas ok desde una IP consume cupo aunque no falle
+    ninguna (si no, el rate-limit solo frenaría fuerza bruta, no spam de cuentas)."""
     _failures[ip].append(time.time())
+
+
+def _record_fail(ip: str) -> None:
+    _record_event(ip)

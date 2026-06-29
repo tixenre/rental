@@ -1658,3 +1658,101 @@ cancel-in-progress` ya cancela corridas viejas.
   de cálculo en el front. El supervisor marca una regla de precio/descuento/IVA/combo recalculada en el front.
 - **Gotcha.** "Sumar para mostrar subtotales que el backend ya calculó" no es calcular plata; "multiplicar
   precio×cantidad×jornadas×(1−desc)" sí lo es y va al backend.
+
+### 2026-06-29 — Cuentas livianas: alta passwordless con passkey (cuenta vacía hasta Didit, inerte + anti-spam)
+
+- **Contexto.** Hoy la cuenta de un cliente **nace por Google** (el registro arranca con el login de Google;
+  la búsqueda es por email). El dueño quiere el norte "modelo banco": el cliente **no tipea nada** (ni mail, ni
+  contraseña, ni sus datos), los trae Didit. La experiencia faro la describió él: "entré a Vercel, elegí passkey
+  y me creó la cuenta directamente". Además, al probar passkey en staging apareció una **trampa**: el único botón
+  "Entrar con passkey" mandaba a un QR sin salida a quien no tenía una. Se juzgó con el `consejo` (Nivel 1): el
+  riesgo era la cuenta **huérfana pre-Didit** (sin contacto para avisar/recuperar); lo desinfla que las passkeys
+  **sincronizan** (iCloud/Google) + Didit devuelve mail/tel al primer pedido. El consejo recomendó **A** (mail
+  skippeable); el dueño eligió **C** (passkey-pura, cero contacto en el alta) — override consciente: "la cuenta
+  vacía no vale nada hasta que pide → no me importa el huérfano pre-pedido".
+- **Decisión.** Alta passwordless **opción C**: `POST /auth/passkey/signup/{begin,complete}` (motor
+  `auth/passkey/`, aditivo a Google) crea una **cuenta liviana** — nace solo con `id` + passkey, sin datos. Para
+  eso se **relajan los `NOT NULL`** de los campos base de `clientes` (nombre/apellido/telefono/email/direccion/
+  cuit) y se agrega `cuenta_estado TEXT NOT NULL DEFAULT 'completa'` (las existentes quedan `'completa'`; las
+  nuevas, `'liviana'`); la passkey lleva `owner_email=''` (la cuenta no tiene mail). Cuenta + passkey se insertan
+  en **una transacción atómica** (si falla la passkey, no queda cuenta huérfana) y la sesión mintea por el punto
+  único `_make_session_response` (que ahora tolera email/nombre NULL → `""`, heredando jti + revocación). La
+  **identidad/contacto los completa Didit al primer pedido**, en las columnas `*_renaper` (con COALESCE) —**el
+  usuario nunca escribe los campos base de identidad**—; la cuenta queda **inerte** hasta verificar
+  (`require_cliente_verificado` mira `dni_validado_at`). El **admin no tiene signup** (es allowlist; su passkey se
+  agrega desde el perfil tras entrar por Google). En el front, el login del cliente lidera con "Crear cuenta con
+  passkey" (CTA `Button variant=primary`, gesto ink→accent) separado de "Entrar con passkey" → cierra la trampa;
+  se saca el bloque "¿no tenés cuenta? WhatsApp".
+- **Why.** Reusa los tres motores sin tocarlos: `auth/` (mismo `_make_session_response` + cookie + jti),
+  `reservas/` (intacto), Didit (el gate de verificación ya existía). El esquema va en **dos capas**
+  (_2026-06-03_): `init_db()` **y** la migración `a7f3e1c9d2b4` hacen lo mismo (idempotente, convergen — lo clava
+  `test_alembic_upgrade_db`). El blast-radius de relajar los `NOT NULL` es seguro porque la arquitectura ya lee la
+  identidad validada de `*_renaper` (con COALESCE), no de los campos base. Anclar el CUIL recién al verificar (no
+  forzar KYC en el alta) no mata conversión y respeta la separación identidad(locked)↔contacto/login(editable).
+- **Consecuencias.** **Higiene anti-spam, invisible al usuario (las 3 patas):** (1) rate-limit por-IP que cuenta
+  también las altas **exitosas** (`_record_event`, no solo los fallos — si no, frenaría fuerza bruta pero no spam
+  de cuentas; lo cazó el supervisor); (2) inertidad-hasta-Didit (una liviana no puede pedir ni mandar mails); (3)
+  **cleanup diario** de livianas abandonadas (`jobs/cleanup_livianas.py`, colgado del scheduler in-process único
+  _2026-06-04_: borra liviana + sin verificar + sin email + sin pedidos + > 30d; el `ON DELETE CASCADE` limpia
+  passkey/sesiones/identidades; el predicado además evita orfanar pedidos, cuya FK es `SET NULL`). El daño máximo
+  pre-cleanup es filas vacías inertes, no abuso real. Candados: `test_clientes_livianas_db` (alta + cleanup contra
+  Postgres real: `NOT NULL` relajados, `UNIQUE(email)` con múltiples NULL, `owner_email=''`, inerte, el barrido
+  borra solo lo abandonado) + unit en `test_passkey` (signup begin/complete, 409 passkey duplicada, flag `signup`
+  del challenge, ráfaga de altas → 429). El supervisor marca un alta que escriba identidad en los campos base en
+  vez de esperar a Didit, o un signup fuera de la transacción atómica / del punto único de minteo. Es la **Fase 4**
+  de la iniciativa de identidad (#1098); quedan dentro de la fase la invitación white-glove del admin. Cómo →
+  [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); juicio → `consejo/BITACORA.md` (2026-06-29); historia → commits del lote en `dev`.
+
+### 2026-06-29 — Merge de cuentas por link autenticado (unir cuando es la misma persona + una es absorbible)
+
+- **Contexto.** Probando en staging, el dueño hizo el alta con passkey (cuenta liviana nueva) y desde el perfil
+  quiso **Vincular Google** con su Google de siempre → chocó con "ese Google ya está en uso por otra cuenta" (su
+  cuenta real). Quedó con **dos cuentas** y un dead-end. **Insight del dueño:** "si se crea una con passkey y
+  después quiere vincular Google desde su perfil, deberían vincularse o mergear, porque sabemos que las dos cuentas
+  son la misma persona". Y la contraparte, que él mismo marcó: si crea la passkey, se desloguea y vuelve por Google
+  **sin esa prueba**, no hay forma de saber que es la misma → quedan separadas (entiende la diferencia).
+- **Decisión.** **Merge-on-link.** Al vincular una llave (Google) que ya es de otra cuenta B estando logueado en A,
+  se **unen** A y B en vez de rechazar — porque estar logueado en A prueba control de una llave de A, y completar el
+  OAuth prueba control de una llave de B → **misma persona**. **Guardrail:** se mergea solo si una de las dos es
+  **absorbible** (`auth/account_merge.account_is_absorbable`: liviana + `dni_validado_at` NULL + sin pedidos). Se
+  mueven sus llaves (passkeys + `login_identities`, respetando el `UNIQUE`) a la otra y se borra (`merge_accounts`,
+  transaccional). Si la absorbida es la cuenta donde estabas, se re-mintea sesión en la sobreviviente por
+  `_make_session_response`. Si **ninguna** es absorbible (ambas con datos) → no se auto-mergea, vuelve "taken". Va
+  por la URL `?keys=merged|taken|...` que el perfil convierte en toast.
+- **Why.** El **link autenticado es la prueba** de control de ambas cuentas — más fuerte que matchear por mail
+  (SIM-swappeable) y disponible sin Didit. Absorber **solo lo vacío** mantiene el merge trivial y seguro (no hay
+  datos que reasignar; todas las FKs a `clientes` son CASCADE/SET NULL → el DELETE nunca falla por una referencia
+  colgada). El merge **general** de dos cuentas con datos (reasignar pedidos/contabilidad, diagnóstico de duplicados,
+  dedup por CUIL verificado) es la parte delicada → se difiere a **Fase 2** (`identity/merge`), como pide el plan
+  ("nunca auto-merge de datos sin cuidado"). La red última sigue siendo Didit: al primer pedido el CUIL ancla y
+  unifica aunque el merge-on-link no haya disparado.
+- **Consecuencias.** Saca el dead-end que encontró el dueño: un usuario que ya tiene Google y prueba el alta-passkey
+  termina con **una** cuenta (su real + la passkey nueva), no dos. La sesión vieja de la cuenta absorbida muere con
+  el `DELETE` (cascade de `auth_sessions`) y se re-mintea en la sobreviviente. Candados:
+  `test_clientes_livianas_db::test_merge_absorbe_*` (DB real: mueve llaves, borra el source, respeta el guard) +
+  `test_linking::TestMergePorGoogle` (las 3 ramas: actual absorbible → entra a la real; otra absorbible → la
+  absorbe; ninguna → "taken"). El supervisor marca un merge sin el guard de absorbible o un auto-merge de dos
+  cuentas con datos. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → commits del lote en `dev`; #1098 Fase 1B.
+
+### 2026-06-29 — Step-up con passkey ("confirmá que sos vos") para operaciones sensibles del cliente
+
+- **Contexto.** El dueño, probando, pidió poder **usar la passkey para confirmar cosas sensibles** — "como borrar
+  algo, o hacer un pedido". Borrar un método de acceso es sensible: alguien con una sesión robada podría quitarte
+  tus otras llaves y dejarte afuera. Confirmar con una prueba fresca de identidad lo frena.
+- **Decisión.** Un **primitivo de step-up** reusable: `POST /cliente/auth/passkey/stepup/{begin,complete}` corre
+  una assertion WebAuthn (la misma del login, pero **scopeada**: la passkey TIENE que ser de esta cuenta) y, si
+  pasa, deja una cookie firmada `stepup` de corta vida (~5 min, owner-scopeada). El guard **`require_recent_auth`**
+  (`auth/stepup.py`) = `require_cliente` + `stepup` fresca; lo usa el `DELETE /cliente/auth/keys/...`. **No es un
+  login** (no mintea sesión). El front (`stepUpWithPasskey()`) dispara la confirmación antes de la acción.
+- **Why.** El **link/assertion autenticado es prueba fresca** de control — más fuerte que un simple confirm. Se
+  hace **un primitivo** (no un "confirmá con passkey" ad-hoc por endpoint) para reusarlo: hoy el borrado de llaves;
+  mañana, **confirmar un pedido** (mismo guard al confirmar) y la base de la **firma con passkey (Fase 5)**. Reusa
+  la ceremonia de `auth/passkey/` (cero motor nuevo) + `itsdangerous` para la marca (sin Redis ni tabla). Es el
+  `require_recent_auth` que el plan tenía para la **Fase 3** (step-up transversal), aterrizado en su primer uso.
+- **Consecuencias.** Quitar un método de acceso ahora exige confirmar con passkey (el front lo dispara y reintenta;
+  si cancelás, no borra). **Pendiente:** aplicarlo a **confirmar un pedido** (toca el flujo de pedidos + decidir el
+  fallback para quien no tiene passkey — Google-only) y la firma criptográfica del contrato (Fase 5). Candados:
+  `test_passkey::TestStepup` (la passkey tiene que ser de la cuenta → 401 si es de otra) + `test_linking`
+  (el borrado sin `stepup` da 401; con `stepup` fresco procede). El supervisor marca una operación sensible del
+  cliente sin `require_recent_auth`, o un step-up que acepte una passkey de otra cuenta. Cómo →
+  [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → commits del lote en `dev`; #1098 Fase 1B.
