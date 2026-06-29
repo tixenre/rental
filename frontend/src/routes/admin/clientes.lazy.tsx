@@ -45,6 +45,7 @@ import { QueryState } from "@/components/admin/QueryState";
 import { TableSkeleton } from "@/components/admin/skeletons";
 import { EmptyState } from "@/components/rental/EmptyState";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
+import { ClientesDuplicadosDialog } from "@/components/admin/ClientesDuplicadosDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
@@ -74,6 +75,7 @@ function ClientesPage() {
   const [viewing, setViewing] = useState<Cliente | null>(null);
   const [deleting, setDeleting] = useState<Cliente | null>(null);
   const [menuCliente, setMenuCliente] = useState<Cliente | null>(null);
+  const [showDuplicados, setShowDuplicados] = useState(false);
 
   const listQ = useQuery({
     queryKey: ["admin", "clientes", { q: debouncedQ }],
@@ -98,9 +100,14 @@ function ClientesPage() {
       title="Clientes"
       description={listQ.isLoading ? "Cargando…" : `${total} clientes`}
       actions={
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Nuevo cliente
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setShowDuplicados(true)}>
+            <Users className="h-4 w-4 mr-1" /> Duplicados
+          </Button>
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nuevo cliente
+          </Button>
+        </div>
       }
     >
       <div className="space-y-6">
@@ -246,6 +253,7 @@ function ClientesPage() {
         />
 
         <ClienteFormDialog open={creating} onOpenChange={setCreating} cliente={null} />
+        <ClientesDuplicadosDialog open={showDuplicados} onOpenChange={setShowDuplicados} />
         <ClienteFormDialog
           open={!!editing}
           onOpenChange={(v) => {
