@@ -199,6 +199,8 @@ def _capture_create_session(monkeypatch):
     monkeypatch.setattr(
         "routes.didit.get_db", _fake_get_db(_FakeRow(id=123)),
     )
+    # El endpoint ahora registra consentimiento (identity/kyc) — no-op en este test.
+    monkeypatch.setattr("routes.didit.kyc.registrar_consentimiento", lambda *a, **k: None)
     return captured
 
 
@@ -238,86 +240,61 @@ def test_sesion_sin_body_sigue_creando(monkeypatch):
     assert "return_to=" not in captured["return_url"]
 
 
-# ── Webhook PR2: estados intermedios ─────────────────────────────────────────
-
-class _FakeConnRecorder(_FakeConn):
-    """FakeConn que graba todas las llamadas a execute() para inspección."""
-
-    def __init__(self):
-        super().__init__(None)
-        self.calls: list[tuple[str, tuple]] = []
-
-    def execute(self, sql, params=()):
-        self.calls.append((sql, tuple(params)))
-        return _FakeCursor(None)
+# ── Webhook PR2: el route fino delega en identity/kyc ────────────────────────
+# El route es transporte: mapea el status de Didit → la llamada a kyc. La conducta
+# (el UPDATE del estado) se testea en test_identity_kyc. Acá: que delegue bien.
 
 
 def _mock_webhook(monkeypatch):
-    """Parcha verify_webhook (no-op HMAC) y get_db (recorder) para tests del webhook."""
-    recorder = _FakeConnRecorder()
+    """No-op del HMAC + captura de las llamadas a kyc.* (el route delega en kyc)."""
+    calls = {"aprobar": [], "actualizar": []}
     monkeypatch.setattr("routes.didit.verify_webhook", lambda **kw: None)
-    monkeypatch.setattr("routes.didit.get_db", lambda: recorder)
-    return recorder
+    monkeypatch.setattr("routes.didit.kyc.aprobar", lambda **kw: calls["aprobar"].append(kw) or True)
+    monkeypatch.setattr("routes.didit.kyc.actualizar_estado",
+                        lambda **kw: calls["actualizar"].append(kw) or True)
+    return calls
 
 
 _WH_HEADERS = {"X-Signature": "x", "X-Timestamp": "0"}
 
 
-def test_webhook_declined_actualiza_estado_rechazado(monkeypatch):
-    """Webhook Declined → UPDATE dni_verificacion_estado='rechazado' con motivo."""
-    recorder = _mock_webhook(monkeypatch)
+def test_webhook_declined_delega_rechazado(monkeypatch):
+    """Webhook Declined → kyc.actualizar_estado(estado='rechazado', motivo=…)."""
+    calls = _mock_webhook(monkeypatch)
     res = client.post(
         "/api/webhooks/didit",
-        json={
-            "session_id": "sess-decline",
-            "status": "Declined",
-            "vendor_data": "123",
-            "decision": {"decline_reason": "foto borrosa"},
-        },
+        json={"session_id": "sess-decline", "status": "Declined", "vendor_data": "123",
+              "decision": {"decline_reason": "foto borrosa"}},
         headers=_WH_HEADERS,
     )
     assert res.status_code == 200, res.text
-    updates = [c for c in recorder.calls if "dni_verificacion_estado" in c[0]]
-    assert updates, "No se llamó UPDATE con dni_verificacion_estado"
-    _, params = updates[0]
-    assert params[0] == "rechazado"
-    assert params[1] == "foto borrosa"
+    assert calls["actualizar"], "no delegó en kyc.actualizar_estado"
+    kw = calls["actualizar"][0]
+    assert kw["estado"] == "rechazado" and kw["motivo"] == "foto borrosa"
+    assert kw["cliente_id"] == 123 and kw["session_id"] == "sess-decline"
 
 
-def test_webhook_processing_actualiza_estado_en_revision(monkeypatch):
-    """Webhook Processing → UPDATE dni_verificacion_estado='en_revision', motivo=None."""
-    recorder = _mock_webhook(monkeypatch)
+def test_webhook_processing_delega_en_revision(monkeypatch):
+    """Webhook Processing → kyc.actualizar_estado(estado='en_revision', motivo None)."""
+    calls = _mock_webhook(monkeypatch)
     res = client.post(
         "/api/webhooks/didit",
-        json={
-            "session_id": "sess-proc",
-            "status": "Processing",
-            "vendor_data": "123",
-        },
+        json={"session_id": "sess-proc", "status": "Processing", "vendor_data": "123"},
         headers=_WH_HEADERS,
     )
     assert res.status_code == 200, res.text
-    updates = [c for c in recorder.calls if "dni_verificacion_estado" in c[0]]
-    assert updates, "No se llamó UPDATE con dni_verificacion_estado"
-    _, params = updates[0]
-    assert params[0] == "en_revision"
-    assert params[1] is None
+    assert calls["actualizar"], "no delegó en kyc.actualizar_estado"
+    kw = calls["actualizar"][0]
+    assert kw["estado"] == "en_revision" and kw.get("motivo") is None
 
 
-def test_webhook_in_review_actualiza_estado_en_revision(monkeypatch):
+def test_webhook_in_review_delega_en_revision(monkeypatch):
     """Webhook In_review → mismo camino que Processing."""
-    recorder = _mock_webhook(monkeypatch)
+    calls = _mock_webhook(monkeypatch)
     res = client.post(
         "/api/webhooks/didit",
-        json={
-            "session_id": "sess-review",
-            "status": "In_review",
-            "vendor_data": "123",
-        },
+        json={"session_id": "sess-review", "status": "In_review", "vendor_data": "123"},
         headers=_WH_HEADERS,
     )
     assert res.status_code == 200, res.text
-    updates = [c for c in recorder.calls if "dni_verificacion_estado" in c[0]]
-    assert updates
-    _, params = updates[0]
-    assert params[0] == "en_revision"
+    assert calls["actualizar"] and calls["actualizar"][0]["estado"] == "en_revision"
