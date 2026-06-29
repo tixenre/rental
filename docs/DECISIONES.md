@@ -1415,3 +1415,51 @@ cancel-in-progress` ya cancela corridas viejas.
   en código nuevo, `%` literal en SQL, reimplementación/bypass del DAL, o un CTA de adoptar ORM/async sin que
   cambien las condiciones de revisita (equipo >10 / multi-DB / tiempo-real). Implementación en el plan.
 - **Estado (2026-06-27):** Fases 0-6 (`?`→`%s` + shim retirado) + `lastrowid`→`RETURNING` (7 usos) completadas en PR #1075.
+
+### 2026-06-29 — `backend/auth/` = motor único de autenticación (multi-método sobre una sesión única, aditiva)
+
+- **Contexto.** La auth estaba **desperdigada** en ~5 lugares: `routes/auth.py` (631 líneas, god-module: sesión
+  + OAuth + staging + rate-limit), `admin_guard.py`, los guards de cliente en `routes/cliente_portal/core.py`, y
+  `services/passkeys/`. Tras sumar passkey (PR #1095), era el único concern transversal sin paquete propio.
+  Insight: Google OAuth y passkey **ya convergían** en una sola sesión (la cookie que mintea
+  `_make_session_response`); faltaba juntar los *archivos*, no rediseñar.
+- **Decisión.** Toda la auth en el **paquete-motor `backend/auth/`** (espeja `reservas/`/`contabilidad/`):
+  `session` (núcleo: signer único + cookie + `_make_session_response` + `get_session`), `ratelimit`, `guards`
+  (admin + cliente), `google` (OAuth + el router compartido), `staging`, `sessions_store`/`sessions_routes`
+  (revocación), `passkey/`. **Una sola sesión, varios métodos:** todo login (Google admin/cliente, passkey,
+  staging) pasa por el **punto único `_make_session_response`** → la misma cookie firmada `session`. Los guards
+  **solo la leen** (agnósticos del método). Passkey es **aditivo** a Google: no lo reemplaza; Google sigue siendo
+  el anchor de identidad + la recuperación (perdés el dispositivo → entrás por Google y re-registrás).
+- **Why.** "Una sola forma de cada cosa" + "el core que anda no se toca; lo nuevo se acopla alrededor". La
+  consolidación fue **move-verbatim** (sin shims; git detectó renames byte-idénticos), con imports y tests
+  re-apuntados — no un rediseño. Tener un punto único de minteo es lo que después habilitó la revocación (un solo
+  lugar donde crear el `jti`).
+- **Consecuencias.** El supervisor marca: un `set_cookie("session", …)` crudo por fuera de
+  `_make_session_response` (no heredaría jti/revocación), o lógica de auth (un guard, un mint de sesión) recreada
+  fuera del paquete. Setup de prueba logueada: _Staging-login (2026-06-19)_. El "cómo funciona" vive en
+  [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); la historia, en PR #1095 (passkey) + #1100 (consolidación).
+
+### 2026-06-29 — Revocación de sesión: allowlist `auth_sessions` + `jti` obligatorio (corte limpio, anti-IDOR)
+
+- **Contexto.** La sesión era una cookie firmada **stateless** (itsdangerous, TTL 30 días): el logout solo
+  borraba la cookie del navegador → un token robado valía 30 días, sin forma de matarlo ni de "cerrar mis otras
+  sesiones". Era el gap #1 de la auditoría de seguridad. El dueño priorizó seguridad ("la web tiene que ser
+  segura") y no le molesta el re-login.
+- **Decisión.** Un **id opaco de sesión (`jti`)** viaja firmado en la cookie + una **allowlist server-side**
+  (tabla `auth_sessions`). `get_session` valida la firma **y** que el `jti` siga vivo (`is_active`: no revocada,
+  no vencida). **`jti` OBLIGATORIO (corte limpio):** una cookie sin jti (las viejas pre-deploy, las hand-minted de
+  tests) se **rechaza** → re-login; **ninguna sesión válida queda fuera de la tabla** (todo revocable desde el
+  minuto uno). Logout (`GET`/`POST /auth/logout`) y "cerrar mis otras sesiones" son **reales**: revocan el `jti`
+  en la tabla; `revoke_all_for_owner` preserva el dispositivo que la pide con `except_jti`. El `jti` se crea en el
+  punto único `_make_session_response` y viaja **solo en la cookie** (no en el body JSON).
+- **Why.** El corte limpio (vs. tolerar cookies viejas) lo eligió el dueño: cierra el (chico) hueco de transición
+  al instante a cambio de un re-login único; el invariante "toda sesión es revocable" es más simple que dos clases
+  de cookie. La forma (allowlist + jti) reusa lo existente: esquema en dos capas (_2026-06-03_), DAL `%s` + bound
+  params (_2026-06-27_), y el patrón owner-scoped de `passkey/store`. Sin infra nueva (sin Redis). El chequeo va
+  dentro de `get_session` (fuente única: middleware/guards/handlers lo heredan); memoizado en `request.state`.
+- **Consecuencias.** **Anti-IDOR:** toda revocación incluye al dueño en el `WHERE` (`owner_type` +
+  `cliente_id`/`owner_email`), no solo el `jti`. Tiempos en wall-clock de AR (`now_ar()`) en ambos lados de la
+  comparación de vencimiento. Al promover a prod, las sesiones abiertas de antes se cierran (re-login una vez):
+  es el corte limpio funcionando, no un bug. El supervisor marca una sesión minteada sin pasar por
+  `_make_session_response` (quedaría sin jti) o una revocación que no scopee al dueño. Cómo →
+  [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §2; historia → PR #1102 (revocación) + #1103 (quick wins de seguridad).

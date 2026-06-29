@@ -404,6 +404,27 @@ aportaría algo solo en CRUD simple aislado, que ya está hecho). Revisita solo 
 necesidad de ORM o tiempo-real. El supervisor marca: `?` nuevo en código nuevo, `%` literal en SQL, y
 reimplementación o bypass del DAL.
 
+### 2026-06-29 — `backend/auth/` = motor único de autenticación (multi-método sobre una sesión única, aditiva)
+
+Toda la auth vive en el paquete-motor **`backend/auth/`** (sesión, guards, OAuth Google, passkey, staging,
+revocación) — como `reservas/`/`contabilidad/`. **Todos los métodos de login convergen en UNA cookie firmada**
+(`session`), que mintea el **punto único `_make_session_response`**; los guards (`require_admin`/`require_cliente`)
+solo la **leen** (agnósticos del método). Passkey es **aditivo** a Google (no lo reemplaza; Google = anchor de
+identidad + recuperación). El supervisor marca un `set_cookie("session")` crudo fuera de `_make_session_response`
+(no heredaría jti/revocación) o lógica de auth (guard/mint de sesión) recreada fuera del paquete. Cómo →
+[`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → PR #1095 (passkey) + #1100 (consolidación).
+
+### 2026-06-29 — Revocación de sesión: allowlist `auth_sessions` + `jti` obligatorio (corte limpio, anti-IDOR)
+
+La sesión es **revocable server-side**: la cookie firmada lleva un `jti` opaco y la allowlist **`auth_sessions`**
+decide si vive (`get_session` valida firma **Y** `is_active`: no revocada, no vencida). **`jti` OBLIGATORIO
+(corte limpio):** una cookie sin jti (las viejas pre-deploy, las hand-minted de tests) se **rechaza** → re-login;
+**ninguna sesión válida queda fuera de la tabla**. Logout y "cerrar mis otras sesiones" son **reales** (revocan
+el jti; `revoke_all` preserva la actual con `except_jti`). Revocaciones **owner-scoped** (el `WHERE` incluye el
+dueño, no solo el jti → anti-IDOR), espejando `passkey/store`. Tabla en 2 capas (_2026-06-03_), DAL `%s`
+(_2026-06-27_), tiempos en `now_ar()`. El supervisor marca una sesión sin pasar por `_make_session_response` (sin
+jti) o una revocación no scopeada al dueño. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → PR #1102/#1103.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
