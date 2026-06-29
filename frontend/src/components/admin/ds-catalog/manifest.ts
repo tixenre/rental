@@ -19,6 +19,7 @@ import { containersSection } from "./sections/containers";
 import { statesSection } from "./sections/states";
 import { catalogSharedSection } from "./sections/catalog-shared";
 import { feedbackSection } from "./sections/feedback";
+import { flujosSection } from "./sections/flujos";
 import { pagesSection } from "./sections/pages";
 
 export const CATALOG: CatalogSection[] = [
@@ -33,5 +34,6 @@ export const CATALOG: CatalogSection[] = [
   statesSection,
   catalogSharedSection,
   feedbackSection,
+  flujosSection,
   pagesSection,
 ];
