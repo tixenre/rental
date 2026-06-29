@@ -8,7 +8,12 @@ incompletos o malformados (el webhook nunca debe romper → siempre 200).
 
 import pytest
 
-from services.didit.decision import DatosRenaper, extraer_datos_renaper
+from services.didit.decision import (
+    ContactosVerificados,
+    DatosRenaper,
+    extraer_contactos,
+    extraer_datos_renaper,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -149,3 +154,123 @@ def test_payload_incompleto_o_invalido_no_rompe(decision):
     d = extraer_datos_renaper(decision)
     assert d == DatosRenaper()
     assert d.tiene_datos is False
+
+
+# ── Contactos verificados (email_verifications[] / phone_verifications[]) ──────
+# El cliente los tipea en el flujo de Didit y Didit los verifica por control
+# (código al mail / OTP-WhatsApp al teléfono). NO salen de RENAPER.
+
+_DECISION_CONTACTOS = {
+    "email_verifications": [
+        {
+            "node_id": "email_1",
+            "status": "Approved",
+            "email": "juan@gmail.com",
+            "is_breached": False,
+            "is_disposable": False,
+            "is_undeliverable": False,
+            "verified_at": "2026-06-29T12:00:00Z",
+        }
+    ],
+    "phone_verifications": [
+        {
+            "node_id": "phone_1",
+            "status": "Approved",
+            "phone_number": "2235551234",
+            "full_number": "+5492235551234",
+            "country_code": "AR",
+            "carrier": "Movistar",
+            "verification_method": "whatsapp",
+            "is_disposable": False,
+            "is_virtual": False,
+            "verified_at": "2026-06-29T12:01:00Z",
+        }
+    ],
+}
+
+
+def test_contactos_extrae_mail_y_telefono():
+    c = extraer_contactos(_DECISION_CONTACTOS)
+    assert c.email is not None and c.email.value == "juan@gmail.com"
+    assert c.email.kind == "email"
+    assert c.email.verified_at == "2026-06-29T12:00:00Z"
+    # Teléfono: se guarda el full_number (E.164), no el local — listo para WhatsApp.
+    assert c.phone is not None and c.phone.value == "+5492235551234"
+    assert c.phone.kind == "phone"
+    assert c.phone.metodo == "whatsapp"
+    assert c.tiene_alguno is True
+
+
+def test_contactos_senales_antifraude():
+    c = extraer_contactos(_DECISION_CONTACTOS)
+    assert c.email.is_disposable is False
+    assert c.email.is_breached is False
+    assert c.phone.is_disposable is False
+    assert c.phone.is_virtual is False
+
+
+def test_contactos_telefono_prefiere_full_number():
+    c = extraer_contactos(
+        {"phone_verifications": [{"status": "Approved", "phone_number": "2235551234",
+                                  "full_number": "+5492235551234"}]}
+    )
+    assert c.phone.value == "+5492235551234"
+
+
+def test_contactos_telefono_fallback_phone_number():
+    """Sin full_number cae al phone_number local."""
+    c = extraer_contactos(
+        {"phone_verifications": [{"status": "Approved", "phone_number": "2235551234"}]}
+    )
+    assert c.phone is not None and c.phone.value == "2235551234"
+
+
+def test_contactos_prefiere_approved():
+    c = extraer_contactos(
+        {"email_verifications": [
+            {"status": "Declined", "email": "viejo@x.com"},
+            {"status": "Approved", "email": "bueno@gmail.com"},
+        ]}
+    )
+    assert c.email.value == "bueno@gmail.com"
+
+
+def test_contactos_solo_email_o_solo_telefono():
+    solo_mail = extraer_contactos(
+        {"email_verifications": [{"status": "Approved", "email": "a@b.com"}]}
+    )
+    assert solo_mail.email is not None and solo_mail.phone is None
+    solo_tel = extraer_contactos(
+        {"phone_verifications": [{"status": "Approved", "full_number": "+541112345678"}]}
+    )
+    assert solo_tel.phone is not None and solo_tel.email is None
+
+
+def test_contactos_flags_ausentes_son_none():
+    """Si Didit no manda las señales anti-fraude, quedan None (no inventamos False)."""
+    c = extraer_contactos(
+        {"email_verifications": [{"status": "Approved", "email": "a@b.com"}]}
+    )
+    assert c.email.is_disposable is None
+    assert c.email.is_breached is None
+
+
+def test_contactos_ignora_entradas_malformadas():
+    c = extraer_contactos(
+        {"email_verifications": [
+            "no-dict", None,
+            {"status": "Approved"},  # sin email
+            {"status": "Approved", "email": "  "},  # vacío
+            {"status": "Approved", "email": "ok@x.com"},
+        ]}
+    )
+    assert c.email is not None and c.email.value == "ok@x.com"
+
+
+@pytest.mark.parametrize("decision", [None, {}, {"email_verifications": []},
+                                      {"phone_verifications": "no-es-lista"},
+                                      {"otra_cosa": 1}, "no-soy-dict", 42])
+def test_contactos_payload_invalido_no_rompe(decision):
+    c = extraer_contactos(decision)
+    assert c == ContactosVerificados()
+    assert c.tiene_alguno is False

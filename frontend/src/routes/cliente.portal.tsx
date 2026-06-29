@@ -661,8 +661,6 @@ export default function ClientePortal() {
           {activeTab === "perfil" && perfil && (
             <PerfilSection
               perfil={perfil}
-              pedidosCount={pedidos.length}
-              totalAlquilado={pedidos.reduce((s, p) => s + (p.monto_total ?? 0), 0)}
               onLogout={handleLogout}
               confirmandoVerif={confirmandoVerif}
               onPerfilChange={setPerfil}

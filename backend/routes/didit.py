@@ -39,14 +39,16 @@ from config import settings
 from database import get_db, now_ar
 from routes.cliente_portal import require_cliente
 from services.didit import (
-    DatosRenaper,
     DiditNotConfiguredError,
     DiditSignatureError,
     create_session,
+    extraer_contactos,
     extraer_datos_renaper,
     retrieve_decision,
     verify_webhook,
 )
+
+from identity import kyc
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +176,9 @@ def cliente_iniciar_verificacion(request: Request, body: Optional[SesionVerifica
         )
         conn.commit()
 
+    # El cliente inició su propia verificación → consentimiento explícito del KYC (Ley 25.326).
+    kyc.registrar_consentimiento(cliente_id)
+
     logger.info("didit: cliente %s inició verificación session_id=%s", cliente_id, sesion.session_id)
     return {"session_id": sesion.session_id, "url": sesion.url}
 
@@ -233,11 +238,11 @@ async def webhook_didit(request: Request):
         return {"ok": True}  # Devolvemos 200 para que Didit no reintente.
 
     if status == "Approved":
-        # Datos validados por RENAPER. Viven en `decision.id_verifications[]` (API v3).
-        # Normalmente el webhook ya los trae embebidos; si llegara 'liviano' (sin
-        # `decision` o sin DNI), los pedimos por API a la fuente canónica. No se
-        # loguea el body completo (Ley 25.326).
-        datos = extraer_datos_renaper(payload.get("decision"))
+        # Identidad (RENAPER) + contactos verificados (mail/teléfono). Normalmente el
+        # webhook ya los trae embebidos; si llegara 'liviano' (sin `decision` o sin DNI),
+        # pedimos la decisión canónica por API. No se loguea el body (Ley 25.326).
+        decision = payload.get("decision")
+        datos = extraer_datos_renaper(decision)
         if not datos.tiene_datos:
             try:
                 # `retrieve_decision` hace un GET httpx SÍNCRONO (hasta el timeout):
@@ -247,7 +252,10 @@ async def webhook_didit(request: Request):
                 datos = extraer_datos_renaper(decision)
             except Exception as exc:
                 logger.error("didit webhook: no se pudo recuperar la decisión session_id=%s — %s", session_id, exc)
-        _guardar_verificacion(cliente_id=cliente_id, session_id=session_id, datos=datos)
+        # La orquestación (escribir identidad + ancla CUIL + contactos + evento) vive en
+        # identity/kyc — el route es solo transporte.
+        contactos = extraer_contactos(decision)
+        kyc.aprobar(cliente_id=cliente_id, session_id=session_id, datos=datos, contactos=contactos)
 
     elif status == "Declined":
         # Intentamos extraer un motivo legible del payload (no siempre presente).
@@ -263,105 +271,14 @@ async def webhook_didit(request: Request):
                 motivo = str(motivo)[:500]  # cap defensivo
         except Exception:
             pass
-        _actualizar_estado_verificacion(
+        kyc.actualizar_estado(
             cliente_id=cliente_id, session_id=session_id, estado="rechazado", motivo=motivo
         )
 
     else:
-        # Processing, In_review, Under_review → en revisión.
-        _actualizar_estado_verificacion(
+        # Processing / In_review / Under_review → en revisión.
+        kyc.actualizar_estado(
             cliente_id=cliente_id, session_id=session_id, estado="en_revision"
         )
 
     return {"ok": True}
-
-
-def _guardar_verificacion(
-    *,
-    cliente_id: int,
-    session_id: str,
-    datos: DatosRenaper,
-) -> None:
-    """Persiste los datos verificados por RENAPER en clientes. Idempotente.
-
-    Solo actualiza si el didit_session_id almacenado coincide con el de este
-    webhook — previene que un vendor_data forjado marque como verificado a otro
-    cliente (el payload ya está firmado con HMAC, esto es defensa en profundidad).
-
-    Cada campo de datos va con COALESCE: una re-verificación o un webhook
-    incompleto no pisa con NULL lo que ya estaba guardado. `dni_validado_at` sí
-    se actualiza siempre (re-confirma la fecha de la última aprobación).
-    """
-    ahora = now_ar()
-    with get_db() as conn:
-        conn.execute(
-            """UPDATE clientes
-               SET dni=COALESCE(%s, dni),
-                   cuil=COALESCE(%s, cuil),
-                   dni_validado_at=%s,
-                   didit_session_id=%s,
-                   dni_verificacion_estado='verificado',
-                   dni_verificacion_motivo=NULL,
-                   nombre_renaper=COALESCE(%s, nombre_renaper),
-                   apellido_renaper=COALESCE(%s, apellido_renaper),
-                   nombre_completo_renaper=COALESCE(%s, nombre_completo_renaper),
-                   fecha_nacimiento_renaper=COALESCE(%s, fecha_nacimiento_renaper),
-                   direccion_renaper=COALESCE(%s, direccion_renaper),
-                   genero_renaper=COALESCE(%s, genero_renaper),
-                   nacionalidad_renaper=COALESCE(%s, nacionalidad_renaper),
-                   lugar_nacimiento_renaper=COALESCE(%s, lugar_nacimiento_renaper),
-                   vencimiento_documento_renaper=COALESCE(%s, vencimiento_documento_renaper),
-                   emision_documento_renaper=COALESCE(%s, emision_documento_renaper),
-                   tipo_documento_renaper=COALESCE(%s, tipo_documento_renaper),
-                   estado_civil_renaper=COALESCE(%s, estado_civil_renaper),
-                   updated_at=%s
-               WHERE id=%s AND didit_session_id=%s""",
-            (datos.dni, datos.cuil, ahora, session_id,
-             datos.nombre, datos.apellido, datos.nombre_completo,
-             datos.fecha_nacimiento, datos.direccion,
-             datos.genero, datos.nacionalidad, datos.lugar_nacimiento,
-             datos.vencimiento_documento, datos.emision_documento,
-             datos.tipo_documento, datos.estado_civil,
-             ahora, cliente_id, session_id),
-        )
-        conn.commit()
-    # Logueamos solo PRESENCIA de cada campo (bool), nunca el valor: diagnóstico
-    # de "¿se capturó?" sin escribir datos personales en logs (Ley 25.326).
-    logger.info(
-        "didit: cliente_id=%s verificado dni=%s cuil=%s nombre=%s direccion=%s session_id=%s",
-        cliente_id,
-        bool(datos.dni),
-        bool(datos.cuil),
-        bool(datos.nombre_completo or datos.nombre),
-        bool(datos.direccion),
-        session_id,
-    )
-
-
-def _actualizar_estado_verificacion(
-    *,
-    cliente_id: int,
-    session_id: str,
-    estado: str,
-    motivo: Optional[str] = None,
-) -> None:
-    """Persiste el estado intermedio de verificación (rechazado / en_revision).
-
-    Solo actualiza si el didit_session_id coincide — misma defensa en profundidad
-    que _guardar_verificacion. `motivo` es directo (no COALESCE): un evento
-    posterior puede limpiar el motivo de un rechazo previo al pasar a en_revision.
-    """
-    with get_db() as conn:
-        conn.execute(
-            """UPDATE clientes
-               SET dni_verificacion_estado=%s,
-                   dni_verificacion_motivo=%s,
-                   updated_at=%s
-               WHERE id=%s AND didit_session_id=%s""",
-            (estado, motivo, now_ar(), cliente_id, session_id),
-        )
-        conn.commit()
-    logger.info(
-        "didit: cliente_id=%s estado=%s session_id=%s",
-        cliente_id, estado, session_id,
-    )

@@ -9,6 +9,10 @@
 > consolidación en `auth/` ([#1100](https://github.com/tixenre/rental/pull/1100)), revocación de sesión
 > ([#1102](https://github.com/tixenre/rental/pull/1102)), quick wins de seguridad
 > ([#1103](https://github.com/tixenre/rental/pull/1103)).
+>
+> **Frontera con identidad:** "¿quién sos?" (ancla CUIL, KYC sobre Didit, contactos verificados, estado de
+> la cuenta) vive en el motor **hermano** `identity/` → [`SISTEMA_IDENTITY.md`](SISTEMA_IDENTITY.md). Se
+> tocan solo en `clientes.id`: **`auth/` nunca ve un CUIL; `identity/` nunca ve una cookie.**
 
 ## El panorama: un motor, una sesión, varios métodos
 

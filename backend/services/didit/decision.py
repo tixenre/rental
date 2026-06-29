@@ -59,6 +59,37 @@ class DatosRenaper:
         return bool(self.dni)
 
 
+@dataclass
+class ContactoVerificado:
+    """Un contacto (mail o teléfono) verificado por Didit durante el KYC.
+
+    Verificado-**por-control** (código al mail / OTP-WhatsApp al teléfono) — NO sale
+    de RENAPER, lo tipea el cliente en el flujo y Didit prueba que lo controla. Sirve
+    como factor de comunicación y de recuperación. El `value` del teléfono viene en
+    formato internacional (E.164, campo `full_number` de Didit)."""
+
+    kind: str  # "email" | "phone"
+    value: str
+    verified_at: str | None = None
+    metodo: str | None = None  # phone: "sms" | "whatsapp" / email: None
+    # Señales anti-fraude (las trae Didit; opcionales)
+    is_disposable: bool | None = None  # mail/número descartable
+    is_virtual: bool | None = None  # solo phone: número virtual (VoIP)
+    is_breached: bool | None = None  # solo email: aparece en filtraciones
+
+
+@dataclass
+class ContactosVerificados:
+    """Mail + teléfono verificados que devuelve Didit (ambos opcionales)."""
+
+    email: ContactoVerificado | None = None
+    phone: ContactoVerificado | None = None
+
+    @property
+    def tiene_alguno(self) -> bool:
+        return self.email is not None or self.phone is not None
+
+
 def _limpiar(valor) -> str | None:
     """Normaliza un campo a texto plano o None (vacío/espacios → None)."""
     if valor is None:
@@ -133,3 +164,70 @@ def extraer_datos_renaper(decision: dict | None) -> DatosRenaper:
         tipo_documento=_limpiar(v.get("document_type")),
         estado_civil=_limpiar(v.get("marital_status")),
     )
+
+
+def _a_bool(valor) -> bool | None:
+    """Devuelve el bool si vino como tal; None si está ausente (no inventa False)."""
+    return valor if isinstance(valor, bool) else None
+
+
+def _elegir_contacto(items: list, value_key: str) -> dict | None:
+    """Elige la entrada de contacto con `value_key` presente, prefiriendo las
+    Approved (espeja `_elegir_verificacion`). Defensivo ante entradas malformadas."""
+    candidato = None
+    for it in items:
+        if not isinstance(it, dict) or not _limpiar(it.get(value_key)):
+            continue
+        if (it.get("status") or "").strip().lower() == "approved":
+            return it
+        candidato = candidato or it
+    return candidato
+
+
+def extraer_contactos(decision: dict | None) -> ContactosVerificados:
+    """Extrae mail + teléfono **verificados** del `decision` v3 (arrays plurales
+    `email_verifications[]` / `phone_verifications[]`).
+
+    Distinto de `extraer_datos_renaper`: eso saca la **identidad** del documento
+    (RENAPER); esto saca los **contactos** que el cliente tipeó en el flujo y Didit
+    verificó por control. Puro y tolerante a payloads incompletos (devuelve vacío,
+    nunca rompe — el webhook siempre responde 200).
+
+    Mapa de campos (Didit):
+      email ← email_verifications[].email     (+ is_disposable, is_breached, verified_at)
+      phone ← phone_verifications[].full_number  (E.164; fallback phone_number)
+              (+ verification_method, is_disposable, is_virtual, verified_at)
+    """
+    if not isinstance(decision, dict):
+        return ContactosVerificados()
+
+    email = None
+    evs = decision.get("email_verifications")
+    if isinstance(evs, list):
+        e = _elegir_contacto(evs, "email")
+        if e is not None:
+            email = ContactoVerificado(
+                kind="email",
+                value=_limpiar(e.get("email")),
+                verified_at=_limpiar(e.get("verified_at")),
+                is_disposable=_a_bool(e.get("is_disposable")),
+                is_breached=_a_bool(e.get("is_breached")),
+            )
+
+    phone = None
+    pvs = decision.get("phone_verifications")
+    if isinstance(pvs, list):
+        # Preferimos full_number (internacional / E.164); fallback al número local.
+        p = _elegir_contacto(pvs, "full_number") or _elegir_contacto(pvs, "phone_number")
+        if p is not None:
+            phone_val = _limpiar(p.get("full_number") or p.get("phone_number"))
+            phone = ContactoVerificado(
+                kind="phone",
+                value=phone_val,
+                verified_at=_limpiar(p.get("verified_at")),
+                metodo=_limpiar(p.get("verification_method")),
+                is_disposable=_a_bool(p.get("is_disposable")),
+                is_virtual=_a_bool(p.get("is_virtual")),
+            )
+
+    return ContactosVerificados(email=email, phone=phone)
