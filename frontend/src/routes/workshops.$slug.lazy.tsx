@@ -4,6 +4,7 @@ import { createLazyFileRoute, Link, notFound } from "@tanstack/react-router";
 import { Calendar, MapPin, Users, CheckCircle2, Clock, X } from "lucide-react";
 
 import { PublicLayout } from "@/components/rental/PublicLayout";
+import { Button } from "@/design-system/ui/button";
 import { Logo } from "@/components/rental/Logo";
 import { WorkshopInscripcionForm } from "@/components/talleres/WorkshopInscripcionForm";
 import { TallerCalendario } from "@/components/talleres/TallerCalendario";
@@ -171,13 +172,15 @@ function InteresadoForm({ slug }: { slug: string }) {
         className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm text-ink placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
       />
       {status === "error" && <p className="text-xs text-destructive">{errorMsg}</p>}
-      <button
+      <Button
         type="submit"
+        variant="amber"
+        shape="pill"
         disabled={status === "sending"}
-        className="w-full rounded-full bg-rosa text-ink font-bold py-3.5 text-base hover:brightness-110 active:scale-[0.97] transition-all disabled:opacity-60"
+        className="w-full py-3.5 text-base font-bold"
       >
         {status === "sending" ? "Enviando…" : "Avisame"}
-      </button>
+      </Button>
     </form>
   );
 }

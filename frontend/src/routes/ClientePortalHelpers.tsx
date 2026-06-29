@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
+import { Button } from "@/design-system/ui/button";
 import { toast } from "sonner";
 import {
   Bell,
@@ -671,19 +672,14 @@ function DatosForm({
         </div>
       )}
 
-      <button
+      <Button
         type="submit"
+        variant="primary"
         disabled={saving}
-        className="w-full inline-flex items-center justify-center gap-2 rounded-[10px] bg-ink h-[46px] font-sans text-15 font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-50"
+        className="w-full h-[46px] text-[15px] font-bold rounded-[10px]"
       >
-        {saving ? (
-          <>
-            <Spinner size="sm" /> Guardando…
-          </>
-        ) : (
-          "Guardar cambios"
-        )}
-      </button>
+        {saving ? <><Spinner size="sm" /> Guardando…</> : "Guardar cambios"}
+      </Button>
     </form>
   );
 }

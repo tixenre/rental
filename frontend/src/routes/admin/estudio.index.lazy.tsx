@@ -860,8 +860,8 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
       <div className="sticky bottom-0 bg-background border-t hairline -mx-4 md:-mx-6 px-4 md:px-6 py-3 flex justify-end gap-3">
         <Button
           type="submit"
+          variant="primary"
           disabled={mutation.isPending || !isDirty}
-          className="bg-foreground text-background hover:bg-amber hover:text-ink"
         >
           {mutation.isPending ? (
             <Spinner size="sm" className="mr-2" />

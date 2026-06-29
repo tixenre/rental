@@ -298,8 +298,10 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
 
       <Button
         type="submit"
+        variant="amber"
+        shape="pill"
         disabled={submitState === "submitting" || upload.status === "uploading"}
-        className="bg-rosa text-ink hover:brightness-110 active:scale-[0.98] font-bold rounded-full py-6 text-base transition-all"
+        className="w-full py-6 text-base font-bold"
       >
         {submitState === "submitting" ? (
           <span className="flex items-center gap-2">

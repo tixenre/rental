@@ -1755,6 +1755,7 @@ ${fotoTag}
       )}
       <Button
         type="submit"
+        variant="primary"
         form={formId}
         disabled={saving}
         onClick={() => {
