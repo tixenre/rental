@@ -265,6 +265,55 @@ def _init_db_schema(conn):
     )
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_verificacion_motivo TEXT")
 
+    # ── Identidad (Fase 2): contactos verificados + bitácora KYC + consentimiento ──
+    # Base del motor `backend/identity/` ("quién sos"). El payload crudo de Didit muere
+    # en `services/didit/`; acá viven los datos normalizados. Espejo idempotente de la
+    # migración 1d3nt1dadf2a. El índice único parcial de CUIL va aparte, AL FINAL (tras
+    # limpiar duplicados legacy).
+    #   — kyc_consent_at: el cliente consintió el KYC + el guardado (Ley 25.326).
+    #   — identidad_conflicto: conflicto de dedup (dos cuentas mismo CUIL) que necesita
+    #     resolución manual del admin → estado derivado 'conflicto'.
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS kyc_consent_at TIMESTAMP")
+    conn.execute(
+        "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS "
+        "identidad_conflicto BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    # verified_contacts: mail/teléfono VERIFICADOS (Google OAuth / código Didit / OTP) —
+    # factores de comunicación y recuperación. El teléfono se guarda en E.164. Owner-scoped
+    # (FK CASCADE). Trae las señales anti-fraude de Didit (is_disposable/is_virtual/is_breached).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS verified_contacts (
+            id            SERIAL PRIMARY KEY,
+            cliente_id    INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            kind          TEXT NOT NULL CHECK (kind IN ('email', 'phone')),
+            value         TEXT NOT NULL,
+            source        TEXT NOT NULL CHECK (source IN ('google', 'didit', 'otp', 'manual')),
+            verified_at   TIMESTAMP,
+            is_disposable BOOLEAN,
+            is_virtual    BOOLEAN,
+            is_breached   BOOLEAN,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (cliente_id, kind, value)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_verified_contacts_cliente ON verified_contacts(cliente_id)"
+    )
+    # kyc_events: bitácora de auditoría del KYC (started / approved / declined / reverify /
+    # anchor_set / merge / conflict). SOLO TEXTO (Ley 25.326: nada de biometría; `detalle`
+    # es para diagnóstico, no para PII).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS kyc_events (
+            id          SERIAL PRIMARY KEY,
+            cliente_id  INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            evento      TEXT NOT NULL,
+            detalle     TEXT,
+            session_id  TEXT,
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_kyc_events_cliente ON kyc_events(cliente_id)")
+
     # Passkeys (WebAuthn/FIDO2) — login aditivo a Google OAuth. Una sola tabla
     # para admin (owner_email, cliente_id NULL) y
     # cliente (cliente_id seteado), con discriminador `owner_type`. credential_id /
