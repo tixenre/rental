@@ -25,8 +25,11 @@ import { crearCompartido, type CompartirItem } from "@/lib/compartir";
 import { shareLink } from "@/lib/share";
 import { cn } from "@/lib/utils";
 
-/** Texto que acompaña al link, para no mandar un link pelado (mobile share + copia desktop). */
-const MENSAJE_COMPARTIR = "Te comparto este listado de equipos para armar un pedido 👇";
+/** Texto que acompaña al link (mobile share + copia desktop) — la "línea de chat" del que comparte.
+ * Lleva la ACCIÓN, complementaria a la card: el título enmarca ("Te compartieron un listado") y la
+ * descripción lista el contenido, así que acá NO repetimos eso. Sin emoji direccional: WhatsApp ubica
+ * la card arriba o abajo según la plataforma → una flechita quedaría "al revés" a veces. */
+const MENSAJE_COMPARTIR = "Abrilo y reservalo para tus fechas.";
 
 export function CompartirComposicionButton({
   items,

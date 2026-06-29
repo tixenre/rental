@@ -910,14 +910,12 @@ def compartido_page(token: str):
             if extra > 0:
                 shown += f" y {extra} más"
             unidades = "1 equipo" if n == 1 else f"{n} equipos"
-            # El título ya dice "Te compartieron un listado"; la descripción arranca directo con
-            # el contenido (cantidad + equipos + CTA) para no repetir el mismo arranque.
-            desc = (
-                f"{unidades} para armar tu pedido: {shown}. "
-                "Abrilo y reservalo en Rambla Rental, Mar del Plata."
-            )
+            # Cada línea aporta algo distinto y complementario: el título enmarca ("Te compartieron
+            # un listado"), la descripción lista el CONTENIDO + dónde, y el mensaje de chat (front)
+            # lleva la ACCIÓN ("Abrilo y reservalo"). Acá NO repetimos el arranque del título.
+            desc = f"{unidades}: {shown} — para alquilar en Mar del Plata."
         else:
-            desc = "Una selección de equipos para armar tu pedido en Rambla Rental, Mar del Plata."
+            desc = "Una selección de equipos para alquilar en Rambla Rental, Mar del Plata."
         if len(desc) > 200:
             desc = desc[:197].rstrip() + "…"
         # Imagen: la isologo de marca estática (og-image.png, 1200×630 ya encuadrada para OG). Un
