@@ -227,6 +227,42 @@ if (existsSync(SKILLS_DIR)) {
   }
 }
 
+// ── Bloque 6: COBERTURA de la vitrina del DS (anti-drift del catálogo) ─────────────────────────
+//   Todo componente en `componentDirs` (design-system/ui + kit) debe estar demostrado en la vitrina:
+//   su path (relativo a srcRoot) aparece en algún `Specimen.files` del catálogo. El manifiesto del
+//   catálogo ES el registro (mismo patrón que skills↔CLAUDE.md). Un componente sin vitrina → error.
+//   Solo corre si la config define `dsCatalog` y el dir existe (portable: otros repos no lo tienen).
+let dsCoverChecked = 0;
+const ds = cfg.dsCatalog;
+if (ds && existsSync(join(ROOT, ds.catalogDir))) {
+  const srcRoot = join(ROOT, ds.srcRoot);
+  const catalogSrc = (function collect(dir, acc) {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) collect(p, acc);
+      else if (/\.(tsx?|ts)$/.test(e.name)) acc.push(read(p));
+    }
+    return acc;
+  })(join(ROOT, ds.catalogDir), []).join("\n");
+  const exempt = new Set(ds.exempt ?? []);
+  for (const dir of ds.componentDirs ?? []) {
+    const abs = join(ROOT, dir);
+    if (!existsSync(abs)) continue;
+    for (const e of readdirSync(abs, { withFileTypes: true })) {
+      if (!e.isFile() || !e.name.endsWith(".tsx")) continue; // solo componentes (.tsx); helpers .ts no
+      const rel = relative(srcRoot, join(abs, e.name)); // ej "design-system/ui/button.tsx"
+      if (exempt.has(rel)) continue;
+      dsCoverChecked++;
+      if (!catalogSrc.includes(rel)) {
+        errors.push(
+          `Componente del DS sin vitrina: \`${rel}\` no está en ningún \`Specimen.files\` del catálogo ` +
+            `(${ds.catalogDir}). Agregá su specimen, o exoneralo en governance.config \`dsCatalog.exempt\` (con comentario ⏰).`,
+        );
+      }
+    }
+  }
+}
+
 // ── Veredicto ────────────────────────────────────────────────────────────────────────────────
 if (warnings.length) {
   console.warn("⚠ Warnings de gobernanza (no bloquean):\n");
@@ -246,5 +282,7 @@ if (errors.length) {
 
 console.log(
   `✓ Docs/skills de gobernanza OK — paridad digest↔log (${headersOf(join(ROOT, DIGEST)).length} entradas), ` +
-    `import presente, ${skillCount} skills registrados y bien formados, links vivos en ${govFiles.length} archivos.`,
+    `import presente, ${skillCount} skills registrados y bien formados, links vivos en ${govFiles.length} archivos` +
+    (dsCoverChecked ? `, ${dsCoverChecked} componentes del DS con vitrina` : "") +
+    `.`,
 );

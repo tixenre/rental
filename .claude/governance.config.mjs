@@ -24,4 +24,17 @@ export default {
   skillsDir: ".claude/skills",
   // Umbral de staleness (días desde `last-reviewed:`) que dispara un warning (no error).
   skillStaleDays: 120,
+
+  // Cobertura de la vitrina del Design System (anti-drift del catálogo).
+  // Todo .tsx en `componentDirs` debe aparecer (por su path relativo a `srcRoot`)
+  // en algún `Specimen.files` del catálogo → un componente sin vitrina falla CI.
+  // Espeja la paridad skills↔registro: el manifiesto del catálogo es el registro.
+  dsCatalog: {
+    catalogDir: "frontend/src/components/admin/ds-catalog",
+    srcRoot: "frontend/src",
+    componentDirs: ["frontend/src/design-system/ui", "frontend/src/design-system/kit"],
+    // Exenciones: componentes que NO van a la vitrina. Cada uno con comentario
+    // ⏰ del porqué (mismo criterio de coexistencia temporal del resto del repo).
+    exempt: [],
+  },
 };
