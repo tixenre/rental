@@ -27,10 +27,12 @@ class _Cur:
 
 class _Recorder:
     """Conn fake: graba execute(); soporta transaction(); el SELECT de
-    didit_session_id devuelve el `session_id` esperado."""
+    didit_session_id devuelve el `session_id` esperado. `eventos_previos` simula los
+    eventos ya en la bitácora (para el guard de idempotencia)."""
 
-    def __init__(self, session_id):
+    def __init__(self, session_id, eventos_previos=()):
         self.session_id = session_id
+        self.eventos_previos = set(eventos_previos)
         self.calls = []
 
     def execute(self, sql, params=()):
@@ -38,6 +40,9 @@ class _Recorder:
         self.calls.append((norm, tuple(params)))
         if "SELECT didit_session_id" in norm:
             return _Cur({"didit_session_id": self.session_id})
+        if "SELECT 1 FROM kyc_events" in norm:
+            # params = (session_id, evento) → ¿ya registrado?
+            return _Cur({"?column?": 1} if params[1] in self.eventos_previos else None)
         return _Cur(None)
 
     @contextmanager
@@ -106,3 +111,21 @@ def test_consentimiento(monkeypatch):
     kyc.registrar_consentimiento(1)
     assert _sql(rec, "kyc_consent_at")  # marca el consentimiento
     assert _sql(rec, "INSERT INTO kyc_events")
+
+
+def test_aprobar_idempotente_si_ya_se_aprobo(monkeypatch):
+    # Didit re-entrega el webhook → una 2ª 'approved' del MISMO session_id no debe
+    # re-pisar dni_validado_at ni duplicar la fila de auditoría.
+    rec = _Recorder("sess-1", eventos_previos={"approved"})
+    _patch(monkeypatch, rec)
+    datos = DatosRenaper(dni="12345678", cuil="20123456786", nombre_completo="Juan Pérez")
+    assert kyc.aprobar(cliente_id=1, session_id="sess-1", datos=datos) is True
+    assert not _sql(rec, "dni_validado_at")  # no re-escribe la identidad
+    assert not _sql(rec, "INSERT INTO kyc_events")  # no duplica el evento
+
+
+def test_actualizar_estado_idempotente(monkeypatch):
+    rec = _Recorder("sess-1", eventos_previos={"en_revision"})
+    _patch(monkeypatch, rec)
+    assert kyc.actualizar_estado(cliente_id=1, session_id="sess-1", estado="en_revision") is True
+    assert not _sql(rec, "UPDATE clientes")  # ya estaba registrado → no-op

@@ -62,6 +62,20 @@ def _session_coincide(conn, cliente_id, session_id) -> bool:
     return row is not None and row_to_dict(row).get("didit_session_id") == session_id
 
 
+def _ya_registrado(conn, session_id, evento) -> bool:
+    """Idempotencia: ¿ya procesamos este `evento` para este `session_id`? Didit re-entrega
+    el webhook (reintenta ante cualquier no-200) → sin esto, una re-entrega de 'approved'
+    re-pisaría `dni_validado_at` con un timestamp nuevo y duplicaría la fila de auditoría.
+    La bitácora `kyc_events` ES la fuente de verdad de 'qué ya se ingirió' (sin tabla extra)."""
+    if not session_id:
+        return False
+    row = conn.execute(
+        "SELECT 1 FROM kyc_events WHERE session_id=%s AND evento=%s LIMIT 1",
+        (session_id, evento),
+    ).fetchone()
+    return row is not None
+
+
 def aprobar(*, cliente_id, session_id, datos, contactos=None, conn=None) -> bool:
     """Persiste una verificación Didit APROBADA: identidad RENAPER (COALESCE, única
     pluma) + ancla CUIL (validado mod-11) + contactos verificados + evento. Atómico.
@@ -72,6 +86,10 @@ def aprobar(*, cliente_id, session_id, datos, contactos=None, conn=None) -> bool
         if not _session_coincide(conn, cliente_id, session_id):
             logger.warning("identity: session_id no coincide cliente_id=%s — no se aplica", cliente_id)
             return False
+        if _ya_registrado(conn, session_id, "approved"):
+            logger.info("identity: cliente_id=%s session_id=%s ya aprobado — idempotente, no-op",
+                        cliente_id, session_id)
+            return True
 
         cuil = normalizar_cuil(datos.cuil)
         if cuil and not cuil_valido(cuil):
@@ -130,6 +148,10 @@ def actualizar_estado(*, cliente_id, session_id, estado, motivo=None, conn=None)
         if not _session_coincide(conn, cliente_id, session_id):
             logger.warning("identity: session_id no coincide cliente_id=%s — no se aplica", cliente_id)
             return False
+        if _ya_registrado(conn, session_id, estado):
+            logger.info("identity: cliente_id=%s session_id=%s estado=%s ya registrado — idempotente",
+                        cliente_id, session_id, estado)
+            return True
         with conn.transaction():
             conn.execute(
                 """UPDATE clientes SET dni_verificacion_estado=%s, dni_verificacion_motivo=%s,
