@@ -494,6 +494,18 @@ la familia motor-único (espeja contenido 2026-06-29). El **split de `routes/alq
 lógica de **alquileres**, no del carrito (se tocan, pero es otro motor) → su propio PR. Cómo →
 [`SISTEMA_CARRITO.md`](SISTEMA_CARRITO.md); tracking #1110.
 
+### 2026-06-29 — El front no calcula plata: la pide al backend y la muestra
+
+**Ningún número de plata se calcula en el front.** El backend lo resuelve (el total vía
+`services/precios.calcular_total`; el precio por ítem vía el resolutor único `precio_jornada_efectivo`) y lo
+devuelve ya hecho; el front **solo renderiza** —a lo sumo **suma** valores que el backend ya le dio para mostrar—,
+nunca aplica reglas de precio/descuento/IVA/combo. **Generaliza** _cotizar = fuente única (#617)_ de "el total" a
+**todo** número de plata, incluido el estimado/teaser del carrito (era la raíz del drift de combos cotizado≠cobrado:
+el front multiplicaba el precio crudo). El **cómo se muestra** (lo visual) es decisión aparte. **FASE 3 del carrito
+se implementa así:** el service devuelve los precios resueltos, el front los muestra (para mantenerlo instantáneo,
+cada equipo puede traer su precio efectivo desde el catálogo → el front suma, no calcula). El supervisor marca una
+regla de precio/descuento/IVA/combo recalculada en el front.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

@@ -1634,6 +1634,27 @@ cancel-in-progress` ya cancela corridas viejas.
   (lo importa `pedidos.py`). `readiness` puede lanzar `HTTPException(404)` — convención aceptada en services del
   repo (spec_persist/media). El manual del cómo-funciona vive en [`SISTEMA_CARRITO.md`](SISTEMA_CARRITO.md); este
   log guarda el porqué. Supervisor: APROBADO (PR #1112), sin drift.
-- **Pendiente** (fuera del lote, documentado en `SISTEMA_CARRITO.md` §Pendiente): FASE 3 (display de plata del
-  front: helper único `lib/pricing.ts`), el split de `alquileres/core.py` (alquileres, su propio PR), y FASE 6
-  (features: recuperación #1111, agregar-vs-reemplazar #1108 — definir alcance primero).
+- **Pendiente** (fuera del lote, documentado en `SISTEMA_CARRITO.md` §Pendiente): FASE 3 (display de plata: el
+  front no calcula, el service devuelve los precios — ver decisión siguiente), el split de `alquileres/core.py`
+  (alquileres, su propio PR), y FASE 6 (features: recuperación #1111, agregar-vs-reemplazar #1108 — definir alcance).
+
+### 2026-06-29 — El front no calcula plata: la pide al backend y la muestra
+
+- **Contexto.** El total del carrito ya salía 100% del backend (`/api/cotizar`, #617): el front no lo calcula. Pero
+  el **estimado** ("≈ $X/jornada" sin fechas) y los subtotales por línea se recalculaban a mano en 5 superficies del
+  front (CartDrawer, `c/$token`, ClientePortalListas, CartMiniBar, CatalogoMovilHelpers), con redondeo propio y
+  usando el `pricePerDay` crudo (mal en combos). Al pensar FASE 3 del carrito, el dueño fijó el principio general:
+  "el front no decide nada, solo muestra lo que le dan; pero no calcula".
+- **Decisión.** **Ningún número de plata se calcula en el front.** El backend lo resuelve (el total vía
+  `calcular_total`; el precio por ítem vía el resolutor único `precio_jornada_efectivo`) y lo devuelve ya hecho; el
+  front **solo renderiza**. A lo sumo **suma** valores que el backend ya le dio para mostrar; nunca aplica reglas de
+  precio/descuento/IVA/combo. El "cómo se muestra" (lo visual) es decisión aparte.
+- **Why.** Una sola fuente de la plata, de punta a punta: si el front calcula, hay una segunda verdad que driftea
+  (fue exactamente la raíz del drift de combos cotizado≠cobrado). **Generaliza #617** ("cotizar = fuente única, el
+  front no calcula el total") de *el total* a *todo* número de plata, incluido el teaser.
+- **Consecuencias.** Para no pegarle al backend en cada cambio del carrito por un estimado, cada equipo puede traer
+  su **precio efectivo** desde el catálogo → el front suma lo que le dieron (no aplica reglas) y sigue instantáneo.
+  **FASE 3 del carrito se implementa así** (el service devuelve los precios, el front los muestra), NO con un helper
+  de cálculo en el front. El supervisor marca una regla de precio/descuento/IVA/combo recalculada en el front.
+- **Gotcha.** "Sumar para mostrar subtotales que el backend ya calculó" no es calcular plata; "multiplicar
+  precio×cantidad×jornadas×(1−desc)" sí lo es y va al backend.
