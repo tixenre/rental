@@ -33,7 +33,7 @@ cross-refs del **retro de iniciativa**; una lista incompleta podría no frenar e
 2026-06-25 · gobernanza · Agregar un check de **"staleness por divergencia" de los manuales de sistema**
 (`docs/SISTEMA_*.md`, convención _2026-06-25 — Manuales técnicos por sistema_): detectar si un manual no se
 tocó mientras su motor (los paths que referencia) cambió N veces en git → proponer revisarlo en el cierre
-mensual. **Detecta + propone, no mantiene solo** (el supervisor por cambio + quien toca el código siguen
+de gobernanza. **Detecta + propone, no mantiene solo** (el supervisor por cambio + quien toca el código siguen
 siendo el mantenimiento real). · Por qué: hoy los manuales los vigila el supervisor (por cambio) + `check-docs`
 (links/estructura), pero **nada detecta el desfase de CONTENIDO**. Un check periódico sería la red de seguridad
 que cierra el círculo. **Prematuro con 1 solo manual (fotos)** — activar cuando haya varios (ver el issue de
