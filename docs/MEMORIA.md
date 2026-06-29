@@ -477,6 +477,23 @@ dueño, no solo el jti → anti-IDOR), espejando `passkey/store`. Tabla en 2 cap
 (_2026-06-27_), tiempos en `now_ar()`. El supervisor marca una sesión sin pasar por `_make_session_response` (sin
 jti) o una revocación no scopeada al dueño. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → PR #1102/#1103.
 
+### 2026-06-29 — Cuentas livianas: alta passwordless con passkey (cuenta vacía hasta Didit, inerte + anti-spam)
+
+El alta con passkey (`POST /auth/passkey/signup/{begin,complete}`, motor `auth/passkey/`) crea una **cuenta
+liviana**: nace solo con `id` + passkey, SIN datos —los `NOT NULL` base de `clientes` (nombre/apellido/telefono/
+email/direccion/cuit) se relajaron, `cuenta_estado='liviana'`, `owner_email=''` en la passkey—. La
+**identidad/contacto los completa Didit al primer pedido** y van a las columnas `*_renaper` (con COALESCE),
+**NUNCA** a los campos base por el usuario; la cuenta queda **inerte** (`require_cliente_verificado` la bloquea
+hasta `dni_validado_at`). Cuenta+passkey se insertan en **una transacción atómica** (sin huérfanos) y mintea por
+`_make_session_response` (email/nombre NULL → `""`, hereda jti). **Higiene anti-spam (invisible al usuario, las 3
+patas):** rate-limit por-IP que cuenta también las altas **exitosas** (`_record_event`, no solo fallos) +
+inertidad-hasta-Didit + **cleanup diario** de livianas abandonadas (`jobs/cleanup_livianas.py` en el scheduler
+único: liviana + sin verificar + sin email + sin pedidos + > 30d → borrar; cascade limpia passkey/sesiones).
+Google sigue **co-primario**; el **admin NO se auto-crea** (allowlist — su passkey se agrega desde el perfil tras
+Google). En el front, el login del cliente lidera con "Crear cuenta con passkey" (CTA `Button variant=primary`).
+El supervisor marca un alta que escriba identidad en los campos base en vez de esperar a Didit, o un signup fuera
+de la transacción atómica / del punto único de minteo. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); tracking #1098 (Fase 4).
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

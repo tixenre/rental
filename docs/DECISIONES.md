@@ -1590,3 +1590,47 @@ cancel-in-progress` ya cancela corridas viejas.
   es el corte limpio funcionando, no un bug. El supervisor marca una sesión minteada sin pasar por
   `_make_session_response` (quedaría sin jti) o una revocación que no scopee al dueño. Cómo →
   [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §2; historia → PR #1102 (revocación) + #1103 (quick wins de seguridad).
+
+### 2026-06-29 — Cuentas livianas: alta passwordless con passkey (cuenta vacía hasta Didit, inerte + anti-spam)
+
+- **Contexto.** Hoy la cuenta de un cliente **nace por Google** (el registro arranca con el login de Google;
+  la búsqueda es por email). El dueño quiere el norte "modelo banco": el cliente **no tipea nada** (ni mail, ni
+  contraseña, ni sus datos), los trae Didit. La experiencia faro la describió él: "entré a Vercel, elegí passkey
+  y me creó la cuenta directamente". Además, al probar passkey en staging apareció una **trampa**: el único botón
+  "Entrar con passkey" mandaba a un QR sin salida a quien no tenía una. Se juzgó con el `consejo` (Nivel 1): el
+  riesgo era la cuenta **huérfana pre-Didit** (sin contacto para avisar/recuperar); lo desinfla que las passkeys
+  **sincronizan** (iCloud/Google) + Didit devuelve mail/tel al primer pedido. El consejo recomendó **A** (mail
+  skippeable); el dueño eligió **C** (passkey-pura, cero contacto en el alta) — override consciente: "la cuenta
+  vacía no vale nada hasta que pide → no me importa el huérfano pre-pedido".
+- **Decisión.** Alta passwordless **opción C**: `POST /auth/passkey/signup/{begin,complete}` (motor
+  `auth/passkey/`, aditivo a Google) crea una **cuenta liviana** — nace solo con `id` + passkey, sin datos. Para
+  eso se **relajan los `NOT NULL`** de los campos base de `clientes` (nombre/apellido/telefono/email/direccion/
+  cuit) y se agrega `cuenta_estado TEXT NOT NULL DEFAULT 'completa'` (las existentes quedan `'completa'`; las
+  nuevas, `'liviana'`); la passkey lleva `owner_email=''` (la cuenta no tiene mail). Cuenta + passkey se insertan
+  en **una transacción atómica** (si falla la passkey, no queda cuenta huérfana) y la sesión mintea por el punto
+  único `_make_session_response` (que ahora tolera email/nombre NULL → `""`, heredando jti + revocación). La
+  **identidad/contacto los completa Didit al primer pedido**, en las columnas `*_renaper` (con COALESCE) —**el
+  usuario nunca escribe los campos base de identidad**—; la cuenta queda **inerte** hasta verificar
+  (`require_cliente_verificado` mira `dni_validado_at`). El **admin no tiene signup** (es allowlist; su passkey se
+  agrega desde el perfil tras entrar por Google). En el front, el login del cliente lidera con "Crear cuenta con
+  passkey" (CTA `Button variant=primary`, gesto ink→accent) separado de "Entrar con passkey" → cierra la trampa;
+  se saca el bloque "¿no tenés cuenta? WhatsApp".
+- **Why.** Reusa los tres motores sin tocarlos: `auth/` (mismo `_make_session_response` + cookie + jti),
+  `reservas/` (intacto), Didit (el gate de verificación ya existía). El esquema va en **dos capas**
+  (_2026-06-03_): `init_db()` **y** la migración `a7f3e1c9d2b4` hacen lo mismo (idempotente, convergen — lo clava
+  `test_alembic_upgrade_db`). El blast-radius de relajar los `NOT NULL` es seguro porque la arquitectura ya lee la
+  identidad validada de `*_renaper` (con COALESCE), no de los campos base. Anclar el CUIL recién al verificar (no
+  forzar KYC en el alta) no mata conversión y respeta la separación identidad(locked)↔contacto/login(editable).
+- **Consecuencias.** **Higiene anti-spam, invisible al usuario (las 3 patas):** (1) rate-limit por-IP que cuenta
+  también las altas **exitosas** (`_record_event`, no solo los fallos — si no, frenaría fuerza bruta pero no spam
+  de cuentas; lo cazó el supervisor); (2) inertidad-hasta-Didit (una liviana no puede pedir ni mandar mails); (3)
+  **cleanup diario** de livianas abandonadas (`jobs/cleanup_livianas.py`, colgado del scheduler in-process único
+  _2026-06-04_: borra liviana + sin verificar + sin email + sin pedidos + > 30d; el `ON DELETE CASCADE` limpia
+  passkey/sesiones/identidades; el predicado además evita orfanar pedidos, cuya FK es `SET NULL`). El daño máximo
+  pre-cleanup es filas vacías inertes, no abuso real. Candados: `test_clientes_livianas_db` (alta + cleanup contra
+  Postgres real: `NOT NULL` relajados, `UNIQUE(email)` con múltiples NULL, `owner_email=''`, inerte, el barrido
+  borra solo lo abandonado) + unit en `test_passkey` (signup begin/complete, 409 passkey duplicada, flag `signup`
+  del challenge, ráfaga de altas → 429). El supervisor marca un alta que escriba identidad en los campos base en
+  vez de esperar a Didit, o un signup fuera de la transacción atómica / del punto único de minteo. Es la **Fase 4**
+  de la iniciativa de identidad (#1098); quedan dentro de la fase la invitación white-glove del admin. Cómo →
+  [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); juicio → `consejo/BITACORA.md` (2026-06-29); historia → commits del lote en `dev`.
