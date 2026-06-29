@@ -18,6 +18,22 @@ import { authedPostJson } from "@/lib/authedFetch";
 
 export type DescuentoOrigen = "cliente" | "jornadas" | "ninguno";
 
+/** Detalle por equipo que el front MUESTRA (no calcula): el backend lo resuelve
+ *  en `/api/cotizar` con el precio efectivo (combo-aware). Ver FASE 3 / #1110. */
+export type CotizacionLinea = {
+  /** Backend id del equipo (null = línea personalizada del builder admin, #805). */
+  equipoId: number | null;
+  cantidad: number;
+  /** Precio efectivo por jornada del ítem (combo → derivado de componentes). */
+  precioJornada: number;
+  /** precioJornada × cantidad (el "$X/día" del ítem). */
+  subtotalPorJornada: number;
+  /** Bruto del período: × jornadas (antes de descuento). */
+  bruto: number;
+  /** Neto del período: con el descuento ganado repartido por línea. */
+  neto: number;
+};
+
 /** Desglose normalizado para el UI (mismas keys que usaba `CartTotal`). */
 export type Cotizacion = {
   /** Σ(precio_jornada × cantidad), sin multiplicar por jornadas. */
@@ -35,6 +51,18 @@ export type Cotizacion = {
   conIva: boolean;
   /** Total a mostrar: neto + IVA. */
   total: number;
+  /** Detalle por equipo (para el caján/teasers; el front lo muestra, no lo calcula). */
+  lineas: CotizacionLinea[];
+};
+
+/** Una línea cruda del backend. */
+type CotizarLineaResp = {
+  equipo_id: number | null;
+  cantidad: number;
+  precio_jornada: number;
+  subtotal_por_jornada: number;
+  bruto: number;
+  neto: number;
 };
 
 /** Respuesta cruda del backend (`/api/cotizar`). */
@@ -50,6 +78,7 @@ type CotizarResp = {
   iva_pct: number;
   iva_monto: number;
   total_final: number;
+  lineas?: CotizarLineaResp[];
 };
 
 export const COTIZACION_VACIA: Cotizacion = {
@@ -63,6 +92,7 @@ export const COTIZACION_VACIA: Cotizacion = {
   iva: 0,
   conIva: false,
   total: 0,
+  lineas: [],
 };
 
 function adaptar(r: CotizarResp): Cotizacion {
@@ -77,7 +107,24 @@ function adaptar(r: CotizarResp): Cotizacion {
     iva: r.iva_monto,
     conIva: r.con_iva,
     total: r.total_final,
+    lineas: (r.lineas ?? []).map((l) => ({
+      equipoId: l.equipo_id,
+      cantidad: l.cantidad,
+      precioJornada: l.precio_jornada,
+      subtotalPorJornada: l.subtotal_por_jornada,
+      bruto: l.bruto,
+      neto: l.neto,
+    })),
   };
+}
+
+/** Lookup por equipo_id (backend id) del detalle por línea de una cotización. */
+export function lineaPorEquipo(
+  cot: Cotizacion,
+  equipoId: number | null | undefined,
+): CotizacionLinea | undefined {
+  if (equipoId == null) return undefined;
+  return cot.lineas.find((l) => l.equipoId === equipoId);
 }
 
 export type CotizarItemInput = {
