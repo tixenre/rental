@@ -62,6 +62,22 @@ export async function registerPasskey(scope: PasskeyScope, deviceName?: string):
   });
 }
 
+/** Crea una cuenta NUEVA con una passkey (alta passwordless, estilo Vercel): el
+ * usuario deslogueado registra una passkey y el backend le mintea una cuenta-cliente
+ * liviana + la sesión, sin tipear nada. La identidad la completa Didit al primer
+ * pedido. Discoverable → la passkey queda descubrible para entrar después. */
+export async function signupWithPasskey(deviceName?: string): Promise<void> {
+  const optionsJSON = await authedPostJson<PublicKeyCredentialCreationOptionsJSON>(
+    "/auth/passkey/signup/begin",
+    {},
+  );
+  const credential = await startRegistration({ optionsJSON });
+  await authedPostJson("/auth/passkey/signup/complete", {
+    credential,
+    device_name: deviceName ?? defaultDeviceName(),
+  });
+}
+
 /** Entra con una passkey (discoverable: el browser ofrece las disponibles). */
 export async function loginWithPasskey(): Promise<void> {
   const optionsJSON = await authedPostJson<PublicKeyCredentialRequestOptionsJSON>(

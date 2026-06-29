@@ -2,10 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { useEffect, useState } from "react";
 import { TopBar } from "@/components/rental/TopBar";
-import { useBusinessPhone } from "@/lib/business";
-import { whatsappLink } from "@/lib/whatsapp";
 import { authedFetch } from "@/lib/authedFetch";
-import { loginWithPasskey, passkeyLoginErrorMessage, passkeySupported } from "@/lib/passkey";
+import {
+  loginWithPasskey,
+  signupWithPasskey,
+  passkeyErrorMessage,
+  passkeyLoginErrorMessage,
+  passkeySupported,
+} from "@/lib/passkey";
+import { Button } from "@/design-system/ui/button";
 import { KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/cliente/login")({
@@ -32,11 +37,7 @@ function ClienteLoginPage() {
   const [devMode, setDevMode] = useState(false);
   const [supported] = useState(() => passkeySupported());
   const [passkeyBusy, setPasskeyBusy] = useState(false);
-  const businessPhone = useBusinessPhone();
-  const waHref = whatsappLink({
-    phone: businessPhone,
-    message: "Hola, quiero crear una cuenta para alquilar equipos.",
-  });
+  const [signupBusy, setSignupBusy] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -64,8 +65,21 @@ function ClienteLoginPage() {
     window.location.href = "/auth/dev-login-cliente";
   }
 
+  async function handlePasskeySignup() {
+    if (signupBusy || passkeyBusy) return;
+    setError(null);
+    setSignupBusy(true);
+    try {
+      await signupWithPasskey();
+      window.location.href = "/cliente/portal";
+    } catch (e) {
+      setError(passkeyErrorMessage(e));
+      setSignupBusy(false);
+    }
+  }
+
   async function handlePasskeyLogin() {
-    if (passkeyBusy) return;
+    if (passkeyBusy || signupBusy) return;
     setError(null);
     setPasskeyBusy(true);
     try {
@@ -92,8 +106,8 @@ function ClienteLoginPage() {
               Acceso
             </h1>
             <p className="font-sans text-sm text-muted-foreground leading-[1.55] mt-1.5">
-              Ingresá con la cuenta de Google con la que hiciste tu reserva para ver tus pedidos,
-              descargar remitos y consultar pagos.
+              Creá tu cuenta o ingresá para ver tus pedidos, descargar remitos y consultar pagos.
+              Sin contraseñas.
             </p>
           </div>
 
@@ -110,6 +124,33 @@ function ClienteLoginPage() {
             >
               Entrar en modo desarrollo
             </button>
+          )}
+
+          {/* Alta passwordless (estilo Vercel): el CTA primario crea la cuenta con una
+              passkey directo, sin tipear nada. Es la jugada de marca ink→accent del DS. */}
+          {supported && (
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="primary"
+                onClick={handlePasskeySignup}
+                loading={signupBusy}
+                className="w-full h-auto py-[13px] text-sm font-semibold"
+              >
+                {!signupBusy && <KeyRound className="h-4 w-4" />}
+                {signupBusy ? "Creando tu cuenta…" : "Crear cuenta con passkey"}
+              </Button>
+              <p className="text-center font-sans text-2xs text-muted-foreground leading-[1.5]">
+                Sin contraseña — usás tu huella, Face ID o el PIN del dispositivo.
+              </p>
+            </div>
+          )}
+
+          {/* El divisor separa el alta (arriba) del ingreso (abajo); sin passkey solo
+              hay ingreso → no hace falta. */}
+          {supported && (
+            <div className="flex items-center gap-3 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground before:content-[''] before:flex-1 before:h-px before:bg-[var(--hairline)] after:content-[''] after:flex-1 after:h-px after:bg-[var(--hairline)]">
+              ya tenés cuenta
+            </div>
           )}
 
           <button
@@ -130,26 +171,6 @@ function ClienteLoginPage() {
               {passkeyBusy ? "Verificando…" : "Entrar con passkey"}
             </button>
           )}
-
-          <div className="flex items-center gap-3 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground before:content-[''] before:flex-1 before:h-px before:bg-[var(--hairline)] after:content-[''] after:flex-1 after:h-px after:bg-[var(--hairline)]">
-            o
-          </div>
-
-          <div className="text-center font-sans text-xs text-muted-foreground">
-            ¿No tenés cuenta todavía?{" "}
-            {waHref ? (
-              <a
-                href={waHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-ink border-b border-ink pb-px hover:text-amber hover:border-amber transition"
-              >
-                Hablanos por WhatsApp
-              </a>
-            ) : (
-              <span className="text-ink">Escribinos para crear tu cuenta.</span>
-            )}
-          </div>
         </div>
       </div>
     </div>
