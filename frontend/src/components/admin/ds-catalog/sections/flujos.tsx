@@ -5,7 +5,7 @@
  * la vitrina le pasa estado MOCK local → se prueba clickeable, sin tocar el carrito
  * real. Se construye por fases: 1) DatePill · 2) carrito mini-bar · 3) modal · 4) drawer.
  */
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { type CatalogSection } from "../types";
@@ -14,6 +14,7 @@ import { Button } from "@/design-system/ui/button";
 import { DatePill } from "@/components/rental/DatePill";
 import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
 import { CartMiniBarView, type CartPreviewItem } from "@/components/rental/CartMiniBarView";
+import { CartDrawerView } from "@/components/rental/CartDrawerView";
 import { type Equipment } from "@/data/equipment";
 import { computeJornadas } from "@/lib/rental-dates";
 
@@ -150,6 +151,105 @@ function CartMiniBarDemo() {
   );
 }
 
+// ── Carrito (drawer desktop / checkout) ──────────────────────────────────────────
+function CartDrawerDemo() {
+  const [qtys, setQtys] = useState<Record<string, number>>({ "1": 1, "2": 1 });
+  const [open, setOpen] = useState(false);
+  const [openKits, setOpenKits] = useState<Record<string, boolean>>({});
+  const [notas, setNotas] = useState("");
+  const [showNotas, setShowNotas] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+
+  const list = MOCK_EQUIPOS.filter((e) => qtys[e.id]).map((e) => ({ it: e, qty: qtys[e.id] }));
+  const subtotal = list.reduce((a, { it, qty }) => a + it.pricePerDay * qty * DEMO_DAYS, 0);
+
+  const add = (id: string) => setQtys((q) => ({ ...q, [id]: (q[id] ?? 0) + 1 }));
+  const remove = (id: string) =>
+    setQtys((q) => {
+      const n = (q[id] ?? 0) - 1;
+      const next = { ...q };
+      if (n <= 0) delete next[id];
+      else next[id] = n;
+      return next;
+    });
+  const setQty = (id: string, qty: number) =>
+    setQtys((q) => {
+      const next = { ...q };
+      if (qty <= 0) delete next[id];
+      else next[id] = qty;
+      return next;
+    });
+
+  // Fechas mock (3 noches → 4 jornadas) para que el panel muestre un rango.
+  const start = new Date();
+  const end = new Date();
+  end.setDate(end.getDate() + 3);
+
+  return (
+    <Stack className="gap-3">
+      <Button variant="amber" shape="pill" onClick={() => setOpen(true)}>
+        Abrir drawer (desktop)
+      </Button>
+      <Caption>
+        abre el panel real · cambiá cantidades y mirá los totales · Confirmar/Compartir hacen toast
+        (sin backend)
+      </Caption>
+      <CartDrawerView
+        drawerOpen={open}
+        isBottom={false}
+        dialogRef={dialogRef}
+        closeBtnRef={closeBtnRef}
+        titleId={titleId}
+        onClose={() => setOpen(false)}
+        onExplore={() => setOpen(false)}
+        startDate={start}
+        endDate={end}
+        startTime="09:00"
+        endTime="09:00"
+        d={DEMO_DAYS}
+        hayFechas
+        onOpenDateModal={() =>
+          toast('El selector de fechas está en el specimen "Fechas" de arriba')
+        }
+        dateModalOpen={false}
+        onDateModalChange={() => {}}
+        list={list}
+        getDisponible={undefined}
+        openKits={openKits}
+        onToggleKit={(id) => setOpenKits((p) => ({ ...p, [id]: !p[id] }))}
+        onAdd={add}
+        onRemove={remove}
+        onSetQty={setQty}
+        subtotalTotal={subtotal}
+        descuentoPct={0}
+        descuentoOrigen="ninguno"
+        descuentoMonto={0}
+        totalNeto={subtotal}
+        conIva={false}
+        notas={notas}
+        showNotas={showNotas}
+        onNotasChange={setNotas}
+        onShowNotas={() => setShowNotas(true)}
+        submitError={null}
+        submitting={false}
+        onSubmit={() => toast.success("Confirmar pedido (demo — en la app crea el pedido real)")}
+        hayNoDisponible={false}
+        nombresSinDisp={[]}
+        needsLogin={false}
+        onLogin={() => {}}
+        onRegister={() => {}}
+        needsVerif={false}
+        iniciandoVerif={false}
+        onVerificar={() => {}}
+        clienteSession={null}
+        onClear={() => setQtys({})}
+      />
+    </Stack>
+  );
+}
+
 export const flujosSection: CatalogSection = {
   id: "flujos",
   title: "Módulos con flujo",
@@ -168,6 +268,13 @@ export const flujosSection: CatalogSection = {
       blurb:
         "La barra del carrito mobile. View presentacional: la app le pasa store + cotización del backend; acá, ítems mock. Agregá equipos y mirá actualizarse.",
       render: () => <CartMiniBarDemo />,
+    },
+    {
+      name: "CartDrawer (desktop · checkout)",
+      files: ["components/rental/CartDrawerView.tsx"],
+      blurb:
+        "El panel completo del carrito: fechas, ítems con stepper, qué incluye, totales, notas y acciones. View presentacional; la app cablea store/cotización/creación de pedido. Acá: ítems mock, Confirmar/Compartir hacen toast.",
+      render: () => <CartDrawerDemo />,
     },
   ],
 };
