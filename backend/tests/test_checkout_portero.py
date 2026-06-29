@@ -11,9 +11,6 @@ Cubre:
 """
 
 import datetime
-import json
-
-import pytest
 
 from services.checkout.validar import (
     _Item,
