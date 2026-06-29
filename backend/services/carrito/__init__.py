@@ -7,7 +7,14 @@ services.precios = plata, services.contenido = qué-incluye, create_pedido = cre
 
 Esta fase (F2, epic #1110) trae la SELECCIÓN canónica + el normalizar único; el resto
 de los submódulos (activos, compartido, listas, readiness) se incorpora fase por fase.
+F4 sumó `activos` (estado server-side: heartbeat / abandono / métricas).
 """
+from services.carrito.activos import (
+    ABANDONO_HORAS,
+    heartbeat_upsert,
+    listar_carritos_admin,
+    marcar_confirmado,
+)
 from services.carrito.modelos import CANTIDAD_MAX, MAX_ITEMS, SeleccionItem
 from services.carrito.seleccion import (
     a_items_json,
@@ -24,4 +31,8 @@ __all__ = [
     "a_items_json",
     "desde_items_json",
     "a_tuplas",
+    "ABANDONO_HORAS",
+    "heartbeat_upsert",
+    "listar_carritos_admin",
+    "marcar_confirmado",
 ]
