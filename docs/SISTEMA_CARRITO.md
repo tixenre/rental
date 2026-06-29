@@ -137,18 +137,27 @@ cliente, en la capa cliente, no en `create_pedido`).
   combo. La paridad **cotizado == cobrado** queda garantizada **por construcción** (un solo
   resolutor) — no hace falta un test de DB que compare "la misma función con la misma función".
 
+## Plata en el front: el front muestra, no calcula (FASE 3 — hecho)
+
+Las superficies del **carrito** (CartDrawer, CartMiniBar, CatalogoMovil, carrito compartido,
+listas) renderizan la plata que devuelve `/api/cotizar` —que ahora incluye **desglose por línea**
+(`lineas`: `subtotal_por_jornada`/`bruto`/`neto` por equipo, combo-aware vía
+`precio_jornada_efectivo`)— en vez de multiplicar `precio × cantidad × jornadas × (1−desc)` a mano.
+El estimado "sin fechas" es `cotizar` con 1 jornada (sin descuento/IVA): un número real del backend,
+no inventado por el front. El total que se cobra ya era backend (#617); esto cerró el detalle por
+línea y los teasers. Materializa el principio _el front no calcula plata (2026-06-29)_.
+
 ## Pendiente (fuera de este epic, a tomar como trabajo propio)
 
-- **FASE 3 — display de plata: el front NO calcula, pide y muestra.** Hoy el `CartDrawer` y los
-  teasers inline (5 superficies) **calculan** el estimado por jornada a mano (`precio × cantidad`,
-  redondeo propio). **Decisión del dueño (2026-06-29): el front no decide plata — la pide al
-  backend y solo renderiza.** El service del carrito devuelve cada precio ya resuelto (vía el
-  resolutor único `precio_jornada_efectivo`), no un helper de cálculo en el front. **Bonus:** el
-  estimado de los **combos** queda correcto (hoy el front usa el precio crudo; el service sabe el
-  efectivo). Para no pegarle al backend en cada clic del teaser, cada equipo puede traer su
-  **precio efectivo** desde el catálogo → el front **suma** lo que le dan, no aplica reglas de
-  precio. El **cómo se muestra** (lo visual) es aparte (pasada de UI del dueño). Espeja
-  _cotizar = fuente única, el front no calcula el total (#617)_.
+- **Catálogo: precio efectivo de combos en `/api/equipos`.** El price-block canónico de las
+  **fichas/cards** (`PriceBlock` → `lib/pricing.priceBreakdown`) y `PreviewPane` aún multiplican el
+  `precio_jornada` **crudo** del catálogo → para un **combo**, la card muestra el precio guardado, no
+  el efectivo (derivado de componentes). Es **otra superficie** (el catálogo, no el carrito): el carrito
+  ya quedó correcto vía `cotizar`. Fix limpio (lo sugirió el dueño): que `list_equipos`/`get_equipo`
+  devuelvan el **precio efectivo** para combos → las cards lo **suman/muestran** sin aplicar reglas, y
+  de paso los teasers de compartir/listas pueden sumar local (sin un `cotizar` por card). Ojo N+1 al
+  resolver el combo en el listado. (Hallazgo durante FASE 3 — la exploración inicial lo había marcado
+  como código muerto; no lo es.)
 - **Split de `routes/alquileres/core.py`** (god-module ~1057 líneas) en cortes move-verbatim
   de piezas **periféricas** (emails, enriquecer), 1 PR por corte, **sin tocar**
   create_pedido/advisory-lock. **Es lógica de `alquileres`, no del carrito** (se tocan, pero es
