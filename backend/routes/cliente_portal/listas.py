@@ -19,12 +19,11 @@ from pydantic import BaseModel
 
 from database import get_db
 from routes.cliente_portal.core import router, require_cliente
+from services.carrito import normalizar_seleccion, a_tuplas
 
 
 # ── Caps de seguridad (no son invariantes de negocio, solo cotas sanas) ───────
 NOMBRE_MAX = 80
-CANTIDAD_MAX = 99
-MAX_ITEMS = 200
 MAX_LISTAS = 50
 
 
@@ -57,25 +56,6 @@ def _clean_nombre(nombre: str) -> str:
     if not n:
         raise HTTPException(400, "La lista necesita un nombre.")
     return n
-
-
-def _normalizar_items(conn, items: list[ListaItemIn]) -> list[tuple[int, int]]:
-    """Dedup por equipo_id (última cantidad gana), clamp de cantidad y filtro a
-    equipos existentes (un equipo borrado del catálogo no entra). Cap a MAX_ITEMS.
-    Preserva el orden de inserción (orden del carrito)."""
-    dedup: dict[int, int] = {}
-    for it in items:
-        dedup[it.equipo_id] = max(1, min(int(it.cantidad), CANTIDAD_MAX))
-    if not dedup:
-        return []
-    existentes = {
-        r["id"]
-        for r in conn.execute(
-            "SELECT id FROM equipos WHERE id = ANY(%s)", (list(dedup.keys()),)
-        ).fetchall()
-    }
-    out = [(eid, cant) for eid, cant in dedup.items() if eid in existentes]
-    return out[:MAX_ITEMS]
 
 
 def _fetch_lista(conn, lista_id: int, cliente_id: int) -> dict | None:
@@ -157,7 +137,7 @@ def create_lista(data: ListaCreate, request: Request):
             raise HTTPException(
                 400, f"Llegaste al máximo de {MAX_LISTAS} listas. Borrá una para crear otra."
             )
-        items = _normalizar_items(conn, data.items)
+        items = a_tuplas(normalizar_seleccion(conn, data.items))
         with conn.transaction():
             lista_id = conn.insert_returning(
                 "INSERT INTO cliente_listas (cliente_id, nombre) VALUES (%s, %s)",
@@ -203,7 +183,7 @@ def replace_items(lista_id: int, data: ListaItemsReplace, request: Request):
         ).fetchone()
         if not owner:
             raise HTTPException(404, "Lista no encontrada")
-        items = _normalizar_items(conn, data.items)
+        items = a_tuplas(normalizar_seleccion(conn, data.items))
         with conn.transaction():
             conn.execute(
                 "DELETE FROM cliente_listas_items WHERE lista_id = %s", (lista_id,)

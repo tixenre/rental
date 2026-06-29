@@ -16,7 +16,6 @@ nombre/foto/precio/disponibilidad se resuelven en vivo desde el catálogo, igual
 que listas. El prefijo `/api/public/` ya está en `middleware.PUBLIC_API_ANY`
 (no requiere sesión). Rate-limit por IP para acotar el abuso del POST anónimo.
 """
-import json
 import secrets
 
 from fastapi import APIRouter, Request, HTTPException
@@ -26,13 +25,12 @@ from config import SITE_URL
 from database import get_db
 from rate_limit import limiter
 from auth.session import get_session
+from services.carrito import normalizar_seleccion, a_items_json, desde_items_json
 
 router = APIRouter(tags=["compartir"])
 
 # ── Caps de seguridad (cotas sanas, no invariantes de negocio) ────────────────
 TITULO_MAX = 80
-CANTIDAD_MAX = 99
-MAX_ITEMS = 200
 TOKEN_BYTES = 12  # ~16 chars urlsafe — corto para un link, sobra de entropía
 
 
@@ -54,32 +52,6 @@ def _clean_titulo(titulo: str | None) -> str | None:
     return t or None
 
 
-def _normalizar_items(conn, items: list[CompartirItemIn]) -> list[dict]:
-    """Dedup por equipo_id (última cantidad gana), clamp de cantidad y filtro a
-    equipos existentes. Cap a MAX_ITEMS. Preserva el orden de inserción.
-
-    Espeja `cliente_portal/listas._normalizar_items` (misma forma de validación);
-    devuelve dicts {equipo_id, cantidad} listos para serializar a items_json.
-    """
-    dedup: dict[int, int] = {}
-    for it in items:
-        dedup[it.equipo_id] = max(1, min(int(it.cantidad), CANTIDAD_MAX))
-    if not dedup:
-        return []
-    existentes = {
-        r["id"]
-        for r in conn.execute(
-            "SELECT id FROM equipos WHERE id = ANY(%s)", (list(dedup.keys()),)
-        ).fetchall()
-    }
-    out = [
-        {"equipo_id": eid, "cantidad": cant}
-        for eid, cant in dedup.items()
-        if eid in existentes
-    ]
-    return out[:MAX_ITEMS]
-
-
 @router.post("/public/compartir", status_code=201)
 @limiter.limit("20/minute")
 def crear_compartido(data: CompartirCreate, request: Request):
@@ -95,8 +67,8 @@ def crear_compartido(data: CompartirCreate, request: Request):
     cliente_id = session["cliente_id"] if session and "cliente_id" in session else None
 
     with get_db() as conn:
-        items = _normalizar_items(conn, data.items)
-        if not items:
+        sel = normalizar_seleccion(conn, data.items)
+        if not sel:
             raise HTTPException(400, "Agregá al menos un equipo para compartir.")
         # token_urlsafe es colisión-improbable (96 bits); el UNIQUE de la columna
         # es la red final. Pre-chequeamos para evitar el choque rarísimo.
@@ -112,7 +84,7 @@ def crear_compartido(data: CompartirCreate, request: Request):
         conn.execute(
             "INSERT INTO carritos_compartidos (token, titulo, items_json, cliente_id)"
             " VALUES (%s, %s, %s::jsonb, %s)",
-            (token, titulo, json.dumps(items), cliente_id),
+            (token, titulo, a_items_json(sel), cliente_id),
         )
         conn.commit()
 
@@ -140,8 +112,7 @@ def get_compartido(token: str, request: Request):
         )
         conn.commit()
 
-    raw = row["items_json"]
-    items = raw if isinstance(raw, list) else json.loads(raw or "[]")
+    items = desde_items_json(row["items_json"])
     return {
         "token": row["token"],
         "titulo": row["titulo"],
