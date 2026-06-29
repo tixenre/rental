@@ -15,6 +15,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 
 from auth.guards import require_cliente
+from auth.stepup import require_recent_auth
 from auth.passkey import store as passkey_store
 from auth import identities_store
 
@@ -66,10 +67,12 @@ def cliente_list_keys(request: Request):
 
 @router.delete("/cliente/auth/keys/{kind}/{key_id}")
 def cliente_remove_key(kind: str, key_id: int, request: Request):
-    """Quita una llave (`passkey` o `identity`), scopeada al dueño. Guardrail: no podés
-    quitar la última (te dejaría sin acceso). El chequeo es best-effort (cuenta antes de
-    borrar) — alcanza para el caso real (no auto-lockearse); no es un candado concurrente."""
-    sess = require_cliente(request)
+    """Quita una llave (`passkey` o `identity`), scopeada al dueño. Exige **step-up**
+    (`require_recent_auth`): confirmar con passkey antes de quitar un método de acceso
+    (operación sensible). Guardrail: no podés quitar la última (te dejaría sin acceso).
+    El chequeo de última llave es best-effort (cuenta antes de borrar) — alcanza para el
+    caso real (no auto-lockearse); no es un candado concurrente."""
+    sess = require_recent_auth(request)
     cid = sess["cliente_id"]
     if kind not in ("passkey", "identity"):
         raise HTTPException(404, "Tipo de llave inválido.")

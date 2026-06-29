@@ -33,6 +33,20 @@ def _cliente_session(cliente_id: int = 42) -> str:
     )
 
 
+def _stepup_cookie(cliente_id: int = 42) -> str:
+    """Marca de step-up fresca (lo que deja una confirmación con passkey) para los tests."""
+    from auth.stepup import _signer
+    return _signer.dumps({"cid": cliente_id})
+
+
+def _client_con_stepup(cliente_id: int = 42) -> TestClient:
+    """Client con sesión de cliente + step-up fresco (para el borrado, que lo exige)."""
+    c = _client()
+    c.cookies.set("session", _cliente_session(cliente_id))
+    c.cookies.set("stepup", _stepup_cookie(cliente_id))
+    return c
+
+
 class TestListKeys:
     def test_sin_sesion_401(self):
         assert _client().get("/cliente/auth/keys").status_code == 401
@@ -63,12 +77,16 @@ class TestRemoveKey:
                             lambda *a, **k: [{"id": i} for i in range(passkeys)])
         monkeypatch.setattr(identities_store, "count_for_cliente", lambda cid: identities)
 
+    def test_sin_stepup_401(self, monkeypatch):
+        # Sin confirmación con passkey reciente (cookie stepup), el borrado se rechaza.
+        self._stub_counts(monkeypatch, passkeys=2, identities=0)
+        c = _client()
+        c.cookies.set("session", _cliente_session())  # sesión SÍ, step-up NO
+        assert c.delete("/cliente/auth/keys/passkey/1").status_code == 401
+
     def test_guardrail_ultima_llave_409(self, monkeypatch):
         self._stub_counts(monkeypatch, passkeys=1, identities=0)  # total = 1
-        c = _client()
-        c.cookies.set("session", _cliente_session())
-        r = c.delete("/cliente/auth/keys/passkey/1")
-        assert r.status_code == 409
+        assert _client_con_stepup().delete("/cliente/auth/keys/passkey/1").status_code == 409
 
     def test_borra_passkey_scopeado_al_dueno(self, monkeypatch):
         self._stub_counts(monkeypatch, passkeys=2, identities=0)  # total = 2 → se puede
@@ -79,9 +97,7 @@ class TestRemoveKey:
             return True
 
         monkeypatch.setattr(passkey_store, "delete_for_owner", fake_del)
-        c = _client()
-        c.cookies.set("session", _cliente_session(cliente_id=42))
-        r = c.delete("/cliente/auth/keys/passkey/1")
+        r = _client_con_stepup(42).delete("/cliente/auth/keys/passkey/1")
         assert r.status_code == 200
         # pasa el cliente_id de la SESIÓN (42), no algo del request → anti-IDOR
         assert captured == {"key_id": 1, "owner_type": "cliente", "cliente_id": 42}
@@ -91,24 +107,18 @@ class TestRemoveKey:
         captured = {}
         monkeypatch.setattr(identities_store, "unlink_for_cliente",
                             lambda pk, cid: captured.update(pk=pk, cid=cid) or True)
-        c = _client()
-        c.cookies.set("session", _cliente_session(cliente_id=42))
-        r = c.delete("/cliente/auth/keys/identity/5")
+        r = _client_con_stepup(42).delete("/cliente/auth/keys/identity/5")
         assert r.status_code == 200
         assert captured == {"pk": 5, "cid": 42}
 
     def test_kind_invalido_404(self, monkeypatch):
         self._stub_counts(monkeypatch, passkeys=2, identities=0)
-        c = _client()
-        c.cookies.set("session", _cliente_session())
-        assert c.delete("/cliente/auth/keys/banana/1").status_code == 404
+        assert _client_con_stepup().delete("/cliente/auth/keys/banana/1").status_code == 404
 
     def test_no_encontrada_404(self, monkeypatch):
         self._stub_counts(monkeypatch, passkeys=2, identities=0)
         monkeypatch.setattr(passkey_store, "delete_for_owner", lambda *a, **k: False)
-        c = _client()
-        c.cookies.set("session", _cliente_session())
-        assert c.delete("/cliente/auth/keys/passkey/99").status_code == 404
+        assert _client_con_stepup().delete("/cliente/auth/keys/passkey/99").status_code == 404
 
 
 class TestGoogleLinkHelpers:

@@ -156,6 +156,14 @@ identidades (`login_identities`) en una sola lista de lectura, y `DELETE /client
 vincular Google, en el link-mode de `google.py` (arriba). Es la cara de "varias llaves" del modelo banco (#1098,
 Fase 1B). Front: `AccessMethods.tsx` (cliente) generaliza `PasskeyManager` (que queda solo para el admin).
 
+### Step-up — `auth/stepup.py` + `…/passkey/stepup/{begin,complete}`
+**"Confirmá que sos vos"** con una passkey **fresca** antes de una operación sensible (hoy: **quitar un método de
+acceso**; reusable a futuro para confirmar un pedido). `POST /cliente/auth/passkey/stepup/{begin,complete}` corre
+la assertion WebAuthn **scopeada** (la passkey TIENE que ser de esta cuenta) y deja la cookie firmada `stepup`
+(~5 min). El guard **`require_recent_auth`** (en `stepup.py`, = `require_cliente` + `stepup` fresca y de esta
+cuenta) la exige; lo usa `DELETE /cliente/auth/keys/...`. **No es un login** (no mintea sesión, solo deja la marca).
+Regla → MEMORIA _2026-06-29 — Step-up con passkey_.
+
 ---
 
 ## 4 · Guards — `auth/guards.py`
@@ -199,7 +207,8 @@ el guard del handler sigue siendo el chequeo fino).
 | `…/cliente/auth/passkey/register/…` · `…/credentials[...]` | `passkey/routes.py` | Registro + gestión de passkeys del cliente. |
 | `GET·DELETE·PATCH /auth/passkey/credentials[/{id}]` | `passkey/routes.py` | Gestión de passkeys del admin. |
 | `GET /cliente/auth/google/link` | `google.py` | Vincular Google a la cuenta logueada (account-linking, no login). |
-| `GET /cliente/auth/keys` · `DELETE /cliente/auth/keys/{kind}/{id}` | `linking.py` | "Métodos de acceso": llaves unificadas (passkey+Google) + quitar con guardrail de última llave. |
+| `GET /cliente/auth/keys` · `DELETE /cliente/auth/keys/{kind}/{id}` | `linking.py` | "Métodos de acceso": llaves unificadas (passkey+Google) + quitar (guardrail de última llave **+ step-up**). |
+| `POST /cliente/auth/passkey/stepup/begin`·`/complete` | `passkey/routes.py` | Step-up (confirmá con passkey) para acciones sensibles → deja la marca `stepup`. |
 | `GET /auth/sessions` · `POST /auth/sessions/revoke-all` · `DELETE /auth/sessions/{jti}` | `sessions_routes.py` | Sesiones activas del admin (listar / cerrar-otras / cerrar-una). |
 | `…/cliente/auth/sessions[...]` | `sessions_routes.py` | Ídem para el cliente (scopeado a su `cliente_id`). |
 | `GET /auth/dev-login[-cliente]` · `POST /auth/staging-login` | `staging.py` | Login programático de dev/staging. |
