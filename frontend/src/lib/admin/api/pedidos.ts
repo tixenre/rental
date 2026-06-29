@@ -16,6 +16,7 @@ import type {
   BusquedasData,
   LiquidacionData,
   ReconciliacionData,
+  GrupoDuplicado,
 } from "./types";
 
 export const pedidosMethods = {
@@ -181,6 +182,18 @@ export const pedidosMethods = {
     authedJson<{ session_id: string; url: string }>(`/api/admin/verificacion/sesion/${clienteId}`, {
       method: "POST",
     }),
+
+  // clientes — fusión de duplicados (mismo CUIL verificado)
+  getClientesDuplicados: () => authedJson<GrupoDuplicado[]>(`/api/clientes/duplicados`),
+  mergeClientes: (source: number, target: number) =>
+    authedPostJson<{ ok: boolean; merged_into: number }>(`/api/clientes/merge`, { source, target }),
+
+  // clientes — invitación (white-glove): crea/reusa la cuenta + link de activación
+  invitarCliente: (email: string, nombre?: string, telefono?: string) =>
+    authedPostJson<{ ok: boolean; cliente_id: number; ya_existia: boolean; url: string }>(
+      `/api/clientes/invitar`,
+      { email, nombre, telefono },
+    ),
 
   // calendario
   getCalendario: (desde: string, hasta: string) => {

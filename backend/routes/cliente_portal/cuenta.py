@@ -127,6 +127,54 @@ def cliente_registro(request: Request, data: RegistroCreate):
     )
 
 
+# ── Claim de invitación (Fase 4 identidad #1098) ──────────────────────────────
+# El admin invita (routes/clientes.py::invitar_cliente) → manda un link single-use → el
+# cliente lo abre, lo RECLAMA (consume el magic-link) y queda logueado → registra su
+# passkey desde "Métodos de acceso". El email se vincula-como-llave al reclamar (probó
+# control del canal). Reusa auth/magic + el punto único de minteo `_make_session_response`.
+
+class ClaimIn(BaseModel):
+    token: str
+
+
+@router.get("/api/cliente/claim-info")
+@limiter.limit("10/minute")
+def cliente_claim_info(request: Request, t: str):
+    """Previsualiza una invitación SIN consumirla (para el landing)."""
+    from auth import magic
+    ctx = magic.peek(t, purpose="invitacion")
+    if not ctx:
+        raise HTTPException(400, "Invitación inválida, vencida o ya usada.")
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT nombre FROM clientes WHERE id=%s", (ctx["cliente_id"],)
+        ).fetchone()
+    return {"email": ctx["email"], "nombre": row_to_dict(row).get("nombre") if row else None}
+
+
+@router.post("/api/cliente/claim")
+@limiter.limit("10/minute")
+def cliente_claim(request: Request, data: ClaimIn):
+    """Reclama una cuenta invitada: CONSUME el magic-link (single-use), vincula el email
+    como llave verificada y MINTEA la sesión. El cliente queda logueado → registra su
+    passkey desde 'Métodos de acceso'."""
+    from auth import magic
+    ctx = magic.consumir(data.token, purpose="invitacion")
+    if not ctx:
+        raise HTTPException(400, "Invitación inválida, vencida o ya usada.")
+    cliente_id, email = ctx["cliente_id"], ctx["email"]
+    with get_db() as conn:
+        row = conn.execute("SELECT id, nombre FROM clientes WHERE id=%s", (cliente_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "La cuenta de esta invitación ya no existe.")
+        nombre = row_to_dict(row).get("nombre") or ""
+    from auth.identities_store import link_identity
+    link_identity(cliente_id=cliente_id, method="email", identifier=email, verified=True)
+    return _make_session_response(
+        email, nombre, extra={"role": "cliente", "cliente_id": cliente_id}, request=request,
+    )
+
+
 # ── Perfil ────────────────────────────────────────────────────────────────────
 
 @router.get("/api/cliente/me")
