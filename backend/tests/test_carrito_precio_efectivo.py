@@ -21,6 +21,7 @@ import services.precios as precios
 from routes.alquileres import cotizacion as ruta_cotizar
 from routes.cliente_portal import pedidos as ruta_crear
 from routes.cliente_portal import solicitudes as ruta_modificar
+from services.carrito import readiness as carrito_readiness
 
 pytestmark = pytest.mark.unit
 
@@ -73,31 +74,48 @@ def test_precio_nulo_es_cero():
 
 # ── 2 · Source-scan (candado: una sola fuente) ────────────────────────────────
 
-# Los 3 caminos que ponen el precio que se PERSISTE. Cada uno mantiene su propio gate
-# de seguridad, pero la resolución del precio efectivo delega en la fuente única.
-_CONSUMIDORES = [ruta_cotizar, ruta_crear, ruta_modificar]
+# Dónde se resuelve el precio EFECTIVO que después se persiste, tras F6:
+#  - cotizar (cotizacion.py) lo resuelve para mostrar el total,
+#  - crear delega en la puerta del carrito `readiness.precios_catalogo_para_reserva`
+#    (que es quien llama al resolutor único),
+#  - modificar (solicitudes.py) lo resuelve en `_equipo_precio_catalogo`.
+# Los tres deben pasar por `precio_jornada_efectivo`, ninguno inlinear el combo.
+_RESOLVERS = [ruta_cotizar, carrito_readiness, ruta_modificar]
+
+# Ningún camino que toque la plata persistida puede reintroducir la resolución de
+# combo inline (así nacía el drift). Incluye al route de crear, que delega.
+_SIN_COMBO_INLINE = [ruta_cotizar, ruta_crear, ruta_modificar, carrito_readiness]
 
 
 def _src(mod) -> str:
     return inspect.getsource(mod)
 
 
-@pytest.mark.parametrize("mod", _CONSUMIDORES, ids=lambda m: m.__name__)
-def test_consumidor_usa_el_resolutor_unico(mod):
+@pytest.mark.parametrize("mod", _RESOLVERS, ids=lambda m: m.__name__)
+def test_resolutor_usa_la_fuente_unica(mod):
     assert "precio_jornada_efectivo" in _src(mod), (
         f"{mod.__name__} debe resolver el precio por jornada vía "
         f"services.precios.precio_jornada_efectivo (fuente única)."
     )
 
 
-@pytest.mark.parametrize("mod", _CONSUMIDORES, ids=lambda m: m.__name__)
-def test_consumidor_no_inlinea_la_resolucion_de_combo(mod):
+def test_crear_delega_en_la_puerta_del_carrito():
+    """El route de crear NO resuelve el precio inline: delega en la puerta del
+    carrito (que mantiene el gate `visible_catalogo` + el resolutor único)."""
+    assert "precios_catalogo_para_reserva" in _src(ruta_crear), (
+        "cliente_crear_pedido debe delegar la resolución de precios en "
+        "services.carrito.precios_catalogo_para_reserva."
+    )
+
+
+@pytest.mark.parametrize("mod", _SIN_COMBO_INLINE, ids=lambda m: m.__name__)
+def test_no_inlinea_la_resolucion_de_combo(mod):
     src = _src(mod)
     assert "precio_combo(" not in src, (
         f"{mod.__name__} inlinea precio_combo() — debe delegar en "
         f"precio_jornada_efectivo para no reintroducir el drift de combos."
     )
-    assert "tipo FROM equipos" not in src and "tipo from equipos" not in src.lower(), (
+    assert "tipo from equipos" not in src.lower(), (
         f"{mod.__name__} arma inline el SELECT de la rama de combo (precio_jornada + "
         f"tipo) — debe delegar en precio_jornada_efectivo."
     )

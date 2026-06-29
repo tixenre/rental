@@ -92,34 +92,15 @@ def cliente_crear_pedido(
 
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
     from routes.alquileres import create_pedido_retry, PedidoCreate, PedidoItem
-    from services.precios import precio_jornada_efectivo
+    from services.carrito import precios_catalogo_para_reserva
 
-    # SEGURIDAD: el cliente nunca decide el precio. Resolvemos cada
-    # `precio_jornada` desde `equipos.precio_jornada` y descartamos lo
-    # que vino en el body. Si un equipo no existe en el catálogo,
-    # devolvemos 404 (no creamos pedidos con equipos fantasma).
-    # (Mismo patrón que `cliente_modificar_pedido` —
-    # `_items_payload_to_pedido_items`.)
+    # SEGURIDAD: el cliente nunca decide el precio. La puerta del carrito
+    # `precios_catalogo_para_reserva` resuelve cada precio desde el catálogo
+    # (gate `visible_catalogo` + fuente única `precio_jornada_efectivo`,
+    # combo-aware) y descarta lo que vino en el body; 404 si un equipo no está
+    # en el catálogo público. Acá solo hacemos el handoff a `create_pedido_retry`.
     with get_db() as conn:
-        precios: dict[int, int] = {}
-        for it in data.items:
-            if it.equipo_id in precios:
-                continue
-            # Sólo equipos del catálogo público y con precio: sin el gate de
-            # `visible_catalogo`, un cliente podía reservar por API un equipo
-            # oculto/interno (o sin precio) enumerando ids → pedido $0.
-            row = conn.execute(
-                "SELECT precio_jornada FROM equipos "
-                "WHERE id = %s AND visible_catalogo = 1 AND precio_jornada IS NOT NULL",
-                (it.equipo_id,),
-            ).fetchone()
-            if not row:
-                raise HTTPException(404, f"Equipo {it.equipo_id} no encontrado en el catálogo")
-            # El SELECT de arriba es el GATE de seguridad (visible_catalogo + precio
-            # no nulo). El precio EFECTIVO lo resuelve la fuente única
-            # `precio_jornada_efectivo` (combo → derivado de componentes C3 #635),
-            # igual que `cotizar` → lo cotizado == lo cobrado (sin drift de combos).
-            precios[it.equipo_id] = int(precio_jornada_efectivo(conn, it.equipo_id) or 0)
+        precios = precios_catalogo_para_reserva(conn, data.items)
 
     payload = PedidoCreate(
         cliente_id=cliente_id,
