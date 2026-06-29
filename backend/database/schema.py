@@ -200,6 +200,18 @@ def _init_db_schema(conn):
     # Migration: link clientes to Supabase Auth users (Phase 1 of unified backend)
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS supabase_uid UUID UNIQUE")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_supabase_uid ON clientes(supabase_uid)")
+    # Cuentas livianas (alta passwordless con passkey): la cuenta NACE sin datos
+    # (solo id + passkey); Didit completa identidad/contacto al primer pedido —y los
+    # escribe en `*_renaper`, no en estos campos base— así que se relajan los NOT NULL.
+    # El `UNIQUE` de email se mantiene (Postgres permite múltiples NULL). `cuenta_estado`
+    # = 'liviana' marca la cuenta vacía. Espejo idempotente de la migración a7f3e1c9d2b4.
+    conn.execute("ALTER TABLE clientes ALTER COLUMN nombre DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN apellido DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN telefono DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN email DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN direccion DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ALTER COLUMN cuit DROP NOT NULL")
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS cuenta_estado TEXT NOT NULL DEFAULT 'completa'")
     # Functional index sobre LOWER(email): el UNIQUE no se usa porque las
     # queries hacen WHERE LOWER(email) = LOWER(?) (auth.py, cliente_portal.py).
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clientes_email_lower ON clientes(LOWER(email))")

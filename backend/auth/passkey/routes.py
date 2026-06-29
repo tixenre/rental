@@ -11,11 +11,13 @@ estar logueado por Google), así que perder el dispositivo = entrar por Google y
 re-registrar. No hay flujo de recovery extra.
 """
 import logging
+import secrets
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import psycopg.errors
+from webauthn.helpers import bytes_to_base64url
 
 from auth.guards import is_admin_email, require_admin
 from database import get_db
@@ -30,6 +32,7 @@ router = APIRouter()
 
 _REG_COOKIE = "wa_chal_reg"
 _AUTH_COOKIE = "wa_chal_auth"
+_SIGNUP_COOKIE = "wa_chal_signup"
 
 
 class RegisterCompleteIn(BaseModel):
@@ -139,6 +142,72 @@ def cliente_register_complete(body: RegisterCompleteIn, request: Request):
                               cliente_id=sess["cliente_id"], owner_key=str(sess["cliente_id"]))
 
 
+# ── Alta passwordless (signup) — registrar passkey SIN cuenta previa ──────────
+# El usuario DESLOGUEADO crea una passkey y se le mintea una cuenta-cliente
+# **liviana** (sin nombre/mail/datos): la cuenta nace solo con `id` + passkey.
+# La identidad/contacto los completa Didit al primer pedido (gate
+# `require_cliente_verificado` la deja inerte hasta verificar → no puede pedir).
+# Anti-spam: rate-limit por IP (el alta crea filas). El `user_handle` es aleatorio
+# (no hay cliente_id todavía); el login discoverable resuelve por credential_id.
+
+@router.post("/auth/passkey/signup/begin")
+def signup_begin(request: Request):
+    _check_rate(get_client_ip(request))  # comparte el bucket por-IP con login/OAuth/staging
+    uh = bytes_to_base64url(secrets.token_bytes(32))
+    options, challenge_b64 = ceremonies.build_registration_options(
+        user_name="Cliente Rambla", user_display_name="Cliente Rambla",
+        user_handle_b64=uh, exclude_ids=[],
+    )
+    res = JSONResponse(options)
+    _set_challenge(res, _SIGNUP_COOKIE,
+                   ceremonies.sign_challenge(challenge_b64, signup=True, uh=uh))
+    return res
+
+
+@router.post("/auth/passkey/signup/complete")
+def signup_complete(body: RegisterCompleteIn, request: Request):
+    ip = get_client_ip(request)
+    _check_rate(ip)
+    data = ceremonies.read_challenge(request.cookies.get(_SIGNUP_COOKIE) or "")
+    if not data or not data.get("signup"):
+        _record_fail(ip)
+        raise HTTPException(400, "Challenge inválido o expirado. Reintentá.")
+    try:
+        reg = ceremonies.verify_registration(credential=body.credential, challenge_b64=data["challenge"])
+    except Exception as e:  # noqa: BLE001 — la lib lanza varios tipos; todos = registro inválido
+        _record_fail(ip)
+        logger.warning("passkey signup verify falló: %s", e)
+        raise HTTPException(400, "No se pudo verificar la passkey.")
+    device_name = (body.device_name or "").strip() or "Passkey"
+    # Cuenta liviana + passkey en UNA transacción: si el insert de la credencial
+    # falla, no queda una cuenta huérfana (atómico). owner_email="" (la cuenta no
+    # tiene mail todavía; la columna es NOT NULL → string vacío).
+    try:
+        with get_db() as conn:
+            with conn.transaction():
+                cliente_id = conn.insert_returning(
+                    "INSERT INTO clientes (cuenta_estado) VALUES (%s)", ("liviana",)
+                )
+                conn.execute(
+                    """INSERT INTO passkey_credentials
+                           (owner_type, owner_email, cliente_id, credential_id, public_key,
+                            sign_count, transports, aaguid, device_name, user_handle)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    ("cliente", "", cliente_id, reg["credential_id"], reg["public_key"],
+                     reg["sign_count"], _extract_transports(body.credential), reg["aaguid"],
+                     device_name, data["uh"]),
+                )
+    except psycopg.errors.UniqueViolation:
+        # credential_id UNIQUE: esa passkey ya existe → no recreamos cuenta. Entrá con ella.
+        raise HTTPException(409, "Esa passkey ya está registrada. Entrá con ella.")
+    logger.info("alta passwordless: cuenta liviana creada id=%s", cliente_id)
+    res = _make_session_response(
+        email="", name="", extra={"role": "cliente", "cliente_id": cliente_id}, request=request,
+    )
+    res.delete_cookie(_SIGNUP_COOKIE)
+    return res
+
+
 # ── Login (begin/complete) — discoverable, un solo flujo para admin y cliente ─
 
 @router.post("/auth/passkey/login/begin")
@@ -203,9 +272,11 @@ def _mint_session_for_owner(row: dict, request: Request):
         ).fetchone()
     if not c:
         raise HTTPException(401, "Cliente no encontrado.")
-    name = f"{c['nombre'] or ''} {c['apellido'] or ''}".strip() or c["email"]
+    # Cuenta liviana (alta passwordless): email/nombre/apellido pueden ser NULL
+    # hasta que Didit los complete → fallback a "" (la sesión no necesita un mail).
+    name = f"{c['nombre'] or ''} {c['apellido'] or ''}".strip() or (c["email"] or "")
     return _make_session_response(
-        email=c["email"], name=name, extra={"role": "cliente", "cliente_id": c["id"]},
+        email=c["email"] or "", name=name, extra={"role": "cliente", "cliente_id": c["id"]},
         request=request,
     )
 

@@ -7,6 +7,7 @@ nuestro — resolución de dueño, minteo de la MISMA cookie de sesión, rechazo
 replay, 403 de no-admin, binding del challenge y scoping anti-IDOR.
 """
 import pytest
+import psycopg.errors
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -242,6 +243,88 @@ class TestRegisterComplete:
                       ceremonies.sign_challenge("chal", ot="admin", ok="otro@x.com", uh="uh"))
         r = c.post("/auth/passkey/register/complete", json={"credential": {"id": "cid"}})
         assert r.status_code == 400
+
+
+class TestSignup:
+    """Alta passwordless: registrar passkey SIN cuenta previa → cuenta liviana +
+    sesión de cliente. DB mockeada (el flujo real contra Postgres está en
+    test_clientes_livianas_db.py)."""
+
+    def _fake_db(self, monkeypatch, *, cliente_id=101, raise_unique=False):
+        captured = {}
+
+        class _Tx:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+
+        class _Conn:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def transaction(self): return _Tx()
+            def insert_returning(self, sql, params=()):
+                captured["cliente_params"] = params
+                return cliente_id
+            def execute(self, sql, params=()):
+                captured["cred_params"] = params
+                if raise_unique:
+                    raise psycopg.errors.UniqueViolation
+                return self
+
+        monkeypatch.setattr("auth.passkey.routes.get_db", lambda: _Conn())
+        return captured
+
+    def test_begin_setea_cookie_con_flag_signup(self):
+        c = _client()
+        r = c.post("/auth/passkey/signup/begin")
+        assert r.status_code == 200
+        assert "wa_chal_signup" in r.cookies
+        data = ceremonies.read_challenge(r.cookies["wa_chal_signup"])
+        assert data and data.get("signup") is True  # complete lo exige
+
+    def test_complete_crea_cuenta_liviana_y_mintea_sesion(self, monkeypatch):
+        monkeypatch.setattr(ceremonies, "verify_registration",
+                            lambda **kw: {"credential_id": "cid", "public_key": "pk",
+                                          "sign_count": 0, "aaguid": "aa"})
+        captured = self._fake_db(monkeypatch, cliente_id=101)
+        c = _client()
+        c.post("/auth/passkey/signup/begin")  # el client guarda la cookie de challenge
+        r = c.post("/auth/passkey/signup/complete",
+                   json={"credential": {"id": "cid", "response": {"transports": ["internal"]}},
+                         "device_name": "iPhone"})
+        assert r.status_code == 200
+        assert "session" in r.cookies
+        sess = signer.loads(r.cookies["session"])
+        assert sess["role"] == "cliente" and sess["cliente_id"] == 101
+        assert sess["email"] == ""  # cuenta sin mail todavía
+        # cuenta insertada como liviana; passkey con owner_email='' + cliente_id.
+        assert captured["cliente_params"] == ("liviana",)
+        assert captured["cred_params"][0] == "cliente"  # owner_type
+        assert captured["cred_params"][1] == ""         # owner_email
+        assert captured["cred_params"][2] == 101        # cliente_id
+
+    def test_complete_challenge_sin_flag_signup_400(self, monkeypatch):
+        # Una cookie de challenge que NO es de signup (p.ej. de un login) no sirve.
+        monkeypatch.setattr(ceremonies, "verify_registration", lambda **kw: {})
+        c = _client()
+        c.cookies.set("wa_chal_signup", ceremonies.sign_challenge("chal"))  # sin signup=True
+        r = c.post("/auth/passkey/signup/complete", json={"credential": {"id": "cid"}})
+        assert r.status_code == 400
+
+    def test_complete_sin_cookie_400(self):
+        c = _client()
+        r = c.post("/auth/passkey/signup/complete", json={"credential": {"id": "cid"}})
+        assert r.status_code == 400
+
+    def test_complete_passkey_duplicada_409(self, monkeypatch):
+        monkeypatch.setattr(ceremonies, "verify_registration",
+                            lambda **kw: {"credential_id": "cid", "public_key": "pk",
+                                          "sign_count": 0, "aaguid": "aa"})
+        self._fake_db(monkeypatch, raise_unique=True)
+        c = _client()
+        c.post("/auth/passkey/signup/begin")
+        r = c.post("/auth/passkey/signup/complete",
+                   json={"credential": {"id": "cid", "response": {"transports": ["internal"]}}})
+        assert r.status_code == 409
 
 
 class TestGestionIDOR:
