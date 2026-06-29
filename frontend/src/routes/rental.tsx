@@ -16,7 +16,6 @@ import {
   LayoutGrid,
   List,
   ArrowRight,
-  Loader2,
   Search,
   X,
   Check,
@@ -49,6 +48,7 @@ import { toast } from "sonner";
 import { type Equipment } from "@/data/equipment";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/design-system/ui/skeleton";
+import { Spinner } from "@/design-system/ui/spinner";
 
 // Lazy: estos componentes solo son visibles tras interacción del usuario.
 // Sacarlos del bundle inicial reduce ~24KB de parse/exec en la carga inicial.
@@ -1243,7 +1243,7 @@ function ListMode({
                   ref={sentinelRef}
                   className="flex items-center justify-center py-6 font-mono text-2xs uppercase tracking-[0.2em] text-muted-foreground"
                 >
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Spinner size="sm" className="mr-2" />
                   Cargando más equipos…
                 </div>
               )}

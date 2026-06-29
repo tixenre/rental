@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/design-system/ui/button";
+import { SegmentedControl } from "@/design-system/ui/segmented-control";
 import { adminApi, type CalendarioPedido } from "@/lib/admin/api";
 import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
 
@@ -142,28 +143,15 @@ export function CalendarioWidget({
         <div className="font-display text-lg md:text-xl text-ink">{headerLabel}</div>
         <div className="flex items-center gap-2">
           {!hideViewSwitch && (
-            <div className="inline-flex rounded-full border hairline bg-background overflow-hidden text-xs">
-              <button
-                type="button"
-                onClick={() => setView("mes")}
-                className={`px-3 py-1 font-mono uppercase tracking-[0.15em] ${
-                  view === "mes" ? "bg-ink text-background" : "text-muted-foreground hover:text-ink"
-                }`}
-              >
-                Mes
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("semana")}
-                className={`px-3 py-1 font-mono uppercase tracking-[0.15em] ${
-                  view === "semana"
-                    ? "bg-ink text-background"
-                    : "text-muted-foreground hover:text-ink"
-                }`}
-              >
-                Semana
-              </button>
-            </div>
+            <SegmentedControl
+              variant="pill"
+              value={view}
+              onChange={(v) => setView(v as "mes" | "semana")}
+              options={[
+                { value: "mes", label: "Mes" },
+                { value: "semana", label: "Semana" },
+              ]}
+            />
           )}
           <Button variant="outline" size="icon" onClick={goPrev} aria-label="Anterior">
             <ChevronLeft className="h-4 w-4" />

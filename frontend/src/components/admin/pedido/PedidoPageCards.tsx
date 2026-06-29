@@ -11,12 +11,12 @@ import {
   Minus,
   AlertTriangle,
   Check,
-  Loader2,
   Eye,
   Download,
   ShoppingCart,
   Mail,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -463,7 +463,7 @@ export function PagosSidebar({
               disabled={addMut.isPending}
             >
               {addMut.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Spinner size="xs" />
               ) : (
                 <Check className="h-3.5 w-3.5" />
               )}{" "}

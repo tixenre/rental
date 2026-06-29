@@ -7,7 +7,8 @@
  */
 
 import { useRef } from "react";
-import { ImageIcon, Trash2, Star, ChevronUp, ChevronDown, Loader2, Upload } from "lucide-react";
+import { ImageIcon, Trash2, Star, ChevronUp, ChevronDown, Upload } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { cn } from "@/lib/utils";
 
 export type GalleryFoto = {
@@ -77,7 +78,7 @@ export function PhotoGallery({
         >
           {uploading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner size="sm" />
               Subiendo…
             </>
           ) : (

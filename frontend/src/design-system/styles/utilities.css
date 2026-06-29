@@ -268,6 +268,34 @@
   }
 }
 
+/* ── Portal gutter responsive ──────────────────────────────
+   Gutter estándar de las cards del portal cliente y c.$token.
+   px-4 (16px) en mobile → 18px en ≥ sm. Usen .px-portal en vez
+   de repetir sm:px-[18px] en cada contenedor. */
+@layer utilities {
+  .px-portal {
+    padding-inline: 1rem;
+  }
+  @media (min-width: 640px) {
+    .px-portal {
+      padding-inline: 1.125rem;
+    }
+  }
+}
+
+/* ── prefers-reduced-motion: kill ALL CSS animations ───────── */
+/* La red de Framer Motion la tira MotionConfig reducedMotion="user" en main.tsx */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ── Keyframes ─────────────────────────────────────────────── */
 /* Animaciones solo si el usuario NO pidió reduced motion */
 @media (prefers-reduced-motion: no-preference) {

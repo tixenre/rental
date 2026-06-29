@@ -11,12 +11,12 @@ import {
   SlidersHorizontal,
   X,
   Calendar,
-  Loader2,
   ChevronRight,
   ChevronDown,
   Check,
   Plus,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { Button } from "@/design-system/ui/button";
 import { useNavigate } from "@tanstack/react-router";
@@ -677,7 +677,7 @@ export function CartSheet({
               disabled={submitting}
             >
               {submitting ? (
-                <Loader2 size={18} className="animate-spin mx-auto" />
+                <Spinner size="md" className="mx-auto" />
               ) : (
                 "Solicitar rental"
               )}

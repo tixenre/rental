@@ -17,12 +17,12 @@ import {
   Send,
   Eye,
   Pencil,
-  Loader2,
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
   Mail,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { EmptyState } from "@/components/rental/EmptyState";
@@ -765,7 +765,7 @@ function TestTab({ tplKey }: { tplKey: string }) {
       >
         {sendMut.isPending ? (
           <>
-            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            <Spinner size="xs" className="mr-1.5" />
             Enviando…
           </>
         ) : (

@@ -6,6 +6,8 @@
  * Select y Calendar son críticos en el flujo de reserva.
  */
 import { useState } from "react";
+import { SegmentedControl } from "@/design-system/ui/segmented-control";
+import { QtyInput } from "@/design-system/ui/qty-input";
 import { useForm } from "react-hook-form";
 import { type DateRange } from "react-day-picker";
 
@@ -297,6 +299,69 @@ export const formsSection: CatalogSection = {
       blurb:
         "Date-picker del flujo de reserva (react-day-picker). mode single (un día) y range (retiro → devolución).",
       render: () => <CalendarDemo />,
+    },
+    {
+      name: "SegmentedControl",
+      files: ["design-system/ui/segmented-control.tsx"],
+      blurb:
+        'Toggle de opciones mutuamente exclusivas. variant="default" = botones separados (back-office). variant="pill" = track conectado (CalendarioWidget).',
+      render: () => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [v1, setV1] = useState("sena");
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [v2, setV2] = useState("mes");
+        return (
+          <Stack>
+            <Sample label="default">
+              <SegmentedControl
+                value={v1}
+                onChange={setV1}
+                options={[
+                  { value: "sena", label: "Seña 50%" },
+                  { value: "saldo", label: "Saldo total" },
+                  { value: "otro", label: "Otro" },
+                ]}
+              />
+            </Sample>
+            <Sample label="pill">
+              <SegmentedControl
+                variant="pill"
+                value={v2}
+                onChange={setV2}
+                options={[
+                  { value: "mes", label: "Mes" },
+                  { value: "semana", label: "Semana" },
+                ]}
+              />
+            </Sample>
+          </Stack>
+        );
+      },
+    },
+    {
+      name: "QtyInput",
+      files: ["design-system/ui/qty-input.tsx"],
+      blurb:
+        "Stepper editable: − / input / +. Controla min/max y muestra estado de error (overstock).",
+      render: () => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [qty, setQty] = useState(1);
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [qtyErr, setQtyErr] = useState(3);
+        return (
+          <Row className="gap-6">
+            <Sample label="default (min 1)">
+              <QtyInput value={qty} onChange={setQty} min={1} />
+            </Sample>
+            <Sample label="error / overstock (max 2)">
+              <QtyInput value={qtyErr} onChange={setQtyErr} min={1} max={2} error={qtyErr > 2} />
+            </Sample>
+            <Sample label="size sm">
+              <QtyInput value={qty} onChange={setQty} size="sm" />
+            </Sample>
+          </Row>
+        );
+      },
     },
   ],
 };

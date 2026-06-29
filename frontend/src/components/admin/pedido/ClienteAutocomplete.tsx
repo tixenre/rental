@@ -49,6 +49,11 @@ export function ClienteAutocomplete({
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           value={q}
+          role="combobox"
+          aria-expanded={open && q.trim().length > 0}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
+          aria-controls="cliente-autocomplete-list"
           onChange={(e) => {
             setQ(e.target.value);
             setOpen(true);
@@ -59,7 +64,11 @@ export function ClienteAutocomplete({
           className="pl-9 text-base sm:text-sm"
         />
         {open && q.trim().length > 0 && (
-          <div className="absolute z-30 left-0 right-0 mt-1 rounded-md border hairline bg-background shadow-md max-h-52 overflow-auto">
+          <div
+            role="listbox"
+            id="cliente-autocomplete-list"
+            className="absolute z-30 left-0 right-0 mt-1 rounded-md border hairline bg-background shadow-md max-h-52 overflow-auto"
+          >
             {clientesQ.isLoading && (
               <div className="p-3 text-xs text-muted-foreground">Buscando…</div>
             )}
@@ -70,6 +79,8 @@ export function ClienteAutocomplete({
               <button
                 key={c.id}
                 type="button"
+                role="option"
+                aria-selected={false}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   onPick(c);

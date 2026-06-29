@@ -115,6 +115,12 @@ export function EquipoComboSearch({
       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
       <Input
         value={q}
+        role="combobox"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-autocomplete="list"
+        aria-controls="equipo-combo-list"
+        aria-activedescendant={focusedIdx >= 0 ? `equipo-opt-${focusedIdx}` : undefined}
         onChange={(e) => {
           setQ(e.target.value);
           setOpen(true);
@@ -123,7 +129,6 @@ export function EquipoComboSearch({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         className="pl-9 text-base sm:text-sm"
-        aria-activedescendant={focusedIdx >= 0 ? `equipo-opt-${focusedIdx}` : undefined}
       />
 
       {open && (
@@ -135,13 +140,19 @@ export function EquipoComboSearch({
               {q.trim() ? `Sin resultados para "${q.trim()}".` : "No hay equipos."}
             </div>
           ) : (
-            <ul ref={listRef} className="divide-y hairline">
+            <ul ref={listRef} role="listbox" id="equipo-combo-list" className="divide-y hairline">
               {visibles.map((eq, idx) => {
                 const disponible = disponibleDe(eq);
                 const sinStock = disponible <= 0;
                 const isFocused = idx === focusedIdx;
                 return (
-                  <li key={eq.id} id={`equipo-opt-${idx}`}>
+                  <li
+                    key={eq.id}
+                    id={`equipo-opt-${idx}`}
+                    role="option"
+                    aria-selected={isFocused}
+                    aria-disabled={sinStock}
+                  >
                     <button
                       type="button"
                       disabled={sinStock}

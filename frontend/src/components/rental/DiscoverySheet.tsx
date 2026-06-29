@@ -4,6 +4,8 @@ import { ArrowLeft, ChevronRight, Search, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system/ui/tabs";
+import { Button } from "@/design-system/ui/button";
+import { CountBadge } from "@/design-system/ui/count-badge";
 import type { Equipment } from "@/data/equipment";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { normalizar, tokenizar } from "@/lib/search/normalize";
@@ -142,11 +144,7 @@ export function DiscoverySheet({
                   className="data-[state=active]:border-b-2 data-[state=active]:border-ink data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none h-11"
                 >
                   Filtros
-                  {activeFilters > 0 && (
-                    <span className="ml-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-ink px-1 text-3xs font-bold text-amber">
-                      {activeFilters}
-                    </span>
-                  )}
+                  <CountBadge count={activeFilters} className="ml-1.5" />
                 </TabsTrigger>
               </TabsList>
 
@@ -199,12 +197,14 @@ export function DiscoverySheet({
                   <X className="h-3 w-3" /> Limpiar
                 </button>
               )}
-              <button
+              <Button
+                variant="primary"
+                shape="pill"
                 onClick={() => onOpenChange(false)}
-                className="ml-auto flex-1 rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-amber hover:bg-foreground"
+                className="ml-auto flex-1 h-auto py-2.5 font-semibold"
               >
                 Ver {resultCount} resultados
-              </button>
+              </Button>
             </div>
           )}
         </motion.div>

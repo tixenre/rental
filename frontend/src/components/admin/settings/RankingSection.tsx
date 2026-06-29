@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -48,13 +49,13 @@ export function RankingSection() {
           disabled={recalcMut.isPending}
         >
           {recalcMut.isPending && recalcMut.variables ? (
-            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            <Spinner size="sm" className="mr-1" />
           ) : null}
           Ver preview (dry-run)
         </Button>
         <Button onClick={() => recalcMut.mutate(false)} disabled={recalcMut.isPending}>
           {recalcMut.isPending && !recalcMut.variables ? (
-            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            <Spinner size="sm" className="mr-1" />
           ) : null}
           Recalcular y aplicar
         </Button>

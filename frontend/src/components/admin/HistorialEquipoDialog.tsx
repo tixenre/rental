@@ -7,7 +7,8 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { Link } from "@tanstack/react-router";
 
 import {
@@ -79,7 +80,7 @@ export function HistorialEquipoDialog({
 
         {histQ.isLoading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-6">
-            <Loader2 className="h-4 w-4 animate-spin" /> Cargando historial…
+            <Spinner size="sm" /> Cargando historial…
           </div>
         )}
 

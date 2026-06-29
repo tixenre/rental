@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
+import { Button } from "@/design-system/ui/button";
 import { toast } from "sonner";
 import {
   Bell,
@@ -23,8 +24,8 @@ import {
   BadgeCheck,
   ShieldAlert,
   ShieldCheck,
-  Loader2,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { cn } from "@/lib/utils";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
@@ -651,7 +652,7 @@ function SaveButton({ saving, disabled = false }: { saving: boolean; disabled?: 
     >
       {saving ? (
         <>
-          <Loader2 className="h-4 w-4 animate-spin" /> Guardando…
+          <Spinner size="sm" /> Guardando…
         </>
       ) : (
         "Guardar cambios"

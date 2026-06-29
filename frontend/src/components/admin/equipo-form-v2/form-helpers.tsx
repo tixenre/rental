@@ -4,10 +4,10 @@ import {
   ExternalLink,
   ChevronDown,
   Image as ImageIcon,
-  Loader2,
   Upload,
   X,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import {
@@ -249,7 +249,7 @@ export function PhotoCard({
         >
           {uploading ? (
             <>
-              <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo…
+              <Spinner size="xs" className="mr-1" /> Subiendo…
             </>
           ) : (
             <>
@@ -268,7 +268,7 @@ export function PhotoCard({
           >
             {uploadingToR2 ? (
               <>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Subiendo…
+                <Spinner size="xs" className="mr-1" /> Subiendo…
               </>
             ) : (
               "Subir a R2"

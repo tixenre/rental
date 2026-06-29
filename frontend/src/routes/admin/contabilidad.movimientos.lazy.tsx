@@ -31,6 +31,7 @@ import { EmptyState } from "@/components/rental/EmptyState";
 import { formatMoney, formatFechaDisplay } from "@/lib/format";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
+import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { TipoMovimientoBadge, TIPO_MOVIMIENTO_META } from "@/components/admin/badges";
 import { cn } from "@/lib/utils";
@@ -592,13 +593,9 @@ function NuevoMovimientoForm({ onCreated }: { onCreated: () => void }) {
             className="text-xs"
           />
         </Field>
-        <button
-          type="submit"
-          disabled={crear.isPending}
-          className="h-9 rounded-md bg-ink px-4 text-sm text-background disabled:opacity-50"
-        >
+        <Button type="submit" variant="primary" disabled={crear.isPending} loading={crear.isPending}>
           {crear.isPending ? "Guardando…" : "Registrar"}
-        </button>
+        </Button>
       </div>
     </form>
   );
