@@ -192,7 +192,7 @@ function AccessKeyRow({ k, isOnly }: { k: AccessKey; isOnly: boolean }) {
           <>
             <div className="truncate text-sm font-medium text-ink">{k.label}</div>
             <div className="font-mono text-2xs uppercase tracking-wider text-muted-foreground">
-              {fmtFecha(k.created_at, k.last_used_at)}
+              {typeLabel(k.kind)} · {fmtFecha(k.created_at, k.last_used_at)}
             </div>
           </>
         )}
@@ -236,6 +236,14 @@ function AccessKeyRow({ k, isOnly }: { k: AccessKey; isOnly: boolean }) {
       )}
     </li>
   );
+}
+
+/** Tipo de la llave en claro — para que una passkey con nombre raro (un mail viejo) no
+ * se confunda con la cuenta de Google. */
+function typeLabel(kind: AccessKey["kind"]): string {
+  if (kind === "google") return "Google";
+  if (kind === "email") return "Mail";
+  return "Passkey";
 }
 
 function fmtFecha(created: string | null, lastUsed: string | null): string {
