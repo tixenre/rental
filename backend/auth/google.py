@@ -297,6 +297,61 @@ def cliente_auth_google(request: Request):
     return res
 
 
+@router.get("/cliente/auth/google/link")
+def cliente_auth_google_link(request: Request):
+    """Vincular OTRA cuenta de Google a la cuenta del cliente **ya logueado**
+    (account-linking — "varias llaves"). NO es un login: el callback detecta el
+    `link_cliente_id` firmado en el state y vincula la identidad en vez de mintear una
+    sesión nueva. Requiere sesión de cliente; el `cliente_id` viaja firmado (no forjable)."""
+    sess = get_session(request)
+    if not sess or sess.get("role") != "cliente":
+        raise HTTPException(401, "Sesión de cliente requerida.")
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(503, "Google OAuth no configurado en el servidor.")
+    client = OAuth2Client(
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        redirect_uri=CLIENTE_REDIRECT_URI,
+        scope="openid email profile",
+    )
+    state = signer.dumps({"nonce": secrets.token_urlsafe(16), "link_cliente_id": sess["cliente_id"]})
+    uri, _ = client.create_authorization_url(
+        GOOGLE_AUTH_URL, state=state, access_type="online", prompt="select_account",
+    )
+    res = RedirectResponse(uri, status_code=302)
+    res.set_cookie("oauth_state_cliente", state, httponly=True, samesite="lax",
+                   secure=COOKIE_SECURE, max_age=600)
+    return res
+
+
+def _link_cliente_id_de_state(state: str | None):
+    """Extrae el `link_cliente_id` del state firmado (None si no es un link o expiró)."""
+    if not state:
+        return None
+    try:
+        payload = signer.loads(state, max_age=600)
+    except (BadSignature, SignatureExpired):
+        return None
+    return payload.get("link_cliente_id") if isinstance(payload, dict) else None
+
+
+def _completar_link_google(request: Request, link_cid: int, sub: str | None):
+    """Vincula el `sub` de Google a la cuenta logueada y vuelve a "métodos de acceso"
+    con un estado. Defensa: la sesión actual TIENE que ser la de esa cuenta (no se
+    vincula a una cuenta ajena aunque el state lo diga)."""
+    current = get_session(request)
+    base = f"{FRONTEND_BASE}/cliente/perfil"
+    if not current or current.get("role") != "cliente" or current.get("cliente_id") != link_cid or not sub:
+        return RedirectResponse(f"{base}?keys=error", status_code=303)
+    from auth.identities_store import link_identity  # perezoso: evita ciclo con auth/__init__
+    resultado = link_identity(cliente_id=link_cid, method="google", identifier=sub, verified=True)
+    estado = {"linked": "ok", "already_yours": "ya", "taken_by_other": "taken"}.get(resultado, "error")
+    res = RedirectResponse(f"{base}?keys={estado}", status_code=303)
+    res.delete_cookie("oauth_state_cliente")
+    res.delete_cookie("oauth_next_cliente")
+    return res
+
+
 @router.get("/cliente/auth/callback")
 def cliente_auth_callback(request: Request):
     """Google redirige acá. Si el cliente existe → sesión. Si no → registro."""
@@ -362,6 +417,14 @@ def cliente_auth_callback(request: Request):
     # a la misma cuenta.
     from auth.identities_store import find_or_backfill_google  # perezoso: evita ciclo con auth/__init__
     sub = userinfo.get("sub") or userinfo.get("id")
+
+    # ¿Es un LINK (vincular Google a una cuenta ya logueada), no un login? El
+    # `link_cliente_id` viaja firmado en el state (lo puso /cliente/auth/google/link).
+    # En ese caso no minteamos sesión: vinculamos la identidad y volvemos a la cuenta.
+    link_cid = _link_cliente_id_de_state(state)
+    if link_cid is not None:
+        return _completar_link_google(request, link_cid, sub)
+
     cliente_id = find_or_backfill_google(sub, email)
 
     if cliente_id is not None:

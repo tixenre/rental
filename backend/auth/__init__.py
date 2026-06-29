@@ -30,9 +30,11 @@ import auth.google  # noqa: F401
 import auth.staging  # noqa: F401
 import auth.passkey.routes  # noqa: F401
 import auth.sessions_routes  # noqa: F401
+import auth.linking  # noqa: F401
 
 from auth.google import router  # router compartido google + staging
 from auth.passkey.routes import router as auth_passkey_router
 from auth.sessions_routes import router as auth_sessions_router
+from auth.linking import router as auth_linking_router
 
-__all__ = ["router", "auth_passkey_router", "auth_sessions_router"]
+__all__ = ["router", "auth_passkey_router", "auth_sessions_router", "auth_linking_router"]
