@@ -353,7 +353,7 @@ export function PedidoCard({
     toast.success(
       "Armamos tu carrito con los equipos de este pedido. Elegí las fechas para reservar.",
     );
-    navigate({ to: "/", search: { openCarrito: true } });
+    navigate({ to: "/rental", search: { openCarrito: true } });
   }
   function handleRepetirClick() {
     if (itemsRepetibles.length === 0) {

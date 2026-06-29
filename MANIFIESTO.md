@@ -286,6 +286,7 @@ Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`
 | [`docs/SISTEMA_SPECS.md`](docs/SISTEMA_SPECS.md) | **Manual técnico del sistema de specs / catálogo / datasets / autocompletar / compat** |
 | [`docs/SISTEMA_FOTOS.md`](docs/SISTEMA_FOTOS.md) | **Manual técnico del sistema de fotos / media: motor (procesar) + componentes (mostrar)** |
 | [`docs/SISTEMA_CONTENIDO.md`](docs/SISTEMA_CONTENIDO.md) | **Manual técnico del contenido de producto: puerta única "qué incluye un kit/combo" (`services/contenido`)** |
+| [`docs/SISTEMA_CARRITO.md`](docs/SISTEMA_CARRITO.md) | **Manual técnico del carrito: módulo único de la lógica (`services/carrito`) — selección / activos / readiness; carrito = intención, gate = verdad** |
 | [`docs/SISTEMA_AUTH.md`](docs/SISTEMA_AUTH.md) | **Manual técnico de la autenticación: motor `auth/` (sesión + jti/revocación), métodos (Google/passkey/staging), guards, middleware, seguridad** |
 | [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido` |
 | [`docs/MOBILE.md`](docs/MOBILE.md) | Componentes y patrones mobile |

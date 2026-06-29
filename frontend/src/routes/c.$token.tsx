@@ -104,6 +104,10 @@ function CompartidoBody({
     (r): r is { item: CompartirItem; equipo: Equipment } => r.equipo !== null,
   );
   const noDisponibles = resueltos.length - reservables.length;
+  // Estimado por jornada: suma del precio EFECTIVO por jornada que ya da el backend.
+  // El catálogo devuelve el precio combo-aware (resuelto en el server), así que el
+  // front solo SUMA lo que le dieron — no aplica reglas (FASE 3). Sin fechas = una
+  // jornada de referencia, sin descuento/IVA (eso lo pone cotizar al elegir período).
   const estimadoJornada = reservables.reduce(
     (acc, r) => acc + (r.equipo.pricePerDay ?? 0) * r.item.cantidad,
     0,
@@ -122,7 +126,7 @@ function CompartidoBody({
       rearmarCarrito(comp);
       toast.success("Armamos tu carrito con esta selección. Elegí las fechas para reservar.");
     }
-    navigate({ to: "/", search: { openCarrito: true } });
+    navigate({ to: "/rental", search: { openCarrito: true } });
   }
   function handleArmarClick() {
     if (reservables.length === 0) {

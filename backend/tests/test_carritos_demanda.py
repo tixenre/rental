@@ -5,7 +5,7 @@ la DB) → se testea sin Postgres. Fija el contrato del ranking: agrupar por
 equipo, contar carritos + unidades, y ordenar por presencia y luego unidades.
 """
 
-from routes.carritos import _calcular_demanda
+from services.carrito.activos import _calcular_demanda
 
 
 def _carrito(items):

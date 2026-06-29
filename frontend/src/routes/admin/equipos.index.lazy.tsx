@@ -138,7 +138,9 @@ function EquiposPage() {
   const [openDashboard, setOpenDashboard] = useState(false);
   const [openComboBuilder, setOpenComboBuilder] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [tab, setTab] = useState<"todos" | "destacados" | "nuevos" | "sin-foto">("todos");
+  const [tab, setTab] = useState<"todos" | "combos" | "destacados" | "nuevos" | "sin-foto">(
+    "todos",
+  );
 
   const equiposQ = useQuery({
     queryKey: [
@@ -276,20 +278,28 @@ function EquiposPage() {
   const esDestacado = (eq: Equipo) =>
     (eq.etiquetas ?? []).some((t) => t.toLowerCase() === "destacado");
   const esNuevo = (eq: Equipo) => (eq.etiquetas ?? []).some((t) => t.toLowerCase() === "nuevo");
+  // Los combos son "otra cosa" (sin stock propio, precio derivado de componentes):
+  // viven en su propio tab. El resto de los tabs operan sobre el inventario FÍSICO
+  // (equipos + kits), sin combos.
+  const esCombo = (eq: Equipo) => eq.tipo === "combo";
+  const fisicos = allItems.filter((e) => !esCombo(e));
   const tabCounts = {
-    todos: allItems.length,
-    destacados: allItems.filter(esDestacado).length,
-    nuevos: allItems.filter(esNuevo).length,
-    "sin-foto": allItems.filter((e) => !e.foto_url).length,
+    todos: fisicos.length,
+    combos: allItems.filter(esCombo).length,
+    destacados: fisicos.filter(esDestacado).length,
+    nuevos: fisicos.filter(esNuevo).length,
+    "sin-foto": fisicos.filter((e) => !e.foto_url).length,
   };
   const items =
-    tab === "destacados"
-      ? allItems.filter(esDestacado)
-      : tab === "nuevos"
-        ? allItems.filter(esNuevo)
-        : tab === "sin-foto"
-          ? allItems.filter((e) => !e.foto_url)
-          : allItems;
+    tab === "combos"
+      ? allItems.filter(esCombo)
+      : tab === "destacados"
+        ? fisicos.filter(esDestacado)
+        : tab === "nuevos"
+          ? fisicos.filter(esNuevo)
+          : tab === "sin-foto"
+            ? fisicos.filter((e) => !e.foto_url)
+            : fisicos;
 
   const etiquetasOpts = useMemo(
     () => (etiquetasQ.data ?? []).filter((e) => (e.total ?? 0) > 0),
@@ -317,7 +327,7 @@ function EquiposPage() {
     <AdminPage
       title="Equipos"
       maxW="max-w-7xl"
-      description={equiposQ.isLoading ? "Cargando…" : `${total} equipos`}
+      description={equiposQ.isLoading ? "Cargando…" : `${kpisQ.data?.total ?? total} equipos`}
       actions={
         <>
           <Button
@@ -628,6 +638,7 @@ function EquiposPage() {
           {(
             [
               ["todos", "Todos"],
+              ["combos", "Combos"],
               ["destacados", "Destacados"],
               ["nuevos", "Nuevos"],
               ["sin-foto", "Sin foto"],
@@ -770,10 +781,19 @@ function EquiposPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    <StockInline
-                      equipo={eq}
-                      onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
-                    />
+                    {eq.tipo === "combo" ? (
+                      <span
+                        className="font-mono text-2xs uppercase tracking-[0.1em] text-muted-foreground"
+                        title="El stock de un combo se deriva de sus componentes (mín. de los esenciales)"
+                      >
+                        derivado
+                      </span>
+                    ) : (
+                      <StockInline
+                        equipo={eq}
+                        onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
+                      />
+                    )}
                   </TableCell>
                   <TableCell className="text-right hidden sm:table-cell w-32">
                     <PrecioJornadaInline
