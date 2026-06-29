@@ -6,7 +6,7 @@ import { nombreCliente } from "@/lib/cliente-nombre";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { PublicLayout } from "@/components/rental/PublicLayout";
-import { PasskeyManager } from "@/components/rental/PasskeyManager";
+import { AccessMethods } from "@/components/rental/AccessMethods";
 import { SessionManager } from "@/components/rental/SessionManager";
 
 export const Route = createFileRoute("/cliente/perfil")({
@@ -263,9 +263,9 @@ function PerfilPage() {
         </form>
 
         <section className="mt-10 border-t hairline pt-8">
-          <h2 className="font-display text-xl text-ink">Acceso con passkey</h2>
+          <h2 className="font-display text-xl text-ink">Métodos de acceso</h2>
           <div className="mt-4">
-            <PasskeyManager scope="cliente" />
+            <AccessMethods />
           </div>
         </section>
 
