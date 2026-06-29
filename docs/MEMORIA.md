@@ -268,7 +268,7 @@ telemetría de uso por hook y check-in proactivo de la cola. Plantilla `.claude/
 (`.claude/skills/gobernanza/SKILL.md`, `model: opus`) implementa el loop completo: dashboard `/skills`
 (qué hay, último uso del ledger, staleness, propuestas pendientes), auditoría profunda de drift/overlap/
 bloat/routing de modelo, consumo del buzón + ledger, consolidación en modo **dry-run** (propone-no-borra,
-archiva a `.claude/skills/.archive/`), y cierre periódico mensual. Modo propone-aprobás en todos los pasos.
+archiva a `.claude/skills/.archive/`), y cierre de gobernanza por volumen del buzón (≥5 propuestas, _2026-06-29_). Modo propone-aprobás en todos los pasos.
 El supervisor marca skills sin `## Auto-mejora` o un `gobernanza` que aplique cambios sin aprobación.
 
 ### 2026-06-23 — pendientes (ex-`cola`) = skill único de administración de la cola (issues/feature-requests); Frente D apunta acá
@@ -375,7 +375,7 @@ confusión del dueño) y, si el dueño confirma, **procede** — la **excepción
 un **patrón repetido** o un **cambio de criterio explícito** lo muta. **Aplicarlos es default de la sesión,
 no se pide** (mismo loop que el `## Auto-mejora` de los skills: el sistema detecta y propone, el dueño
 aprueba). Los **mantiene** el supervisor (testea cada lote: _excepción puntual_ vs. _drift recurrente_ →
-propone mutar) + `gobernanza` (re-deriva en el cierre mensual). El supervisor marca un principio aplicado
+propone mutar) + `gobernanza` (re-deriva cada 2 cierres de gobernanza). El supervisor marca un principio aplicado
 como ley rígida (sin permitir excepción confirmada por el dueño) o una mutación grabada sin su aprobación.
 
 ### 2026-06-27 — PR como hoja de ruta: rama aislada → PR scoped del tema → issue de tracking → batch a prod
@@ -441,6 +441,20 @@ directa == `reservas.semantics`, a equipos no retirados). Candados: `test_conten
 que el gate) + `test_contenido_sql_safety.py` (prohíbe SQL inline de `kit_componentes`). El supervisor marca
 display de "qué incluye" ad-hoc fuera de la puerta. Cómo → [`SISTEMA_CONTENIDO.md`](SISTEMA_CONTENIDO.md);
 tracking #1087.
+
+### 2026-06-29 — Cierre de gobernanza disparado por volumen del buzón (no por calendario)
+
+El **cierre de gobernanza** (§6 del skill) deja de ser **mensual** y se dispara **por volumen**: cuando el
+buzón `PROPUESTAS_SKILLS.md` junta **≥ 5 propuestas pendientes** (constante `THRESHOLD` tuneable en el hook;
+**N=5** de arranque, se afina con el ritmo real — empirismo proporcional _2026-06-27_). Lo **surfacea solo**
+el hook `check-buzon.sh` (SessionStart, gemelo de `check-pendientes.sh`; terminal/desktop, no web/celu) → la
+sesión le pregunta al dueño si corre el cierre; el dueño es el gate. **Sin piso de tiempo:** buzón quieto =
+nada que triagear = correcto; el resto del cierre (staleness de manuales, skills > 120 días) ya tiene su
+propia red (supervisor + `check-docs`), así que el **buzón es la señal correcta** para gatillar (mismo
+criterio que `check-retro.sh`: por volumen/diff, no por fecha). La **re-derivación de principios**
+(anti-congelamiento) va **cada 2 cierres**, no en cada uno (re-derivar sobre poco corpus agrega ruido).
+Refina —no reemplaza— la cadencia "mensual" de _2026-06-23 (Etapa 2)_ y _2026-06-27 (Filosofía derivada)_.
+El supervisor marca un cierre gateado por calendario en vez de por volumen.
 
 ---
 

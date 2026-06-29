@@ -1017,11 +1017,12 @@ cancel-in-progress` ya cancela corridas viejas.
      completo de curación: dashboard `/skills` (qué hay, uso real del ledger, staleness, buzón); auditoría
      profunda (drift de `model:`, overlap, staleness de contenido, bloat, cross-refs); consumo del buzón
      (`PROPUESTAS_SKILLS.md`) y el ledger (`.claude/skill-ledger.jsonl`); consolidación dry-run (propone
-     archivar a `.claude/skills/.archive/`, no borra); cierre periódico mensual con digest. Blueprint:
+     archivar a `.claude/skills/.archive/`, no borra); cierre periódico con digest (cadencia por volumen
+     del buzón desde _2026-06-29_). Blueprint:
      Curator de Hermes, nativo. Modo propone-aprobás en todos los pasos.
 - **Why.** El sistema aprende de su propio uso (ledger → qué se invoca de verdad) y de las mejoras
   detectadas durante el uso (buzón → propuestas acumuladas). Sin el meta-skill, la telemetría y el buzón
-  son datos sin consumidor. El ritual mensual convierte "tengo datos" en "el sistema evoluciona con
+  son datos sin consumidor. El ritual periódico convierte "tengo datos" en "el sistema evoluciona con
   criterio, no al azar". La sección Auto-mejora universal cierra el loop recursivo: cualquier skill puede
   proponer su propia mejora, independientemente de quién lo corra.
 - **Consecuencias.** 7 skills registrados y bien formados (`check-docs.mjs` verde). El linter exige
@@ -1336,8 +1337,8 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Cómo se mantiene (mecanismo).** Auto-load nativo (CLAUDE.md se lee en cada sesión, todas las superficies) =
   los principios siempre en contexto. El **supervisor** (ya despachado antes de cada PR) suma a su checklist:
   ¿el lote confirma/tensiona/suma un principio? → distingue **excepción puntual** (no propone) de **drift
-  recurrente / cambio de criterio** (propone mutar). `gobernanza` los **re-deriva del corpus** en el cierre
-  mensual (anti-congelamiento). El hook `check-governance-review.sh` los **surfacea** como backstop cuando la
+  recurrente / cambio de criterio** (propone mutar). `gobernanza` los **re-deriva del corpus** cada 2 cierres
+  de gobernanza (anti-congelamiento). El hook `check-governance-review.sh` los **surfacea** como backstop cuando la
   rama toca el digest (local: terminal/desktop; no en celu/web).
 - **Por qué así (reusar, no recrear).** Es el mecanismo que el dueño ya confía para los skills (`## Auto-mejora`:
   detectar-proponer sin pedido), aplicado a los principios — no se inventa uno nuevo (principio #1). Límite
@@ -1459,7 +1460,7 @@ cancel-in-progress` ya cancela corridas viejas.
   gitignored, `exit 0` siempre), con dos diferencias: filtro **disjunto** = código de producto
   `^(backend/|frontend/src/)` (excluye naturalmente skills/digest → cero overlap con el de gobernanza) y umbral
   "no trivial" (≥4 archivos **o** ≥150 líneas vs `origin/dev`, en constantes arriba del script). (b) **Método** en
-  el skill `gobernanza` (§7 "Retro de iniciativa", hermana del cierre mensual §6, pero per-iniciativa y extendida
+  el skill `gobernanza` (§7 "Retro de iniciativa", hermana del cierre de gobernanza §6, pero per-iniciativa y extendida
   a aprendizajes de **producto**, no solo de skills). (c) **Reparto**: método de skill → buzón (**autónomo**);
   criterio/arquitectura → `MEMORIA`+`DECISIONES` (OK); gotcha cómo-funciona-X → `SISTEMA_*` (OK); principio →
   `CLAUDE.md` Filosofía (OK); trabajo diferido → issue vía `pendientes` (autónomo); nada → decirlo (no fabricar
@@ -1512,3 +1513,32 @@ cancel-in-progress` ya cancela corridas viejas.
   **re-cotiza el catálogo actual** respetando la decisión snapshot _2026-06-06_ (presupuestos se recotizan;
   confirmados conservan su snapshot). Features #3 «armá tu kit» y #5 «faltantes inteligentes» quedaron diferidas
   (#1092).
+
+### 2026-06-29 — Cierre de gobernanza disparado por volumen del buzón (no por calendario)
+
+- **Contexto.** El cierre de gobernanza (skill `gobernanza` §6) nació **mensual** (_2026-06-23 — Etapa 2_).
+  Al ritmo real de la sesión, un mes deja apilar demasiado drift antes de triagear el buzón, podar lo que no
+  rinde y re-derivar principios. El dueño lo notó: _"1 mes me parece mucho al ritmo que vamos"_.
+- **Decisión.** El cierre se dispara **por volumen, no por almanaque**: cuando el buzón
+  `docs/PROPUESTAS_SKILLS.md` junta **≥ 5 propuestas pendientes** (las que no llevan `✅ aplicada`). Constante
+  `THRESHOLD` tuneable arriba del hook; **N=5** de arranque, se afina con el ritmo real observado (empirismo
+  proporcional, _2026-06-27_). Lo **surfacea solo** un hook nuevo `check-buzon.sh` (SessionStart, **gemelo de
+  `check-pendientes.sh`**: cuenta un backlog y nudgea; **sin state file** → recomputa en cada arranque, así el
+  aviso **persiste** hasta que el cierre baje el buzón). Como todo hook de Claude Code: terminal/desktop, no
+  web/celu; `exit 0` siempre.
+- **Why volumen y no tiempo.** El cierre hace varias cosas, pero casi todas **ya tienen su propia red**: la
+  staleness de manuales la caza el supervisor por-cambio (+ el check de staleness propuesto en el buzón), y los
+  skills sin revisar > 120 días son un warning de `check-docs`. **Lo único que necesita de verdad un ritual
+  periódico de juicio humano es el triage del buzón** — y eso **es** volumen. Por eso el buzón es la señal
+  correcta para gatillar; un calendario quedaría siempre mal calibrado cuando el ritmo varía (mismo criterio
+  que `check-retro.sh`, que dispara por tamaño de diff, no por fecha).
+- **Sin piso de tiempo (el borde honesto).** Si el buzón queda quieto, el cierre no corre — y eso es
+  **correcto** (buzón vacío = nada que triagear). Cualquier otra cosa la cubren el supervisor (por cambio) y el
+  `/gobernanza` a demanda. No hace falta un "dead-man switch" de calendario.
+- **Principios cada 2 cierres.** La re-derivación de la Filosofía de trabajo (anti-congelamiento) va en un beat
+  más lento —cada segundo cierre— porque re-derivar sobre poco corpus agrega ruido en vez de señal.
+- **Consecuencias.** Refina —no reemplaza— la cadencia "mensual" de _2026-06-23 (Etapa 2)_ y _2026-06-27
+  (Filosofía de trabajo derivada)_; el skill §6 + cheatsheet, la fila de `CLAUDE.md` y los punteros de memoria
+  se actualizaron a "por volumen". El supervisor marca un cierre gateado por calendario en vez de por volumen, o
+  un `THRESHOLD` cambiado en el hook sin reflejarlo en la memoria. Salida de la conversación de cierre de la
+  iniciativa del retro (misma sesión que _2026-06-29 — Retro de iniciativa_).
