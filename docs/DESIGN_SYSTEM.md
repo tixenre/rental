@@ -392,15 +392,16 @@ Utilidades canónicas en `frontend/src/design-system/styles/utilities.css` para 
 ```tsx
 import { Button } from "@/design-system/ui/button";
 
-// variants: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link" | "primary" | "amber"
+// variants: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
+//         | "primary" | "amber" | "on-accent"
 // sizes:    "default" (h-9) | "sm" (h-8) | "lg" (h-10) | "icon" (h-9 w-9)
 // shape:    "rounded" (default) | "pill"
-// "amber" y el axis "shape" fueron agregados por PR #577. "primary" (ink→amber
-// al hover, CTA signature) por el Master Handoff — distinto de "amber".
 
 <Button variant="default">Reservar</Button>
 <Button variant="primary" shape="pill">Solicitar rental</Button>
 <Button variant="amber" shape="pill" asChild><a href="/estudio">→</a></Button>
+// on-accent: CTA sobre fondo ink o accent — fondo bone, texto ink
+<Button variant="on-accent">Ver catálogo</Button>
 ```
 
 > **No renombrar `default` a `primary`** — eso rompería decenas de
@@ -417,6 +418,10 @@ import { Button } from "@/design-system/ui/button";
 >
 > `variant="amber"` siempre muestra el accent activo (`bg-[var(--area-accent)]`) sin
 > inversión — en estudio aparece naranja, en rental/global aparece amber.
+>
+> `variant="on-accent"` es para CTAs sobre fondos con color fuerte (ink o accent):
+> fondo bone (`bg-background shadow-sm`) + texto ink, hover invierte a ink/bone.
+> Ejemplo: CartMiniBar sobre fondo ink, botones en heroes de marketing.
 
 ### EstadoBadge
 
@@ -450,12 +455,12 @@ inline, usar este chip.
 
 ### ClienteAvatar
 
-**Fuente única**: `frontend/src/design-system/kit/ClienteAvatar.tsx`. Círculo con iniciales y
-color **determinístico por nombre** (hash sobre paleta acotada de tokens, todos
+**Fuente única**: `frontend/src/design-system/kit/ClienteAvatar.tsx`. Círculo con foto opcional
+o iniciales y color **determinístico por nombre** (hash sobre paleta acotada de tokens, todos
 con buen contraste) → el mismo nombre siempre cae en el mismo color, para
-reconocimiento visual rápido en listas/headers (idea de Booqable). Tamaño/typo por
-`className`. Reusable en admin y portal. No crear avatares ad-hoc con `bg-ink`
-inline.
+reconocimiento visual rápido en listas/headers (idea de Booqable). Props: `nombre`, `src?` (foto
+con fallback a iniciales si falla la carga), `className` (tamaño + tipografía). Reusable en admin
+y portal. No crear avatares ad-hoc con `bg-ink` inline.
 
 ### Spinner / loading (`frontend/src/design-system/ui/spinner.tsx`)
 
@@ -481,6 +486,88 @@ import { Button } from "@/design-system/ui/button";
 
 No crear spinners con `Loader2` suelto — siempre `<Spinner>`.
 
+### IconButton (`frontend/src/design-system/ui/icon-button.tsx`)
+
+Wrapper de `buttonVariants` con `aria-label` **obligatorio** a nivel de tipos — sin él TypeScript
+rechaza el prop. Cuatro tamaños calibrados para HIG (≥44px tap target en el `lg`):
+
+```tsx
+import { IconButton } from "@/design-system/ui/icon-button";
+
+<IconButton aria-label="Cerrar" onClick={onClose}><X /></IconButton>
+// sizes: "xs" (h-7) | "sm" (h-8) | "md" (h-9, default) | "lg" (h-11, HIG tap target)
+// variant: cualquier ButtonProps["variant"] — default = "ghost"
+```
+
+No usar `<button>` crudo para icon-buttons — `IconButton` lo reemplaza en todos los contextos.
+
+### ModalBackdrop (`frontend/src/design-system/ui/modal-backdrop.tsx`)
+
+Backdrop de fixed overlay canónico para modales hechos a mano (no-Radix). Usa `onPointerDown`
+(no `onClick`) para evitar cierre accidental al soltar el drag dentro del modal.
+
+```tsx
+import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
+
+<ModalBackdrop onClose={onDismiss}>
+  <div className="...">contenido del modal</div>
+</ModalBackdrop>
+// ModalBackdrop incluye fixed inset-0 + z-50 + bg-black/60 — no wrappear con otro backdrop.
+```
+
+### `.px-portal` (utility CSS en `utilities.css`)
+
+Padding horizontal del card portal (1rem mobile · 1.125rem ≥sm). Reemplaza el `px-4 sm:px-[18px]`
+disperso en rutas del portal cliente:
+
+```tsx
+<div className="px-portal">…</div>  // en vez de px-4 sm:px-[18px]
+```
+
+### SegmentedControl (`frontend/src/design-system/ui/segmented-control.tsx`)
+
+Toggle de opciones mutuamente exclusivas. Fuente única — reemplaza las implementaciones manuales
+con `<button>` por fila:
+
+```tsx
+import { SegmentedControl } from "@/design-system/ui/segmented-control";
+
+// variant "default" — botones separados, fondo ink en activo (back-office)
+<SegmentedControl
+  value={preset}
+  onChange={setPreset}
+  options={[{ value: "sena", label: "Seña 50%" }, { value: "saldo", label: "Saldo total" }]}
+/>
+
+// variant "pill" — track capsule conectado (toggle Mes/Semana en CalendarioWidget)
+<SegmentedControl variant="pill" value={view} onChange={setView}
+  options={[{ value: "mes", label: "Mes" }, { value: "semana", label: "Semana" }]} />
+```
+
+### CountBadge (`frontend/src/design-system/ui/count-badge.tsx`)
+
+Contador circular compacto: `bg-ink text-amber`, oculto si `count ≤ 0`, máx visible "99+".
+
+```tsx
+import { CountBadge } from "@/design-system/ui/count-badge";
+
+<CountBadge count={activeFilters} className="ml-1.5" />  // sm (h-4) por default
+<CountBadge count={n} size="md" />  // md (h-5), para contextos más grandes
+```
+
+### QtyInput (`frontend/src/design-system/ui/qty-input.tsx`)
+
+Stepper editable canónico: `−` / `<input number>` / `+`. Controla min/max con clamping y
+puede mostrar estado de error (overstock).
+
+```tsx
+import { QtyInput } from "@/design-system/ui/qty-input";
+
+<QtyInput value={cant} onChange={setCant} min={1} />
+<QtyInput value={cant} onChange={setCant} min={1} max={stock} error={cant > stock} />
+// size="sm" (h-7, compacto para solicitudes) | "md" (h-9, default)
+```
+
 ### Componentes presentacionales (`frontend/src/components/rental/`)
 
 > **OJO — ubicación.** Estas piezas **NO viven en `kit/`** (el `kit/` solo tiene
@@ -490,14 +577,14 @@ No crear spinners con `Loader2` suelto — siempre `<Spinner>`.
 - `AddonPills` (`rental/AddonPills.tsx`) — items "incluye" sobre rows de equipo.
 - `EmptyState` (`rental/EmptyState.tsx`) — pattern "nada para mostrar".
 - `PriceBlock` (`rental/equipment/shared/PriceBlock.tsx`) — precio + tarifa display.
-- `ViewToggle` (`rental/ViewToggle.tsx`) — segmented control con pill deslizante.
+- `ViewToggle` (`rental/ViewToggle.tsx`) — segmented control con pill deslizante (diferente al
+  `SegmentedControl` del `ui/`: este tiene animación de slider, ese tiene fondo ink sólido).
 - `StatCard` (`rental/StatCard.tsx`) — número grande para dashboards.
 
 El primitivo `Input` vive en **`frontend/src/design-system/ui/input.tsx`** (no en `kit/`).
-**No existe** un `SearchInput` en el repo. **`FieldLabel` no es una pieza única**:
-está duplicado inline en 3 lugares (`StudioBookingForm`, `PedidoPageHelpers`,
-`pagos.lazy`) → es un **patrón pendiente de extraer** a una pieza compartida, no un
-componente del DS hoy.
+**No existe** un `SearchInput` en el repo. **`FieldLabel` existe** como función local en
+`pagos.lazy.tsx` y en `StudioBookingForm` — todavía no es una pieza única del DS (es un
+`<label className="block t-eyebrow">`). `PedidoPageHelpers` ya usa `Field` del kit.
 
 > **Patrón de lista de pedidos (Booqable-inspired, 2026-06):** una fila se lee de
 > un vistazo con **avatar (`ClienteAvatar`) + nombre + `EstadoBadge` + `PagoBadge`

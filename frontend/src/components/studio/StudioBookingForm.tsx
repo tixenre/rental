@@ -12,6 +12,7 @@ import {
   Plus,
 } from "lucide-react";
 import { Button } from "@/design-system/ui/button";
+import { Pill } from "@/design-system/kit/Pill";
 import { Spinner } from "@/design-system/ui/spinner";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { Calendar } from "@/design-system/ui/calendar";
@@ -528,9 +529,9 @@ export function StudioBookingForm({
           {/* Banda verde — solo cuando hay fecha y está libre */}
           {fechaISO && disponibilidad === "libre" && (
             <div className="flex items-center gap-2.5 px-4 py-2.5 bg-verde/5 border-y border-verde/10">
-              <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-verde/10 text-verde-ink border-verde/20">
+              <Pill tone="success" className="gap-1 px-2.5 py-1 text-xs">
                 <Check className="h-3 w-3" /> Disponible
-              </span>
+              </Pill>
               <span className="text-xs text-muted-foreground tabular">
                 {dateLabel} · {startSlot} a {endTime}
               </span>
@@ -540,9 +541,9 @@ export function StudioBookingForm({
           {/* Ocupado */}
           {fechaISO && disponibilidad === "ocupado" && (
             <div className="flex items-center gap-2 px-4 py-2.5 bg-destructive/5 border-y border-destructive/10">
-              <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium bg-destructive/10 text-destructive border-destructive/20">
+              <Pill tone="danger" className="px-2.5 py-1 text-xs">
                 {motivo ?? "Ocupado en esa franja"}
-              </span>
+              </Pill>
             </div>
           )}
 
