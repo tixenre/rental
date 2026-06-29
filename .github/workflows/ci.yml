@@ -262,6 +262,16 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      # Gate de lockfile bun: Railway buildea con `bun install --frozen-lockfile`
+      # (bun.lock), mientras el resto del CI usa npm (package-lock.json). Sin este
+      # check, un dep agregado a package.json sin regenerar bun.lock pasa el CI pero
+      # ROMPE el deploy de staging (cazado: #1095 sumó @simplewebauthn sin tocar
+      # bun.lock → "lockfile had changes, but lockfile is frozen"). Corre el MISMO
+      # check que Railway, en seco (sin instalar), antes del build.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13"
+      - run: bun install --frozen-lockfile --dry-run
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
