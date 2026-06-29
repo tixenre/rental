@@ -143,6 +143,26 @@ def precio_combo(conn, equipo_id: int) -> int:
     return _precio_combo_calc(rows)
 
 
+def precios_combo_batch(conn, equipo_ids) -> dict[int, int]:
+    """Precio efectivo por jornada de varios COMBOS en UNA sola query (evita N+1 en
+    el catálogo). Devuelve `{equipo_id: precio_efectivo}` para los ids que tengan
+    componentes vivos; un combo sin componentes no aparece (el caller cae a 0). Mismo
+    cálculo que `precio_combo` (reusa `_precio_combo_calc`)."""
+    ids = list(equipo_ids)
+    if not ids:
+        return {}
+    rows = conn.execute(
+        "SELECT kc.equipo_id, e.precio_jornada, kc.cantidad, kc.descuento_pct "
+        "FROM kit_componentes kc JOIN equipos e ON e.id = kc.componente_id "
+        "WHERE kc.equipo_id = ANY(%s) AND e.eliminado_at IS NULL",
+        (ids,),
+    ).fetchall()
+    por_combo: dict[int, list] = {}
+    for r in rows:
+        por_combo.setdefault(r["equipo_id"], []).append(r)
+    return {eid: _precio_combo_calc(comps) for eid, comps in por_combo.items()}
+
+
 def precio_jornada_efectivo(conn, equipo_id: int) -> Optional[int]:
     """Precio por jornada EFECTIVO de un equipo, resuelto en UN solo lugar: para un
     COMBO se deriva en vivo de sus componentes (`precio_combo`, C3 #635); un kit/simple

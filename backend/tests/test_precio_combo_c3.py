@@ -49,3 +49,45 @@ def test_campos_nulos_tolerados():
         {"precio_jornada": 600, "cantidad": 1, "descuento_pct": None},
     ]
     assert _precio_combo_calc(comps) == 600
+
+
+# ── Batch (catálogo: precio efectivo de combos sin N+1) ────────────────────────
+
+
+class _FakeCursor:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def fetchall(self):
+        return self._rows
+
+
+class _FakeConn:
+    """Filtra las filas de componentes por los equipo_id pedidos (= ANY(%s))."""
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def execute(self, _sql, params=None):
+        ids = set(params[0]) if params else set()
+        return _FakeCursor([r for r in self._rows if r["equipo_id"] in ids])
+
+
+def test_precios_combo_batch_agrupa_y_calcula_por_equipo():
+    from services.precios import precios_combo_batch
+
+    rows = [
+        {"equipo_id": 10, "precio_jornada": 1000, "cantidad": 2, "descuento_pct": 10},
+        {"equipo_id": 10, "precio_jornada": 500, "cantidad": 1, "descuento_pct": 70},
+        {"equipo_id": 20, "precio_jornada": 1000, "cantidad": 2, "descuento_pct": 0},
+    ]
+    out = precios_combo_batch(_FakeConn(rows), [10, 20, 30])
+    # 10 == el mismo cálculo que test_suma_con_descuento_por_linea (1950); 20 → 2000;
+    # 30 no tiene componentes vivos → no aparece (el caller cae a 0).
+    assert out == {10: 1950, 20: 2000}
+
+
+def test_precios_combo_batch_sin_ids_no_consulta():
+    from services.precios import precios_combo_batch
+
+    assert precios_combo_batch(_FakeConn([]), []) == {}

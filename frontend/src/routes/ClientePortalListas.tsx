@@ -42,7 +42,6 @@ import {
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
 import { rearmarCarrito } from "@/lib/rearmar-carrito";
-import { useCotizacion } from "@/lib/cotizacion";
 import { useCart } from "@/lib/cart-store";
 import { cn } from "@/lib/utils";
 import { fmt } from "./ClientePortalTypes";
@@ -155,14 +154,14 @@ function ListaCard({
     (r): r is { item: ListaItem; equipo: Equipment } => r.equipo !== null,
   );
   const noDisponibles = resueltos.length - reservables.length;
-  // Estimado por jornada desde el BACKEND (cotizar sin fechas = 1 jornada, sin
-  // descuento/IVA; combo-aware). El front muestra, no calcula (FASE 3). Mismos ids
-  // que se mandan al reservar → el preview coincide con la cotización real.
-  // Nota: una cotización por card; si un cliente junta muchas listas el follow-up del
-  // catálogo (precio efectivo en /api/equipos) deja sumar local sin pedir por card.
-  const estimadoJornada = useCotizacion({
-    items: reservables.map((r) => ({ equipoId: r.item.equipo_id, cantidad: r.item.cantidad })),
-  }).data.subtotalPorJornada;
+  // Estimado por jornada: suma del precio EFECTIVO por jornada que ya da el backend.
+  // El catálogo devuelve el precio combo-aware (resuelto en el server) → el front solo
+  // SUMA lo que le dieron, sin aplicar reglas ni pedir una cotización por card (FASE 3).
+  // Sin fechas = una jornada de referencia, sin descuento/IVA.
+  const estimadoJornada = reservables.reduce(
+    (acc, r) => acc + (r.equipo.pricePerDay ?? 0) * r.item.cantidad,
+    0,
+  );
 
   function reservarLista() {
     setAskReservar(false);

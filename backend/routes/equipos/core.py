@@ -491,6 +491,20 @@ def list_equipos(
         equipos = attach_specs_estructuradas(conn, equipos)
         equipos = attach_specs_destacados(conn, equipos)
 
+        # Combos: el precio que se MUESTRA es el EFECTIVO (derivado de componentes,
+        # combo-aware), no el `precio_jornada` crudo de la tabla → la card del catálogo
+        # coincide con lo que el carrito cotiza/cobra (el front muestra, no calcula —
+        # FASE 3). Batch: una sola query para todos los combos (sin N+1). Un combo sin
+        # componentes vivos → 0. (El sort precio_asc/desc sigue sobre el crudo en SQL:
+        # aproximado para combos; el display es exacto.)
+        combo_ids = [e["id"] for e in equipos if e.get("tipo") == "combo"]
+        if combo_ids:
+            from services.precios import precios_combo_batch
+            efectivos = precios_combo_batch(conn, combo_ids)
+            for e in equipos:
+                if e.get("tipo") == "combo":
+                    e["precio_jornada"] = efectivos.get(e["id"], 0)
+
         # Filtrar kits/combos que no pueden armarse ni una vez (stock de
         # componentes insuficiente, sin considerar reservas). Solo para catálogo
         # público — el admin los sigue viendo para poder corregirlos.
@@ -574,6 +588,12 @@ def get_equipo(id_or_slug: str):
         equipo["fotos"] = [
             {"url": r["url"], "es_principal": bool(r["es_principal"])} for r in fotos
         ]
+        # Combo: el precio mostrado es el EFECTIVO (derivado de componentes), igual que
+        # en el listado y que lo que el carrito cotiza/cobra (el front muestra, no
+        # calcula — FASE 3).
+        if equipo.get("tipo") == "combo":
+            from services.precios import precio_combo
+            equipo["precio_jornada"] = precio_combo(conn, actual_id)
         return equipo
 
 

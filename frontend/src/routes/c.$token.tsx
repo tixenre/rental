@@ -45,7 +45,6 @@ import { rearmarCarrito, agregarAlCarrito } from "@/lib/rearmar-carrito";
 import { useCart } from "@/lib/cart-store";
 import { useEquipos } from "@/hooks/useEquipos";
 import { getCompartido, type CompartidoData, type CompartirItem } from "@/lib/compartir";
-import { useCotizacion } from "@/lib/cotizacion";
 import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { fmt } from "./ClientePortalTypes";
 import { cn } from "@/lib/utils";
@@ -105,12 +104,14 @@ function CompartidoBody({
     (r): r is { item: CompartirItem; equipo: Equipment } => r.equipo !== null,
   );
   const noDisponibles = resueltos.length - reservables.length;
-  // Estimado por jornada desde el BACKEND (cotizar sin fechas = 1 jornada, sin
-  // descuento/IVA; combo-aware). El front muestra, no calcula (FASE 3). Mismos ids
-  // que se mandan al armar el carrito → el preview coincide con la cotización real.
-  const estimadoJornada = useCotizacion({
-    items: reservables.map((r) => ({ equipoId: r.item.equipo_id, cantidad: r.item.cantidad })),
-  }).data.subtotalPorJornada;
+  // Estimado por jornada: suma del precio EFECTIVO por jornada que ya da el backend.
+  // El catálogo devuelve el precio combo-aware (resuelto en el server), así que el
+  // front solo SUMA lo que le dieron — no aplica reglas (FASE 3). Sin fechas = una
+  // jornada de referencia, sin descuento/IVA (eso lo pone cotizar al elegir período).
+  const estimadoJornada = reservables.reduce(
+    (acc, r) => acc + (r.equipo.pricePerDay ?? 0) * r.item.cantidad,
+    0,
+  );
 
   function armar(modo: "reemplazar" | "agregar") {
     setAskReemplazar(false);
