@@ -1,7 +1,7 @@
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Spinner } from "@/design-system/ui/spinner";
 import { adminApi } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
 
@@ -43,7 +43,7 @@ function NuevoPedidoPage() {
 
   return (
     <div className="flex items-center justify-center h-[60vh] text-muted-foreground gap-2">
-      <Loader2 className="h-4 w-4 animate-spin" /> Creando borrador…
+      <Spinner size="sm" /> Creando borrador…
     </div>
   );
 }

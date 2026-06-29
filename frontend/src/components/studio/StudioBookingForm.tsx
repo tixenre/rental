@@ -7,12 +7,12 @@ import {
   Calendar as CalendarIcon,
   Check,
   Clock,
-  Loader2,
   MessageCircle,
   Minus,
   Plus,
 } from "lucide-react";
 import { Button } from "@/design-system/ui/button";
+import { Spinner } from "@/design-system/ui/spinner";
 import { GoogleIcon } from "@/design-system/ui/GoogleIcon";
 import { Calendar } from "@/design-system/ui/calendar";
 import {
@@ -584,7 +584,7 @@ export function StudioBookingForm({
           >
             {submitting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reservando…
+                <Spinner size="sm" className="mr-2" /> Reservando…
               </>
             ) : (
               ctaLabel

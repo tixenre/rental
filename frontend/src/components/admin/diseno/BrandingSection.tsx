@@ -14,7 +14,6 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Upload,
-  Loader2,
   MessageCircle,
   Image as ImageIcon,
   Check,
@@ -22,6 +21,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -188,7 +188,7 @@ export function BrandingSection() {
             >
               {uploading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Subiendo…
+                  <Spinner size="sm" className="mr-2" /> Subiendo…
                 </>
               ) : (
                 <>
@@ -230,7 +230,7 @@ export function BrandingSection() {
           >
             {phoneMut.isPending ? (
               <>
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Guardando…
+                <Spinner size="sm" className="mr-1" /> Guardando…
               </>
             ) : (
               <>
@@ -311,7 +311,7 @@ export function BrandingSection() {
           >
             {taglinesMut.isPending ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Guardando…
+                <Spinner size="xs" className="mr-1" /> Guardando…
               </>
             ) : (
               <>

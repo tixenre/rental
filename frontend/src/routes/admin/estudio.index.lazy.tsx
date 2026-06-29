@@ -8,7 +8,6 @@ import {
   Plus,
   Trash2,
   Save,
-  Loader2,
   Package,
   Search,
   GripVertical,
@@ -39,6 +38,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
+import { Spinner } from "@/design-system/ui/spinner";
 import { Pill } from "@/design-system/kit/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Textarea } from "@/design-system/ui/textarea";
@@ -597,7 +597,7 @@ function SlotForm({
       <div className="flex gap-2">
         <Button type="submit" disabled={mutation.isPending} size="sm">
           {mutation.isPending ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Spinner size="sm" className="mr-2" />
           ) : (
             <Save className="mr-2 h-4 w-4" />
           )}
@@ -864,7 +864,7 @@ function ConfigForm({ config, onSaved }: { config: EstudioConfig; onSaved: () =>
           className="bg-foreground text-background hover:bg-amber hover:text-ink"
         >
           {mutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            <Spinner size="sm" className="mr-2" />
           ) : (
             <Save className="h-4 w-4 mr-2" />
           )}
@@ -1179,7 +1179,7 @@ function TrabajoDialog({
               </button>
               {fetchingMeta && (
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Spinner size="xs" />
                   Obteniendo info…
                 </span>
               )}
@@ -1337,7 +1337,7 @@ function TrabajoDialog({
             >
               {uploadingFoto ? (
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Spinner size="sm" />
                   Subiendo…
                 </div>
               ) : (
@@ -1434,7 +1434,7 @@ function TrabajoDialog({
                       disabled={uploadingLogo}
                     >
                       {uploadingLogo ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        <Spinner size="xs" className="mr-1.5" />
                       ) : null}
                       {logoUrl ? "Cambiar logo" : "Subir logo"}
                     </Button>
@@ -1474,7 +1474,7 @@ function TrabajoDialog({
             onClick={handleSave}
             disabled={saving || (!linksPayload.length && !titulo.trim() && !fotos.length)}
           >
-            {saving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : null}
+            {saving ? <Spinner size="sm" className="mr-1.5" /> : null}
             {isEdit ? "Guardar cambios" : "Crear trabajo"}
           </Button>
         </div>

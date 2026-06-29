@@ -20,10 +20,10 @@ import {
   Trash2,
   Check,
   MoreHorizontal,
-  Loader2,
   CloudOff,
   CloudCheck,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -165,7 +165,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
   if (status === "saving" || status === "dirty")
     return (
       <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1">
-        <Loader2 className="h-3 w-3 animate-spin" /> Guardando…
+        <Spinner size="xs" /> Guardando…
       </span>
     );
   if (status === "saved")

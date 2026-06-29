@@ -5,7 +5,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  Loader2,
   Plus,
   Trash2,
   Search,
@@ -13,6 +12,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import {
@@ -189,7 +189,7 @@ export function KitComponentEditor({ equipoId, mode }: { equipoId: number; mode:
           className="pl-8"
         />
         {searching && (
-          <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          <Spinner size="xs" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
         )}
       </div>
 
@@ -250,7 +250,7 @@ export function KitComponentEditor({ equipoId, mode }: { equipoId: number; mode:
 
         {loading ? (
           <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…
+            <Spinner size="xs" /> Cargando…
           </div>
         ) : items.length === 0 ? (
           <p className="text-xs text-muted-foreground italic mt-2">

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Upload, CheckCircle2, AlertCircle, Loader2, X } from "lucide-react";
+import { Upload, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -261,7 +262,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
             </>
           ) : upload.status === "uploading" ? (
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner size="sm" />
               Subiendo comprobante…
             </div>
           ) : (
@@ -302,7 +303,7 @@ export function WorkshopInscripcionForm({ taller, onSuccess }: Props) {
       >
         {submitState === "submitting" ? (
           <span className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner size="sm" />
             Enviando…
           </span>
         ) : (
