@@ -314,6 +314,25 @@ def _init_db_schema(conn):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_kyc_events_cliente ON kyc_events(cliente_id)")
 
+    # Índice único de CUIL — "una persona verificada = una cuenta". PARCIAL: solo cuenta a
+    # los verificados (CUIL NULL o no-verificado nunca bloquea; extranjeros sin CUIL tampoco).
+    # Lo escribe SOLO identity/kyc al aprobar Didit; jamás el usuario. Va AL FINAL: si quedan
+    # duplicados legacy, la creación falla con UniqueViolation → NO rompemos el boot (init_db
+    # corre en autocommit, cada DDL es atómico). Logueamos un aviso accionable y seguimos; el
+    # operador corre el dedup (identity.merge.candidatos_duplicados → merge_accounts) y en el
+    # próximo boot el índice se crea. El gate anti-duplicado lo da el merge + este candado a
+    # nivel DB. Espejo de la migración f2cu1lun1qx01. (MEMORIA: ancla CUIL, Fase 2 #1098.)
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uniq_cliente_cuil_verificado "
+            "ON clientes (cuil) WHERE cuil IS NOT NULL AND dni_validado_at IS NOT NULL"
+        )
+    except psycopg.errors.UniqueViolation:
+        logger.warning(
+            "Índice único de CUIL no creado: hay clientes verificados con CUIL duplicado. "
+            "Corré el dedup (identity.merge.candidatos_duplicados → merge_accounts) y reiniciá."
+        )
+
     # Passkeys (WebAuthn/FIDO2) — login aditivo a Google OAuth. Una sola tabla
     # para admin (owner_email, cliente_id NULL) y
     # cliente (cliente_id seteado), con discriminador `owner_type`. credential_id /
