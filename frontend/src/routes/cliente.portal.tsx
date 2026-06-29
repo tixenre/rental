@@ -289,6 +289,18 @@ export default function ClientePortal() {
     return () => clearTimeout(t);
   }, [highlightId]);
 
+  // Título del navegador según la solapa activa: el portal es un hub multi-tab, así
+  // que entrar directo a ?tab=perfil ya no debe decir "Mis pedidos".
+  useEffect(() => {
+    const titulos: Record<PortalTab, string> = {
+      pedidos: "Mis pedidos",
+      listas: "Mis listas",
+      notificaciones: "Notificaciones",
+      perfil: "Mi perfil",
+    };
+    document.title = `${titulos[activeTab]} — Rambla Rental`;
+  }, [activeTab]);
+
   async function handleLogout() {
     await authedFetch("/auth/logout", { method: "POST" }).catch(() => {});
     navigate({ to: "/cliente/login" });
