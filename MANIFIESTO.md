@@ -273,6 +273,7 @@ Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`
 | [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Prompt del auditor + mobile gate (método de mantenimiento → skill `limpieza`) |
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/SISTEMA_SPECS.md`](docs/SISTEMA_SPECS.md) | **Manual técnico del sistema de specs / catálogo / datasets / autocompletar / compat** |
+| [`docs/SISTEMA_FACTURACION.md`](docs/SISTEMA_FACTURACION.md) | **Manual técnico del sistema de facturación electrónica ARCA** |
 | [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido` |
 | [`docs/MOBILE.md`](docs/MOBILE.md) | Componentes y patrones mobile |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Criterio mobile + checklist + status por ruta |
