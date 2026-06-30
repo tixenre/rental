@@ -16,7 +16,6 @@ from xml.etree import ElementTree as ET
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.hazmat.primitives.serialization.pkcs7 import (
-    PKCS7Options,
     PKCS7SignatureBuilder,
 )
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
@@ -81,7 +80,7 @@ def firmar_tra(tra: bytes, cert_pem: bytes, key_pem: bytes) -> bytes:
         PKCS7SignatureBuilder()
         .set_data(tra)
         .add_signer(cert, private_key, hashes.SHA256())
-        .sign(serialization.Encoding.DER, [PKCS7Options.DetachedSignature])
+        .sign(serialization.Encoding.DER, [])  # TRA embebido; AFIP rechaza detached
     )
     return cms
 
