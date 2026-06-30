@@ -50,12 +50,20 @@ def get_ta(emisor: str, conn) -> tuple[str, str]:
             "Subí el cert + clave desde el back-office → Facturación ARCA → Emisores."
         )
 
-    token, sign, expira_at = login_con_cert(
-        "wsfe",
-        cred.cert_pem.encode() if isinstance(cred.cert_pem, str) else cred.cert_pem,
-        cred.key_pem.encode() if isinstance(cred.key_pem, str) else cred.key_pem,
-        cred.endpoint_wsaa,
-    )
+    try:
+        token, sign, expira_at = login_con_cert(
+            "wsfe",
+            cred.cert_pem.encode() if isinstance(cred.cert_pem, str) else cred.cert_pem,
+            cred.key_pem.encode() if isinstance(cred.key_pem, str) else cred.key_pem,
+            cred.endpoint_wsaa,
+        )
+    except (RuntimeError, ValueError):
+        raise
+    except Exception as exc:
+        # httpx.HTTPStatusError (AFIP 4xx/5xx), httpx.RequestError (timeout/red), etc.
+        raise RuntimeError(
+            f"Error al contactar WSAA ({cred.endpoint_wsaa}): {type(exc).__name__}: {exc}"
+        ) from exc
 
     conn.execute(
         """

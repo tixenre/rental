@@ -993,6 +993,12 @@ function FacturacionRailSection({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const enviarMail = useMutation({
+    mutationFn: (facturaId: number) => facturacionApi.enviarMailFactura(facturaId),
+    onSuccess: (data) => toast.success(`Factura enviada a ${data.to}`),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const facturas = q.data ?? [];
   const principal = facturas.find(
     (f: Factura) => f.nota_credito_de == null && f.estado !== "anulada",
@@ -1051,15 +1057,27 @@ function FacturacionRailSection({
           )}
 
           {principal.pdf_key && (
-            <a
-              href={`/api/facturas/${principal.id}/pdf`}
-              target="_blank"
-              rel="noreferrer"
-              // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
-            >
-              <Download className="h-3 w-3" /> Descargar PDF
-            </a>
+            <div className="flex items-center gap-3">
+              <a
+                href={`/api/facturas/${principal.id}/pdf`}
+                target="_blank"
+                rel="noreferrer"
+                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+              >
+                <Download className="h-3 w-3" /> Descargar PDF
+              </a>
+              <button
+                type="button"
+                onClick={() => enviarMail.mutate(principal.id)}
+                disabled={enviarMail.isPending}
+                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink disabled:opacity-50"
+              >
+                <Mail className="h-3 w-3" />
+                {enviarMail.isPending ? "Enviando…" : "Enviar por mail"}
+              </button>
+            </div>
           )}
 
           {nc && (

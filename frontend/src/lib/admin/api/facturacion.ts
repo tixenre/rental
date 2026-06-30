@@ -85,6 +85,8 @@ export const facturacionApi = {
     authedJson<Factura[]>(`/api/alquileres/${pedidoId}/facturas`),
   notaCreditoFactura: (facturaId: number) =>
     authedPostJson<Factura>(`/api/facturas/${facturaId}/nota-credito`, {}),
+  enviarMailFactura: (facturaId: number) =>
+    authedPostJson<{ ok: boolean; to: string }>(`/api/facturas/${facturaId}/enviar-mail`, {}),
   listFacturas: (params?: { emisor?: string; estado?: string; desde?: string; hasta?: string }) => {
     const sp = new URLSearchParams();
     if (params?.emisor) sp.set("emisor", params.emisor);
