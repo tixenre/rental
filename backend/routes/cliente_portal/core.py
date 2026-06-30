@@ -10,7 +10,8 @@ import logging
 from fastapi import APIRouter
 from typing import Optional
 
-from database import to_datetime, now_ar
+from database import to_datetime
+from services.fechas import setting_horas, dentro_de_ventana_horas
 
 # Guards de cliente: viven en auth/guards.py (motor único de auth). Se re-exportan
 # acá para que los submódulos del portal y el __init__ los importen desde el spine.
@@ -50,27 +51,19 @@ def _proyectar(item: dict, campos: tuple) -> dict:
 
 
 def _modificacion_ventana_horas(conn) -> int:
-    """Devuelve la ventana de corte (en horas) configurada en app_settings."""
-    row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = 'modificacion_ventana_horas'"
-    ).fetchone()
-    try:
-        return int(row["value"]) if row else 24
-    except (TypeError, ValueError):
-        return 24
+    """Ventana de corte (en horas) para modificar un pedido, configurada en
+    `app_settings.modificacion_ventana_horas` (default 24). Fuente única del lector
+    de horas: `services.fechas.setting_horas`."""
+    return setting_horas(conn, "modificacion_ventana_horas", 24)
 
 
 def _ventana_cumple(fecha_desde: Optional[str], ventana_horas: int) -> bool:
-    """True si todavía estamos a >= ventana_horas del retiro (o si no hay fecha)."""
+    """True si todavía estamos a >= ventana_horas del retiro (o si no hay fecha).
+    Es la negación de la ventana de tiempo compartida (`dentro_de_ventana_horas`):
+    cumple = el retiro NO cae dentro de las próximas `ventana_horas`."""
     if not fecha_desde:
         return True
-    try:
-        d0 = to_datetime(fecha_desde)
-    except ValueError:
-        return True
-    if d0 is None:
-        return True
-    return (d0 - now_ar()).total_seconds() >= ventana_horas * 3600
+    return not dentro_de_ventana_horas(to_datetime(fecha_desde), ventana_horas)
 
 
 # ── Documentos disponibles según estado del pedido ───────────────────────────

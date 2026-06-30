@@ -144,6 +144,9 @@ function CartDrawerDemo() {
         onSubmit={noop}
         hayNoDisponible={false}
         nombresSinDisp={[]}
+        dentroDeLeadTime={false}
+        leadTimeHoras={0}
+        urgenciaWhatsappUrl={null}
         needsLogin={false}
         onLogin={noop}
         onRegister={noop}

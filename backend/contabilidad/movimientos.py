@@ -72,9 +72,9 @@ def _cuentas_validas(conn) -> set[int]:
 
 
 def _mes_de_fecha(fecha) -> str:
-    from datetime import date
     if not fecha:
-        return date.today().strftime("%Y-%m")
+        from services.fechas import mes_actual_ar
+        return mes_actual_ar()
     return str(fecha)[:7]
 
 

@@ -27,11 +27,15 @@ import json
 from fastapi import HTTPException
 
 from auth.guards import cliente_verificado
-from database import now_ar
 from identity.contacts import email_comunicacion
 from reservas.disponibilidad import calcular_disponibilidad
 from services.carrito.readiness import precios_catalogo_para_reserva
 from services.checkout.tyc import TYC_VERSION_ACTUAL, ya_acepto
+from services.fechas import (
+    antelacion_insuficiente,
+    inicio_desde_fecha_hora,
+    validar_rango_fechas,
+)
 
 
 class _Item:
@@ -93,6 +97,7 @@ def validar_checkout(
 
     fd = _date_str(carrito.get("fecha_desde"))
     fh = _date_str(carrito.get("fecha_hasta"))
+    hora_desde = carrito.get("hora_desde")
 
     # ── Checks (todos corren, nunca fail-fast) ───────────────────────────────
     _check_identidad(conn, cliente_id, faltan)
@@ -107,7 +112,7 @@ def validar_checkout(
     _check_firma(firma_ok, faltan)
     _check_bloqueo(conn, cliente_id, faltan)   # cableado-apagado #1125
     if fd:
-        _check_antelacion(fd, faltan)          # cableado-apagado #1126
+        _check_antelacion(conn, fd, hora_desde, faltan)   # lead-time configurable #1126
 
     return {"listo": len(faltan) == 0, "faltan": faltan}
 
@@ -144,7 +149,7 @@ def _leer_carrito(conn, session_id: str, cliente_id: int) -> dict | None:
     """Carrito activo del cliente (owner-scoped: session_id + cliente_id).
     Devuelve None si no existe o ya fue confirmado."""
     row = conn.execute(
-        """SELECT items_json, fecha_desde, fecha_hasta
+        """SELECT items_json, fecha_desde, fecha_hasta, hora_desde, hora_hasta
            FROM carritos_activos
            WHERE session_id = %s AND cliente_id = %s AND NOT confirmado""",
         (session_id, cliente_id),
@@ -155,6 +160,8 @@ def _leer_carrito(conn, session_id: str, cliente_id: int) -> dict | None:
         "items_json":   row["items_json"],
         "fecha_desde":  row["fecha_desde"],
         "fecha_hasta":  row["fecha_hasta"],
+        "hora_desde":   row["hora_desde"],
+        "hora_hasta":   row["hora_hasta"],
     }
 
 
@@ -194,20 +201,15 @@ def _check_fechas(fd: str | None, fh: str | None, es_admin: bool, faltan: list) 
         faltan.append(_falta("fechas", "Elegí las fechas de tu alquiler.", "/carrito"))
         return
     try:
-        d0 = datetime.date.fromisoformat(fd)
-        d1 = datetime.date.fromisoformat(fh)
+        datetime.date.fromisoformat(fd)
+        datetime.date.fromisoformat(fh)
     except (ValueError, TypeError):
         faltan.append(_falta("fechas", "Las fechas del alquiler no son válidas."))
         return
-    if d1 <= d0:
-        faltan.append(_falta(
-            "fechas",
-            "La fecha de devolución debe ser posterior a la de retiro.",
-            "/carrito",
-        ))
-        return
-    if not es_admin and d0 < now_ar().date():
-        faltan.append(_falta("fechas", "La fecha de inicio no puede ser en el pasado.", "/carrito"))
+    # Criterio (orden + no-pasado) por la fuente única `validar_rango_fechas`.
+    msg = validar_rango_fechas(fd, fh, permitir_pasado=es_admin)
+    if msg:
+        faltan.append(_falta("fechas", msg, "/carrito"))
 
 
 def _check_stock_preflight(
@@ -285,9 +287,17 @@ def _check_bloqueo(conn, cliente_id: int, faltan: list) -> None:
     #     faltan.append(_falta("bloqueo", "Tu cuenta no puede hacer pedidos en este momento."))
 
 
-def _check_antelacion(fd: str, faltan: list) -> None:
-    """Antelación mínima configurable. Cableado-apagado hasta implementar #1126."""
-    # TODO (#1126): activar cuando se configure el lead-time mínimo:
-    # min_dias = get_antelacion_minima()  # de app_settings
-    # if min_dias and datetime.date.fromisoformat(fd) < now_ar().date() + datetime.timedelta(days=min_dias):
-    #     faltan.append(_falta("antelacion", f"Los pedidos necesitan al menos {min_dias} días de anticipación.", "/carrito"))
+def _check_antelacion(conn, fd: str, hora_desde, faltan: list) -> None:
+    """Lead-time: el cliente no puede reservar con menos de X horas de antelación
+    (#1126). X se administra desde el back-office (`antelacion_minima_horas`,
+    default 0 = apagado). Usa fecha + hora del carrito para precisión horaria; el
+    predicado `antelacion_insuficiente` es la fuente única (lo comparte el backstop
+    de creación). Es regla solo-cliente: el portero nunca corre con es_admin."""
+    inicio = inicio_desde_fecha_hora(fd, hora_desde)
+    horas = antelacion_insuficiente(conn, inicio)
+    if horas:
+        faltan.append(_falta(
+            "antelacion",
+            f"Tu retiro es en menos de {horas} h. Por la antelación mínima no podemos "
+            "confirmar el pedido online — escribinos para coordinar una urgencia.",
+        ))

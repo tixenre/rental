@@ -15,8 +15,9 @@ from typing import Optional
 from fastapi import BackgroundTasks, Request, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from database import get_db, row_to_dict, to_datetime, now_ar
+from database import get_db, row_to_dict, to_datetime
 from auth.guards import require_admin
+from services.fechas import validar_rango_fechas, validar_fecha_iso
 from routes.cliente_portal.core import (
     router,
     require_cliente,
@@ -57,8 +58,7 @@ class ModificacionIn(BaseModel):
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
     def _v_fechas(cls, v):
-        from routes.alquileres import _validar_fecha_iso
-        return _validar_fecha_iso(v)
+        return validar_fecha_iso(v)
 
 
 def _validar_fechas_propuestas(
@@ -73,16 +73,13 @@ def _validar_fechas_propuestas(
     nueva_hasta = fecha_hasta if fecha_hasta is not None else fallback_hasta
     if not nueva_desde or not nueva_hasta:
         return  # Pedido sin fechas (caso raro de borrador) — no validamos
+    # Criterio (orden + no-pasado) por la fuente única `validar_rango_fechas`.
     try:
-        d0 = to_datetime(nueva_desde)
-        d1 = to_datetime(nueva_hasta)
+        msg = validar_rango_fechas(nueva_desde, nueva_hasta, permitir_pasado=False)
     except ValueError:
         raise HTTPException(400, "Formato de fechas inválido")
-    if d0 >= d1:
-        raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
-    hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
-    if d0 < hoy:
-        raise HTTPException(400, "fecha_desde no puede ser en el pasado")
+    if msg:
+        raise HTTPException(400, msg)
 
 
 def _validar_modificacion_estado(estado: str) -> None:

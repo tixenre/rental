@@ -16,13 +16,14 @@ import psycopg.errors
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, field_validator, model_validator
 
-from database import get_db, row_to_dict, to_datetime, to_iso, now_ar, MARCA_SUBQUERY, marca_subquery
+from database import get_db, row_to_dict, to_datetime, to_iso, MARCA_SUBQUERY, marca_subquery
 from routes.clientes import nombre_completo_cliente
 from identity import nombre_validado
 from services.email import send_email, Attachment
 from services.email.service import get_admin_to
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
 from services.precios import bruto_linea, calcular_total, jornadas_periodo
+from services.fechas import validar_rango_fechas, validar_fecha_iso
 from config import SITE_URL
 
 # Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
@@ -399,19 +400,10 @@ def _parse_precio(v) -> int:
         return 0
 
 
-def _validar_fecha_iso(v):
-    """Valida que una fecha sea ISO parseable (o None/''). Se usa como
-    field_validator en los modelos de pedido para rechazar fechas malformadas
-    en el borde (422) en vez de explotar como 500 más adentro al castear."""
-    if v is None or v == "":
-        return None
-    try:
-        datetime.datetime.fromisoformat(str(v))
-    except (ValueError, TypeError):
-        raise ValueError(
-            f"fecha inválida: '{v}'. Formato esperado ISO (yyyy-mm-dd o yyyy-mm-ddThh:mm)"
-        )
-    return str(v)
+# La validación de formato vive en la puerta única `services/fechas.py`. Se
+# mantiene el nombre `_validar_fecha_iso` como alias para los field_validators de
+# este módulo y la re-exportación de `routes/alquileres/__init__.py`.
+_validar_fecha_iso = validar_fecha_iso
 
 
 class PedidoItem(BaseModel):
@@ -722,16 +714,14 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                 raise HTTPException(400, "Indicá fecha de retiro y devolución, o ninguna")
 
             if data.fecha_desde and data.fecha_hasta:
-                d0 = to_datetime(data.fecha_desde)
-                d1 = to_datetime(data.fecha_hasta)
-                hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
-
-                if d0 >= d1:
-                    raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
-                # El admin puede crear pedidos con fecha pasada (carga retroactiva);
-                # el cliente no. La distinción la pasa `create_pedido_endpoint`.
-                if d0 < hoy and not es_admin:
-                    raise HTTPException(400, "fecha_desde no puede ser en el pasado")
+                # Criterio de fechas por la fuente única `validar_rango_fechas`.
+                # El admin puede crear con fecha pasada (carga retroactiva); el
+                # cliente no (la distinción la pasa `create_pedido_endpoint`).
+                msg = validar_rango_fechas(
+                    data.fecha_desde, data.fecha_hasta, permitir_pasado=es_admin
+                )
+                if msg:
+                    raise HTTPException(400, msg)
 
             # Serializar la creación sobre cada equipo del pedido ANTES de
             # insertar los ítems. El insert de `alquiler_items` toma un FK
@@ -936,19 +926,18 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
         nueva_desde = payload.get("fecha_desde") or p["fecha_desde"]
         nueva_hasta = payload.get("fecha_hasta") or p["fecha_hasta"]
         if nueva_desde and nueva_hasta:
-            d0 = to_datetime(nueva_desde)
-            d1 = to_datetime(nueva_hasta)
-            hoy = now_ar().replace(hour=0, minute=0, second=0, microsecond=0)
-
-            if d0 >= d1:
-                raise HTTPException(400, "fecha_hasta debe ser posterior a fecha_desde")
             # Históricos importados tienen fechas en el pasado por diseño. El
             # frontend manda fecha_desde junto con cualquier cambio (ej. solo
             # el descuento), así que sin este bypass no se podría editar nada.
-            # El admin además puede fijar fechas pasadas a propósito (carga
-            # retroactiva); el cliente (es_admin=False) sigue sin poder.
-            if d0 < hoy and not es_admin and not _es_historico(p["fuente"]):
-                raise HTTPException(400, "fecha_desde no puede ser en el pasado")
+            # El admin además puede fijar fechas pasadas (carga retroactiva); el
+            # cliente (es_admin=False) sigue sin poder. Criterio por la fuente
+            # única `validar_rango_fechas`.
+            permitir_pasado = es_admin or _es_historico(p["fuente"])
+            msg = validar_rango_fechas(
+                nueva_desde, nueva_hasta, permitir_pasado=permitir_pasado
+            )
+            if msg:
+                raise HTTPException(400, msg)
 
     if not payload:
         return _get_alquiler_detail(conn, id)

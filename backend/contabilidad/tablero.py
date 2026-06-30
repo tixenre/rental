@@ -7,14 +7,13 @@ La rendición / quién le debe a quién vive en la cuenta corriente de socios
 (`saldos().socios`, que ya viaja en `disponible`).
 """
 
-from datetime import date
-
 from contabilidad.pyl import ganancia_neta
 from contabilidad.saldos import saldos
+from services.fechas import mes_actual_ar
 
 
 def mes_actual() -> str:
-    return date.today().strftime("%Y-%m")
+    return mes_actual_ar()
 
 
 def tablero(conn, mes: str | None = None) -> dict:

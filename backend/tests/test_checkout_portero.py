@@ -66,6 +66,8 @@ def _conn_all_ok(items_json=None, tyc_accepted=True, email="test@example.com"):
             "items_json": items,
             "fecha_desde": datetime.date.today() + datetime.timedelta(days=2),
             "fecha_hasta": datetime.date.today() + datetime.timedelta(days=5),
+            "hora_desde": "09:00",
+            "hora_hasta": "18:00",
         },
         "dni_validado_at": {"dni_validado_at": datetime.datetime.now()},
         "visible_catalogo": {"id": 1},
@@ -337,10 +339,32 @@ def test_bloqueo_cableado_apagado():
     assert faltan == []  # siempre OK hasta activar #1125
 
 
-def test_antelacion_cableado_apagado():
+def test_antelacion_apagada_no_bloquea():
+    # Setting en 0 (o ausente) → lead-time apagado: nunca bloquea.
+    conn = _FakeConn({"app_settings": {"value": "0"}})
     faltan = []
-    _check_antelacion("2026-07-10", faltan)
-    assert faltan == []  # siempre OK hasta activar #1126
+    manana = (now_ar() + datetime.timedelta(days=1)).date().isoformat()
+    _check_antelacion(conn, manana, "09:00", faltan)
+    assert faltan == []
+
+
+def test_antelacion_bloquea_dentro_de_la_ventana():
+    # Lead-time 12h: un retiro dentro de las próximas 2h cae en la ventana → bloquea.
+    conn = _FakeConn({"app_settings": {"value": "12"}})
+    proximo = now_ar() + datetime.timedelta(hours=2)
+    faltan = []
+    _check_antelacion(conn, proximo.date().isoformat(), proximo.strftime("%H:%M"), faltan)
+    assert len(faltan) == 1
+    assert faltan[0]["check"] == "antelacion"
+
+
+def test_antelacion_permite_fuera_de_la_ventana():
+    # Lead-time 12h: un retiro dentro de 48h está fuera de la ventana → permite.
+    conn = _FakeConn({"app_settings": {"value": "12"}})
+    lejano = now_ar() + datetime.timedelta(hours=48)
+    faltan = []
+    _check_antelacion(conn, lejano.date().isoformat(), lejano.strftime("%H:%M"), faltan)
+    assert faltan == []
 
 
 # ── TYC helpers ───────────────────────────────────────────────────────────────
@@ -430,6 +454,8 @@ def test_validar_checkout_fail_not_fast(monkeypatch):
             "items_json": [{"equipo_id": 1, "cantidad": 1}],
             "fecha_desde": hoy + datetime.timedelta(days=2),
             "fecha_hasta": hoy + datetime.timedelta(days=5),
+            "hora_desde": "09:00",
+            "hora_hasta": "18:00",
         },
         "dni_validado_at": {"dni_validado_at": None},       # identidad falla
         "visible_catalogo": {"id": 1},                      # carrito OK
