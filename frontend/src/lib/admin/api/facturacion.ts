@@ -68,6 +68,7 @@ export const facturacionApi = {
   updateEmisor: (id: number, body: Partial<EmisorArca>) =>
     authedJson<EmisorArca>(`/api/admin/emisores-arca/${id}`, {
       method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   cargarCert: (id: number, cert_pem: string, key_pem: string) =>
