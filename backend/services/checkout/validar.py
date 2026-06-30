@@ -112,6 +112,31 @@ def validar_checkout(
     return {"listo": len(faltan) == 0, "faltan": faltan}
 
 
+# ── Gate de CREACIÓN (cliente-scoped, sin carrito) ────────────────────────────
+# El portero `validar_checkout` (arriba) lee el carrito de `carritos_activos` — es el
+# pre-flight advisory para pintar la UI. El GATE DE CREACIÓN real (`POST /api/cliente/
+# pedidos`) NO puede depender de eso: el carrito no siempre está sincronizado ahí. Así que
+# reusa SOLO los checks cliente-scoped (T&C + firma), corriendo las MISMAS funciones del
+# portero (`_check_tyc`, `_check_firma`) → una sola fuente, sin re-implementar. El stock/
+# precio los sigue enforzando `create_pedido_retry` (motor sagrado), no hace falta acá.
+
+# ⏰ LEGACY: la firma del checkout queda CABLEADO-APAGADO hasta que la UI del checkout (el
+# paso de firma con passkey / "Confirmo") shippee y mande la señal. Flip a True en el MISMO
+# PR que enchufa ese paso (si no, el create actual —sin señal de firma— daría 422). Espeja
+# el patrón cableado-apagado del portero (#1125/#1126).
+FIRMA_CHECKOUT_OBLIGATORIA = False
+
+
+def faltan_firma_tyc(conn, cliente_id: int, firma_ok: bool) -> list[dict]:
+    """Precondiciones cliente-scoped del checkout (T&C + firma) para el GATE DE CREACIÓN,
+    sin depender del carrito. Corre los MISMOS checks del portero → una sola fuente.
+    Devuelve la lista `faltan` (vacía = OK), mismo contrato que `validar_checkout`."""
+    faltan: list[dict] = []
+    _check_tyc(conn, cliente_id, faltan)
+    _check_firma(firma_ok, faltan)
+    return faltan
+
+
 # ── Helpers de lectura ────────────────────────────────────────────────────────
 
 

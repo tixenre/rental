@@ -244,6 +244,38 @@ class TestRegisterComplete:
         r = c.post("/auth/passkey/register/complete", json={"credential": {"id": "cid"}})
         assert r.status_code == 400
 
+    def test_cliente_register_marca_stepup_firma_on_the_fly(self, monkeypatch):
+        # On-the-fly (#1098 Fase 5): registrar una passkey es un gesto biométrico fresco →
+        # deja la marca `stepup` que el portero de checkout lee como firma. Así CREAR la
+        # llave ya firma → un solo toque la primera vez.
+        monkeypatch.setattr(ceremonies, "verify_registration",
+                            lambda **kw: {"credential_id": "cid", "public_key": "pk",
+                                          "sign_count": 0, "aaguid": "aa"})
+        monkeypatch.setattr(store, "insert_credential", lambda **kw: 9)
+        c = _client()
+        c.cookies.set("session", _cliente_session(cliente_id=42))
+        c.cookies.set("wa_chal_reg",
+                      ceremonies.sign_challenge("chal", ot="cliente", ok="42", uh="uh"))
+        r = c.post("/cliente/auth/passkey/register/complete",
+                   json={"credential": {"id": "cid", "response": {"transports": ["internal"]}}})
+        assert r.status_code == 200
+        assert "stepup" in r.cookies  # registrar dejó la marca de step-up (firma on-the-fly)
+
+    def test_admin_register_no_marca_stepup(self, monkeypatch):
+        # El step-up/firma es del portal cliente; el admin no firma nada → sin marca.
+        monkeypatch.setattr(ceremonies, "verify_registration",
+                            lambda **kw: {"credential_id": "cid", "public_key": "pk",
+                                          "sign_count": 0, "aaguid": "aa"})
+        monkeypatch.setattr(store, "insert_credential", lambda **kw: 7)
+        c = _client()
+        c.cookies.set("session", _admin_session())
+        c.cookies.set("wa_chal_reg",
+                      ceremonies.sign_challenge("chal", ot="admin", ok="admin@test.com", uh="uh"))
+        r = c.post("/auth/passkey/register/complete",
+                   json={"credential": {"id": "cid", "response": {"transports": ["internal"]}}})
+        assert r.status_code == 200
+        assert "stepup" not in r.cookies
+
 
 class TestSignup:
     """Alta passwordless: registrar passkey SIN cuenta previa → cuenta liviana +
