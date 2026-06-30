@@ -35,14 +35,13 @@ export function RegistrarPagoModal({
   type Preset = "sena" | "saldo" | "otro";
   const sena50 = Math.round(total * 0.5);
 
-  const [preset, setPreset] = useState<Preset>(pagado === 0 ? "sena" : "saldo");
-  const [montoInput, setMontoInput] = useState<string>(
-    pagado === 0 ? String(sena50) : String(saldo),
-  );
-  const [concepto, setConcepto] = useState(pagado === 0 ? "Seña" : "Saldo final");
+  const [preset, setPreset] = useState<Preset>("saldo");
+  const [montoInput, setMontoInput] = useState<string>(String(saldo));
+  const [concepto, setConcepto] = useState("Saldo final");
   // A quién se cobró y cómo. Default del dueño: Tincho + transferencia.
   const [destinatario, setDestinatario] = useState<string>("Rambla");
   const [metodo, setMetodo] = useState<string>("transferencia");
+  const [fecha, setFecha] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
   const monto = Math.max(0, Number(montoInput) || 0);
 
@@ -50,17 +49,12 @@ export function RegistrarPagoModal({
   // editarse desde que se montó el modal → los presets deben reflejar lo vigente).
   useEffect(() => {
     if (!open) return;
-    setDestinatario("Tincho");
+    setDestinatario("Rambla");
     setMetodo("transferencia");
-    if (pagado === 0) {
-      setPreset("sena");
-      setMontoInput(String(Math.round(total * 0.5)));
-      setConcepto("Seña");
-    } else {
-      setPreset("saldo");
-      setMontoInput(String(Math.max(0, total - pagado)));
-      setConcepto("Saldo final");
-    }
+    setFecha(new Date().toISOString().slice(0, 10));
+    setPreset("saldo");
+    setMontoInput(String(Math.max(0, total - pagado)));
+    setConcepto("Saldo final");
   }, [open, total, pagado]);
 
   const selectPreset = (p: Preset) => {
@@ -90,7 +84,14 @@ export function RegistrarPagoModal({
 
   const addMut = useMutation({
     mutationFn: () =>
-      adminApi.addPago(pedidoId, monto, concepto || undefined, undefined, destinatario, metodo),
+      adminApi.addPago(
+        pedidoId,
+        monto,
+        concepto || undefined,
+        fecha || undefined,
+        destinatario,
+        metodo,
+      ),
     onSuccess: () => {
       toast.success("Pago registrado");
       qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
@@ -177,6 +178,23 @@ export function RegistrarPagoModal({
             value={concepto}
             onChange={(e) => setConcepto(e.target.value)}
             placeholder="Seña, saldo final…"
+            className="h-9 text-sm"
+          />
+        </div>
+
+        {/* Fecha */}
+        <div className="space-y-1">
+          <Label
+            htmlFor="pago-fecha"
+            className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground"
+          >
+            Fecha del cobro
+          </Label>
+          <Input
+            id="pago-fecha"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
             className="h-9 text-sm"
           />
         </div>
