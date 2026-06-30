@@ -195,25 +195,29 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
         )
 
         ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
-
-        # Revisar si el último número ya tiene un CAE (idempotencia post-timeout)
         numero_a_emitir = ultimo + 1
+
+        # Idempotencia post-timeout: si un intento anterior de ESTE pedido ya
+        # le pidió a ARCA el número `numero_a_emitir` y la respuesta se perdió
+        # por timeout de nuestro lado, ARCA ya lo tiene autorizado → lo
+        # recuperamos en vez de pedir un CAE nuevo (evitaría "comprobante ya
+        # autorizado"). Consultamos el PRÓXIMO número, no el último ya
+        # autorizado — `ultimo` por definición siempre devuelve Resultado='A'
+        # (no es nuestro, es el de la factura previa) y reusarlo duplicaría
+        # número+CAE entre pedidos distintos (bug encontrado en prod).
         recuperado: Optional[CaeResult] = None
-        if ultimo > 0:
-            consultado = wsfe.consultar(emisor_obj.punto_venta, int(cbte_tipo), ultimo)
-            if consultado and (consultado.get("Resultado") or "R") == "A":
-                # Puede que sea de una factura anterior (no nuestra)
-                cae_consulta = consultado.get("CodAutorizacion")
-                if cae_consulta:
-                    vto_raw = consultado.get("CAEFchVto", "")
-                    from arca_fe.wsfe import _parse_fecha
-                    recuperado = CaeResult(
-                        resultado="A",
-                        cae=str(cae_consulta),
-                        cae_vto=_parse_fecha(vto_raw),
-                        numero=ultimo,
-                    )
-                    numero_a_emitir = ultimo
+        consultado = wsfe.consultar(emisor_obj.punto_venta, int(cbte_tipo), numero_a_emitir)
+        if consultado and (consultado.get("Resultado") or "R") == "A":
+            cae_consulta = consultado.get("CodAutorizacion")
+            if cae_consulta:
+                vto_raw = consultado.get("CAEFchVto", "")
+                from arca_fe.wsfe import _parse_fecha
+                recuperado = CaeResult(
+                    resultado="A",
+                    cae=str(cae_consulta),
+                    cae_vto=_parse_fecha(vto_raw),
+                    numero=numero_a_emitir,
+                )
 
         cae_result: Optional[CaeResult] = recuperado
         if cae_result is None:
