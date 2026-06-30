@@ -152,7 +152,7 @@ supervisor marca `ILIKE`/`LIKE` o normalizadores ad-hoc, e índices cuya expresi
 
 ### 2026-06-06 — Design system consolidado en la app; `design-system` gobierna, `pulido-frontend` aplica
 
-El DS canónico es la app: primitivos en `src/design-system/{ui,kit}`, componentes de negocio en
+El DS canónico es la app: primitivos en `src/design-system/{ui,composites}`, componentes de negocio en
 `src/components/{rental,admin}`, tokens/fuentes en `src/design-system/styles/` (entry
 `src/design-system/ds-styles.css`). **El skill `design-system` (opus) gobierna** (audita sistémicamente,
 dashboard `/ds`, propone issues); **`pulido-frontend` aplica** los fixes en pantalla. `importar-diseno`
@@ -614,7 +614,7 @@ Toda UI nueva o rediseñada sigue la **Filosofía de diseño** del DS (`DESIGN_S
 11 principios): la info se tiene que ver (contraste/peso reales), **estado + plata visibles** (`Debe $X`,
 no "sin seña" gris), un foco por pantalla, **una sola forma de hacer cada cosa** (sin controles/botones
 duplicados), lo más usado a mano, reconocimiento > lectura (avatares/pills), densidad sin aire muerto,
-**reusar no recrear** (la forma del pill vive en `kit/Pill`; `EstadoBadge`/`PagoBadge` derivan, cero clases
+**reusar no recrear** (la forma del pill vive en `ui/Pill`; `EstadoBadge`/`PagoBadge` derivan, cero clases
 copiadas), mobile/a11y no son extra, el core es presentación. El supervisor la hace cumplir; el detalle
 vive en el doc. Es la contraparte visual de la _Barra de calidad de ingeniería (2026-05-25)_.
 
