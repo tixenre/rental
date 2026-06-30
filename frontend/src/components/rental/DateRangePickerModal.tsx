@@ -12,7 +12,7 @@ import {
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/design-system/ui/dialog";
 import { Calendar } from "@/design-system/ui/calendar";
 import { Button } from "@/design-system/ui/button";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import {
   computeJornadas,
   deriveEndDate,

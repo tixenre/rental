@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { Inbox } from "lucide-react";
 
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { ErrorState } from "./ErrorState";
 import { ListSkeleton } from "./skeletons";
 

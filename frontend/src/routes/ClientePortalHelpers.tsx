@@ -31,7 +31,7 @@ import { nombreCliente } from "@/lib/cliente-nombre";
 import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
 import { AccessMethods } from "@/components/rental/AccessMethods";
 import { SessionManager } from "@/components/rental/SessionManager";
-import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
+import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { invalidateClienteSession } from "@/lib/iva";
 import type { Perfil } from "./ClientePortalTypes";
 

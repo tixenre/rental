@@ -33,7 +33,7 @@ import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { Switch } from "@/design-system/ui/switch";
 import { Badge } from "@/design-system/ui/badge";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import { authedJson } from "@/lib/authedFetch";
 
 type SpecTipo =

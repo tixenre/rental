@@ -13,7 +13,7 @@ import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import {

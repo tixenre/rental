@@ -1,4 +1,4 @@
-import { Pill, type PillTone } from "@/design-system/kit/Pill";
+import { Pill, type PillTone } from "@/design-system/ui/Pill";
 import type { TipoMovimiento } from "@/lib/admin/api";
 
 /**

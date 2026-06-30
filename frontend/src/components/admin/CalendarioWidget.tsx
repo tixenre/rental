@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/design-system/ui/button";
 import { SegmentedControl } from "@/design-system/ui/segmented-control";
 import { adminApi, type CalendarioPedido } from "@/lib/admin/api";
-import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
+import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 
 const MESES = [
   "Enero",

@@ -32,7 +32,7 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { QueryState } from "@/components/admin/QueryState";
 import { TableSkeleton } from "@/components/admin/skeletons";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 
 export const Route = createLazyFileRoute("/admin/unidades")({
   component: UnidadesPage,
