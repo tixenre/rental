@@ -43,8 +43,9 @@ def construir_tra(
     if ahora is None:
         ahora = datetime.now(timezone.utc)
 
-    gen_time = ahora - timedelta(minutes=10)
-    exp_time = ahora + timedelta(seconds=ttl)
+    _AR = timezone(timedelta(hours=-3))
+    gen_time = (ahora - timedelta(minutes=10)).astimezone(_AR)
+    exp_time = (ahora + timedelta(seconds=ttl)).astimezone(_AR)
 
     unique_id = int(hashlib.sha256(str(ahora.timestamp()).encode()).hexdigest(), 16) % (
         2**31
@@ -54,8 +55,8 @@ def construir_tra(
 <loginTicketRequest version="1.0">
   <header>
     <uniqueId>{unique_id}</uniqueId>
-    <generationTime>{gen_time.strftime("%Y-%m-%dT%H:%M:%S")}</generationTime>
-    <expirationTime>{exp_time.strftime("%Y-%m-%dT%H:%M:%S")}</expirationTime>
+    <generationTime>{gen_time.isoformat(timespec="seconds")}</generationTime>
+    <expirationTime>{exp_time.isoformat(timespec="seconds")}</expirationTime>
   </header>
   <service>{servicio}</service>
 </loginTicketRequest>"""
