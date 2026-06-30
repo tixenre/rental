@@ -113,6 +113,13 @@ def _register_complete(request: Request, body: RegisterCompleteIn, *, owner_type
         raise HTTPException(409, "Esa passkey ya está registrada.")
     res = JSONResponse({"ok": True, "id": new_id, "device_name": device_name})
     res.delete_cookie(_REG_COOKIE)
+    # Registrar una passkey es un evento de auth FRESCA (Face ID/huella/PIN, owner-scoped):
+    # vale como step-up reciente. Así "enrolar una llave" es un modo más de prueba de
+    # presencia del motor de auth (junto a login y step-up) → habilita la firma on-the-fly
+    # de UN toque (creás la llave y eso ya firma) y deja la ventana que `require_recent_auth`
+    # exige. Solo cliente (el step-up es del portal; el admin no firma nada).
+    if owner_type == "cliente" and cliente_id is not None:
+        mark_stepup(res, cliente_id)
     return res
 
 
