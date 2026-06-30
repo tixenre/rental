@@ -484,6 +484,21 @@ export function CartDrawerView({
                   )}
                 </Button>
 
+                {list.length > 0 && !hayNoDisponible && (
+                  <p className="text-center text-xs text-muted-foreground leading-tight">
+                    Al confirmar con Face ID / huella aceptás nuestros{" "}
+                    <a
+                      href="/tyc"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2 hover:text-ink"
+                    >
+                      Términos y Condiciones
+                    </a>
+                    .
+                  </p>
+                )}
+
                 {hayNoDisponible ? (
                   <p className="flex items-center justify-center gap-1.5 text-center text-xs text-destructive">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0" />
