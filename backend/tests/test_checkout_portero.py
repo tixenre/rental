@@ -28,6 +28,7 @@ from services.checkout.validar import (
     validar_checkout,
 )
 from services.checkout.tyc import ya_acepto, registrar_aceptacion
+from database import now_ar
 
 
 # ── Fake infrastructure ────────────────────────────────────────────────────────
@@ -171,9 +172,12 @@ def test_check_fechas_hasta_menor_que_desde():
     assert "posterior" in faltan[0]["mensaje"]
 
 
+# `now_ar().date()`, no `date.today()`: el portero compara contra hora de Argentina
+# (validar.py: `d0 < now_ar().date()`). Con `date.today()` (UTC en CI) "ayer" cae en el
+# MISMO día que AR entre las 00:00–03:00 UTC → falso negativo. Mismo reloj que el código.
 def test_check_fechas_pasada_cliente():
-    ayer = str(datetime.date.today() - datetime.timedelta(days=1))
-    manana = str(datetime.date.today() + datetime.timedelta(days=1))
+    ayer = str(now_ar().date() - datetime.timedelta(days=1))
+    manana = str(now_ar().date() + datetime.timedelta(days=1))
     faltan = []
     _check_fechas(ayer, manana, es_admin=False, faltan=faltan)
     assert len(faltan) == 1
@@ -181,8 +185,8 @@ def test_check_fechas_pasada_cliente():
 
 
 def test_check_fechas_pasada_admin_ok():
-    ayer = str(datetime.date.today() - datetime.timedelta(days=1))
-    manana = str(datetime.date.today() + datetime.timedelta(days=1))
+    ayer = str(now_ar().date() - datetime.timedelta(days=1))
+    manana = str(now_ar().date() + datetime.timedelta(days=1))
     faltan = []
     _check_fechas(ayer, manana, es_admin=True, faltan=faltan)
     assert faltan == []
