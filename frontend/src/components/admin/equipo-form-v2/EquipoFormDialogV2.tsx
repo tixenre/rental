@@ -18,7 +18,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Loader2,
   Upload,
   Plus,
   Trash2,
@@ -29,6 +28,7 @@ import {
   X,
   Printer,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import {
@@ -1081,7 +1081,7 @@ export function EquipoFormDialogV2({
           >
             {photoSearching ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Buscando…
+                <Spinner size="xs" className="mr-1" /> Buscando…
               </>
             ) : (
               <>
@@ -1112,7 +1112,7 @@ export function EquipoFormDialogV2({
               >
                 {uploadingHtml ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Subiendo…
+                    <Spinner size="xs" className="mr-1" /> Subiendo…
                   </>
                 ) : (
                   <>
@@ -1253,7 +1253,7 @@ export function EquipoFormDialogV2({
                     />
                     {isPicking && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        <Spinner size="sm" className="text-white" />
                       </div>
                     )}
                   </button>
@@ -1746,7 +1746,7 @@ ${fotoTag}
         <Button type="button" variant="outline" disabled={saving} onClick={triggerApply}>
           {saving ? (
             <>
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Guardando…
+              <Spinner size="sm" className="mr-1.5" /> Guardando…
             </>
           ) : (
             "Aplicar"
@@ -1755,6 +1755,7 @@ ${fotoTag}
       )}
       <Button
         type="submit"
+        variant="primary"
         form={formId}
         disabled={saving}
         onClick={() => {
@@ -1763,7 +1764,7 @@ ${fotoTag}
       >
         {saving ? (
           <>
-            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Guardando…
+            <Spinner size="sm" className="mr-1.5" /> Guardando…
           </>
         ) : (
           "Guardar"

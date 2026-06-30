@@ -48,6 +48,21 @@ export function useRoiPctDefault(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
 }
 
+/** Lead-time: horas mínimas de antelación para que el cliente reserve online
+ *  (#1126). Default 0 = apagado. El admin lo configura desde /admin/settings.
+ *  El backend es la fuente de verdad (lo enforza el portero + el backstop de
+ *  creación); el front lo lee solo para avisar antes de tiempo (disclaimer). */
+export function useAntelacionMinimaHoras(): number {
+  const q = useQuery({
+    queryKey: ["settings", "antelacion_minima_horas"],
+    queryFn: () => adminApi.getSetting("antelacion_minima_horas").catch(() => null),
+    staleTime: SETTINGS_STALE_MS,
+    retry: 0,
+  });
+  const parsed = Number(q.data?.value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 /** Helper puro: precio jornada en ARS según fórmula
  *    precio_usd × usd_rate × (roi_pct / 100)
  *  Devuelve null si falta algún input.

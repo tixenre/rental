@@ -21,7 +21,7 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { fmtArs, formatFechaCorta } from "@/lib/format";
 import { whatsappLink } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { Kpi, Section, BarChart, RankList } from "@/components/admin/LiquidacionReporte";
 

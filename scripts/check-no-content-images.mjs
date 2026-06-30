@@ -34,6 +34,7 @@ const ALLOWLIST = new Set([
 const ALLOWED_PREFIXES = [
   "docs/audit-ui-screenshots/",
   "frontend/src/design-system/", // si algún token tiene una img de referencia
+  "frontend/public/ds-thumbs/", // miniaturas del dashboard /ds (generadas por scripts/ds-thumbs.mjs)
 ];
 
 function isAllowed(relPath) {

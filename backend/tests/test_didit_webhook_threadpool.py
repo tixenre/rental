@@ -40,9 +40,10 @@ def test_retrieve_decision_se_offloadea_a_threadpool(monkeypatch):
         return func(*args, **kwargs)
 
     monkeypatch.setattr(didit_mod, "run_in_threadpool", fake_run_in_threadpool)
-    # retrieve_decision mockeado (no toca red); _guardar_verificacion no-op (no DB).
+    # retrieve_decision mockeado (no toca red); kyc.aprobar no-op (no DB — el route
+    # delega la persistencia en identity/kyc).
     monkeypatch.setattr(didit_mod, "retrieve_decision", lambda sid: {"id_verifications": []})
-    monkeypatch.setattr(didit_mod, "_guardar_verificacion", lambda **kw: None)
+    monkeypatch.setattr(didit_mod.kyc, "aprobar", lambda **kw: True)
 
     # Payload 'liviano' Approved (sin `decision`) → fuerza el fallback retrieve_decision.
     body = json.dumps(

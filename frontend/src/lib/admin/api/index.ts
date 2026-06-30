@@ -9,6 +9,14 @@
 export * from "./types";
 export { estudioAdminApi, trabajosAdminApi } from "./estudio";
 export { descuentosJornadaApi } from "./estudio";
+export { facturacionApi } from "./facturacion";
+export type {
+  EmisorArca,
+  EstadoFacturacion,
+  FacturaEstado,
+  Factura,
+  FacturasListResp,
+} from "./facturacion";
 
 // URL absoluta para abrir PDFs en nueva pestaña
 const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");

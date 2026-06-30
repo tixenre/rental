@@ -1,6 +1,6 @@
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 
 import { adminApi, type EquipoInput } from "@/lib/admin/api";
 import { EquipoFormDialogV2 } from "@/components/admin/equipo-form-v2/EquipoFormDialogV2";
@@ -47,7 +47,7 @@ function EditarEquipoRoute() {
   if (equipoQ.isLoading) {
     return (
       <div className="p-10 grid place-items-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Spinner size="lg" className="text-muted-foreground" />
       </div>
     );
   }

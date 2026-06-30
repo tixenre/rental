@@ -13,6 +13,10 @@ on:
       - ".claude/**"
       - "scripts/check-docs.mjs"
       - ".github/workflows/docs-lint.yml"
+      # Guardrail Bloque 6 (vitrina del DS): un componente nuevo en design-system/ o
+      # un cambio en el catálogo deben re-verificar la cobertura, o el anti-drift no se arma.
+      - "frontend/src/design-system/**"
+      - "frontend/src/components/admin/ds-catalog/**"
   push:
     branches: [main, dev]
     paths:
@@ -20,6 +24,10 @@ on:
       - ".claude/**"
       - "scripts/check-docs.mjs"
       - ".github/workflows/docs-lint.yml"
+      # Guardrail Bloque 6 (vitrina del DS): un componente nuevo en design-system/ o
+      # un cambio en el catálogo deben re-verificar la cobertura, o el anti-drift no se arma.
+      - "frontend/src/design-system/**"
+      - "frontend/src/components/admin/ds-catalog/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

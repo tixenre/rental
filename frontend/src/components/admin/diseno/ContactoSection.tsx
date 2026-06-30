@@ -10,7 +10,8 @@
  */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, MapPin, Phone, Mail, Instagram, Map as MapIcon } from "lucide-react";
+import { Check, MapPin, Phone, Mail, Instagram, Map as MapIcon } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -132,11 +133,7 @@ function FieldRow({ field }: { field: FieldDef }) {
           disabled={!changed || mut.isPending}
           onClick={() => mut.mutate(trimmed)}
         >
-          {mut.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Check className="h-4 w-4" />
-          )}
+          {mut.isPending ? <Spinner size="sm" /> : <Check className="h-4 w-4" />}
         </Button>
       </div>
       {field.helper && <p className="text-xs text-muted-foreground">{field.helper}</p>}

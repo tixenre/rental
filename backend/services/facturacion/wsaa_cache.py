@@ -1,0 +1,80 @@
+"""services.facturacion.wsaa_cache — cache del Ticket de Acceso en `afip_ta`.
+
+Obtiene (token, sign) frescos: lee `afip_ta`, renueva si falta o está vencido,
+persiste el nuevo TA. El refresh es serializado por fila via SELECT FOR UPDATE
+para evitar que dos workers pidan el TA simultáneamente.
+
+Nota: no usa threading.Lock porque Railway corre un solo proceso uvicorn; el
+FOR UPDATE de Postgres es suficiente para serializar.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+
+# Renovar TA si le quedan menos de N minutos de vida
+_MARGEN_MINUTOS = 30
+
+
+def get_ta(emisor: str, conn) -> tuple[str, str]:
+    """Devuelve (token, sign) vigentes para el emisor.
+
+    Si el TA está vencido (o no existe), llama al WSAA y persiste el nuevo.
+    `conn` es una conexión de `database.get_db()` ya en contexto de transacción
+    (dentro de `with get_db() as conn:`).
+    """
+    from services.facturacion.config import credenciales
+    from arca_fe.wsaa import login_con_cert
+
+    cred = credenciales(emisor, conn)
+    ahora = datetime.now(timezone.utc)
+    limite = ahora + timedelta(minutes=_MARGEN_MINUTOS)
+
+    # Intentar usar el TA cacheado (FOR UPDATE para serializar renovación)
+    row = conn.execute(
+        """
+        SELECT token, sign, expira_at
+          FROM afip_ta
+         WHERE ambiente = %s AND emisor = %s
+        FOR UPDATE
+        """,
+        (cred.ambiente, emisor),
+    ).fetchone()
+
+    if row and _vigente(row["expira_at"], limite):
+        return row["token"], row["sign"]
+
+    # Necesitamos un TA nuevo
+    if not cred.cert_pem or not cred.key_pem:
+        raise RuntimeError(
+            f"Certificado de '{emisor}' no cargado. "
+            "Subí el cert + clave desde el back-office → Facturación ARCA → Emisores."
+        )
+
+    token, sign, expira_at = login_con_cert(
+        "wsfe",
+        cred.cert_pem.encode() if isinstance(cred.cert_pem, str) else cred.cert_pem,
+        cred.key_pem.encode() if isinstance(cred.key_pem, str) else cred.key_pem,
+        cred.endpoint_wsaa,
+    )
+
+    conn.execute(
+        """
+        INSERT INTO afip_ta (ambiente, emisor, token, sign, expira_at)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (ambiente, emisor)
+        DO UPDATE SET token = EXCLUDED.token,
+                      sign  = EXCLUDED.sign,
+                      expira_at = EXCLUDED.expira_at
+        """,
+        (cred.ambiente, emisor, token, sign, expira_at),
+    )
+
+    return token, sign
+
+
+def _vigente(expira_at: datetime, limite: datetime) -> bool:
+    if expira_at is None:
+        return False
+    if expira_at.tzinfo is None:
+        expira_at = expira_at.replace(tzinfo=timezone.utc)
+    return expira_at > limite

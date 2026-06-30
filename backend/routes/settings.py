@@ -157,6 +157,7 @@ ALLOWED_SETTINGS_KEYS = {
     "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
+    "antelacion_minima_horas",  # Lead-time: horas mín. de antelación para reservar online (#1126). Int >= 0. 0 = apagado.
     "horarios_retiro",   # Horas habilitadas de retiro/devolución por día de semana. JSON.
     "faq_json",          # Preguntas frecuentes editables. JSON [{title, items:[{q,a}]}].
     "hero_taglines",     # Taglines del hero del catálogo. JSON [[línea1, línea2], ...].
@@ -170,6 +171,9 @@ ALLOWED_SETTINGS_KEYS = {
     "business_instagram",      # Handle de IG sin @ ("ramblarental").
     # ── Analítica ────────────────────────────────────────────────────
     "ga4_measurement_id",      # Measurement ID de Google Analytics 4 ("G-XXXXXXXXXX"). Vacío = GA apagado.
+    # ── Facturación electrónica ARCA (#1139) ─────────────────────────
+    # Emisores, CUIT, PtoVta y cert+clave se gestionan en la tabla `emisores_arca`
+    # desde /admin/facturacion/emisores. No hay settings de AFIP aquí.
     # ── Reportes ─────────────────────────────────────────────────────
     "comisiones_modelo",       # Reparto de ingresos por dueño (#88). JSON {dueño: {beneficiario: %}}.
     # ── Recordatorio de retiro (Fase B mails) ────────────────────────
@@ -292,7 +296,7 @@ def update_setting(key: str, payload: dict, request: Request):
                 raise ValueError("debe ser >= 0")
         except (ValueError, TypeError) as e:
             raise HTTPException(400, f"Valor inválido para '{key}': debe ser un número >= 0 ({e})")
-    if key == "buffer_horas_alquiler":
+    if key in ("buffer_horas_alquiler", "antelacion_minima_horas"):
         try:
             v = int(value)
             if v < 0:

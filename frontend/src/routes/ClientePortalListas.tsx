@@ -235,7 +235,7 @@ function ListaCard({
   return (
     <div className="rounded-xl border border-[var(--hairline)] bg-surface overflow-hidden">
       {/* Header: nombre + acciones (renombrar / borrar) */}
-      <div className="flex items-center gap-2.5 px-4 sm:px-[18px] py-3 border-b border-dashed border-[var(--hairline)]">
+      <div className="flex items-center gap-2.5 px-portal py-3 border-b border-dashed border-[var(--hairline)]">
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-amber-soft text-amber">
           <ClipboardList className="h-4 w-4" strokeWidth={1.8} />
         </div>
@@ -317,11 +317,11 @@ function ListaCard({
 
       {/* Items */}
       {lista.items.length === 0 ? (
-        <div className="px-4 sm:px-[18px] py-6 text-center font-sans text-sm text-muted-foreground">
+        <div className="px-portal py-6 text-center font-sans text-sm text-muted-foreground">
           Esta lista quedó vacía.
         </div>
       ) : (
-        <ul className="px-4 sm:px-[18px]">
+        <ul className="px-portal">
           {resueltos.map(({ item, equipo }) => {
             const display = equipo?.name ?? "Equipo no disponible";
             const thumb = equipo?.fotoUrlThumb ?? equipo?.fotoUrl ?? null;
@@ -376,7 +376,7 @@ function ListaCard({
       )}
 
       {/* Footer: reservar */}
-      <div className="px-4 sm:px-[18px] py-3.5 border-t border-dashed border-[var(--hairline)]">
+      <div className="px-portal py-3.5 border-t border-dashed border-[var(--hairline)]">
         <Button
           type="button"
           variant="primary"

@@ -9,6 +9,7 @@ from fastapi import Request, HTTPException
 from fastapi.responses import Response
 
 from database import get_db, row_to_dict
+from identity import direccion_validada, nombre_validado
 from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
 from routes.cliente_portal.core import (
     router, require_cliente, _proyectar, _documentos_disponibles,
@@ -49,13 +50,11 @@ def _load_pedido_para_pdf(conn, pedido_id: int, cliente_id: int) -> dict:
     ).fetchone()
     if cli:
         c = row_to_dict(cli)
-        if c.get("nombre_renaper"):
-            pedido["cliente_nombre"] = f"{c['nombre_renaper']} {c.get('apellido_renaper', '')}".strip()
-        else:
-            pedido["cliente_nombre"] = f"{c.get('nombre', '')} {c.get('apellido', '')}".strip()
+        # Nombre/dirección: preferí RENAPER si está verificado (fuente única en identity).
+        pedido["cliente_nombre"] = nombre_validado(c) or f"{c.get('nombre', '')} {c.get('apellido', '')}".strip()
         pedido["cliente_email"] = c.get("email")
         pedido["cliente_telefono"] = c.get("telefono")
-        pedido["cliente_direccion"] = c.get("direccion_renaper") or c.get("direccion")
+        pedido["cliente_direccion"] = direccion_validada(c) or c.get("direccion")
         pedido["cliente_cuit"] = c.get("cuit")
         pedido["cliente_dni"] = c.get("dni")
         pedido["cliente_perfil_impuestos"] = c.get("perfil_impuestos")

@@ -21,6 +21,7 @@ import {
   Trash2,
   GripVertical,
   Tag,
+  Receipt,
   ShieldAlert,
   ShieldCheck,
   Copy,
@@ -59,23 +60,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
-import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
+import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   adminApi,
+  facturacionApi,
   ESTADO_LABEL,
   pedidoPdfUrl,
   type Pedido,
   type PedidoEstado,
   type Equipo,
+  type Factura,
 } from "@/lib/admin/api";
+import { FacturaBadge } from "@/components/kit/FacturaBadge";
 import {
   usePedidoDraft,
   nuevoUidLinea,
   type DraftItem,
 } from "@/components/admin/pedido/usePedidoDraft";
 import { ClienteAutocomplete } from "@/components/admin/pedido/ClienteAutocomplete";
-import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
+import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
 import { computeJornadas, parseDateTimeParts, toLocalISO } from "@/lib/rental-dates";
@@ -796,6 +800,9 @@ function PedidoEditorPage() {
             </Button>
           </RailSection>
 
+          {/* Factura ARCA */}
+          <FacturacionRailSection pedidoId={p.id} estadoPedido={p.estado} />
+
           {/* Eliminar pedido */}
           <RailSection label="Zona peligrosa">
             {transiciones(p.estado).includes("cancelado") && (
@@ -941,6 +948,160 @@ function PedidoEditorPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+// ── FacturacionRailSection ────────────────────────────────────────────────────
+
+const ESTADOS_FACTURABLES: PedidoEstado[] = [
+  "confirmado",
+  "retirado",
+  "entregado",
+  "devuelto",
+  "finalizado",
+];
+
+function FacturacionRailSection({
+  pedidoId,
+  estadoPedido,
+}: {
+  pedidoId: number;
+  estadoPedido: PedidoEstado;
+}) {
+  const qc = useQueryClient();
+
+  const q = useQuery({
+    queryKey: ["admin", "facturas", pedidoId],
+    queryFn: () => facturacionApi.listFacturasPedido(pedidoId),
+  });
+
+  const facturar = useMutation({
+    mutationFn: () => facturacionApi.facturarPedido(pedidoId),
+    onSuccess: () => {
+      toast.success("Factura emitida");
+      qc.invalidateQueries({ queryKey: ["admin", "facturas", pedidoId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const notaCredito = useMutation({
+    mutationFn: (facturaId: number) => facturacionApi.notaCreditoFactura(facturaId),
+    onSuccess: () => {
+      toast.success("Nota de crédito emitida");
+      qc.invalidateQueries({ queryKey: ["admin", "facturas", pedidoId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const facturas = q.data ?? [];
+  const principal = facturas.find(
+    (f: Factura) => f.nota_credito_de == null && f.estado !== "anulada",
+  );
+  const nc = facturas.find((f: Factura) => f.nota_credito_de != null);
+  const puedeFacturar = ESTADOS_FACTURABLES.includes(estadoPedido) && !principal;
+  const puedeAnular = principal?.estado === "emitida" && !nc;
+
+  const cbteLetra = principal
+    ? ({ 1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C" }[principal.cbte_tipo] ?? "?")
+    : null;
+
+  return (
+    <RailSection label="Factura ARCA">
+      {q.isLoading && (
+        // eslint-disable-next-line no-restricted-syntax -- text-[11px]: entre text-2xs(10px) y text-xs(12px), sin equiv DS
+        <div className="text-[11px] text-muted-foreground">Cargando…</div>
+      )}
+
+      {principal && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <FacturaBadge estado={principal.estado} />
+            {cbteLetra && (
+              // eslint-disable-next-line no-restricted-syntax -- text-[11px]: entre text-2xs y text-xs, sin equiv DS
+              <span className="font-mono text-[11px] text-muted-foreground">Fact. {cbteLetra}</span>
+            )}
+            {principal.ambiente === "homologacion" && (
+              // eslint-disable-next-line no-restricted-syntax -- text-[10px] alias text-2xs; amber: paleta categórica homologación (Tier 3)
+              <span className="font-mono text-2xs text-amber-600 border border-amber-400/50 rounded px-1">
+                TEST
+              </span>
+            )}
+          </div>
+
+          {principal.cbte_nro && (
+            // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
+            <div className="font-mono text-[11px] text-muted-foreground">
+              {String(principal.pto_vta).padStart(5, "0")}-
+              {String(principal.cbte_nro).padStart(8, "0")}
+            </div>
+          )}
+
+          {principal.cae && (
+            // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
+            <div className="font-mono text-[11px] text-muted-foreground">CAE {principal.cae}</div>
+          )}
+
+          {principal.estado === "error" && principal.errores && (
+            // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
+            <div className="text-[11px] text-destructive rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5">
+              {Array.isArray(principal.errores)
+                ? principal.errores.join(" / ")
+                : String(principal.errores)}
+            </div>
+          )}
+
+          {principal.pdf_key && (
+            <a
+              href={`/api/facturas/${principal.id}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+            >
+              <Download className="h-3 w-3" /> Descargar PDF
+            </a>
+          )}
+
+          {nc && (
+            <div className="mt-1 flex items-center gap-1.5">
+              <FacturaBadge estado={nc.estado} />
+              <span className="font-mono text-2xs text-muted-foreground">NC emitida</span>
+            </div>
+          )}
+
+          {puedeAnular && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={notaCredito.isPending}
+              onClick={() => notaCredito.mutate(principal.id)}
+            >
+              <X className="h-3.5 w-3.5 mr-1" />
+              {notaCredito.isPending ? "Emitiendo NC…" : "Anular con NC"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!principal && !q.isLoading && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          disabled={!puedeFacturar || facturar.isPending}
+          title={
+            !ESTADOS_FACTURABLES.includes(estadoPedido)
+              ? "El pedido debe estar confirmado para facturar"
+              : undefined
+          }
+          onClick={() => facturar.mutate()}
+        >
+          <Receipt className="h-3.5 w-3.5 mr-1" />
+          {facturar.isPending ? "Emitiendo…" : "Facturar"}
+        </Button>
+      )}
+    </RailSection>
   );
 }
 

@@ -13,9 +13,11 @@ from routes.equipos.core import (
     ESTADOS_RESERVADO,
     EquipoCreate,
     EquipoUpdate,
-    _attach_disponibilidad,
     _normalize_fecha_compra,
 )
+# `_attach_disponibilidad` moved to services.catalogo (puerta única); re-exportado
+# para back-compat con tests que lo importan desde routes.equipos.
+from services.catalogo.proyeccion import _attach_disponibilidad
 
 # `__all__` declara la superficie pública re-exportada (y le dice a ruff que
 # estos imports no están "sin usar": son re-exports a propósito).

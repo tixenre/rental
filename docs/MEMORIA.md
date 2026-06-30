@@ -152,7 +152,7 @@ supervisor marca `ILIKE`/`LIKE` o normalizadores ad-hoc, e índices cuya expresi
 
 ### 2026-06-06 — Design system consolidado en la app; `design-system` gobierna, `pulido-frontend` aplica
 
-El DS canónico es la app: primitivos en `src/design-system/{ui,kit}`, componentes de negocio en
+El DS canónico es la app: primitivos en `src/design-system/{ui,composites}`, componentes de negocio en
 `src/components/{rental,admin}`, tokens/fuentes en `src/design-system/styles/` (entry
 `src/design-system/ds-styles.css`). **El skill `design-system` (opus) gobierna** (audita sistémicamente,
 dashboard `/ds`, propone issues); **`pulido-frontend` aplica** los fixes en pantalla. `importar-diseno`
@@ -425,6 +425,9 @@ arquitectura → `MEMORIA`+`DECISIONES` (OK del dueño); gotcha cómo-funciona-X
 desktop; surfacea, no despacha ni reemplaza al de gobernanza) · **skill `gobernanza` §7 = método** · **dueño =
 gate** (dos OK: ¿corro el retro? → reparto ítem por ítem). Semi-automático: el hook recuerda, la sesión juzga, el
 dueño aprueba. Propone-no-aplica salvo buzón e issues. Aplica la cláusula de retiro del harness de evals.
+**El disparador mide TAMAÑO (proxy barato); el rinde lo da la NOVEDAD** (criterio/arquitectura/principio nuevo, no
+líneas) → al primer OK la sesión **estima el rinde por novedad** ("rutinaria, reusó X → flaca" vs. "terreno nuevo en
+Y → vale") para que el dueño gatee informado y temprano, no tras gastar el análisis (refinado 2026-06-30).
 
 ### 2026-06-29 — `backend/services/contenido/` = puerta única de "qué incluye un producto" (display derivado de la receta real)
 
@@ -549,6 +552,54 @@ marca una operación sensible del cliente sin `require_recent_auth`, o un step-u
 cuenta. Base del step-up de **Fase 3** (operaciones sensibles) y se conecta con la **firma con passkey (Fase 5)**.
 Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); #1098 Fase 1B.
 
+### 2026-06-29 — `backend/services/checkout/` = portero único del checkout (fail-not-fast; devuelve {listo, faltan})
+
+Toda validación previa a crear un pedido pasa por la **puerta única** `backend/services/checkout/validar.py::validar_checkout(conn, cliente_id, session_id, firma_ok)`. Corre **10 checks fail-not-fast** (sin parar en el primero) y devuelve `{listo: bool, faltan: [{check, mensaje}]}` para que la UI muestre exactamente qué resolver. **No crea pedidos** — el gate de creación sigue siendo `create_pedido_retry` (`routes/alquileres/core.py`; core sagrado intacto). **2 checks cableado-apagado** (`_check_bloqueo` #1125, `_check_antelacion` #1126) retornan siempre OK hasta activarse. La **firma** admite passkey step-up (`has_recent_stepup`, ~5 min) O fallback `session_confirmed=true` ("Confirmo") para clientes sin passkey. HTTP: `POST /api/checkout/validar` + `POST /api/checkout/aceptar-tyc` (idempotente). El supervisor marca validación de checkout ad-hoc fuera de la puerta, o un check nuevo no cableado-apagado sumado fuera de `validar_checkout`.
+
+### 2026-06-30 — Firma con passkey: presencia de un toque (on-the-fly) + gate del checkout reusa el portero; presencia ≠ firma legal
+
+La firma con passkey del cliente es **presencia fresca de un toque**: registrar una passkey de cliente deja la marca
+`stepup` (`_register_complete`→`mark_stepup`; registrar exige el mismo gesto biométrico que una assertion) → es un
+**modo más de auth fresca** (junto a login/step-up) y **crear la llave ya firma**. Helper **único**
+`firmarConPasskey(tienePasskey)` en `lib/passkey.ts` (no un módulo aparte — `lib/firma.ts` se borró). El **gate de
+firma+T&C en la creación del pedido reusa** los checks cliente-scoped del portero (`faltan_firma_tyc` =
+`_check_tyc`+`_check_firma`), **no re-implementa** ni usa el portero completo (depende de `carritos_activos`);
+stock/precio los sigue enforzando `create_pedido_retry`. **Cableado-apagado** (`FIRMA_CHECKOUT_OBLIGATORIA=False`)
+hasta que la UI del checkout mande la señal (patrón #1125/#1126). **Presencia ≠ firma legal:** la marca prueba "hay
+un humano con el dispositivo ahora" (checkout = acepto T&C + confirmo); la **firma legal del contrato** (no-repudio
+**atada al hash**, Ley 25.506) extiende la **misma** ceremonia de `auth/passkey/` firmando el `doc_hash` — **no un
+sistema paralelo** (contratos/ARCA, aparte). El supervisor marca: firma de presencia recreada fuera de
+`auth/stepup`+`firmarConPasskey`; el gate del checkout re-implementando los checks; o una firma de contrato con
+ceremonia paralela. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §3; historia → #1131.
+
+### 2026-06-30 — `staging-verify`: fakear la verificación Didit en dev SIN tocar `dni_validado_at` a mano
+
+Didit (KYC) no corre en dev/staging → una cuenta nunca llega a `dni_validado_at` y el portero del checkout la
+bloquea, impidiendo probar el flujo de pedido. `POST /auth/staging-verify` la marca como verificada **reusando la
+pluma única `identity.kyc`** (`aprobar`/`actualizar_estado`): setea un `didit_session_id` fresco y delega — **nunca
+un UPDATE manual de `dni_validado_at`**. **Mismo gate de doble llave** que staging-login (`is_production` falla-a-prod
++ `STAGING_LOGIN_SECRET`): **404 en prod**. Soporta `estado` approved/rejected/en_revision y siembra contacto para
+cuentas livianas; CUIL fake válido (mod-11) único por id. **No mintea sesión** (combinar con `staging-login
+target=cliente`). Extiende _Staging-login (2026-06-19)_ al gate de identidad. El supervisor marca un fake de KYC vía
+UPDATE de `dni_validado_at`/`*_renaper` a mano en vez de la puerta. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) +
+[`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md).
+
+### 2026-06-30 — `backend/services/fechas.py` = puerta única de la lógica de fechas/horas; lead-time configurable (#1126)
+
+Toda **decisión** sobre fechas/horas vive en `services/fechas.py`: formato (`validar_fecha_iso`), criterio de
+rango (`validar_rango_fechas`: orden/no-pasado/tope de días), lead-time (`antelacion_*`), ventana/corte de
+modificación (`setting_horas` + el predicado puro `dentro_de_ventana_horas`), horarios de retiro
+(`validar_horarios_habilitados`, devuelve `str|None`; el route es adapter que levanta el 400) y mes actual
+(`mes_actual_ar`). Se construye sobre las **primitivas** `now_ar()`/`to_datetime()` del DAL (fuente única de bajo
+nivel, _2026-06-27_): el módulo es dueño de las **reglas**, el DAL de las primitivas. El **dominio de cada motor NO
+se mueve** (reservas: buffer/overlap; precios: jornadas; reportes/contabilidad: ventanas de mes; auth: TTLs;
+ical/pdf/email: display). El **lead-time** (#1126) es configurable (`app_settings.antelacion_minima_horas`,
+0 = apagado) con **defensa en profundidad** (portero UX `_check_antelacion` + backstop server-side en
+`cliente_crear_pedido`, **solo-cliente** — el admin carga urgencias a mano; no toca el `FOR UPDATE`) y un disclaimer
+con CTA de WhatsApp en el carrito; **fail-open** (setting corrupto/ausente → 0). El supervisor marca: una regla o
+validación de fecha/hora genérica recreada o duplicada fuera del módulo, o `date.today()` donde debería ir
+`now_ar()`. Cómo → el propio docstring de `services/fechas.py`; tracking #1126.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
@@ -610,7 +661,7 @@ Toda UI nueva o rediseñada sigue la **Filosofía de diseño** del DS (`DESIGN_S
 11 principios): la info se tiene que ver (contraste/peso reales), **estado + plata visibles** (`Debe $X`,
 no "sin seña" gris), un foco por pantalla, **una sola forma de hacer cada cosa** (sin controles/botones
 duplicados), lo más usado a mano, reconocimiento > lectura (avatares/pills), densidad sin aire muerto,
-**reusar no recrear** (la forma del pill vive en `kit/Pill`; `EstadoBadge`/`PagoBadge` derivan, cero clases
+**reusar no recrear** (la forma del pill vive en `ui/Pill`; `EstadoBadge`/`PagoBadge` derivan, cero clases
 copiadas), mobile/a11y no son extra, el core es presentación. El supervisor la hace cumplir; el detalle
 vive en el doc. Es la contraparte visual de la _Barra de calidad de ingeniería (2026-05-25)_.
 

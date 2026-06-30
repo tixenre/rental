@@ -15,23 +15,20 @@ from fastapi import APIRouter, Query, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from database import (
-    get_db, row_to_dict, attach_tags, attach_kit, attach_categorias,
-    attach_ficha, attach_specs_destacados, attach_specs_estructuradas,
+    get_db, row_to_dict, attach_tags,
     regenerate_auto_tags, regenerate_auto_tags_batch,
     MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
 )
 from busqueda import construir
 from reservas import (
-    calcular_disponibilidad,
     reservado_total,
     ESTADOS_RESERVADO,  # noqa: F401 — re-export canónico (guard: test_reservas_sql_safety)
 )
-from reservas.disponibilidad import _derivar_compuestos
-from reservas.semantics import componentes_de, parientes_de
+from reservas.semantics import parientes_de
 from auth.session import get_session
 from auth.guards import require_admin
-from services.contenido import contenido_de
 from services.nombre_service import actualizar_nombres_de
+from services.catalogo import proyectar_lista, proyectar_uno
 # `delete_equipo` limpia el blob HTML scrapeado en R2 al borrar un equipo; los
 # endpoints de fotos viven en `routes.equipos.fotos` (importan estos mismos
 # helpers de `services.media.storage` por su cuenta). Lo testea
@@ -248,36 +245,6 @@ def equipos_kpis(request: Request):
 # ── Rutas de equipos ─────────────────────────────────────────────────────────
 
 
-def _stock_sin_reservas(conn) -> dict[int, int]:
-    """Stock teórico de kits/combos derivado solo del stock de componentes, sin
-    descontar ninguna reserva. Detecta kits imposibles de armar (components <
-    cantidad requerida) independientemente de las fechas seleccionadas."""
-    raw = {
-        r["id"]: r["cantidad"]
-        for r in conn.execute(
-            "SELECT id, cantidad FROM equipos WHERE eliminado_at IS NULL"
-        ).fetchall()
-    }
-    return _derivar_compuestos(raw, componentes_de(conn))
-
-
-def _attach_disponibilidad(conn, equipos: list, desde: str, hasta: str) -> list:
-    """Inyecta el campo `disponible` por equipo, usando la fuente única de
-    lectura del motor (`reservas.calcular_disponibilidad`).
-
-    Antes esta función tenía su propia query (directas + vía kit) que NO restaba
-    mantenimiento ni aplicaba buffer → mostraba disponibilidad inflada respecto
-    del gate real (bug #619). Ahora delega en el motor, así el catálogo refleja
-    exactamente lo mismo que el chequeo de confirmación."""
-    disp = calcular_disponibilidad(conn, desde, hasta)
-    for eq in equipos:
-        eid = eq["id"]
-        # `calcular_disponibilidad` indexa por str(equipo_id); fallback al stock
-        # propio si el equipo no aparece (ej. equipo nuevo sin filas asociadas).
-        eq["disponible"] = disp.get(str(eid), eq.get("cantidad", 0))
-    return equipos
-
-
 @router.get("/equipos")
 def list_equipos(
     request:       Request,
@@ -432,116 +399,26 @@ def list_equipos(
         base_sql += f" AND LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(%s)"
         params.append(marca)
 
-    # ── Sort ──
-    # Default: ranking compuesto (relevancia_manual + popularidad_score).
-    # Esto pone los flagship arriba y desempata por uso real.
-    # Cuando hay búsqueda (`q`) y el sort es el default, ordena por relevancia
-    # del match (`_score`) primero — el mejor resultado arriba, consistente.
-    _RANKING = "e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC"
-    # Precio efectivo por jornada para ordenar: un combo se ordena por la SUMA de sus
-    # componentes (mismo criterio que el display, `precios_combo_batch`); el resto por su
-    # precio propio. Correlado por e.id; el subquery solo se evalúa para filas combo. Así
-    # el orden coincide con el precio que se muestra y se cobra (exacto, no aproximado).
-    _PRECIO_EFECTIVO = (
-        "CASE WHEN e.tipo = 'combo' THEN COALESCE(("
-        " SELECT ROUND(SUM(ce.precio_jornada * kc.cantidad"
-        " * (1 - COALESCE(kc.descuento_pct, 0) / 100.0)))"
-        " FROM kit_componentes kc JOIN equipos ce ON ce.id = kc.componente_id"
-        " WHERE kc.equipo_id = e.id AND ce.eliminado_at IS NULL"
-        "), 0) ELSE e.precio_jornada END"
-    )
-    use_score = bool(pred and pred.activo) and sort in (None, "ranking")
-    if use_score:
-        order_clause = f"ORDER BY _score DESC, {_RANKING}"
-    else:
-        order_clause = {
-            None: f"ORDER BY {_RANKING}",
-            "ranking": f"ORDER BY {_RANKING}",
-            "nombre": "ORDER BY COALESCE(e.nombre_publico, e.nombre) ASC",
-            "precio_asc": f"ORDER BY ({_PRECIO_EFECTIVO}) ASC NULLS LAST, e.nombre ASC",
-            "precio_desc": f"ORDER BY ({_PRECIO_EFECTIVO}) DESC NULLS LAST, e.nombre ASC",
-            "id": "ORDER BY e.id ASC",
-        }.get(sort, f"ORDER BY {_RANKING}")
-
     with get_db() as conn:
-        total = conn.execute(f"SELECT COUNT(*) {base_sql}", params).fetchone()[0]
-        if use_score:
-            select_cols = f"e.*, {MARCA_SUBQUERY}, ({pred.score}) AS _score"
-            select_params = pred.score_params + params + [per_page, offset]
-        else:
-            select_cols = f"e.*, {MARCA_SUBQUERY}"
-            select_params = params + [per_page, offset]
-        rows  = conn.execute(
-            f"SELECT {select_cols} {base_sql} {order_clause} LIMIT %s OFFSET %s",
-            select_params,
-        ).fetchall()
-        equipos = [row_to_dict(r) for r in rows]
-        for e in equipos:
-            e.pop("_score", None)  # interno del ranking, no parte del contrato
-
-        # Attach brand object (id, nombre, logo_url) — batched (#350 perf).
-        # Antes era 1 query por equipo (N+1). Con 168 equipos sobre Railway
-        # eso significaba 60s+ de latencia. Ahora una sola query.
-        brand_ids = {e['brand_id'] for e in equipos if e.get('brand_id')}
-        brands_map: dict = {}
-        if brand_ids:
-            placeholders = ",".join(["%s"] * len(brand_ids))
-            brand_rows = conn.execute(
-                f"SELECT id, nombre, logo_url FROM marcas WHERE id IN ({placeholders})",
-                tuple(brand_ids),
-            ).fetchall()
-            brands_map = {r["id"]: row_to_dict(r) for r in brand_rows}
-        for equipo in equipos:
-            bid = equipo.get('brand_id')
-            equipo['brand'] = brands_map.get(bid) if bid else None
-
-        equipos = attach_tags(conn, equipos)
-        equipos = attach_kit(conn, equipos)
-        equipos = attach_categorias(conn, equipos)
-        equipos = attach_ficha(conn, equipos)
-        # Fase D: specs estructuradas para el catálogo público. Cada
-        # equipo recibe `specs: {spec_key: {label, value, ...}}` desde
-        # equipo_specs JOIN spec_definitions JOIN template.
-        equipos = attach_specs_estructuradas(conn, equipos)
-        equipos = attach_specs_destacados(conn, equipos)
-
-        # Combos: el precio que se MUESTRA es el EFECTIVO (derivado de componentes,
-        # combo-aware), no el `precio_jornada` crudo de la tabla → la card del catálogo
-        # coincide con lo que el carrito cotiza/cobra (el front muestra, no calcula —
-        # FASE 3). Batch: una sola query para todos los combos (sin N+1). Un combo sin
-        # componentes vivos → 0. (El sort precio_asc/desc sigue sobre el crudo en SQL:
-        # aproximado para combos; el display es exacto.)
-        combo_ids = [e["id"] for e in equipos if e.get("tipo") == "combo"]
-        if combo_ids:
-            from services.precios import precios_combo_batch
-            efectivos = precios_combo_batch(conn, combo_ids)
-            for e in equipos:
-                if e.get("tipo") == "combo":
-                    e["precio_jornada"] = efectivos.get(e["id"], 0)
-
-        # Filtrar kits/combos que no pueden armarse ni una vez (stock de
-        # componentes insuficiente, sin considerar reservas). Solo para catálogo
-        # público — el admin los sigue viendo para poder corregirlos.
-        # Solo aplica a kits (los que tienen kit_componentes) para no afectar
-        # equipos hoja con cantidad=0. Las claves de stock_teo son str(id).
-        if not is_admin:
-            stock_teo = _stock_sin_reservas(conn)
-            equipos = [
-                e for e in equipos
-                if not e.get("kit")
-                or stock_teo.get(str(e["id"]), 0) > 0
-            ]
-
-        if desde and hasta:
-            equipos = _attach_disponibilidad(conn, equipos, desde, hasta)
-
-        # Cache: la respuesta pública es estable para un set dado de params.
-        # Admin recibe no-store (ve equipos no-visibles y filtros extra).
-        response.headers["Cache-Control"] = (
-            "private, no-store" if is_admin
-            else "public, max-age=60, stale-while-revalidate=300"
+        result = proyectar_lista(
+            conn,
+            filtro_sql=base_sql,
+            filtro_params=params,
+            sort=sort,
+            pred=pred,
+            page=page,
+            per_page=per_page,
+            desde=desde,
+            hasta=hasta,
+            is_admin=is_admin,
         )
-        return {"total": total, "page": page, "per_page": per_page, "items": equipos}
+    # Cache: respuesta pública estable para un set dado de params;
+    # admin recibe no-store (ve equipos no-visibles y filtros extra).
+    response.headers["Cache-Control"] = (
+        "private, no-store" if is_admin
+        else "public, max-age=60, stale-while-revalidate=300"
+    )
+    return result
 
 
 @router.get("/equipos/{id_or_slug}")
@@ -567,50 +444,10 @@ def get_equipo(id_or_slug: str):
         actual_id = int(m.group(1))
 
     with get_db() as conn:
-        row = conn.execute(
-            f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id = %s", (actual_id,)
-        ).fetchone()
-        if not row:
-            raise HTTPException(404, "Equipo no encontrado")
-        equipo = attach_tags(conn, [row_to_dict(row)])[0]
-        equipo = attach_ficha(conn, [equipo])[0]
-        equipo = attach_categorias(conn, [equipo])[0]
-        # Specs estructuradas (Fase D): el catálogo público lee
-        # `equipo.specs` (dict keyed por spec_key) en vez de las columnas
-        # legacy de equipo_fichas. Mantenemos `ficha` para back-compat.
-        equipo = attach_specs_estructuradas(conn, [equipo])[0]
-        # Componentes vía la puerta única (services.contenido). `solo_activos=False`:
-        # preserva el comportamiento previo de la ficha (no filtraba soft-deleted).
-        equipo["kit"] = [{
-            "componente_id": c["componente_id"],
-            "cantidad":      c["cantidad"],
-            "descuento_pct": c["descuento_pct"],
-            "esencial":      c["esencial"],
-            "nombre":        c["nombre"],
-            "marca":         c["marca"],
-            "foto_url":      c["foto_url"],
-        } for c in contenido_de(conn, actual_id, solo_activos=False)]
-        # Galería multi-foto (#125): el catálogo público expone las fotos de
-        # `equipo_fotos` (principal primero) para que la ficha muestre la galería,
-        # no solo `foto_url`. Shape liviano (url + es_principal) — sin internals.
-        fotos = conn.execute(
-            "SELECT url, es_principal FROM equipo_fotos "
-            "WHERE equipo_id = %s AND url IS NOT NULL AND url <> '' "
-            "ORDER BY es_principal DESC, orden ASC, id ASC",
-            (actual_id,),
-        ).fetchall()
-        equipo["fotos"] = [
-            {"url": r["url"], "es_principal": bool(r["es_principal"])} for r in fotos
-        ]
-        # Combo: el precio mostrado es el EFECTIVO (derivado de componentes), igual en
-        # TODAS las superficies — listado, ficha pública, form de edición del admin y lo
-        # que el carrito cotiza/cobra (el front muestra, no calcula — FASE 3). El precio
-        # del combo es AUTO/derivado (no se edita a mano), así que mostrar el efectivo es
-        # lo correcto también en el back-office (no hay un crudo editable que proteger).
-        if equipo.get("tipo") == "combo":
-            from services.precios import precio_combo
-            equipo["precio_jornada"] = precio_combo(conn, actual_id)
-        return equipo
+        equipo = proyectar_uno(conn, actual_id)
+    if not equipo:
+        raise HTTPException(404, "Equipo no encontrado")
+    return equipo
 
 
 # Series tipo "N/A", "ND", "-", "Sin serie" se aceptan duplicadas — son

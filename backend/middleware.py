@@ -41,6 +41,7 @@ PUBLIC_API_ANY = (
     # sesión adentro del handler (get_session), así que abrirla es seguro.
     "/api/public/",
     "/api/cliente/registro",  # registro-info y registro (sin sesión)
+    "/api/cliente/claim",  # claim-info y claim de invitación (sin sesión — se reclama con token)
     # /api/estudio expone la config del espacio (incluyendo pack curado) y la
     # disponibilidad por franja — son lecturas públicas. La creación de reservas
     # vive bajo /api/estudio/reservas y tiene su propio `_require_cliente` en el

@@ -1,17 +1,18 @@
 """Catálogo: `_attach_disponibilidad` usa la fuente única del motor.
 
-Antes el catálogo (`routes/equipos._attach_disponibilidad`) tenía su propia query
-de disponibilidad que NO restaba mantenimiento ni aplicaba buffer → mostraba
-disponibilidad inflada respecto del gate de confirmación (bug #619). Ahora delega
-en `reservas.calcular_disponibilidad`, así muestra exactamente lo mismo que el
+Antes el catálogo tenía su propia query de disponibilidad que NO restaba
+mantenimiento ni aplicaba buffer → mostraba disponibilidad inflada respecto del
+gate de confirmación (bug #619). Ahora delega en
+`reservas.calcular_disponibilidad`, así muestra exactamente lo mismo que el
 chequeo real.
 
-Estos tests fijan esa conducta con un fake conn que stubea las 3 queries de
-`calcular_disponibilidad` (directas + vía kit + mantenimiento).
+La función vive en `services.catalogo.proyeccion` (motor de catálogo, puerta
+única). Estos tests fijan esa conducta con un fake conn que stubea las 3 queries
+de `calcular_disponibilidad` (directas + vía kit + mantenimiento).
 """
 import pytest
 
-from routes.equipos import _attach_disponibilidad
+from services.catalogo.proyeccion import _attach_disponibilidad
 
 pytestmark = pytest.mark.unit
 

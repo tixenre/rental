@@ -8,7 +8,12 @@
 > Historia de cómo llegó a esta forma: passkey ([#1095](https://github.com/tixenre/rental/pull/1095)),
 > consolidación en `auth/` ([#1100](https://github.com/tixenre/rental/pull/1100)), revocación de sesión
 > ([#1102](https://github.com/tixenre/rental/pull/1102)), quick wins de seguridad
-> ([#1103](https://github.com/tixenre/rental/pull/1103)).
+> ([#1103](https://github.com/tixenre/rental/pull/1103)), firma on-the-fly
+> ([#1131](https://github.com/tixenre/rental/pull/1131)).
+>
+> **Frontera con identidad:** "¿quién sos?" (ancla CUIL, KYC sobre Didit, contactos verificados, estado de
+> la cuenta) vive en el motor **hermano** `identity/` → [`SISTEMA_IDENTITY.md`](SISTEMA_IDENTITY.md). Se
+> tocan solo en `clientes.id`: **`auth/` nunca ve un CUIL; `identity/` nunca ve una cookie.**
 
 ## El panorama: un motor, una sesión, varios métodos
 
@@ -146,6 +151,12 @@ Para que la **sesión automatizada pruebe flujos logueados en staging** (no solo
 - `GET /auth/dev-login[-cliente]` — solo dev (`ADMIN_BYPASS_AUTH`, nunca Railway).
 - `POST /auth/staging-login` — **doble llave**: `is_production` (falla-a-prod) + secreto `STAGING_LOGIN_SECRET`.
   `target: "admin"|"cliente"`. En prod responde 404. La admin-ness la sigue resolviendo `is_admin_email`.
+- `POST /auth/staging-verify` — **fakea la verificación de identidad Didit** (Didit no corre en dev → una cuenta
+  nunca llega a `dni_validado_at` y el portero del checkout la bloquea para siempre). **Mismo gate de doble llave**
+  que staging-login (404 en prod). Body: `{secret, cliente_id?, estado?, email?}`; `estado` ∈ `approved`(default)/
+  `rejected`/`en_revision` para probar cada camino del KYC. **Reusa la pluma única `identity.kyc`** (`aprobar`/
+  `actualizar_estado`) — no escribe `dni_validado_at` a mano: setea un `didit_session_id` fresco y delega. **No
+  mintea sesión** (combinar con `staging-login target=cliente`). El CUIL fake es válido (mod-11) y único por id.
 
 ### Account-linking / "Métodos de acceso" — `auth/linking.py`
 La cuenta del cliente tiene **varias llaves intercambiables** (passkey + Google; mail magic-link, futuro). Esta
@@ -156,13 +167,29 @@ identidades (`login_identities`) en una sola lista de lectura, y `DELETE /client
 vincular Google, en el link-mode de `google.py` (arriba). Es la cara de "varias llaves" del modelo banco (#1098,
 Fase 1B). Front: `AccessMethods.tsx` (cliente) generaliza `PasskeyManager` (que queda solo para el admin).
 
-### Step-up — `auth/stepup.py` + `…/passkey/stepup/{begin,complete}`
+### Step-up + firma on-the-fly — `auth/stepup.py` + `…/passkey/stepup/{begin,complete}`
 **"Confirmá que sos vos"** con una passkey **fresca** antes de una operación sensible (hoy: **quitar un método de
-acceso**; reusable a futuro para confirmar un pedido). `POST /cliente/auth/passkey/stepup/{begin,complete}` corre
+acceso**; reusable para confirmar/firmar un pedido). `POST /cliente/auth/passkey/stepup/{begin,complete}` corre
 la assertion WebAuthn **scopeada** (la passkey TIENE que ser de esta cuenta) y deja la cookie firmada `stepup`
 (~5 min). El guard **`require_recent_auth`** (en `stepup.py`, = `require_cliente` + `stepup` fresca y de esta
 cuenta) la exige; lo usa `DELETE /cliente/auth/keys/...`. **No es un login** (no mintea sesión, solo deja la marca).
 Regla → MEMORIA _2026-06-29 — Step-up con passkey_.
+
+**On-the-fly de un toque (#1131):** **registrar una passkey de cliente también deja la marca `stepup`**
+(`_register_complete` llama a `mark_stepup` cuando `owner_type=="cliente"`) — registrar exige el mismo gesto
+biométrico que una assertion, así que vale como prueba de presencia fresca (un modo más de auth, junto a login
+y step-up). Consecuencia: el cliente **sin** passkey puede firmar **en un solo toque** (crear la llave ya firma),
+igual que el que **sí** tiene. El helper frontend único es **`firmarConPasskey(tienePasskey)`**
+(`frontend/src/lib/passkey.ts`): si tiene llave → `stepUpWithPasskey`; si no → `registerPasskey("cliente")` (que
+ya firma). Devuelve `"passkey" | "sin-soporte" | "cancelado"` para que el caller ofrezca el fallback (checkbox
+"Confirmo"). `tienePasskey` lo pasa el caller (sin `await` de red entre el click y el prompt WebAuthn).
+_(Criterio pendiente de promover a MEMORIA — owner-gated.)_
+
+> **Presencia ≠ firma del documento.** Esta marca prueba *"hay un humano con el dispositivo, ahora"* → sirve
+> para el **checkout** (acepto T&C + confirmo; gate liviano `faltan_firma_tyc` en `services/checkout`, hoy
+> cableado-apagado → [`SISTEMA_CHECKOUT.md`](SISTEMA_CHECKOUT.md)). La **firma legal del contrato** (no-repudio
+> **atada al hash**, Ley 25.506) es otra cosa: se logra haciendo que la assertion firme el `doc_hash` del
+> contrato — **extendiendo esta misma ceremonia, no un sistema paralelo**. Iniciativa aparte (contratos/ARCA, #1098).
 
 ---
 
@@ -204,7 +231,7 @@ el guard del handler sigue siendo el chequeo fino).
 | `POST /auth/passkey/login/begin`·`/complete` | `passkey/routes.py` | Login discoverable (admin + cliente). |
 | `POST /auth/passkey/signup/begin`·`/complete` | `passkey/routes.py` | **Alta passwordless** (solo cliente): crea cuenta liviana + passkey + sesión, **sin sesión previa**. |
 | `POST /auth/passkey/register/begin`·`/complete` | `passkey/routes.py` | Registrar passkey (admin). |
-| `…/cliente/auth/passkey/register/…` · `…/credentials[...]` | `passkey/routes.py` | Registro + gestión de passkeys del cliente. |
+| `…/cliente/auth/passkey/register/…` · `…/credentials[...]` | `passkey/routes.py` | Registro + gestión de passkeys del cliente. **Registrar deja la marca `stepup`** (firma on-the-fly, §3). |
 | `GET·DELETE·PATCH /auth/passkey/credentials[/{id}]` | `passkey/routes.py` | Gestión de passkeys del admin. |
 | `GET /cliente/auth/google/link` | `google.py` | Vincular Google a la cuenta logueada (account-linking, no login). |
 | `GET /cliente/auth/keys` · `DELETE /cliente/auth/keys/{kind}/{id}` | `linking.py` | "Métodos de acceso": llaves unificadas (passkey+Google) + quitar (guardrail de última llave **+ step-up**). |
@@ -212,6 +239,7 @@ el guard del handler sigue siendo el chequeo fino).
 | `GET /auth/sessions` · `POST /auth/sessions/revoke-all` · `DELETE /auth/sessions/{jti}` | `sessions_routes.py` | Sesiones activas del admin (listar / cerrar-otras / cerrar-una). |
 | `…/cliente/auth/sessions[...]` | `sessions_routes.py` | Ídem para el cliente (scopeado a su `cliente_id`). |
 | `GET /auth/dev-login[-cliente]` · `POST /auth/staging-login` | `staging.py` | Login programático de dev/staging. |
+| `POST /auth/staging-verify` | `staging.py` | Fakea la verificación Didit en dev (Didit no corre ahí). Mismo gate; reusa `identity.kyc`. |
 
 **Frontend de gestión:** `frontend/src/components/rental/SessionManager.tsx` (sesiones), `PasskeyManager.tsx`
 (passkeys — admin) y `AccessMethods.tsx` (llaves unificadas — cliente) son **compartidos/parametrizados**, sobre
@@ -273,6 +301,11 @@ los helpers `lib/sessions.ts` / `lib/passkey.ts` / `lib/accessKeys.ts`. Se monta
 - **CSP a enforce** — hoy Report-Only; owner-gated (validar el reporte de prod antes, para no romper el sitio).
 - **Identidad por CUIL** — que la cuenta se ancle al **CUIL** (verificado por Didit/RENAPER), no al mail;
   el mail pasa a ser una llave de login cambiable. Iniciativa fundacional (contratos + ARCA), **sesión aparte**.
+- **Firma del checkout** — el gate de firma+T&C en la creación del pedido está **cableado-apagado**
+  (`FIRMA_CHECKOUT_OBLIGATORIA=False` en `services/checkout/validar.py`); se prende en el PR que enchufe el
+  paso de firma en la UI del checkout (la herramienta `firmarConPasskey` ya está, §3).
+- **Firma legal del contrato** — no-repudio **atada al hash** (Ley 25.506): **sesión aparte**; debe **reusar**
+  el step-up/on-the-fly de §3 firmando el `doc_hash` (no un sistema nuevo). Encadena con contratos + ARCA.
 - **ARCA** (facturación electrónica) — motor + mock, sesión aparte.
 - **Revocación a prod:** al promover, las sesiones abiertas de antes se cierran (re-login una vez) — es el
   corte limpio funcionando, no un bug.

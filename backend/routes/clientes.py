@@ -7,9 +7,14 @@ from typing import Optional
 from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
 
+from urllib.parse import quote
+
 from database import get_db, row_to_dict
 from auth.guards import require_admin
+from auth import magic
 from busqueda import construir
+from config import settings
+from identity import merge
 
 router = APIRouter()
 
@@ -129,6 +134,108 @@ def list_clientes(
         return {"total": total, "page": page, "per_page": per_page, "items": items}
 
 
+# ── Fusión de duplicados (Fase 2 identidad #1098) ─────────────────────────────
+# El back-office para deduplicar clientes que son la misma persona. Cablea al motor
+# `identity/merge` (transaccional, con guardas). Destructivo → require_admin.
+# ⚠️ ORDEN: la GET estática va ANTES de `/clientes/{id}` — si no, `/{id}` captura
+# "duplicados" como id y tira 422 (colisión de rutas — cazada por el supervisor; el
+# test_clientes_merge_route la clava a nivel HTTP).
+
+@router.get("/clientes/duplicados")
+def clientes_duplicados(request: Request):
+    """Grupos de clientes que comparten un CUIL verificado — candidatos a fusionar
+    (justo lo que el índice único de CUIL rechaza). Enriquece cada id con nombre,
+    contacto, estado y nº de pedidos para que el admin elija cuál conservar."""
+    require_admin(request)
+    with get_db() as conn:
+        out = []
+        for g in merge.candidatos_duplicados(conn):
+            clientes = []
+            for cid in g["ids"]:
+                row = conn.execute(
+                    """SELECT c.id, c.nombre, c.apellido, c.email, c.telefono,
+                              c.nombre_completo_renaper, c.dni_validado_at, c.created_at,
+                              (SELECT COUNT(*) FROM alquileres a WHERE a.cliente_id = c.id) AS pedidos
+                         FROM clientes c WHERE c.id = %s""",
+                    (cid,),
+                ).fetchone()
+                if row:
+                    clientes.append(row_to_dict(row))
+            out.append({"cuil": g["cuil"], "clientes": clientes})
+        return out
+
+
+class MergeClientesIn(BaseModel):
+    source: int  # se absorbe y se borra
+    target: int  # sobrevive con su identidad
+
+
+@router.post("/clientes/merge")
+def merge_clientes(body: MergeClientesIn, request: Request):
+    """Fusiona dos clientes que son la MISMA persona: mueve pedidos / datos / llaves /
+    bitácora de `source` a `target` y borra `source`. **Destructivo e irreversible** →
+    require_admin + las guardas del motor (rehúsa perder una identidad verificada o unir
+    dos personas con CUIL distinto → 400)."""
+    require_admin(request)
+    if body.source == body.target:
+        raise HTTPException(400, "No se puede fusionar un cliente consigo mismo")
+    try:
+        merge.merge_accounts(source=body.source, target=body.target)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "merged_into": body.target}
+
+
+class InvitarClienteIn(BaseModel):
+    email: str
+    nombre: Optional[str] = None
+    telefono: Optional[str] = None
+
+
+@router.post("/clientes/invitar")
+def invitar_cliente(body: InvitarClienteIn, request: Request):
+    """Crea (o reusa) una cuenta por email y devuelve un LINK de invitación single-use
+    para que el cliente la reclame (active la cuenta + registre su passkey). El admin lo
+    manda por donde quiera — mismo patrón que el link de verificación (no se manda mail
+    desde acá: el motor de mail es por plantilla; el admin copia el link). El email se
+    valida/locked recién con Didit; el nombre/teléfono del admin son provisionales."""
+    require_admin(request)
+    email = (body.email or "").strip().lower()
+    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+        raise HTTPException(400, "Email inválido")
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id, dni_validado_at FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
+        ).fetchone()
+        if row:
+            # Anti-takeover: una cuenta YA verificada (identidad + pagos) NO se invita por
+            # link — si se filtra, quien lo abra entra con todo adentro. Esas se recuperan
+            # por Didit/CUIL (Fase 3, no se puede falsificar). Sí se invita lo no-verificado
+            # (incluso clientes viejos con pedidos pero sin Didit → caso de migración).
+            if row["dni_validado_at"] is not None:
+                raise HTTPException(
+                    400,
+                    "Esa cuenta ya está verificada — el cliente la recupera por su identidad "
+                    "(Didit), no por un link de invitación.",
+                )
+            cliente_id, ya_existia = row["id"], True
+        else:
+            cliente_id = conn.insert_returning(
+                "INSERT INTO clientes (email, nombre, telefono, cuenta_estado) "
+                "VALUES (%s, %s, %s, 'liviana')",
+                (email, (body.nombre or "").strip() or None, (body.telefono or "").strip() or None),
+            )
+            conn.commit()
+            ya_existia = False
+    token = magic.crear(email=email, purpose="invitacion", cliente_id=cliente_id)
+    return {
+        "ok": True,
+        "cliente_id": cliente_id,
+        "ya_existia": ya_existia,
+        "url": f"{settings.SITE_URL}/cliente/claim?t={quote(token, safe='')}",
+    }
+
+
 @router.get("/clientes/{id}")
 def get_cliente(id: int, request: Request):
     require_admin(request)
@@ -218,3 +325,5 @@ def delete_cliente(id: int, request: Request):
         except Exception:
             conn.rollback()
             raise
+
+

@@ -6,58 +6,28 @@ horarios habilitados del cliente, y el disparador on-demand de recordatorios de
 retiro. Registra sus rutas sobre el router compartido del paquete
 `routes.alquileres`.
 """
-import json
-
 from fastapi import Request, HTTPException, Query
 
-from database import get_db, to_datetime
+from database import get_db
 from auth.guards import require_admin
 from reservas import (
     calcular_disponibilidad as _calcular_disponibilidad,
     dias_no_disponibles as _dias_no_disponibles,
 )
 from routes.alquileres.core import router
+from services.fechas import validar_horarios_habilitados
 
 
 # ── Disponibilidad ───────────────────────────────────────────────────────────
 
-_DIAS_HORARIO = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
-
-
 def _validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> None:
-    """Valida que retiro/devolución caigan en días/horas habilitados (setting
-    `horarios_retiro`). Sin config → no restringe. Pensado para el flujo del
-    cliente, que manda hora real (el admin carga date-only y no se restringe).
-    Lanza HTTPException 400 si algo cae fuera."""
-    row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = %s", ("horarios_retiro",)
-    ).fetchone()
-    if not row or not row["value"]:
-        return
-    try:
-        horarios = json.loads(row["value"])
-    except (ValueError, TypeError):
-        return
-    if not isinstance(horarios, dict) or not horarios:
-        return
-
-    def _check(dt_raw, etiqueta: str):
-        if not dt_raw:
-            return
-        dt = to_datetime(dt_raw)
-        franja = horarios.get(_DIAS_HORARIO[dt.weekday()])
-        if not franja:
-            raise HTTPException(400, f"El {etiqueta} cae en un día no habilitado")
-        hhmm = dt.strftime("%H:%M")
-        if hhmm < franja["desde"] or hhmm > franja["hasta"]:
-            raise HTTPException(
-                400,
-                f"El horario de {etiqueta} ({hhmm}) está fuera del rango "
-                f"habilitado ({franja['desde']}–{franja['hasta']})",
-            )
-
-    _check(fecha_desde, "retiro")
-    _check(fecha_hasta, "devolución")
+    """Adapter HTTP de `services.fechas.validar_horarios_habilitados`: la lógica de
+    horarios vive en la puerta única de fechas; acá solo levantamos el 400. Se
+    mantiene el nombre (re-exportado por `routes/alquileres`) para los callsites y
+    el monkeypatch de tests."""
+    msg = validar_horarios_habilitados(conn, fecha_desde, fecha_hasta)
+    if msg:
+        raise HTTPException(400, msg)
 
 
 @router.get("/disponibilidad-dias")

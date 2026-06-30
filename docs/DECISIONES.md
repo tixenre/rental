@@ -490,7 +490,7 @@
   y propone issues. **`pulido-frontend`** aplica los fixes en pantalla. Cuadro de roles: `design-system`
   gobierna · `pulido-frontend` ejecuta UI · `mantenimiento` ejecuta código.
 - **Cómo aplica / quién hace cumplir:** un token/utility se edita en `src/design-system/styles/`,
-  una pieza de DS en `src/design-system/{ui,kit}` o de negocio en `src/components/{rental,admin}`;
+  una pieza de DS en `src/design-system/{ui,composites}` o de negocio en `src/components/{rental,admin}`;
   **no se recrea un paquete workspace** ni se duplica una pieza que ya existe. El
   supervisor marca un skill en disco que no esté listado en `CLAUDE.md`; `check-docs.mjs` lo caza.
   Los trackers de migración por pantalla (#612) siguen vigentes sobre `src/`.
@@ -828,14 +828,14 @@ cancel-in-progress` ya cancela corridas viejas.
   **deriva** del backend); (3) un foco por pantalla; (4) **una sola forma de hacer cada cosa** (sin tres
   controles para una acción ni botones duplicados); (5) lo más usado, a mano; (6) reconocimiento >
   lectura (avatares, pills, selección obvia); (7) densidad útil sin aire muerto; (8) decí lo que hace
-  (copy/labels/empty states, voz "vos"); (9) **reusar no recrear** (la forma del pill vive en `kit/Pill`;
+  (copy/labels/empty states, voz "vos"); (9) **reusar no recrear** (la forma del pill vive en `ui/Pill`;
   `EstadoBadge`/`PagoBadge` derivan; cero clases copiadas a mano); (10) mobile/a11y no son extra (HIG,
   ≥44px, foco visible); (11) el core es sagrado, el diseño es presentación.
 - **Why.** Sin el _por qué_ escrito, cada pantalla re-discute el mismo criterio y el front deriva. La
   esencia documentada + enforceable es lo que hace que el rollout a toda la web sea consistente y no una
   colección de one-offs.
-- **Consecuencias.** Materializado en código: `kit/Pill` (forma + tonos semánticos única), `kit/PagoBadge`
-  (estado de pago con monto), `kit/ClienteAvatar` (avatar determinístico). El **contraste de los tints de
+- **Consecuencias.** Materializado en código: `ui/Pill` (forma + tonos semánticos única), `ui/PagoBadge`
+  (estado de pago con monto), `ui/ClienteAvatar` (avatar determinístico). El **contraste de los tints de
   `EstadoBadge`** queda como decisión visual aparte (pendiente, afecta también el portal del cliente).
   Refina —no reemplaza— _Apple HIG (2026-06-05)_ y es la contraparte visual de la _Barra de calidad de
   ingeniería (2026-05-25)_: les da el marco de diseño unificado.
@@ -1032,7 +1032,7 @@ cancel-in-progress` ya cancela corridas viejas.
 
 ### 2026-06-23 — design-system = gobernador del DS; importar-diseno archivado
 
-- **Contexto.** El DS de Rambla tiene estructura sólida (tokens OKLCH modulares, 4 piezas `kit/` con
+- **Contexto.** El DS de Rambla tiene estructura sólida (tokens OKLCH modulares, primitivos en `ui/` con
   fuente única, guardrails ESLint) pero **adopción incompleta** que acumula drift en cada PR: ~19 CTAs
   crudos, ~52 `text-[Nrem]` escapados, ~7 pills manuales, tokens de motion sin adoptar (~0%), N1/N8
   (contrastes WCAG bajo AA). No existía un skill que auditara el DS sistémicamente — `pulido-frontend`
@@ -1474,6 +1474,17 @@ cancel-in-progress` ya cancela corridas viejas.
   nota de scope), `CLAUDE.md` (fila de `gobernanza` con el disparador del retro), `scripts/evals/README.md` (2º
   auto-disparador en "Auto-disparo (Nivel 1)"). **Dogfooded** sobre la iniciativa de contenido (entrada gemela
   2026-06-29): produjo la corroboración gh-CLI al buzón (autónomo) + la entrada de memoria de la puerta.
+- **Refinamiento 2026-06-30 — tamaño ≠ novedad; rinde estimado al gate.** El disparador por **tamaño de diff**
+  (≥4 archivos/≥150 líneas) es un **proxy barato**, pero lo que el retro **paga** es la **novedad**: una iniciativa
+  grande-pero-rutinaria (reusa patrones/guards ya establecidos) rinde poco; una chica-pero-novedosa rinde mucho.
+  Por eso, al dispararse, la sesión **estima el rinde esperado por novedad ANTES de analizar** y lo trae al primer
+  OK ("rutinaria, reusó X → va a salir flaca" vs. "rompió terreno en Y → vale"), para que el dueño **gatee informado
+  y temprano**, no después de gastar el análisis. **Caso testigo (dogfood):** el retro de la *vitrina de organismos
+  del DS* (7 archivos / ~1.100 líneas → calificaba por tamaño) salió **flaco** porque fue rutinario (reusó el patrón
+  de vitrina + el guard Bloque 6b de la iniciativa anterior): rinde neto = **1 gotcha al buzón**, todo lo demás
+  confirmó decisiones existentes. El dueño lo notó al final (_"¿hay que hacer el retro?"_) → de ahí el refinamiento.
+  El skill `gobernanza` §7 paso 1 + cheatsheet se actualizaron. El supervisor marca un retro que reporte solo el
+  tamaño al gate sin estimar la novedad.
 
 ### 2026-06-29 — `backend/services/contenido/` = puerta única de "qué incluye un producto" (display derivado de la receta real)
 
@@ -1756,3 +1767,113 @@ cancel-in-progress` ya cancela corridas viejas.
   (el borrado sin `stepup` da 401; con `stepup` fresco procede). El supervisor marca una operación sensible del
   cliente sin `require_recent_auth`, o un step-up que acepte una passkey de otra cuenta. Cómo →
   [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); historia → commits del lote en `dev`; #1098 Fase 1B.
+
+### 2026-06-29 — `backend/services/checkout/` = portero único del checkout (fail-not-fast; devuelve {listo, faltan})
+
+- **Contexto.** `create_pedido_retry` mezclaba validación + creación: la UI no podía mostrar "qué te falta" sin intentar crear el pedido y fallar en el primer check. El flujo tiene 9 precondiciones activas (logueado, identidad, carrito, fechas, stock-preflight, precio, contacto, T&C, firma) + 2 diferidas (bloqueo #1125, antelación #1126).
+- **Decisión.** Módulo validador puro `backend/services/checkout/` que corre todos los checks **fail-not-fast** y devuelve `{listo, faltan}`. Wired a `POST /api/checkout/validar` (body: `session_id` UUID v4 + `session_confirmed` bool; el route computa `firma_ok = has_recent_stepup OR session_confirmed`). T&C separado en `POST /api/checkout/aceptar-tyc` (idempotente; tabla `aceptaciones_tyc` `UNIQUE(cliente_id, version)`). Los 2 checks cableado-apagado retornan siempre OK hasta que el issue los active.
+- **Why.** Separa concerns: validar ANTES, crear después — el `FOR UPDATE` + advisory lock de `create_pedido_retry` sigue intacto. El fail-not-fast es el corazón: la UI necesita la lista completa de problemas para que el cliente los resuelva de una. La firma con passkey es más fuerte pero no bloquea a clientes sin passkey: el `session_confirmed` es un fallback consciente y documentado (weaker, no una laguna — el cliente declaró intención en la misma sesión). El stock-preflight no tiene lock (solo lectura): puede dar verde y que el gate falle después, documentado como "preflight" para no confundir. El contacto viene de `*_renaper` (no del usuario): si Didit no terminó, el check falla — correcto y explícito.
+- **Consecuencias.** `aceptaciones_tyc` en `init_db()` + migración Alembic `b1a2c3d4e5f6` (convención _2026-06-03_); clasificada en `identity/merge.py::TABLAS_REASIGNADAS` con dedup-on-reassign por el `UNIQUE`. 31 tests unitarios sin DB real (fake conn configurable). El check `logueado` lo hace el route vía `require_cliente` — el servicio recibe `cliente_id` y asume cliente válido. El supervisor marca validación de checkout ad-hoc fuera de la puerta, un fail-fast en el medio de `validar_checkout`, o `session_confirmed` aceptado sin documentar como fallback de firma. PR #1128 (servicio) + #1129 (routes).
+
+### 2026-06-30 — Firma con passkey: presencia de un toque (on-the-fly) + gate del checkout reusa el portero; presencia ≠ firma legal
+
+- **Contexto.** El dueño pidió poder **firmar/confirmar el pedido con passkey** sin fricción — "como cuando desbloqueás
+  el celular, que cree la passkey de un saque, simple". La base ya existía (step-up _2026-06-29_: cookie `stepup` +
+  `require_recent_auth`), pero (a) el cliente **sin** passkey caía a un fallback débil, y (b) la firma vivía solo en el
+  pre-flight advisory `/checkout/validar`, **no** en el gate real de creación (`POST /api/cliente/pedidos`, que solo
+  exigía identidad). Aparte, el dueño aclaró que la firma **legal** (no-repudio del contrato) la construye en **otra
+  sesión** — esto es "más un acepto los términos y condiciones".
+- **Decisión.** Tres piezas. **(1) On-the-fly de un toque:** registrar una passkey de cliente **deja la marca `stepup`**
+  (`_register_complete`→`mark_stepup` cuando `owner_type=="cliente"`) — registrar exige el mismo gesto biométrico que
+  una assertion, así que **vale como presencia fresca**; es un **modo más de auth** (junto a login/step-up) y **crear
+  la llave ya firma**. Helper **único** `firmarConPasskey(tienePasskey)` en `lib/passkey.ts` (step-up si tiene llave,
+  register on-the-fly si no — un toque en ambos); se borró el island `lib/firma.ts`. **(2) Gate en la creación
+  reusando el portero:** `faltan_firma_tyc(conn, cliente_id, firma_ok)` corre los **mismos** `_check_tyc`+`_check_firma`
+  del portero (no re-implementa); el route computa `firma_ok = has_recent_stepup OR session_confirmed`. **No** usa el
+  portero completo (lee `carritos_activos`, no siempre sincronizado → 422-earía pedidos válidos); el stock/precio los
+  enforza `create_pedido_retry` (motor sagrado intacto). **Cableado-apagado** (`FIRMA_CHECKOUT_OBLIGATORIA=False`) hasta
+  que la UI del checkout mande la señal. **(3) Presencia ≠ firma legal:** frontera explícita.
+- **Why.** "Reusar no recrear": el gate reusa los checks del portero, el helper se pliega al cliente de auth, y
+  registrar-como-firma evita un segundo prompt → un toque siempre. El cableado-apagado (patrón #1125/#1126 + _⏰ LEGACY
+  2026-06-25_) deja la firma lista sin romper el flujo vivo (que aún no manda la señal). La distinción **presencia ≠
+  firma legal** es la que más valió: la marca `stepup` prueba "hay un humano con el dispositivo ahora" (alcanza para el
+  checkout = acepto T&C + confirmo, liviano); la **firma legal del contrato** (no-repudio **atada al hash**, Ley
+  25.506) se logra **extendiendo la misma ceremonia** de `auth/passkey/` para firmar el `doc_hash` — **no un sistema
+  paralelo**. Se difirió a contratos/ARCA (su lugar natural: ahí existe el documento que se hashea) y la construye otra
+  sesión que **reusa** estos primitivos (nota de handoff en #1098 + `SISTEMA_AUTH.md` §3).
+- **Consecuencias.** La firma del checkout queda en `services/checkout` (gate liviano), separada de la firma legal. El
+  supervisor marca: una firma de presencia recreada fuera de `auth/stepup`+`firmarConPasskey`; el gate del checkout
+  re-implementando los checks en vez de reusar el portero; o una firma de contrato con ceremonia paralela en vez de
+  firmar el `doc_hash` sobre la ceremonia existente. **Pendiente:** prender `FIRMA_CHECKOUT_OBLIGATORIA` con la UI del
+  checkout (otra sesión); la firma legal atada al hash (contratos/ARCA). Candados: `test_passkey` (registrar cliente
+  deja `stepup`, admin no) + `test_checkout_portero::faltan_firma_tyc`. En el retro salió como caso testigo un flake de
+  timezone (`test_check_fechas_pasada_cliente` usaba `date.today()` UTC vs `now_ar()` del código) → buzón de
+  `calidad-tests`. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §3; historia → #1131 (on-the-fly + gate), #1132 (handoff).
+
+### 2026-06-30 — `staging-verify`: fakear la verificación Didit en dev SIN tocar `dni_validado_at` a mano
+
+- **Contexto.** El dueño quiso **probar el checkout y el passkey end-to-end en dev**, pero su cuenta no estaba
+  verificada y **Didit no corre en dev/staging** (la API de KYC no está cableada ahí). Sin verificación, el portero
+  del checkout (`_check_identidad` → `cliente_verificado` → `dni_validado_at`) bloquea para siempre y no se puede
+  llegar al pago. Pidió explícitamente "fakear la autorización, es para chequear y validar, estamos en dev".
+- **Decisión.** Endpoint dev-only **`POST /auth/staging-verify`** (`auth/staging.py`), gemelo de `staging-login`:
+  **misma doble llave** (`is_production` falla-a-prod + secreto `STAGING_LOGIN_SECRET`) → **404 en prod**, secreto en
+  tiempo constante, rate-limit por IP. Marca una cuenta como verificada **reusando la pluma única `identity.kyc`**
+  (`aprobar` / `actualizar_estado`): setea un `didit_session_id` fresco (único por llamada → sin colisión de
+  idempotencia en `kyc_events`) y delega — **nunca un UPDATE manual de `dni_validado_at`/`*_renaper`**. Body:
+  `{secret, cliente_id?, estado?, email?}`; `estado` ∈ approved(default)/rejected/en_revision (los 3 caminos del
+  KYC); siembra un contacto verificado para cuentas livianas (que el portero exige email); CUIL fake válido (mod-11)
+  único por id (no colisiona con el índice único). **No mintea sesión** (se combina con `staging-login
+  target=cliente`).
+- **Why.** "Una sola forma + reusar no recrear": un UPDATE a mano de `dni_validado_at` duplicaría la escritura de
+  identidad que el supervisor marca como prohibida fuera de `identity/kyc` (la pluma única). Reusar `aprobar` hace
+  que el fake recorra **exactamente** el mismo camino que el webhook real (COALESCE, ancla CUIL mod-11, contactos,
+  evento de auditoría) → lo que se prueba en dev es lo que pasa en prod. La doble llave heredada de staging-login es
+  la red ya probada (staging tiene PII real; 404 en prod). Extiende _Staging-login (2026-06-19)_ del login al **gate
+  de identidad**; mismo patrón que _Iteración local con datos reales (2026-06-20)_.
+- **Consecuencias.** La sesión puede smoke-testear el flujo de pedido logueado+verificado en local y en staging
+  Railway sin Didit. **Verificado en vivo:** `/api/checkout/validar` pasa a `listo:true` tras fakear identidad +
+  aceptar T&C + firma "Confirmo"; el front (login → carrito → passkey) anda. Candados: `test_staging_verify.py`
+  (gate 404/401, approved/rejected, CUIL fake válido y único). En la misma sesión salieron, como cruft del clon
+  local (no del código), dos gaps de config dev que rompían el passkey en `localhost` y se arreglaron: deps
+  faltantes (`webauthn`, `@simplewebauthn/browser`) y el **default de `FRONTEND_ORIGINS`** que no incluía el puerto
+  `:3000` del `vite dev` (el origin que el navegador reporta en la assertion) → fix de 1 línea en `config.py`. El
+  supervisor marca un fake de KYC vía UPDATE a mano en vez de la puerta. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) +
+  [`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md).
+
+### 2026-06-30 — `backend/services/fechas.py` = puerta única de la lógica de fechas/horas; lead-time configurable (#1126)
+
+- **Contexto.** El criterio de validación de fechas estaba **duplicado byte-por-byte en 4 lugares**
+  (`create_pedido`, `_apply_pedido_datos`, `_validar_fechas_propuestas`, el cap de 120 días del portal), con
+  mensajes y comparadores que iban divergiendo; la validación de **formato** (`_validar_fecha_iso`) vivía suelta en
+  `routes/alquileres`; y el check de **antelación mínima** (#1126) estaba cableado-apagado. El dueño pidió, además,
+  que "el módulo de fechas maneje **todo** lo de fechas y horas, así todos usan los mismos valores".
+- **Decisión.** Crear `backend/services/fechas.py` como **puerta única de toda DECISIÓN sobre fechas/horas**:
+  `validar_fecha_iso` (formato, borde→422), `validar_rango_fechas` (orden/no-pasado/tope), `setting_horas` (lector
+  genérico de settings de horas) + `dentro_de_ventana_horas` (predicado puro), `antelacion_*` (lead-time),
+  `inicio_desde_fecha_hora`, `mes_actual_ar`, `validar_horarios_habilitados`. Los 4 callsites + el portero +
+  `_modificacion_ventana_horas`/`_ventana_cumple` + los horarios delegan ahí. Se **activa el lead-time** (#1126):
+  setting `app_settings.antelacion_minima_horas` (0 = apagado) en `init_db()` + Alembic + whitelist; portero
+  `_check_antelacion` (UX, lee fecha+hora del carrito) + **backstop** en `cliente_crear_pedido` (defensa en
+  profundidad, solo-cliente); disclaimer + CTA de WhatsApp en el carrito (el front lee el setting y avisa, el back
+  enforza).
+- **Why.** "Una sola forma de cada cosa": el criterio de fechas no puede tener 4 copias que driftean. La frontera
+  con el DAL: `now_ar()`/`to_datetime()` son **primitivas de bajo nivel** (reloj AR + coerción psycopg) y se quedan
+  en `database/core.py` (_2026-06-27_) porque ya son fuente única y no son "decisiones"; el módulo de fechas es dueño
+  de las **reglas** construidas sobre ellas (re-exportarlas crearía dos caminos → se evitó). El **dominio de cada
+  motor NO se mueve** (reservas: buffer/overlap; precios: jornadas de facturación; reportes/contabilidad: ventanas de
+  mes/cierre; auth: TTLs de sesión/step-up; ical/pdf/email: formateo de display) — una auditoría de todo el backend
+  lo confirmó. El lead-time con **doble enforcement** (portero advisory + backstop en creación) cierra el agujero de
+  saltear el pre-flight, sin tocar el `FOR UPDATE` del gate (core sagrado). **Fail-open**: un setting corrupto/ausente
+  cae a 0 (no bloquea pedidos por mal-config). El backstop es **solo-cliente** (el admin carga urgencias a mano),
+  espejando el cap de 120 días.
+- **Consecuencias.** `validar_horarios_habilitados` se movió a `services/fechas` devolviendo `str|None`;
+  `_validar_horarios_habilitados` quedó como **adapter** que levanta el 400 (preserva firma, re-export y el monkeypatch
+  de tests). De paso se corrigió un **sesgo de timezone**: `mes_actual()` (tablero) y `_mes_de_fecha` (movimientos)
+  usaban `date.today()` (UTC en CI) → ahora `mes_actual_ar()`; `pagos.py` usa `now_ar().date()`. El cambio de mensajes
+  de error a lenguaje claro no rompe nada (ni tests ni front dependían del texto). Candados: `test_fechas.py`
+  (32 tests) + `test_checkout_portero` (lead-time activo) + los de horarios/seguridad existentes. Dos consolidaciones
+  más quedaron **descartadas a propósito** por la auditoría: `validar_mes`/`rango_mes` (reportes) ya tienen fuente
+  única sana, y el buffer del motor de reservas es regla de overlap (no genérica). **Pendiente menor** (no es de
+  fechas): `cuentas.py` hardcodea `'2026-06-01'` en vez de `LIQUIDACION_INICIO` (drift latente del clean-start). PR
+  #1136; tracking #1126.

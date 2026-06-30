@@ -1,0 +1,366 @@
+"""Routes de facturación electrónica ARCA (#1139).
+
+Fase 1: estado/configuración.
+Fase 3: POST /alquileres/{id}/facturar (engine + PDF).
+Fases 4-5: listados, PDF download, NC.
+Fase 7: CRUD emisores (credenciales dinámicas, cifradas).
+"""
+from __future__ import annotations
+
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import Response
+
+from database import get_db
+from auth.guards import require_admin
+
+router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# GET /admin/facturacion/estado
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/facturacion/estado")
+def estado_facturacion(request: Request):
+    """Estado de configuración: ambiente activo + lista de emisores (sin secretos)."""
+    require_admin(request)
+
+    from config import settings as app_settings
+    ambiente = "produccion" if app_settings.is_production else "homologacion"
+
+    from services.facturacion.emisores_repo import list_emisores
+    with get_db() as conn:
+        emisores = list_emisores(conn)
+
+    return {
+        "ambiente": ambiente,
+        "emisores": [_emisor_to_dict(e) for e in emisores],
+    }
+
+
+# ---------------------------------------------------------------------------
+# CRUD emisores (Fase 7)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/emisores-arca")
+def listar_emisores(request: Request):
+    """Lista todos los emisores configurados (sin cert/clave)."""
+    require_admin(request)
+    from services.facturacion.emisores_repo import list_emisores
+    with get_db() as conn:
+        return [_emisor_to_dict(e) for e in list_emisores(conn)]
+
+
+@router.post("/admin/emisores-arca", status_code=201)
+def crear_emisor(request: Request, body: dict):
+    """Crea un nuevo emisor. No incluye cert/clave (se suben aparte)."""
+    require_admin(request)
+    nombre = (body.get("nombre") or "").strip()
+    cuit = (body.get("cuit") or "").strip()
+    pto_vta = body.get("pto_vta")
+    condicion_iva = (body.get("condicion_iva") or "").strip()
+    notas = (body.get("notas") or "").strip() or None
+
+    if not nombre or not cuit or not pto_vta or not condicion_iva:
+        raise HTTPException(400, "nombre, cuit, pto_vta y condicion_iva son obligatorios")
+
+    try:
+        pto_vta_int = int(pto_vta)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "pto_vta debe ser un número entero")
+
+    from services.facturacion.emisores_repo import create_emisor
+    try:
+        with get_db() as conn:
+            emisor_id = create_emisor(
+                conn,
+                nombre=nombre,
+                cuit=cuit,
+                pto_vta=pto_vta_int,
+                condicion_iva=condicion_iva,
+                notas=notas,
+            )
+            from services.facturacion.emisores_repo import get_by_id
+            emisor = get_by_id(emisor_id, conn)
+            conn.commit()
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    return _emisor_to_dict(emisor)
+
+
+@router.put("/admin/emisores-arca/{emisor_id}")
+def actualizar_emisor(emisor_id: int, request: Request, body: dict):
+    """Actualiza datos del emisor (nombre, CUIT, pto_vta, condicion_iva, activo, notas)."""
+    require_admin(request)
+
+    from services.facturacion.emisores_repo import update_emisor, get_by_id
+    try:
+        with get_db() as conn:
+            update_emisor(
+                emisor_id,
+                conn,
+                nombre=body.get("nombre"),
+                cuit=body.get("cuit"),
+                pto_vta=body.get("pto_vta"),
+                condicion_iva=body.get("condicion_iva"),
+                activo=body.get("activo"),
+                notas=body.get("notas"),
+            )
+            emisor = get_by_id(emisor_id, conn)
+            conn.commit()
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    if emisor is None:
+        raise HTTPException(404, "Emisor no encontrado")
+    return _emisor_to_dict(emisor)
+
+
+@router.post("/admin/emisores-arca/{emisor_id}/cert")
+def cargar_cert(emisor_id: int, request: Request, body: dict):
+    """Sube y cifra el certificado + clave privada PEM del emisor.
+
+    Body: { "cert_pem": "-----BEGIN CERTIFICATE-----\\n...", "key_pem": "-----BEGIN PRIVATE KEY-----\\n..." }
+    Nunca devuelve el cert/clave; solo confirma que se guardó.
+    """
+    require_admin(request)
+
+    cert_pem_str = (body.get("cert_pem") or "").strip()
+    key_pem_str = (body.get("key_pem") or "").strip()
+
+    if not cert_pem_str or not key_pem_str:
+        raise HTTPException(400, "cert_pem y key_pem son obligatorios")
+    if "BEGIN CERTIFICATE" not in cert_pem_str:
+        raise HTTPException(400, "cert_pem no parece un certificado PEM válido")
+    if "PRIVATE KEY" not in key_pem_str:
+        raise HTTPException(400, "key_pem no parece una clave privada PEM válida")
+
+    from services.facturacion.emisores_repo import set_cert, get_by_id
+    try:
+        with get_db() as conn:
+            set_cert(
+                emisor_id,
+                conn,
+                cert_pem=cert_pem_str.encode(),
+                key_pem=key_pem_str.encode(),
+            )
+            emisor = get_by_id(emisor_id, conn)
+            conn.commit()
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    if emisor is None:
+        raise HTTPException(404, "Emisor no encontrado")
+    return {"ok": True, "cert_cargado": emisor.cert_cargado}
+
+
+@router.delete("/admin/emisores-arca/{emisor_id}", status_code=204)
+def desactivar_emisor(emisor_id: int, request: Request):
+    """Marca el emisor como inactivo (soft-delete). Las facturas existentes no se tocan."""
+    require_admin(request)
+    from services.facturacion.emisores_repo import delete_emisor
+    with get_db() as conn:
+        delete_emisor(emisor_id, conn)
+        conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# POST /alquileres/{id}/facturar
+# ---------------------------------------------------------------------------
+
+
+@router.post("/alquileres/{pedido_id}/facturar")
+def facturar_pedido(pedido_id: int, request: Request):
+    """Emite (o devuelve la vigente) la factura electrónica para el pedido.
+
+    Idempotente: si ya existe una factura 'emitida' o 'pendiente' para el pedido,
+    la devuelve sin volver a llamar a ARCA.
+    """
+    require_admin(request)
+
+    try:
+        from services.facturacion.engine import emitir_factura
+        session = getattr(request.state, "session", None)
+        emitido_por = (session or {}).get("email") if session else None
+        factura = emitir_factura(pedido_id, emitido_por=emitido_por)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    return _factura_to_dict(factura)
+
+
+# ---------------------------------------------------------------------------
+# POST /facturas/{id}/nota-credito
+# ---------------------------------------------------------------------------
+
+
+@router.post("/facturas/{factura_id}/nota-credito")
+def nota_credito(factura_id: int, request: Request):
+    """Emite una Nota de Crédito que anula la factura indicada. Idempotente."""
+    require_admin(request)
+
+    try:
+        from services.facturacion.engine import emitir_nota_credito
+        session = getattr(request.state, "session", None)
+        emitido_por = (session or {}).get("email") if session else None
+        nc = emitir_nota_credito(factura_id, emitido_por=emitido_por)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    return _factura_to_dict(nc)
+
+
+# ---------------------------------------------------------------------------
+# GET /alquileres/{id}/facturas
+# ---------------------------------------------------------------------------
+
+
+@router.get("/alquileres/{pedido_id}/facturas")
+def facturas_del_pedido(pedido_id: int, request: Request):
+    """Lista las facturas de un pedido (incluye NC)."""
+    require_admin(request)
+
+    from services.facturacion.repo import list_facturas
+    with get_db() as conn:
+        facturas = list_facturas(conn, pedido_id=pedido_id)
+    return [_factura_to_dict(f) for f in facturas]
+
+
+# ---------------------------------------------------------------------------
+# GET /admin/facturas
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/facturas")
+def listar_facturas(
+    request: Request,
+    emisor: Optional[str] = Query(None),
+    estado: Optional[str] = Query(None),
+    desde: Optional[str] = Query(None),
+    hasta: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """Listado global de facturas con filtros. Requiere sesión de admin."""
+    require_admin(request)
+
+    from services.facturacion.repo import list_facturas
+    with get_db() as conn:
+        facturas = list_facturas(
+            conn,
+            emisor=emisor or None,
+            estado=estado or None,
+            desde=desde or None,
+            hasta=hasta or None,
+            limit=limit,
+            offset=offset,
+        )
+
+    dicts = [_factura_to_dict(f) for f in facturas]
+    total_imp_total = sum(d["imp_total"] for d in dicts if d.get("estado") == "emitida")
+    return {
+        "facturas": dicts,
+        "total_imp_total": total_imp_total,
+        "count": len(dicts),
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /facturas/{id}/pdf
+# ---------------------------------------------------------------------------
+
+
+@router.get("/facturas/{factura_id}/pdf")
+def descargar_pdf_factura(factura_id: int, request: Request):
+    """Descarga el PDF de una factura desde R2. Requiere sesión de admin."""
+    require_admin(request)
+
+    from services.facturacion.repo import get_by_id
+    with get_db() as conn:
+        factura = get_by_id(factura_id, conn)
+
+    if factura is None:
+        raise HTTPException(404, "Factura no encontrada")
+    if not factura.pdf_key:
+        raise HTTPException(404, "PDF no disponible aún")
+
+    try:
+        from services.media.storage import get as storage_get
+        pdf_bytes = storage_get(factura.pdf_key)
+    except Exception as e:
+        raise HTTPException(503, f"No se pudo obtener el PDF: {e}")
+
+    cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
+        factura.cbte_tipo, "X"
+    )
+    es_nc = factura.cbte_tipo in (3, 8, 13)
+    prefijo = "NC" if es_nc else "Factura"
+    filename = f"{prefijo}-{cbte_tipo_letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Serialización
+# ---------------------------------------------------------------------------
+
+
+def _factura_to_dict(f) -> dict:
+    if f is None:
+        return {}
+    return {
+        "id": f.id,
+        "pedido_id": f.pedido_id,
+        "emisor": f.emisor,
+        "ambiente": f.ambiente,
+        "cbte_tipo": f.cbte_tipo,
+        "pto_vta": f.pto_vta,
+        "cbte_nro": f.cbte_nro,
+        "cae": f.cae,
+        "cae_vto": str(f.cae_vto) if f.cae_vto else None,
+        "doc_tipo": f.doc_tipo,
+        "doc_nro": f.doc_nro,
+        "condicion_iva_receptor": f.condicion_iva_receptor,
+        "imp_neto": f.imp_neto,
+        "imp_iva": f.imp_iva,
+        "imp_total": f.imp_total,
+        "moneda": f.moneda,
+        "cliente_cuit": f.cliente_cuit,
+        "razon_social": f.razon_social,
+        "qr_payload": f.qr_payload,
+        "pdf_key": f.pdf_key,
+        "estado": f.estado,
+        "nota_credito_de": f.nota_credito_de,
+        "errores": f.errores,
+        "fecha_emision": f.fecha_emision.isoformat() if f.fecha_emision else None,
+        "created_at": f.created_at.isoformat() if f.created_at else None,
+        "created_by": f.created_by,
+    }
+
+
+def _emisor_to_dict(e) -> dict:
+    return {
+        "id": e.id,
+        "nombre": e.nombre,
+        "cuit": e.cuit,
+        "pto_vta": e.pto_vta,
+        "condicion_iva": e.condicion_iva,
+        "cert_cargado": e.cert_cargado,
+        "activo": e.activo,
+        "notas": e.notas,
+        "created_at": e.created_at.isoformat() if e.created_at else None,
+        "updated_at": e.updated_at.isoformat() if e.updated_at else None,
+    }

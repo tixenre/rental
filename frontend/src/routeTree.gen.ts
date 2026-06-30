@@ -32,6 +32,7 @@ import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
 import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
 import { Route as ClientePerfilRouteImport } from './routes/cliente.perfil'
 import { Route as ClienteLoginRouteImport } from './routes/cliente.login'
+import { Route as ClienteClaimRouteImport } from './routes/cliente.claim'
 import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
 import { Route as CTokenRouteImport } from './routes/c.$token'
 import { Route as AdminTalleresRouteImport } from './routes/admin/talleres'
@@ -49,6 +50,7 @@ const AdminSettingsLazyRouteImport = createFileRoute('/admin/settings')()
 const AdminPagosLazyRouteImport = createFileRoute('/admin/pagos')()
 const AdminMediaLazyRouteImport = createFileRoute('/admin/media')()
 const AdminMarcaLazyRouteImport = createFileRoute('/admin/marca')()
+const AdminFacturasLazyRouteImport = createFileRoute('/admin/facturas')()
 const AdminEstadisticasLazyRouteImport = createFileRoute(
   '/admin/estadisticas',
 )()
@@ -75,6 +77,9 @@ const AdminPedidosNuevoLazyRouteImport = createFileRoute(
   '/admin/pedidos/nuevo',
 )()
 const AdminPedidosIdLazyRouteImport = createFileRoute('/admin/pedidos/$id')()
+const AdminFacturacionEmisoresLazyRouteImport = createFileRoute(
+  '/admin/facturacion/emisores',
+)()
 const AdminEquiposSpecsLazyRouteImport = createFileRoute(
   '/admin/equipos/specs',
 )()
@@ -227,6 +232,13 @@ const AdminMarcaLazyRoute = AdminMarcaLazyRouteImport.update({
   path: '/marca',
   getParentRoute: () => AdminRoute,
 } as any).lazy(() => import('./routes/admin/marca.lazy').then((d) => d.Route))
+const AdminFacturasLazyRoute = AdminFacturasLazyRouteImport.update({
+  id: '/facturas',
+  path: '/facturas',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/facturas.lazy').then((d) => d.Route),
+)
 const AdminEstadisticasLazyRoute = AdminEstadisticasLazyRouteImport.update({
   id: '/estadisticas',
   path: '/estadisticas',
@@ -305,6 +317,11 @@ const ClientePerfilRoute = ClientePerfilRouteImport.update({
 const ClienteLoginRoute = ClienteLoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => ClienteRoute,
+} as any)
+const ClienteClaimRoute = ClienteClaimRouteImport.update({
+  id: '/claim',
+  path: '/claim',
   getParentRoute: () => ClienteRoute,
 } as any)
 const CategoriaSlugRoute = CategoriaSlugRouteImport.update({
@@ -407,6 +424,14 @@ const AdminPedidosIdLazyRoute = AdminPedidosIdLazyRouteImport.update({
 } as any).lazy(() =>
   import('./routes/admin/pedidos.$id.lazy').then((d) => d.Route),
 )
+const AdminFacturacionEmisoresLazyRoute =
+  AdminFacturacionEmisoresLazyRouteImport.update({
+    id: '/facturacion/emisores',
+    path: '/facturacion/emisores',
+    getParentRoute: () => AdminRoute,
+  } as any).lazy(() =>
+    import('./routes/admin/facturacion.emisores.lazy').then((d) => d.Route),
+  )
 const AdminEquiposSpecsLazyRoute = AdminEquiposSpecsLazyRouteImport.update({
   id: '/specs',
   path: '/specs',
@@ -517,6 +542,7 @@ export interface FileRoutesByFullPath {
   '/admin/talleres': typeof AdminTalleresRouteWithChildren
   '/c/$token': typeof CTokenRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
+  '/cliente/claim': typeof ClienteClaimRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
@@ -531,6 +557,7 @@ export interface FileRoutesByFullPath {
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/errores': typeof AdminErroresLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/facturas': typeof AdminFacturasLazyRoute
   '/admin/marca': typeof AdminMarcaLazyRoute
   '/admin/media': typeof AdminMediaLazyRoute
   '/admin/pagos': typeof AdminPagosLazyRoute
@@ -551,6 +578,7 @@ export interface FileRoutesByFullPath {
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
   '/admin/equipos/nuevo': typeof AdminEquiposNuevoLazyRoute
   '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
+  '/admin/facturacion/emisores': typeof AdminFacturacionEmisoresLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
@@ -576,6 +604,7 @@ export interface FileRoutesByTo {
   '/admin/novedades': typeof AdminNovedadesRoute
   '/c/$token': typeof CTokenRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
+  '/cliente/claim': typeof ClienteClaimRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
@@ -590,6 +619,7 @@ export interface FileRoutesByTo {
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/errores': typeof AdminErroresLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/facturas': typeof AdminFacturasLazyRoute
   '/admin/marca': typeof AdminMarcaLazyRoute
   '/admin/media': typeof AdminMediaLazyRoute
   '/admin/pagos': typeof AdminPagosLazyRoute
@@ -610,6 +640,7 @@ export interface FileRoutesByTo {
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
   '/admin/equipos/nuevo': typeof AdminEquiposNuevoLazyRoute
   '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
+  '/admin/facturacion/emisores': typeof AdminFacturacionEmisoresLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
@@ -643,6 +674,7 @@ export interface FileRoutesById {
   '/admin/talleres': typeof AdminTalleresRouteWithChildren
   '/c/$token': typeof CTokenRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
+  '/cliente/claim': typeof ClienteClaimRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
@@ -657,6 +689,7 @@ export interface FileRoutesById {
   '/admin/email-templates': typeof AdminEmailTemplatesLazyRoute
   '/admin/errores': typeof AdminErroresLazyRoute
   '/admin/estadisticas': typeof AdminEstadisticasLazyRoute
+  '/admin/facturas': typeof AdminFacturasLazyRoute
   '/admin/marca': typeof AdminMarcaLazyRoute
   '/admin/media': typeof AdminMediaLazyRoute
   '/admin/pagos': typeof AdminPagosLazyRoute
@@ -677,6 +710,7 @@ export interface FileRoutesById {
   '/admin/equipos/marcas': typeof AdminEquiposMarcasLazyRoute
   '/admin/equipos/nuevo': typeof AdminEquiposNuevoLazyRoute
   '/admin/equipos/specs': typeof AdminEquiposSpecsLazyRoute
+  '/admin/facturacion/emisores': typeof AdminFacturacionEmisoresLazyRoute
   '/admin/pedidos/$id': typeof AdminPedidosIdLazyRoute
   '/admin/pedidos/nuevo': typeof AdminPedidosNuevoLazyRoute
   '/admin/specs/definitions': typeof AdminSpecsDefinitionsLazyRoute
@@ -711,6 +745,7 @@ export interface FileRouteTypes {
     | '/admin/talleres'
     | '/c/$token'
     | '/categoria/$slug'
+    | '/cliente/claim'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
@@ -725,6 +760,7 @@ export interface FileRouteTypes {
     | '/admin/email-templates'
     | '/admin/errores'
     | '/admin/estadisticas'
+    | '/admin/facturas'
     | '/admin/marca'
     | '/admin/media'
     | '/admin/pagos'
@@ -745,6 +781,7 @@ export interface FileRouteTypes {
     | '/admin/equipos/marcas'
     | '/admin/equipos/nuevo'
     | '/admin/equipos/specs'
+    | '/admin/facturacion/emisores'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
@@ -770,6 +807,7 @@ export interface FileRouteTypes {
     | '/admin/novedades'
     | '/c/$token'
     | '/categoria/$slug'
+    | '/cliente/claim'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
@@ -784,6 +822,7 @@ export interface FileRouteTypes {
     | '/admin/email-templates'
     | '/admin/errores'
     | '/admin/estadisticas'
+    | '/admin/facturas'
     | '/admin/marca'
     | '/admin/media'
     | '/admin/pagos'
@@ -804,6 +843,7 @@ export interface FileRouteTypes {
     | '/admin/equipos/marcas'
     | '/admin/equipos/nuevo'
     | '/admin/equipos/specs'
+    | '/admin/facturacion/emisores'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
@@ -836,6 +876,7 @@ export interface FileRouteTypes {
     | '/admin/talleres'
     | '/c/$token'
     | '/categoria/$slug'
+    | '/cliente/claim'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
@@ -850,6 +891,7 @@ export interface FileRouteTypes {
     | '/admin/email-templates'
     | '/admin/errores'
     | '/admin/estadisticas'
+    | '/admin/facturas'
     | '/admin/marca'
     | '/admin/media'
     | '/admin/pagos'
@@ -870,6 +912,7 @@ export interface FileRouteTypes {
     | '/admin/equipos/marcas'
     | '/admin/equipos/nuevo'
     | '/admin/equipos/specs'
+    | '/admin/facturacion/emisores'
     | '/admin/pedidos/$id'
     | '/admin/pedidos/nuevo'
     | '/admin/specs/definitions'
@@ -1057,6 +1100,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMarcaLazyRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/facturas': {
+      id: '/admin/facturas'
+      path: '/facturas'
+      fullPath: '/admin/facturas'
+      preLoaderRoute: typeof AdminFacturasLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/estadisticas': {
       id: '/admin/estadisticas'
       path: '/estadisticas'
@@ -1153,6 +1203,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/cliente/login'
       preLoaderRoute: typeof ClienteLoginRouteImport
+      parentRoute: typeof ClienteRoute
+    }
+    '/cliente/claim': {
+      id: '/cliente/claim'
+      path: '/claim'
+      fullPath: '/cliente/claim'
+      preLoaderRoute: typeof ClienteClaimRouteImport
       parentRoute: typeof ClienteRoute
     }
     '/categoria/$slug': {
@@ -1265,6 +1322,13 @@ declare module '@tanstack/react-router' {
       path: '/pedidos/$id'
       fullPath: '/admin/pedidos/$id'
       preLoaderRoute: typeof AdminPedidosIdLazyRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/facturacion/emisores': {
+      id: '/admin/facturacion/emisores'
+      path: '/facturacion/emisores'
+      fullPath: '/admin/facturacion/emisores'
+      preLoaderRoute: typeof AdminFacturacionEmisoresLazyRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/equipos/specs': {
@@ -1415,6 +1479,7 @@ interface AdminRouteChildren {
   AdminEmailTemplatesLazyRoute: typeof AdminEmailTemplatesLazyRoute
   AdminErroresLazyRoute: typeof AdminErroresLazyRoute
   AdminEstadisticasLazyRoute: typeof AdminEstadisticasLazyRoute
+  AdminFacturasLazyRoute: typeof AdminFacturasLazyRoute
   AdminMarcaLazyRoute: typeof AdminMarcaLazyRoute
   AdminMediaLazyRoute: typeof AdminMediaLazyRoute
   AdminPagosLazyRoute: typeof AdminPagosLazyRoute
@@ -1427,6 +1492,7 @@ interface AdminRouteChildren {
   AdminContabilidadLiquidacionLazyRoute: typeof AdminContabilidadLiquidacionLazyRoute
   AdminContabilidadMovimientosLazyRoute: typeof AdminContabilidadMovimientosLazyRoute
   AdminContabilidadReporteLazyRoute: typeof AdminContabilidadReporteLazyRoute
+  AdminFacturacionEmisoresLazyRoute: typeof AdminFacturacionEmisoresLazyRoute
   AdminPedidosIdLazyRoute: typeof AdminPedidosIdLazyRoute
   AdminPedidosNuevoLazyRoute: typeof AdminPedidosNuevoLazyRoute
   AdminSpecsDefinitionsLazyRoute: typeof AdminSpecsDefinitionsLazyRoute
@@ -1448,6 +1514,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEmailTemplatesLazyRoute: AdminEmailTemplatesLazyRoute,
   AdminErroresLazyRoute: AdminErroresLazyRoute,
   AdminEstadisticasLazyRoute: AdminEstadisticasLazyRoute,
+  AdminFacturasLazyRoute: AdminFacturasLazyRoute,
   AdminMarcaLazyRoute: AdminMarcaLazyRoute,
   AdminMediaLazyRoute: AdminMediaLazyRoute,
   AdminPagosLazyRoute: AdminPagosLazyRoute,
@@ -1460,6 +1527,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminContabilidadLiquidacionLazyRoute: AdminContabilidadLiquidacionLazyRoute,
   AdminContabilidadMovimientosLazyRoute: AdminContabilidadMovimientosLazyRoute,
   AdminContabilidadReporteLazyRoute: AdminContabilidadReporteLazyRoute,
+  AdminFacturacionEmisoresLazyRoute: AdminFacturacionEmisoresLazyRoute,
   AdminPedidosIdLazyRoute: AdminPedidosIdLazyRoute,
   AdminPedidosNuevoLazyRoute: AdminPedidosNuevoLazyRoute,
   AdminSpecsDefinitionsLazyRoute: AdminSpecsDefinitionsLazyRoute,
@@ -1471,6 +1539,7 @@ const AdminRouteChildren: AdminRouteChildren = {
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface ClienteRouteChildren {
+  ClienteClaimRoute: typeof ClienteClaimRoute
   ClienteLoginRoute: typeof ClienteLoginRoute
   ClientePerfilRoute: typeof ClientePerfilRoute
   ClientePortalRoute: typeof ClientePortalRoute
@@ -1480,6 +1549,7 @@ interface ClienteRouteChildren {
 }
 
 const ClienteRouteChildren: ClienteRouteChildren = {
+  ClienteClaimRoute: ClienteClaimRoute,
   ClienteLoginRoute: ClienteLoginRoute,
   ClientePerfilRoute: ClientePerfilRoute,
   ClientePortalRoute: ClientePortalRoute,

@@ -837,6 +837,21 @@ export type ClientePedidoRow = {
   equipos: string | null;
 };
 
+// Fusión de duplicados (Fase 2 identidad #1098): grupos de clientes que comparten un
+// CUIL verificado, para que el admin elija cuál conservar y fusione los demás.
+export type DuplicadoCliente = {
+  id: number;
+  nombre: string;
+  apellido: string;
+  email: string | null;
+  telefono: string | null;
+  nombre_completo_renaper: string | null;
+  dni_validado_at: string | null;
+  created_at: string | null;
+  pedidos: number;
+};
+export type GrupoDuplicado = { cuil: string; clientes: DuplicadoCliente[] };
+
 export type CalendarioPedido = {
   id: number;
   numero_pedido: number | null;

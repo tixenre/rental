@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Check, ChevronLeft, GripVertical, Minus, Plus, Tag, X } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, GripVertical, Tag, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
+import { IconButton } from "@/design-system/ui/icon-button";
 import { Input } from "@/design-system/ui/input";
+import { QtyInput } from "@/design-system/ui/qty-input";
 import { cn } from "@/lib/utils";
 import { adminApi } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
@@ -37,15 +39,15 @@ export function PagoRow({
       </span>
       <div className="flex items-center gap-1">
         <span className="font-mono">{formatARS(pago.monto)}</span>
-        <button
-          type="button"
+        <IconButton
+          aria-label="Eliminar pago"
+          size="xs"
           onClick={() => delMut.mutate()}
           disabled={delMut.isPending}
-          className="rounded p-1 text-muted-foreground hover:text-destructive transition"
-          aria-label="Eliminar pago"
+          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
         >
           <X className="h-3 w-3" />
-        </button>
+        </IconButton>
       </div>
     </div>
   );
@@ -90,15 +92,15 @@ export function ItemRow({
     >
       {/* Identidad: grip + foto + nombre/meta (crece y ocupa el ancho sobrante) */}
       <div className="flex min-w-[200px] flex-1 items-center gap-2">
-        <button
-          type="button"
+        <IconButton
           aria-label="Reordenar línea"
-          className="inline-flex h-11 w-9 -ml-2 shrink-0 items-center justify-center text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
+          size="lg"
+          className="-ml-2 w-9 shrink-0 text-muted-foreground/60 hover:text-ink cursor-grab touch-none active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
           <GripVertical className="h-4 w-4" />
-        </button>
+        </IconButton>
         {esLibre ? (
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-dashed hairline text-muted-foreground/60">
             <Tag className="h-4 w-4" />
@@ -144,37 +146,12 @@ export function ItemRow({
       {/* Controles: cantidad · precio · subtotal · quitar (alineados en columna) */}
       <div className="ml-auto flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5">
         {/* Stepper de cantidad */}
-        <div className="flex items-center gap-1">
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-9 w-9"
-            aria-label="Restar uno"
-            onClick={() => updateItem(it.uid, { cantidad: Math.max(1, it.cantidad - 1) })}
-          >
-            <Minus className="h-3 w-3" />
-          </Button>
-          <Input
-            type="number"
-            min={1}
-            value={it.cantidad}
-            aria-label="Cantidad"
-            onChange={(e) => updateItem(it.uid, { cantidad: parseInt(e.target.value) || 1 })}
-            className={cn(
-              "h-9 w-11 text-center text-sm p-0",
-              overstock && "border-destructive text-destructive",
-            )}
-          />
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-9 w-9"
-            aria-label="Sumar uno"
-            onClick={() => updateItem(it.uid, { cantidad: it.cantidad + 1 })}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-        </div>
+        <QtyInput
+          value={it.cantidad}
+          onChange={(v) => updateItem(it.uid, { cantidad: v })}
+          min={1}
+          error={overstock}
+        />
 
         {/* Precio editable por jornada */}
         <div className="flex items-center gap-1">
@@ -209,14 +186,13 @@ export function ItemRow({
         </div>
 
         {/* Quitar */}
-        <button
-          type="button"
-          onClick={() => removeItem(it.uid)}
+        <IconButton
           aria-label="Quitar línea"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
+          onClick={() => removeItem(it.uid)}
+          className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
         >
           <X className="h-4 w-4" />
-        </button>
+        </IconButton>
       </div>
     </li>
   );

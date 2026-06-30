@@ -265,6 +265,74 @@ def _init_db_schema(conn):
     )
     conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS dni_verificacion_motivo TEXT")
 
+    # ── Identidad (Fase 2): contactos verificados + bitácora KYC + consentimiento ──
+    # Base del motor `backend/identity/` ("quién sos"). El payload crudo de Didit muere
+    # en `services/didit/`; acá viven los datos normalizados. Espejo idempotente de la
+    # migración 1d3nt1dadf2a. El índice único parcial de CUIL va aparte, AL FINAL (tras
+    # limpiar duplicados legacy).
+    #   — kyc_consent_at: el cliente consintió el KYC + el guardado (Ley 25.326).
+    #   — identidad_conflicto: conflicto de dedup (dos cuentas mismo CUIL) que necesita
+    #     resolución manual del admin → estado derivado 'conflicto'.
+    conn.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS kyc_consent_at TIMESTAMP")
+    conn.execute(
+        "ALTER TABLE clientes ADD COLUMN IF NOT EXISTS "
+        "identidad_conflicto BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    # verified_contacts: mail/teléfono VERIFICADOS (Google OAuth / código Didit / OTP) —
+    # factores de comunicación y recuperación. El teléfono se guarda en E.164. Owner-scoped
+    # (FK CASCADE). Trae las señales anti-fraude de Didit (is_disposable/is_virtual/is_breached).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS verified_contacts (
+            id            SERIAL PRIMARY KEY,
+            cliente_id    INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            kind          TEXT NOT NULL CHECK (kind IN ('email', 'phone')),
+            value         TEXT NOT NULL,
+            source        TEXT NOT NULL CHECK (source IN ('google', 'didit', 'otp', 'manual')),
+            verified_at   TIMESTAMP,
+            is_disposable BOOLEAN,
+            is_virtual    BOOLEAN,
+            is_breached   BOOLEAN,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (cliente_id, kind, value)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_verified_contacts_cliente ON verified_contacts(cliente_id)"
+    )
+    # kyc_events: bitácora de auditoría del KYC (started / approved / declined / reverify /
+    # anchor_set / merge / conflict). SOLO TEXTO (Ley 25.326: nada de biometría; `detalle`
+    # es para diagnóstico, no para PII).
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS kyc_events (
+            id          SERIAL PRIMARY KEY,
+            cliente_id  INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            evento      TEXT NOT NULL,
+            detalle     TEXT,
+            session_id  TEXT,
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_kyc_events_cliente ON kyc_events(cliente_id)")
+
+    # Índice único de CUIL — "una persona verificada = una cuenta". PARCIAL: solo cuenta a
+    # los verificados (CUIL NULL o no-verificado nunca bloquea; extranjeros sin CUIL tampoco).
+    # Lo escribe SOLO identity/kyc al aprobar Didit; jamás el usuario. Va AL FINAL: si quedan
+    # duplicados legacy, la creación falla con UniqueViolation → NO rompemos el boot (init_db
+    # corre en autocommit, cada DDL es atómico). Logueamos un aviso accionable y seguimos; el
+    # operador corre el dedup (identity.merge.candidatos_duplicados → merge_accounts) y en el
+    # próximo boot el índice se crea. El gate anti-duplicado lo da el merge + este candado a
+    # nivel DB. Espejo de la migración f2cu1lun1qx01. (MEMORIA: ancla CUIL, Fase 2 #1098.)
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uniq_cliente_cuil_verificado "
+            "ON clientes (cuil) WHERE cuil IS NOT NULL AND dni_validado_at IS NOT NULL"
+        )
+    except psycopg.errors.UniqueViolation:
+        logger.warning(
+            "Índice único de CUIL no creado: hay clientes verificados con CUIL duplicado. "
+            "Corré el dedup (identity.merge.candidatos_duplicados → merge_accounts) y reiniciá."
+        )
+
     # Passkeys (WebAuthn/FIDO2) — login aditivo a Google OAuth. Una sola tabla
     # para admin (owner_email, cliente_id NULL) y
     # cliente (cliente_id seteado), con discriminador `owner_type`. credential_id /
@@ -1097,6 +1165,14 @@ def _init_db_schema(conn):
     conn.execute("""
         INSERT INTO app_settings (key, value, updated_by)
         VALUES ('modificacion_ventana_horas', '24', 'system-seed')
+        ON CONFLICT (key) DO NOTHING
+    """)
+    # Antelación mínima (lead-time) para que el cliente reserve online (#1126).
+    # 0 = apagado (default): el admin lo sube desde /admin/settings cuando quiere
+    # exigir un mínimo de horas entre el pedido y el retiro.
+    conn.execute("""
+        INSERT INTO app_settings (key, value, updated_by)
+        VALUES ('antelacion_minima_horas', '0', 'system-seed')
         ON CONFLICT (key) DO NOTHING
     """)
     conn.execute("""
@@ -2079,6 +2155,77 @@ def _init_db_schema(conn):
             ), true)
     """)
 
+    # ── Facturación electrónica ARCA (#1139) ─────────────────────────────────
+    # Motor portable en `backend/arca_fe/`; adapter en `backend/services/facturacion/`.
+    # Esquema en dos capas (MEMORIA 2026-06-03): también en migración a2b3c4d5e6f7.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS facturas (
+            id                      SERIAL PRIMARY KEY,
+            pedido_id               INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
+            emisor                  TEXT NOT NULL,
+            ambiente                TEXT NOT NULL,
+            cbte_tipo               INTEGER NOT NULL,
+            pto_vta                 INTEGER NOT NULL,
+            cbte_nro                INTEGER,
+            cae                     TEXT,
+            cae_vto                 DATE,
+            doc_tipo                INTEGER NOT NULL,
+            doc_nro                 TEXT NOT NULL,
+            condicion_iva_receptor  INTEGER NOT NULL,
+            concepto                INTEGER NOT NULL,
+            imp_neto                INTEGER NOT NULL,
+            imp_iva                 INTEGER NOT NULL DEFAULT 0,
+            imp_total               INTEGER NOT NULL,
+            moneda                  TEXT NOT NULL DEFAULT 'PES',
+            cliente_cuit            TEXT,
+            razon_social            TEXT,
+            qr_payload              TEXT,
+            pdf_key                 TEXT,
+            estado                  TEXT NOT NULL DEFAULT 'pendiente',
+            nota_credito_de         INTEGER REFERENCES facturas(id),
+            raw_request             JSONB,
+            raw_response            JSONB,
+            errores                 JSONB,
+            fecha_emision           TIMESTAMPTZ,
+            created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+            created_by              TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_factura_vigente_por_pedido
+        ON facturas (pedido_id) WHERE estado IN ('pendiente','emitida')
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_facturas_pedido ON facturas (pedido_id)
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS afip_ta (
+            ambiente   TEXT NOT NULL,
+            emisor     TEXT NOT NULL,
+            token      TEXT NOT NULL,
+            sign       TEXT NOT NULL,
+            expira_at  TIMESTAMPTZ NOT NULL,
+            PRIMARY KEY (ambiente, emisor)
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emisores_arca (
+            id              SERIAL PRIMARY KEY,
+            nombre          TEXT NOT NULL UNIQUE,
+            cuit            TEXT NOT NULL,
+            pto_vta         INTEGER NOT NULL,
+            condicion_iva   TEXT NOT NULL,
+            cert_enc        BYTEA,
+            key_enc         BYTEA,
+            activo          BOOLEAN NOT NULL DEFAULT true,
+            notas           TEXT,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+    """)
+
     # Regenerar etiquetas auto (origen='auto') para todos los equipos.
     # Idempotente: solo borra y reinserta las auto, no toca las manuales.
     # Se hace una vez por arranque para mantener la bolsa sincronizada
@@ -2195,5 +2342,25 @@ def _init_db_schema(conn):
             created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
+
+    # ── Aceptaciones de Términos y Condiciones (checkout portero) ─────────────
+    # Registro inmutable de qué versión de T&C aceptó cada cliente y cuándo.
+    # La versión actual es `TYC_VERSION_ACTUAL` en `services/checkout/tyc.py`;
+    # sube junto al texto cuando cambian. ON CONFLICT DO NOTHING → idempotente.
+    # Esquema en dos capas (MEMORIA 2026-06-03): también en la migración
+    # b1a2c3d4e5f6_checkout_aceptaciones_tyc.py.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS aceptaciones_tyc (
+            id          SERIAL PRIMARY KEY,
+            cliente_id  INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+            version     TEXT NOT NULL,
+            aceptado_en TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (cliente_id, version)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aceptaciones_tyc_cliente "
+        "ON aceptaciones_tyc(cliente_id)"
+    )
 
     conn.commit()

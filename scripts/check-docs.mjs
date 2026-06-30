@@ -227,6 +227,83 @@ if (existsSync(SKILLS_DIR)) {
   }
 }
 
+// ── Bloque 6: COBERTURA de la vitrina del DS (anti-drift del catálogo) ─────────────────────────
+//   Todo componente en `componentDirs` (design-system/ui + composites) debe estar demostrado en la vitrina:
+//   su path (relativo a srcRoot) aparece en algún `Specimen.files` del catálogo. El manifiesto del
+//   catálogo ES el registro (mismo patrón que skills↔CLAUDE.md). Un componente sin vitrina → error.
+//   Solo corre si la config define `dsCatalog` y el dir existe (portable: otros repos no lo tienen).
+let dsCoverChecked = 0;
+const ds = cfg.dsCatalog;
+if (ds && existsSync(join(ROOT, ds.catalogDir))) {
+  const srcRoot = join(ROOT, ds.srcRoot);
+  const catalogSrc = (function collect(dir, acc) {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) collect(p, acc);
+      else if (/\.(tsx?|ts)$/.test(e.name)) acc.push(read(p));
+    }
+    return acc;
+  })(join(ROOT, ds.catalogDir), []).join("\n");
+  const exempt = new Set(ds.exempt ?? []);
+  for (const dir of ds.componentDirs ?? []) {
+    const abs = join(ROOT, dir);
+    if (!existsSync(abs)) continue;
+    for (const e of readdirSync(abs, { withFileTypes: true })) {
+      if (!e.isFile() || !e.name.endsWith(".tsx")) continue; // solo componentes (.tsx); helpers .ts no
+      const rel = relative(srcRoot, join(abs, e.name)); // ej "design-system/ui/button.tsx"
+      if (exempt.has(rel)) continue;
+      dsCoverChecked++;
+      if (!catalogSrc.includes(rel)) {
+        errors.push(
+          `Componente del DS sin vitrina: \`${rel}\` no está en ningún \`Specimen.files\` del catálogo ` +
+            `(${ds.catalogDir}). Agregá su specimen, o exoneralo en governance.config \`dsCatalog.exempt\` (con comentario ⏰).`,
+        );
+      }
+    }
+  }
+}
+
+// ── Bloque 6b: WIRING del manifest de la vitrina (sección importada == registrada en SECTIONS) ──
+//   Cada `import { xSection } from "./sections/..."` del manifest DEBE figurar en el array SECTIONS.
+//   Un import que no entra al array = sección que NO renderiza, y tsc no lo caza (noUnusedLocals está
+//   en off → un import sin usar no es error). Cazó el slip de `catalogoOrganismosSection`, que se
+//   commiteó importada pero fuera de SECTIONS y por eso no aparecía en la vitrina. Solo si hay dsCatalog.
+if (ds) {
+  const manifestPath = join(ROOT, ds.catalogDir, "manifest.ts");
+  if (existsSync(manifestPath)) {
+    const mSrc = read(manifestPath);
+    const importedSections = [
+      ...mSrc.matchAll(
+        /import\s*\{([^}]*)\}\s*from\s*["']\.\/sections\/[^"']+["']/g,
+      ),
+    ]
+      .flatMap((m) => m[1].split(","))
+      .map((s) =>
+        s
+          .trim()
+          .split(/\s+as\s+/)
+          .pop()
+          .trim(),
+      )
+      .filter(Boolean);
+    const arr = mSrc.match(/const\s+SECTIONS\s*:[^=]*=\s*\[([\s\S]*?)\]/);
+    const registered = new Set(
+      (arr ? arr[1] : "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    for (const name of importedSections) {
+      if (!registered.has(name)) {
+        errors.push(
+          `Vitrina del DS: \`${name}\` se importa en manifest.ts pero NO está en el array SECTIONS → ` +
+            `no se renderiza (tsc no lo caza: noUnusedLocals off). Agregalo a SECTIONS.`,
+        );
+      }
+    }
+  }
+}
+
 // ── Veredicto ────────────────────────────────────────────────────────────────────────────────
 if (warnings.length) {
   console.warn("⚠ Warnings de gobernanza (no bloquean):\n");
@@ -246,5 +323,9 @@ if (errors.length) {
 
 console.log(
   `✓ Docs/skills de gobernanza OK — paridad digest↔log (${headersOf(join(ROOT, DIGEST)).length} entradas), ` +
-    `import presente, ${skillCount} skills registrados y bien formados, links vivos en ${govFiles.length} archivos.`,
+    `import presente, ${skillCount} skills registrados y bien formados, links vivos en ${govFiles.length} archivos` +
+    (dsCoverChecked
+      ? `, ${dsCoverChecked} componentes del DS con vitrina`
+      : "") +
+    `.`,
 );

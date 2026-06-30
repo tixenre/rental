@@ -13,7 +13,8 @@
 
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { GripVertical, Eye, EyeOff, Loader2 } from "lucide-react";
+import { GripVertical, Eye, EyeOff } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -136,7 +137,7 @@ export function DisenoSection() {
 
       {catsQ.isLoading && (
         <div className="py-6 text-sm text-muted-foreground flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+          <Spinner size="sm" /> Cargando…
         </div>
       )}
 

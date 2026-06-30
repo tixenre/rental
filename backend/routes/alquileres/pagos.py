@@ -6,14 +6,13 @@ modelo + validación de destinatario/método, el recálculo del monto pagado, y 
 endpoints del ledger (por pedido + global). Registra sus rutas sobre el router
 compartido del paquete `routes.alquileres`.
 """
-import datetime
 import logging
 from typing import Optional
 
 from fastapi import Request, HTTPException, Query
 from pydantic import BaseModel
 
-from database import get_db, row_to_dict
+from database import get_db, row_to_dict, now_ar
 from auth.guards import require_admin
 from routes.alquileres.core import (
     router,
@@ -117,7 +116,7 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
             if p["estado"] in ("cancelado",):
                 raise HTTPException(400, "No se pueden agregar pagos a un pedido cancelado")
 
-            fecha = data.fecha or datetime.date.today().isoformat()
+            fecha = data.fecha or now_ar().date().isoformat()
             conn.execute("""
                 INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
                 VALUES (%s,%s,%s,%s,%s,%s)

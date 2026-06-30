@@ -9,6 +9,7 @@
 
 import { useState } from "react";
 import { authedFetch } from "@/lib/authedFetch";
+import { Button } from "@/design-system/ui/button";
 import { toast } from "sonner";
 import {
   Bell,
@@ -23,14 +24,14 @@ import {
   BadgeCheck,
   ShieldAlert,
   ShieldCheck,
-  Loader2,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { cn } from "@/lib/utils";
 import { nombreCliente } from "@/lib/cliente-nombre";
-import { formatARS } from "@/lib/format";
 import { iniciarVerificacionIdentidad } from "@/lib/verificacion";
 import { AccessMethods } from "@/components/rental/AccessMethods";
 import { SessionManager } from "@/components/rental/SessionManager";
+import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { invalidateClienteSession } from "@/lib/iva";
 import type { Perfil } from "./ClientePortalTypes";
 
@@ -142,12 +143,10 @@ export function NotificacionesSection() {
 
 export function IdentidadSection({
   perfil,
-  onPerfilChange,
   confirmando = false,
   compact = false,
 }: {
   perfil: Perfil;
-  onPerfilChange: (p: Perfil) => void;
   /** True mientras esperamos el webhook tras volver del flujo Didit. */
   confirmando?: boolean;
   /** True cuando está embebido en PerfilSection (omite el heading y el padding exterior). */
@@ -157,8 +156,6 @@ export function IdentidadSection({
   const estado = perfil.dni_verificacion_estado ?? "no_verificado";
   const motivo = perfil.dni_verificacion_motivo;
   const [iniciando, setIniciando] = useState(false);
-  const [apodo, setApodo] = useState(perfil.apodo ?? "");
-  const [guardandoApodo, setGuardandoApodo] = useState(false);
 
   async function iniciarVerificacion() {
     setIniciando(true);
@@ -168,28 +165,6 @@ export function IdentidadSection({
       /* el helper ya hizo toast */
     } finally {
       setIniciando(false);
-    }
-  }
-
-  async function guardarApodo() {
-    setGuardandoApodo(true);
-    try {
-      const r = await authedFetch("/api/cliente/me", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apodo: apodo.trim() || null }),
-      });
-      if (!r.ok) {
-        toast.error("No se pudo guardar el apodo");
-        return;
-      }
-      const updated = await r.json();
-      onPerfilChange({ ...perfil, ...updated });
-      toast.success("Apodo guardado");
-    } catch {
-      toast.error("Error de red");
-    } finally {
-      setGuardandoApodo(false);
     }
   }
 
@@ -342,35 +317,6 @@ export function IdentidadSection({
           </button>
         </div>
       )}
-
-      {/* Apodo (siempre editable) */}
-      <div className="mb-2">
-        <label className="block font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground mb-2">
-          Apodo (opcional)
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={apodo}
-            onChange={(e) => setApodo(e.target.value)}
-            placeholder="Ej: Nacho, Sofi, Toto…"
-            maxLength={40}
-            className="flex-1 rounded-lg border hairline bg-surface px-3.5 py-2.5 font-sans text-sm text-ink outline-none transition placeholder:text-muted-foreground hover:border-ink/30 focus:border-ink focus:bg-card"
-          />
-          <button
-            type="button"
-            onClick={guardarApodo}
-            disabled={guardandoApodo || apodo.trim() === (perfil.apodo ?? "")}
-            className="h-11 rounded-lg bg-ink px-4 font-sans text-sm font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-40"
-          >
-            {guardandoApodo ? "…" : "Guardar"}
-          </button>
-        </div>
-        <p className="mt-1.5 font-sans text-xs text-muted-foreground">
-          Lo usamos para saludarte en los mails (ej. "Hola Nacho"). Tu nombre oficial sigue siendo
-          el del DNI.
-        </p>
-      </div>
     </>
   );
 
@@ -382,20 +328,15 @@ export function IdentidadSection({
 
 export function PerfilSection({
   perfil,
-  pedidosCount,
-  totalAlquilado,
   onLogout,
   confirmandoVerif = false,
   onPerfilChange,
 }: {
   perfil: Perfil;
-  pedidosCount: number;
-  totalAlquilado: number;
   onLogout: () => void;
   confirmandoVerif?: boolean;
   onPerfilChange: (p: Perfil) => void;
 }) {
-  const initial = perfil.nombre?.[0]?.toUpperCase() ?? "?";
   const fullName = nombreCliente(perfil);
 
   const memberSince = (() => {
@@ -427,9 +368,10 @@ export function PerfilSection({
       {/* Avatar + nombre. Las llaves de acceso reales se muestran abajo (Métodos de
           acceso), por eso no va un badge fijo de Google acá (puede ser passkey-only). */}
       <div className="flex items-center gap-4 mb-8">
-        <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-amber">
-          <span className="font-display font-black text-xl text-ink leading-none">{initial}</span>
-        </div>
+        <ClienteAvatar
+          nombre={fullName}
+          className="h-[52px] w-[52px] font-display font-black text-xl"
+        />
         <div>
           {/* eslint-disable-next-line no-restricted-syntax -- nombre en tarjeta de perfil: entre text-base y text-lg, extra-bold lo equilibra */}
           <div className="font-sans font-bold text-[17px] text-ink">{fullName}</div>
@@ -441,59 +383,30 @@ export function PerfilSection({
         </div>
       </div>
 
-      {/* Datos (editables): contacto + facturación. Reemplaza la card read-only —
-          antes se editaban en la página /cliente/perfil aparte, ahora viven acá. */}
-      <DatosForm perfil={perfil} onPerfilChange={onPerfilChange} />
+      {/* Identidad — RENAPER (bloqueada si verificada) + estado de la verificación. */}
+      <Bloque title="identidad.">
+        <IdentidadSection perfil={perfil} confirmando={confirmandoVerif} compact />
+      </Bloque>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 mt-8 mb-6">
-        <div className="rounded-lg border hairline bg-card px-4 py-3 text-center">
-          {/* eslint-disable-next-line no-restricted-syntax -- stat number display: entre text-2xl (24px) y text-3xl (30px) */}
-          <div className="font-sans font-extrabold text-[26px] text-ink leading-none tabular-nums">
-            {pedidosCount}
-          </div>
-          <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mt-1">
-            Pedidos
-          </div>
-        </div>
-        <div className="rounded-lg border hairline bg-card px-4 py-3 text-center">
-          <div className="font-sans font-extrabold text-22 text-ink leading-none tabular-nums">
-            {formatARS(totalAlquilado)}
-          </div>
-          <div className="font-mono text-2xs uppercase tracking-[0.22em] text-muted-foreground mt-1">
-            Total alquilado
-          </div>
-        </div>
-      </div>
+      {/* Contacto — cómo te escribimos (editable: teléfono + apodo). */}
+      <Bloque title="contacto.">
+        <ContactoForm perfil={perfil} onPerfilChange={onPerfilChange} />
+      </Bloque>
 
-      {/* Identidad — embebida en perfil */}
-      <div className="border-t hairline pt-6 mb-6">
-        <h3 className="font-display text-lg font-black text-ink tracking-[-0.01em] mb-4">
-          identidad.
-        </h3>
-        <IdentidadSection
-          perfil={perfil}
-          onPerfilChange={onPerfilChange}
-          confirmando={confirmandoVerif}
-          compact
-        />
-      </div>
+      {/* Facturación — perfil fiscal (editable; NO es identidad). */}
+      <Bloque title="facturación.">
+        <FacturacionForm perfil={perfil} onPerfilChange={onPerfilChange} />
+      </Bloque>
 
-      {/* Métodos de acceso (passkeys + Google) — antes vivían en /cliente/perfil */}
-      <div className="border-t hairline pt-6 mb-6">
-        <h3 className="font-display text-lg font-black text-ink tracking-[-0.01em] mb-4">
-          métodos de acceso.
-        </h3>
+      {/* Métodos de acceso (passkeys + Google). */}
+      <Bloque title="métodos de acceso.">
         <AccessMethods />
-      </div>
+      </Bloque>
 
-      {/* Sesiones activas — antes vivían en /cliente/perfil */}
-      <div className="border-t hairline pt-6 mb-6">
-        <h3 className="font-display text-lg font-black text-ink tracking-[-0.01em] mb-4">
-          sesiones activas.
-        </h3>
+      {/* Sesiones activas. */}
+      <Bloque title="sesiones activas.">
         <SessionManager scope="cliente" />
-      </div>
+      </Bloque>
 
       {/* Logout */}
       <button
@@ -507,13 +420,50 @@ export function PerfilSection({
   );
 }
 
-// ── Form de datos editables (contacto + facturación) ──────────────────────────
-// Movido de la página /cliente/perfil (ahora redirige acá). Identidad (nombre legal /
-// DNI / CUIL de RENAPER) NO se edita acá — eso es solo lectura en IdentidadSection.
+// ── Bloque clasificado del perfil (separador + heading) ───────────────────────
+// Una sola forma del bloque del perfil (DRY): identidad / contacto / facturación /
+// métodos / sesiones comparten la misma cáscara.
+function Bloque({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="border-t hairline pt-6 mb-6">
+      <h3 className="font-display text-lg font-black text-ink tracking-[-0.01em] mb-4">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+// ── Datos editables del perfil (contacto + facturación) ───────────────────────
+// Identidad (nombre legal / DNI / CUIL / domicilio de RENAPER) NO se edita acá: es
+// solo lectura en IdentidadSection (la trae Didit — decisión del dueño). Acá viven
+// SOLO los datos que el cliente controla: contacto y perfil fiscal.
 
 type PerfilImpuestos = "consumidor_final" | "responsable_inscripto" | "monotributo" | "exento";
 
-function DatosForm({
+/** PATCH parcial a /api/cliente/me; refleja la respuesta en el perfil. Punto único
+ *  de guardado del perfil (lo comparten Contacto y Facturación). */
+async function patchPerfil(
+  perfil: Perfil,
+  onPerfilChange: (p: Perfil) => void,
+  body: Record<string, unknown>,
+  { invalidate = false }: { invalidate?: boolean } = {},
+) {
+  const res = await authedFetch("/api/cliente/me", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? `Error ${res.status}`);
+  }
+  const updated = (await res.json()) as Perfil;
+  onPerfilChange({ ...perfil, ...updated });
+  // El perfil fiscal cambia cómo se cotiza el IVA en catálogo / carrito / ficha.
+  if (invalidate) invalidateClienteSession();
+}
+
+// ── Contacto: cómo te escribimos (mail de comunicación + teléfono + apodo) ─────
+function ContactoForm({
   perfil,
   onPerfilChange,
 }: {
@@ -521,13 +471,84 @@ function DatosForm({
   onPerfilChange: (p: Perfil) => void;
 }) {
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState<Partial<Perfil>>({
-    nombre: perfil.nombre,
-    apellido: perfil.apellido,
-    telefono: perfil.telefono,
-    direccion: perfil.direccion,
+  const [telefono, setTelefono] = useState(perfil.telefono ?? "");
+  const [apodo, setApodo] = useState(perfil.apodo ?? "");
+  const dirty = telefono !== (perfil.telefono ?? "") || apodo !== (perfil.apodo ?? "");
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving || !dirty) return;
+    setSaving(true);
+    try {
+      await patchPerfil(perfil, onPerfilChange, {
+        telefono: telefono.trim(),
+        apodo: apodo.trim() || null,
+      });
+      toast.success("Contacto actualizado");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave} className="space-y-5">
+      <Field
+        label="Mail de comunicación"
+        hint="Tu mail de Google — te escribimos acá. No se edita."
+      >
+        <input
+          type="email"
+          value={perfil.email ?? ""}
+          disabled
+          className="w-full rounded-md border hairline bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+        />
+      </Field>
+
+      <Field label="Teléfono" hint="Para coordinar el retiro y los avisos por WhatsApp">
+        <input
+          type="tel"
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+          placeholder="+54 9 223 ..."
+          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+        />
+      </Field>
+
+      <Field
+        label="Apodo"
+        hint={
+          'Cómo te saludamos en los mails ("Hola Nacho"). Tu nombre oficial sigue siendo el del DNI.'
+        }
+      >
+        <input
+          type="text"
+          value={apodo}
+          onChange={(e) => setApodo(e.target.value)}
+          placeholder="Ej: Nacho, Sofi, Toto…"
+          maxLength={40}
+          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+        />
+      </Field>
+
+      <SaveButton saving={saving} disabled={!dirty} />
+    </form>
+  );
+}
+
+// ── Facturación: perfil fiscal (condición frente al IVA + CUIT + datos Factura A) ──
+function FacturacionForm({
+  perfil,
+  onPerfilChange,
+}: {
+  perfil: Perfil;
+  onPerfilChange: (p: Perfil) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
     cuit: perfil.cuit ?? "",
-    perfil_impuestos: perfil.perfil_impuestos ?? "consumidor_final",
+    perfil_impuestos: (perfil.perfil_impuestos ?? "consumidor_final") as PerfilImpuestos,
     razon_social: perfil.razon_social ?? "",
     domicilio_fiscal: perfil.domicilio_fiscal ?? "",
     email_facturacion: perfil.email_facturacion ?? "",
@@ -538,20 +559,8 @@ function DatosForm({
     if (saving) return;
     setSaving(true);
     try {
-      const res = await authedFetch("/api/cliente/me", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.detail ?? `Error ${res.status}`);
-      }
-      const updated = (await res.json()) as Perfil;
-      onPerfilChange({ ...perfil, ...updated });
-      // Refresca el perfil impositivo compartido (catálogo / carrito / ficha).
-      invalidateClienteSession();
-      toast.success("Perfil actualizado");
+      await patchPerfil(perfil, onPerfilChange, form, { invalidate: true });
+      toast.success("Facturación actualizada");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar");
     } finally {
@@ -561,68 +570,12 @@ function DatosForm({
 
   return (
     <form onSubmit={handleSave} className="space-y-5">
-      <Field label="Email" hint="No se puede modificar acá">
-        <input
-          type="email"
-          value={perfil.email}
-          disabled
-          className="w-full rounded-md border hairline bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
-        />
-      </Field>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Nombre">
-          <input
-            type="text"
-            value={form.nombre ?? ""}
-            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-            required
-          />
-        </Field>
-        <Field label="Apellido">
-          <input
-            type="text"
-            value={form.apellido ?? ""}
-            onChange={(e) => setForm({ ...form, apellido: e.target.value })}
-            className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-          />
-        </Field>
-      </div>
-
-      <Field label="Teléfono">
-        <input
-          type="tel"
-          value={form.telefono ?? ""}
-          onChange={(e) => setForm({ ...form, telefono: e.target.value })}
-          placeholder="+54 9 223 ..."
-          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-        />
-      </Field>
-
-      <Field label="Dirección">
-        <input
-          type="text"
-          value={form.direccion ?? ""}
-          onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-          placeholder="Calle, número, ciudad"
-          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-        />
-      </Field>
-
-      <Field label="CUIT/CUIL" hint="Opcional — para facturación">
-        <input
-          type="text"
-          value={form.cuit ?? ""}
-          onChange={(e) => setForm({ ...form, cuit: e.target.value })}
-          placeholder="20-12345678-9"
-          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
-        />
-      </Field>
-
-      <Field label="Perfil impositivo" hint="Determina cómo se discrimina el IVA en tus facturas">
+      <Field
+        label="Condición frente al IVA"
+        hint="Determina cómo se discrimina el IVA en tus facturas"
+      >
         <select
-          value={form.perfil_impuestos ?? "consumidor_final"}
+          value={form.perfil_impuestos}
           onChange={(e) =>
             setForm({ ...form, perfil_impuestos: e.target.value as PerfilImpuestos })
           }
@@ -635,6 +588,19 @@ function DatosForm({
         </select>
       </Field>
 
+      <Field
+        label="CUIT / CUIL"
+        hint="Para la factura. Puede diferir del CUIL verificado de tu identidad."
+      >
+        <input
+          type="text"
+          value={form.cuit}
+          onChange={(e) => setForm({ ...form, cuit: e.target.value })}
+          placeholder="20-12345678-9"
+          className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
+        />
+      </Field>
+
       {/* Datos para Factura A — sólo visibles si el cliente es RI */}
       {form.perfil_impuestos === "responsable_inscripto" && (
         <div className="rounded-md border border-dashed hairline bg-amber-soft/40 p-4 space-y-3">
@@ -644,16 +610,16 @@ function DatosForm({
           <Field label="Razón social" hint="Nombre legal de tu empresa">
             <input
               type="text"
-              value={form.razon_social ?? ""}
+              value={form.razon_social}
               onChange={(e) => setForm({ ...form, razon_social: e.target.value })}
               placeholder="Productora SA"
               className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
             />
           </Field>
-          <Field label="Domicilio fiscal" hint="Si difiere del domicilio de entrega">
+          <Field label="Domicilio fiscal" hint="Si difiere del domicilio del DNI">
             <input
               type="text"
-              value={form.domicilio_fiscal ?? ""}
+              value={form.domicilio_fiscal}
               onChange={(e) => setForm({ ...form, domicilio_fiscal: e.target.value })}
               placeholder="Av. Siempre Viva 123, Mar del Plata"
               className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
@@ -662,7 +628,7 @@ function DatosForm({
           <Field label="Email de facturación" hint="Si querés que la factura llegue a otro email">
             <input
               type="email"
-              value={form.email_facturacion ?? ""}
+              value={form.email_facturacion}
               onChange={(e) => setForm({ ...form, email_facturacion: e.target.value })}
               placeholder="facturacion@empresa.com"
               className="w-full rounded-md border hairline bg-background px-3 py-2 text-base sm:text-sm text-ink"
@@ -671,20 +637,27 @@ function DatosForm({
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-full inline-flex items-center justify-center gap-2 rounded-[10px] bg-ink h-[46px] font-sans text-15 font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-50"
-      >
-        {saving ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" /> Guardando…
-          </>
-        ) : (
-          "Guardar cambios"
-        )}
-      </button>
+      <SaveButton saving={saving} />
     </form>
+  );
+}
+
+// ── Botón guardar compartido (contacto + facturación) ─────────────────────────
+function SaveButton({ saving, disabled = false }: { saving: boolean; disabled?: boolean }) {
+  return (
+    <button
+      type="submit"
+      disabled={saving || disabled}
+      className="w-full inline-flex items-center justify-center gap-2 rounded-[10px] bg-ink h-[46px] font-sans text-15 font-bold text-amber transition hover:bg-amber hover:text-ink disabled:opacity-50"
+    >
+      {saving ? (
+        <>
+          <Spinner size="sm" /> Guardando…
+        </>
+      ) : (
+        "Guardar cambios"
+      )}
+    </button>
   );
 }
 

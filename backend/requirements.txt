@@ -42,6 +42,10 @@ slowapi==0.1.10
 # Error tracking en producción. Solo activo si SENTRY_DSN está seteado.
 sentry-sdk[fastapi]==2.63.0
 
+# Cliente SOAP para ARCA/AFIP (facturación electrónica #1139).
+# lxml es la dependencia de parseo XML de zeep (viene incluida pero la fijamos explícita).
+zeep>=4.2.1
+
 # Versiones PINEADAS (==) para builds reproducibles (#925). Estas son el set
 # resuelto y validado por CI al momento de pinear; antes el repo floteaba a la
 # última en cada build de Docker. Para subir una dep: cambiar el == acá, dejar

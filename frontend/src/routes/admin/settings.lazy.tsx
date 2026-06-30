@@ -7,6 +7,7 @@ import { EmailsAdmin } from "@/components/admin/email/EmailsAdmin";
 import { ComisionesSection } from "@/components/admin/settings/ComisionesSection";
 import { DescuentosJornadaSection } from "@/components/admin/settings/DescuentosJornadaSection";
 import { BufferSection } from "@/components/admin/settings/BufferSection";
+import { LeadTimeSection } from "@/components/admin/settings/LeadTimeSection";
 import { GoogleAnalyticsSection } from "@/components/admin/settings/GoogleAnalyticsSection";
 import { CalendarFeedSection } from "@/components/admin/settings/CalendarFeedSection";
 import { HorariosSection } from "@/components/admin/settings/HorariosSection";
@@ -15,6 +16,7 @@ import { RankingSection } from "@/components/admin/settings/RankingSection";
 import { CambioYPreciosSection } from "@/components/admin/settings/CambioYPreciosSection";
 import { PasskeysSection } from "@/components/admin/settings/PasskeysSection";
 import { SessionsSection } from "@/components/admin/settings/SessionsSection";
+import { FacturacionSection } from "@/components/admin/settings/FacturacionSection";
 
 export const Route = createLazyFileRoute("/admin/settings")({
   component: SettingsPage,
@@ -36,6 +38,10 @@ function SettingsPage() {
 
         <AdminSection title="Buffer entre alquileres" storageKey="settings:buffer">
           <BufferSection />
+        </AdminSection>
+
+        <AdminSection title="Antelación mínima (lead-time)" storageKey="settings:leadtime">
+          <LeadTimeSection />
         </AdminSection>
 
         <AdminSection
@@ -84,6 +90,14 @@ function SettingsPage() {
 
         <AdminSection title="Emails" storageKey="settings:emails" defaultOpen={false}>
           <EmailsAdmin />
+        </AdminSection>
+
+        <AdminSection
+          title="Facturación ARCA"
+          storageKey="settings:facturacion"
+          defaultOpen={false}
+        >
+          <FacturacionSection />
         </AdminSection>
       </div>
     </AdminPage>

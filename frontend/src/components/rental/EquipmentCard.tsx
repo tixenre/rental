@@ -10,7 +10,7 @@ import { buildEquipoSlug } from "@/lib/equipo-slug";
 import { EmptyImage } from "./EmptyImage";
 import { EquipoFoto } from "./EquipoFoto";
 import { cn } from "@/lib/utils";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { PriceBlock } from "./equipment/shared/PriceBlock";
 import { FavButton } from "./equipment/shared/FavButton";

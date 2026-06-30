@@ -8,7 +8,8 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Trash2, AlertCircle } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import {
@@ -279,7 +280,7 @@ export function MantenimientoEquipoDialog({
             <Button size="sm" onClick={handleAdd} disabled={addMut.isPending}>
               {addMut.isPending ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Guardando…
+                  <Spinner size="xs" className="mr-1" /> Guardando…
                 </>
               ) : (
                 <>
@@ -293,7 +294,7 @@ export function MantenimientoEquipoDialog({
         {/* Lista */}
         {logQ.isLoading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-            <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+            <Spinner size="sm" /> Cargando…
           </div>
         )}
 
