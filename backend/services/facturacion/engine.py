@@ -259,6 +259,7 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
                     "observaciones": list(cae_result.observaciones),
                 },
             )
+        conn.commit()
 
     # Leer la factura ya actualizada (fuera de la TX)
     with get_db() as conn:
@@ -434,6 +435,7 @@ def emitir_nota_credito(
                 errores=list(cae_result.errores),
                 raw_response={"resultado": cae_result.resultado, "errores": list(cae_result.errores)},
             )
+        conn.commit()
 
     with get_db() as conn:
         return get_by_id(nc_id, conn)
