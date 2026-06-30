@@ -29,7 +29,7 @@ _EMISORES_DATA: dict[str, dict] = {
         "telefono": os.getenv("OWNER_TELEFONO", "223 590-9080"),
     },
     "santini": {
-        "nombre": os.getenv("AFIP_SANTINI_NOMBRE", "Martín Javier Santini Calarco"),
+        "nombre": os.getenv("AFIP_SANTINI_NOMBRE", ""),
         "cond_iva_label": "Monotributo",
         "tipo_cbte": "FACTURA",
         "domicilio": os.getenv("AFIP_SANTINI_DOMICILIO", "Falucho 4625, Mar del Plata"),
