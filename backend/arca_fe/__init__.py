@@ -27,6 +27,7 @@ from .modelos import (
     IVA_27,
     Emisor,
     Receptor,
+    CbteAsoc,
     ComprobanteRequest,
     CaeResult,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "IVA_27",
     "Emisor",
     "Receptor",
+    "CbteAsoc",
     "ComprobanteRequest",
     "CaeResult",
     # lógica fiscal

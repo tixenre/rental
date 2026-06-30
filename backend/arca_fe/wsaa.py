@@ -23,8 +23,6 @@ from cryptography.hazmat.primitives.serialization.pkcs7 import (
 )
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
-import httpx
-
 
 _WSAA_SERVICE = "wsfe"
 _TRA_TTL_SECONDS = 36 * 3600  # 36 h (AFIP acepta hasta 48h, dejamos margen)
@@ -126,6 +124,8 @@ def login(
     </wsaa:loginCms>
   </soapenv:Body>
 </soapenv:Envelope>"""
+
+    import httpx  # lazy: solo se necesita al llamar al endpoint WSAA real
 
     url = _wsaa_url(endpoint)
     resp = httpx.post(
