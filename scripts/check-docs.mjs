@@ -263,6 +263,47 @@ if (ds && existsSync(join(ROOT, ds.catalogDir))) {
   }
 }
 
+// ── Bloque 6b: WIRING del manifest de la vitrina (sección importada == registrada en SECTIONS) ──
+//   Cada `import { xSection } from "./sections/..."` del manifest DEBE figurar en el array SECTIONS.
+//   Un import que no entra al array = sección que NO renderiza, y tsc no lo caza (noUnusedLocals está
+//   en off → un import sin usar no es error). Cazó el slip de `catalogoOrganismosSection`, que se
+//   commiteó importada pero fuera de SECTIONS y por eso no aparecía en la vitrina. Solo si hay dsCatalog.
+if (ds) {
+  const manifestPath = join(ROOT, ds.catalogDir, "manifest.ts");
+  if (existsSync(manifestPath)) {
+    const mSrc = read(manifestPath);
+    const importedSections = [
+      ...mSrc.matchAll(
+        /import\s*\{([^}]*)\}\s*from\s*["']\.\/sections\/[^"']+["']/g,
+      ),
+    ]
+      .flatMap((m) => m[1].split(","))
+      .map((s) =>
+        s
+          .trim()
+          .split(/\s+as\s+/)
+          .pop()
+          .trim(),
+      )
+      .filter(Boolean);
+    const arr = mSrc.match(/const\s+SECTIONS\s*:[^=]*=\s*\[([\s\S]*?)\]/);
+    const registered = new Set(
+      (arr ? arr[1] : "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    for (const name of importedSections) {
+      if (!registered.has(name)) {
+        errors.push(
+          `Vitrina del DS: \`${name}\` se importa en manifest.ts pero NO está en el array SECTIONS → ` +
+            `no se renderiza (tsc no lo caza: noUnusedLocals off). Agregalo a SECTIONS.`,
+        );
+      }
+    }
+  }
+}
+
 // ── Veredicto ────────────────────────────────────────────────────────────────────────────────
 if (warnings.length) {
   console.warn("⚠ Warnings de gobernanza (no bloquean):\n");
@@ -283,6 +324,8 @@ if (errors.length) {
 console.log(
   `✓ Docs/skills de gobernanza OK — paridad digest↔log (${headersOf(join(ROOT, DIGEST)).length} entradas), ` +
     `import presente, ${skillCount} skills registrados y bien formados, links vivos en ${govFiles.length} archivos` +
-    (dsCoverChecked ? `, ${dsCoverChecked} componentes del DS con vitrina` : "") +
+    (dsCoverChecked
+      ? `, ${dsCoverChecked} componentes del DS con vitrina`
+      : "") +
     `.`,
 );

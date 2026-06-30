@@ -569,6 +569,18 @@ sistema paralelo** (contratos/ARCA, aparte). El supervisor marca: firma de prese
 `auth/stepup`+`firmarConPasskey`; el gate del checkout re-implementando los checks; o una firma de contrato con
 ceremonia paralela. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §3; historia → #1131.
 
+### 2026-06-30 — `staging-verify`: fakear la verificación Didit en dev SIN tocar `dni_validado_at` a mano
+
+Didit (KYC) no corre en dev/staging → una cuenta nunca llega a `dni_validado_at` y el portero del checkout la
+bloquea, impidiendo probar el flujo de pedido. `POST /auth/staging-verify` la marca como verificada **reusando la
+pluma única `identity.kyc`** (`aprobar`/`actualizar_estado`): setea un `didit_session_id` fresco y delega — **nunca
+un UPDATE manual de `dni_validado_at`**. **Mismo gate de doble llave** que staging-login (`is_production` falla-a-prod
++ `STAGING_LOGIN_SECRET`): **404 en prod**. Soporta `estado` approved/rejected/en_revision y siembra contacto para
+cuentas livianas; CUIL fake válido (mod-11) único por id. **No mintea sesión** (combinar con `staging-login
+target=cliente`). Extiende _Staging-login (2026-06-19)_ al gate de identidad. El supervisor marca un fake de KYC vía
+UPDATE de `dni_validado_at`/`*_renaper` a mano en vez de la puerta. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) +
+[`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md).
+
 ### 2026-06-30 — `backend/services/fechas.py` = puerta única de la lógica de fechas/horas; lead-time configurable (#1126)
 
 Toda **decisión** sobre fechas/horas vive en `services/fechas.py`: formato (`validar_fecha_iso`), criterio de
