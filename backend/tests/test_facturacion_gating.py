@@ -58,6 +58,7 @@ class _FakeConn:
                     "cert_enc": b"FAKE_CERT_ENC",
                     "key_enc": b"FAKE_KEY_ENC",
                     "activo": True,
+                    "razon_social": None,
                     "notas": None,
                     "created_at": None,
                     "updated_at": None,
@@ -154,7 +155,7 @@ def test_gating_emisor_inactivo_levanta(monkeypatch):
                         "id": 1, "nombre": "pablo", "cuit": "20-30000000-0",
                         "pto_vta": 1, "condicion_iva": "responsable_inscripto",
                         "cert_enc": b"x", "key_enc": b"x",
-                        "activo": False, "notas": None,
+                        "activo": False, "razon_social": None, "notas": None,
                         "created_at": None, "updated_at": None,
                     }
             return _R()
@@ -263,6 +264,7 @@ class _FakeConnEmisor:
                     "cert_enc": None,
                     "key_enc": None,
                     "activo": True,
+                    "razon_social": None,
                     "notas": None,
                     "created_at": None,
                     "updated_at": None,
