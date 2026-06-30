@@ -106,7 +106,7 @@ def crear_cuenta(conn, *, nombre, tipo, socio=None, moneda="ARS", saldo_inicial=
                  fecha_apertura=None, orden=0, por=None) -> dict:
     """Crea una cuenta (valida primero). Devuelve la cuenta creada.
 
-    `fecha_apertura` None → default de la tabla (clean start 2026-06-01).
+    `fecha_apertura` None → clean start de la liquidación (`LIQUIDACION_INICIO`).
     `moneda` ARS (default) o USD.
     """
     moneda = (moneda or "ARS")
@@ -115,12 +115,16 @@ def crear_cuenta(conn, *, nombre, tipo, socio=None, moneda="ARS", saldo_inicial=
     validar_cuenta(data)
     socio_val = data["socio"] if tipo == "socio" else None
 
+    # Default de `fecha_apertura` = el clean start de la liquidación (constante única
+    # en reportes/), como bound param (DAL: nada de literales de valor en el SQL).
+    from reportes.liquidacion import LIQUIDACION_INICIO
+
     cur = conn.execute(
         """INSERT INTO cuentas (nombre, tipo, socio, moneda, saldo_inicial, fecha_apertura, orden, created_by, updated_by)
-           VALUES (%s, %s, %s, %s, %s, COALESCE(%s::date, '2026-06-01'::date), %s, %s, %s)
+           VALUES (%s, %s, %s, %s, %s, COALESCE(%s::date, %s::date), %s, %s, %s)
            RETURNING id""",
         (data["nombre"], tipo, socio_val, moneda, data["saldo_inicial"], fecha_apertura,
-         int(orden or 0), por, por),
+         LIQUIDACION_INICIO, int(orden or 0), por, por),
     )
     new_id = cur.fetchone()[0]
     return obtener_cuenta(conn, new_id)
