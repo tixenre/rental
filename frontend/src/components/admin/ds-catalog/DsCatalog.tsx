@@ -2,7 +2,7 @@
  * DsCatalog — la vitrina del Design System de Rambla (la fuente de verdad, visible).
  *
  * Manifest-driven: mapea `CATALOG_BY_LAYER` (manifest.ts). Muestra TODO lo que el DS
- * cubre, agrupado por capa funcional —fundamentos, primitivos, composites, secciones,
+ * cubre, **una pestaña por capa** funcional —fundamentos, primitivos, composites, secciones,
  * páginas, flujos— para REUSAR (no recrear) y ver de un vistazo qué hay y qué falta.
  * Read-only por ahora; es la puerta de entrada al futuro editor de temas (los tokens de
  * color de acá son los que ese editor va a poder cambiar). Se renderiza como solapa
@@ -13,30 +13,41 @@
  */
 import { Sparkles } from "lucide-react";
 
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/design-system/ui/tabs";
 import { CATALOG, CATALOG_BY_LAYER } from "./manifest";
-import { LayerHeading, SectionBlock, TocNav } from "./catalog-kit";
+import { SectionBlock, SectionNav } from "./catalog-kit";
 
 export function DsCatalog() {
   const total = CATALOG.reduce((n, s) => n + s.specimens.length, 0);
+  const firstLayer = CATALOG_BY_LAYER[0]?.layer.id;
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        {CATALOG_BY_LAYER.length} capas · {CATALOG.length} secciones · {total} piezas. La librería
-        viva — ordenada de la materia prima (tokens) al recorrido completo (flujos).
+        {CATALOG_BY_LAYER.length} capas · {CATALOG.length} secciones · {total} piezas. Una pestaña
+        por capa — de la materia prima (tokens) al recorrido completo (flujos).
       </p>
 
-      <TocNav groups={CATALOG_BY_LAYER} />
+      <Tabs defaultValue={firstLayer}>
+        <TabsList className="h-auto flex-wrap justify-start">
+          {CATALOG_BY_LAYER.map((group) => (
+            <TabsTrigger key={group.layer.id} value={group.layer.id}>
+              {group.layer.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <div className="space-y-12">
         {CATALOG_BY_LAYER.map((group) => (
-          <div key={group.layer.id} className="space-y-8">
-            <LayerHeading layer={group.layer} />
-            {group.sections.map((section) => (
-              <SectionBlock key={section.id} section={section} />
-            ))}
-          </div>
+          <TabsContent key={group.layer.id} value={group.layer.id} className="space-y-6">
+            <p className="max-w-2xl text-sm text-muted-foreground">{group.layer.blurb}</p>
+            {group.sections.length > 1 && <SectionNav sections={group.sections} />}
+            <div className="space-y-8">
+              {group.sections.map((section) => (
+                <SectionBlock key={section.id} section={section} />
+              ))}
+            </div>
+          </TabsContent>
         ))}
-      </div>
+      </Tabs>
 
       <p className="flex items-center gap-2 border-t border-hairline pt-4 text-xs text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5 shrink-0" />
