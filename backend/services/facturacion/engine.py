@@ -16,13 +16,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-import os
-from datetime import date
-from decimal import Decimal
 from typing import Optional
 
 from database import get_db, now_ar
-from routes.auth import require_admin
 
 from arca_fe import (
     CaeResult,

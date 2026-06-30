@@ -49,7 +49,7 @@ function FacturasPage() {
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
       <header>
-        <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+        <div className="font-mono text-2xs uppercase tracking-[0.25em] text-muted-foreground">
           Back-office · Facturación ARCA
         </div>
         <h1 className="font-display text-3xl text-ink">Facturas electrónicas</h1>
@@ -64,16 +64,23 @@ function FacturasPage() {
           label="Emisor"
           value={emisor}
           onChange={setEmisor}
-          options={[["", "Todos"], ...EMISORES.map((e) => [e, e[0].toUpperCase() + e.slice(1)] as [string, string])]}
+          options={[
+            ["", "Todos"],
+            ...EMISORES.map((e) => [e, e[0].toUpperCase() + e.slice(1)] as [string, string]),
+          ]}
         />
         <Segment
           label="Estado"
           value={estado}
           onChange={setEstado}
-          options={[["", "Todos"], ...ESTADOS_FACTURA.map((s) => [s, s[0].toUpperCase() + s.slice(1)] as [string, string])]}
+          options={[
+            ["", "Todos"],
+            ...ESTADOS_FACTURA.map((s) => [s, s[0].toUpperCase() + s.slice(1)] as [string, string]),
+          ]}
         />
         <div className="space-y-1">
           <FieldLabel>Desde</FieldLabel>
+          {/* eslint-disable-next-line no-restricted-syntax -- type="date" nativo, Input DS no soporta este tipo */}
           <input
             type="date"
             value={desde}
@@ -83,6 +90,7 @@ function FacturasPage() {
         </div>
         <div className="space-y-1">
           <FieldLabel>Hasta</FieldLabel>
+          {/* eslint-disable-next-line no-restricted-syntax -- type="date" nativo, Input DS no soporta este tipo */}
           <input
             type="date"
             value={hasta}
@@ -108,7 +116,7 @@ function FacturasPage() {
 
       {/* Total */}
       <div className="flex items-baseline gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        <span className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
           Total facturado {q.data ? `(${count})` : ""}
         </span>
         <span className="font-mono text-xl font-semibold tabular-nums text-ink">
@@ -126,25 +134,26 @@ function FacturasPage() {
       {/* Tabla */}
       {facturas.length > 0 && (
         <div className="overflow-x-auto rounded-xl border hairline">
+          {/* eslint-disable-next-line no-restricted-syntax -- tabla de solo lectura con rendering complejo por celda */}
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b hairline bg-surface-elevated text-left">
-                <th className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                <th className="px-4 py-2.5 font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
                   Fecha
                 </th>
-                <th className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                <th className="px-4 py-2.5 font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
                   Comprobante
                 </th>
-                <th className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                <th className="px-4 py-2.5 font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
                   Pedido
                 </th>
-                <th className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                <th className="px-4 py-2.5 font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
                   Receptor
                 </th>
-                <th className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground text-right">
+                <th className="px-4 py-2.5 font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground text-right">
                   Total
                 </th>
-                <th className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                <th className="px-4 py-2.5 font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
                   Estado
                 </th>
               </tr>
@@ -186,6 +195,7 @@ function FacturasPage() {
                       <div className="flex items-center gap-1.5">
                         <FacturaBadge estado={f.estado} />
                         {f.ambiente === "homologacion" && (
+                          // eslint-disable-next-line no-restricted-syntax -- text-[9px]: menor que text-2xs, sin equiv DS; amber: paleta categórica homologación (Tier 3)
                           <span className="font-mono text-[9px] text-amber-600 border border-amber-400/50 rounded px-1">
                             TEST
                           </span>
@@ -201,8 +211,10 @@ function FacturasPage() {
       )}
 
       {!q.isLoading && facturas.length === 0 && (
-        <div className="text-sm text-muted-foreground py-8 text-center">
-          {hasFiltros ? "Sin facturas para los filtros seleccionados." : "Todavía no hay facturas emitidas."}
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          {hasFiltros
+            ? "Sin facturas para los filtros seleccionados."
+            : "Todavía no hay facturas emitidas."}
         </div>
       )}
     </div>
@@ -213,7 +225,7 @@ function FacturasPage() {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+    <div className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
       {children}
     </div>
   );

@@ -21,8 +21,6 @@ from arca_fe import (
     Receptor,
     CbteAsoc,
 )
-from services.facturacion.emisores import emisor_para
-
 
 # Condición IVA por perfil_impuestos del receptor (fuente única)
 _PERFIL_A_COND_IVA: dict[str, CondicionIva] = {

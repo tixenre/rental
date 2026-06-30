@@ -10,11 +10,6 @@ FOR UPDATE de Postgres es suficiente para serializar.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from database import PGCursor  # solo para type hints, no runtime dep
-
 
 # Renovar TA si le quedan menos de N minutos de vida
 _MARGEN_MINUTOS = 30

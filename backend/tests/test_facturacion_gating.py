@@ -8,7 +8,6 @@ Verifica el invariante central del sistema de facturación:
 - Emisores_para: RI → pablo, cualquier otro → santini.
 """
 
-import os
 import pytest
 
 pytestmark = pytest.mark.unit

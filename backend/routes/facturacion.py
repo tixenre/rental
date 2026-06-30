@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 
 from database import get_db
-from routes.auth import require_admin
+from auth.guards import require_admin
 
 router = APIRouter()
 

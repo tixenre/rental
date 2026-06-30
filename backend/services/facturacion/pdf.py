@@ -12,7 +12,6 @@ from __future__ import annotations
 import html as _html
 import os
 from datetime import date
-from typing import Optional
 
 # ---------------------------------------------------------------------------
 # Datos de los emisores (env o defaults razonables para homologación)

@@ -130,10 +130,13 @@ function EmisorCard({
 }) {
   const qc = useQueryClient();
   const toggle = useMutation({
-    mutationFn: () =>
-      emisor.activo
-        ? facturacionApi.desactivarEmisor(emisor.id)
-        : facturacionApi.updateEmisor(emisor.id, { activo: true }),
+    mutationFn: async () => {
+      if (emisor.activo) {
+        await facturacionApi.desactivarEmisor(emisor.id);
+      } else {
+        await facturacionApi.updateEmisor(emisor.id, { activo: true });
+      }
+    },
     onSuccess: () => {
       toast.success(emisor.activo ? "Emisor desactivado" : "Emisor activado");
       qc.invalidateQueries({ queryKey: ["admin", "emisores-arca"] });

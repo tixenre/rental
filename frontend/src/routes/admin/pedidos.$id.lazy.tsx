@@ -951,11 +951,14 @@ function PedidoEditorPage() {
   );
 }
 
-
 // ── FacturacionRailSection ────────────────────────────────────────────────────
 
 const ESTADOS_FACTURABLES: PedidoEstado[] = [
-  "confirmado", "retirado", "entregado", "devuelto", "finalizado",
+  "confirmado",
+  "retirado",
+  "entregado",
+  "devuelto",
+  "finalizado",
 ];
 
 function FacturacionRailSection({
@@ -1000,12 +1003,13 @@ function FacturacionRailSection({
     principal?.estado === "emitida" && !nc;
 
   const cbteLetra = principal
-    ? { 1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C" }[principal.cbte_tipo] ?? "?"
+    ? ({ 1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C" }[principal.cbte_tipo] ?? "?")
     : null;
 
   return (
     <RailSection label="Factura ARCA">
       {q.isLoading && (
+        // eslint-disable-next-line no-restricted-syntax -- text-[11px]: entre text-2xs(10px) y text-xs(12px), sin equiv DS
         <div className="text-[11px] text-muted-foreground">Cargando…</div>
       )}
 
@@ -1014,18 +1018,21 @@ function FacturacionRailSection({
           <div className="flex items-center gap-1.5">
             <FacturaBadge estado={principal.estado} />
             {cbteLetra && (
+              // eslint-disable-next-line no-restricted-syntax -- text-[11px]: entre text-2xs y text-xs, sin equiv DS
               <span className="font-mono text-[11px] text-muted-foreground">
                 Fact. {cbteLetra}
               </span>
             )}
             {principal.ambiente === "homologacion" && (
-              <span className="font-mono text-[10px] text-amber-600 border border-amber-400/50 rounded px-1">
+              // eslint-disable-next-line no-restricted-syntax -- text-[10px] alias text-2xs; amber: paleta categórica homologación (Tier 3)
+              <span className="font-mono text-2xs text-amber-600 border border-amber-400/50 rounded px-1">
                 TEST
               </span>
             )}
           </div>
 
           {principal.cbte_nro && (
+            // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
             <div className="font-mono text-[11px] text-muted-foreground">
               {String(principal.pto_vta).padStart(5, "0")}-
               {String(principal.cbte_nro).padStart(8, "0")}
@@ -1033,12 +1040,12 @@ function FacturacionRailSection({
           )}
 
           {principal.cae && (
-            <div className="font-mono text-[11px] text-muted-foreground">
-              CAE {principal.cae}
-            </div>
+            // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
+            <div className="font-mono text-[11px] text-muted-foreground">CAE {principal.cae}</div>
           )}
 
           {principal.estado === "error" && principal.errores && (
+            // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
             <div className="text-[11px] text-destructive rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5">
               {Array.isArray(principal.errores)
                 ? principal.errores.join(" / ")
@@ -1051,6 +1058,7 @@ function FacturacionRailSection({
               href={`/api/facturas/${principal.id}/pdf`}
               target="_blank"
               rel="noreferrer"
+              // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
               className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
             >
               <Download className="h-3 w-3" /> Descargar PDF
@@ -1058,9 +1066,10 @@ function FacturacionRailSection({
           )}
 
           {nc && (
-            <div className="flex items-center gap-1.5 mt-1">
+            <div className="mt-1 flex items-center gap-1.5">
               <FacturaBadge estado={nc.estado} />
-              <span className="font-mono text-[10px] text-muted-foreground">NC emitida</span>
+              {/* eslint-disable-next-line no-restricted-syntax -- text-[10px] alias text-2xs */}
+              <span className="font-mono text-2xs text-muted-foreground">NC emitida</span>
             </div>
           )}
 

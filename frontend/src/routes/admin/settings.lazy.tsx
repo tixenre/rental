@@ -92,7 +92,11 @@ function SettingsPage() {
           <EmailsAdmin />
         </AdminSection>
 
-        <AdminSection title="Facturación ARCA" storageKey="settings:facturacion" defaultOpen={false}>
+        <AdminSection
+          title="Facturación ARCA"
+          storageKey="settings:facturacion"
+          defaultOpen={false}
+        >
           <FacturacionSection />
         </AdminSection>
       </div>
