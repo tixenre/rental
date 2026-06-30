@@ -126,17 +126,23 @@ def login(
     import httpx  # lazy: solo se necesita al llamar al endpoint WSAA real
 
     url = _wsaa_url(endpoint)
-    resp = httpx.post(
-        url,
-        content=soap_body.encode("utf-8"),
-        headers={
-            "Content-Type": "text/xml; charset=utf-8",
-            "SOAPAction": "loginCms",
-        },
-        timeout=timeout,
-        verify=True,
-    )
-    resp.raise_for_status()
+    try:
+        resp = httpx.post(
+            url,
+            content=soap_body.encode("utf-8"),
+            headers={
+                "Content-Type": "text/xml; charset=utf-8",
+                "SOAPAction": "loginCms",
+            },
+            timeout=timeout,
+            verify=True,
+        )
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        cuerpo = exc.response.text[:800] if exc.response.text else "(sin cuerpo)"
+        raise RuntimeError(
+            f"WSAA devolvió {exc.response.status_code} para {url}:\n{cuerpo}"
+        ) from exc
     return _parsear_login_response(resp.text)
 
 
