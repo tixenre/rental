@@ -1798,3 +1798,34 @@ cancel-in-progress` ya cancela corridas viejas.
   deja `stepup`, admin no) + `test_checkout_portero::faltan_firma_tyc`. En el retro salió como caso testigo un flake de
   timezone (`test_check_fechas_pasada_cliente` usaba `date.today()` UTC vs `now_ar()` del código) → buzón de
   `calidad-tests`. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §3; historia → #1131 (on-the-fly + gate), #1132 (handoff).
+
+### 2026-06-30 — `staging-verify`: fakear la verificación Didit en dev SIN tocar `dni_validado_at` a mano
+
+- **Contexto.** El dueño quiso **probar el checkout y el passkey end-to-end en dev**, pero su cuenta no estaba
+  verificada y **Didit no corre en dev/staging** (la API de KYC no está cableada ahí). Sin verificación, el portero
+  del checkout (`_check_identidad` → `cliente_verificado` → `dni_validado_at`) bloquea para siempre y no se puede
+  llegar al pago. Pidió explícitamente "fakear la autorización, es para chequear y validar, estamos en dev".
+- **Decisión.** Endpoint dev-only **`POST /auth/staging-verify`** (`auth/staging.py`), gemelo de `staging-login`:
+  **misma doble llave** (`is_production` falla-a-prod + secreto `STAGING_LOGIN_SECRET`) → **404 en prod**, secreto en
+  tiempo constante, rate-limit por IP. Marca una cuenta como verificada **reusando la pluma única `identity.kyc`**
+  (`aprobar` / `actualizar_estado`): setea un `didit_session_id` fresco (único por llamada → sin colisión de
+  idempotencia en `kyc_events`) y delega — **nunca un UPDATE manual de `dni_validado_at`/`*_renaper`**. Body:
+  `{secret, cliente_id?, estado?, email?}`; `estado` ∈ approved(default)/rejected/en_revision (los 3 caminos del
+  KYC); siembra un contacto verificado para cuentas livianas (que el portero exige email); CUIL fake válido (mod-11)
+  único por id (no colisiona con el índice único). **No mintea sesión** (se combina con `staging-login
+  target=cliente`).
+- **Why.** "Una sola forma + reusar no recrear": un UPDATE a mano de `dni_validado_at` duplicaría la escritura de
+  identidad que el supervisor marca como prohibida fuera de `identity/kyc` (la pluma única). Reusar `aprobar` hace
+  que el fake recorra **exactamente** el mismo camino que el webhook real (COALESCE, ancla CUIL mod-11, contactos,
+  evento de auditoría) → lo que se prueba en dev es lo que pasa en prod. La doble llave heredada de staging-login es
+  la red ya probada (staging tiene PII real; 404 en prod). Extiende _Staging-login (2026-06-19)_ del login al **gate
+  de identidad**; mismo patrón que _Iteración local con datos reales (2026-06-20)_.
+- **Consecuencias.** La sesión puede smoke-testear el flujo de pedido logueado+verificado en local y en staging
+  Railway sin Didit. **Verificado en vivo:** `/api/checkout/validar` pasa a `listo:true` tras fakear identidad +
+  aceptar T&C + firma "Confirmo"; el front (login → carrito → passkey) anda. Candados: `test_staging_verify.py`
+  (gate 404/401, approved/rejected, CUIL fake válido y único). En la misma sesión salieron, como cruft del clon
+  local (no del código), dos gaps de config dev que rompían el passkey en `localhost` y se arreglaron: deps
+  faltantes (`webauthn`, `@simplewebauthn/browser`) y el **default de `FRONTEND_ORIGINS`** que no incluía el puerto
+  `:3000` del `vite dev` (el origin que el navegador reporta en la assertion) → fix de 1 línea en `config.py`. El
+  supervisor marca un fake de KYC vía UPDATE a mano en vez de la puerta. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) +
+  [`DEPLOY_RAILWAY.md`](DEPLOY_RAILWAY.md).
