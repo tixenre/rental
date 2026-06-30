@@ -186,21 +186,37 @@ def _parece_base64(b: bytes) -> bool:
 
 
 def _parsear_login_response(xml_text: str) -> tuple[str, str, datetime]:
-    """Extrae (token, sign, expira_at) del XML de respuesta del WSAA."""
-    # Limpia namespace prefixes para simplificar la búsqueda
-    xml_clean = xml_text
+    """Extrae (token, sign, expira_at) del XML de respuesta del WSAA.
+
+    AFIP devuelve un SOAP envelope donde <loginCmsReturn> contiene el
+    loginTicketResponse como texto XML escapado (no como nodos hijos).
+    Hay que parsearlo en dos pasos.
+    """
     try:
-        root = ET.fromstring(xml_clean)
+        root = ET.fromstring(xml_text)
     except ET.ParseError:
         raise ValueError(f"Respuesta WSAA inválida: {xml_text[:200]}")
 
-    # Busca el nodo loginTicketResponse en cualquier namespace
-    def _find(tag: str) -> Optional[str]:
-        for el in root.iter():
+    def _iter_find(tree: ET.Element, tag: str) -> Optional[str]:
+        for el in tree.iter():
             local = el.tag.split("}")[-1] if "}" in el.tag else el.tag
             if local == tag:
                 return el.text
         return None
+
+    # loginCmsReturn contiene el loginTicketResponse como texto XML escapado
+    cms_return_text = _iter_find(root, "loginCmsReturn")
+    if cms_return_text:
+        try:
+            inner = ET.fromstring(cms_return_text.strip())
+            def _find(tag: str) -> Optional[str]:
+                return _iter_find(inner, tag)
+        except ET.ParseError:
+            def _find(tag: str) -> Optional[str]:
+                return _iter_find(root, tag)
+    else:
+        def _find(tag: str) -> Optional[str]:
+            return _iter_find(root, tag)
 
     token = _find("token")
     sign = _find("sign")
