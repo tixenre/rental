@@ -13,6 +13,8 @@ import html as _html
 import os
 from datetime import date
 
+from pdf_templates import _active_wordmark as _wordmark
+
 # ---------------------------------------------------------------------------
 # Datos de los emisores (env o defaults razonables para homologación)
 # ---------------------------------------------------------------------------
@@ -27,7 +29,7 @@ _EMISORES_DATA: dict[str, dict] = {
         "telefono": os.getenv("OWNER_TELEFONO", "223 590-9080"),
     },
     "santini": {
-        "nombre": os.getenv("AFIP_SANTINI_NOMBRE", "Javier Santini Calarco"),
+        "nombre": os.getenv("AFIP_SANTINI_NOMBRE", "Martín Javier Santini Calarco"),
         "cond_iva_label": "Monotributo",
         "tipo_cbte": "FACTURA",
         "domicilio": os.getenv("AFIP_SANTINI_DOMICILIO", "Falucho 4625, Mar del Plata"),
@@ -168,11 +170,13 @@ def factura_html(factura, pedido: dict) -> str:
     iva_display = _ars(factura.imp_iva) if mostrar_iva else ""
     total_display = _ars(factura.imp_total)
 
+    wordmark_svg = _wordmark()
+
     body = f"""
 <div class="header-top">
   <div>
-    <h1>rambla</h1>
-    <div style="font-size:10px; color:#888; margin-top:2px">ALQUILER DE EQUIPOS AUDIOVISUALES</div>
+    <div style="color:#1a1a1a">{wordmark_svg}</div>
+    <div style="font-size:10px; color:#888; margin-top:4px">ALQUILER DE EQUIPOS AUDIOVISUALES</div>
     <div style="margin-top:8px">
       <div class="label">Emisor</div>
       <div class="value">{_e(em_data['nombre'])}</div>
