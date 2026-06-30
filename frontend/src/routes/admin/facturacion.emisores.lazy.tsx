@@ -302,10 +302,7 @@ function EmisorFormModal({
             className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
           />
         </Field>
-        <Field
-          label="Razón social"
-          hint="Nombre legal que aparece en el PDF de la factura"
-        >
+        <Field label="Razón social" hint="Nombre legal que aparece en el PDF de la factura">
           {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
           <input
             type="text"
