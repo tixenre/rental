@@ -51,6 +51,7 @@ if _sentry_dsn:
     )
 
 from database import init_db, get_db, row_to_dict, FRONT, FRONT_NEW, MARCA_SUBQUERY
+from services.catalogo import proyectar_seed
 from config import SITE_URL
 from routes.equipos          import router as equipos_router
 from routes.alquileres       import router as alquileres_router
@@ -633,51 +634,9 @@ def _inject_json_ld(html_text: str, *schemas: dict) -> str:
 def _get_initial_catalog(conn) -> dict:
     """Serializa equipos visibles + categorías para el script __INITIAL__ del catálogo.
 
-    Subset de list_equipos sin filtros ni attach_*, suficiente para el primer
-    render de las cards sin round-trip. backendToEquipment tolera campos ausentes
-    (etiquetas/kit/specs → arrays vacíos o None).
+    Delegated to services.catalogo.proyectar_seed (puerta única).
     """
-    rows = conn.execute(f"""
-        SELECT
-            e.id, e.nombre, e.nombre_publico, e.modelo,
-            e.foto_url, e.foto_url_sm, e.foto_url_thumb,
-            e.foto_url_avif, e.foto_url_sm_avif, e.foto_url_thumb_avif, e.foto_lqip,
-            e.precio_jornada, e.precio_usd, e.cantidad,
-            e.estado, e.visible_catalogo, e.relevancia_manual,
-            e.popularidad_score, e.destacado, e.tipo,
-            {MARCA_SUBQUERY}
-        FROM equipos e
-        WHERE e.visible_catalogo = 1
-          AND e.estado != 'fuera_servicio'
-          AND e.eliminado_at IS NULL
-          AND e.es_recurso_interno = FALSE
-        ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC
-        LIMIT 500
-    """).fetchall()
-
-    items = []
-    for row in rows:
-        item = dict(row)
-        item.setdefault("etiquetas", [])
-        item.setdefault("kit", [])
-        items.append(item)
-
-    cats = conn.execute(
-        "SELECT id, nombre, COALESCE(total, 0) AS total, prioridad, parent_id "
-        "FROM categorias ORDER BY COALESCE(prioridad, 999), nombre"
-    ).fetchall()
-
-    estudio_fotos = conn.execute(
-        "SELECT url, url_sm, url_avif, url_sm_avif, es_principal, orden "
-        "FROM estudio_fotos WHERE estudio_id = 1 "
-        "ORDER BY es_principal DESC, orden ASC LIMIT 5"
-    ).fetchall()
-
-    return {
-        "equipos": {"total": len(items), "items": items},
-        "categorias": [dict(c) for c in cats],
-        "estudio": {"fotos": [dict(f) for f in estudio_fotos]},
-    }
+    return proyectar_seed(conn)
 
 
 def _inject_initial_data(html_text: str, data: dict) -> str:
