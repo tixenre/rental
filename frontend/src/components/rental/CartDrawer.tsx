@@ -7,6 +7,8 @@ import { type Equipment } from "@/data/equipment";
 import { useClienteSession } from "@/lib/iva";
 import { createOrder, OrderVerificationError } from "@/lib/orders";
 import { chequearEstadoCuenta, iniciarVerificacionIdentidad } from "@/lib/verificacion";
+import { stepUpWithPasskey, passkeyErrorMessage } from "@/lib/passkey";
+import { aceptarTyc, validarCheckout } from "@/lib/checkout";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion } from "@/lib/cotizacion";
 import { CartDrawerView } from "./CartDrawerView";
@@ -223,6 +225,23 @@ export function CartDrawer({
     // "logueado-verificado" → sigue al createOrder
 
     try {
+      // 1. Registrar aceptación de T&C (idempotente)
+      await aceptarTyc();
+
+      // 2. Passkey step-up: Face ID / huella = firma del pedido + aceptación de T&C
+      await stepUpWithPasskey();
+
+      // 3. Portero: verificar que todo esté en orden antes de crear
+      const { listo, faltan } = await validarCheckout(useCart.getState().sessionId);
+      if (!listo) {
+        const msg = faltan.map((f) => f.mensaje).join(" • ");
+        setSubmitError(msg);
+        toast.error("Revisá los datos antes de continuar", { description: msg, duration: 8000 });
+        setSubmitting(false);
+        return;
+      }
+
+      // 4. Crear el pedido
       const order = await createOrder({
         status: "solicitado",
         startDate,
@@ -258,7 +277,7 @@ export function CartDrawer({
         setSubmitting(false);
         return;
       }
-      const msg = err instanceof Error ? err.message : "Error al enviar el pedido";
+      const msg = passkeyErrorMessage(err);
       setSubmitError(msg);
       toast.error(msg, { duration: 6000 });
     } finally {
