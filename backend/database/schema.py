@@ -2220,6 +2220,7 @@ def _init_db_schema(conn):
             cert_enc        BYTEA,
             key_enc         BYTEA,
             activo          BOOLEAN NOT NULL DEFAULT true,
+            razon_social    TEXT,
             notas           TEXT,
             created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
