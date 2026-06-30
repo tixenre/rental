@@ -57,7 +57,7 @@ import {
 import { adminApi, type CategoriaAdmin, type SpecTemplate } from "@/lib/admin/api";
 import { TableSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { NombreTemplateBuilder } from "./NombreTemplateBuilder";
 import {
   OrphansPanel,

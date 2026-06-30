@@ -1,7 +1,7 @@
 /**
- * Tipos compartidos por los componentes del kit Rambla.
+ * Tipos compartidos por los primitivos del DS (Pill, EstadoBadge, PagoBadge…).
  *
- * Duplicados acá para que `src/components/kit/*` sean drop-in.
+ * Viven acá, junto a las piezas que los usan en `design-system/ui/`.
  * Mantenelos en sync con el repo de producción (`src/data/*`) si crecen.
  */
 

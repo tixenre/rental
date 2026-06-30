@@ -19,7 +19,7 @@ import { adminApi, type Equipo } from "@/lib/admin/api";
 import { Button } from "@/design-system/ui/button";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { cn } from "@/lib/utils";
 
 // ── Toggle ─────────────────────────────────────────────────────────────

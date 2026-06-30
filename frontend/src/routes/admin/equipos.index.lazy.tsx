@@ -19,7 +19,7 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Checkbox } from "@/design-system/ui/checkbox";
 import { cn } from "@/lib/utils";

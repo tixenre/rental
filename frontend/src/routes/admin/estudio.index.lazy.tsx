@@ -41,7 +41,7 @@ import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Spinner } from "@/design-system/ui/spinner";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -64,7 +64,7 @@ import { AdminSection } from "@/components/admin/AdminSection";
 import { useConfirm } from "@/components/admin/useConfirm";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 
 export const Route = createLazyFileRoute("/admin/estudio/")({
   component: EstudioAdminPage,

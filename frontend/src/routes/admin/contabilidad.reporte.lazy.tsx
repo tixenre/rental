@@ -16,7 +16,7 @@ import { AdminPage } from "@/components/admin/AdminPage";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { TableSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { adminApi, type CuentaSaldo } from "@/lib/admin/api";
 import { Input } from "@/design-system/ui/input";
 import { formatARS } from "@/lib/format";

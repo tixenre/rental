@@ -16,7 +16,7 @@ import { type CatalogSection } from "../types";
 import { Caption } from "../catalog-kit";
 import { Button } from "@/design-system/ui/button";
 import { AdminPage } from "@/components/admin/AdminPage";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 
 type Archetype = {
   name: string;
@@ -213,7 +213,7 @@ export const pagesSection: CatalogSection = {
     },
     {
       name: "EmptyState con CTA",
-      files: ["components/rental/EmptyState.tsx"],
+      files: ["design-system/composites/EmptyState.tsx"],
       blurb:
         "El patrón de vacío con acción: no dejar al usuario en un callejón — siempre un próximo paso.",
       render: () => (

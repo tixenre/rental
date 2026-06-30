@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
-import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
+import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { adminApi, type GrupoDuplicado } from "@/lib/admin/api";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { formatFechaDisplay } from "@/lib/format";

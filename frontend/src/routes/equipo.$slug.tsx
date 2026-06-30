@@ -28,7 +28,7 @@ import { EmptyImage } from "@/components/rental/EmptyImage";
 import { KitSection, BoxItemsSection } from "@/components/rental/KitSection";
 import { KeywordChips } from "@/components/rental/KeywordChips";
 import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import { SpecsGrid } from "@/components/rental/equipment/shared/SpecsGrid";
 import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { Lightbox } from "@/components/rental/Lightbox";

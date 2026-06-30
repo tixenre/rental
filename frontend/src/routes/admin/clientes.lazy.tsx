@@ -40,11 +40,11 @@ import {
 } from "@/design-system/ui/alert-dialog";
 
 import { adminApi, ESTADO_LABEL, type Cliente } from "@/lib/admin/api";
-import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
+import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { QueryState } from "@/components/admin/QueryState";
 import { TableSkeleton } from "@/components/admin/skeletons";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { ClientesDuplicadosDialog } from "@/components/admin/ClientesDuplicadosDialog";
 import { InvitarClienteDialog } from "@/components/admin/InvitarClienteDialog";

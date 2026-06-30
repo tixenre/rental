@@ -9,9 +9,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { clienteApi } from "@/lib/cliente/api";
-import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
-import { PagoBadge } from "@/design-system/kit/PagoBadge";
-import { Pill } from "@/design-system/kit/Pill";
+import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
+import { PagoBadge } from "@/design-system/ui/PagoBadge";
+import { Pill } from "@/design-system/ui/Pill";
 import {
   ArrowRight,
   ChevronDown,

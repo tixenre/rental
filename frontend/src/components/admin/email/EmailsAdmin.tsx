@@ -17,11 +17,11 @@ import { Send, Eye, Pencil, CheckCircle2, AlertTriangle, RefreshCw, Mail } from 
 import { Spinner } from "@/design-system/ui/spinner";
 
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { ListSkeleton, TableSkeleton } from "@/components/admin/skeletons";
 import { Button } from "@/design-system/ui/button";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import { ModalBackdrop } from "@/design-system/ui/modal-backdrop";
 import { Input } from "@/design-system/ui/input";
 import { Textarea } from "@/design-system/ui/textarea";

@@ -490,7 +490,7 @@
   y propone issues. **`pulido-frontend`** aplica los fixes en pantalla. Cuadro de roles: `design-system`
   gobierna · `pulido-frontend` ejecuta UI · `mantenimiento` ejecuta código.
 - **Cómo aplica / quién hace cumplir:** un token/utility se edita en `src/design-system/styles/`,
-  una pieza de DS en `src/design-system/{ui,kit}` o de negocio en `src/components/{rental,admin}`;
+  una pieza de DS en `src/design-system/{ui,composites}` o de negocio en `src/components/{rental,admin}`;
   **no se recrea un paquete workspace** ni se duplica una pieza que ya existe. El
   supervisor marca un skill en disco que no esté listado en `CLAUDE.md`; `check-docs.mjs` lo caza.
   Los trackers de migración por pantalla (#612) siguen vigentes sobre `src/`.
@@ -828,14 +828,14 @@ cancel-in-progress` ya cancela corridas viejas.
   **deriva** del backend); (3) un foco por pantalla; (4) **una sola forma de hacer cada cosa** (sin tres
   controles para una acción ni botones duplicados); (5) lo más usado, a mano; (6) reconocimiento >
   lectura (avatares, pills, selección obvia); (7) densidad útil sin aire muerto; (8) decí lo que hace
-  (copy/labels/empty states, voz "vos"); (9) **reusar no recrear** (la forma del pill vive en `kit/Pill`;
+  (copy/labels/empty states, voz "vos"); (9) **reusar no recrear** (la forma del pill vive en `ui/Pill`;
   `EstadoBadge`/`PagoBadge` derivan; cero clases copiadas a mano); (10) mobile/a11y no son extra (HIG,
   ≥44px, foco visible); (11) el core es sagrado, el diseño es presentación.
 - **Why.** Sin el _por qué_ escrito, cada pantalla re-discute el mismo criterio y el front deriva. La
   esencia documentada + enforceable es lo que hace que el rollout a toda la web sea consistente y no una
   colección de one-offs.
-- **Consecuencias.** Materializado en código: `kit/Pill` (forma + tonos semánticos única), `kit/PagoBadge`
-  (estado de pago con monto), `kit/ClienteAvatar` (avatar determinístico). El **contraste de los tints de
+- **Consecuencias.** Materializado en código: `ui/Pill` (forma + tonos semánticos única), `ui/PagoBadge`
+  (estado de pago con monto), `ui/ClienteAvatar` (avatar determinístico). El **contraste de los tints de
   `EstadoBadge`** queda como decisión visual aparte (pendiente, afecta también el portal del cliente).
   Refina —no reemplaza— _Apple HIG (2026-06-05)_ y es la contraparte visual de la _Barra de calidad de
   ingeniería (2026-05-25)_: les da el marco de diseño unificado.
@@ -1032,7 +1032,7 @@ cancel-in-progress` ya cancela corridas viejas.
 
 ### 2026-06-23 — design-system = gobernador del DS; importar-diseno archivado
 
-- **Contexto.** El DS de Rambla tiene estructura sólida (tokens OKLCH modulares, 4 piezas `kit/` con
+- **Contexto.** El DS de Rambla tiene estructura sólida (tokens OKLCH modulares, primitivos en `ui/` con
   fuente única, guardrails ESLint) pero **adopción incompleta** que acumula drift en cada PR: ~19 CTAs
   crudos, ~52 `text-[Nrem]` escapados, ~7 pills manuales, tokens de motion sin adoptar (~0%), N1/N8
   (contrastes WCAG bajo AA). No existía un skill que auditara el DS sistémicamente — `pulido-frontend`

@@ -4,14 +4,14 @@
  */
 import { type CatalogSection } from "../types";
 import { Caption, Row, Sample } from "../catalog-kit";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import { CountBadge } from "@/design-system/ui/count-badge";
-import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
-import { PagoBadge } from "@/design-system/kit/PagoBadge";
-import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
+import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
+import { PagoBadge } from "@/design-system/ui/PagoBadge";
+import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { TipoMovimientoBadge } from "@/components/admin/badges";
 import { Badge } from "@/design-system/ui/badge";
-import type { EstadoPedido } from "@/design-system/kit/types";
+import type { EstadoPedido } from "@/design-system/ui/types";
 
 const ESTADOS: EstadoPedido[] = [
   "borrador",
@@ -28,11 +28,11 @@ const ESTADOS: EstadoPedido[] = [
 export const badgesSection: CatalogSection = {
   id: "badges",
   title: "Badges, Pills & Avatares",
-  hint: "Para chips de estado — nunca <span> a mano. La forma del pill vive una vez en kit/Pill.",
+  hint: "Para chips de estado — nunca <span> a mano. La forma del pill vive una vez en ui/Pill.",
   specimens: [
     {
       name: "Pill",
-      files: ["design-system/kit/Pill.tsx"],
+      files: ["design-system/ui/Pill.tsx"],
       blurb:
         "Forma única del chip: 5 tonos semánticos (ink-on-tint). Todo badge nuevo deriva de acá.",
       render: () => (
@@ -61,7 +61,7 @@ export const badgesSection: CatalogSection = {
     },
     {
       name: "EstadoBadge",
-      files: ["design-system/kit/EstadoBadge.tsx", "design-system/kit/types.ts"],
+      files: ["design-system/ui/EstadoBadge.tsx", "design-system/ui/types.ts"],
       blurb: "Estado del pedido → color de marca. Fuente única (admin + portal). Los 9 estados:",
       render: () => (
         <Row>
@@ -73,7 +73,7 @@ export const badgesSection: CatalogSection = {
     },
     {
       name: "PagoBadge",
-      files: ["design-system/kit/PagoBadge.tsx"],
+      files: ["design-system/ui/PagoBadge.tsx"],
       blurb:
         "Estado de cobranza con el monto. Devuelve null cuando no hay nada útil (cotización sin seña).",
       render: () => (
@@ -128,7 +128,7 @@ export const badgesSection: CatalogSection = {
     },
     {
       name: "ClienteAvatar",
-      files: ["design-system/kit/ClienteAvatar.tsx"],
+      files: ["design-system/ui/ClienteAvatar.tsx"],
       blurb:
         "Foto (opcional) o iniciales con color determinístico por hash del nombre. Mismo nombre → mismo color. Reconocimiento rápido en listas.",
       render: () => (

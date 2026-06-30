@@ -13,7 +13,7 @@ import { type DateRange } from "react-day-picker";
 
 import { type CatalogSection } from "../types";
 import { Caption, Row, Sample, Stack } from "../catalog-kit";
-import { Field } from "@/design-system/kit/Field";
+import { Field } from "@/design-system/ui/Field";
 import { Label } from "@/design-system/ui/label";
 import { Input } from "@/design-system/ui/input";
 import { Textarea } from "@/design-system/ui/textarea";
@@ -136,7 +136,7 @@ export const formsSection: CatalogSection = {
   specimens: [
     {
       name: "Field",
-      files: ["design-system/kit/Field.tsx"],
+      files: ["design-system/ui/Field.tsx"],
       blurb:
         "Molécula label+control+hint/error. Una sola forma del campo en forms controlados — el error tiene prioridad sobre el hint.",
       render: () => (

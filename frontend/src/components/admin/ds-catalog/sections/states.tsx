@@ -8,7 +8,7 @@ import { type CatalogSection } from "../types";
 import { Caption } from "../catalog-kit";
 import { Skeleton } from "@/design-system/ui/skeleton";
 import { TableSkeleton, ListSkeleton, CardGridSkeleton } from "@/components/admin/skeletons";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { QueryState } from "@/components/admin/QueryState";
 
@@ -71,7 +71,7 @@ export const statesSection: CatalogSection = {
     },
     {
       name: "EmptyState · ErrorState",
-      files: ["components/rental/EmptyState.tsx", "components/admin/ErrorState.tsx"],
+      files: ["design-system/composites/EmptyState.tsx", "components/admin/ErrorState.tsx"],
       blurb:
         "Vacío (amber) y error (destructive, loguea el técnico a consola, muestra copy genérico).",
       render: () => (
