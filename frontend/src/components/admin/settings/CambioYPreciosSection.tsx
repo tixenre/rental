@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -159,7 +159,7 @@ export function CambioYPreciosSection() {
             >
               {dryRunMut.isPending ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  <Spinner size="xs" className="mr-1.5" />
                   Calculando…
                 </>
               ) : (

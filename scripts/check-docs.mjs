@@ -228,7 +228,7 @@ if (existsSync(SKILLS_DIR)) {
 }
 
 // ── Bloque 6: COBERTURA de la vitrina del DS (anti-drift del catálogo) ─────────────────────────
-//   Todo componente en `componentDirs` (design-system/ui + kit) debe estar demostrado en la vitrina:
+//   Todo componente en `componentDirs` (design-system/ui + composites) debe estar demostrado en la vitrina:
 //   su path (relativo a srcRoot) aparece en algún `Specimen.files` del catálogo. El manifiesto del
 //   catálogo ES el registro (mismo patrón que skills↔CLAUDE.md). Un componente sin vitrina → error.
 //   Solo corre si la config define `dsCatalog` y el dir existe (portable: otros repos no lo tienen).

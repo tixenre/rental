@@ -10,7 +10,7 @@ import type { ServerError } from "@/lib/admin/api/errores";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { QueryState } from "@/components/admin/QueryState";
 import { ListSkeleton } from "@/components/admin/skeletons";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 
 export const Route = createLazyFileRoute("/admin/errores")({
   component: ErroresPage,

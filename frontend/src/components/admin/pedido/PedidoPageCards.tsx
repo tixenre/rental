@@ -11,19 +11,19 @@ import {
   Minus,
   AlertTriangle,
   Check,
-  Loader2,
   Eye,
   Download,
   ShoppingCart,
   Mail,
 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Badge } from "@/design-system/ui/badge";
-import { Pill } from "@/design-system/kit/Pill";
+import { Pill } from "@/design-system/ui/Pill";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -462,12 +462,7 @@ export function PagosSidebar({
               }}
               disabled={addMut.isPending}
             >
-              {addMut.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Check className="h-3.5 w-3.5" />
-              )}{" "}
-              Guardar
+              {addMut.isPending ? <Spinner size="xs" /> : <Check className="h-3.5 w-3.5" />} Guardar
             </Button>
             <Button size="sm" variant="outline" onClick={() => setShowForm(false)}>
               Cancelar

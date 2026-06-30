@@ -11,7 +11,8 @@
  */
 
 import { useState } from "react";
-import { Loader2, Upload, X, Plus } from "lucide-react";
+import { Upload, X, Plus } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -234,7 +235,7 @@ export function ComboBuilderDialog({
               <Button onClick={() => void crearCombo()} disabled={saving || uploading}>
                 {saving || uploading ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Creando…
+                    <Spinner size="sm" className="mr-1.5" /> Creando…
                   </>
                 ) : (
                   <>

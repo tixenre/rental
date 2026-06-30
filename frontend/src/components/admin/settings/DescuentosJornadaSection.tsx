@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -90,7 +91,7 @@ export function DescuentosJornadaSection() {
 
       {/* Tabla de puntos */}
       {isLoading ? (
-        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+        <Spinner size="sm" className="text-muted-foreground" />
       ) : sorted.length === 0 ? (
         <p className="text-sm text-muted-foreground italic">
           Sin descuentos configurados. Todos los alquileres aplican 0%.
@@ -131,11 +132,7 @@ export function DescuentosJornadaSection() {
           onClick={() => crear.mutate()}
           disabled={!dias || !pct || crear.isPending}
         >
-          {crear.isPending ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Plus className="w-3.5 h-3.5" />
-          )}
+          {crear.isPending ? <Spinner size="xs" /> : <Plus className="w-3.5 h-3.5" />}
           Agregar
         </Button>
       </div>

@@ -23,7 +23,7 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { Badge } from "@/design-system/ui/badge";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
-import { Pill, type PillTone } from "@/design-system/kit/Pill";
+import { Pill, type PillTone } from "@/design-system/ui/Pill";
 import { cn } from "@/lib/utils";
 
 // El socio se crea desde el sistema (seed); acá solo cajas/cuentas genéricas.

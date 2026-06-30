@@ -32,7 +32,7 @@ export default {
   dsCatalog: {
     catalogDir: "frontend/src/components/admin/ds-catalog",
     srcRoot: "frontend/src",
-    componentDirs: ["frontend/src/design-system/ui", "frontend/src/design-system/kit"],
+    componentDirs: ["frontend/src/design-system/ui", "frontend/src/design-system/composites"],
     // Exenciones: componentes que NO van a la vitrina. Cada uno con comentario
     // ⏰ del porqué (mismo criterio de coexistencia temporal del resto del repo).
     exempt: [],

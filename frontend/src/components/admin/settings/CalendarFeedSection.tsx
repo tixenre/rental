@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -74,7 +74,7 @@ export function CalendarFeedSection() {
         <div className="text-2xs uppercase tracking-wide text-muted-foreground">URL del feed</div>
         {feedQ.isLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+            <Spinner size="sm" /> Cargando…
           </div>
         ) : feedQ.isError ? (
           <p className="text-sm text-destructive">

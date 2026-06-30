@@ -16,7 +16,6 @@ import {
   FileArchive,
   FileJson,
   FileSpreadsheet,
-  Loader2,
   Package,
   Settings,
   Trash2,
@@ -38,6 +37,7 @@ import {
 } from "@/design-system/ui/alert-dialog";
 import { AdminPage } from "@/components/admin/AdminPage";
 import { Button } from "@/design-system/ui/button";
+import { Spinner } from "@/design-system/ui/spinner";
 import { Input } from "@/design-system/ui/input";
 import { authedFetch } from "@/lib/authedFetch";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -284,11 +284,7 @@ function DataIoPage() {
                   }}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  {resetBusy ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-4" />
-                  )}
+                  {resetBusy ? <Spinner size="sm" /> : <Trash2 className="size-4" />}
                   Borrar definitivamente
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -319,7 +315,7 @@ function DataIoPage() {
                 disabled={busy !== null}
               >
                 {busy === "catalog-all" ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Spinner size="sm" />
                 ) : (
                   <FileArchive className="size-4" />
                 )}
@@ -332,7 +328,7 @@ function DataIoPage() {
                 disabled={busy !== null}
               >
                 {busy === "csv-all" ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Spinner size="sm" />
                 ) : (
                   <FileSpreadsheet className="size-4" />
                 )}
@@ -344,11 +340,7 @@ function DataIoPage() {
                 onClick={() => handleDownload("full", "Backup completo", "backup-full.zip")}
                 disabled={busy !== null}
               >
-                {busy === "full" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Database className="size-4" />
-                )}
+                {busy === "full" ? <Spinner size="sm" /> : <Database className="size-4" />}
                 Todo en un ZIP
               </Button>
             </div>
@@ -367,11 +359,7 @@ function DataIoPage() {
                     disabled={busy !== null}
                     className="shrink-0"
                   >
-                    {busy === e.key ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Download className="size-4" />
-                    )}
+                    {busy === e.key ? <Spinner size="sm" /> : <Download className="size-4" />}
                     JSON
                   </Button>
                 </div>
@@ -441,11 +429,7 @@ function GroupCard({
           onClick={() => onDownload(backupEntity, label, `backup-${scope}.zip`)}
           disabled={busy !== null || importing}
         >
-          {downloading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Download className="size-4" />
-          )}
+          {downloading ? <Spinner size="sm" /> : <Download className="size-4" />}
           Descargar backup
         </Button>
         <Button
@@ -458,7 +442,7 @@ function GroupCard({
           }}
           disabled={importing}
         >
-          {importing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {importing ? <Spinner size="sm" /> : <Upload className="size-4" />}
           Restaurar (simular)
         </Button>
         <Button
@@ -471,7 +455,7 @@ function GroupCard({
           }}
           disabled={importing}
         >
-          {importing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {importing ? <Spinner size="sm" /> : <Upload className="size-4" />}
           Restaurar (aplicar)
         </Button>
       </div>

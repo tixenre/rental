@@ -32,6 +32,7 @@ import { Route as ClienteRegistroRouteImport } from './routes/cliente.registro'
 import { Route as ClientePortalRouteImport } from './routes/cliente.portal'
 import { Route as ClientePerfilRouteImport } from './routes/cliente.perfil'
 import { Route as ClienteLoginRouteImport } from './routes/cliente.login'
+import { Route as ClienteClaimRouteImport } from './routes/cliente.claim'
 import { Route as CategoriaSlugRouteImport } from './routes/categoria.$slug'
 import { Route as CTokenRouteImport } from './routes/c.$token'
 import { Route as AdminTalleresRouteImport } from './routes/admin/talleres'
@@ -307,6 +308,11 @@ const ClienteLoginRoute = ClienteLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => ClienteRoute,
 } as any)
+const ClienteClaimRoute = ClienteClaimRouteImport.update({
+  id: '/claim',
+  path: '/claim',
+  getParentRoute: () => ClienteRoute,
+} as any)
 const CategoriaSlugRoute = CategoriaSlugRouteImport.update({
   id: '/categoria/$slug',
   path: '/categoria/$slug',
@@ -517,6 +523,7 @@ export interface FileRoutesByFullPath {
   '/admin/talleres': typeof AdminTalleresRouteWithChildren
   '/c/$token': typeof CTokenRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
+  '/cliente/claim': typeof ClienteClaimRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
@@ -576,6 +583,7 @@ export interface FileRoutesByTo {
   '/admin/novedades': typeof AdminNovedadesRoute
   '/c/$token': typeof CTokenRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
+  '/cliente/claim': typeof ClienteClaimRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
@@ -643,6 +651,7 @@ export interface FileRoutesById {
   '/admin/talleres': typeof AdminTalleresRouteWithChildren
   '/c/$token': typeof CTokenRoute
   '/categoria/$slug': typeof CategoriaSlugRoute
+  '/cliente/claim': typeof ClienteClaimRoute
   '/cliente/login': typeof ClienteLoginRoute
   '/cliente/perfil': typeof ClientePerfilRoute
   '/cliente/portal': typeof ClientePortalRoute
@@ -711,6 +720,7 @@ export interface FileRouteTypes {
     | '/admin/talleres'
     | '/c/$token'
     | '/categoria/$slug'
+    | '/cliente/claim'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
@@ -770,6 +780,7 @@ export interface FileRouteTypes {
     | '/admin/novedades'
     | '/c/$token'
     | '/categoria/$slug'
+    | '/cliente/claim'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
@@ -836,6 +847,7 @@ export interface FileRouteTypes {
     | '/admin/talleres'
     | '/c/$token'
     | '/categoria/$slug'
+    | '/cliente/claim'
     | '/cliente/login'
     | '/cliente/perfil'
     | '/cliente/portal'
@@ -1155,6 +1167,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClienteLoginRouteImport
       parentRoute: typeof ClienteRoute
     }
+    '/cliente/claim': {
+      id: '/cliente/claim'
+      path: '/claim'
+      fullPath: '/cliente/claim'
+      preLoaderRoute: typeof ClienteClaimRouteImport
+      parentRoute: typeof ClienteRoute
+    }
     '/categoria/$slug': {
       id: '/categoria/$slug'
       path: '/categoria/$slug'
@@ -1471,6 +1490,7 @@ const AdminRouteChildren: AdminRouteChildren = {
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface ClienteRouteChildren {
+  ClienteClaimRoute: typeof ClienteClaimRoute
   ClienteLoginRoute: typeof ClienteLoginRoute
   ClientePerfilRoute: typeof ClientePerfilRoute
   ClientePortalRoute: typeof ClientePortalRoute
@@ -1480,6 +1500,7 @@ interface ClienteRouteChildren {
 }
 
 const ClienteRouteChildren: ClienteRouteChildren = {
+  ClienteClaimRoute: ClienteClaimRoute,
   ClienteLoginRoute: ClienteLoginRoute,
   ClientePerfilRoute: ClientePerfilRoute,
   ClientePortalRoute: ClientePortalRoute,

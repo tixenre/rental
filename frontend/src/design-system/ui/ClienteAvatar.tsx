@@ -1,13 +1,15 @@
 /**
- * ClienteAvatar — círculo con iniciales y color determinístico por nombre.
+ * ClienteAvatar — círculo con foto o iniciales y color determinístico por nombre.
  *
  * Da reconocimiento visual rápido de una persona/cliente en listas y headers
- * (idea tomada de Booqable). El color sale de un hash del nombre sobre una
- * paleta acotada del DS (tokens de marca/secundarios, todos con buen
- * contraste), así un mismo nombre siempre cae en el mismo color. Tamaño y typo
- * se controlan por `className`. Reusable en cualquier superficie (admin/portal).
+ * (idea tomada de Booqable). Si se pasa `src`, muestra la imagen; si no carga
+ * (o no se pasa), cae a iniciales con color determinístico por hash del nombre.
+ * El color sale de una paleta acotada del DS (tokens de marca/secundarios, todos
+ * con buen contraste), así un mismo nombre siempre cae en el mismo color.
+ * Tamaño y typo se controlan por `className`. Reusable en cualquier superficie.
  */
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 // Paleta categórica (tier-3): tokens del DS con texto de alto contraste.
@@ -34,23 +36,37 @@ function iniciales(nombre: string): string {
 
 export function ClienteAvatar({
   nombre,
+  src,
   className,
 }: {
   nombre?: string | null;
+  src?: string | null;
   className?: string;
 }) {
+  const [imgError, setImgError] = useState(false);
   const safe = (nombre ?? "").trim() || "?";
   const color = AVATAR_COLORS[hashIndex(safe, AVATAR_COLORS.length)];
+  const showImg = !!src && !imgError;
+
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-medium leading-none",
-        color,
+        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-medium leading-none",
+        !showImg && color,
         className,
       )}
       aria-hidden
     >
-      {iniciales(safe)}
+      {showImg ? (
+        <img
+          src={src}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        iniciales(safe)
+      )}
     </div>
   );
 }

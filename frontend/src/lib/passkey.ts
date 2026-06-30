@@ -100,6 +100,44 @@ export async function stepUpWithPasskey(): Promise<void> {
   await authedPostJson("/cliente/auth/passkey/stepup/complete", { credential });
 }
 
+export type ResultadoFirma = "passkey" | "sin-soporte" | "cancelado";
+
+/**
+ * Firma "on-the-fly" con passkey — **un modo más de la autenticación con passkey** (junto a
+ * login / signup / step-up), el tier fuerte para confirmar una acción sensible: hoy el
+ * checkout (`services/checkout` acepta `firma_ok = has_recent_stepup() OR session_confirmed`),
+ * reusable a futuro. Por eso vive acá, en el cliente de auth, y no en un módulo del checkout.
+ *
+ * Es step-up + enrolamiento al toque: si ya tenés una llave, firmás con ella (`stepUp`); si
+ * NO tenés, se crea en el momento (`register`) y **esa creación YA cuenta como firma** — el
+ * backend deja la misma marca `stepup` al registrar una passkey (registrar es un gesto
+ * biométrico fresco = prueba de presencia). Por eso es **un solo toque** siempre, incluso la
+ * primera vez (la 1ª te crea la llave, las próximas firman con ella; un único prompt del SO).
+ *
+ * `tienePasskey` lo sabe el caller (de `listPasskeys` / un flag) → cero `await` de red entre
+ * el click y el prompt de WebAuthn (un fetch ahí rompería el user-gesture en algunos browsers).
+ *
+ *   · "passkey"     → firmó fuerte (el backend ve `firma_ok` por la marca de step-up).
+ *   · "sin-soporte" → el device/navegador no soporta passkeys → ofrecé el fallback (checkbox).
+ *   · "cancelado"   → el usuario canceló el prompt o falló → ofrecé el fallback.
+ *
+ * Uso en el checkout: `const r = await firmarConPasskey(tienePasskey)` → si `r === "passkey"`
+ * confirmá el pedido; si no, mostrá el fallback "Confirmo y acepto" por sesión.
+ */
+export async function firmarConPasskey(tienePasskey: boolean): Promise<ResultadoFirma> {
+  if (!passkeySupported()) return "sin-soporte";
+  try {
+    if (tienePasskey) {
+      await stepUpWithPasskey(); // un toque: firmás con la llave que ya tenés
+    } else {
+      await registerPasskey("cliente"); // un toque: crear la llave on-the-fly YA cuenta como firma
+    }
+    return "passkey";
+  } catch {
+    return "cancelado";
+  }
+}
+
 export async function listPasskeys(scope: PasskeyScope): Promise<PasskeyCredential[]> {
   const data = await authedJson<{ credentials: PasskeyCredential[] }>(`${BASE[scope]}/credentials`);
   return data.credentials;

@@ -4,14 +4,14 @@
  */
 import { type CatalogSection } from "../types";
 import { Caption, Row, Sample } from "../catalog-kit";
-import { Pill } from "@/design-system/kit/Pill";
-import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
-import { PagoBadge } from "@/design-system/kit/PagoBadge";
-import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
+import { Pill } from "@/design-system/ui/Pill";
+import { CountBadge } from "@/design-system/ui/count-badge";
+import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
+import { PagoBadge } from "@/design-system/ui/PagoBadge";
+import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { TipoMovimientoBadge } from "@/components/admin/badges";
 import { Badge } from "@/design-system/ui/badge";
-import { Avatar, AvatarFallback } from "@/design-system/ui/avatar";
-import type { EstadoPedido } from "@/design-system/kit/types";
+import type { EstadoPedido } from "@/design-system/ui/types";
 
 const ESTADOS: EstadoPedido[] = [
   "borrador",
@@ -28,11 +28,11 @@ const ESTADOS: EstadoPedido[] = [
 export const badgesSection: CatalogSection = {
   id: "badges",
   title: "Badges, Pills & Avatares",
-  hint: "Para chips de estado — nunca <span> a mano. La forma del pill vive una vez en kit/Pill.",
+  hint: "Para chips de estado — nunca <span> a mano. La forma del pill vive una vez en ui/Pill.",
   specimens: [
     {
       name: "Pill",
-      files: ["design-system/kit/Pill.tsx"],
+      files: ["design-system/ui/Pill.tsx"],
       blurb:
         "Forma única del chip: 5 tonos semánticos (ink-on-tint). Todo badge nuevo deriva de acá.",
       render: () => (
@@ -61,7 +61,7 @@ export const badgesSection: CatalogSection = {
     },
     {
       name: "EstadoBadge",
-      files: ["design-system/kit/EstadoBadge.tsx", "design-system/kit/types.ts"],
+      files: ["design-system/ui/EstadoBadge.tsx", "design-system/ui/types.ts"],
       blurb: "Estado del pedido → color de marca. Fuente única (admin + portal). Los 9 estados:",
       render: () => (
         <Row>
@@ -73,7 +73,7 @@ export const badgesSection: CatalogSection = {
     },
     {
       name: "PagoBadge",
-      files: ["design-system/kit/PagoBadge.tsx"],
+      files: ["design-system/ui/PagoBadge.tsx"],
       blurb:
         "Estado de cobranza con el monto. Devuelve null cuando no hay nada útil (cotización sin seña).",
       render: () => (
@@ -106,29 +106,31 @@ export const badgesSection: CatalogSection = {
       ),
     },
     {
-      name: "Avatar",
-      files: ["design-system/ui/avatar.tsx"],
-      blurb: "Primitivo: imagen circular con fallback de iniciales. Tamaño por className.",
+      name: "CountBadge",
+      files: ["design-system/ui/count-badge.tsx"],
+      blurb:
+        "Contador circular compacto. sm = h-4 (filtros activos, tabs). md = h-5 (destacados). Oculto si count ≤ 0.",
       render: () => (
-        <Row className="gap-4">
-          <Sample label="default">
-            <Avatar>
-              <AvatarFallback>RR</AvatarFallback>
-            </Avatar>
-          </Sample>
-          <Sample label="h-12 w-12">
-            <Avatar className="h-12 w-12">
-              <AvatarFallback>AB</AvatarFallback>
-            </Avatar>
-          </Sample>
+        <Row className="gap-6">
+          {[0, 1, 5, 12, 99, 100].map((n) => (
+            <div key={n} className="flex flex-col items-center gap-1.5">
+              <div className="relative inline-flex">
+                <div className="h-8 w-8 rounded-full border hairline bg-muted/20" />
+                <span className="absolute -right-1 -top-1">
+                  <CountBadge count={n} />
+                </span>
+              </div>
+              <span className="font-mono text-2xs text-muted-foreground">{n}</span>
+            </div>
+          ))}
         </Row>
       ),
     },
     {
       name: "ClienteAvatar",
-      files: ["design-system/kit/ClienteAvatar.tsx"],
+      files: ["design-system/ui/ClienteAvatar.tsx"],
       blurb:
-        "Iniciales + color determinístico por hash del nombre (mismo nombre → mismo color). Reconocimiento rápido en listas.",
+        "Foto (opcional) o iniciales con color determinístico por hash del nombre. Mismo nombre → mismo color. Reconocimiento rápido en listas.",
       render: () => (
         <Row className="gap-3">
           {["Pablo Ferrari", "Tincho Rambla", "María González", "Juan Pérez", "Lucía Díaz"].map(

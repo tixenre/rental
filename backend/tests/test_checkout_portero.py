@@ -26,8 +26,10 @@ from services.checkout.validar import (
     _check_antelacion,
     _date_str,
     validar_checkout,
+    faltan_firma_tyc,
 )
 from services.checkout.tyc import ya_acepto, registrar_aceptacion
+from database import now_ar
 
 
 # ── Fake infrastructure ────────────────────────────────────────────────────────
@@ -171,9 +173,12 @@ def test_check_fechas_hasta_menor_que_desde():
     assert "posterior" in faltan[0]["mensaje"]
 
 
+# `now_ar().date()`, no `date.today()`: el portero compara contra hora de Argentina
+# (validar.py: `d0 < now_ar().date()`). Con `date.today()` (UTC en CI) "ayer" cae en el
+# MISMO día que AR entre las 00:00–03:00 UTC → falso negativo. Mismo reloj que el código.
 def test_check_fechas_pasada_cliente():
-    ayer = str(datetime.date.today() - datetime.timedelta(days=1))
-    manana = str(datetime.date.today() + datetime.timedelta(days=1))
+    ayer = str(now_ar().date() - datetime.timedelta(days=1))
+    manana = str(now_ar().date() + datetime.timedelta(days=1))
     faltan = []
     _check_fechas(ayer, manana, es_admin=False, faltan=faltan)
     assert len(faltan) == 1
@@ -181,11 +186,38 @@ def test_check_fechas_pasada_cliente():
 
 
 def test_check_fechas_pasada_admin_ok():
-    ayer = str(datetime.date.today() - datetime.timedelta(days=1))
-    manana = str(datetime.date.today() + datetime.timedelta(days=1))
+    ayer = str(now_ar().date() - datetime.timedelta(days=1))
+    manana = str(now_ar().date() + datetime.timedelta(days=1))
     faltan = []
     _check_fechas(ayer, manana, es_admin=True, faltan=faltan)
     assert faltan == []
+
+
+# ── faltan_firma_tyc (gate de creación, cliente-scoped, sin carrito) ──────────
+# Reusa los MISMOS checks del portero (_check_tyc + _check_firma) → una sola fuente.
+
+
+def test_faltan_firma_tyc_todo_ok():
+    conn = _FakeConn({"aceptaciones_tyc": {"cliente_id": 1}})  # T&C aceptados
+    assert faltan_firma_tyc(conn, cliente_id=1, firma_ok=True) == []
+
+
+def test_faltan_firma_tyc_sin_firma():
+    conn = _FakeConn({"aceptaciones_tyc": {"cliente_id": 1}})
+    faltan = faltan_firma_tyc(conn, cliente_id=1, firma_ok=False)
+    assert [f["check"] for f in faltan] == ["firma"]
+
+
+def test_faltan_firma_tyc_sin_tyc():
+    conn = _FakeConn({})  # aceptaciones_tyc → None → no aceptó
+    faltan = faltan_firma_tyc(conn, cliente_id=1, firma_ok=True)
+    assert [f["check"] for f in faltan] == ["tyc"]
+
+
+def test_faltan_firma_tyc_sin_nada():
+    conn = _FakeConn({})
+    faltan = faltan_firma_tyc(conn, cliente_id=1, firma_ok=False)
+    assert {f["check"] for f in faltan} == {"tyc", "firma"}
 
 
 # ── _check_stock_preflight ────────────────────────────────────────────────────

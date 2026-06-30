@@ -162,7 +162,7 @@ function CompartidoBody({
 
       {/* Card con la composición */}
       <div className="overflow-hidden rounded-xl border hairline bg-surface">
-        <div className="flex items-center justify-between gap-3 border-b border-dashed hairline px-4 py-3 sm:px-[18px]">
+        <div className="flex items-center justify-between gap-3 border-b border-dashed hairline px-portal py-3">
           <span className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
             {data.items.length} {data.items.length === 1 ? "equipo" : "equipos"}
           </span>
@@ -174,7 +174,7 @@ function CompartidoBody({
         </div>
 
         {equiposLoading ? (
-          <ul className="px-4 sm:px-[18px]">
+          <ul className="px-portal">
             {data.items.slice(0, 4).map((it) => (
               <li
                 key={it.equipo_id}
@@ -186,7 +186,7 @@ function CompartidoBody({
             ))}
           </ul>
         ) : (
-          <ul className="px-4 sm:px-[18px]">
+          <ul className="px-portal">
             {resueltos.map(({ item, equipo }) => {
               const display = equipo?.name ?? "Equipo no disponible";
               const thumb = equipo?.fotoUrlThumb ?? equipo?.fotoUrl ?? null;
@@ -248,7 +248,7 @@ function CompartidoBody({
         )}
 
         {/* Footer: CTA armar carrito */}
-        <div className="border-t border-dashed hairline px-4 py-4 sm:px-[18px]">
+        <div className="border-t border-dashed hairline px-portal py-4">
           <Button
             type="button"
             variant="primary"

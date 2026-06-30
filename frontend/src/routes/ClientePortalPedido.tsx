@@ -9,9 +9,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { clienteApi } from "@/lib/cliente/api";
-import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
-import { PagoBadge } from "@/design-system/kit/PagoBadge";
-import { Pill } from "@/design-system/kit/Pill";
+import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
+import { PagoBadge } from "@/design-system/ui/PagoBadge";
+import { Pill } from "@/design-system/ui/Pill";
 import {
   ArrowRight,
   ChevronDown,
@@ -444,7 +444,7 @@ export function PedidoCard({
         <button
           type="button"
           onClick={handleToggle}
-          className="flex-1 min-w-0 flex items-center gap-3.5 px-4 sm:px-[18px] py-3.5 transition hover:bg-[color-mix(in_oklch,var(--ink)_2%,transparent)] text-left"
+          className="flex-1 min-w-0 flex items-center gap-3.5 px-portal py-3.5 transition hover:bg-[color-mix(in_oklch,var(--ink)_2%,transparent)] text-left"
         >
           <span className="font-mono text-sm font-bold text-ink tracking-[0.04em]">
             #{pedido.numero_pedido}
@@ -499,7 +499,7 @@ export function PedidoCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-dashed border-[var(--hairline)] px-4 sm:px-[18px] pt-[18px] pb-[22px] grid gap-y-5 gap-x-7 animate-[expand-in_.22s_ease-out] [grid-template-areas:'banner''timeline''main''side'] lg:[grid-template-columns:minmax(0,1fr)_clamp(20rem,26%,25rem)] lg:[grid-template-areas:'banner_banner''timeline_timeline''main_side']">
+        <div className="border-t border-dashed border-[var(--hairline)] px-portal pt-[18px] pb-[22px] grid gap-y-5 gap-x-7 animate-[expand-in_.22s_ease-out] [grid-template-areas:'banner''timeline''main''side'] lg:[grid-template-columns:minmax(0,1fr)_clamp(20rem,26%,25rem)] lg:[grid-template-areas:'banner_banner''timeline_timeline''main_side']">
           {/* ── Banner: solicitud pendiente / resuelta / bienvenida (full width) ── */}
           {(pendiente || ultimaResuelta || showWelcome) && (
             <div className="[grid-area:banner] flex flex-col gap-3">

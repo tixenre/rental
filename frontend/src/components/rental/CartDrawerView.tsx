@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { StepperPill } from "./equipment/shared/StepperPill";
 import { IncludesLine } from "./equipment/shared/IncludesLine";
 import { KitSection } from "./KitSection";
-import { EmptyState } from "./EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 import { EmptyImage } from "./EmptyImage";
 import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
 import { GuardarComoListaButton } from "./GuardarComoListaButton";
@@ -228,12 +228,14 @@ export function CartDrawerView({
                     title="Tu rental está vacío"
                     sub="Elegí equipos del catálogo y se sumarán acá."
                   >
-                    <button
+                    <Button
+                      variant="primary"
+                      shape="pill"
                       onClick={onExplore}
-                      className="rounded-full bg-ink px-5 py-2 text-sm font-semibold text-amber transition hover:opacity-90"
+                      className="px-5 font-semibold"
                     >
                       Explorar catálogo
-                    </button>
+                    </Button>
                   </EmptyState>
                 ) : (
                   <>

@@ -152,7 +152,7 @@ supervisor marca `ILIKE`/`LIKE` o normalizadores ad-hoc, e índices cuya expresi
 
 ### 2026-06-06 — Design system consolidado en la app; `design-system` gobierna, `pulido-frontend` aplica
 
-El DS canónico es la app: primitivos en `src/design-system/{ui,kit}`, componentes de negocio en
+El DS canónico es la app: primitivos en `src/design-system/{ui,composites}`, componentes de negocio en
 `src/components/{rental,admin}`, tokens/fuentes en `src/design-system/styles/` (entry
 `src/design-system/ds-styles.css`). **El skill `design-system` (opus) gobierna** (audita sistémicamente,
 dashboard `/ds`, propone issues); **`pulido-frontend` aplica** los fixes en pantalla. `importar-diseno`
@@ -553,6 +553,22 @@ Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md); #1098 Fase 1B.
 
 Toda validación previa a crear un pedido pasa por la **puerta única** `backend/services/checkout/validar.py::validar_checkout(conn, cliente_id, session_id, firma_ok)`. Corre **10 checks fail-not-fast** (sin parar en el primero) y devuelve `{listo: bool, faltan: [{check, mensaje}]}` para que la UI muestre exactamente qué resolver. **No crea pedidos** — el gate de creación sigue siendo `create_pedido_retry` (`routes/alquileres/core.py`; core sagrado intacto). **2 checks cableado-apagado** (`_check_bloqueo` #1125, `_check_antelacion` #1126) retornan siempre OK hasta activarse. La **firma** admite passkey step-up (`has_recent_stepup`, ~5 min) O fallback `session_confirmed=true` ("Confirmo") para clientes sin passkey. HTTP: `POST /api/checkout/validar` + `POST /api/checkout/aceptar-tyc` (idempotente). El supervisor marca validación de checkout ad-hoc fuera de la puerta, o un check nuevo no cableado-apagado sumado fuera de `validar_checkout`.
 
+### 2026-06-30 — Firma con passkey: presencia de un toque (on-the-fly) + gate del checkout reusa el portero; presencia ≠ firma legal
+
+La firma con passkey del cliente es **presencia fresca de un toque**: registrar una passkey de cliente deja la marca
+`stepup` (`_register_complete`→`mark_stepup`; registrar exige el mismo gesto biométrico que una assertion) → es un
+**modo más de auth fresca** (junto a login/step-up) y **crear la llave ya firma**. Helper **único**
+`firmarConPasskey(tienePasskey)` en `lib/passkey.ts` (no un módulo aparte — `lib/firma.ts` se borró). El **gate de
+firma+T&C en la creación del pedido reusa** los checks cliente-scoped del portero (`faltan_firma_tyc` =
+`_check_tyc`+`_check_firma`), **no re-implementa** ni usa el portero completo (depende de `carritos_activos`);
+stock/precio los sigue enforzando `create_pedido_retry`. **Cableado-apagado** (`FIRMA_CHECKOUT_OBLIGATORIA=False`)
+hasta que la UI del checkout mande la señal (patrón #1125/#1126). **Presencia ≠ firma legal:** la marca prueba "hay
+un humano con el dispositivo ahora" (checkout = acepto T&C + confirmo); la **firma legal del contrato** (no-repudio
+**atada al hash**, Ley 25.506) extiende la **misma** ceremonia de `auth/passkey/` firmando el `doc_hash` — **no un
+sistema paralelo** (contratos/ARCA, aparte). El supervisor marca: firma de presencia recreada fuera de
+`auth/stepup`+`firmarConPasskey`; el gate del checkout re-implementando los checks; o una firma de contrato con
+ceremonia paralela. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §3; historia → #1131.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
@@ -614,7 +630,7 @@ Toda UI nueva o rediseñada sigue la **Filosofía de diseño** del DS (`DESIGN_S
 11 principios): la info se tiene que ver (contraste/peso reales), **estado + plata visibles** (`Debe $X`,
 no "sin seña" gris), un foco por pantalla, **una sola forma de hacer cada cosa** (sin controles/botones
 duplicados), lo más usado a mano, reconocimiento > lectura (avatares/pills), densidad sin aire muerto,
-**reusar no recrear** (la forma del pill vive en `kit/Pill`; `EstadoBadge`/`PagoBadge` derivan, cero clases
+**reusar no recrear** (la forma del pill vive en `ui/Pill`; `EstadoBadge`/`PagoBadge` derivan, cero clases
 copiadas), mobile/a11y no son extra, el core es presentación. El supervisor la hace cumplir; el detalle
 vive en el doc. Es la contraparte visual de la _Barra de calidad de ingeniería (2026-05-25)_.
 

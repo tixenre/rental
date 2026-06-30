@@ -9,8 +9,9 @@ import { type ReactNode } from "react";
  *
  * `Specimen.files` es la clave anti-drift: lista los archivos fuente que el
  * specimen cubre (relativos a `frontend/src`). El guardrail de `check-docs.mjs`
- * exige que TODO archivo de `design-system/ui` + `design-system/kit` aparezca en
- * algún `files` → un componente sin vitrina falla CI (no se olvida en silencio).
+ * exige que TODO archivo de `design-system/ui` + `design-system/composites`
+ * aparezca en algún `files` → un componente sin vitrina falla CI (no se olvida
+ * en silencio).
  */
 
 /** Un specimen = la demo en vivo de UN componente (o token-group) del DS. */
@@ -38,4 +39,31 @@ export type CatalogSection = {
   /** Bajada opcional. */
   hint?: string;
   specimens: Specimen[];
+};
+
+/**
+ * Las capas funcionales de la librería, en orden ascendente de composición:
+ * de la materia prima (tokens) al recorrido completo (flujos). La clasificación
+ * es por FUNCIÓN (tamaño de composición), no por dominio. Ver `manifest.ts`.
+ */
+export type CatalogLayer =
+  | "fundamentos"
+  | "primitivos"
+  | "composites"
+  | "secciones"
+  | "paginas"
+  | "flujos";
+
+/** Encabezado visible de una capa en la vitrina. */
+export type LayerMeta = {
+  id: CatalogLayer;
+  label: string;
+  /** Una línea en lenguaje claro: qué es esta capa. */
+  blurb: string;
+};
+
+/** Una capa con las secciones que le tocan — la unidad de render agrupado. */
+export type LayerGroup = {
+  layer: LayerMeta;
+  sections: CatalogSection[];
 };

@@ -59,7 +59,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
-import { EstadoBadge } from "@/design-system/kit/EstadoBadge";
+import { EstadoBadge } from "@/design-system/ui/EstadoBadge";
 import { WhatsAppButton } from "@/components/admin/WhatsAppButton";
 import {
   adminApi,
@@ -75,7 +75,7 @@ import {
   type DraftItem,
 } from "@/components/admin/pedido/usePedidoDraft";
 import { ClienteAutocomplete } from "@/components/admin/pedido/ClienteAutocomplete";
-import { ClienteAvatar } from "@/design-system/kit/ClienteAvatar";
+import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
 import { computeJornadas, parseDateTimeParts, toLocalISO } from "@/lib/rental-dates";

@@ -12,7 +12,8 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/design-system/ui/button";
-import { Pill } from "@/design-system/kit/Pill";
+import { IconButton } from "@/design-system/ui/icon-button";
+import { Pill } from "@/design-system/ui/Pill";
 import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import {
@@ -143,16 +144,16 @@ export function SortableSpecRow({
       style={style}
       className="grid grid-cols-[24px_1fr_140px_minmax(0,1fr)_64px] items-center gap-2 px-3 py-2 text-sm hover:bg-muted/20"
     >
-      <button
+      <IconButton
+        aria-label={`Reordenar ${template.label}`}
+        size="xs"
+        disabled={disabled}
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
         {...attributes}
         {...listeners}
-        disabled={disabled}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground disabled:opacity-50"
-        aria-label={`Reordenar ${template.label}`}
-        title="Arrastrar para reordenar"
       >
         <GripVertical className="h-4 w-4" />
-      </button>
+      </IconButton>
 
       <div className="min-w-0">
         <div className="truncate text-ink">{template.label}</div>
@@ -181,20 +182,22 @@ export function SortableSpecRow({
       <div className="md:hidden" aria-hidden />
 
       <div className="flex justify-end gap-1">
-        <button
-          onClick={onEdit}
-          className="rounded p-1 text-muted-foreground hover:bg-muted/50 hover:text-ink"
+        <IconButton
           aria-label="Editar"
+          size="xs"
+          onClick={onEdit}
+          className="text-muted-foreground hover:bg-muted/50 hover:text-ink"
         >
           <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+        </IconButton>
+        <IconButton
           aria-label="Eliminar"
+          size="xs"
+          onClick={onDelete}
+          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
         >
           <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        </IconButton>
       </div>
     </div>
   );

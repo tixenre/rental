@@ -23,7 +23,7 @@ import { useDocumentTitle } from "@/lib/use-document-title";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { Textarea } from "@/design-system/ui/textarea";
-import { Pill, type PillTone } from "@/design-system/kit/Pill";
+import { Pill, type PillTone } from "@/design-system/ui/Pill";
 import { Spinner } from "@/design-system/ui/spinner";
 import { Switch } from "@/design-system/ui/switch";
 import {
@@ -46,7 +46,7 @@ import { useConfirm } from "@/components/admin/useConfirm";
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { ListSkeleton } from "@/components/admin/skeletons";
 import { ErrorState } from "@/components/admin/ErrorState";
-import { EmptyState } from "@/components/rental/EmptyState";
+import { EmptyState } from "@/design-system/composites/EmptyState";
 
 export const Route = createLazyFileRoute("/admin/talleres/")({
   component: TalleresAdminPage,

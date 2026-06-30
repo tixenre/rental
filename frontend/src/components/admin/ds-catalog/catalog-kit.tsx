@@ -72,14 +72,15 @@ export function SectionBlock({ section }: { section: CatalogSection }) {
 }
 
 /**
- * TocNav — índice de salto, sticky. Es el mapa de la librería: de un vistazo se
- * ve TODO lo que el DS cubre. En mobile scrollea horizontal.
+ * SectionNav — índice de salto entre las secciones DE UNA capa, sticky. Solo se
+ * usa en capas con varias secciones (hoy Primitivos): saltar sin scrollear toda
+ * la pestaña. En mobile scrollea horizontal.
  */
-export function TocNav({ sections }: { sections: CatalogSection[] }) {
+export function SectionNav({ sections }: { sections: CatalogSection[] }) {
   return (
     <nav
-      aria-label="Secciones del Design System"
-      className="sticky top-0 z-10 -mx-1 mb-2 flex gap-1.5 overflow-x-auto bg-background/80 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      aria-label="Secciones de la capa"
+      className="sticky top-0 z-10 -mx-1 flex gap-2 overflow-x-auto bg-background/80 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/60"
     >
       {sections.map((s) => (
         <a

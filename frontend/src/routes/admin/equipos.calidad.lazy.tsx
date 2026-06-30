@@ -10,12 +10,12 @@ import {
   Folder,
   ArrowRight,
   Lightbulb,
-  Loader2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
+import { Spinner } from "@/design-system/ui/spinner";
 import {
   adminApi,
   type CalidadInventario,
@@ -127,7 +127,7 @@ function SugerenciasSection() {
                     onClick={() => ignorar.mutate({ tipo: s.tipo, ref: s.ref })}
                     title="Descartar — no volverá a aparecer"
                   >
-                    {isIgnoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Ignorar"}
+                    {isIgnoring ? <Spinner size="xs" /> : "Ignorar"}
                   </Button>
                   {s.equipo_id && (
                     <Button
@@ -148,7 +148,7 @@ function SugerenciasSection() {
                   >
                     {isApplying ? (
                       <>
-                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Aplicando…
+                        <Spinner size="xs" className="mr-1" /> Aplicando…
                       </>
                     ) : (
                       s.accion_label

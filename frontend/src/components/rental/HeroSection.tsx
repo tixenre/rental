@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { Calendar, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/design-system/ui/button";
 import { useHeroPhotos, heroImgProps } from "@/lib/studio/hero-photos";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
@@ -66,15 +67,17 @@ export function HeroSection({ tagline, equipmentCount, onDateOpen }: HeroSection
 
             {/* CTA */}
             <div>
-              <button
+              <Button
+                variant="on-accent"
+                shape="pill"
                 onClick={onDateOpen}
                 className={cn(
-                  "inline-flex items-center gap-2.5 bg-ink text-amber rounded-full px-[26px] py-[14px] text-15 font-bold tracking-[-0.01em] whitespace-nowrap shadow-[0_4px_20px_oklch(0.14_0.01_60/24%)] transition-colors duration-150 hover:bg-black active:scale-[0.97]",
+                  "h-auto px-[26px] py-[14px] text-15 font-bold tracking-[-0.01em] gap-2.5 shadow-[0_4px_20px_oklch(0.14_0.01_60/24%)]",
                   reducedMotion && "no-motion",
                 )}
               >
                 <Calendar size={16} /> Elegí fechas y reservá
-              </button>
+              </Button>
             </div>
           </div>
 

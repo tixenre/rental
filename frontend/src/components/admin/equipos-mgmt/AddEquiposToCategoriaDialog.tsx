@@ -9,7 +9,8 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Loader2 } from "lucide-react";
+import { Search } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -123,7 +124,7 @@ export function AddEquiposToCategoriaDialog({
         <div className="flex-1 min-h-0 overflow-y-auto rounded-md border hairline">
           {equiposQ.isLoading ? (
             <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando equipos…
+              <Spinner size="sm" className="mr-2" /> Cargando equipos…
             </div>
           ) : filtered.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">

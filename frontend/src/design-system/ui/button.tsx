@@ -29,6 +29,11 @@ export const buttonVariants = cva(
         // (hero estudio, banners, etc.) o cuando el primario no tiene suficiente
         // contraste con el fondo. El nombre "amber" se mantiene (renombrar = churn).
         amber: "bg-[var(--area-accent)] text-ink shadow-sm hover:bg-[var(--area-accent-hot)]",
+
+        // on-accent — CTA sobre fondos de color (hero amber, banners de área).
+        // Reposo: bone/background + ink. Hover: invierte a ink + bone. Tres colores
+        // distintos garantizados: fondo de área ≠ botón reposo ≠ botón hover.
+        "on-accent": "bg-background text-ink shadow-sm hover:bg-ink hover:text-background",
       },
       size: {
         default: "h-9 px-4 py-2",

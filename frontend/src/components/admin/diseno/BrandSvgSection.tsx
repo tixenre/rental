@@ -13,7 +13,8 @@
  */
 import { useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Upload, Shapes, Type } from "lucide-react";
+import { Upload, Shapes, Type } from "lucide-react";
+import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
@@ -113,7 +114,7 @@ function Uploader({ kind }: { kind: Kind }) {
             disabled={mut.isPending}
           >
             {mut.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Spinner size="sm" className="mr-2" />
             ) : (
               <Upload className="h-4 w-4 mr-2" />
             )}

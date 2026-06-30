@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from "node:fs";
-import type { IncomingMessage } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
 // Fuente ÚNICA del conteo de jornadas (espejo del backend: ceil(Δ/24h), mín 1).
@@ -122,6 +122,61 @@ function cotizar(body: CotizarBody, precios: Map<number, number>) {
   };
 }
 
+// ── Dev auth bypass ──────────────────────────────────────────────────────────
+
+const DEV_AUTH_COOKIE = "dev_auth";
+
+function parseCookies(req: IncomingMessage): Record<string, string> {
+  const header = req.headers.cookie ?? "";
+  return Object.fromEntries(
+    header
+      .split(";")
+      .map((c) => c.trim().split("="))
+      .filter(([k]) => k)
+      .map(([k, ...v]) => [k.trim(), v.join("=").trim()]),
+  );
+}
+
+const DEV_SESSIONS: Record<string, object> = {
+  admin: { email: "dev@rambla.ar", name: "Dev Admin", is_admin: true },
+  cliente: { email: "dev-cliente@rambla.ar", name: "Dev Cliente", is_admin: false },
+};
+
+/** Sirve la página de login dev con links para elegir rol o salir. */
+function serveDevLoginPage(res: ServerResponse, role: string | undefined) {
+  const active = role && role in DEV_SESSIONS ? role : null;
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dev Login — Rambla</title>
+  <style>
+    body { font-family: monospace; max-width: 480px; margin: 80px auto; padding: 0 1rem; background: #fafaf0; color: #18180f; }
+    h1 { font-size: 1.1rem; margin-bottom: 1.5rem; }
+    .status { font-size: 0.85rem; padding: 8px 12px; border-radius: 6px; margin-bottom: 1.5rem;
+              background: ${active ? "#d4edda" : "#fff3cd"}; border: 1px solid ${active ? "#c3e6cb" : "#ffc107"}; }
+    a { display: inline-block; margin: 4px 4px 4px 0; padding: 8px 16px; border-radius: 6px;
+        text-decoration: none; font-size: 0.85rem; font-weight: 600; }
+    .btn-admin { background: #18180f; color: #fafaf0; }
+    .btn-cliente { background: #e9a825; color: #18180f; }
+    .btn-off { background: #eee; color: #555; }
+    .note { font-size: 0.75rem; color: #888; margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <h1>🛠 Dev login (solo localhost)</h1>
+  <p class="status">${active ? `Sesión activa: <strong>${active}</strong>` : "Sin sesión activa"}</p>
+  <a class="btn-admin" href="/_dev/login?role=admin&redirect=/admin">→ Admin</a>
+  <a class="btn-cliente" href="/_dev/login?role=cliente&redirect=/cliente/portal">→ Cliente</a>
+  <a class="btn-off" href="/_dev/login?role=off&redirect=/">✕ Salir</a>
+  <p class="note">Setea la cookie <code>${DEV_AUTH_COOKIE}</code> y redirige. Solo activo en dev con fixtures.</p>
+</body>
+</html>`;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.statusCode = 200;
+  res.end(html);
+}
+
 function readBody(req: IncomingMessage): Promise<CotizarBody> {
   return new Promise((resolve) => {
     let data = "";
@@ -150,7 +205,45 @@ export function apiFixturesPlugin(): Plugin {
 
       server.middlewares.use(async (req, res, next) => {
         if (!req.url) return next();
-        const pathname = req.url.split("?")[0];
+        const [pathname, qs] = req.url.split("?");
+        const params = new URLSearchParams(qs ?? "");
+        const cookies = parseCookies(req);
+        const devRole = cookies[DEV_AUTH_COOKIE];
+
+        // ── Dev auth endpoints ──────────────────────────────────────────────
+
+        // Página/acción de login dev: /_dev/login[?role=admin|cliente|off][&redirect=/path]
+        if (pathname === "/_dev/login") {
+          const role = params.get("role") ?? undefined;
+          const redirect = params.get("redirect");
+          if (role) {
+            const expires = role === "off" ? "Thu, 01 Jan 1970 00:00:00 GMT" : "";
+            const maxAge = role === "off" ? "Max-Age=0" : "Max-Age=86400";
+            res.setHeader(
+              "Set-Cookie",
+              `${DEV_AUTH_COOKIE}=${role === "off" ? "" : role}; Path=/; ${maxAge}; SameSite=Lax${expires ? `; Expires=${expires}` : ""}`,
+            );
+            if (redirect) {
+              res.setHeader("Location", redirect);
+              res.statusCode = 302;
+              res.end();
+              return;
+            }
+          }
+          serveDevLoginPage(res, role ?? devRole);
+          return;
+        }
+
+        // Mock de /auth/me cuando la cookie dev_auth=admin está seteada.
+        if (req.method === "GET" && pathname === "/auth/me" && devRole && devRole in DEV_SESSIONS) {
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("X-Rambla-Fixture", "dev-auth");
+          res.statusCode = 200;
+          res.end(JSON.stringify(DEV_SESSIONS[devRole]));
+          return;
+        }
+
+        // ── Fin dev auth ────────────────────────────────────────────────────
 
         // Cotización dinámica del carrito.
         if (req.method === "POST" && pathname === "/api/cotizar") {
@@ -195,8 +288,9 @@ export function apiFixturesPlugin(): Plugin {
       });
 
       server.config.logger.info(
-        "  ➜  [rambla] API fixtures de dev activos (catálogo + cotización)",
+        "  ➜  [rambla] API fixtures de dev activos (catálogo + cotización + auth)",
       );
+      server.config.logger.info("  ➜  [rambla] Dev login: http://localhost:3000/_dev/login");
     },
   };
 }
