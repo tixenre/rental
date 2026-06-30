@@ -29,6 +29,7 @@ import { containersSection } from "./sections/containers";
 import { statesSection } from "./sections/states";
 import { catalogSharedSection } from "./sections/catalog-shared";
 import { catalogoOrganismosSection } from "./sections/catalogo-organismos";
+import { clienteOrganismosSection } from "./sections/cliente-organismos";
 import { feedbackSection } from "./sections/feedback";
 import { flujosSection } from "./sections/flujos";
 import { pagesSection } from "./sections/pages";
@@ -56,7 +57,7 @@ export const LAYERS: LayerMeta[] = [
     id: "secciones",
     label: "Secciones",
     blurb:
-      "Organismos del dominio: el cluster compartido de equipos (precio, stepper, favorito) y las piezas ensambladas del catálogo público (card, lista, buscador, carrito). Viven en components/, no en la librería pura, pero son canónicos.",
+      "Organismos del dominio: las piezas ensambladas de cada área — el cluster compartido de equipos (precio, stepper, favorito), el catálogo público (card, lista, buscador, carrito) y el portal del cliente (pedido, identidad, listas). Viven en components/ y routes/, no en la librería pura, pero son canónicos.",
   },
   {
     id: "paginas",
@@ -87,6 +88,7 @@ const SECTION_LAYER: Record<string, CatalogLayer> = {
   estados: "composites",
   "catalogo-shared": "secciones",
   "catalogo-organismos": "secciones",
+  "cliente-organismos": "secciones",
   paginas: "paginas",
   flujos: "flujos",
 };
@@ -103,6 +105,8 @@ const SECTIONS: CatalogSection[] = [
   containersSection,
   statesSection,
   catalogSharedSection,
+  catalogoOrganismosSection,
+  clienteOrganismosSection,
   feedbackSection,
   flujosSection,
   pagesSection,
