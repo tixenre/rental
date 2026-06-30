@@ -28,6 +28,7 @@ import { navigationSection } from "./sections/navigation";
 import { containersSection } from "./sections/containers";
 import { statesSection } from "./sections/states";
 import { catalogSharedSection } from "./sections/catalog-shared";
+import { catalogoOrganismosSection } from "./sections/catalogo-organismos";
 import { feedbackSection } from "./sections/feedback";
 import { flujosSection } from "./sections/flujos";
 import { pagesSection } from "./sections/pages";
@@ -55,7 +56,7 @@ export const LAYERS: LayerMeta[] = [
     id: "secciones",
     label: "Secciones",
     blurb:
-      "Organismos del dominio de equipos (precio, stepper, favorito, incluye). Viven en components/, no en la librería pura, pero son canónicos.",
+      "Organismos del dominio: el cluster compartido de equipos (precio, stepper, favorito) y las piezas ensambladas del catálogo público (card, lista, buscador, carrito). Viven en components/, no en la librería pura, pero son canónicos.",
   },
   {
     id: "paginas",
@@ -85,6 +86,7 @@ const SECTION_LAYER: Record<string, CatalogLayer> = {
   notificaciones: "primitivos",
   estados: "composites",
   "catalogo-shared": "secciones",
+  "catalogo-organismos": "secciones",
   paginas: "paginas",
   flujos: "flujos",
 };
