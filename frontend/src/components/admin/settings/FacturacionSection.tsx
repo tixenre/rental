@@ -41,9 +41,8 @@ export function FacturacionSection() {
         <div className="flex items-center gap-2">
           <span className="t-eyebrow">Ambiente:</span>
           <span
-            // eslint-disable-next-line no-restricted-syntax -- ambiente: verde-ink + amber-700 paleta categórica producción/homologación (Tier 3)
             className={`text-xs font-mono font-medium ${
-              estadoQ.data.ambiente === "produccion" ? "text-verde-ink" : "text-amber-700"
+              estadoQ.data.ambiente === "produccion" ? "text-verde-ink" : "text-amber-700" // eslint-disable-line no-restricted-syntax -- paleta categórica Tier 3: verde-ink producción, amber-700 homologación
             }`}
           >
             {estadoQ.data.ambiente === "produccion" ? "Producción" : "Homologación (pruebas)"}

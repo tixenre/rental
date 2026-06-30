@@ -169,12 +169,11 @@ function EmisorCard({
               </span>
             )}
             <span
-              // eslint-disable-next-line no-restricted-syntax -- text-2xs alias; text-verde-ink cert ok; amber-700 paleta categórica sin-cert (Tier 3)
               className={cn(
                 "inline-flex text-2xs font-mono font-medium rounded-full px-2 py-0.5 border",
                 emisor.cert_cargado
                   ? "bg-verde/10 text-verde-ink border-verde/30"
-                  : "bg-amber/10 text-amber-700 border-amber/40",
+                  : "bg-amber/10 text-amber-700 border-amber/40", // eslint-disable-line no-restricted-syntax -- paleta categórica Tier 3: amber-700 sin-cert
               )}
             >
               {emisor.cert_cargado ? "🔑 Cert cargado" : "⚠ Sin cert"}
