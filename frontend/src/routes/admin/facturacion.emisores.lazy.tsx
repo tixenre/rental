@@ -550,12 +550,12 @@ function PemFileField({
     <Field label={displayLabel}>
       <div className="space-y-1.5">
         {/* File picker */}
-        {/* eslint-disable-next-line no-restricted-syntax -- label wrapping file input es patrón estándar; no hay DS equivalente */}
         <label className="flex items-center gap-2 h-9 px-3 rounded-md border hairline bg-surface-elevated text-sm cursor-pointer hover:bg-muted/20 w-full">
           <Upload className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <span className={cn("truncate text-sm", fileName ? "text-ink" : "text-muted-foreground")}>
             {fileName ?? "Elegir archivo .pem / .crt / .key"}
           </span>
+          {/* eslint-disable-next-line no-restricted-syntax -- input[type=file] nativo para file picker; no hay DS equivalente */}
           <input
             type="file"
             accept=".pem,.crt,.key,.cer"
