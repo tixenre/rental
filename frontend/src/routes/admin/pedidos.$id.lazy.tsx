@@ -1056,7 +1056,7 @@ function FacturacionRailSection({
             </div>
           )}
 
-          {principal.pdf_key && (
+          {principal.estado === "emitida" && (
             <div className="flex items-center gap-3">
               <a
                 href={`/api/facturas/${principal.id}/pdf`}
