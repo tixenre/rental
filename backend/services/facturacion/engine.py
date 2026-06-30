@@ -122,15 +122,15 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
             )
 
         perfil_receptor = (pedido.get("cliente_perfil_impuestos") or "").strip().lower()
-        nombre_emisor = emisor_para(perfil_receptor)
+        nombre_emisor = emisor_para(perfil_receptor, conn)
         cred = credenciales(nombre_emisor, conn)
 
         emisor_obj = Emisor(
-            cuit=int(cred.cuit.replace("-", "")),
-            punto_venta=int(cred.punto_venta),
+            cuit=cred.cuit,
+            punto_venta=cred.punto_venta,
             condicion_iva=(
                 CondicionIva.RESPONSABLE_INSCRIPTO
-                if nombre_emisor == "pablo"
+                if cred.condicion_iva == "responsable_inscripto"
                 else CondicionIva.MONOTRIBUTO
             ),
         )
@@ -193,7 +193,7 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
         token, sign = get_ta(nombre_emisor, conn)
         wsfe = WsfeClient(
             endpoint=cred.endpoint_wsfe,
-            cuit=int(cred.cuit.replace("-", "")),
+            cuit=cred.cuit,
             token=token,
             sign=sign,
         )
@@ -227,7 +227,7 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
         # 8. TX atómica: persistir CAE
         if cae_result.resultado == "A" and cae_result.cae:
             qr_url = armar_qr(
-                cuit_emisor=int(cred.cuit.replace("-", "")),
+                cuit_emisor=cred.cuit,
                 pto_vta=emisor_obj.punto_venta,
                 cbte_tipo=int(cbte_tipo),
                 nro_cmp=cae_result.numero,
@@ -335,11 +335,11 @@ def emitir_nota_credito(
         cred = credenciales(nombre_emisor, conn)
 
         emisor_obj = Emisor(
-            cuit=int(cred.cuit.replace("-", "")),
+            cuit=cred.cuit,
             punto_venta=original.pto_vta,
             condicion_iva=(
                 CondicionIva.RESPONSABLE_INSCRIPTO
-                if nombre_emisor == "pablo"
+                if cred.condicion_iva == "responsable_inscripto"
                 else CondicionIva.MONOTRIBUTO
             ),
         )
@@ -349,7 +349,7 @@ def emitir_nota_credito(
             tipo=cbte_orig,
             punto_venta=original.pto_vta,
             numero=original.cbte_nro,
-            cuit=int(cred.cuit.replace("-", "")),
+            cuit=cred.cuit,
             fecha=original.fecha_emision.date() if original.fecha_emision else None,
         )
 
@@ -401,7 +401,7 @@ def emitir_nota_credito(
         token, sign = get_ta(nombre_emisor, conn)
         wsfe = WsfeClient(
             endpoint=cred.endpoint_wsfe,
-            cuit=int(cred.cuit.replace("-", "")),
+            cuit=cred.cuit,
             token=token,
             sign=sign,
         )
@@ -412,7 +412,7 @@ def emitir_nota_credito(
 
         if cae_result.resultado == "A" and cae_result.cae:
             qr_url = armar_qr(
-                cuit_emisor=int(cred.cuit.replace("-", "")),
+                cuit_emisor=cred.cuit,
                 pto_vta=emisor_obj.punto_venta,
                 cbte_tipo=int(cbte_tipo_nc),
                 nro_cmp=cae_result.numero,

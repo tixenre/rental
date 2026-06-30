@@ -51,8 +51,8 @@ def get_ta(emisor: str, conn) -> tuple[str, str]:
     # Necesitamos un TA nuevo
     if not cred.cert_pem or not cred.key_pem:
         raise RuntimeError(
-            f"Certificado de {emisor} no cargado en ENV "
-            f"(AFIP_{emisor.upper()}_CERT / AFIP_{emisor.upper()}_KEY)"
+            f"Certificado de '{emisor}' no cargado. "
+            "Subí el cert + clave desde el back-office → Facturación ARCA → Emisores."
         )
 
     token, sign, expira_at = login_con_cert(

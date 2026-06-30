@@ -37,18 +37,34 @@ class _Cursor:
 
 
 class _FakeConn:
-    def __init__(self, cuit="20-30000000-0", ptovta="1"):
-        self._rows = [
-            _Row({"key": "afip_pablo_cuit", "value": cuit}),
-            _Row({"key": "afip_pablo_ptovta", "value": ptovta}),
-            _Row({"key": "afip_santini_cuit", "value": "20-40000000-0"}),
-            _Row({"key": "afip_santini_ptovta", "value": "2"}),
-        ]
+    """Simula la tabla emisores_arca para tests de credenciales."""
+    def __init__(self, nombre="pablo", cuit="20-30000000-0", pto_vta=1, condicion_iva="responsable_inscripto"):
+        self._nombre = nombre
+        self._cuit = cuit
+        self._pto_vta = pto_vta
+        self._condicion_iva = condicion_iva
 
     def execute(self, query, params=None):
-        key_list = params[0] if params else []
-        rows = [r for r in self._rows if r["key"] in key_list]
-        return _Cursor(rows)
+        conn = self
+
+        class _Result:
+            def fetchone(self_inner):
+                # Simular fila de emisores_arca
+                return {
+                    "id": 1,
+                    "nombre": conn._nombre,
+                    "cuit": conn._cuit,
+                    "pto_vta": conn._pto_vta,
+                    "condicion_iva": conn._condicion_iva,
+                    "cert_enc": b"FAKE_CERT_ENC",
+                    "key_enc": b"FAKE_KEY_ENC",
+                    "activo": True,
+                    "notas": None,
+                    "created_at": None,
+                    "updated_at": None,
+                }
+
+        return _Result()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -73,106 +89,249 @@ def _set_env_certs(monkeypatch, emisor: str, present: bool = True):
 # ── Gating default-deny ────────────────────────────────────────────────────────
 
 
-def test_gating_produccion_cuando_is_production_y_cert(monkeypatch):
-    """is_production=True + cert → ambiente='produccion'."""
+_FAKE_CERT = b"-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----"
+_FAKE_KEY = b"-----BEGIN PRIVATE KEY-----\nFAKE\n-----END PRIVATE KEY-----"
+
+
+def _mock_get_cert_pem(monkeypatch, cert=_FAKE_CERT, key=_FAKE_KEY):
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_cert_pem",
+        lambda emisor_id, conn: (cert, key),
+    )
+
+
+def test_gating_produccion_cuando_is_production(monkeypatch):
+    """is_production=True → ambiente='produccion'."""
     from services.facturacion.config import credenciales
 
     _set_is_production(monkeypatch, True)
-    _set_env_certs(monkeypatch, "pablo", present=True)
+    _mock_get_cert_pem(monkeypatch)
 
     cred = credenciales("pablo", _FakeConn())
     assert cred.ambiente == "produccion"
-    assert "wsaa.afip.gov.ar" in cred.endpoint_wsaa  # endpoint real, sin "homo"
+    assert "wsaa.afip.gov.ar" in cred.endpoint_wsaa
     assert "homo" not in cred.endpoint_wsaa
 
 
 def test_gating_homologacion_cuando_no_is_production(monkeypatch):
-    """is_production=False → homologación aunque haya cert."""
+    """is_production=False → homologación sin importar el cert."""
     from services.facturacion.config import credenciales
 
     _set_is_production(monkeypatch, False)
-    _set_env_certs(monkeypatch, "pablo", present=True)
+    _mock_get_cert_pem(monkeypatch)
 
     cred = credenciales("pablo", _FakeConn())
     assert cred.ambiente == "homologacion"
     assert "homo" in cred.endpoint_wsaa
 
 
-def test_gating_falta_cert_levanta_valor(monkeypatch):
-    """Sin cert → ValueError descriptivo (no 500 críptico)."""
+def test_gating_emisor_no_encontrado_levanta(monkeypatch):
+    """Emisor no en DB → ValueError descriptivo."""
     from services.facturacion.config import credenciales
 
     _set_is_production(monkeypatch, True)
-    _set_env_certs(monkeypatch, "pablo", present=False)
 
-    with pytest.raises(ValueError, match="AFIP_PABLO"):
+    class _ConnNone:
+        def execute(self, q, p=None):
+            class _R:
+                def fetchone(self): return None
+            return _R()
+
+    with pytest.raises(ValueError, match="no encontrado"):
+        credenciales("inexistente", _ConnNone())
+
+
+def test_gating_emisor_inactivo_levanta(monkeypatch):
+    """Emisor inactivo → ValueError."""
+    from services.facturacion.config import credenciales
+
+    _set_is_production(monkeypatch, True)
+
+    class _ConnInactivo:
+        def execute(self, q, p=None):
+            class _R:
+                def fetchone(self):
+                    return {
+                        "id": 1, "nombre": "pablo", "cuit": "20-30000000-0",
+                        "pto_vta": 1, "condicion_iva": "responsable_inscripto",
+                        "cert_enc": b"x", "key_enc": b"x",
+                        "activo": False, "notas": None,
+                        "created_at": None, "updated_at": None,
+                    }
+            return _R()
+
+    with pytest.raises(ValueError, match="inactivo"):
+        credenciales("pablo", _ConnInactivo())
+
+
+def test_gating_sin_cert_en_db_levanta(monkeypatch):
+    """Emisor sin cert en DB → ValueError descriptivo."""
+    from services.facturacion.config import credenciales
+
+    _set_is_production(monkeypatch, True)
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_cert_pem",
+        lambda emisor_id, conn: (_ for _ in ()).throw(
+            ValueError("no tiene certificado cargado")
+        ),
+    )
+
+    with pytest.raises(ValueError, match="certificado"):
         credenciales("pablo", _FakeConn())
 
 
-def test_gating_emisor_desconocido_levanta(monkeypatch):
-    """Emisor no reconocido → ValueError (no cae a un default silencioso)."""
-    from services.facturacion.config import credenciales
-
-    _set_is_production(monkeypatch, True)
-    _set_env_certs(monkeypatch, "pablo", present=True)
-
-    with pytest.raises(ValueError, match="desconocido"):
-        credenciales("rambla", _FakeConn())
-
-
-def test_gating_santini_ok(monkeypatch):
-    """Santini también funciona con los mismos invariantes."""
+def test_gating_condicion_iva_en_cred(monkeypatch):
+    """CredARCA incluye condicion_iva del emisor."""
     from services.facturacion.config import credenciales
 
     _set_is_production(monkeypatch, False)
-    _set_env_certs(monkeypatch, "santini", present=True)
+    _mock_get_cert_pem(monkeypatch)
 
-    cred = credenciales("santini", _FakeConn())
+    cred = credenciales("pablo", _FakeConn(condicion_iva="responsable_inscripto"))
+    assert cred.condicion_iva == "responsable_inscripto"
+
+
+def test_gating_santini_homologacion(monkeypatch):
+    """Santini con is_production=False → homologación."""
+    from services.facturacion.config import credenciales
+
+    _set_is_production(monkeypatch, False)
+    _mock_get_cert_pem(monkeypatch)
+
+    cred = credenciales(
+        "santini",
+        _FakeConn(nombre="santini", condicion_iva="monotributo"),
+    )
     assert cred.emisor == "santini"
     assert cred.ambiente == "homologacion"
 
 
-def test_cert_cargado_true_si_env_presentes(monkeypatch):
-    """cert_cargado devuelve True solo si AMBAS vars están seteadas."""
-    from services.facturacion.config import cert_cargado
+def test_cert_cargado_true_si_enc_presente(monkeypatch):
+    """cert_cargado_para_emisor devuelve True si cert_enc + key_enc están en DB."""
+    from services.facturacion.config import cert_cargado_para_emisor
 
-    _set_env_certs(monkeypatch, "pablo", present=True)
-    assert cert_cargado("pablo") is True
+    class _ConnConCert:
+        def execute(self, q, p=None):
+            class _R:
+                def fetchone(self): return {"cert_enc": b"x", "key_enc": b"y"}
+            return _R()
 
-
-def test_cert_cargado_false_si_env_ausentes(monkeypatch):
-    from services.facturacion.config import cert_cargado
-
-    _set_env_certs(monkeypatch, "pablo", present=False)
-    assert cert_cargado("pablo") is False
+    assert cert_cargado_para_emisor(1, _ConnConCert()) is True
 
 
-# ── Routing de emisor ─────────────────────────────────────────────────────────
+def test_cert_cargado_false_si_enc_null(monkeypatch):
+    from services.facturacion.config import cert_cargado_para_emisor
+
+    class _ConnSinCert:
+        def execute(self, q, p=None):
+            class _R:
+                def fetchone(self): return {"cert_enc": None, "key_enc": None}
+            return _R()
+
+    assert cert_cargado_para_emisor(1, _ConnSinCert()) is False
 
 
-def test_emisor_para_ri_es_pablo():
-    from services.facturacion.emisores import emisor_para
-
-    assert emisor_para("responsable_inscripto") == "pablo"
-    assert emisor_para("RESPONSABLE_INSCRIPTO") == "pablo"
-    assert emisor_para("  Responsable_Inscripto  ") == "pablo"
+# ── Routing de emisor (vía DB) ────────────────────────────────────────────────
 
 
-def test_emisor_para_monotributo_es_santini():
-    from services.facturacion.emisores import emisor_para
+class _FakeEmisorRow:
+    """Simula una row de emisores_arca."""
+    def __init__(self, nombre, condicion_iva="monotributo"):
+        self.nombre = nombre
+        self.condicion_iva = condicion_iva
 
-    assert emisor_para("monotributo") == "santini"
-
-
-def test_emisor_para_consumidor_final_es_santini():
-    from services.facturacion.emisores import emisor_para
-
-    assert emisor_para("consumidor_final") == "santini"
+    def __getitem__(self, k):
+        return getattr(self, k)
 
 
-def test_emisor_para_vacio_es_santini():
-    """Default seguro: sin perfil fiscal → santini (no pablo)."""
-    from services.facturacion.emisores import emisor_para
+class _FakeConnEmisor:
+    """Conexión que devuelve un emisor según condicion_iva."""
+    def __init__(self, nombre="santini", condicion_iva="monotributo"):
+        self._nombre = nombre
+        self._condicion_iva = condicion_iva
 
-    assert emisor_para("") == "santini"
-    assert emisor_para(None) == "santini"
+    def execute(self, query, params=None):
+        conn = self
+
+        class _Result:
+            def fetchone(self_inner):
+                row = {
+                    "id": 1,
+                    "nombre": conn._nombre,
+                    "cuit": "20-30000000-0",
+                    "pto_vta": 1,
+                    "condicion_iva": conn._condicion_iva,
+                    "cert_enc": None,
+                    "key_enc": None,
+                    "activo": True,
+                    "notas": None,
+                    "created_at": None,
+                    "updated_at": None,
+                }
+                return row
+
+        return _Result()
+
+
+def test_emisor_para_ri_llama_con_condicion_ri(monkeypatch):
+    """emisor_para pasa 'responsable_inscripto' a la consulta SQL para RI."""
+    from services.facturacion import emisores as mod
+
+    captured = {}
+
+    def fake_get(condicion, conn):
+        captured["condicion"] = condicion
+        r = _FakeEmisorRow("pablo", condicion)
+        return r
+
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_activo_para_condicion", fake_get
+    )
+    result = mod.emisor_para("responsable_inscripto", _FakeConnEmisor())
+    assert captured["condicion"] == "responsable_inscripto"
+    assert result == "pablo"
+
+
+def test_emisor_para_monotributo_llama_con_condicion_mt(monkeypatch):
+    from services.facturacion import emisores as mod
+
+    captured = {}
+
+    def fake_get(condicion, conn):
+        captured["condicion"] = condicion
+        return _FakeEmisorRow("santini", condicion)
+
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_activo_para_condicion", fake_get
+    )
+    mod.emisor_para("monotributo", _FakeConnEmisor())
+    assert captured["condicion"] == "monotributo"
+
+
+def test_emisor_para_vacio_usa_monotributo(monkeypatch):
+    """Default seguro: sin perfil fiscal → monotributo (nunca RI)."""
+    from services.facturacion import emisores as mod
+
+    captured = {}
+
+    def fake_get(condicion, conn):
+        captured["condicion"] = condicion
+        return _FakeEmisorRow("santini", condicion)
+
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_activo_para_condicion", fake_get
+    )
+    mod.emisor_para("", _FakeConnEmisor())
+    assert captured["condicion"] == "monotributo"
+
+
+def test_emisor_para_sin_emisor_activo_levanta(monkeypatch):
+    """Sin emisor activo → ValueError descriptivo."""
+    from services.facturacion import emisores as mod
+
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_activo_para_condicion",
+        lambda condicion, conn: None,
+    )
+    with pytest.raises(ValueError, match="No hay emisor activo"):
+        mod.emisor_para("monotributo", _FakeConnEmisor())

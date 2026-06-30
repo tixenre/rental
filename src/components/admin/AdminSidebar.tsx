@@ -93,6 +93,7 @@ const items: NavItem[] = [
       { title: "Liquidación", url: "/admin/contabilidad/liquidacion", icon: Calculator },
       { title: "Cobros de pedidos", url: "/admin/pagos", icon: List },
       { title: "Facturas ARCA", url: "/admin/facturas", icon: Receipt },
+      { title: "Emisores ARCA", url: "/admin/facturacion/emisores", icon: Receipt },
       { title: "Glosario", url: "/admin/contabilidad/glosario", icon: BookOpen },
     ],
   },

@@ -1790,15 +1790,21 @@ def init_db():
         )
     """)
 
-    # Seeds para las claves editables por el admin (no-secretas). Las secretas
-    # (cert/clave AFIP) van en ENV de Railway, nunca acá.
-    for key in ("afip_pablo_cuit", "afip_pablo_ptovta",
-                "afip_santini_cuit", "afip_santini_ptovta"):
-        conn.execute(
-            "INSERT INTO app_settings (key, value, updated_by) VALUES (%s, %s, 'system-seed')"
-            " ON CONFLICT (key) DO NOTHING",
-            (key, ""),
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emisores_arca (
+            id              SERIAL PRIMARY KEY,
+            nombre          TEXT NOT NULL UNIQUE,
+            cuit            TEXT NOT NULL,
+            pto_vta         INTEGER NOT NULL,
+            condicion_iva   TEXT NOT NULL,
+            cert_enc        BYTEA,
+            key_enc         BYTEA,
+            activo          BOOLEAN NOT NULL DEFAULT true,
+            notas           TEXT,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
         )
+    """)
 
     # Regenerar etiquetas auto (origen='auto') para todos los equipos.
     # Idempotente: solo borra y reinserta las auto, no toca las manuales.

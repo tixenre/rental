@@ -2370,12 +2370,22 @@ export const estudioAdminApi = {
 
 // ── Facturación electrónica ARCA (#1139) ────────────────────────────────────
 
+export type EmisorArca = {
+  id: number;
+  nombre: string;
+  cuit: string;
+  pto_vta: number;
+  condicion_iva: "responsable_inscripto" | "monotributo" | "exento";
+  cert_cargado: boolean;
+  activo: boolean;
+  notas: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 export type EstadoFacturacion = {
   ambiente: "homologacion" | "produccion";
-  emisores: Record<
-    "pablo" | "santini",
-    { cuit: string; ptovta: string; cert_cargado: boolean }
-  >;
+  emisores: EmisorArca[];
 };
 
 export type FacturaEstado = "pendiente" | "emitida" | "error" | "anulada";
@@ -2417,6 +2427,25 @@ export type FacturasListResp = {
 
 export const facturacionApi = {
   getEstado: () => authedJson<EstadoFacturacion>("/api/admin/facturacion/estado"),
+
+  // Emisores
+  listEmisores: () => authedJson<EmisorArca[]>("/api/admin/emisores-arca"),
+  createEmisor: (body: Omit<EmisorArca, "id" | "cert_cargado" | "created_at" | "updated_at">) =>
+    authedPostJson<EmisorArca>("/api/admin/emisores-arca", body),
+  updateEmisor: (id: number, body: Partial<EmisorArca>) =>
+    authedJson<EmisorArca>(`/api/admin/emisores-arca/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  cargarCert: (id: number, cert_pem: string, key_pem: string) =>
+    authedPostJson<{ ok: boolean; cert_cargado: boolean }>(
+      `/api/admin/emisores-arca/${id}/cert`,
+      { cert_pem, key_pem },
+    ),
+  desactivarEmisor: (id: number) =>
+    authedJson<void>(`/api/admin/emisores-arca/${id}`, { method: "DELETE" }),
+
+  // Facturas
   facturarPedido: (pedidoId: number) =>
     authedPostJson<Factura>(`/api/alquileres/${pedidoId}/facturar`, {}),
   listFacturasPedido: (pedidoId: number) =>

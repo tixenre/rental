@@ -1,8 +1,9 @@
 """Routes de facturación electrónica ARCA (#1139).
 
-Fase 1: estado/configuración (sin emitir).
+Fase 1: estado/configuración.
 Fase 3: POST /alquileres/{id}/facturar (engine + PDF).
-Fases 4-5: listados, PDF download, mail, NC.
+Fases 4-5: listados, PDF download, NC.
+Fase 7: CRUD emisores (credenciales dinámicas, cifradas).
 """
 from __future__ import annotations
 
@@ -13,54 +14,159 @@ from fastapi.responses import Response
 
 from database import get_db
 from routes.auth import require_admin
-from services.facturacion.config import cert_cargado
 
 router = APIRouter()
 
-_EMISORES = ("pablo", "santini")
-
 
 # ---------------------------------------------------------------------------
-# GET /admin/facturacion/estado (Fase 1)
+# GET /admin/facturacion/estado
 # ---------------------------------------------------------------------------
 
 
 @router.get("/admin/facturacion/estado")
 def estado_facturacion(request: Request):
-    """Estado de configuración de los dos emisores ARCA.
-
-    Devuelve CUIT, PtoVta y si el certificado está cargado en ENV (sí/no).
-    Nunca expone el secreto.
-    Requiere sesión de admin.
-    """
+    """Estado de configuración: ambiente activo + lista de emisores (sin secretos)."""
     require_admin(request)
-
-    with get_db() as conn:
-        keys = [f"afip_{e}_{campo}" for e in _EMISORES for campo in ("cuit", "ptovta")]
-        rows = conn.execute(
-            "SELECT key, value FROM app_settings WHERE key = ANY(%s)",
-            (keys,),
-        ).fetchall()
-    kv = {r["key"]: r["value"] for r in rows}
 
     from config import settings as app_settings
     ambiente = "produccion" if app_settings.is_production else "homologacion"
 
+    from services.facturacion.emisores_repo import list_emisores
+    with get_db() as conn:
+        emisores = list_emisores(conn)
+
     return {
         "ambiente": ambiente,
-        "emisores": {
-            emisor: {
-                "cuit": kv.get(f"afip_{emisor}_cuit", "") or "",
-                "ptovta": kv.get(f"afip_{emisor}_ptovta", "") or "",
-                "cert_cargado": cert_cargado(emisor),
-            }
-            for emisor in _EMISORES
-        },
+        "emisores": [_emisor_to_dict(e) for e in emisores],
     }
 
 
 # ---------------------------------------------------------------------------
-# POST /alquileres/{id}/facturar (Fase 3)
+# CRUD emisores (Fase 7)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/emisores-arca")
+def listar_emisores(request: Request):
+    """Lista todos los emisores configurados (sin cert/clave)."""
+    require_admin(request)
+    from services.facturacion.emisores_repo import list_emisores
+    with get_db() as conn:
+        return [_emisor_to_dict(e) for e in list_emisores(conn)]
+
+
+@router.post("/admin/emisores-arca", status_code=201)
+def crear_emisor(request: Request, body: dict):
+    """Crea un nuevo emisor. No incluye cert/clave (se suben aparte)."""
+    require_admin(request)
+    nombre = (body.get("nombre") or "").strip()
+    cuit = (body.get("cuit") or "").strip()
+    pto_vta = body.get("pto_vta")
+    condicion_iva = (body.get("condicion_iva") or "").strip()
+    notas = (body.get("notas") or "").strip() or None
+
+    if not nombre or not cuit or not pto_vta or not condicion_iva:
+        raise HTTPException(400, "nombre, cuit, pto_vta y condicion_iva son obligatorios")
+
+    try:
+        pto_vta_int = int(pto_vta)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "pto_vta debe ser un número entero")
+
+    from services.facturacion.emisores_repo import create_emisor
+    try:
+        with get_db() as conn:
+            emisor_id = create_emisor(
+                conn,
+                nombre=nombre,
+                cuit=cuit,
+                pto_vta=pto_vta_int,
+                condicion_iva=condicion_iva,
+                notas=notas,
+            )
+            from services.facturacion.emisores_repo import get_by_id
+            emisor = get_by_id(emisor_id, conn)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    return _emisor_to_dict(emisor)
+
+
+@router.put("/admin/emisores-arca/{emisor_id}")
+def actualizar_emisor(emisor_id: int, request: Request, body: dict):
+    """Actualiza datos del emisor (nombre, CUIT, pto_vta, condicion_iva, activo, notas)."""
+    require_admin(request)
+
+    from services.facturacion.emisores_repo import update_emisor, get_by_id
+    try:
+        with get_db() as conn:
+            update_emisor(
+                emisor_id,
+                conn,
+                nombre=body.get("nombre"),
+                cuit=body.get("cuit"),
+                pto_vta=body.get("pto_vta"),
+                condicion_iva=body.get("condicion_iva"),
+                activo=body.get("activo"),
+                notas=body.get("notas"),
+            )
+            emisor = get_by_id(emisor_id, conn)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    if emisor is None:
+        raise HTTPException(404, "Emisor no encontrado")
+    return _emisor_to_dict(emisor)
+
+
+@router.post("/admin/emisores-arca/{emisor_id}/cert")
+def cargar_cert(emisor_id: int, request: Request, body: dict):
+    """Sube y cifra el certificado + clave privada PEM del emisor.
+
+    Body: { "cert_pem": "-----BEGIN CERTIFICATE-----\\n...", "key_pem": "-----BEGIN PRIVATE KEY-----\\n..." }
+    Nunca devuelve el cert/clave; solo confirma que se guardó.
+    """
+    require_admin(request)
+
+    cert_pem_str = (body.get("cert_pem") or "").strip()
+    key_pem_str = (body.get("key_pem") or "").strip()
+
+    if not cert_pem_str or not key_pem_str:
+        raise HTTPException(400, "cert_pem y key_pem son obligatorios")
+    if "BEGIN CERTIFICATE" not in cert_pem_str:
+        raise HTTPException(400, "cert_pem no parece un certificado PEM válido")
+    if "PRIVATE KEY" not in key_pem_str:
+        raise HTTPException(400, "key_pem no parece una clave privada PEM válida")
+
+    from services.facturacion.emisores_repo import set_cert, get_by_id
+    try:
+        with get_db() as conn:
+            set_cert(
+                emisor_id,
+                conn,
+                cert_pem=cert_pem_str.encode(),
+                key_pem=key_pem_str.encode(),
+            )
+            emisor = get_by_id(emisor_id, conn)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    if emisor is None:
+        raise HTTPException(404, "Emisor no encontrado")
+    return {"ok": True, "cert_cargado": emisor.cert_cargado}
+
+
+@router.delete("/admin/emisores-arca/{emisor_id}", status_code=204)
+def desactivar_emisor(emisor_id: int, request: Request):
+    """Marca el emisor como inactivo (soft-delete). Las facturas existentes no se tocan."""
+    require_admin(request)
+    from services.facturacion.emisores_repo import delete_emisor
+    with get_db() as conn:
+        delete_emisor(emisor_id, conn)
+
+
+# ---------------------------------------------------------------------------
+# POST /alquileres/{id}/facturar
 # ---------------------------------------------------------------------------
 
 
@@ -70,8 +176,6 @@ def facturar_pedido(pedido_id: int, request: Request):
 
     Idempotente: si ya existe una factura 'emitida' o 'pendiente' para el pedido,
     la devuelve sin volver a llamar a ARCA.
-
-    Requiere sesión de admin. El estado del pedido debe ser ≥ 'confirmado'.
     """
     require_admin(request)
 
@@ -89,17 +193,13 @@ def facturar_pedido(pedido_id: int, request: Request):
 
 
 # ---------------------------------------------------------------------------
-# POST /facturas/{id}/nota-credito (Fase 5 — adelantamos el handler)
+# POST /facturas/{id}/nota-credito
 # ---------------------------------------------------------------------------
 
 
 @router.post("/facturas/{factura_id}/nota-credito")
 def nota_credito(factura_id: int, request: Request):
-    """Emite una Nota de Crédito que anula la factura indicada.
-
-    Idempotente: si ya existe una NC vigente para esta factura, la devuelve.
-    Requiere sesión de admin.
-    """
+    """Emite una Nota de Crédito que anula la factura indicada. Idempotente."""
     require_admin(request)
 
     try:
@@ -116,7 +216,7 @@ def nota_credito(factura_id: int, request: Request):
 
 
 # ---------------------------------------------------------------------------
-# GET /alquileres/{id}/facturas (Fase 4)
+# GET /alquileres/{id}/facturas
 # ---------------------------------------------------------------------------
 
 
@@ -132,7 +232,7 @@ def facturas_del_pedido(pedido_id: int, request: Request):
 
 
 # ---------------------------------------------------------------------------
-# GET /admin/facturas — listado global con filtros (Fase 4)
+# GET /admin/facturas
 # ---------------------------------------------------------------------------
 
 
@@ -171,7 +271,7 @@ def listar_facturas(
 
 
 # ---------------------------------------------------------------------------
-# GET /facturas/{id}/pdf — descarga del PDF de la factura (Fase 4)
+# GET /facturas/{id}/pdf
 # ---------------------------------------------------------------------------
 
 
@@ -244,4 +344,19 @@ def _factura_to_dict(f) -> dict:
         "fecha_emision": f.fecha_emision.isoformat() if f.fecha_emision else None,
         "created_at": f.created_at.isoformat() if f.created_at else None,
         "created_by": f.created_by,
+    }
+
+
+def _emisor_to_dict(e) -> dict:
+    return {
+        "id": e.id,
+        "nombre": e.nombre,
+        "cuit": e.cuit,
+        "pto_vta": e.pto_vta,
+        "condicion_iva": e.condicion_iva,
+        "cert_cargado": e.cert_cargado,
+        "activo": e.activo,
+        "notas": e.notas,
+        "created_at": e.created_at.isoformat() if e.created_at else None,
+        "updated_at": e.updated_at.isoformat() if e.updated_at else None,
     }
