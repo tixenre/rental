@@ -516,7 +516,7 @@ export function CartDrawerView({
                         href={urgenciaWhatsappUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-full border border-ink/15 bg-background px-4 py-2 text-xs font-semibold text-ink hover:bg-surface"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink/15 bg-background px-4 py-2.5 text-xs font-semibold text-ink hover:bg-surface"
                       >
                         <MessageCircle className="h-4 w-4" />
                         Escribinos por WhatsApp
