@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { adminApi, descuentosJornadaApi } from "@/lib/admin/api";
+import { FacturacionSection } from "@/components/admin/settings/FacturacionSection";
 import { DUENOS } from "@/lib/admin/duenos";
 import { formatARS } from "@/lib/format";
 import { interpolarDescuento } from "@/lib/api";
@@ -77,6 +78,10 @@ function SettingsPage() {
 
       <AdminSection title="Ranking automático" storageKey="settings:ranking" defaultOpen={false}>
         <RankingSection />
+      </AdminSection>
+
+      <AdminSection title="Facturación ARCA" storageKey="settings:facturacion" defaultOpen={false}>
+        <FacturacionSection />
       </AdminSection>
 
       <AdminSection title="Google Analytics" storageKey="settings:ga4" defaultOpen={false}>

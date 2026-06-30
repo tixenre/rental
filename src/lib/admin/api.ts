@@ -2368,6 +2368,20 @@ export const estudioAdminApi = {
 
 // ── Descuentos por jornadas ──────────────────────────────────────────────────
 
+// ── Facturación electrónica ARCA (#1139) ────────────────────────────────────
+
+export type EstadoFacturacion = {
+  ambiente: "homologacion" | "produccion";
+  emisores: Record<
+    "pablo" | "santini",
+    { cuit: string; ptovta: string; cert_cargado: boolean }
+  >;
+};
+
+export const facturacionApi = {
+  getEstado: () => authedJson<EstadoFacturacion>("/api/admin/facturacion/estado"),
+};
+
 export type DescuentoJornada = { id: number; jornadas: number; pct: number };
 
 export const descuentosJornadaApi = {

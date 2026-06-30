@@ -1735,6 +1735,71 @@ def init_db():
             ), true)
     """)
 
+    # ── Facturación electrónica ARCA (#1139) ─────────────────────────────────
+    # Motor portable en `backend/arca_fe/`; adapter en `backend/services/facturacion/`.
+    # Esquema en dos capas (MEMORIA 2026-06-03): también en migración a2b3c4d5e6f7.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS facturas (
+            id                      SERIAL PRIMARY KEY,
+            pedido_id               INTEGER NOT NULL REFERENCES alquileres(id) ON DELETE CASCADE,
+            emisor                  TEXT NOT NULL,
+            ambiente                TEXT NOT NULL,
+            cbte_tipo               INTEGER NOT NULL,
+            pto_vta                 INTEGER NOT NULL,
+            cbte_nro                INTEGER,
+            cae                     TEXT,
+            cae_vto                 DATE,
+            doc_tipo                INTEGER NOT NULL,
+            doc_nro                 TEXT NOT NULL,
+            condicion_iva_receptor  INTEGER NOT NULL,
+            concepto                INTEGER NOT NULL,
+            imp_neto                INTEGER NOT NULL,
+            imp_iva                 INTEGER NOT NULL DEFAULT 0,
+            imp_total               INTEGER NOT NULL,
+            moneda                  TEXT NOT NULL DEFAULT 'PES',
+            cliente_cuit            TEXT,
+            razon_social            TEXT,
+            qr_payload              TEXT,
+            pdf_key                 TEXT,
+            estado                  TEXT NOT NULL DEFAULT 'pendiente',
+            nota_credito_de         INTEGER REFERENCES facturas(id),
+            raw_request             JSONB,
+            raw_response            JSONB,
+            errores                 JSONB,
+            fecha_emision           TIMESTAMPTZ,
+            created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+            created_by              TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_factura_vigente_por_pedido
+        ON facturas (pedido_id) WHERE estado IN ('pendiente','emitida')
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_facturas_pedido ON facturas (pedido_id)
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS afip_ta (
+            ambiente   TEXT NOT NULL,
+            emisor     TEXT NOT NULL,
+            token      TEXT NOT NULL,
+            sign       TEXT NOT NULL,
+            expira_at  TIMESTAMPTZ NOT NULL,
+            PRIMARY KEY (ambiente, emisor)
+        )
+    """)
+
+    # Seeds para las claves editables por el admin (no-secretas). Las secretas
+    # (cert/clave AFIP) van en ENV de Railway, nunca acá.
+    for key in ("afip_pablo_cuit", "afip_pablo_ptovta",
+                "afip_santini_cuit", "afip_santini_ptovta"):
+        conn.execute(
+            "INSERT INTO app_settings (key, value, updated_by) VALUES (%s, %s, 'system-seed')"
+            " ON CONFLICT (key) DO NOTHING",
+            (key, ""),
+        )
+
     # Regenerar etiquetas auto (origen='auto') para todos los equipos.
     # Idempotente: solo borra y reinserta las auto, no toca las manuales.
     # Se hace una vez por arranque para mantener la bolsa sincronizada
