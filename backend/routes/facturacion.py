@@ -63,6 +63,7 @@ def crear_emisor(request: Request, body: dict):
     cuit = (body.get("cuit") or "").strip()
     pto_vta = body.get("pto_vta")
     condicion_iva = (body.get("condicion_iva") or "").strip()
+    razon_social = (body.get("razon_social") or "").strip() or None
     notas = (body.get("notas") or "").strip() or None
 
     if not nombre or not cuit or not pto_vta or not condicion_iva:
@@ -82,6 +83,7 @@ def crear_emisor(request: Request, body: dict):
                 cuit=cuit,
                 pto_vta=pto_vta_int,
                 condicion_iva=condicion_iva,
+                razon_social=razon_social,
                 notas=notas,
             )
             from services.facturacion.emisores_repo import get_by_id
@@ -109,6 +111,7 @@ def actualizar_emisor(emisor_id: int, request: Request, body: dict):
                 pto_vta=body.get("pto_vta"),
                 condicion_iva=body.get("condicion_iva"),
                 activo=body.get("activo"),
+                razon_social=body.get("razon_social"),
                 notas=body.get("notas"),
             )
             emisor = get_by_id(emisor_id, conn)
@@ -472,6 +475,7 @@ def _emisor_to_dict(e) -> dict:
         "condicion_iva": e.condicion_iva,
         "cert_cargado": e.cert_cargado,
         "activo": e.activo,
+        "razon_social": e.razon_social,
         "notas": e.notas,
         "created_at": e.created_at.isoformat() if e.created_at else None,
         "updated_at": e.updated_at.isoformat() if e.updated_at else None,

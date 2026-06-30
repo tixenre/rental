@@ -5,6 +5,7 @@ Sin estado, sin IO, sin imports de backend.*
 from __future__ import annotations
 
 import base64
+import io
 import json
 from datetime import date
 from decimal import Decimal
@@ -50,3 +51,13 @@ def armar_qr(
     json_bytes = json.dumps(payload, separators=(",", ":")).encode()
     b64 = base64.b64encode(json_bytes).decode()
     return f"https://www.afip.gob.ar/fe/qr/?p={b64}"
+
+
+def _build_qr_image_data_uri(url: str) -> str:
+    """Genera un QR code PNG como data-URI a partir de la URL fiscal AFIP."""
+    import segno
+    qr = segno.make(url, error="M")
+    buf = io.BytesIO()
+    qr.save(buf, kind="png", scale=4, border=2)
+    png_b64 = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/png;base64,{png_b64}"

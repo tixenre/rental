@@ -2225,6 +2225,10 @@ def _init_db_schema(conn):
             updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """)
+    conn.execute("""
+        ALTER TABLE emisores_arca
+            ADD COLUMN IF NOT EXISTS razon_social TEXT
+    """)
 
     # Regenerar etiquetas auto (origen='auto') para todos los equipos.
     # Idempotente: solo borra y reinserta las auto, no toca las manuales.

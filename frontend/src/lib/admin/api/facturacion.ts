@@ -11,6 +11,7 @@ export type EmisorArca = {
   condicion_iva: "responsable_inscripto" | "monotributo" | "exento";
   cert_cargado: boolean;
   activo: boolean;
+  razon_social: string | null;
   notas: string | null;
   created_at: string | null;
   updated_at: string | null;

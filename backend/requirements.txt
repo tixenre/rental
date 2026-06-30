@@ -46,6 +46,9 @@ sentry-sdk[fastapi]==2.63.0
 # lxml es la dependencia de parseo XML de zeep (viene incluida pero la fijamos explícita).
 zeep>=4.2.1
 
+# Generación de QR fiscal (RG4892) en el PDF de factura.
+segno>=1.5.0
+
 # Versiones PINEADAS (==) para builds reproducibles (#925). Estas son el set
 # resuelto y validado por CI al momento de pinear; antes el repo floteaba a la
 # última en cada build de Docker. Para subir una dep: cambiar el == acá, dejar
