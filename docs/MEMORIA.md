@@ -425,6 +425,9 @@ arquitectura → `MEMORIA`+`DECISIONES` (OK del dueño); gotcha cómo-funciona-X
 desktop; surfacea, no despacha ni reemplaza al de gobernanza) · **skill `gobernanza` §7 = método** · **dueño =
 gate** (dos OK: ¿corro el retro? → reparto ítem por ítem). Semi-automático: el hook recuerda, la sesión juzga, el
 dueño aprueba. Propone-no-aplica salvo buzón e issues. Aplica la cláusula de retiro del harness de evals.
+**El disparador mide TAMAÑO (proxy barato); el rinde lo da la NOVEDAD** (criterio/arquitectura/principio nuevo, no
+líneas) → al primer OK la sesión **estima el rinde por novedad** ("rutinaria, reusó X → flaca" vs. "terreno nuevo en
+Y → vale") para que el dueño gatee informado y temprano, no tras gastar el análisis (refinado 2026-06-30).
 
 ### 2026-06-29 — `backend/services/contenido/` = puerta única de "qué incluye un producto" (display derivado de la receta real)
 

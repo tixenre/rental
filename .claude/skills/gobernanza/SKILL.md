@@ -163,8 +163,11 @@ retro"). **No** para cambios triviales — el hook ya filtra por umbral (≥4 ar
 
 **Interacción — el flujo de los dos OK del dueño.** Un hook no puede despachar un agente ni preguntarte y
 esperar: solo recuerda → la sesión maneja el resto, y **vos seguís siendo el gate**:
-1. La sesión **te pregunta primero** (sí/no): "esta iniciativa tocó N archivos / M líneas — ¿corro el
-   retro?". Si decís que no, no corre.
+1. La sesión **te pregunta primero** (sí/no) **con un rinde estimado por NOVEDAD, no solo el tamaño**:
+   "tocó N archivos / M líneas — **pero reusó `<patrón/guard ya establecido>` → va a salir flaca**" vs.
+   "**rompió terreno en `<X>` → vale**". El tamaño es el disparador (proxy barato); la **novedad**
+   —criterio/arquitectura/principio nuevo— es lo que paga. Así gateás **informado y temprano**, antes de
+   gastar el análisis. Si decís que no, no corre.
 2. Con tu OK, **analiza** qué rindió y qué no (abajo).
 3. Te trae el **reparto ítem por ítem** y **vos aprobás cada destino**. Nada va a memoria / SISTEMA /
    principios sin tu OK; lo único que la sesión escribe sola es el **buzón** (que ya es el inbox de
@@ -242,7 +245,7 @@ Cierre de gobernanza (lo dispara check-buzon.sh cuando el buzón junta ≥5 pend
   → si hay decisión nueva: memoria + DECISIONES en paridad · principios: re-derivar cada 2 cierres
 
 Retro de iniciativa (al cerrar algo grande · lo dispara check-retro.sh · o a demanda):
-  → preguntá sí/no → con OK analizá qué rindió/qué no → reparto ítem-por-ítem (el dueño aprueba c/u)
+  → preguntá sí/no (con rinde estimado por NOVEDAD, no solo tamaño) → con OK analizá qué rindió/qué no → reparto ítem-por-ítem (el dueño aprueba c/u)
   → método de skill → buzón (autónomo) · criterio → MEMORIA+DECISIONES · gotcha → SISTEMA_* ·
     principio → CLAUDE.md · diferido → issue · nada → decilo (no fabriques churn)
 ```

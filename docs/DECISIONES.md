@@ -1474,6 +1474,17 @@ cancel-in-progress` ya cancela corridas viejas.
   nota de scope), `CLAUDE.md` (fila de `gobernanza` con el disparador del retro), `scripts/evals/README.md` (2º
   auto-disparador en "Auto-disparo (Nivel 1)"). **Dogfooded** sobre la iniciativa de contenido (entrada gemela
   2026-06-29): produjo la corroboración gh-CLI al buzón (autónomo) + la entrada de memoria de la puerta.
+- **Refinamiento 2026-06-30 — tamaño ≠ novedad; rinde estimado al gate.** El disparador por **tamaño de diff**
+  (≥4 archivos/≥150 líneas) es un **proxy barato**, pero lo que el retro **paga** es la **novedad**: una iniciativa
+  grande-pero-rutinaria (reusa patrones/guards ya establecidos) rinde poco; una chica-pero-novedosa rinde mucho.
+  Por eso, al dispararse, la sesión **estima el rinde esperado por novedad ANTES de analizar** y lo trae al primer
+  OK ("rutinaria, reusó X → va a salir flaca" vs. "rompió terreno en Y → vale"), para que el dueño **gatee informado
+  y temprano**, no después de gastar el análisis. **Caso testigo (dogfood):** el retro de la *vitrina de organismos
+  del DS* (7 archivos / ~1.100 líneas → calificaba por tamaño) salió **flaco** porque fue rutinario (reusó el patrón
+  de vitrina + el guard Bloque 6b de la iniciativa anterior): rinde neto = **1 gotcha al buzón**, todo lo demás
+  confirmó decisiones existentes. El dueño lo notó al final (_"¿hay que hacer el retro?"_) → de ahí el refinamiento.
+  El skill `gobernanza` §7 paso 1 + cheatsheet se actualizaron. El supervisor marca un retro que reporte solo el
+  tamaño al gate sin estimar la novedad.
 
 ### 2026-06-29 — `backend/services/contenido/` = puerta única de "qué incluye un producto" (display derivado de la receta real)
 
