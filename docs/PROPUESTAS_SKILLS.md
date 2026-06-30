@@ -38,3 +38,10 @@ siendo el mantenimiento real). · Por qué: hoy los manuales los vigila el super
 (links/estructura), pero **nada detecta el desfase de CONTENIDO**. Un check periódico sería la red de seguridad
 que cierra el círculo. **Prematuro con 1 solo manual (fotos)** — activar cuando haya varios (ver el issue de
 relevamiento de manuales).
+
+2026-06-30 · calidad-tests · Caso testigo: un test que compara fechas contra `now_ar()` (hora de Argentina, la
+convención del repo) debe construir sus fechas con `now_ar().date()`, **NO** con `datetime.date.today()` (UTC en
+CI) → si no, falla ~00:00–03:00 UTC (UTC ya es el día siguiente que AR). Sumarlo como gotcha de "tests frágiles /
+edge cases de fecha" · Por qué: apareció como **flake real** en `test_check_fechas_pasada_cliente` (#1131) — tapó
+el CI verde de un cambio no relacionado y costó un diagnóstico; el test usaba un reloj distinto al del código bajo
+prueba. Patrón repetible en cualquier test de fechas (now_ar es la convención en todo el backend).
