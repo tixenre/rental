@@ -280,8 +280,8 @@ def listar_facturas(
 
 
 @router.get("/facturas/{factura_id}/pdf")
-def descargar_pdf_factura(factura_id: int, request: Request):
-    """Descarga el PDF de una factura desde R2. Requiere sesión de admin."""
+async def descargar_pdf_factura(factura_id: int, request: Request):
+    """Descarga el PDF de una factura. Si no está cacheado en R2, lo genera on-demand."""
     require_admin(request)
 
     from services.facturacion.repo import get_by_id
@@ -290,14 +290,31 @@ def descargar_pdf_factura(factura_id: int, request: Request):
 
     if factura is None:
         raise HTTPException(404, "Factura no encontrada")
-    if not factura.pdf_key:
-        raise HTTPException(404, "PDF no disponible aún")
+    if factura.estado != "emitida":
+        raise HTTPException(400, "Solo se pueden descargar facturas emitidas")
 
-    try:
-        from services.media.storage import get as storage_get
-        pdf_bytes = storage_get(factura.pdf_key)
-    except Exception as e:
-        raise HTTPException(503, f"No se pudo obtener el PDF: {e}")
+    pdf_bytes: Optional[bytes] = None
+
+    if factura.pdf_key:
+        try:
+            from services.media.storage import get as storage_get
+            pdf_bytes = storage_get(factura.pdf_key)
+        except Exception:
+            pdf_bytes = None
+
+    if pdf_bytes is None:
+        try:
+            from services.facturacion.engine import _get_pedido
+            from services.facturacion.pdf import factura_html
+            from pdf import _render_pdf
+
+            with get_db() as conn:
+                pedido = _get_pedido(conn, factura.pedido_id)
+
+            html_str = factura_html(factura, pedido)
+            pdf_bytes = await _render_pdf(html_str)
+        except Exception as e:
+            raise HTTPException(503, f"No se pudo generar el PDF: {e}")
 
     cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
         factura.cbte_tipo, "X"
@@ -319,12 +336,11 @@ def descargar_pdf_factura(factura_id: int, request: Request):
 
 
 @router.post("/facturas/{factura_id}/enviar-mail")
-def enviar_mail_factura(factura_id: int, request: Request):
+async def enviar_mail_factura(factura_id: int, request: Request):
     """Envía el PDF de la factura al email del cliente del pedido."""
     require_admin(request)
 
     from services.facturacion.repo import get_by_id
-    from services.media.storage import get as storage_get
     from services.email import send_raw_email, Attachment
 
     with get_db() as conn:
@@ -334,8 +350,6 @@ def enviar_mail_factura(factura_id: int, request: Request):
         raise HTTPException(404, "Factura no encontrada")
     if factura.estado != "emitida":
         raise HTTPException(400, "Solo se pueden enviar facturas emitidas")
-    if not factura.pdf_key:
-        raise HTTPException(404, "PDF no disponible aún")
 
     # Email del cliente: está en el pedido
     with get_db() as conn:
@@ -355,10 +369,27 @@ def enviar_mail_factura(factura_id: int, request: Request):
     email_cliente = row["owner_email"]
     nombre_cliente = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip() or email_cliente
 
-    try:
-        pdf_bytes = storage_get(factura.pdf_key)
-    except Exception as e:
-        raise HTTPException(503, f"No se pudo obtener el PDF: {e}")
+    pdf_bytes: Optional[bytes] = None
+    if factura.pdf_key:
+        try:
+            from services.media.storage import get as storage_get
+            pdf_bytes = storage_get(factura.pdf_key)
+        except Exception:
+            pdf_bytes = None
+
+    if pdf_bytes is None:
+        try:
+            from services.facturacion.engine import _get_pedido
+            from services.facturacion.pdf import factura_html
+            from pdf import _render_pdf
+
+            with get_db() as conn:
+                pedido = _get_pedido(conn, factura.pedido_id)
+
+            html_str = factura_html(factura, pedido)
+            pdf_bytes = await _render_pdf(html_str)
+        except Exception as e:
+            raise HTTPException(503, f"No se pudo generar el PDF para el mail: {e}")
 
     cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
         factura.cbte_tipo, "X"
