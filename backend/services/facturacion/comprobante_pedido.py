@@ -11,7 +11,6 @@ from decimal import Decimal
 from typing import Optional
 
 from arca_fe import (
-    CbteTipo,
     Concepto,
     CondicionIva,
     DocTipo,

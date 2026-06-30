@@ -9,13 +9,11 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import textwrap
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from xml.etree import ElementTree as ET
 
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.hazmat.primitives.serialization.pkcs7 import (
     PKCS7Options,

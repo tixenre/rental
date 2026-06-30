@@ -26,8 +26,8 @@ export function FacturacionSection() {
   return (
     <section className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        Motor de facturación electrónica ARCA. Los certificados y la clave maestra van en
-        variables de entorno Railway (nunca acá). Gestión completa de emisores en la{" "}
+        Motor de facturación electrónica ARCA. Los certificados y la clave maestra van en variables
+        de entorno Railway (nunca acá). Gestión completa de emisores en la{" "}
         <Link
           to="/admin/facturacion/emisores"
           className="underline hover:text-ink inline-flex items-center gap-1"
@@ -41,8 +41,9 @@ export function FacturacionSection() {
         <div className="flex items-center gap-2">
           <span className="t-eyebrow">Ambiente:</span>
           <span
+            // eslint-disable-next-line no-restricted-syntax -- ambiente: verde-ink + amber-700 paleta categórica producción/homologación (Tier 3)
             className={`text-xs font-mono font-medium ${
-              estadoQ.data.ambiente === "produccion" ? "text-verde" : "text-amber-700"
+              estadoQ.data.ambiente === "produccion" ? "text-verde-ink" : "text-amber-700"
             }`}
           >
             {estadoQ.data.ambiente === "produccion" ? "Producción" : "Homologación (pruebas)"}
@@ -64,8 +65,8 @@ export function FacturacionSection() {
               <div className="flex items-center gap-1 text-xs shrink-0">
                 {em.cert_cargado ? (
                   <>
-                    <CheckCircle2 className="h-4 w-4 text-verde" />
-                    <span className="text-verde">Cert. cargado</span>
+                    <CheckCircle2 className="h-4 w-4 text-verde-ink" />
+                    <span className="text-verde-ink">Cert. cargado</span>
                   </>
                 ) : (
                   <>

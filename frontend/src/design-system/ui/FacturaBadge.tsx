@@ -34,7 +34,7 @@ export function FacturaBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2 py-0.5 font-sans text-[10px] font-medium",
+        "inline-flex items-center rounded-full border px-2 py-0.5 font-sans text-2xs font-medium",
         cls,
         className,
       )}

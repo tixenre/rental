@@ -999,8 +999,7 @@ function FacturacionRailSection({
   );
   const nc = facturas.find((f: Factura) => f.nota_credito_de != null);
   const puedeFacturar = ESTADOS_FACTURABLES.includes(estadoPedido) && !principal;
-  const puedeAnular =
-    principal?.estado === "emitida" && !nc;
+  const puedeAnular = principal?.estado === "emitida" && !nc;
 
   const cbteLetra = principal
     ? ({ 1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C" }[principal.cbte_tipo] ?? "?")
@@ -1019,9 +1018,7 @@ function FacturacionRailSection({
             <FacturaBadge estado={principal.estado} />
             {cbteLetra && (
               // eslint-disable-next-line no-restricted-syntax -- text-[11px]: entre text-2xs y text-xs, sin equiv DS
-              <span className="font-mono text-[11px] text-muted-foreground">
-                Fact. {cbteLetra}
-              </span>
+              <span className="font-mono text-[11px] text-muted-foreground">Fact. {cbteLetra}</span>
             )}
             {principal.ambiente === "homologacion" && (
               // eslint-disable-next-line no-restricted-syntax -- text-[10px] alias text-2xs; amber: paleta categórica homologación (Tier 3)
@@ -1068,7 +1065,6 @@ function FacturacionRailSection({
           {nc && (
             <div className="mt-1 flex items-center gap-1.5">
               <FacturaBadge estado={nc.estado} />
-              {/* eslint-disable-next-line no-restricted-syntax -- text-[10px] alias text-2xs */}
               <span className="font-mono text-2xs text-muted-foreground">NC emitida</span>
             </div>
           )}

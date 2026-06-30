@@ -71,7 +71,7 @@ class _FakeConn:
 
 def _set_is_production(monkeypatch, value: bool):
     import config
-    monkeypatch.setattr(config.settings, "is_production", value)
+    monkeypatch.setattr(type(config.settings), "is_production", property(lambda self: value))
 
 
 def _set_env_certs(monkeypatch, emisor: str, present: bool = True):

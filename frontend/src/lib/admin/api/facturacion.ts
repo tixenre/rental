@@ -71,10 +71,10 @@ export const facturacionApi = {
       body: JSON.stringify(body),
     }),
   cargarCert: (id: number, cert_pem: string, key_pem: string) =>
-    authedPostJson<{ ok: boolean; cert_cargado: boolean }>(
-      `/api/admin/emisores-arca/${id}/cert`,
-      { cert_pem, key_pem },
-    ),
+    authedPostJson<{ ok: boolean; cert_cargado: boolean }>(`/api/admin/emisores-arca/${id}/cert`, {
+      cert_pem,
+      key_pem,
+    }),
   desactivarEmisor: (id: number) =>
     authedJson<void>(`/api/admin/emisores-arca/${id}`, { method: "DELETE" }),
 
@@ -85,12 +85,7 @@ export const facturacionApi = {
     authedJson<Factura[]>(`/api/alquileres/${pedidoId}/facturas`),
   notaCreditoFactura: (facturaId: number) =>
     authedPostJson<Factura>(`/api/facturas/${facturaId}/nota-credito`, {}),
-  listFacturas: (params?: {
-    emisor?: string;
-    estado?: string;
-    desde?: string;
-    hasta?: string;
-  }) => {
+  listFacturas: (params?: { emisor?: string; estado?: string; desde?: string; hasta?: string }) => {
     const sp = new URLSearchParams();
     if (params?.emisor) sp.set("emisor", params.emisor);
     if (params?.estado) sp.set("estado", params.estado);

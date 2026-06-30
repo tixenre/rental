@@ -47,18 +47,21 @@ function EmisoresPage() {
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-3xl mx-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+          <div className="font-mono text-2xs uppercase tracking-[0.25em] text-muted-foreground">
             Back-office · Facturación ARCA
           </div>
           <h1 className="font-display text-3xl text-ink">Emisores</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            CUITs habilitados para emitir comprobantes electrónicos. Las claves
-            se cifran con AES antes de guardarse.
+            CUITs habilitados para emitir comprobantes electrónicos. Las claves se cifran con AES
+            antes de guardarse.
           </p>
         </div>
         <button
           type="button"
-          onClick={() => { setEditId(null); setShowForm(true); }}
+          onClick={() => {
+            setEditId(null);
+            setShowForm(true);
+          }}
           className="shrink-0 flex items-center gap-1.5 h-9 px-3 rounded-md bg-ink text-background text-sm font-medium"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -80,7 +83,10 @@ function EmisoresPage() {
             <EmisorCard
               key={e.id}
               emisor={e}
-              onEdit={() => { setEditId(e.id); setShowForm(true); }}
+              onEdit={() => {
+                setEditId(e.id);
+                setShowForm(true);
+              }}
               onCert={() => setCertId(e.id)}
               onToggleActivo={invalidate}
             />
@@ -98,18 +104,17 @@ function EmisoresPage() {
       {showForm && (
         <EmisorFormModal
           emisor={editEmisor ?? null}
-          onClose={() => { setShowForm(false); setEditId(null); }}
+          onClose={() => {
+            setShowForm(false);
+            setEditId(null);
+          }}
           onSaved={invalidate}
         />
       )}
 
       {/* Formulario de cert/clave */}
       {certId !== null && certEmisor && (
-        <CertFormModal
-          emisor={certEmisor}
-          onClose={() => setCertId(null)}
-          onSaved={invalidate}
-        />
+        <CertFormModal emisor={certEmisor} onClose={() => setCertId(null)} onSaved={invalidate} />
       )}
     </div>
   );
@@ -145,33 +150,30 @@ function EmisorCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const condLabel = CONDICIONES.find((c) => c.value === emisor.condicion_iva)?.label ?? emisor.condicion_iva;
+  const condLabel =
+    CONDICIONES.find((c) => c.value === emisor.condicion_iva)?.label ?? emisor.condicion_iva;
 
   return (
-    <div
-      className={cn(
-        "rounded-xl border hairline p-4 space-y-3",
-        !emisor.activo && "opacity-60",
-      )}
-    >
+    <div className={cn("rounded-xl border hairline p-4 space-y-3", !emisor.activo && "opacity-60")}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-ink">{emisor.nombre}</span>
             {emisor.activo ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium text-verde border border-verde/30 bg-verde/10 rounded-full px-2 py-0.5">
+              <span className="inline-flex items-center gap-1 text-2xs font-mono font-medium text-verde-ink border border-verde/30 bg-verde/10 rounded-full px-2 py-0.5">
                 <CheckCircle2 className="h-3 w-3" /> Activo
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium text-muted-foreground border hairline bg-muted/30 rounded-full px-2 py-0.5">
+              <span className="inline-flex items-center gap-1 text-2xs font-mono font-medium text-muted-foreground border hairline bg-muted/30 rounded-full px-2 py-0.5">
                 <XCircle className="h-3 w-3" /> Inactivo
               </span>
             )}
             <span
+              // eslint-disable-next-line no-restricted-syntax -- text-2xs alias; text-verde-ink cert ok; amber-700 paleta categórica sin-cert (Tier 3)
               className={cn(
-                "inline-flex text-[10px] font-mono font-medium rounded-full px-2 py-0.5 border",
+                "inline-flex text-2xs font-mono font-medium rounded-full px-2 py-0.5 border",
                 emisor.cert_cargado
-                  ? "bg-verde/10 text-verde border-verde/30"
+                  ? "bg-verde/10 text-verde-ink border-verde/30"
                   : "bg-amber/10 text-amber-700 border-amber/40",
               )}
             >
@@ -264,6 +266,7 @@ function EmisorFormModal({
       </h2>
       <div className="space-y-3">
         <Field label="Nombre (identificador)">
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad; DS Input no soporta estilos custom hairline */}
           <input
             type="text"
             value={nombre}
@@ -273,6 +276,7 @@ function EmisorFormModal({
           />
         </Field>
         <Field label="CUIT">
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
           <input
             type="text"
             value={cuit}
@@ -282,6 +286,7 @@ function EmisorFormModal({
           />
         </Field>
         <Field label="Punto de Venta">
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo type="number"; DS Input no soporta este tipo */}
           <input
             type="number"
             value={ptoVta}
@@ -299,13 +304,16 @@ function EmisorFormModal({
               className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm appearance-none pr-8"
             >
               {CONDICIONES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
               ))}
             </select>
             <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
         </Field>
         <Field label="Notas (opcional)">
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
           <input
             type="text"
             value={notas}
@@ -316,7 +324,11 @@ function EmisorFormModal({
         </Field>
       </div>
       <div className="flex justify-end gap-2 mt-5">
-        <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border hairline text-sm text-muted-foreground hover:text-ink">
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-9 px-4 rounded-md border hairline text-sm text-muted-foreground hover:text-ink"
+        >
           Cancelar
         </button>
         <button
@@ -363,15 +375,14 @@ function CertFormModal({
 
   return (
     <Overlay onClose={onClose}>
-      <h2 className="font-display text-xl text-ink mb-1">
-        Cert · {emisor.nombre}
-      </h2>
+      <h2 className="font-display text-xl text-ink mb-1">Cert · {emisor.nombre}</h2>
       <p className="text-xs text-muted-foreground mb-4">
-        Pegá el contenido PEM completo (con encabezados BEGIN / END). Se cifra
-        antes de guardarse — nunca se expone en texto.
+        Pegá el contenido PEM completo (con encabezados BEGIN / END). Se cifra antes de guardarse —
+        nunca se expone en texto.
       </p>
       <div className="space-y-3">
         <Field label={`Certificado${certOk ? " ✓" : ""}`}>
+          {/* eslint-disable-next-line no-restricted-syntax -- textarea para pegar PEM multilínea; DS Textarea no soporta spellCheck + font-mono */}
           <textarea
             rows={6}
             value={cert}
@@ -382,6 +393,7 @@ function CertFormModal({
           />
         </Field>
         <Field label={`Clave privada${keyOk ? " ✓" : ""}`}>
+          {/* eslint-disable-next-line no-restricted-syntax -- textarea para pegar PEM multilínea */}
           <textarea
             rows={6}
             value={key}
@@ -393,7 +405,11 @@ function CertFormModal({
         </Field>
       </div>
       <div className="flex justify-end gap-2 mt-5">
-        <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border hairline text-sm text-muted-foreground hover:text-ink">
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-9 px-4 rounded-md border hairline text-sm text-muted-foreground hover:text-ink"
+        >
           Cancelar
         </button>
         <button
@@ -425,7 +441,7 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+      <div className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
         {label}
       </div>
       {children}

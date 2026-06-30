@@ -5,12 +5,9 @@ de respuestas CAE (éxito y rechazo) con objetos mock en vez de llamadas SOAP re
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import date
-from typing import Any, Optional
+from typing import Optional
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 
 # ---------------------------------------------------------------------------

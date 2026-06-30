@@ -56,7 +56,6 @@ def test_version_semver():
 
 def test_all_exports_son_importables():
     """Todo símbolo en __all__ es importable desde el paquete."""
-    import importlib
     import arca_fe
 
     for name in arca_fe.__all__:

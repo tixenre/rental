@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from .modelos import CaeResult
 
 import zeep
 import zeep.helpers
@@ -111,7 +114,7 @@ class WsfeClient:
     # FECAESolicitar — solicitar CAE
     # ------------------------------------------------------------------
 
-    def solicitar_cae(self, fecae: dict) -> "CaeResult":
+    def solicitar_cae(self, fecae: dict) -> CaeResult:
         """Envía FECAESolicitar y parsea la respuesta en un CaeResult.
 
         NUNCA asume éxito: valida Resultado == 'A' y extrae errores si 'R'.
