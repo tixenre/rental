@@ -1167,6 +1167,14 @@ def _init_db_schema(conn):
         VALUES ('modificacion_ventana_horas', '24', 'system-seed')
         ON CONFLICT (key) DO NOTHING
     """)
+    # Antelación mínima (lead-time) para que el cliente reserve online (#1126).
+    # 0 = apagado (default): el admin lo sube desde /admin/settings cuando quiere
+    # exigir un mínimo de horas entre el pedido y el retiro.
+    conn.execute("""
+        INSERT INTO app_settings (key, value, updated_by)
+        VALUES ('antelacion_minima_horas', '0', 'system-seed')
+        ON CONFLICT (key) DO NOTHING
+    """)
     conn.execute("""
         INSERT INTO app_settings (key, value, updated_by)
         VALUES ('hero_taglines', '[["rental, estudio,","rambla."],["en rambla,","en mardel."],["en rambla,","tu proyecto."],["en rambla,","tu rodaje."]]', 'system-seed')

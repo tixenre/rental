@@ -157,6 +157,7 @@ ALLOWED_SETTINGS_KEYS = {
     "email_from",        # From address de mails ('Rambla <pedidos@rambla.com.uy>'). Pisado por env EMAIL_FROM.
     "email_admin_to",    # Destinatario de notif al admin cuando entra un pedido. Pisado por env EMAIL_ADMIN_TO.
     "buffer_horas_alquiler",  # Horas de prep/revisión exigidas entre alquileres. Int >= 0.
+    "antelacion_minima_horas",  # Lead-time: horas mín. de antelación para reservar online (#1126). Int >= 0. 0 = apagado.
     "horarios_retiro",   # Horas habilitadas de retiro/devolución por día de semana. JSON.
     "faq_json",          # Preguntas frecuentes editables. JSON [{title, items:[{q,a}]}].
     "hero_taglines",     # Taglines del hero del catálogo. JSON [[línea1, línea2], ...].
@@ -292,7 +293,7 @@ def update_setting(key: str, payload: dict, request: Request):
                 raise ValueError("debe ser >= 0")
         except (ValueError, TypeError) as e:
             raise HTTPException(400, f"Valor inválido para '{key}': debe ser un número >= 0 ({e})")
-    if key == "buffer_horas_alquiler":
+    if key in ("buffer_horas_alquiler", "antelacion_minima_horas"):
         try:
             v = int(value)
             if v < 0:

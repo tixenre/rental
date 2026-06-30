@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import Request, HTTPException, BackgroundTasks
 from pydantic import BaseModel, field_validator
 
-from database import get_db, row_to_dict
+from database import get_db, row_to_dict, to_datetime
 from routes.cliente_portal.core import (
     router,
     require_cliente,
@@ -22,6 +22,7 @@ from routes.cliente_portal.core import (
 )
 from routes.cliente_portal.solicitudes import _cancelar_solicitudes_pendientes
 from services.checkout import faltan_firma_tyc, FIRMA_CHECKOUT_OBLIGATORIA
+from services.fechas import validar_rango_fechas, antelacion_insuficiente, validar_fecha_iso
 from auth.stepup import has_recent_stepup
 
 
@@ -65,8 +66,7 @@ class PedidoClienteCreate(BaseModel):
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
     def _v_fechas(cls, v):
-        from routes.alquileres import _validar_fecha_iso
-        return _validar_fecha_iso(v)
+        return validar_fecha_iso(v)
 
 
 @router.post("/api/cliente/pedidos", status_code=201)
@@ -84,12 +84,27 @@ def cliente_crear_pedido(
 
     # Caps espejo de la UI (el cliente las tiene en el front; la API no las
     # validaba → defensa en profundidad). El rango de 120 días es límite del
-    # cliente, NO del admin, por eso vive acá y no en `create_pedido`.
+    # cliente, NO del admin, por eso vive acá y no en `create_pedido`. Criterio
+    # (orden + no-pasado + tope) por la fuente única `validar_rango_fechas`.
     if data.notas and len(data.notas) > 500:
         raise HTTPException(400, "Las notas no pueden superar los 500 caracteres")
-    from datetime import datetime as _dt
-    if (_dt.fromisoformat(data.fecha_hasta) - _dt.fromisoformat(data.fecha_desde)).days > 120:
-        raise HTTPException(400, "El rango del alquiler no puede superar los 120 días")
+    msg = validar_rango_fechas(
+        data.fecha_desde, data.fecha_hasta, permitir_pasado=False, max_dias=120
+    )
+    if msg:
+        raise HTTPException(400, msg)
+
+    # Lead-time mínimo (#1126): backstop server-side. El portero ya lo avisa en la
+    # UI antes de submitear; esto bloquea por si un cliente saltea el pre-flight.
+    # Límite solo-cliente (el admin carga urgencias a mano), por eso vive acá.
+    with get_db() as _conn:
+        horas = antelacion_insuficiente(_conn, to_datetime(data.fecha_desde))
+    if horas:
+        raise HTTPException(
+            422,
+            f"Tu retiro es en menos de {horas} h. Por la antelación mínima no podemos "
+            "confirmar el pedido online — escribinos para coordinar una urgencia.",
+        )
 
     # Horas habilitadas de retiro/devolución (setting `horarios_retiro`).
     from routes.alquileres import _validar_horarios_habilitados
