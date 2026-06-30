@@ -217,6 +217,15 @@ function EmisorCard({
   );
 }
 
+// ── Helpers de CUIT ───────────────────────────────────────────────────────────
+
+function formatCuit(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 10) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
+}
+
 // ── Modal crear/editar emisor ──────────────────────────────────────────────────
 
 function EmisorFormModal({
@@ -228,15 +237,23 @@ function EmisorFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const isNew = emisor === null;
   const [nombre, setNombre] = useState(emisor?.nombre ?? "");
   const [cuit, setCuit] = useState(emisor?.cuit ?? "");
   const [ptoVta, setPtoVta] = useState(String(emisor?.pto_vta ?? ""));
   const [condicion, setCondicion] = useState<string>(emisor?.condicion_iva ?? "monotributo");
   const [notas, setNotas] = useState(emisor?.notas ?? "");
+  // Cert opcional al crear
+  const [cert, setCert] = useState("");
+  const [key, setKey] = useState("");
+
+  const certOk = cert.includes("BEGIN CERTIFICATE");
+  const keyOk = key.includes("PRIVATE KEY");
+  const withCert = isNew && (cert.length > 0 || key.length > 0);
 
   const qc = useQueryClient();
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const body = {
         nombre,
         cuit,
@@ -245,12 +262,18 @@ function EmisorFormModal({
         notas: notas || null,
         activo: emisor?.activo ?? true,
       };
-      return emisor
-        ? facturacionApi.updateEmisor(emisor.id, body)
-        : facturacionApi.createEmisor(body);
+      if (emisor) return facturacionApi.updateEmisor(emisor.id, body);
+      const created = await facturacionApi.createEmisor(body);
+      if (certOk && keyOk) await facturacionApi.cargarCert(created.id, cert, key);
+      return created;
     },
     onSuccess: () => {
-      toast.success(emisor ? "Emisor actualizado" : "Emisor creado");
+      const msg = emisor
+        ? "Emisor actualizado"
+        : certOk && keyOk
+          ? "Emisor creado con certificado"
+          : "Emisor creado";
+      toast.success(msg);
       qc.invalidateQueries({ queryKey: ["admin", "emisores-arca"] });
       onSaved();
       onClose();
@@ -264,7 +287,10 @@ function EmisorFormModal({
         {emisor ? "Editar emisor" : "Nuevo emisor"}
       </h2>
       <div className="space-y-3">
-        <Field label="Nombre (identificador)">
+        <Field
+          label="Nombre interno"
+          hint="Identificador corto para este sistema (no el nombre legal)"
+        >
           {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad; DS Input no soporta estilos custom hairline */}
           <input
             type="text"
@@ -278,8 +304,9 @@ function EmisorFormModal({
           {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
           <input
             type="text"
+            inputMode="numeric"
             value={cuit}
-            onChange={(e) => setCuit(e.target.value)}
+            onChange={(e) => setCuit(formatCuit(e.target.value))}
             placeholder="20-30000000-0"
             className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
           />
@@ -321,6 +348,54 @@ function EmisorFormModal({
             className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
           />
         </Field>
+
+        {/* Cert opcional al crear */}
+        {isNew && (
+          <>
+            <div className="border-t hairline pt-3">
+              <p className="text-xs text-muted-foreground mb-3">
+                Certificado ARCA{" "}
+                <span className="text-muted-foreground/60">
+                  (opcional — podés cargarlo después)
+                </span>
+              </p>
+              <div className="space-y-3">
+                <Field label={`Certificado PEM${certOk ? " ✓" : ""}`}>
+                  {/* eslint-disable-next-line no-restricted-syntax -- textarea para pegar PEM multilínea */}
+                  <textarea
+                    rows={4}
+                    value={cert}
+                    onChange={(e) => setCert(e.target.value)}
+                    placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
+                    className="w-full rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs font-mono resize-none"
+                    spellCheck={false}
+                  />
+                </Field>
+                <Field label={`Clave privada PEM${keyOk ? " ✓" : ""}`}>
+                  {/* eslint-disable-next-line no-restricted-syntax -- textarea para pegar PEM multilínea */}
+                  <textarea
+                    rows={4}
+                    value={key}
+                    onChange={(e) => setKey(e.target.value)}
+                    placeholder={"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"}
+                    className="w-full rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs font-mono resize-none"
+                    spellCheck={false}
+                  />
+                </Field>
+                {withCert && !certOk && (
+                  <p className="text-xs text-destructive">
+                    El certificado debe incluir los encabezados BEGIN / END CERTIFICATE.
+                  </p>
+                )}
+                {withCert && !keyOk && (
+                  <p className="text-xs text-destructive">
+                    La clave debe incluir los encabezados BEGIN / END PRIVATE KEY.
+                  </p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
       <div className="flex justify-end gap-2 mt-5">
         <button
@@ -333,7 +408,9 @@ function EmisorFormModal({
         <button
           type="button"
           onClick={() => save.mutate()}
-          disabled={save.isPending || !nombre || !cuit || !ptoVta}
+          disabled={
+            save.isPending || !nombre || !cuit || !ptoVta || (withCert && (!certOk || !keyOk))
+          }
           className="h-9 px-4 rounded-md bg-ink text-background text-sm font-medium disabled:opacity-50"
         >
           {save.isPending ? "Guardando…" : "Guardar"}
@@ -437,12 +514,21 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1">
       <div className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
         {label}
       </div>
+      {hint && <p className="text-xs text-muted-foreground/70 -mt-0.5">{hint}</p>}
       {children}
     </div>
   );

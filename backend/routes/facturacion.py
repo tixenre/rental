@@ -86,6 +86,7 @@ def crear_emisor(request: Request, body: dict):
             )
             from services.facturacion.emisores_repo import get_by_id
             emisor = get_by_id(emisor_id, conn)
+            conn.commit()
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -111,6 +112,7 @@ def actualizar_emisor(emisor_id: int, request: Request, body: dict):
                 notas=body.get("notas"),
             )
             emisor = get_by_id(emisor_id, conn)
+            conn.commit()
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -148,6 +150,7 @@ def cargar_cert(emisor_id: int, request: Request, body: dict):
                 key_pem=key_pem_str.encode(),
             )
             emisor = get_by_id(emisor_id, conn)
+            conn.commit()
     except RuntimeError as e:
         raise HTTPException(503, str(e))
 
@@ -163,6 +166,7 @@ def desactivar_emisor(emisor_id: int, request: Request):
     from services.facturacion.emisores_repo import delete_emisor
     with get_db() as conn:
         delete_emisor(emisor_id, conn)
+        conn.commit()
 
 
 # ---------------------------------------------------------------------------
