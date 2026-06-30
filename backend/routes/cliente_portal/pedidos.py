@@ -21,6 +21,8 @@ from routes.cliente_portal.core import (
     _ITEM_CAMPOS_PORTAL,
 )
 from routes.cliente_portal.solicitudes import _cancelar_solicitudes_pendientes
+from services.checkout import faltan_firma_tyc, FIRMA_CHECKOUT_OBLIGATORIA
+from auth.stepup import has_recent_stepup
 
 
 # ── Crear / cancelar pedido ───────────────────────────────────────────────────
@@ -55,6 +57,10 @@ class PedidoClienteCreate(BaseModel):
     # session_id del carrito (#280 Fase 1): si viene, marcamos el carrito como
     # confirmado en carritos_activos para cerrar el funnel de conversión.
     session_id:  Optional[str] = None
+    # Firma del checkout (Fase 5 #1098): fallback "Confirmo" por sesión para el cliente
+    # sin passkey. La firma fuerte es la cookie `stepup` (passkey / on-the-fly), que el
+    # server lee aparte (no viaja en el body). Ver el gate más abajo.
+    session_confirmed: bool = False
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
@@ -89,6 +95,18 @@ def cliente_crear_pedido(
     from routes.alquileres import _validar_horarios_habilitados
     with get_db() as _conn:
         _validar_horarios_habilitados(_conn, data.fecha_desde, data.fecha_hasta)
+
+    # Gate de firma + T&C (Fase 5 #1098): reusa los checks cliente-scoped del portero del
+    # checkout (`services/checkout`), sin re-implementarlos. `has_recent_stepup` lee la
+    # cookie `stepup` (passkey / firma on-the-fly); el fallback es "Confirmo" por sesión.
+    # Cableado-apagado (FIRMA_CHECKOUT_OBLIGATORIA) hasta que la UI del checkout mande la
+    # señal → no rompe el flujo actual; se activa en el PR que enchufa el paso de firma.
+    if FIRMA_CHECKOUT_OBLIGATORIA:
+        firma_ok = has_recent_stepup(request, cliente_id) or data.session_confirmed
+        with get_db() as _conn:
+            faltan = faltan_firma_tyc(_conn, cliente_id, firma_ok)
+        if faltan:
+            raise HTTPException(422, detail={"faltan": faltan})
 
     # Reusamos la lógica de creación del back-office para mantener una sola fuente.
     from routes.alquileres import create_pedido_retry, PedidoCreate, PedidoItem

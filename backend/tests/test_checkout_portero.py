@@ -26,6 +26,7 @@ from services.checkout.validar import (
     _check_antelacion,
     _date_str,
     validar_checkout,
+    faltan_firma_tyc,
 )
 from services.checkout.tyc import ya_acepto, registrar_aceptacion
 from database import now_ar
@@ -190,6 +191,33 @@ def test_check_fechas_pasada_admin_ok():
     faltan = []
     _check_fechas(ayer, manana, es_admin=True, faltan=faltan)
     assert faltan == []
+
+
+# ── faltan_firma_tyc (gate de creación, cliente-scoped, sin carrito) ──────────
+# Reusa los MISMOS checks del portero (_check_tyc + _check_firma) → una sola fuente.
+
+
+def test_faltan_firma_tyc_todo_ok():
+    conn = _FakeConn({"aceptaciones_tyc": {"cliente_id": 1}})  # T&C aceptados
+    assert faltan_firma_tyc(conn, cliente_id=1, firma_ok=True) == []
+
+
+def test_faltan_firma_tyc_sin_firma():
+    conn = _FakeConn({"aceptaciones_tyc": {"cliente_id": 1}})
+    faltan = faltan_firma_tyc(conn, cliente_id=1, firma_ok=False)
+    assert [f["check"] for f in faltan] == ["firma"]
+
+
+def test_faltan_firma_tyc_sin_tyc():
+    conn = _FakeConn({})  # aceptaciones_tyc → None → no aceptó
+    faltan = faltan_firma_tyc(conn, cliente_id=1, firma_ok=True)
+    assert [f["check"] for f in faltan] == ["tyc"]
+
+
+def test_faltan_firma_tyc_sin_nada():
+    conn = _FakeConn({})
+    faltan = faltan_firma_tyc(conn, cliente_id=1, firma_ok=False)
+    assert {f["check"] for f in faltan} == {"tyc", "firma"}
 
 
 # ── _check_stock_preflight ────────────────────────────────────────────────────
