@@ -234,7 +234,7 @@ def update_pedido(id: int, data: PedidoEstado, request: Request, background: Bac
                 next_n = _next_numero_pedido(conn)
                 updates["numero_pedido"] = next_n
 
-            set_clause = ", ".join(f"{k}=?" for k in updates)
+            set_clause = ", ".join(f"{k}=%s" for k in updates)
             conn.execute(f"UPDATE alquileres SET {set_clause} WHERE id=%s", (*updates.values(), id))
 
             # Si el pedido se va a un estado fuera de los modificables, las
