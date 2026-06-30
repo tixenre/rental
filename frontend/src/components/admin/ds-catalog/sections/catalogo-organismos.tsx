@@ -167,8 +167,13 @@ export const catalogoOrganismosSection: CatalogSection = {
       files: ["components/rental/EquipmentCard.tsx"],
       blurb:
         "Card de grilla del catálogo: foto (o EmptyImage), nombre, precio, stepper y favorito. Las tres formas + un caso sin stock.",
+      // La card está afinada para la grilla ANGOSTA del catálogo (foto aspect-square
+      // + content-visibility con un intrinsic-size de 280px): en columnas anchas la
+      // foto se dispara y las cards se pisan. Espejamos las proporciones reales
+      // (grid-cols-2 → md:4, igual que categoria.$slug.tsx) y capamos el ancho para
+      // que rinda a tamaño catálogo, no estiradas.
       render: () => (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4">
           <Sample label="kit — destacado">
             <EquipmentCard item={equipoKit} index={0} />
           </Sample>
