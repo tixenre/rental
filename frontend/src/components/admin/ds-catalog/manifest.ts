@@ -30,6 +30,7 @@ import { statesSection } from "./sections/states";
 import { catalogSharedSection } from "./sections/catalog-shared";
 import { catalogoOrganismosSection } from "./sections/catalogo-organismos";
 import { clienteOrganismosSection } from "./sections/cliente-organismos";
+import { adminOrganismosSection } from "./sections/admin-organismos";
 import { feedbackSection } from "./sections/feedback";
 import { flujosSection } from "./sections/flujos";
 import { pagesSection } from "./sections/pages";
@@ -89,6 +90,7 @@ const SECTION_LAYER: Record<string, CatalogLayer> = {
   "catalogo-shared": "secciones",
   "catalogo-organismos": "secciones",
   "cliente-organismos": "secciones",
+  "admin-organismos": "secciones",
   paginas: "paginas",
   flujos: "flujos",
 };
@@ -107,6 +109,7 @@ const SECTIONS: CatalogSection[] = [
   catalogSharedSection,
   catalogoOrganismosSection,
   clienteOrganismosSection,
+  adminOrganismosSection,
   feedbackSection,
   flujosSection,
   pagesSection,
