@@ -34,7 +34,7 @@ def tablero(conn, mes: str | None = None) -> dict:
         "disponible": disponible,
         "ganancia_mes": {
             "mes": mes,
-            "ingresos": gan["ingresos"],
+            "ingresos": gan["facturado"],
             "gastos": gan["gastos"],
             "neta": gan["ganancia_neta"],
         },
