@@ -141,6 +141,26 @@ curl -s -b jar_cli.txt "$B/api/cliente/me"
 
 Escrituras de prueba con IDs inexistentes para no mutar staging (MEMORIA 2026-06-19).
 
+#### Fakear la verificación de identidad (Didit no corre en dev)
+
+Una cuenta sin Didit nunca llega a `dni_validado_at` → el portero del checkout
+(`_check_identidad`) la bloquea y no se puede probar el flujo de pedido. `POST
+/auth/staging-verify` la marca como verificada **reusando la pluma única
+`identity.kyc`** (no toca `dni_validado_at` a mano). **Mismo gate** que
+staging-login (404 en prod).
+
+```bash
+# Marcar al cliente 123 como verificado (approved):
+curl -s -H 'Content-Type: application/json' \
+  -d "{\"secret\":\"$STAGING_LOGIN_SECRET\",\"cliente_id\":123}" "$B/auth/staging-verify"
+# Probar el camino de rechazo:  ,"estado":"rejected"   (o "en_revision")
+# Cuenta liviana sin email base:  ,"email":"yo@test.local"  (siembra el contacto)
+```
+
+Después combinás con `staging-login target=cliente` (la sesión) → el checkout
+pasa el check de identidad. La **firma** del checkout admite passkey step-up
+**o** `session_confirmed:true` (botón "Confirmo") para clientes sin passkey.
+
 ### Iterar local con datos reales (clon de staging)
 
 Para iterar UI/flujos que necesitan **sesión o datos/assets reales** (portal cliente,

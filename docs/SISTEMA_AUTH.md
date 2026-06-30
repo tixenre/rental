@@ -151,6 +151,12 @@ Para que la **sesión automatizada pruebe flujos logueados en staging** (no solo
 - `GET /auth/dev-login[-cliente]` — solo dev (`ADMIN_BYPASS_AUTH`, nunca Railway).
 - `POST /auth/staging-login` — **doble llave**: `is_production` (falla-a-prod) + secreto `STAGING_LOGIN_SECRET`.
   `target: "admin"|"cliente"`. En prod responde 404. La admin-ness la sigue resolviendo `is_admin_email`.
+- `POST /auth/staging-verify` — **fakea la verificación de identidad Didit** (Didit no corre en dev → una cuenta
+  nunca llega a `dni_validado_at` y el portero del checkout la bloquea para siempre). **Mismo gate de doble llave**
+  que staging-login (404 en prod). Body: `{secret, cliente_id?, estado?, email?}`; `estado` ∈ `approved`(default)/
+  `rejected`/`en_revision` para probar cada camino del KYC. **Reusa la pluma única `identity.kyc`** (`aprobar`/
+  `actualizar_estado`) — no escribe `dni_validado_at` a mano: setea un `didit_session_id` fresco y delega. **No
+  mintea sesión** (combinar con `staging-login target=cliente`). El CUIL fake es válido (mod-11) y único por id.
 
 ### Account-linking / "Métodos de acceso" — `auth/linking.py`
 La cuenta del cliente tiene **varias llaves intercambiables** (passkey + Google; mail magic-link, futuro). Esta
@@ -233,6 +239,7 @@ el guard del handler sigue siendo el chequeo fino).
 | `GET /auth/sessions` · `POST /auth/sessions/revoke-all` · `DELETE /auth/sessions/{jti}` | `sessions_routes.py` | Sesiones activas del admin (listar / cerrar-otras / cerrar-una). |
 | `…/cliente/auth/sessions[...]` | `sessions_routes.py` | Ídem para el cliente (scopeado a su `cliente_id`). |
 | `GET /auth/dev-login[-cliente]` · `POST /auth/staging-login` | `staging.py` | Login programático de dev/staging. |
+| `POST /auth/staging-verify` | `staging.py` | Fakea la verificación Didit en dev (Didit no corre ahí). Mismo gate; reusa `identity.kyc`. |
 
 **Frontend de gestión:** `frontend/src/components/rental/SessionManager.tsx` (sesiones), `PasskeyManager.tsx`
 (passkeys — admin) y `AccessMethods.tsx` (llaves unificadas — cliente) son **compartidos/parametrizados**, sobre
