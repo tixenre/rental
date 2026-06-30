@@ -314,6 +314,87 @@ def descargar_pdf_factura(factura_id: int, request: Request):
 
 
 # ---------------------------------------------------------------------------
+# POST /facturas/{id}/enviar-mail
+# ---------------------------------------------------------------------------
+
+
+@router.post("/facturas/{factura_id}/enviar-mail")
+def enviar_mail_factura(factura_id: int, request: Request):
+    """Envía el PDF de la factura al email del cliente del pedido."""
+    require_admin(request)
+
+    from services.facturacion.repo import get_by_id
+    from services.media.storage import get as storage_get
+    from services.email import send_raw_email, Attachment
+
+    with get_db() as conn:
+        factura = get_by_id(factura_id, conn)
+
+    if factura is None:
+        raise HTTPException(404, "Factura no encontrada")
+    if factura.estado != "emitida":
+        raise HTTPException(400, "Solo se pueden enviar facturas emitidas")
+    if not factura.pdf_key:
+        raise HTTPException(404, "PDF no disponible aún")
+
+    # Email del cliente: está en el pedido
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT c.owner_email, c.nombre, c.apellido
+            FROM alquileres a
+            JOIN clientes c ON c.id = a.cliente_id
+            WHERE a.id = %s
+            """,
+            (factura.pedido_id,),
+        ).fetchone()
+
+    if not row or not row["owner_email"]:
+        raise HTTPException(400, "El pedido no tiene cliente con email asociado")
+
+    email_cliente = row["owner_email"]
+    nombre_cliente = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip() or email_cliente
+
+    try:
+        pdf_bytes = storage_get(factura.pdf_key)
+    except Exception as e:
+        raise HTTPException(503, f"No se pudo obtener el PDF: {e}")
+
+    cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
+        factura.cbte_tipo, "X"
+    )
+    filename = f"Factura-{cbte_tipo_letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}.pdf"
+
+    nro = f"{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}"
+    subject = f"Tu factura {cbte_tipo_letra} Nº {nro} — Rambla Rental"
+    body_html = f"""
+<p>Hola {nombre_cliente},</p>
+<p>Te enviamos la factura electrónica correspondiente a tu alquiler. La encontrás adjunta a este mail.</p>
+<p><strong>Factura {cbte_tipo_letra} Nº {nro}</strong><br>
+CAE: {factura.cae or "—"}<br>
+Total: ${factura.imp_total:,.2f}</p>
+<p>Cualquier consulta no dudes en escribirnos.</p>
+<p>Saludos,<br>Rambla Rental</p>
+"""
+    text = f"Hola {nombre_cliente}, adjuntamos tu Factura {cbte_tipo_letra} Nº {nro}. CAE: {factura.cae}. Total: ${factura.imp_total:,.2f}."
+
+    result = send_raw_email(
+        to=email_cliente,
+        subject=subject,
+        body_html=body_html,
+        text=text,
+        attachments=[Attachment(filename=filename, content=pdf_bytes, content_type="application/pdf")],
+        alquiler_id=factura.pedido_id,
+        log_key="factura_arca",
+    )
+
+    if not result.get("ok"):
+        raise HTTPException(503, f"No se pudo enviar el mail: {result.get('error')}")
+
+    return {"ok": True, "to": email_cliente}
+
+
+# ---------------------------------------------------------------------------
 # Serialización
 # ---------------------------------------------------------------------------
 
