@@ -6,7 +6,10 @@ Fases 4-5: listados, PDF download, mail, NC.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import Response
 
 from database import get_db
 from routes.auth import require_admin
@@ -126,6 +129,84 @@ def facturas_del_pedido(pedido_id: int, request: Request):
     with get_db() as conn:
         facturas = list_facturas(conn, pedido_id=pedido_id)
     return [_factura_to_dict(f) for f in facturas]
+
+
+# ---------------------------------------------------------------------------
+# GET /admin/facturas — listado global con filtros (Fase 4)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/facturas")
+def listar_facturas(
+    request: Request,
+    emisor: Optional[str] = Query(None),
+    estado: Optional[str] = Query(None),
+    desde: Optional[str] = Query(None),
+    hasta: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """Listado global de facturas con filtros. Requiere sesión de admin."""
+    require_admin(request)
+
+    from services.facturacion.repo import list_facturas
+    with get_db() as conn:
+        facturas = list_facturas(
+            conn,
+            emisor=emisor or None,
+            estado=estado or None,
+            desde=desde or None,
+            hasta=hasta or None,
+            limit=limit,
+            offset=offset,
+        )
+
+    dicts = [_factura_to_dict(f) for f in facturas]
+    total_imp_total = sum(d["imp_total"] for d in dicts if d.get("estado") == "emitida")
+    return {
+        "facturas": dicts,
+        "total_imp_total": total_imp_total,
+        "count": len(dicts),
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /facturas/{id}/pdf — descarga del PDF de la factura (Fase 4)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/facturas/{factura_id}/pdf")
+def descargar_pdf_factura(factura_id: int, request: Request):
+    """Descarga el PDF de una factura desde R2. Requiere sesión de admin."""
+    require_admin(request)
+
+    from services.facturacion.repo import get_by_id
+    with get_db() as conn:
+        factura = get_by_id(factura_id, conn)
+
+    if factura is None:
+        raise HTTPException(404, "Factura no encontrada")
+    if not factura.pdf_key:
+        raise HTTPException(404, "PDF no disponible aún")
+
+    try:
+        from services.media.storage import get as storage_get
+        pdf_bytes = storage_get(factura.pdf_key)
+    except Exception as e:
+        raise HTTPException(503, f"No se pudo obtener el PDF: {e}")
+
+    cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
+        factura.cbte_tipo, "X"
+    )
+    es_nc = factura.cbte_tipo in (3, 8, 13)
+    prefijo = "NC" if es_nc else "Factura"
+    filename = f"{prefijo}-{cbte_tipo_letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ---------------------------------------------------------------------------

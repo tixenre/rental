@@ -111,7 +111,9 @@ def list_facturas(
     pedido_id: Optional[int] = None,
     emisor: Optional[str] = None,
     estado: Optional[str] = None,
-    limit: int = 100,
+    desde: Optional[str] = None,
+    hasta: Optional[str] = None,
+    limit: int = 200,
     offset: int = 0,
 ) -> list[Factura]:
     clauses = []
@@ -126,6 +128,12 @@ def list_facturas(
     if estado:
         clauses.append("estado = %s")
         params.append(estado)
+    if desde:
+        clauses.append("fecha_emision >= %s")
+        params.append(desde)
+    if hasta:
+        clauses.append("fecha_emision < (%s::date + interval '1 day')")
+        params.append(hasta)
 
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     params += [limit, offset]

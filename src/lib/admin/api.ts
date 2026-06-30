@@ -2378,8 +2378,65 @@ export type EstadoFacturacion = {
   >;
 };
 
+export type FacturaEstado = "pendiente" | "emitida" | "error" | "anulada";
+
+export type Factura = {
+  id: number;
+  pedido_id: number;
+  emisor: string;
+  ambiente: "homologacion" | "produccion";
+  cbte_tipo: number;
+  pto_vta: number;
+  cbte_nro: number | null;
+  cae: string | null;
+  cae_vto: string | null;
+  doc_tipo: number | null;
+  doc_nro: number | null;
+  condicion_iva_receptor: number | null;
+  imp_neto: number;
+  imp_iva: number;
+  imp_total: number;
+  moneda: string;
+  cliente_cuit: string | null;
+  razon_social: string | null;
+  qr_payload: string | null;
+  pdf_key: string | null;
+  estado: FacturaEstado;
+  nota_credito_de: number | null;
+  errores: string[] | null;
+  fecha_emision: string | null;
+  created_at: string | null;
+  created_by: string | null;
+};
+
+export type FacturasListResp = {
+  facturas: Factura[];
+  total_imp_total: number;
+  count: number;
+};
+
 export const facturacionApi = {
   getEstado: () => authedJson<EstadoFacturacion>("/api/admin/facturacion/estado"),
+  facturarPedido: (pedidoId: number) =>
+    authedPostJson<Factura>(`/api/alquileres/${pedidoId}/facturar`, {}),
+  listFacturasPedido: (pedidoId: number) =>
+    authedJson<Factura[]>(`/api/alquileres/${pedidoId}/facturas`),
+  notaCreditoFactura: (facturaId: number) =>
+    authedPostJson<Factura>(`/api/facturas/${facturaId}/nota-credito`, {}),
+  listFacturas: (params?: {
+    emisor?: string;
+    estado?: string;
+    desde?: string;
+    hasta?: string;
+  }) => {
+    const sp = new URLSearchParams();
+    if (params?.emisor) sp.set("emisor", params.emisor);
+    if (params?.estado) sp.set("estado", params.estado);
+    if (params?.desde) sp.set("desde", params.desde);
+    if (params?.hasta) sp.set("hasta", params.hasta);
+    const qs = sp.toString();
+    return authedJson<FacturasListResp>(`/api/admin/facturas${qs ? `?${qs}` : ""}`);
+  },
 };
 
 export type DescuentoJornada = { id: number; jornadas: number; pct: number };
