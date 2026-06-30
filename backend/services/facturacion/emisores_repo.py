@@ -21,6 +21,7 @@ class EmisorArca:
     condicion_iva: str       # 'responsable_inscripto' | 'monotributo'
     cert_cargado: bool       # True si cert_enc y key_enc no son null
     activo: bool
+    razon_social: Optional[str]   # nombre legal para imprimir en el PDF
     notas: Optional[str]
     created_at: datetime
     updated_at: datetime
@@ -35,6 +36,7 @@ def _row_to_emisor(row: dict) -> EmisorArca:
         condicion_iva=row["condicion_iva"],
         cert_cargado=bool(row["cert_enc"] and row["key_enc"]),
         activo=row["activo"],
+        razon_social=row.get("razon_social"),
         notas=row["notas"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -104,16 +106,17 @@ def create_emisor(
     cuit: str,
     pto_vta: int,
     condicion_iva: str,
+    razon_social: Optional[str] = None,
     notas: Optional[str] = None,
 ) -> int:
     _validate_condicion_iva(condicion_iva)
     row = conn.execute(
         """
-        INSERT INTO emisores_arca (nombre, cuit, pto_vta, condicion_iva, notas)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO emisores_arca (nombre, cuit, pto_vta, condicion_iva, razon_social, notas)
+        VALUES (%s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
-        (nombre, cuit.strip(), pto_vta, condicion_iva, notas),
+        (nombre, cuit.strip(), pto_vta, condicion_iva, razon_social or None, notas),
     ).fetchone()
     return row["id"]
 
@@ -127,6 +130,7 @@ def update_emisor(
     pto_vta: Optional[int] = None,
     condicion_iva: Optional[str] = None,
     activo: Optional[bool] = None,
+    razon_social: Optional[str] = None,
     notas: Optional[str] = None,
 ) -> None:
     sets: list[str] = ["updated_at = now()"]
@@ -143,6 +147,8 @@ def update_emisor(
         sets.append("condicion_iva = %s"); params.append(condicion_iva)
     if activo is not None:
         sets.append("activo = %s"); params.append(activo)
+    if razon_social is not None:
+        sets.append("razon_social = %s"); params.append(razon_social or None)
     if notas is not None:
         sets.append("notas = %s"); params.append(notas)
 

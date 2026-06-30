@@ -239,6 +239,7 @@ function EmisorFormModal({
 }) {
   const isNew = emisor === null;
   const [nombre, setNombre] = useState(emisor?.nombre ?? "");
+  const [razonSocial, setRazonSocial] = useState(emisor?.razon_social ?? "");
   const [cuit, setCuit] = useState(emisor?.cuit ?? "");
   const [ptoVta, setPtoVta] = useState(String(emisor?.pto_vta ?? ""));
   const [condicion, setCondicion] = useState<string>(emisor?.condicion_iva ?? "monotributo");
@@ -256,6 +257,7 @@ function EmisorFormModal({
     mutationFn: async () => {
       const body = {
         nombre,
+        razon_social: razonSocial || null,
         cuit,
         pto_vta: parseInt(ptoVta, 10),
         condicion_iva: condicion as EmisorArca["condicion_iva"],
@@ -297,6 +299,19 @@ function EmisorFormModal({
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             placeholder="pablo, santini, empresa_xyz…"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
+          />
+        </Field>
+        <Field
+          label="Razón social"
+          hint="Nombre legal que aparece en el PDF de la factura"
+        >
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={razonSocial}
+            onChange={(e) => setRazonSocial(e.target.value)}
+            placeholder="Martín Javier Santini Calarco"
             className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
           />
         </Field>

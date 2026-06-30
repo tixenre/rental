@@ -77,6 +77,24 @@ def _e(s) -> str:
     return _html.escape(str(s or ""))
 
 
+def _emisor_razon_social(nombre: str) -> str:
+    """Lee razon_social de emisores_arca. Fallback: cadena vacía."""
+    try:
+        from database import get_db
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT razon_social FROM emisores_arca WHERE nombre = %s", (nombre,)
+            ).fetchone()
+        finally:
+            conn.close()
+        if row and row["razon_social"] and row["razon_social"].strip():
+            return row["razon_social"]
+    except Exception:
+        pass
+    return ""
+
+
 # ---------------------------------------------------------------------------
 # CSS mínimo (hereda tokens del DS, versión inline)
 # ---------------------------------------------------------------------------
@@ -84,7 +102,9 @@ def _e(s) -> str:
 _CSS = """
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'TT Commons', sans-serif; font-size: 11px;
-         color: #1a1a1a; background: #fff; padding: 14mm; }
+         color: #1a1a1a; background: #fff; padding: 14mm;
+         min-height: calc(297mm - 28mm);
+         display: flex; flex-direction: column; }
   h1 { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; }
   h2 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
   table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
@@ -100,6 +120,7 @@ _CSS = """
   .section { margin-top: 16px; }
   .box { border: 1px solid #e0ddd5; border-radius: 6px; padding: 10px; }
   .total-row { font-size: 13px; font-weight: 700; }
+  .spacer { flex: 1; min-height: 20mm; }
   .qr-area { display: flex; align-items: flex-start; gap: 16px; margin-top: 12px; }
   .cae-data { font-size: 10px; }
   .cae-data p { margin-bottom: 2px; }
@@ -135,6 +156,7 @@ def factura_html(factura, pedido: dict) -> str:
     `pedido` debe tener cliente_nombre, descripción de ítems, etc.
     """
     em_data = _EMISORES_DATA.get(factura.emisor, _EMISORES_DATA["santini"])
+    emisor_nombre = _emisor_razon_social(factura.emisor)
     letra = _CBTE_TIPO_LABEL.get(factura.cbte_tipo, "C")
     es_nc = _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False)
     es_prod = factura.ambiente == "produccion"
@@ -179,7 +201,7 @@ def factura_html(factura, pedido: dict) -> str:
     <div style="font-size:10px; color:#888; margin-top:4px">ALQUILER DE EQUIPOS AUDIOVISUALES</div>
     <div style="margin-top:8px">
       <div class="label">Emisor</div>
-      <div class="value">{_e(em_data['nombre'])}</div>
+      <div class="value">{_e(emisor_nombre)}</div>
       <div>{_e(em_data['cond_iva_label'])}</div>
       <div class="mono">{_e(factura.emisor == 'pablo' and pedido.get('cuit_pablo', '') or '')}</div>
       <div style="font-size:10px; color:#666">{_e(em_data['domicilio'])}</div>
@@ -236,6 +258,8 @@ def factura_html(factura, pedido: dict) -> str:
     </tfoot>
   </table>
 </div>
+
+<div class="spacer"></div>
 
 <div class="qr-area section">
   {qr_img}
