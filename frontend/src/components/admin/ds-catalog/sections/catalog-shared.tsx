@@ -9,61 +9,8 @@ import { IncludesLine } from "@/components/rental/equipment/shared/IncludesLine"
 import { SpecsGrid } from "@/components/rental/equipment/shared/SpecsGrid";
 import { AddonPills } from "@/components/rental/AddonPills";
 import { EmptyImage } from "@/components/rental/EmptyImage";
-import { type Equipment, type IncludedItem } from "@/data/equipment";
-
-/**
- * Equipo de muestra para los specimens que consumen un `Equipment` real
- * (SpecsGrid, ShareButton). Mínimo viable: solo los campos que cada
- * componente lee. `specsRaw` marca dos specs como `destacado` para que
- * SpecsGrid las cure.
- */
-const equipoDemo: Equipment = {
-  id: "0",
-  slug: "demo-sony-fx6",
-  name: "FX6 Cinema Line",
-  brand: "Sony",
-  category: "Cámaras",
-  pricePerDay: 38000,
-  description: "Cámara cine full-frame para el catálogo de muestra.",
-  specs: [
-    { label: "Sensor", value: "Full-frame 10.2MP" },
-    { label: "Montura", value: "E-mount" },
-    { label: "ISO", value: "409600" },
-    { label: "Formato", value: "4K 120p" },
-  ],
-  specsRaw: {
-    sensor: {
-      label: "Sensor",
-      value: "Full-frame 10.2MP",
-      tipo: "texto",
-      unidad: null,
-      prioridad: 1,
-      en_card: true,
-      en_filtros: false,
-      destacado: true,
-    },
-    formato: {
-      label: "Formato",
-      value: "4K 120p",
-      tipo: "texto",
-      unidad: null,
-      prioridad: 2,
-      en_card: true,
-      en_filtros: false,
-      destacado: true,
-    },
-  },
-};
-
-const includesDemo: IncludedItem[] = [
-  { name: "Cuerpo FX6" },
-  { name: "Batería BP-U60", qty: 2 },
-  { name: "Cargador" },
-  { name: "Asa XLR" },
-  { name: "Correa" },
-];
-
-const noop = () => {};
+// Dataset demo canónico — fuente única (no recrear mocks por sección).
+import { equipoKit as equipoDemo, includesDemo, noop } from "../fixtures";
 
 export const catalogSharedSection: CatalogSection = {
   id: "catalogo-shared",
