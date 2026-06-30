@@ -22,7 +22,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 
 _WSAA_SERVICE = "wsfe"
-_TRA_TTL_SECONDS = 36 * 3600  # 36 h (AFIP acepta hasta 48h, dejamos margen)
+_TRA_TTL_SECONDS = 12 * 3600  # 12 h — AFIP rechaza expirationTime > 24 h
 
 
 # ---------------------------------------------------------------------------
