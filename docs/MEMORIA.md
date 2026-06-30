@@ -569,6 +569,22 @@ sistema paralelo** (contratos/ARCA, aparte). El supervisor marca: firma de prese
 `auth/stepup`+`firmarConPasskey`; el gate del checkout re-implementando los checks; o una firma de contrato con
 ceremonia paralela. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §3; historia → #1131.
 
+### 2026-06-30 — `backend/services/fechas.py` = puerta única de la lógica de fechas/horas; lead-time configurable (#1126)
+
+Toda **decisión** sobre fechas/horas vive en `services/fechas.py`: formato (`validar_fecha_iso`), criterio de
+rango (`validar_rango_fechas`: orden/no-pasado/tope de días), lead-time (`antelacion_*`), ventana/corte de
+modificación (`setting_horas` + el predicado puro `dentro_de_ventana_horas`), horarios de retiro
+(`validar_horarios_habilitados`, devuelve `str|None`; el route es adapter que levanta el 400) y mes actual
+(`mes_actual_ar`). Se construye sobre las **primitivas** `now_ar()`/`to_datetime()` del DAL (fuente única de bajo
+nivel, _2026-06-27_): el módulo es dueño de las **reglas**, el DAL de las primitivas. El **dominio de cada motor NO
+se mueve** (reservas: buffer/overlap; precios: jornadas; reportes/contabilidad: ventanas de mes; auth: TTLs;
+ical/pdf/email: display). El **lead-time** (#1126) es configurable (`app_settings.antelacion_minima_horas`,
+0 = apagado) con **defensa en profundidad** (portero UX `_check_antelacion` + backstop server-side en
+`cliente_crear_pedido`, **solo-cliente** — el admin carga urgencias a mano; no toca el `FOR UPDATE`) y un disclaimer
+con CTA de WhatsApp en el carrito; **fail-open** (setting corrupto/ausente → 0). El supervisor marca: una regla o
+validación de fecha/hora genérica recreada o duplicada fuera del módulo, o `date.today()` donde debería ir
+`now_ar()`. Cómo → el propio docstring de `services/fechas.py`; tracking #1126.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

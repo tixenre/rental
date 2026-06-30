@@ -1798,3 +1798,40 @@ cancel-in-progress` ya cancela corridas viejas.
   deja `stepup`, admin no) + `test_checkout_portero::faltan_firma_tyc`. En el retro salió como caso testigo un flake de
   timezone (`test_check_fechas_pasada_cliente` usaba `date.today()` UTC vs `now_ar()` del código) → buzón de
   `calidad-tests`. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §3; historia → #1131 (on-the-fly + gate), #1132 (handoff).
+
+### 2026-06-30 — `backend/services/fechas.py` = puerta única de la lógica de fechas/horas; lead-time configurable (#1126)
+
+- **Contexto.** El criterio de validación de fechas estaba **duplicado byte-por-byte en 4 lugares**
+  (`create_pedido`, `_apply_pedido_datos`, `_validar_fechas_propuestas`, el cap de 120 días del portal), con
+  mensajes y comparadores que iban divergiendo; la validación de **formato** (`_validar_fecha_iso`) vivía suelta en
+  `routes/alquileres`; y el check de **antelación mínima** (#1126) estaba cableado-apagado. El dueño pidió, además,
+  que "el módulo de fechas maneje **todo** lo de fechas y horas, así todos usan los mismos valores".
+- **Decisión.** Crear `backend/services/fechas.py` como **puerta única de toda DECISIÓN sobre fechas/horas**:
+  `validar_fecha_iso` (formato, borde→422), `validar_rango_fechas` (orden/no-pasado/tope), `setting_horas` (lector
+  genérico de settings de horas) + `dentro_de_ventana_horas` (predicado puro), `antelacion_*` (lead-time),
+  `inicio_desde_fecha_hora`, `mes_actual_ar`, `validar_horarios_habilitados`. Los 4 callsites + el portero +
+  `_modificacion_ventana_horas`/`_ventana_cumple` + los horarios delegan ahí. Se **activa el lead-time** (#1126):
+  setting `app_settings.antelacion_minima_horas` (0 = apagado) en `init_db()` + Alembic + whitelist; portero
+  `_check_antelacion` (UX, lee fecha+hora del carrito) + **backstop** en `cliente_crear_pedido` (defensa en
+  profundidad, solo-cliente); disclaimer + CTA de WhatsApp en el carrito (el front lee el setting y avisa, el back
+  enforza).
+- **Why.** "Una sola forma de cada cosa": el criterio de fechas no puede tener 4 copias que driftean. La frontera
+  con el DAL: `now_ar()`/`to_datetime()` son **primitivas de bajo nivel** (reloj AR + coerción psycopg) y se quedan
+  en `database/core.py` (_2026-06-27_) porque ya son fuente única y no son "decisiones"; el módulo de fechas es dueño
+  de las **reglas** construidas sobre ellas (re-exportarlas crearía dos caminos → se evitó). El **dominio de cada
+  motor NO se mueve** (reservas: buffer/overlap; precios: jornadas de facturación; reportes/contabilidad: ventanas de
+  mes/cierre; auth: TTLs de sesión/step-up; ical/pdf/email: formateo de display) — una auditoría de todo el backend
+  lo confirmó. El lead-time con **doble enforcement** (portero advisory + backstop en creación) cierra el agujero de
+  saltear el pre-flight, sin tocar el `FOR UPDATE` del gate (core sagrado). **Fail-open**: un setting corrupto/ausente
+  cae a 0 (no bloquea pedidos por mal-config). El backstop es **solo-cliente** (el admin carga urgencias a mano),
+  espejando el cap de 120 días.
+- **Consecuencias.** `validar_horarios_habilitados` se movió a `services/fechas` devolviendo `str|None`;
+  `_validar_horarios_habilitados` quedó como **adapter** que levanta el 400 (preserva firma, re-export y el monkeypatch
+  de tests). De paso se corrigió un **sesgo de timezone**: `mes_actual()` (tablero) y `_mes_de_fecha` (movimientos)
+  usaban `date.today()` (UTC en CI) → ahora `mes_actual_ar()`; `pagos.py` usa `now_ar().date()`. El cambio de mensajes
+  de error a lenguaje claro no rompe nada (ni tests ni front dependían del texto). Candados: `test_fechas.py`
+  (32 tests) + `test_checkout_portero` (lead-time activo) + los de horarios/seguridad existentes. Dos consolidaciones
+  más quedaron **descartadas a propósito** por la auditoría: `validar_mes`/`rango_mes` (reportes) ya tienen fuente
+  única sana, y el buffer del motor de reservas es regla de overlap (no genérica). **Pendiente menor** (no es de
+  fechas): `cuentas.py` hardcodea `'2026-06-01'` en vez de `LIQUIDACION_INICIO` (drift latente del clean-start). PR
+  #1136; tracking #1126.
