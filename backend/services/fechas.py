@@ -24,6 +24,7 @@ el DAL, de esas dos primitivas.
 """
 
 import datetime
+import json
 
 from database import now_ar, to_datetime
 
@@ -85,38 +86,49 @@ def validar_rango_fechas(
     return None
 
 
+# ── Settings de horas + ventana de tiempo (primitivas compartidas) ──────────────
+
+
+def setting_horas(conn, key: str, default: int = 0) -> int:
+    """Lee un setting de HORAS (int) de `app_settings` con fallback. Fail-open:
+    valor corrupto/ausente/negativo → `default`; nunca negativo. Fuente única para
+    todos los settings de horas (lead-time, ventana de modificación, …)."""
+    row = conn.execute(
+        "SELECT value FROM app_settings WHERE key = %s", (key,)
+    ).fetchone()
+    try:
+        return max(0, int((row["value"] if row and row["value"] else default) or default))
+    except (ValueError, TypeError):
+        return default
+
+
+def dentro_de_ventana_horas(inicio: datetime.datetime | None, horas: int) -> bool:
+    """True si `inicio` cae DENTRO de las próximas `horas` desde ahora (wall-clock
+    AR). Predicado puro reusable: el lead-time pregunta "¿el retiro es demasiado
+    pronto?" (esto) y el corte de modificación pregunta lo contrario (su negación).
+    `inicio` naive AR, comparable contra `now_ar()`."""
+    if inicio is None:
+        return False
+    return inicio < now_ar() + datetime.timedelta(hours=horas)
+
+
 # ── Antelación mínima (lead-time configurable, #1126) ───────────────────────────
 
 
 def antelacion_minima_horas(conn) -> int:
-    """Horas mínimas de antelación para que un cliente pueda reservar online.
-
-    Se administra desde el back-office (`app_settings.antelacion_minima_horas`).
-    Default 0 = apagado. Fail-open: un valor corrupto/ausente cae a 0 (no bloquea
-    a nadie por un setting mal cargado).
-    """
-    row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = %s",
-        ("antelacion_minima_horas",),
-    ).fetchone()
-    try:
-        return max(0, int((row["value"] if row and row["value"] else "0") or "0"))
-    except (ValueError, TypeError):
-        return 0
+    """Horas mínimas de antelación para que un cliente reserve online
+    (`app_settings.antelacion_minima_horas`, default 0 = apagado)."""
+    return setting_horas(conn, "antelacion_minima_horas", 0)
 
 
 def antelacion_insuficiente(conn, inicio: datetime.datetime | None) -> int | None:
     """Si el retiro `inicio` cae dentro de la ventana de antelación mínima, devuelve
-    las horas configuradas (para armar el mensaje/disclaimer); si no, None.
-
-    Predicado único: lo usa el portero (UX) y el backstop de creación (defensa en
-    profundidad). `inicio` es wall-clock AR (naive), comparable contra `now_ar()`.
-    """
+    las horas configuradas (para armar el mensaje/disclaimer); si no, None. 0 =
+    apagado. Lo usa el portero (UX) y el backstop de creación (defensa en profundidad)."""
     horas = antelacion_minima_horas(conn)
-    if horas <= 0 or inicio is None:
+    if horas <= 0:
         return None
-    limite = now_ar() + datetime.timedelta(hours=horas)
-    return horas if inicio < limite else None
+    return horas if dentro_de_ventana_horas(inicio, horas) else None
 
 
 def inicio_desde_fecha_hora(fecha, hora) -> datetime.datetime | None:
@@ -133,3 +145,53 @@ def inicio_desde_fecha_hora(fecha, hora) -> datetime.datetime | None:
         except (ValueError, TypeError):
             t = datetime.time(0, 0)
     return datetime.datetime.combine(d.date(), t)
+
+
+# ── Mes actual (wall-clock AR) ──────────────────────────────────────────────────
+
+
+def mes_actual_ar() -> str:
+    """Mes calendario actual en formato 'YYYY-MM', en hora de Argentina. Usar esto
+    en vez de `date.today()` (que en CI/servidor corre en UTC y desfasa entre
+    00:00–03:00 → puede devolver el mes equivocado a fin de mes)."""
+    return now_ar().strftime("%Y-%m")
+
+
+# ── Horarios habilitados de retiro/devolución (setting `horarios_retiro`) ────────
+
+_DIAS_HORARIO = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
+
+
+def validar_horarios_habilitados(conn, fecha_desde, fecha_hasta) -> str | None:
+    """Valida que retiro/devolución caigan en días/horas habilitados (setting
+    `horarios_retiro`). Sin config → no restringe. Pensado para el flujo del
+    cliente, que manda hora real (el admin carga date-only y no se restringe).
+    Devuelve un mensaje de error (retiro primero) o None; el route levanta el HTTP."""
+    row = conn.execute(
+        "SELECT value FROM app_settings WHERE key = %s", ("horarios_retiro",)
+    ).fetchone()
+    if not row or not row["value"]:
+        return None
+    try:
+        horarios = json.loads(row["value"])
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(horarios, dict) or not horarios:
+        return None
+
+    def _check(dt_raw, etiqueta: str) -> str | None:
+        if not dt_raw:
+            return None
+        dt = to_datetime(dt_raw)
+        franja = horarios.get(_DIAS_HORARIO[dt.weekday()])
+        if not franja:
+            return f"El {etiqueta} cae en un día no habilitado"
+        hhmm = dt.strftime("%H:%M")
+        if hhmm < franja["desde"] or hhmm > franja["hasta"]:
+            return (
+                f"El horario de {etiqueta} ({hhmm}) está fuera del rango "
+                f"habilitado ({franja['desde']}–{franja['hasta']})"
+            )
+        return None
+
+    return _check(fecha_desde, "retiro") or _check(fecha_hasta, "devolución")

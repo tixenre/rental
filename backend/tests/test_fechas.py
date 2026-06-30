@@ -5,6 +5,7 @@ Tiempos en wall-clock AR (`now_ar()`), no `date.today()` (UTC en CI desfasa).
 """
 
 import datetime
+import json
 
 from database import now_ar
 from services.fechas import (
@@ -12,6 +13,10 @@ from services.fechas import (
     antelacion_minima_horas,
     antelacion_insuficiente,
     inicio_desde_fecha_hora,
+    setting_horas,
+    dentro_de_ventana_horas,
+    mes_actual_ar,
+    validar_horarios_habilitados,
 )
 
 
@@ -148,3 +153,78 @@ def test_inicio_hora_invalida_cae_a_medianoche():
 
 def test_inicio_sin_fecha_es_none():
     assert inicio_desde_fecha_hora(None, "14:30") is None
+
+
+# ── setting_horas (lector genérico de horas) ────────────────────────────────────
+
+
+def test_setting_horas_valido():
+    assert setting_horas(_FakeConn({"app_settings": {"value": "24"}}), "k", 0) == 24
+
+
+def test_setting_horas_ausente_usa_default():
+    assert setting_horas(_FakeConn(), "k", 24) == 24
+
+
+def test_setting_horas_corrupto_usa_default():
+    assert setting_horas(_FakeConn({"app_settings": {"value": "x"}}), "k", 24) == 24
+
+
+def test_setting_horas_negativo_clampea_a_cero():
+    assert setting_horas(_FakeConn({"app_settings": {"value": "-3"}}), "k", 24) == 0
+
+
+# ── dentro_de_ventana_horas (predicado puro compartido) ─────────────────────────
+
+
+def test_dentro_de_ventana_true():
+    assert dentro_de_ventana_horas(now_ar() + datetime.timedelta(hours=2), 12) is True
+
+
+def test_dentro_de_ventana_false():
+    assert dentro_de_ventana_horas(now_ar() + datetime.timedelta(hours=48), 12) is False
+
+
+def test_dentro_de_ventana_none():
+    assert dentro_de_ventana_horas(None, 12) is False
+
+
+# ── mes_actual_ar ───────────────────────────────────────────────────────────────
+
+
+def test_mes_actual_ar_formato():
+    m = mes_actual_ar()
+    assert len(m) == 7 and m[4] == "-"
+    assert m == now_ar().strftime("%Y-%m")
+
+
+# ── validar_horarios_habilitados ────────────────────────────────────────────────
+
+_HORARIOS = json.dumps(
+    {d: {"desde": "09:00", "hasta": "18:00"} for d in
+     ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]}
+)
+
+
+def test_horarios_sin_config_no_restringe():
+    assert validar_horarios_habilitados(_FakeConn(), "2026-07-01T10:00", "2026-07-02T10:00") is None
+
+
+def test_horarios_dentro_de_franja_ok():
+    conn = _FakeConn({"app_settings": {"value": _HORARIOS}})
+    assert validar_horarios_habilitados(conn, "2026-07-01T10:00", "2026-07-02T17:00") is None
+
+
+def test_horarios_fuera_de_franja_devuelve_mensaje():
+    conn = _FakeConn({"app_settings": {"value": _HORARIOS}})
+    msg = validar_horarios_habilitados(conn, "2026-07-01T08:00", "2026-07-02T10:00")
+    assert msg and "retiro" in msg
+
+
+def test_horarios_dia_no_habilitado():
+    # Solo lunes habilitado; un retiro un martes cae en día no habilitado.
+    solo_lunes = json.dumps({"lun": {"desde": "09:00", "hasta": "18:00"}})
+    conn = _FakeConn({"app_settings": {"value": solo_lunes}})
+    # 2026-06-30 es martes.
+    msg = validar_horarios_habilitados(conn, "2026-06-30T10:00", None)
+    assert msg and "no habilitado" in msg
