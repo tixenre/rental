@@ -1185,10 +1185,7 @@ def _init_db_schema(conn):
         INSERT INTO cuentas (nombre, tipo, socio, moneda, orden) VALUES
             ('Caja Tincho', 'socio', 'Tincho', 'ARS', 1),
             ('Caja Pablo',  'socio', 'Pablo',  'ARS', 2),
-            ('Efectivo',    'caja',  NULL,      'ARS', 3),
-            ('Banco',       'banco', NULL,      'ARS', 4),
-            ('Fondo Rambla','fondo', 'Rambla',  'ARS', 5),
-            ('Dólares',     'caja',  NULL,      'USD', 6)
+            ('Fondo Rambla','fondo', 'Rambla',  'ARS', 5)
         ON CONFLICT DO NOTHING
     """)
     # `ON CONFLICT DO NOTHING` SIN target (no `(nombre) WHERE activa`): la tabla
