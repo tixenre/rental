@@ -84,7 +84,14 @@ export function RegistrarPagoModal({
 
   const addMut = useMutation({
     mutationFn: () =>
-      adminApi.addPago(pedidoId, monto, concepto || undefined, fecha || undefined, destinatario, metodo),
+      adminApi.addPago(
+        pedidoId,
+        monto,
+        concepto || undefined,
+        fecha || undefined,
+        destinatario,
+        metodo,
+      ),
     onSuccess: () => {
       toast.success("Pago registrado");
       qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
