@@ -115,15 +115,12 @@ Ante cualquier duda → homologación. INVERSO a GA4 (que expone en prod).
 ambiente = "produccion" if app_settings.is_production else "homologacion"
 ```
 
-Secretos **solo en ENV de Railway** (nunca en `app_settings`, que tiene GET público y se copia
-al clon de staging):
+Credenciales **en la tabla `emisores_arca`**, cifradas con Fernet (`ARCA_MASTER_KEY`). El único
+secreto que va en Railway ENV es `ARCA_MASTER_KEY`. Los cert+clave se cargan desde el
+back-office en `/admin/facturacion/emisores` — nunca en `app_settings` (GET público + clon de staging).
 
-```
-AFIP_PABLO_CERT   / AFIP_PABLO_KEY     ← cert + clave PEM de Pablo
-AFIP_SANTINI_CERT / AFIP_SANTINI_KEY   ← cert + clave PEM de Santini
-```
-
-Si faltan → `ValueError` descriptivo antes de tocar ARCA (no 500 críptico).
+Si falta `ARCA_MASTER_KEY` o el emisor no tiene cert cargado → `ValueError` descriptivo antes
+de tocar ARCA (no 500 críptico).
 
 Test de regresión: `backend/tests/test_facturacion_gating.py`.
 
@@ -174,10 +171,32 @@ original pasa a `'anulada'` antes de que la NC pase a `'emitida'`, dentro de la 
 Caché del Ticket de Autorización (WSAA). PK = `(ambiente, emisor)`. Se renueva automáticamente
 cuando expira (`wsaa_cache.py::get_ta`).
 
+### Tabla `emisores_arca`
+
+Gestión dinámica de emisores desde el back-office (Fase 7).
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `nombre` | TEXT UNIQUE | Identificador interno (`'pablo'`, `'santini'`, etc.) |
+| `cuit` | TEXT | Con guiones: `'20-XXXXXXXX-X'` |
+| `pto_vta` | INTEGER | Punto de venta habilitado ante ARCA |
+| `condicion_iva` | TEXT | `'responsable_inscripto'` \| `'monotributo'` \| `'exento'` |
+| `cert_enc` | BYTEA | Cert PEM cifrado con Fernet (`ARCA_MASTER_KEY`) |
+| `key_enc` | BYTEA | Clave privada PEM cifrada con Fernet |
+| `activo` | BOOLEAN | Solo los activos participan en la resolución de emisores |
+| `notas` | TEXT | Libre |
+| `created_at` / `updated_at` | TIMESTAMPTZ | |
+
+Módulos relacionados: `services/facturacion/emisores_repo.py` (DAL),
+`services/facturacion/crypto.py` (Fernet encrypt/decrypt), `routes/facturacion.py` (CRUD REST).
+
 ### En `database.py::init_db()` y en Alembic
 
-Las dos tablas están en ambas capas (`a2b3c4d5e6f7_facturas_arca.py` + `d3e4f5a6b7c8_factura_a_fields.py`),
-conforme a la regla _2026-06-03_.
+Las tres tablas del sistema están en ambas capas, conforme a la regla _2026-06-03_:
+- `a2b3c4d5e6f7_facturas_arca.py` — tablas `facturas` y `afip_ta`
+- `b1c2d3e4f5a6_emisores_arca.py` — tabla `emisores_arca`
+- `c2d3e4f5a6b7_merge_facturacion_heads.py` — merge de los dos heads anteriores
 
 ---
 
@@ -208,24 +227,24 @@ Importar de ahí; no recrear variantes.
 
 ## 8. Configuración inicial en Railway
 
-1. **Variables de entorno** (tab Variables del servicio de producción):
+1. **Variable de entorno** (única que va en Railway — tab Variables):
    ```
-   AFIP_PABLO_CERT=<contenido PEM del certificado de Pablo>
-   AFIP_PABLO_KEY=<contenido PEM de la clave privada de Pablo>
-   AFIP_SANTINI_CERT=<contenido PEM del certificado de Santini>
-   AFIP_SANTINI_KEY=<contenido PEM de la clave privada de Santini>
+   ARCA_MASTER_KEY=<Fernet key de 44 chars, generada con: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
    ```
+   Puede ser la misma key en staging y producción si comparten DB; si tienen DBs separadas,
+   usar keys distintas (los blobs cifrados no son portables entre keys).
 
-2. **CUIT y Punto de Venta** (Back-office → Settings → Facturación ARCA):
-   - `afip_pablo_cuit` / `afip_pablo_ptovta`
-   - `afip_santini_cuit` / `afip_santini_ptovta`
+2. **Emisores** (Back-office → Finanzas → Emisores ARCA → "Nuevo emisor"):
+   - Crear un emisor por CUIT que emite: nombre, CUIT, Punto de Venta, condición IVA.
+   - En la card del emisor → "Subir certificado" → pegar cert PEM + clave privada PEM.
+   - El cert+clave se cifran con `ARCA_MASTER_KEY` y se guardan en `emisores_arca`.
 
-3. **Homologación primero:** con las certs de homologación y `is_production=False` (staging)
+3. **Homologación primero:** con los cert de homologación y `is_production=False` (staging)
    se pueden emitir facturas de prueba sin afectar la numeración real. Las facturas de
    homologación quedan registradas en la tabla con `ambiente='homologacion'`.
 
-4. **Producción:** setear las certs de producción en el ambiente `production` de Railway.
-   El gating default-deny hace el resto.
+4. **Producción:** subir los cert de producción al emisor (misma UI, distinto cert).
+   El gating default-deny hace el resto — staging nunca emite en producción aunque tenga cert.
 
 ---
 
@@ -233,7 +252,7 @@ Importar de ahí; no recrear variantes.
 
 1. **Nunca DELETE de una factura emitida** → anulación siempre por NC.
 2. **Gating default-deny** → homologación si hay duda; producción solo con `is_production`.
-3. **Secretos en ENV** → nunca en `app_settings` (GET público + clon de staging).
+3. **Credenciales en `emisores_arca`** cifradas con Fernet (`ARCA_MASTER_KEY` en Railway ENV) → nunca en `app_settings` (GET público + clon de staging).
 4. **No tocar el core de reservas** → `emitir_factura` hace SELECTs de lectura, sin locks del motor.
 5. **Plata en enteros ARS** → `int(round(float(importes[...])))`, sin centavos.
 6. **Emisor resuelto por `emisor_para`** → fuente única; no duplicar la regla RI→pablo.

@@ -171,11 +171,8 @@ ALLOWED_SETTINGS_KEYS = {
     # ── Analítica ────────────────────────────────────────────────────
     "ga4_measurement_id",      # Measurement ID de Google Analytics 4 ("G-XXXXXXXXXX"). Vacío = GA apagado.
     # ── Facturación electrónica ARCA (#1139) ─────────────────────────
-    # Solo los no-secretos (CUIT y PtoVta). Cert/clave van en ENV, nunca acá.
-    "afip_pablo_cuit",         # CUIT del emisor Pablo (RI, Factura A). Número sin guiones.
-    "afip_pablo_ptovta",       # Punto de venta ARCA de Pablo para Web Services.
-    "afip_santini_cuit",       # CUIT del emisor Santini (Monotributo, Factura C).
-    "afip_santini_ptovta",     # Punto de venta ARCA de Santini para Web Services.
+    # Emisores, CUIT, PtoVta y cert+clave se gestionan en la tabla `emisores_arca`
+    # desde /admin/facturacion/emisores. No hay settings de AFIP aquí.
     # ── Reportes ─────────────────────────────────────────────────────
     "comisiones_modelo",       # Reparto de ingresos por dueño (#88). JSON {dueño: {beneficiario: %}}.
     # ── Recordatorio de retiro (Fase B mails) ────────────────────────
