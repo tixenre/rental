@@ -43,6 +43,7 @@ export function RegistrarPagoModal({
   // A quién se cobró y cómo. Default del dueño: Tincho + transferencia.
   const [destinatario, setDestinatario] = useState<string>("Rambla");
   const [metodo, setMetodo] = useState<string>("transferencia");
+  const [fecha, setFecha] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
   const monto = Math.max(0, Number(montoInput) || 0);
 
@@ -52,6 +53,7 @@ export function RegistrarPagoModal({
     if (!open) return;
     setDestinatario("Tincho");
     setMetodo("transferencia");
+    setFecha(new Date().toISOString().slice(0, 10));
     if (pagado === 0) {
       setPreset("sena");
       setMontoInput(String(Math.round(total * 0.5)));
@@ -90,7 +92,7 @@ export function RegistrarPagoModal({
 
   const addMut = useMutation({
     mutationFn: () =>
-      adminApi.addPago(pedidoId, monto, concepto || undefined, undefined, destinatario, metodo),
+      adminApi.addPago(pedidoId, monto, concepto || undefined, fecha || undefined, destinatario, metodo),
     onSuccess: () => {
       toast.success("Pago registrado");
       qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
@@ -177,6 +179,23 @@ export function RegistrarPagoModal({
             value={concepto}
             onChange={(e) => setConcepto(e.target.value)}
             placeholder="Seña, saldo final…"
+            className="h-9 text-sm"
+          />
+        </div>
+
+        {/* Fecha */}
+        <div className="space-y-1">
+          <Label
+            htmlFor="pago-fecha"
+            className="font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground"
+          >
+            Fecha del cobro
+          </Label>
+          <Input
+            id="pago-fecha"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
             className="h-9 text-sm"
           />
         </div>
