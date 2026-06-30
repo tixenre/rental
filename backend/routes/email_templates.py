@@ -15,7 +15,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Body, HTTPException, Request
 from pydantic import BaseModel
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import get_db, row_to_dict
 from services.email import branding as _eb, render_template, send_email
 
@@ -51,8 +51,8 @@ _PREVIEW_CONTEXT: dict[str, Any] = {
     "notas": "Necesito un trípode extra.",
     "items_html": _PREVIEW_ITEMS_HTML,
     "items_text": "- Sony FX3 × 1\n- RØDE NTG × 2",
-    "admin_url": "https://www.ramblarental.com.ar/admin/pedidos/1234",
-    "portal_url": "https://www.ramblarental.com.ar/cliente/portal",
+    "admin_url": "https://rambla.house/admin/pedidos/1234",
+    "portal_url": "https://rambla.house/cliente/portal",
     # Sample para que el botón "Agregar al calendario" (confirmado) se vea en
     # el Preview; en el envío real lo arma `_pedido_email_context`.
     "gcal_url": "https://calendar.google.com/calendar/render?action=TEMPLATE",
@@ -122,7 +122,7 @@ def get_template(key: str, request: Request):
         row = conn.execute(
             """
             SELECT key, subject, body_html, body_text, enabled, updated_at, updated_by
-            FROM email_templates WHERE key = ?
+            FROM email_templates WHERE key = %s
             """,
             (key,),
         ).fetchone()
@@ -142,9 +142,9 @@ def update_template(key: str, data: TemplateUpdate, request: Request):
         cur = conn.execute(
             """
             UPDATE email_templates
-            SET subject = ?, body_html = ?, body_text = ?,
-                updated_at = CURRENT_TIMESTAMP, updated_by = ?
-            WHERE key = ?
+            SET subject = %s, body_html = %s, body_text = %s,
+                updated_at = CURRENT_TIMESTAMP, updated_by = %s
+            WHERE key = %s
             RETURNING key, subject, body_html, body_text, updated_at, updated_by
             """,
             (data.subject, data.body_html, data.body_text,
@@ -165,7 +165,7 @@ def set_template_enabled(key: str, data: TemplateEnabled, request: Request):
     require_admin(request)
     with get_db() as conn:
         cur = conn.execute(
-            "UPDATE email_templates SET enabled = ? WHERE key = ? RETURNING key, enabled",
+            "UPDATE email_templates SET enabled = %s WHERE key = %s RETURNING key, enabled",
             (data.enabled, key),
         )
         row = cur.fetchone()
@@ -192,10 +192,10 @@ def list_emails_log(
     where = []
     params: list[Any] = []
     if status:
-        where.append("status = ?")
+        where.append("status = %s")
         params.append(status)
     if template_key:
-        where.append("template_key = ?")
+        where.append("template_key = %s")
         params.append(template_key)
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     with get_db() as conn:
@@ -208,7 +208,7 @@ def list_emails_log(
                    status, provider, provider_id, error, sent_at
             FROM emails_log{clause}
             ORDER BY sent_at DESC, id DESC
-            LIMIT ? OFFSET ?
+            LIMIT %s OFFSET %s
             """,
             (*params, limit, offset),
         ).fetchall()

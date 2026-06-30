@@ -1,0 +1,141 @@
+/* ============================================================
+   Rambla Rental — Color tokens  (CANONICAL · source of truth)
+   Tailwind v4 @theme → genera utilities: bg-amber, text-ink, border-hairline…
+   Accent por área: la página es bone + ink + --area-accent (default amber).
+   El --area-accent lo sobreescribe [data-area] por CSS cascade; los componentes
+   lo consumen sin saber en qué área están. Ver DESIGN_SYSTEM.md §Accent por área.
+   La paleta secundaria (rosa/azul/verde/naranja) SOLO para status & charts.
+   ============================================================ */
+
+@theme {
+  /* ── Brand · amber ─────────────────────────────────────── */
+  --color-amber: #fab428; /* Pantone 1235 C — acento default (rental) */
+  --color-amber-soft: color-mix(in oklch, #fab428 18%, transparent);
+  --color-amber-hot: #ffcc55; /* stripe alternado en amber-tape */
+
+  /* ── Brand · estudio ───────────────────────────────────── */
+  --color-estudio: #e9552f; /* Pantone 172 C — identidad del Estudio */
+  --color-estudio-soft: color-mix(in oklch, #e9552f 18%, transparent);
+  --color-estudio-hot: color-mix(in oklch, #e9552f 85%, white);
+
+  /* ── Ink ───────────────────────────────────────────────── */
+  --color-ink: oklch(0.14 0.01 60); /* warm near-black — texto/UI */
+  --color-ink-pure: #000000; /* hero display + print only */
+
+  /* ── Backgrounds / surfaces ────────────────────────────── */
+  --color-background: oklch(0.985 0.012 90); /* bone — page bg (más chroma para distinguirse) */
+  --color-surface: oklch(0.97 0.008 85); /* cards, panels */
+  --color-surface-elevated: oklch(1 0 0); /* inputs, modales */
+
+  /* ── Text ──────────────────────────────────────────────── */
+  --color-foreground: oklch(0.18 0.01 60);
+  --color-muted-foreground: oklch(0.42 0.01 70);
+
+  /* ── Borders ───────────────────────────────────────────── */
+  --color-hairline: oklch(0.18 0.01 60 / 12%);
+  --color-border: oklch(0.18 0.01 60 / 12%);
+  --color-input: oklch(0.18 0.01 60 / 16%);
+
+  /* ── shadcn semantic ───────────────────────────────────── */
+  --color-primary: oklch(0.18 0.01 60);
+  --color-primary-foreground: oklch(0.985 0.005 90);
+  --color-secondary: oklch(0.94 0.008 85);
+  --color-secondary-foreground: oklch(0.18 0.01 60);
+  --color-muted: oklch(0.88 0.006 85); /* más distinguible del surface en la vitrina */
+  --color-accent: #fab428;
+  --color-accent-foreground: oklch(0.18 0.01 60);
+  /* L 0.55 (no 0.62) para cumplir AA: texto-sobre-claro 3.87→~5.2:1 y botón
+     sólido blanco-sobre-rojo 3.82→~5.1:1. Hue/chroma intactos → mismo rojo de
+     marca, solo un poco más oscuro. Toda la propagación va hacia MÁS contraste. */
+  --color-destructive: oklch(0.55 0.22 27);
+  --color-destructive-foreground: oklch(0.98 0.005 80);
+  --color-ring: color-mix(in oklch, #fab428 60%, transparent);
+
+  /* Card & popover (surfaces shadcn — blanco sobre bone). */
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.18 0.01 60);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.18 0.01 60);
+
+  /* Ring offset (focus rings shadcn — el bg de la página). */
+  --color-ring-offset-background: oklch(0.985 0.005 90);
+
+  /* ── Status palette (secundaria — SOLO order states & charts) ── */
+  --color-rosa: #ed7bad; /* Pantone 211 C  — Devuelto */
+  --color-azul: #1097db; /* Pantone 299 C  — Presupuesto / info */
+  --color-naranja: #f97316; /* orange-500 — Aviso (status) · distinto del rojo-naranja de estudio */
+  --color-verde: #009971; /* Pantone 7724 C — Confirmado / éxito */
+  /* Verde más oscuro SOLO para TEXTO sobre tints de estado (badge Confirmado,
+     Disponible): el --color-verde brillante sobre bg-verde/10-20 da ~3.2:1
+     (falla AA). Mismo hue/chroma, L 0.606→0.48 → 4.8-5.2:1. El verde de marca
+     (charts, montos, bandas) queda intacto; esto es solo el texto del estado. */
+  --color-verde-ink: oklch(0.48 0.125 166.4);
+  /* Azul más oscuro SOLO para TEXTO sobre tints de estado (badge info/Presupuesto):
+     el --color-azul brillante sobre bg-azul/10 da ~2.9:1 (falla AA). Mismo hue/chroma,
+     L 0.64→0.48 → 4.9:1. El azul de marca (charts, labels) queda intacto. */
+  --color-azul-ink: oklch(0.48 0.14 239);
+
+  /* ── Charts (orden oficial: amber → azul → naranja → verde → rosa) ── */
+  --color-chart-1: var(--color-amber);
+  --color-chart-2: var(--color-azul);
+  --color-chart-3: var(--color-naranja);
+  --color-chart-4: var(--color-verde);
+  --color-chart-5: var(--color-rosa);
+
+  /* ── Sidebar (back-office admin) ───────────────────────────
+     Item activo/hover = amber-soft + ink (como el mock). */
+  --color-sidebar: oklch(0.985 0.005 90);
+  --color-sidebar-foreground: oklch(0.18 0.01 60);
+  --color-sidebar-primary: #fab428;
+  --color-sidebar-primary-foreground: oklch(0.18 0.01 60);
+  --color-sidebar-accent: var(--color-amber-soft);
+  --color-sidebar-accent-foreground: oklch(0.18 0.01 60);
+  --color-sidebar-border: oklch(0.18 0.01 60 / 12%);
+  --color-sidebar-ring: color-mix(in oklch, #fab428 50%, transparent);
+}
+
+/* ── Accent de área (token de rol — fuera de @theme para que la cascada
+   [data-area] lo sobreescriba. Los componentes consumen --area-accent*
+   sin conocer el área; el default = amber → cero cambio en rental (workshops sobreescribe a rosa).
+   REGLA: --area-accent gobierna SOLO el accent de marketing de área pública.
+   Focus rings, estados cross-app, --accent/--ring, badges del kit, back-office
+   y la paleta de status → siguen amber/status FIJOS. ─────────────────────── */
+:root {
+  --area-accent: var(--color-amber);
+  --area-accent-soft: var(--color-amber-soft);
+  --area-accent-hot: var(--color-amber-hot);
+}
+
+[data-area="estudio"] {
+  --area-accent: var(--color-estudio);
+  --area-accent-soft: var(--color-estudio-soft);
+  --area-accent-hot: var(--color-estudio-hot);
+}
+
+[data-area="workshops"] {
+  --area-accent: var(--color-rosa);
+  --area-accent-soft: color-mix(in oklch, var(--color-rosa) 18%, transparent);
+  --area-accent-hot: color-mix(in oklch, var(--color-rosa) 85%, white);
+}
+
+/* ── Dark mode ─────────────────────────────────────────────
+   Tokens semánticos auto-switchean con .dark en <html>.
+   Amber permanece como acento en ambos modos.
+   (Hoy la app es light-only —sin toggle—; el set queda completo y correcto
+   por si se habilita más adelante.) */
+.dark {
+  --color-background: oklch(0.16 0.01 60);
+  --color-foreground: oklch(0.97 0.008 85);
+  --color-surface: oklch(0.2 0.01 60);
+  --color-surface-elevated: oklch(0.24 0.01 60);
+  --color-hairline: oklch(1 0 0 / 12%);
+  --color-border: oklch(1 0 0 / 12%);
+  --color-muted: oklch(0.24 0.01 60);
+  --color-muted-foreground: oklch(0.72 0.01 70);
+  --color-card: oklch(0.2 0.01 60);
+  --color-card-foreground: oklch(0.97 0.008 85);
+  --color-popover: oklch(0.2 0.01 60);
+  --color-popover-foreground: oklch(0.97 0.008 85);
+  --color-primary: oklch(0.82 0.16 78);
+  --color-primary-foreground: oklch(0.16 0.01 60);
+}

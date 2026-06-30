@@ -12,21 +12,29 @@ Expone tres endpoints:
 
   POST /api/webhooks/didit
       Webhook público — Didit llama aquí al finalizar una verificación.
-      Autenticado solo por firma HMAC-SHA256 (X-Signature-V2) + freshness (X-Timestamp).
-      En estado "Approved": guarda dni, cuil, nombre/apellido/fecha-nacimiento/
-      dirección de RENAPER y marca dni_validado_at en clientes.
+      Autenticado solo por firma HMAC-SHA256 (X-Signature) + freshness (X-Timestamp).
+      En estado "Approved": guarda dni, cuil, nombre/apellido/nombre-completo/
+      fecha-nacimiento/dirección de RENAPER y marca dni_validado_at en clientes.
+      Los datos viven en `decision.id_verifications[]` (API v3) — ver
+      services/didit/decision.py.
 
 Datos personales (Ley 25.326):
   - Solo se persiste texto plano (nombre, DNI, CUIL, fecha nacimiento, dirección).
   - La foto del DNI nunca llega a nuestra base (Didit la procesa internamente).
-  - No se loguea el body del webhook (puede contener datos RENAPER).
+  - No se loguea el body del webhook (puede contener datos RENAPER); el log de
+    verificación registra solo PRESENCIA de cada campo (bool), no su valor.
 """
 
 import logging
+from typing import Optional
+from urllib.parse import quote
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from config import settings
 from database import get_db, now_ar
 from routes.cliente_portal import require_cliente
@@ -34,8 +42,13 @@ from services.didit import (
     DiditNotConfiguredError,
     DiditSignatureError,
     create_session,
+    extraer_contactos,
+    extraer_datos_renaper,
+    retrieve_decision,
     verify_webhook,
 )
+
+from identity import kyc
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +61,25 @@ router = APIRouter()
 # que la pantalla de Identidad muestre el estado "confirmando…" mientras llega
 # el webhook (el webhook es asíncrono, puede tardar unos segundos).
 _RETURN_PATH = "/cliente/portal?verificacion=pendiente"
+
+
+class SesionVerificacionIn(BaseModel):
+    return_to: Optional[str] = None
+
+
+def _es_path_interno_seguro(p: Optional[str]) -> bool:
+    """Allowlist anti open-redirect: path interno del propio sitio."""
+    if not p or not isinstance(p, str):
+        return False
+    if len(p) > 512:
+        return False
+    if not p.startswith("/") or p.startswith("//"):
+        return False
+    if "://" in p or "\\" in p:
+        return False
+    if any(ord(c) < 0x20 for c in p):  # control chars (\n \r \t ...)
+        return False
+    return True
 
 
 # ── Admin: crear sesión ──────────────────────────────────────────────────────
@@ -68,7 +100,7 @@ def iniciar_verificacion(cliente_id: int, request: Request):
     require_admin(request)
 
     with get_db() as conn:
-        row = conn.execute("SELECT id FROM clientes WHERE id=?", (cliente_id,)).fetchone()
+        row = conn.execute("SELECT id FROM clientes WHERE id=%s", (cliente_id,)).fetchone()
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
 
@@ -80,13 +112,17 @@ def iniciar_verificacion(cliente_id: int, request: Request):
         )
     except DiditNotConfiguredError:
         raise HTTPException(503, "Verificación de identidad no habilitada (DIDIT_API_KEY)")
+    except httpx.HTTPStatusError as exc:
+        # El body ya fue logueado en services/didit/client.py con exc.response.text
+        logger.error("didit: %s al crear sesión admin cliente_id=%s", exc.response.status_code, cliente_id)
+        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
     except Exception as exc:
         logger.error("didit: error al crear sesión admin cliente_id=%s — %s", cliente_id, exc)
         raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
 
     with get_db() as conn:
         conn.execute(
-            "UPDATE clientes SET didit_session_id=?, updated_at=? WHERE id=?",
+            "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
             (sesion.session_id, now_ar(), cliente_id),
         )
         conn.commit()
@@ -98,11 +134,17 @@ def iniciar_verificacion(cliente_id: int, request: Request):
 # ── Cliente: crear sesión propia ─────────────────────────────────────────────
 
 @router.post("/cliente/verificacion/sesion", status_code=201)
-def cliente_iniciar_verificacion(request: Request):
+def cliente_iniciar_verificacion(request: Request, body: Optional[SesionVerificacionIn] = None):
     """El cliente autenticado crea su propia sesión de verificación Didit.
 
     Guarda el didit_session_id para correlacionar el webhook con el cliente.
     Devuelve la URL a la que hay que redirigir al cliente para el flujo Didit.
+
+    Acepta un `return_to` OPCIONAL (path interno del sitio) para que, al terminar
+    el flujo, Didit devuelva al cliente a la pantalla desde la que arrancó (p. ej.
+    retomar un pedido). El body es opcional — el portal puede postear SIN body.
+    Si el `return_to` es inválido o ausente, se usa el fallback al portal; NUNCA
+    se rechaza con 400 por un return_to malo (allowlist anti open-redirect).
 
     503 si DIDIT_API_KEY no está configurada.
     """
@@ -110,6 +152,9 @@ def cliente_iniciar_verificacion(request: Request):
     cliente_id = session["cliente_id"]
 
     return_url = f"{settings.SITE_URL}{_RETURN_PATH}"
+    rt = body.return_to if body else None
+    if _es_path_interno_seguro(rt):
+        return_url = f"{return_url}&return_to={quote(rt, safe='')}"
     try:
         sesion = create_session(
             return_url=return_url,
@@ -117,16 +162,22 @@ def cliente_iniciar_verificacion(request: Request):
         )
     except DiditNotConfiguredError:
         raise HTTPException(503, "Verificación de identidad no habilitada")
+    except httpx.HTTPStatusError as exc:
+        logger.error("didit: %s al crear sesión cliente_id=%s", exc.response.status_code, cliente_id)
+        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
     except Exception as exc:
         logger.error("didit: error al crear sesión cliente_id=%s — %s", cliente_id, exc)
         raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
 
     with get_db() as conn:
         conn.execute(
-            "UPDATE clientes SET didit_session_id=?, updated_at=? WHERE id=?",
+            "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
             (sesion.session_id, now_ar(), cliente_id),
         )
         conn.commit()
+
+    # El cliente inició su propia verificación → consentimiento explícito del KYC (Ley 25.326).
+    kyc.registrar_consentimiento(cliente_id)
 
     logger.info("didit: cliente %s inició verificación session_id=%s", cliente_id, sesion.session_id)
     return {"session_id": sesion.session_id, "url": sesion.url}
@@ -140,18 +191,22 @@ async def webhook_didit(request: Request):
 
     Flujo:
       1. Lee el body raw (antes de parsear JSON).
-      2. Verifica firma HMAC-SHA256 (X-Signature-V2) + freshness (X-Timestamp).
-      3. Si status == "Approved": actualiza clientes con dni, cuil, dni_validado_at.
+      2. Verifica firma HMAC-SHA256 (X-Signature sobre el body crudo, con
+         X-Signature-V2 canónico como respaldo) + freshness (X-Timestamp).
+      3. Si status == "Approved": extrae los datos de RENAPER de
+         `decision.id_verifications[]` (API v3; respaldo: retrieve_decision) y
+         actualiza clientes (dni, cuil, nombre completo, dirección, etc.).
       4. Siempre devuelve 200 (Didit reintenta en 4xx/5xx — idempotente).
 
     No loguea el body completo (puede contener datos RENAPER / Ley 25.326).
     """
     body = await request.body()
-    signature = request.headers.get("X-Signature-V2", "")
+    signature = request.headers.get("X-Signature", "")
+    signature_v2 = request.headers.get("X-Signature-V2", "")
     timestamp = request.headers.get("X-Timestamp", "")
 
     try:
-        verify_webhook(body=body, signature=signature, timestamp=timestamp)
+        verify_webhook(body=body, signature=signature, timestamp=timestamp, signature_v2=signature_v2)
     except DiditSignatureError as exc:
         logger.warning("didit webhook: firma rechazada — %s", exc)
         raise HTTPException(401, "Firma inválida")
@@ -169,23 +224,10 @@ async def webhook_didit(request: Request):
     status = payload.get("status", "")
     logger.info("didit webhook: session_id=%s status=%s", session_id, status)
 
-    if status != "Approved":
-        # Otros estados (Processing, Declined, etc.) se ignoran por ahora.
+    # Solo procesamos estados conocidos que requieren acción.
+    ESTADOS_ACCION = {"Approved", "Declined", "Processing", "In_review", "Under_review"}
+    if status not in ESTADOS_ACCION:
         return {"ok": True}
-
-    # Extraer datos validados por RENAPER. No se logea el body completo (Ley 25.326).
-    kyc = payload.get("kyc") or {}
-    doc = kyc.get("document") or {}
-    dni = (doc.get("document_number") or "").strip() or None
-    cuil = (doc.get("tax_id") or doc.get("cuil") or "").strip() or None
-    nombre_renaper = (doc.get("first_name") or "").strip() or None
-    apellido_renaper = (doc.get("last_name") or "").strip() or None
-    fecha_nacimiento_renaper = (doc.get("date_of_birth") or "").strip() or None
-    addr_raw = doc.get("full_address") or doc.get("address") or {}
-    if isinstance(addr_raw, dict):
-        direccion_renaper = (addr_raw.get("formatted_address") or "").strip() or None
-    else:
-        direccion_renaper = (str(addr_raw)).strip() or None
 
     # vendor_data es el cliente_id que pasamos al crear la sesión.
     vendor_data = payload.get("vendor_data", "")
@@ -195,58 +237,48 @@ async def webhook_didit(request: Request):
         logger.error("didit webhook: vendor_data inválido %r session_id=%s", vendor_data, session_id)
         return {"ok": True}  # Devolvemos 200 para que Didit no reintente.
 
-    _guardar_verificacion(
-        cliente_id=cliente_id,
-        session_id=session_id,
-        dni=dni,
-        cuil=cuil,
-        nombre_renaper=nombre_renaper,
-        apellido_renaper=apellido_renaper,
-        fecha_nacimiento_renaper=fecha_nacimiento_renaper,
-        direccion_renaper=direccion_renaper,
-    )
-    return {"ok": True}
+    if status == "Approved":
+        # Identidad (RENAPER) + contactos verificados (mail/teléfono). Normalmente el
+        # webhook ya los trae embebidos; si llegara 'liviano' (sin `decision` o sin DNI),
+        # pedimos la decisión canónica por API. No se loguea el body (Ley 25.326).
+        decision = payload.get("decision")
+        datos = extraer_datos_renaper(decision)
+        if not datos.tiene_datos:
+            try:
+                # `retrieve_decision` hace un GET httpx SÍNCRONO (hasta el timeout):
+                # en este handler async bloquearía el event loop. Lo mandamos al
+                # threadpool para no congelar el servidor ante un webhook 'liviano'.
+                decision = await run_in_threadpool(retrieve_decision, session_id)
+                datos = extraer_datos_renaper(decision)
+            except Exception as exc:
+                logger.error("didit webhook: no se pudo recuperar la decisión session_id=%s — %s", session_id, exc)
+        # La orquestación (escribir identidad + ancla CUIL + contactos + evento) vive en
+        # identity/kyc — el route es solo transporte.
+        contactos = extraer_contactos(decision)
+        kyc.aprobar(cliente_id=cliente_id, session_id=session_id, datos=datos, contactos=contactos)
 
-
-def _guardar_verificacion(
-    *,
-    cliente_id: int,
-    session_id: str,
-    dni: str | None,
-    cuil: str | None,
-    nombre_renaper: str | None = None,
-    apellido_renaper: str | None = None,
-    fecha_nacimiento_renaper: str | None = None,
-    direccion_renaper: str | None = None,
-) -> None:
-    """Persiste los datos verificados por RENAPER en clientes. Idempotente.
-
-    Solo actualiza si el didit_session_id almacenado coincide con el de este
-    webhook — previene que un vendor_data forjado marque como verificado a otro
-    cliente (el payload ya está firmado con HMAC, esto es defensa en profundidad).
-    """
-    ahora = now_ar()
-    with get_db() as conn:
-        conn.execute(
-            """UPDATE clientes
-               SET dni=?,
-                   cuil=COALESCE(?, cuil),
-                   dni_validado_at=?,
-                   didit_session_id=?,
-                   nombre_renaper=COALESCE(?, nombre_renaper),
-                   apellido_renaper=COALESCE(?, apellido_renaper),
-                   fecha_nacimiento_renaper=COALESCE(?, fecha_nacimiento_renaper),
-                   direccion_renaper=COALESCE(?, direccion_renaper),
-                   updated_at=?
-               WHERE id=? AND didit_session_id=?""",
-            (dni, cuil, ahora, session_id,
-             nombre_renaper, apellido_renaper, fecha_nacimiento_renaper, direccion_renaper,
-             ahora, cliente_id, session_id),
+    elif status == "Declined":
+        # Intentamos extraer un motivo legible del payload (no siempre presente).
+        motivo: Optional[str] = None
+        try:
+            decision = payload.get("decision") or {}
+            motivo = (
+                decision.get("decline_reason")
+                or decision.get("comment")
+                or None
+            )
+            if motivo:
+                motivo = str(motivo)[:500]  # cap defensivo
+        except Exception:
+            pass
+        kyc.actualizar_estado(
+            cliente_id=cliente_id, session_id=session_id, estado="rechazado", motivo=motivo
         )
-        conn.commit()
-    logger.info(
-        "didit: cliente_id=%s verificado dni=%s session_id=%s",
-        cliente_id,
-        dni,
-        session_id,
-    )
+
+    else:
+        # Processing / In_review / Under_review → en revisión.
+        kyc.actualizar_estado(
+            cliente_id=cliente_id, session_id=session_id, estado="en_revision"
+        )
+
+    return {"ok": True}

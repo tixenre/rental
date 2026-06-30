@@ -1,0 +1,246 @@
+import { authedFetch, authedJson, authedPostJson } from "@/lib/authedFetch";
+import type {
+  PedidosListResp,
+  Pedido,
+  PedidoEstado,
+  PedidoDatosInput,
+  PagosLogResp,
+  ClientesListResp,
+  Cliente,
+  ClienteInput,
+  ClientePedidoRow,
+  PedidoCreateInput,
+  CobroModo,
+  CalendarioPedido,
+  EstadisticasData,
+  BusquedasData,
+  LiquidacionData,
+  ReconciliacionData,
+  GrupoDuplicado,
+} from "./types";
+
+export const pedidosMethods = {
+  // pedidos / alquileres
+  listPedidos: (
+    params: {
+      estado?: string;
+      q?: string;
+      con_saldo?: boolean;
+      per_page?: number;
+      page?: number;
+    } = {},
+  ) => {
+    const sp = new URLSearchParams();
+    if (params.estado) sp.set("estado", params.estado);
+    if (params.q) sp.set("q", params.q);
+    if (params.con_saldo) sp.set("con_saldo", "true");
+    sp.set("per_page", String(params.per_page ?? 100));
+    sp.set("page", String(params.page ?? 1));
+    return authedJson<PedidosListResp>(`/api/alquileres?${sp.toString()}`);
+  },
+  getPedido: (id: number) => authedJson<Pedido>(`/api/alquileres/${id}`),
+  enviarDocumentos: (
+    id: number,
+    payload: { docs: string[]; to?: string; mensaje?: string; template?: string },
+  ) =>
+    authedJson<{ ok: true; to: string; docs: string[]; template?: string; provider?: string }>(
+      `/api/alquileres/${id}/enviar-documentos`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    ),
+  // Preview del mail (plantilla + nota + adjuntos) con los datos reales del
+  // pedido, sin enviar. Mismo render que el envío (el backend reusa helpers).
+  previewMailPedido: (
+    id: number,
+    payload: { docs: string[]; mensaje?: string; template?: string },
+  ) =>
+    authedJson<{ subject: string; html: string; text: string }>(
+      `/api/alquileres/${id}/mail-preview`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    ),
+  setPedidoEstado: (id: number, estado: PedidoEstado) =>
+    authedJson<Pedido>(`/api/alquileres/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado }),
+    }),
+  updatePedidoDatos: (id: number, data: Partial<PedidoDatosInput>) =>
+    authedJson<Pedido>(`/api/alquileres/${id}/datos`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  deletePedido: async (id: number) => {
+    const res = await authedFetch(`/api/alquileres/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+  },
+  addPago: (
+    id: number,
+    monto: number,
+    concepto?: string,
+    fecha?: string,
+    destinatario?: string,
+    metodo?: string,
+  ) =>
+    authedPostJson<Pedido>(`/api/alquileres/${id}/pagos`, {
+      monto,
+      concepto,
+      fecha,
+      destinatario,
+      metodo,
+    }),
+  /** Ledger global de pagos — vista de logs del back-office. */
+  listPagosLog: (params?: {
+    destinatario?: string;
+    metodo?: string;
+    desde?: string;
+    hasta?: string;
+  }) => {
+    const sp = new URLSearchParams();
+    if (params?.destinatario) sp.set("destinatario", params.destinatario);
+    if (params?.metodo) sp.set("metodo", params.metodo);
+    if (params?.desde) sp.set("desde", params.desde);
+    if (params?.hasta) sp.set("hasta", params.hasta);
+    const qs = sp.toString();
+    return authedJson<PagosLogResp>(`/api/admin/pagos${qs ? `?${qs}` : ""}`);
+  },
+  deletePago: async (id: number, pagoId: number) => {
+    const res = await authedFetch(`/api/alquileres/${id}/pagos/${pagoId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+    return res.json();
+  },
+
+  // clientes
+  listClientes: (params: { q?: string; per_page?: number } = {}) => {
+    const sp = new URLSearchParams();
+    if (params.q) sp.set("q", params.q);
+    sp.set("per_page", String(params.per_page ?? 200));
+    return authedJson<ClientesListResp>(`/api/clientes?${sp.toString()}`);
+  },
+  createCliente: (data: ClienteInput) => authedPostJson<Cliente>("/api/clientes", data),
+
+  // disponibilidad por rango (mapa equipo_id → { cantidad, reservado })
+  getDisponibilidad: (fechaDesde: string, fechaHasta: string, excludePedidoId?: number) => {
+    const sp = new URLSearchParams({ fecha_desde: fechaDesde, fecha_hasta: fechaHasta });
+    if (excludePedidoId) sp.set("exclude_pedido_id", String(excludePedidoId));
+    // El backend devuelve `{ equipo_id: libres }` — número neto (ya descontadas
+    // reservas + mantenimiento), no `{cantidad, reservado}`. El consumidor lo
+    // adapta. Ver `reservas.calcular_disponibilidad`.
+    return authedJson<Record<string, number>>(`/api/disponibilidad?${sp.toString()}`);
+  },
+
+  // crear pedido nuevo (wizard / página /nuevo)
+  createPedido: (data: PedidoCreateInput) => authedPostJson<Pedido>("/api/alquileres", data),
+
+  // reemplazar items completos del pedido (PUT, requiere ≥1 ítem)
+  updatePedidoItems: (
+    id: number,
+    items: {
+      equipo_id: number | null;
+      cantidad: number;
+      precio_jornada: number;
+      nombre_libre?: string | null;
+      cobro_modo?: CobroModo;
+    }[],
+  ) =>
+    authedJson<Pedido>(`/api/alquileres/${id}/items`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    }),
+
+  // clientes — detalle / edición
+  getCliente: (id: number) => authedJson<Cliente>(`/api/clientes/${id}`),
+  getClientePedidos: (id: number) => authedJson<ClientePedidoRow[]>(`/api/clientes/${id}/pedidos`),
+  updateCliente: (id: number, data: Partial<ClienteInput>) =>
+    authedJson<Cliente>(`/api/clientes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+  deleteCliente: async (id: number) => {
+    const res = await authedFetch(`/api/clientes/${id}`, { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
+    }
+  },
+  generarLinkVerificacion: (clienteId: number) =>
+    authedJson<{ session_id: string; url: string }>(`/api/admin/verificacion/sesion/${clienteId}`, {
+      method: "POST",
+    }),
+
+  // clientes — fusión de duplicados (mismo CUIL verificado)
+  getClientesDuplicados: () => authedJson<GrupoDuplicado[]>(`/api/clientes/duplicados`),
+  mergeClientes: (source: number, target: number) =>
+    authedPostJson<{ ok: boolean; merged_into: number }>(`/api/clientes/merge`, { source, target }),
+
+  // clientes — invitación (white-glove): crea/reusa la cuenta + link de activación
+  invitarCliente: (email: string, nombre?: string, telefono?: string) =>
+    authedPostJson<{ ok: boolean; cliente_id: number; ya_existia: boolean; url: string }>(
+      `/api/clientes/invitar`,
+      { email, nombre, telefono },
+    ),
+
+  // calendario
+  getCalendario: (desde: string, hasta: string) => {
+    const sp = new URLSearchParams({ desde, hasta });
+    return authedJson<CalendarioPedido[]>(`/api/calendario?${sp.toString()}`);
+  },
+
+  // estadísticas
+  getEstadisticas: () => authedJson<EstadisticasData>("/api/estadisticas"),
+
+  // analítica de búsquedas del catálogo público
+  getBusquedas: (dias?: number) =>
+    authedJson<BusquedasData>(`/api/admin/busquedas${dias && dias > 0 ? `?dias=${dias}` : ""}`),
+
+  // Reportes (#88) — liquidación por dueño (pedidos 100% pagados, repartidos)
+  getLiquidacion: (desde: string, hasta: string) =>
+    authedJson<LiquidacionData>(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}`),
+  liquidacionCsv: (desde: string, hasta: string) =>
+    authedFetch(`/api/admin/reportes/liquidacion?desde=${desde}&hasta=${hasta}&formato=csv`).then(
+      (r) => r.blob(),
+    ),
+  // Reporte en PDF branded + envío por mail (misma maquinaria que los documentos
+  // de pedido). El preview se trae como HTML y se muestra con iframe srcDoc para
+  // no depender de cookies cross-origin en un iframe.
+  liquidacionPreviewHtml: (desde: string, hasta: string) =>
+    authedFetch(
+      `/api/admin/reportes/liquidacion/pdf?desde=${desde}&hasta=${hasta}&format=html`,
+    ).then((r) => r.text()),
+  getReporteDestinatarios: () =>
+    authedJson<{ destinatarios: string[] }>("/api/admin/reportes/liquidacion/destinatarios"),
+  enviarReporteMail: (payload: {
+    desde: string;
+    hasta: string;
+    destinatarios: string[];
+    mensaje?: string;
+  }) =>
+    authedPostJson<{ enviados: string[]; fallidos: string[] }>(
+      "/api/admin/reportes/liquidacion/enviar-mail",
+      payload,
+    ),
+  getReconciliacion: () => authedJson<ReconciliacionData>("/api/admin/reportes/reconciliacion"),
+  // Cierre de mes (#721): congelar/reabrir la foto inmutable de un mes liquidado.
+  cerrarMes: (mes: string) =>
+    authedJson<LiquidacionData>(`/api/admin/reportes/cierres/${mes}`, { method: "POST" }),
+  reabrirMes: (mes: string) =>
+    authedJson<{ mes: string; cerrado: boolean; reabierto: boolean }>(
+      `/api/admin/reportes/cierres/${mes}`,
+      { method: "DELETE" },
+    ),
+};

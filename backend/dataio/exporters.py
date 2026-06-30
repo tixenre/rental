@@ -183,83 +183,30 @@ def export_categoria_spec_templates(conn) -> list[dict]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _ensure_equipos_slug(conn) -> None:
-    """Self-heal: si la columna `equipos.slug` no existe (porque alembic
-    upgrade falló o nunca corrió), la creamos y poblamos los slugs faltantes.
-
-    Idempotente: no toca nada si la columna ya existe con todos los slugs.
-    Esto es defensivo para deploys donde la migración e4a7c1f8d6b2 quedó
-    sin aplicar — sin esto, todo el export y catálogo dataio queda roto.
-    """
-    has_slug = conn.execute("""
-        SELECT EXISTS (
-            SELECT 1 FROM information_schema.columns
-            WHERE table_name = 'equipos' AND column_name = 'slug'
-        ) AS x
-    """).fetchone()["x"]
-    changed = False
-    if not has_slug:
-        conn.execute("ALTER TABLE equipos ADD COLUMN slug VARCHAR(80)")
-        changed = True
-
-    # Poblar slugs faltantes (también cubre el caso "columna existía pero
-    # init-slugs nunca corrió").
-    from database import marca_subquery  # type: ignore
-    pending = conn.execute(f"""
-        SELECT id, nombre, {marca_subquery('equipos')}, modelo FROM equipos
-        WHERE slug IS NULL AND eliminado_at IS NULL
-    """).fetchall()
-    if pending:
-        from .slug import equipo_slug
-        existing = {
-            r["slug"] for r in conn.execute(
-                "SELECT slug FROM equipos WHERE slug IS NOT NULL"
-            ).fetchall()
-        }
-        for r in pending:
-            base = equipo_slug(r["marca"], r["modelo"], r["nombre"]) or f"equipo-{r['id']}"
-            slug = base
-            n = 1
-            while slug in existing:
-                n += 1
-                slug = f"{base}-{n}"
-            existing.add(slug)
-            conn.execute("UPDATE equipos SET slug = ? WHERE id = ?", (slug, r["id"]))
-        changed = True
-
-    # Asegurar el UNIQUE constraint completo (consistente con migración
-    # f5b8d2e4a9c1, no el partial index transicional). Idempotente.
-    conn.execute("""
-        DO $$
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_constraint
-                WHERE conname = 'equipos_slug_key' AND conrelid = 'equipos'::regclass
-            ) AND NOT EXISTS (
-                SELECT 1 FROM equipos WHERE slug IS NOT NULL
-                GROUP BY slug HAVING COUNT(*) > 1
-            ) THEN
-                ALTER TABLE equipos ADD CONSTRAINT equipos_slug_key UNIQUE (slug);
-                DROP INDEX IF EXISTS idx_equipos_slug_unique;
-            END IF;
-        END $$;
-    """)
-    changed = True
-
-    if changed:
-        conn.commit()
-
-
 def export_equipos(conn) -> list[dict]:
     """Exporta equipos con slug como clave natural.
 
-    Auto-cura el slug si falta (columna o valor). Esto es defensivo:
-    en deploys donde la migración de Alembic no se aplicó, el export
-    seguía roto hasta intervención manual.
+    READ-ONLY por contrato (#922): el export NO crea columnas ni puebla slugs
+    —antes lo hacía un self-heal acá, mutando esquema/datos en cada "bajar
+    backup" (locks en prod, commit incondicional)—. El slug se garantiza por
+    los caminos correctos: la columna/constraint en `init_db()` + migración, y
+    el valor por el backfill (`dataio.slug.backfill_equipos_slug`) que corre en
+    el bootstrap y en el alta de equipo. Si un equipo activo quedara sin slug
+    (esquema sin migrar), se omite del export y se loguea — no se auto-cura.
     """
-    _ensure_equipos_slug(conn)
-
     from database import MARCA_SUBQUERY  # type: ignore
+
+    sin_slug = conn.execute("""
+        SELECT COUNT(*) AS n FROM equipos
+        WHERE slug IS NULL AND eliminado_at IS NULL
+    """).fetchone()["n"]
+    if sin_slug:
+        import logging
+        logging.getLogger(__name__).warning(
+            "export_equipos: %d equipo(s) activo(s) sin slug se omiten del export. "
+            "Correr el backfill (init_db / migración) antes de exportar.",
+            sin_slug,
+        )
     rows = conn.execute(f"""
         SELECT e.slug, e.nombre, {MARCA_SUBQUERY}, e.modelo, e.cantidad,
                e.precio_jornada, e.precio_jornada_manual, e.precio_usd,
@@ -411,7 +358,6 @@ def export_equipo_fichas(conn) -> list[dict]:
                 notas=r["notas"],
                 keywords_json=r["keywords_json"],
                 nombre_publico_template=r["nombre_publico_template"],
-                incluye_json=r["incluye_json"],
                 conectividad_json=r["conectividad_json"],
                 compatible_con_json=r["compatible_con_json"],
                 video_url=r["video_url"],

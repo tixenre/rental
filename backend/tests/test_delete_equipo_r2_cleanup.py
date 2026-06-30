@@ -6,7 +6,11 @@ public_base. El cleanup es best-effort (envuelto en try/except).
 """
 import pytest
 
-import routes.equipos as eq
+# `delete_equipo` vive en el submódulo `core` del paquete (#501 fase a). El test
+# parchea sus globals (get_db, _delete_from_r2, _r2_config, require_admin), así
+# que apunta al módulo donde la función está DEFINIDA, no al `__init__` del
+# paquete (un monkeypatch sobre el paquete no alcanzaría los globals de core).
+import routes.equipos.core as eq
 
 pytestmark = pytest.mark.unit
 

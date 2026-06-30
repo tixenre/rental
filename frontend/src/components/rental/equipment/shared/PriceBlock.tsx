@@ -1,0 +1,98 @@
+import { formatARS, UNIDADES, unidadLabel, type Unidad } from "@/lib/format";
+import { priceBreakdown } from "@/lib/pricing";
+import { cn } from "@/lib/utils";
+
+interface PriceBlockProps {
+  /** Precio por unidad (jornada/hora) del equipo (base, sin descuentos). */
+  perDay: number;
+  /** Unidades del período seleccionado (jornadas/horas). 0 = sin fechas. */
+  jornadas?: number;
+  /**
+   * Unidad de la tarifa (default `jornada`, alquiler). `hora` para el estudio.
+   * El término y su plural salen de `UNIDADES` (fuente única) — no hardcodear.
+   */
+  unidad?: Unidad;
+  /** Cantidad en el carrito. Default 1. */
+  qty?: number;
+  /** Si el cliente es responsable inscripto (agrega "+IVA" al label). */
+  conIva?: boolean;
+  /** Alineación del bloque. Grid/mobile: left. Lista desktop: right. */
+  align?: "left" | "right";
+  /**
+   * Tamaño del amount principal.
+   * lg = 19px (grid card) · md = 17px (lista desktop) · sm = 14px (mobile)
+   */
+  size?: "lg" | "md" | "sm";
+  /**
+   * Compacto: oculta la 3ª línea ("$X / jornada") cuando se muestra el total
+   * del período. Para filas densas (lista mobile colapsada) donde el ancho es
+   * escaso; el desglose completo queda en el panel expandido / ficha.
+   */
+  compact?: boolean;
+  className?: string;
+}
+
+/**
+ * Bloque de precio — asset compartido de la librería `equipment/shared`.
+ *
+ * Regla de jerarquía:
+ * - Sin fechas / 1 jornada: muestra precio / jornada.
+ * - Con fechas y > 1 jornada: TOTAL del período en grande + precio / jornada
+ *   secundario abajo.
+ *
+ * El total sale SIEMPRE de `priceBreakdown()` (@/lib/pricing) — nunca se
+ * multiplica a mano — para que el día que entren descuentos (#73) no haya que
+ * tocar este componente. Fuente: font-mono font-semibold tabular-nums (nunca
+ * font-display: Champ Black no escala bien por debajo de ~28px).
+ */
+export function PriceBlock({
+  perDay,
+  jornadas = 0,
+  unidad = "jornada",
+  qty = 1,
+  conIva = false,
+  align = "left",
+  size = "md",
+  compact = false,
+  className,
+}: PriceBlockProps) {
+  const unidadSingular = UNIDADES[unidad].singular;
+  const showPeriodTotal = jornadas > 1;
+  const { total } = priceBreakdown(perDay, jornadas, qty);
+  const ivaSuffix = conIva ? " +IVA" : "";
+
+  const amountClass = size === "lg" ? "text-[19px]" : size === "md" ? "text-[17px]" : "text-sm"; // eslint-disable-line no-restricted-syntax -- tamaños ópticos del precio: escala entre text-sm y text-xl calibrada para moneda
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-[1px]",
+        align === "right" && "items-end text-right",
+        className,
+      )}
+    >
+      {/* Número protagonista */}
+      <span
+        className={cn(
+          "font-mono font-semibold tabular-nums text-ink leading-none whitespace-nowrap",
+          amountClass,
+        )}
+      >
+        {showPeriodTotal ? formatARS(total) : formatARS(perDay)}
+      </span>
+
+      {/* Label secundario */}
+      <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground leading-none">
+        {showPeriodTotal ? unidadLabel(jornadas, unidad) : `/ ${unidadSingular}${ivaSuffix}`}
+      </span>
+
+      {/* Por-unidad cuando mostramos total del período (oculto en compact) */}
+      {showPeriodTotal && !compact && (
+        <span className="font-mono text-xs tabular-nums text-muted-foreground leading-none whitespace-nowrap">
+          {formatARS(perDay)} / {unidadSingular}
+          {ivaSuffix}
+        </span>
+      )}
+    </div>
+  );
+}

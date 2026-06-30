@@ -1,0 +1,3 @@
+# Estado efímero de hooks — no se versiona (es per-checkout).
+.governance-review-state
+.retro-state

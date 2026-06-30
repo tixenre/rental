@@ -2,6 +2,7 @@
 routes/marcas.py — CRUD de marcas (brands).
 """
 
+import logging
 import re
 import time
 import unicodedata
@@ -9,8 +10,9 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from database import get_db, row_to_dict
-from admin_guard import require_admin
+from auth.guards import require_admin
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -76,7 +78,7 @@ def list_marcas():
     sino fallback al algoritmo automático de top N por count."""
     with get_db() as conn:
         rows = conn.execute("""
-            SELECT id, nombre, logo_url, destacada, orden,
+            SELECT id, nombre, logo_url, logo_url_sm, destacada, orden,
                    popularidad_score, created_at, updated_at
             FROM marcas
             WHERE visible = TRUE
@@ -199,9 +201,10 @@ def admin_merge_marcas(req: MarcaMergeRequest, request: Request):
         except HTTPException:
             conn.rollback()
             raise
-        except Exception as e:
+        except Exception:
             conn.rollback()
-            raise HTTPException(500, f"Error al fusionar marcas: {e}")
+            logger.exception("Error al fusionar marcas")
+            raise HTTPException(500, "No se pudieron fusionar las marcas")
 
 
 @router.post("/admin/marcas/reorder")
@@ -316,7 +319,7 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
     with get_db() as conn:
         try:
             marca = conn.execute(
-                "SELECT id, nombre FROM marcas WHERE id = ?", (marca_id,)
+                "SELECT id, nombre FROM marcas WHERE id = %s", (marca_id,)
             ).fetchone()
             if not marca:
                 raise HTTPException(404, "Marca no encontrada")
@@ -330,7 +333,7 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
                 with media_http():
                     public_url = _r2_put(path, content, "image/svg+xml")
                 conn.execute(
-                    "UPDATE marcas SET logo_url = ?, updated_at = NOW() WHERE id = ?",
+                    "UPDATE marcas SET logo_url = %s, updated_at = NOW() WHERE id = %s",
                     (public_url, marca_id),
                 )
                 conn.commit()
@@ -344,20 +347,25 @@ async def admin_upload_marca_logo(marca_id: int, request: Request):
                     "height": None,
                 }
             else:
-                from services.media import DISPLAY_KEEP_ASPECT, store_upload
+                from services.media import DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM, store_upload
                 from services.media_fastapi import media_http
                 with media_http():
                     asset = store_upload(
-                        raw_content, kind="marca", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn
+                        raw_content, kind="marca",
+                        derive_specs=[DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM],
+                        conn=conn,
                     )
                 display = asset.variant("display")
+                display_sm = asset.variant("display-sm")
                 conn.execute(
-                    "UPDATE marcas SET logo_url = ?, media_id = ?, updated_at = NOW() WHERE id = ?",
-                    (display.url, asset.id, marca_id),
+                    "UPDATE marcas SET logo_url = %s, logo_url_sm = %s, media_id = %s, "
+                    "updated_at = NOW() WHERE id = %s",
+                    (display.url, display_sm.url if display_sm else None, asset.id, marca_id),
                 )
                 conn.commit()
                 return {
                     "public_url": display.url,
+                    "public_url_sm": display_sm.url if display_sm else None,
                     "path": display.key,
                     "size": display.bytes,
                     "size_original": len(raw_content),

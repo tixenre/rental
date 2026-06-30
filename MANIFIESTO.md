@@ -30,7 +30,7 @@ Un único dueño/operador maneja el back-office. Inventario chico-mediano (cient
 | Capa | Tech |
 |---|---|
 | Frontend | React 19 + Vite + TanStack Router (file-based) + TanStack Query + Tailwind v4 + shadcn/Radix UI |
-| Backend | FastAPI + psycopg2 + PostgreSQL (pool de conexiones) |
+| Backend | FastAPI + psycopg (psycopg3 sync) + PostgreSQL (pool de conexiones) |
 | Auth | Google OAuth via Supabase Auth (admin + portal cliente) |
 | Storage | Cloudflare R2 (S3-compatible) para fotos |
 | Drag-and-drop | `@dnd-kit/*` |
@@ -101,7 +101,7 @@ Body explica el **por qué**, no el **qué**. Bullets si hay varios efectos.
 - **Quién mergea y cuándo** (la sesión a `dev`, los gates del dueño, auto-merge, opt-out): definido en la decisión _Workflow de cambios_ del digest. No se repite acá.
 - Conflicts con main: rebase / merge desde el branch (no force-push a main).
 
-El método de mantenimiento (auditar/fixear/commits/PR) vive en el skill [`limpieza`](.claude/skills/limpieza/SKILL.md); el **mobile gate** + el prompt del auditor, en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
+El método de mantenimiento (auditar/fixear/commits/PR) vive en el skill [`mantenimiento`](.claude/skills/mantenimiento/SKILL.md); el **mobile gate** + la rúbrica de auditoría, en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
 
 ### Issues — labels
 
@@ -128,6 +128,17 @@ Gate de merge: cualquier PR que toque rutas de cliente (`/`, `/equipo/*`, `/clie
 El wrapper [`<PublicLayout>`](src/components/rental/PublicLayout.tsx) provee TopBar + Footer mobile-aware, pero **no garantiza el criterio** — el contenido de cada ruta tiene que cumplirlo por su cuenta.
 
 Definición completa del criterio, checklist y status por ruta en [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md). Procedimiento en [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md).
+
+### Iterar local con datos reales
+
+**Para iterar UI o flujos que necesitan sesión / datos reales (portal cliente, back-office, cualquier cosa con assets del admin), no alcanza con los fixtures.** Los bugs de theming/datos no aparecen con mocks — el wordmark custom del admin se veía amber sobre los topbars de color en staging/prod pero nunca con el SVG bundleado local. El **loop render-compare se valida con datos/assets reales**, no solo mocks.
+
+Montaje del entorno local con datos reales:
+1. **Backend local** — `uvicorn main:app --port 8000` con un `.env` (gitignored): `SECRET_KEY`, `STAGING_LOGIN_SECRET`, `DATABASE_URL` apuntando a tu **Postgres local**.
+2. **BD de staging clonada a local** — `pg_dump` **read-only** de la base de staging → restore en tu Postgres local (cuidar versiones de pg). **Nunca** apuntes el backend local a la base remota: `init_db()` corre al startup y le escribiría el esquema, y es PII real. El clon es solo lectura sobre la remota.
+3. **Login programático** — `POST /auth/staging-login {secret, target:"cliente"|"admin"}` mintea la cookie; el cliente se resuelve por `STAGING_CLIENTE_EMAIL` o un `cliente_id`. Desde el navegador en `localhost:3000` (así guarda la cookie HttpOnly del proxy).
+
+Setup detallado en [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md). Regla viva: _Iteración local con datos reales (2026-06-20)_ en [`docs/MEMORIA.md`](docs/MEMORIA.md).
 
 ---
 
@@ -186,7 +197,7 @@ Puntos de entrada para no grepear:
 
 ### Base de datos
 
-- **Postgres puro** (migró de SQLite). El wrapper `PGCursor` traduce placeholders `?`→`%s` para no reescribir cientos de queries.
+- **Postgres puro** (migró de SQLite). El wrapper `PGConnection`/`PGCursor` es el DAL único: pool, rollback-al-devolver, y el chokepoint de guardas SQL mecánicas (`_assert_pct_safe` + `_assert_params_present`). Paramstyle: `%s` nativo de psycopg3 (la traducción `?`→`%s` fue retirada en Fase 6 de la migración).
 - **Migraciones**: dos capas. (1) schema base con `CREATE IF NOT EXISTS` en `backend/database.py::init_db()` (idempotente, corre en cada arranque — es el bootstrap real). (2) cambios incrementales con Alembic (`backend/migrations/versions/`). Si el `upgrade head` del arranque falla, se loguea y la app sigue → puede quedar **drift silencioso** (BD trabada en una revisión vieja). **Convención: toda tabla/columna nueva va TAMBIÉN en `init_db()`** (no solo en una migración). Visibilidad en `GET /health/migrations`; modelo + runbook de reparación en [`docs/RUNBOOK_MIGRACIONES.md`](docs/RUNBOOK_MIGRACIONES.md).
 - **Soft delete**: equipos tienen `eliminado_at TIMESTAMP NULL`. Las listas filtran `IS NULL` por default. Endpoint `POST /equipos/:id/restore`. Vista "papelera" en lista admin. Bulk delete en papelera = hard delete (action `delete_permanent`).
 
@@ -270,10 +281,15 @@ Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`
 |---|---|
 | [`docs/MEMORIA.md`](docs/MEMORIA.md) | Digest enforceable de decisiones + preferencias (memoria viva, curada; auto-cargado) |
 | [`docs/DECISIONES.md`](docs/DECISIONES.md) | Log ADR completo: el *por qué* de cada decisión (on-demand) |
-| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Prompt del auditor + mobile gate (método de mantenimiento → skill `limpieza`) |
+| [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Rúbrica de auditoría + mobile gate (método de mantenimiento → skill `mantenimiento`) |
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/SISTEMA_SPECS.md`](docs/SISTEMA_SPECS.md) | **Manual técnico del sistema de specs / catálogo / datasets / autocompletar / compat** |
 | [`docs/SISTEMA_FACTURACION.md`](docs/SISTEMA_FACTURACION.md) | **Manual técnico del sistema de facturación electrónica ARCA** |
+| [`docs/SISTEMA_FOTOS.md`](docs/SISTEMA_FOTOS.md) | **Manual técnico del sistema de fotos / media: motor (procesar) + componentes (mostrar)** |
+| [`docs/SISTEMA_CONTENIDO.md`](docs/SISTEMA_CONTENIDO.md) | **Manual técnico del contenido de producto: puerta única "qué incluye un kit/combo" (`services/contenido`)** |
+| [`docs/SISTEMA_CARRITO.md`](docs/SISTEMA_CARRITO.md) | **Manual técnico del carrito: módulo único de la lógica (`services/carrito`) — selección / activos / readiness; carrito = intención, gate = verdad** |
+| [`docs/SISTEMA_AUTH.md`](docs/SISTEMA_AUTH.md) | **Manual técnico de la autenticación: motor `auth/` (sesión + jti/revocación), métodos (Google/passkey/staging), guards, middleware, seguridad** |
+| [`docs/SISTEMA_IDENTITY.md`](docs/SISTEMA_IDENTITY.md) | **Manual técnico de la identidad: motor `identity/` (ancla CUIL, KYC sobre Didit, contactos verificados, lector único `get_validated_identity`, dedup/merge)** |
 | [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido` |
 | [`docs/MOBILE.md`](docs/MOBILE.md) | Componentes y patrones mobile |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Criterio mobile + checklist + status por ruta |

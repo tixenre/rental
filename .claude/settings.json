@@ -6,6 +6,43 @@
           {
             "type": "command",
             "command": "node scripts/check-docs.mjs"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-pendientes.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-buzon.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/log-skill.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-governance-review.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-retro.sh"
           }
         ]
       }

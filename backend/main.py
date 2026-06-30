@@ -3,7 +3,9 @@ Rambla Rental API — FastAPI + PostgreSQL
 Run: uvicorn main:app --reload --port 8000
 """
 
+import json
 import logging
+import mimetypes
 import os
 import threading
 import uuid
@@ -11,11 +13,17 @@ import html as _html
 import re
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -52,13 +60,16 @@ from routes.reportes         import router as reportes_router
 from routes.contabilidad     import router as contabilidad_router
 from routes.busquedas        import router as busquedas_router
 from routes.dashboard        import router as dashboard_router
-from routes.auth             import router as auth_router
+from auth import router as auth_router
+from auth import auth_passkey_router
+from auth import auth_sessions_router
+from auth import auth_linking_router
 from routes.settings         import router as settings_router
 from routes.cliente_portal   import router as cliente_portal_router
 from routes.marcas           import router as marcas_router
 from routes.specs            import router as specs_router
 from routes.unidades         import router as unidades_router
-from routes.seo              import router as seo_router
+from routes.seo              import router as seo_router, _build_categoria_slug as _cat_slug
 from routes.calendar         import router as calendar_router
 from routes.inventario       import router as inventario_router
 from routes.email_templates  import router as email_templates_router
@@ -66,6 +77,13 @@ from routes.dataio           import router as dataio_router
 from routes.estudio          import router as estudio_router
 from routes.didit            import router as didit_router
 from routes.facturacion      import router as facturacion_router
+from routes.talleres         import router as talleres_router
+from routes.carritos         import router as carritos_router
+from routes.checkout         import router as checkout_router
+from routes.compartir        import router as compartir_router
+from routes.errores_admin    import router as errores_admin_router
+from routes.media_api        import router as media_api_router
+from routes.media_admin      import router as media_admin_router
 from middleware          import auth_middleware
 
 logger = logging.getLogger(__name__)
@@ -80,6 +98,65 @@ app = FastAPI(title="Rambla Rental API", version="2.0")
 from rate_limit import limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    """Captura cualquier excepción no manejada, la persiste en server_errors y
+    devuelve el tipo + mensaje al cliente (en vez de "Internal Server Error").
+
+    HTTPException y RateLimitExceeded se propagan normalmente — este handler
+    solo atrapa lo inesperado.
+    """
+    from fastapi import HTTPException as _HTTPException
+    from fastapi.responses import JSONResponse as _JSONResponse
+    from services.error_log import log_server_error
+    from logging_config import request_id_var
+
+    if isinstance(exc, _HTTPException):
+        raise exc
+
+    route = str(request.url.path)
+    rid = request_id_var.get(None)
+    logger.exception("Error no manejado en %s (rid=%s)", route, rid)
+    log_server_error(route, exc, request_id=rid)
+
+    return _JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {exc}"},
+    )
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    """Startup: acota el threadpool + arranca el init de BD en background.
+
+    Threadpool: FastAPI corre los handlers sync en el threadpool de AnyIO (default 40). Cada
+    handler toma una conexión del pool (maxconn). Si los threads superan al pool,
+    el excedente NO espera: psycopg2 lanza `PoolError: connection pool exhausted`
+    → 500 en cascada. Acotando el threadpool a `pool_max()` menos un margen para
+    workers de fondo (scheduler, init de BD, webhooks async que tocan la BD),
+    los requests de más hacen cola en vez de explotar. Back-pressure, no errores.
+
+    DB init: arranca aquí (no a nivel de módulo) para evitar que `import main`
+    en los tests lance el thread antes de que el test tenga la BD preparada,
+    lo que causaba un deadlock entre el upgrade de Alembic y el init_db() del
+    fixture del test.
+    """
+    import anyio.to_thread
+    from database import pool_max
+
+    margen_fondo = 4  # scheduler + init + webhooks async que comparten el pool
+    tokens = max(3, pool_max() - margen_fondo)
+    anyio.to_thread.current_default_thread_limiter().total_tokens = tokens
+    logger.info(
+        "Threadpool acotado a %d (pool_max=%d, margen=%d) — back-pressure activo",
+        tokens, pool_max(), margen_fondo,
+    )
+
+    global db_init_thread
+    db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
+    db_init_thread.start()
 
 
 async def request_id_middleware(request: Request, call_next):
@@ -110,16 +187,81 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
             "Revisá la env var en Railway (no debe tener localhost ni '*')."
         )
 
+# ── Content-Security-Policy (Report-Only) ──────────────────────────────────────
+# Arranca en Report-Only: NO bloquea nada, solo reporta violaciones a /csp-report
+# para mapear las fuentes reales en prod antes de pasar a enforcing. Fuentes
+# relevadas del código: self · Google Fonts (googleapis/gstatic) · GA4
+# (googletagmanager/google-analytics) · R2 (imágenes, *.r2.dev) · embeds (Google
+# Maps, YouTube, Instagram embed.js + cdninstagram/fbcdn) · simpleicons (logos de
+# marca). 'unsafe-inline' en style-src es
+# inevitable por los `style={}` de React + el <style> que inyecta Google Fonts.
+# Solo se aplica al HTML del SPA (no a /api ni assets, que no ejecutan nada).
+CSP_REPORT_ONLY = "; ".join(
+    [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'self'",
+        "form-action 'self'",
+        "script-src 'self' https://www.googletagmanager.com https://www.instagram.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https://*.r2.dev https://www.googletagmanager.com "
+        "https://*.google-analytics.com https://cdn.simpleicons.org "
+        "https://*.cdninstagram.com https://*.fbcdn.net",
+        "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com "
+        "https://*.r2.dev https://www.instagram.com",
+        "frame-src 'self' blob: https://www.google.com https://maps.google.com "
+        "https://www.youtube.com https://*.r2.dev https://www.instagram.com",
+        "report-uri /csp-report",
+    ]
+)
+
+
+# Estáticos no-hasheados servidos por el catch-all (estudio/*.jpg, favicon, icons,
+# robots, manifests): cache de 1 día. Los bundles hasheados (/assets/*) van aparte
+# como `immutable` 1 año (el hash de Vite invalida solos). El HTML del SPA → no-cache.
+_STATIC_EXT_RE = re.compile(
+    r"\.(?:js|css|jpg|jpeg|png|webp|avif|gif|svg|ico|woff2?|ttf|txt|json|map)$", re.I
+)
+
+
 @app.middleware("http")
 async def security_headers(request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
+    # Cache-Control por path (no se toca /api/* ni respuestas que ya fijan el suyo —
+    # sitemap/calendar/doc-preview usan setdefault, así que su valor gana). Arregla
+    # el "Use efficient cache lifetimes" de Lighthouse: el backend servía todo sin TTL.
+    path = request.url.path
+    if not path.startswith("/api/"):
+        ctype = response.headers.get("content-type", "")
+        if path.startswith("/assets/"):
+            response.headers.setdefault(
+                "Cache-Control", "public, max-age=31536000, immutable"
+            )
+        elif ctype.startswith("text/html"):
+            response.headers.setdefault("Cache-Control", "no-cache")
+        elif response.status_code == 200 and _STATIC_EXT_RE.search(path):
+            response.headers.setdefault("Cache-Control", "public, max-age=86400")
     # DENY global por default (anti-clickjacking, #503). `setdefault` para que una
     # ruta pueda relajar a SAMEORIGIN cuando su HTML está hecho para embeberse en
     # un iframe del propio portal (preview de documentos) sin que el middleware lo
     # pise de vuelta a DENY.
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # HSTS solo en prod: fuerza HTTPS por 1 año (incluye subdominios). NO en
+    # dev/staging (no pinear sus dominios a HTTPS). `is_production` falla-a-prod ante
+    # un env desconocido → del lado seguro (todo Railway es HTTPS; sobre HTTP el header
+    # se ignora). Sin `preload` (compromiso difícil de revertir, requiere alta manual).
+    if settings.is_production:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
+    # CSP solo en el HTML del SPA (lo único que ejecuta scripts/estilos). Report-Only
+    # → reporta, no bloquea: cero riesgo de romper prod mientras se mapean las fuentes.
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Content-Security-Policy-Report-Only"] = CSP_REPORT_ONLY
     return response
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -137,13 +279,49 @@ app.add_middleware(
 if FRONT.exists():
     app.mount("/static", StaticFiles(directory=str(FRONT)), name="static")
 
-# Nuevo frontend (Vite SPA — rental-refine)
+# Nuevo frontend (Vite SPA — rental-refine):
+# Content-negotiation: sirve .br / .gz pre-comprimidos si el cliente los acepta.
+# Reemplaza el StaticFiles mount porque StaticFiles no sirve FileResponse comprimidas
+# incluso con GZipMiddleware (limitación de Starlette).
 if FRONT_NEW.exists():
-    app.mount("/assets", StaticFiles(directory=str(FRONT_NEW / "assets")), name="assets")
+    _assets_dir = (FRONT_NEW / "assets").resolve()
+
+    @app.get("/assets/{path:path}", include_in_schema=False)
+    async def serve_asset(path: str, request: Request):
+        """Sirve assets estáticos con content-negotiation (Brotli > gzip > raw)."""
+        try:
+            candidate = (_assets_dir / path).resolve()
+        except Exception:
+            raise HTTPException(status_code=400)
+        if not candidate.is_file() or not candidate.is_relative_to(_assets_dir):
+            raise HTTPException(status_code=404)
+        ctype = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+        cache = "public, max-age=31536000, immutable"
+        accept_enc = request.headers.get("accept-encoding", "")
+        if "br" in accept_enc:
+            br = candidate.parent / (candidate.name + ".br")
+            if br.is_file():
+                return FileResponse(str(br), headers={
+                    "Content-Encoding": "br", "Content-Type": ctype,
+                    "Cache-Control": cache, "Vary": "Accept-Encoding",
+                })
+        if "gzip" in accept_enc:
+            gz = candidate.parent / (candidate.name + ".gz")
+            if gz.is_file():
+                return FileResponse(str(gz), headers={
+                    "Content-Encoding": "gzip", "Content-Type": ctype,
+                    "Cache-Control": cache, "Vary": "Accept-Encoding",
+                })
+        return FileResponse(str(candidate), headers={
+            "Cache-Control": cache, "Vary": "Accept-Encoding",
+        })
 
 # ── Routers ──────────────────────────────────────────────────────────────────
 
 app.include_router(auth_router)
+app.include_router(auth_passkey_router)  # /auth/passkey/* + /cliente/auth/passkey/* (sin prefijo /api)
+app.include_router(auth_sessions_router)  # /auth/sessions/* + /cliente/auth/sessions/* (sin prefijo /api)
+app.include_router(auth_linking_router)  # /cliente/auth/keys/* (métodos de acceso, sin prefijo /api)
 app.include_router(equipos_router,        prefix="/api")
 app.include_router(alquileres_router,     prefix="/api")
 app.include_router(clientes_router,       prefix="/api")
@@ -162,9 +340,37 @@ app.include_router(dataio_router,         prefix="/api")
 app.include_router(estudio_router,        prefix="/api")
 app.include_router(didit_router,          prefix="/api")
 app.include_router(facturacion_router,    prefix="/api")
+app.include_router(talleres_router,       prefix="/api")
+app.include_router(carritos_router,       prefix="/api")
+app.include_router(checkout_router,       prefix="/api")
+app.include_router(compartir_router,      prefix="/api")  # /api/public/compartir (sin auth)
+app.include_router(errores_admin_router,  prefix="/api")
+app.include_router(media_api_router,      prefix="/api")
+app.include_router(media_admin_router,    prefix="/api")
 app.include_router(seo_router)  # /sitemap.xml (sin prefijo /api — debe estar en root)
 app.include_router(calendar_router)  # /calendar/feed.ics (root) + /api/admin/calendar/*
 app.include_router(cliente_portal_router)
+
+# ── CSP violation report sink ────────────────────────────────────────────────
+
+_csp_logger = logging.getLogger("csp")
+
+
+@app.post("/csp-report", include_in_schema=False)
+async def csp_report(request: Request):
+    """Recibe violaciones del CSP Report-Only (browser → report-uri).
+
+    Las loggea para mapear qué fuentes reales usa prod antes de pasar a enforcing.
+    Devuelve 204 sin cuerpo. Capea el payload para no loggear basura enorme.
+    """
+    try:
+        body = await request.body()
+        if body:
+            _csp_logger.warning("csp-violation %s", body[:2000].decode("utf-8", "replace"))
+    except Exception:  # nunca debe fallar la respuesta por un report malformado
+        pass
+    return Response(status_code=204)
+
 
 # ── Health Check ─────────────────────────────────────────────────────────────
 
@@ -183,6 +389,24 @@ def health():
         "status": "ok",
         "migrations": {"checked": mig["checked"], "ok": mig["ok"]},
     }
+
+
+@app.get("/health/frontend", include_in_schema=False)
+def health_frontend():
+    """Readiness del SPA para el healthcheck de Railway.
+
+    503 si el `dist` del frontend NO está donde el backend lo sirve (`FRONT_NEW`).
+    Así un deploy que no puede servir el SPA (ej. la regresión de paths #930, o un
+    `COPY` de dist roto) **falla el healthcheck y NO se promueve** — ni en staging
+    ni en prod. A diferencia de `/health` (siempre 200, para tolerar fallos de
+    migración a propósito), esto SÍ tumba el deploy si el SPA no se sirve.
+    """
+    if (FRONT_NEW / "index.html").is_file():
+        return {"status": "ok", "frontend": "served"}
+    return JSONResponse(
+        {"status": "error", "frontend": "not_built", "expected": str(FRONT_NEW)},
+        status_code=503,
+    )
 
 
 @app.get("/health/migrations", include_in_schema=False)
@@ -226,18 +450,70 @@ def root():
         conn = get_db()
         try:
             row = conn.execute(
-                "SELECT value FROM app_settings WHERE key = ?", ("og_image_url",)
+                "SELECT value FROM app_settings WHERE key = %s", ("og_image_url",)
+            ).fetchone()
+            # Foto principal del estudio = LCP del home (misma fuente y orden que
+            # `useHeroPhotos`: es_principal DESC, orden ASC). Se preloadea para que
+            # sea descubrible en el HTML inicial.
+            hero_row = conn.execute(
+                "SELECT url, url_sm, url_avif, url_sm_avif FROM estudio_fotos WHERE estudio_id = 1 "
+                "ORDER BY es_principal DESC, orden ASC, id ASC LIMIT 1"
             ).fetchone()
         finally:
             conn.close()
+        html_text = index_file.read_text(encoding="utf-8")
+        hero_url = (hero_row["url"].strip() if hero_row and hero_row["url"] else "")
+        hero_sm = (hero_row["url_sm"].strip() if hero_row and hero_row["url_sm"] else "")
+        hero_avif = (hero_row["url_avif"].strip() if hero_row and hero_row["url_avif"] else "")
+        hero_sm_avif = (hero_row["url_sm_avif"].strip() if hero_row and hero_row["url_sm_avif"] else "")
+        if hero_url.startswith("http"):
+            html_text = _inject_hero_preload(
+                html_text, hero_url, hero_sm or None,
+                hero_avif or None, hero_sm_avif or None,
+            )
         image = (row["value"].strip() if row and row["value"] else "")
-        if not image.startswith("http"):
-            return _serve_frontend("index.html")
-        html_text = _set_og_image(index_file.read_text(encoding="utf-8"), image)
+        if image.startswith("http"):
+            html_text = _set_og_image(html_text, image)
         return HTMLResponse(content=html_text)
     except Exception:
         logger.warning("OG injection de la home falló — sirvo index plano", exc_info=True)
         return _serve_frontend("index.html")
+
+def _branding_redirect(setting_key: str, static_path: str):
+    """Redirige a la URL de R2 del asset de branding si está configurada.
+    Si no, el catch-all sirve el archivo estático del repo como fallback."""
+    try:
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT value FROM app_settings WHERE key = %s", (setting_key,)
+            ).fetchone()
+        finally:
+            conn.close()
+        if row and row["value"] and row["value"].strip().startswith("http"):
+            return RedirectResponse(row["value"].strip(), status_code=302)
+    except Exception:
+        pass
+    return _serve_frontend(static_path)
+
+
+@app.get("/favicon.png", include_in_schema=False)
+def favicon_png():
+    """Favicon — redirige al PNG derivado del motor de branding (R2) si existe."""
+    return _branding_redirect("favicon_url", "favicon.png")
+
+
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+def apple_touch_icon():
+    """Apple touch icon — redirige al PNG derivado del motor de branding (R2) si existe."""
+    return _branding_redirect("apple_touch_icon_url", "apple-touch-icon.png")
+
+
+@app.get("/icon-512.png", include_in_schema=False)
+def icon_512():
+    """Ícono 512×512 — redirige al PNG derivado del motor de branding (R2) si existe."""
+    return _branding_redirect("icon_512_url", "icon-512.png")
+
 
 @app.get("/login", include_in_schema=False)
 def login_page():
@@ -268,6 +544,70 @@ def _inject_og_meta(html_text: str, *, title: str, description: str, image: str,
     return html_text
 
 
+def _inject_hero_preload(
+    html_text: str,
+    image: str,
+    image_sm: str | None = None,
+    image_avif: str | None = None,
+    image_sm_avif: str | None = None,
+) -> str:
+    """Inserta `<link rel=preconnect>` al origen R2 + `<link rel=preload as=image
+    fetchpriority=high>` del hero del home justo antes de `</head>`. La URL del hero
+    sale de un query async (`useHeroPhotos`), así que sin esto el LCP no es descubrible
+    en el HTML inicial — el browser no puede arrancar el fetch hasta correr el JS +
+    responder la API (LCP ~21s en Lighthouse).
+
+    Preloadeamos el AVIF cuando la foto principal lo tiene (`type=image/avif`): el hero
+    se renderiza con `<img src=avif>` directo (NO `<picture>`), así que el preload AVIF
+    matchea el elemento LCP de forma determinista — los browsers sin soporte AVIF ignoran
+    el preload y caen a webp vía `onError` (helper `heroImgProps` en el front). Esto
+    espeja la decisión del front sobre la MISMA foto (mismo orden es_principal DESC,
+    orden ASC, id ASC) → preload y `<img>` apuntan al mismo recurso, una sola descarga.
+
+    Si la principal NO tiene AVIF (NULL: subida pre-backfill o codec falló), caemos al
+    preload webp. El `imagesizes="100vw"` matchea EXACTO el `sizes` del `<img>` del hero
+    (mobile y desktop unificados) — Lighthouse mide el LCP mobile, que usa 100vw. El
+    preconnect abre la conexión TLS al bucket R2 antes del fetch."""
+    # Origen del bucket R2 (https://host) derivado de la URL del hero — sin hardcodear
+    # el bucket, robusto ante cambios de ambiente.
+    origin = "/".join(image.split("/")[:3])
+    tags = ""
+    if origin.startswith("http"):
+        esc_origin = _html.escape(origin, quote=True)
+        tags += f'<link rel="preconnect" href="{esc_origin}">'
+
+    if image_avif:
+        # AVIF-directo: el hero renderiza `<img src=avif>`, así que el preload AVIF
+        # matchea el LCP. `type=image/avif` es obligatorio para que el browser lo trate
+        # como AVIF y los que no lo soportan lo ignoren (caen a webp vía onError).
+        esc_avif = _html.escape(image_avif, quote=True)
+        if image_sm_avif:
+            esc_sm_avif = _html.escape(image_sm_avif, quote=True)
+            tags += (
+                f'<link rel="preload" as="image" type="image/avif" fetchpriority="high"'
+                f' imagesrcset="{esc_sm_avif} 800w, {esc_avif} 1600w"'
+                f' imagesizes="100vw">'
+            )
+        else:
+            tags += (
+                f'<link rel="preload" as="image" type="image/avif"'
+                f' fetchpriority="high" href="{esc_avif}">'
+            )
+    else:
+        # Sin AVIF → preload webp (el front también renderiza webp en este caso).
+        esc = _html.escape(image, quote=True)
+        if image_sm:
+            esc_sm = _html.escape(image_sm, quote=True)
+            tags += (
+                f'<link rel="preload" as="image" fetchpriority="high"'
+                f' imagesrcset="{esc_sm} 800w, {esc} 1600w"'
+                f' imagesizes="100vw">'
+            )
+        else:
+            tags += f'<link rel="preload" as="image" fetchpriority="high" href="{esc}">'
+    return html_text.replace("</head>", tags + "</head>", 1)
+
+
 def _set_og_image(html_text: str, image: str) -> str:
     """Reemplaza SOLO `og:image` + `twitter:image` del index.html (el resto del
     `<head>` de la home ya es correcto). Mismo patrón que `_inject_og_meta`."""
@@ -276,6 +616,120 @@ def _set_og_image(html_text: str, image: str) -> str:
         pat = re.compile(r'(<meta\s+' + attr + r'="' + re.escape(key) + r'"\s+content=")[^"]*(")')
         html_text = pat.sub(lambda m: m.group(1) + esc + m.group(2), html_text, count=1)
     return html_text
+
+
+def _inject_json_ld(html_text: str, *schemas: dict) -> str:
+    """Inserta uno o más bloques JSON-LD justo antes de </head>.
+
+    Los crawlers/agentes que no ejecutan JS (Googlebot light, LLM indexers)
+    ven el structured data directamente en el HTML inicial — sin esperar JS.
+    Cada schema se emite en un <script> separado para facilitar el debug.
+    """
+    tags = "".join(
+        f'<script type="application/ld+json">{json.dumps(s, ensure_ascii=False)}</script>'
+        for s in schemas
+    )
+    return html_text.replace("</head>", tags + "</head>", 1)
+
+
+def _get_initial_catalog(conn) -> dict:
+    """Serializa equipos visibles + categorías para el script __INITIAL__ del catálogo.
+
+    Subset de list_equipos sin filtros ni attach_*, suficiente para el primer
+    render de las cards sin round-trip. backendToEquipment tolera campos ausentes
+    (etiquetas/kit/specs → arrays vacíos o None).
+    """
+    rows = conn.execute(f"""
+        SELECT
+            e.id, e.nombre, e.nombre_publico, e.modelo,
+            e.foto_url, e.foto_url_sm, e.foto_url_thumb,
+            e.foto_url_avif, e.foto_url_sm_avif, e.foto_url_thumb_avif, e.foto_lqip,
+            e.precio_jornada, e.precio_usd, e.cantidad,
+            e.estado, e.visible_catalogo, e.relevancia_manual,
+            e.popularidad_score, e.destacado, e.tipo,
+            {MARCA_SUBQUERY}
+        FROM equipos e
+        WHERE e.visible_catalogo = 1
+          AND e.estado != 'fuera_servicio'
+          AND e.eliminado_at IS NULL
+          AND e.es_recurso_interno = FALSE
+        ORDER BY e.relevancia_manual ASC, e.popularidad_score DESC, e.nombre ASC
+        LIMIT 500
+    """).fetchall()
+
+    items = []
+    for row in rows:
+        item = dict(row)
+        item.setdefault("etiquetas", [])
+        item.setdefault("kit", [])
+        items.append(item)
+
+    cats = conn.execute(
+        "SELECT id, nombre, COALESCE(total, 0) AS total, prioridad, parent_id "
+        "FROM categorias ORDER BY COALESCE(prioridad, 999), nombre"
+    ).fetchall()
+
+    estudio_fotos = conn.execute(
+        "SELECT url, url_sm, url_avif, url_sm_avif, es_principal, orden "
+        "FROM estudio_fotos WHERE estudio_id = 1 "
+        "ORDER BY es_principal DESC, orden ASC LIMIT 5"
+    ).fetchall()
+
+    return {
+        "equipos": {"total": len(items), "items": items},
+        "categorias": [dict(c) for c in cats],
+        "estudio": {"fotos": [dict(f) for f in estudio_fotos]},
+    }
+
+
+def _inject_initial_data(html_text: str, data: dict) -> str:
+    """Inyecta <script id="__INITIAL__" type="application/json"> antes de </body>.
+
+    El frontend lo consume en main.tsx para pre-poblar React Query sin round-trip.
+    Se escapa </script> dentro del payload para no romper el parser HTML.
+    """
+    payload = json.dumps(data, ensure_ascii=False, default=str)
+    payload = payload.replace("</script>", r"<\/script>")
+    script_tag = f'<script id="__INITIAL__" type="application/json">{payload}</script>'
+    return html_text.replace("</body>", script_tag + "</body>", 1)
+
+
+@app.get("/rental", include_in_schema=False)
+def rental_page():
+    """Catálogo público. Inyecta:
+    - Hero preload (LCP del catálogo — misma fuente y orden que useHeroPhotos)
+    - __INITIAL__ con equipos + categorías para hydration de React Query (sin round-trip)
+
+    Ante cualquier error sirve el index.html plano — el SPA fetchea normalmente.
+    """
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            hero_row = conn.execute(
+                "SELECT url, url_sm, url_avif, url_sm_avif FROM estudio_fotos WHERE estudio_id = 1 "
+                "ORDER BY es_principal DESC, orden ASC, id ASC LIMIT 1"
+            ).fetchone()
+            initial_data = _get_initial_catalog(conn)
+        finally:
+            conn.close()
+        html_text = index_file.read_text(encoding="utf-8")
+        hero_url = (hero_row["url"].strip() if hero_row and hero_row["url"] else "")
+        hero_sm = (hero_row["url_sm"].strip() if hero_row and hero_row["url_sm"] else "")
+        hero_avif = (hero_row["url_avif"].strip() if hero_row and hero_row["url_avif"] else "")
+        hero_sm_avif = (hero_row["url_sm_avif"].strip() if hero_row and hero_row["url_sm_avif"] else "")
+        if hero_url.startswith("http"):
+            html_text = _inject_hero_preload(
+                html_text, hero_url, hero_sm or None,
+                hero_avif or None, hero_sm_avif or None,
+            )
+        html_text = _inject_initial_data(html_text, initial_data)
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("rental_page: inyección falló — sirvo index plano", exc_info=True)
+        return _serve_frontend("index.html")
 
 
 @app.get("/equipo/{id_or_slug}", include_in_schema=False)
@@ -300,11 +754,12 @@ def equipo_page(id_or_slug: str):
             row = conn.execute(
                 f"""
                 SELECT e.nombre, e.foto_url, e.nombre_publico,
+                       e.precio_jornada, e.cantidad,
                        {MARCA_SUBQUERY},
                        ef.descripcion
                 FROM equipos e
                 LEFT JOIN equipo_fichas ef ON ef.equipo_id = e.id
-                WHERE e.id = ?
+                WHERE e.id = %s
                 """,
                 (equipo_id,),
             ).fetchone()
@@ -313,9 +768,19 @@ def equipo_page(id_or_slug: str):
                 """
                 SELECT mv.url FROM equipo_fotos ef
                 JOIN media_variants mv ON mv.asset_id = ef.media_id
-                WHERE ef.equipo_id = ? AND mv.name = 'og'
+                WHERE ef.equipo_id = %s AND mv.name = 'og'
                 ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC
                 LIMIT 1
+                """,
+                (equipo_id,),
+            ).fetchone()
+            # Primera categoría del equipo (para BreadcrumbList).
+            cat_row = conn.execute(
+                """
+                SELECT c.nombre FROM categorias c
+                JOIN equipo_categorias ec ON ec.categoria_id = c.id
+                WHERE ec.equipo_id = %s
+                ORDER BY ec.id LIMIT 1
                 """,
                 (equipo_id,),
             ).fetchone()
@@ -348,9 +813,141 @@ def equipo_page(id_or_slug: str):
             index_file.read_text(encoding="utf-8"),
             title=title, description=desc, image=image, url=url,
         )
+        # JSON-LD server-side: Product + BreadcrumbList. Visible para crawlers
+        # que no ejecutan JS (Googlebot light, LLM indexers, bots de precios).
+        precio = d.get("precio_jornada")
+        cantidad = d.get("cantidad") or 0
+        marca_str = (d.get("marca") or "").strip()
+        cat_nombre = (cat_row["nombre"] if cat_row else "").strip()
+        product_schema: dict = {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": nombre,
+            "description": desc,
+            "url": url,
+            "image": image,
+        }
+        if marca_str:
+            product_schema["brand"] = {"@type": "Brand", "name": marca_str}
+        if cat_nombre:
+            product_schema["category"] = cat_nombre
+        if precio is not None:
+            product_schema["offers"] = {
+                "@type": "Offer",
+                "priceCurrency": "ARS",
+                "price": precio,
+                "availability": "https://schema.org/InStock" if cantidad > 0 else "https://schema.org/OutOfStock",
+                "priceSpecification": {
+                    "@type": "UnitPriceSpecification",
+                    "price": precio,
+                    "priceCurrency": "ARS",
+                    "unitText": "jornada",
+                },
+            }
+        breadcrumb_items = [{"@type": "ListItem", "position": 1, "name": "Inicio", "item": f"{SITE_URL}/"}]
+        if cat_nombre:
+            breadcrumb_items.append({
+                "@type": "ListItem", "position": 2,
+                "name": cat_nombre,
+                "item": f"{SITE_URL}/categoria/{_cat_slug(cat_nombre)}",
+            })
+        breadcrumb_items.append({
+            "@type": "ListItem", "position": len(breadcrumb_items) + 1,
+            "name": nombre, "item": url,
+        })
+        breadcrumb_schema = {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": breadcrumb_items,
+        }
+        html_text = _inject_json_ld(html_text, product_schema, breadcrumb_schema)
         return HTMLResponse(content=html_text)
     except Exception:
         logger.warning("OG injection falló para /equipo/%s — sirvo index plano", id_or_slug, exc_info=True)
+        return _serve_frontend("index.html")
+
+@app.get("/c/{token}", include_in_schema=False)
+def compartido_page(token: str):
+    """Sirve el SPA para un carrito compartido (/c/<token>) inyectando los meta
+    OG/Twitter server-side, para que la preview de WhatsApp/redes (que NO ejecuta
+    JS) muestre el título y los equipos reales del link (feature #4, #1092).
+
+    La composición se resuelve EN VIVO contra el catálogo (nombre/foto actuales),
+    consistente con el rearmado del carrito. Ante cualquier error o token
+    inexistente cae al index.html plano — el SPA (`c.$token.tsx`) maneja el
+    "link no encontrado" con su propia UI.
+    """
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT titulo, items_json FROM carritos_compartidos WHERE token = %s",
+                (token,),
+            ).fetchone()
+            if not row:
+                return _serve_frontend("index.html")
+            raw = row["items_json"]
+            items = raw if isinstance(raw, list) else json.loads(raw or "[]")
+            ids = [int(it["equipo_id"]) for it in items if it.get("equipo_id") is not None]
+            titulo = (row["titulo"] or "").strip()
+            equipos: dict = {}
+            if ids:
+                # alias `e` + MARCA_SUBQUERY por convención de queries de equipos (MEMORIA 2026-05-26)
+                filas = conn.execute(
+                    f"SELECT e.id, e.nombre, e.nombre_publico, e.foto_url, {MARCA_SUBQUERY}"
+                    " FROM equipos e WHERE e.id = ANY(%s)",
+                    (ids,),
+                ).fetchall()
+                equipos = {f["id"]: row_to_dict(f) for f in filas}
+        finally:
+            conn.close()
+
+        def _nombre(d: dict) -> str:
+            n = (d.get("nombre_publico") or "").strip()
+            if n:
+                return n
+            marca = (d.get("marca") or "").strip()
+            base = (d.get("nombre") or "").strip()
+            return f"{marca} {base}".strip() if marca and marca.lower() not in base.lower() else base
+
+        nombres = [_nombre(equipos[i]) for i in ids if i in equipos]
+        n = len(nombres)
+        # El título y la descripción enmarcan QUÉ es el link —te compartieron un listado para
+        # armar un pedido—, no solo la marca ni la lista cruda de equipos. Así la preview de
+        # WhatsApp le explica el link a quien lo recibe (caso gaffer → productor: "reservá esto").
+        if titulo:
+            title = f"{titulo} — listado de equipos · Rambla Rental"
+        else:
+            title = "Te compartieron un listado de equipos · Rambla Rental"
+        if nombres:
+            shown = ", ".join(nombres[:3])
+            extra = n - 3
+            if extra > 0:
+                shown += f" y {extra} más"
+            unidades = "1 equipo" if n == 1 else f"{n} equipos"
+            # Cada línea aporta algo distinto y complementario: el título enmarca ("Te compartieron
+            # un listado"), la descripción lista el CONTENIDO + dónde, y el mensaje de chat (front)
+            # lleva la ACCIÓN ("Abrilo y reservalo"). Acá NO repetimos el arranque del título.
+            desc = f"{unidades}: {shown} — para alquilar en Mar del Plata."
+        else:
+            desc = "Una selección de equipos para alquilar en Rambla Rental, Mar del Plata."
+        if len(desc) > 200:
+            desc = desc[:197].rstrip() + "…"
+        # Imagen: la isologo de marca estática (og-image.png, 1200×630 ya encuadrada para OG). Un
+        # listado compartido se presenta con la marca Rambla — no la foto de un equipo suelto, ni el
+        # og_image_url de la home (un wordmark a sangre que WhatsApp recorta al centro → "MB").
+        image = f"{SITE_URL}/og-image.png"
+        url = f"{SITE_URL}/c/{token}"
+        html_text = _inject_og_meta(
+            index_file.read_text(encoding="utf-8"),
+            title=title, description=desc, image=image, url=url,
+        )
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("OG injection falló para /c/%s — sirvo index plano", token, exc_info=True)
         return _serve_frontend("index.html")
 
 @app.get("/cliente", include_in_schema=False)
@@ -364,6 +961,162 @@ def cliente_portal_page():
 @app.get("/cliente/registro", include_in_schema=False)
 def cliente_registro_page():
     return _serve_frontend("cliente/registro.html")
+
+
+@app.get("/estudio", include_in_schema=False)
+def estudio_page():
+    """Sirve el SPA del estudio con OG tags dinámicos (foto principal del estudio).
+    Ante cualquier error sirve el index.html plano — nunca rompe la página."""
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            cfg = conn.execute(
+                "SELECT nombre, tagline, descripcion FROM estudio WHERE id = 1"
+            ).fetchone()
+            # Foto principal del estudio — preferir variante OG (jpg); fallback a url
+            foto_row = conn.execute(
+                """
+                SELECT COALESCE(mv.url, ef.url) AS img_url
+                FROM estudio_fotos ef
+                LEFT JOIN media_variants mv ON mv.asset_id = ef.media_id AND mv.name = 'og'
+                WHERE ef.estudio_id = 1
+                ORDER BY ef.es_principal DESC, ef.orden ASC, ef.id ASC
+                LIMIT 1
+                """
+            ).fetchone()
+        finally:
+            conn.close()
+        nombre = (cfg["nombre"] if cfg else "") or "El Estudio"
+        tagline = (cfg["tagline"] if cfg else "") or ""
+        desc_raw = (cfg["descripcion"] if cfg else "") or tagline
+        desc = desc_raw.strip()
+        if len(desc) > 200:
+            desc = desc[:197].rstrip() + "…"
+        if not desc:
+            desc = "Estudio de foto y video en Mar del Plata. Reservá por hora con todo el equipo incluido."
+        title = f"{nombre} — Rambla Rental"
+        img = (foto_row["img_url"] if foto_row else "") or ""
+        if not img.startswith("http"):
+            img = f"{SITE_URL}/icon-512.png"
+        html_text = _inject_og_meta(
+            index_file.read_text(encoding="utf-8"),
+            title=title, description=desc, image=img, url=f"{SITE_URL}/estudio",
+        )
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("OG injection falló para /estudio — sirvo index plano", exc_info=True)
+        return _serve_frontend("index.html")
+
+
+@app.get("/workshops/{slug}", include_in_schema=False)
+def workshop_page(slug: str):
+    """Sirve el SPA del taller con OG tags dinámicos (foto del instructor).
+    Ante cualquier error sirve el index.html plano — nunca rompe la página."""
+    try:
+        index_file = FRONT_NEW / "index.html"
+        if not index_file.exists():
+            return _serve_frontend("index.html")
+        conn = get_db()
+        try:
+            taller = conn.execute(
+                "SELECT nombre, descripcion, instructor_nombre, "
+                "instructor_foto_url, instructor_media_id, "
+                "fecha_inicio, fecha_fin, precio_total "
+                "FROM talleres WHERE slug = %s AND activo = TRUE",
+                (slug,),
+            ).fetchone()
+            if not taller:
+                return _serve_frontend("index.html")
+            # Foto OG: preferir variante 'og' del media; fallback a 'display'
+            # o instructor_foto_url (foto subida antes del motor).
+            media_id = None
+            try:
+                media_id = taller["instructor_media_id"]
+            except (KeyError, IndexError):
+                pass
+            og_img = ""
+            if media_id:
+                mv = conn.execute(
+                    "SELECT url FROM media_variants "
+                    "WHERE asset_id = %s AND name IN ('og', 'display') "
+                    "ORDER BY CASE name WHEN 'og' THEN 0 ELSE 1 END LIMIT 1",
+                    (media_id,),
+                ).fetchone()
+                og_img = (mv["url"] if mv else "") or ""
+            if not og_img:
+                try:
+                    og_img = taller["instructor_foto_url"] or ""
+                except (KeyError, IndexError):
+                    og_img = ""
+        finally:
+            conn.close()
+        nombre = (taller["nombre"] or "").strip()
+        instructor = (taller["instructor_nombre"] or "").strip()
+        desc_raw = (taller["descripcion"] or "").strip()
+        if len(desc_raw) > 200:
+            desc_raw = desc_raw[:197].rstrip() + "…"
+        if not desc_raw:
+            desc_raw = f"Workshop con {instructor} en Rambla, Mar del Plata." if instructor else "Workshops audiovisuales en Mar del Plata."
+        title = f"{nombre} con {instructor} — Rambla" if instructor else f"{nombre} — Rambla"
+        if not og_img.startswith("http"):
+            og_img = f"{SITE_URL}/icon-512.png"
+        taller_url = f"{SITE_URL}/workshops/{slug}"
+        html_text = _inject_og_meta(
+            index_file.read_text(encoding="utf-8"),
+            title=title, description=desc_raw, image=og_img, url=taller_url,
+        )
+        # JSON-LD Event schema — visible para crawlers/agentes sin JS.
+        event_schema: dict = {
+            "@context": "https://schema.org",
+            "@type": "Event",
+            "name": nombre,
+            "description": desc_raw,
+            "url": taller_url,
+            "image": og_img,
+            "location": {
+                "@type": "Place",
+                "name": "Rambla",
+                "address": {
+                    "@type": "PostalAddress",
+                    "addressLocality": "Mar del Plata",
+                    "addressRegion": "Buenos Aires",
+                    "addressCountry": "AR",
+                },
+            },
+            "organizer": {"@type": "Organization", "name": "Rambla", "url": SITE_URL},
+        }
+        if instructor:
+            event_schema["performer"] = {"@type": "Person", "name": instructor}
+        try:
+            fecha_inicio = taller["fecha_inicio"]
+            fecha_fin = taller["fecha_fin"]
+            if fecha_inicio:
+                event_schema["startDate"] = str(fecha_inicio)[:10]
+            if fecha_fin:
+                event_schema["endDate"] = str(fecha_fin)[:10]
+        except (KeyError, IndexError, TypeError):
+            pass
+        try:
+            precio = taller["precio_total"]
+            if precio is not None:
+                event_schema["offers"] = {
+                    "@type": "Offer",
+                    "price": precio,
+                    "priceCurrency": "ARS",
+                    "availability": "https://schema.org/InStock",
+                    "url": taller_url,
+                }
+        except (KeyError, IndexError, TypeError):
+            pass
+        html_text = _inject_json_ld(html_text, event_schema)
+        return HTMLResponse(content=html_text)
+    except Exception:
+        logger.warning("OG injection falló para /workshops/%s — sirvo index plano", slug, exc_info=True)
+        return _serve_frontend("index.html")
+
 
 # ── SPA catch-all: rutas del nuevo frontend (TanStack Router) ────────────────
 # Debe ir AL FINAL para no interceptar rutas de API ni páginas de admin.
@@ -559,8 +1312,7 @@ def _maybe_run_initial_ranking() -> None:
         conn.close()
 
 
-db_init_thread = threading.Thread(target=init_db_bg, daemon=True)
-db_init_thread.start()
+db_init_thread: threading.Thread | None = None  # arranca en el startup event
 
 # Scheduler in-process de recordatorios de retiro (opt-in por REMINDERS_ENABLED).
 # Decisión 2026-06-04 / issue #735: corre dentro de este proceso, no es un

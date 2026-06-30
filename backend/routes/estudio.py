@@ -1,5 +1,6 @@
 """
-routes/estudio.py — CRUD del Estudio (singleton) + galería de fotos (E1).
+routes/estudio.py — CRUD del Estudio (singleton) + galería de fotos (E1)
+                    + trabajos/producciones (galería "en acción").
 """
 
 import json
@@ -7,10 +8,10 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import MARCA_SUBQUERY, get_db, now_ar, to_datetime
 from routes.clientes import nombre_completo_cliente
 from reservas import ESTADOS_RESERVADO, validar_stock as _check_stock
@@ -22,7 +23,15 @@ from routes.alquileres import (
 )
 from services.media.security import _download_image_bytes, _validate_ssrf_only
 from services.media.storage import delete_object as _delete_from_r2
-from services.media import DISPLAY_KEEP_ASPECT, collect_asset_keys, purge_r2, store_upload
+from services.media import (
+    DISPLAY_KEEP_ASPECT,
+    DISPLAY_KEEP_ASPECT_AVIF,
+    DISPLAY_KEEP_ASPECT_SM,
+    DISPLAY_KEEP_ASPECT_SM_AVIF,
+    collect_asset_keys,
+    purge_r2,
+    store_upload,
+)
 from services.media_fastapi import media_http
 
 router = APIRouter()
@@ -53,7 +62,7 @@ def _require_cliente(request):
 
 def _get_fotos(conn) -> list:
     cur = conn.execute(
-        "SELECT id, url, path, orden, es_principal, created_at "
+        "SELECT id, url, url_sm, url_avif, url_sm_avif, path, orden, es_principal, created_at "
         "FROM estudio_fotos WHERE estudio_id = 1 ORDER BY orden, id",
         (),
     )
@@ -62,6 +71,9 @@ def _get_fotos(conn) -> list:
         {
             "id": r["id"],
             "url": r["url"],
+            "url_sm": r["url_sm"],
+            "url_avif": r["url_avif"],
+            "url_sm_avif": r["url_sm_avif"],
             "path": r["path"],
             "orden": r["orden"],
             "es_principal": bool(r["es_principal"]),
@@ -111,7 +123,15 @@ def _build_response(row, fotos: list) -> dict:
     }
 
 
-def _insert_foto(conn, url: str, path: str, media_id: int | None = None) -> dict:
+def _insert_foto(
+    conn,
+    url: str,
+    path: str,
+    media_id: int | None = None,
+    url_sm: str | None = None,
+    url_avif: str | None = None,
+    url_sm_avif: str | None = None,
+) -> dict:
     cur = conn.execute(
         "SELECT COALESCE(MAX(orden), -1) + 1 AS next_orden FROM estudio_fotos WHERE estudio_id = 1",
         (),
@@ -122,21 +142,25 @@ def _insert_foto(conn, url: str, path: str, media_id: int | None = None) -> dict
     is_first = cur2.fetchone()["cnt"] == 0
 
     conn.execute(
-        "INSERT INTO estudio_fotos (estudio_id, url, path, orden, es_principal, media_id) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (1, url, path, orden, is_first, media_id),
+        "INSERT INTO estudio_fotos "
+        "(estudio_id, url, url_sm, url_avif, url_sm_avif, path, orden, es_principal, media_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (1, url, url_sm, url_avif, url_sm_avif, path, orden, is_first, media_id),
     )
     conn.commit()
 
     cur3 = conn.execute(
-        "SELECT id, url, path, orden, es_principal, created_at FROM estudio_fotos "
-        "WHERE path = ? AND estudio_id = 1",
+        "SELECT id, url, url_sm, url_avif, url_sm_avif, path, orden, es_principal, created_at "
+        "FROM estudio_fotos WHERE path = %s AND estudio_id = 1",
         (path,),
     )
     r = cur3.fetchone()
     return {
         "id": r["id"],
         "url": r["url"],
+        "url_sm": r["url_sm"],
+        "url_avif": r["url_avif"],
+        "url_sm_avif": r["url_sm_avif"],
         "path": r["path"],
         "orden": r["orden"],
         "es_principal": bool(r["es_principal"]),
@@ -146,22 +170,334 @@ def _insert_foto(conn, url: str, path: str, media_id: int | None = None) -> dict
 
 # ── Endpoint público ─────────────────────────────────────────────────────────
 
-@router.get("/estudio")
-def get_estudio():
-    """Devuelve la configuración pública del estudio + fotos + pack curado.
+import re as _re
 
-    `pack_equipos` es la lista curada del pack con cantidades (stock total) para
-    mostrar "qué incluye" en la ficha — independiente de la franja. La
-    disponibilidad real por franja sigue saliendo de /estudio/disponibilidad."""
+
+def _extract_ig_shortcode(url_or_code: str) -> tuple[str, str] | None:
+    """Retorna (shortcode, post_type) donde post_type es 'reel', 'p' o 'tv'."""
+    if not url_or_code:
+        return None
+    m = _re.search(r"instagram\.com/(reel|p|tv)/([A-Za-z0-9_-]+)", url_or_code)
+    if m:
+        return (m.group(2), m.group(1))
+    if _re.match(r"^[A-Za-z0-9_-]{8,}$", url_or_code):
+        return (url_or_code, "reel")
+    return None
+
+
+def _extract_og_tag(html_text: str, prop: str) -> str | None:
+    """Extrae el content de un og:meta tag, tolerando orden de atributos."""
+    for pat in (
+        rf'<meta[^>]+property="{_re.escape(prop)}"[^>]+content="([^"]+)"',
+        rf'<meta[^>]+content="([^"]+)"[^>]+property="{_re.escape(prop)}"',
+    ):
+        m = _re.search(pat, html_text)
+        if m:
+            return m.group(1).replace("\\u0026", "&").replace("&amp;", "&")
+    return None
+
+
+def _fetch_og_meta(url: str) -> dict:
+    """Descarga una URL y extrae og:title/image/description (best-effort)."""
+    import httpx
+    try:
+        headers = {
+            "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+            "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
+        }
+        resp = httpx.get(url, headers=headers, timeout=8.0, follow_redirects=True)
+        if resp.status_code != 200:
+            return {}
+        html = resp.text
+        return {
+            "title": _extract_og_tag(html, "og:title"),
+            "image": _extract_og_tag(html, "og:image"),
+            "description": _extract_og_tag(html, "og:description"),
+        }
+    except Exception:
+        return {}
+
+
+# ── Medios externos (links YouTube/Instagram) ─────────────────────────────────
+#
+# Un trabajo es una lista ordenada de medios: links externos (YouTube/Instagram)
+# + fotos subidas. Los thumbnails de los links NO se hotlinkean crudos — las URLs
+# del CDN de Instagram expiran y se bloquean por referrer; las de YouTube son
+# estables pero igual las pasamos por el motor para tener una copia permanente +
+# AVIF. `_process_remote_thumbnail` baja la imagen y la guarda en R2 vía el motor
+# (dedup por hash → no reprocesa la misma imagen).
+
+
+def _detect_link_tipo(url: str) -> str | None:
+    """Clasifica una URL externa. None si no es un proveedor soportado."""
+    if not url:
+        return None
+    if "youtu" in url:
+        return "youtube"
+    if "instagram.com" in url:
+        return "instagram"
+    return None
+
+
+def _extract_yt_id(url: str) -> str | None:
+    m = _re.search(
+        r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|embed/|shorts/|live/))([A-Za-z0-9_-]{11})",
+        url,
+    )
+    return m.group(1) if m else None
+
+
+def _process_remote_thumbnail(url: str | None) -> str | None:
+    """Baja una imagen remota (og:image de IG, thumb de YT) y la guarda permanente
+    en R2 vía el motor de medios. Devuelve la URL de display (webp). Best-effort:
+    None ante cualquier fallo (la card cae a un placeholder)."""
+    if not url:
+        return None
+    try:
+        with media_http():
+            _validate_ssrf_only(url)
+            raw, _ct = _download_image_bytes(url)
+        with get_db() as conn:
+            with media_http():
+                asset = store_upload(
+                    raw,
+                    kind="estudio",
+                    derive_specs=[
+                        DISPLAY_KEEP_ASPECT,
+                        DISPLAY_KEEP_ASPECT_SM,
+                        DISPLAY_KEEP_ASPECT_AVIF,
+                        DISPLAY_KEEP_ASPECT_SM_AVIF,
+                    ],
+                    conn=conn,
+                )
+            conn.commit()
+        v = asset.variant("display")
+        return {"url": v.url, "w": v.width or None, "h": v.height or None}
+    except Exception:
+        return None
+
+
+def _resolve_link_thumbnail(tipo: str, url: str) -> dict | None:
+    """Obtiene un thumbnail permanente {url, w, h} para un link, según el proveedor."""
+    if tipo == "youtube":
+        vid = _extract_yt_id(url)
+        if not vid:
+            return None
+        for quality in ("maxresdefault", "hqdefault"):
+            thumb = _process_remote_thumbnail(
+                f"https://img.youtube.com/vi/{vid}/{quality}.jpg"
+            )
+            if thumb:
+                return thumb
+        return None
+    if tipo == "instagram":
+        ig = _extract_ig_shortcode(url)
+        if not ig:
+            return None
+        og = _fetch_og_meta(f"https://www.instagram.com/{ig[1]}/{ig[0]}/")
+        return _process_remote_thumbnail(og.get("image"))
+    return None
+
+
+def _resolve_links(incoming: list, existing: list | None) -> list:
+    """Normaliza la lista de links entrante a [{tipo, url, thumbnail_url, w, h}].
+
+    Reusa el thumbnail ya procesado (url + dimensiones) de un link cuya URL no
+    cambió (evita re-bajar y re-procesar en cada edición). El `tipo` lo decide el
+    server (ignora lo que mande el front).
+
+    Si el link trae `thumbnail_url` (override del admin), lo descarga y lo usa
+    en lugar del og:image auto-detectado — permite corregir la miniatura de
+    carruseles de IG donde og:image no es el primer slide."""
+    existing_by_url = {l.get("url"): l for l in (existing or []) if l.get("url")}
+    out: list = []
+    seen: set = set()
+    for link in incoming:
+        url = (link.get("url") or "").strip()
+        if not url or url in seen:
+            continue
+        tipo = _detect_link_tipo(url)
+        if not tipo:
+            continue
+        seen.add(url)
+        prev = existing_by_url.get(url)
+        # Override: el admin mandó una URL de miniatura personalizada.
+        override = (link.get("thumbnail_url") or "").strip()
+        if override:
+            thumb = _process_remote_thumbnail(override)
+            out.append({
+                "tipo": tipo, "url": url,
+                "thumbnail_url": thumb["url"] if thumb else (prev or {}).get("thumbnail_url"),
+                "thumbnail_w": thumb["w"] if thumb else (prev or {}).get("thumbnail_w"),
+                "thumbnail_h": thumb["h"] if thumb else (prev or {}).get("thumbnail_h"),
+            })
+            continue
+        if prev and prev.get("thumbnail_url"):
+            out.append({
+                "tipo": tipo, "url": url,
+                "thumbnail_url": prev.get("thumbnail_url"),
+                "thumbnail_w": prev.get("thumbnail_w"),
+                "thumbnail_h": prev.get("thumbnail_h"),
+            })
+            continue
+        thumb = _resolve_link_thumbnail(tipo, url)
+        out.append({
+            "tipo": tipo, "url": url,
+            "thumbnail_url": thumb["url"] if thumb else None,
+            "thumbnail_w": thumb["w"] if thumb else None,
+            "thumbnail_h": thumb["h"] if thumb else None,
+        })
+    return out
+
+
+def _build_media(links: list, fotos: list) -> list:
+    """Une links + fotos en la lista `media` ordenada que consume el carrusel del
+    front. Links primero (el medio 'titular'), después las fotos subidas. `w`/`h`
+    = dimensiones del thumbnail, para que la card use la proporción real."""
+    media: list = []
+    for link in links or []:
+        media.append({
+            "kind": link.get("tipo"),
+            "url": link.get("url"),
+            "thumbnail": link.get("thumbnail_url"),
+            "w": link.get("thumbnail_w"),
+            "h": link.get("thumbnail_h"),
+        })
+    for foto in fotos or []:
+        media.append({
+            "kind": "foto",
+            "url": foto.get("url"),
+            "url_sm": foto.get("url_sm"),
+            "url_avif": foto.get("url_avif"),
+            "url_sm_avif": foto.get("url_sm_avif"),
+            "w": foto.get("w"),
+            "h": foto.get("h"),
+        })
+    return media
+
+
+def _trabajo_links(row) -> list:
+    """Lee los links de un trabajo: links_json, con fallback a las columnas
+    sueltas legacy (youtube_url/instagram_reel_url) para filas no migradas.
+
+    ⏰ LEGACY: el fallback a youtube_url/instagram_reel_url/thumbnail_url (acá +
+    en el UPDATE que las vacía) se remueve cuando todos los trabajos existentes
+    pasaron por links_json (editar y guardar cada uno migra on-write). Una vez
+    que no quede ninguna fila con esas columnas pobladas, dropear las 3 columnas
+    y este bloque."""
+    links = _parse_json_field(row["links_json"]) or []
+    if links:
+        return links
+    legacy: list = []
+    if row["youtube_url"]:
+        legacy.append({
+            "tipo": "youtube", "url": row["youtube_url"],
+            "thumbnail_url": row["thumbnail_url"],
+        })
+    if row["instagram_reel_url"]:
+        legacy.append({
+            "tipo": "instagram", "url": row["instagram_reel_url"],
+            "thumbnail_url": row["thumbnail_url"],
+        })
+    return legacy
+
+
+def _clean_categorias(cats: list | None) -> list:
+    """Normaliza tags: trim, descarta vacíos, deduplica case-insensitive
+    preservando el orden y la capitalización de la primera aparición."""
+    out: list = []
+    seen: set = set()
+    for c in cats or []:
+        c = (c or "").strip()
+        if not c:
+            continue
+        key = c.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(c)
+    return out
+
+
+def _trabajo_categorias(row) -> list:
+    """Lee los tags de un trabajo: categorias_json, con fallback legacy a la
+    columna `categoria` (singular) para filas no migradas."""
+    cats = _parse_json_field(row["categorias_json"]) or []
+    if cats:
+        return cats
+    return [row["categoria"]] if row["categoria"] else []
+
+
+def _get_trabajos(conn, solo_activos: bool = True) -> list:
+    q = (
+        "SELECT id, titulo, realizador, realizador_logo_url, "
+        "realizador_instagram, realizador_web, categoria, categorias_json, descripcion, "
+        "tipo, youtube_url, instagram_reel_url, thumbnail_url, "
+        "links_json, fotos_json, orden, activo, created_at, updated_at "
+        "FROM estudio_trabajos "
+    )
+    q += "WHERE activo = TRUE " if solo_activos else ""
+    q += "ORDER BY orden, id"
+    cur = conn.execute(q)
+    rows = cur.fetchall()
+    out = []
+    for r in rows:
+        links = _trabajo_links(r)
+        fotos = _parse_json_field(r["fotos_json"]) or []
+        cats = _trabajo_categorias(r)
+        out.append({
+            "id": r["id"],
+            "titulo": r["titulo"],
+            "realizador": r["realizador"],
+            "realizador_logo_url": r["realizador_logo_url"],
+            "realizador_instagram": r["realizador_instagram"],
+            "realizador_web": r["realizador_web"],
+            # `categoria` (singular) = primer tag, legacy; `categorias` = fuente única.
+            "categoria": cats[0] if cats else "",
+            "categorias": cats,
+            "descripcion": r["descripcion"] or "",
+            "tipo": r["tipo"],
+            # Fuente única para el front: lista ordenada de medios (links + fotos).
+            "media": _build_media(links, fotos),
+            # Links crudos para que el admin pueda editarlos.
+            "links": links,
+            "fotos": fotos,
+            "orden": r["orden"],
+            "activo": bool(r["activo"]),
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+        })
+    return out
+
+
+@router.get("/estudio")
+def get_estudio(response: Response):
+    """Devuelve la configuración pública del estudio + fotos + pack curado + trabajos."""
+    response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=30"
     with get_db() as conn:
         row = _get_estudio_row(conn)
         fotos = _get_fotos(conn)
         resp = _build_response(row, fotos)
         resp["pack_equipos"] = _pack_curado(conn)
+        resp["trabajos"] = _get_trabajos(conn, solo_activos=True)
         return resp
 
 
 # ── Endpoints admin ──────────────────────────────────────────────────────────
+
+@router.get("/admin/estudio")
+def get_estudio_admin(request: Request):
+    """Versión admin del GET /estudio — sin Cache-Control público (el endpoint
+    público está cacheado 5min en Cloudflare, lo que causaba que subir/borrar
+    fotos no se reflejara hasta que el caché expirara)."""
+    require_admin(request)
+    with get_db() as conn:
+        row = _get_estudio_row(conn)
+        fotos = _get_fotos(conn)
+        resp = _build_response(row, fotos)
+        resp["pack_equipos"] = _pack_curado(conn)
+        resp["trabajos"] = _get_trabajos(conn, solo_activos=False)
+        return resp
 
 class EstudioUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -219,13 +555,13 @@ def patch_estudio(body: EstudioUpdate, request: Request):
 
     with get_db() as conn:
         if updates:
-            set_parts = [f"{k} = ?" for k in updates]
-            set_parts.append("updated_at = ?")
+            set_parts = [f"{k} = %s" for k in updates]
+            set_parts.append("updated_at = %s")
             values = list(updates.values())
             values.append(datetime.now(tz=timezone.utc))
             values.append(1)
             conn.execute(
-                f"UPDATE estudio SET {', '.join(set_parts)} WHERE id = ?",
+                f"UPDATE estudio SET {', '.join(set_parts)} WHERE id = %s",
                 tuple(values),
             )
             conn.commit()
@@ -254,10 +590,29 @@ async def upload_foto(request: Request):
         try:
             with media_http():
                 asset = store_upload(
-                    raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
+                    raw,
+                    kind="estudio",
+                    derive_specs=[
+                        DISPLAY_KEEP_ASPECT,
+                        DISPLAY_KEEP_ASPECT_SM,
+                        DISPLAY_KEEP_ASPECT_AVIF,
+                        DISPLAY_KEEP_ASPECT_SM_AVIF,
+                    ],
+                    conn=conn,
                 )
             display = asset.variant("display")
-            foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
+            display_sm = asset.variant("display-sm")
+            display_avif = asset.variant("display-avif")
+            display_sm_avif = asset.variant("display-sm-avif")
+            foto = _insert_foto(
+                conn,
+                url=display.url,
+                path=display.key,
+                media_id=asset.id,
+                url_sm=display_sm.url if display_sm else None,
+                url_avif=display_avif.url if display_avif else None,
+                url_sm_avif=display_sm_avif.url if display_sm_avif else None,
+            )
         except Exception:
             conn.rollback()
             raise
@@ -295,10 +650,29 @@ def upload_foto_from_url(body: UploadFromUrlBody, request: Request):
         try:
             with media_http():
                 asset = store_upload(
-                    raw, kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn,
+                    raw,
+                    kind="estudio",
+                    derive_specs=[
+                        DISPLAY_KEEP_ASPECT,
+                        DISPLAY_KEEP_ASPECT_SM,
+                        DISPLAY_KEEP_ASPECT_AVIF,
+                        DISPLAY_KEEP_ASPECT_SM_AVIF,
+                    ],
+                    conn=conn,
                 )
             display = asset.variant("display")
-            foto = _insert_foto(conn, url=display.url, path=display.key, media_id=asset.id)
+            display_sm = asset.variant("display-sm")
+            display_avif = asset.variant("display-avif")
+            display_sm_avif = asset.variant("display-sm-avif")
+            foto = _insert_foto(
+                conn,
+                url=display.url,
+                path=display.key,
+                media_id=asset.id,
+                url_sm=display_sm.url if display_sm else None,
+                url_avif=display_avif.url if display_avif else None,
+                url_sm_avif=display_sm_avif.url if display_sm_avif else None,
+            )
         except Exception:
             conn.rollback()
             raise
@@ -321,7 +695,7 @@ def delete_foto(foto_id: int, request: Request):
 
     with get_db() as conn:
         cur = conn.execute(
-            "SELECT path, media_id FROM estudio_fotos WHERE id = ? AND estudio_id = 1",
+            "SELECT path, media_id FROM estudio_fotos WHERE id = %s AND estudio_id = 1",
             (foto_id,),
         )
         row = cur.fetchone()
@@ -335,9 +709,9 @@ def delete_foto(foto_id: int, request: Request):
         if media_id:
             r2_keys = collect_asset_keys(conn, media_id)
 
-        conn.execute("DELETE FROM estudio_fotos WHERE id = ?", (foto_id,))
+        conn.execute("DELETE FROM estudio_fotos WHERE id = %s", (foto_id,))
         if media_id:
-            conn.execute("DELETE FROM media_assets WHERE id = ?", (media_id,))
+            conn.execute("DELETE FROM media_assets WHERE id = %s", (media_id,))
         conn.commit()
 
     # Best-effort R2 cleanup (después del commit — la DB es la fuente de verdad)
@@ -366,14 +740,311 @@ def reorder_fotos(body: ReorderBody, request: Request):
     with get_db() as conn:
         for f in body.fotos:
             conn.execute(
-                "UPDATE estudio_fotos SET orden = ?, es_principal = ? "
-                "WHERE id = ? AND estudio_id = 1",
+                "UPDATE estudio_fotos SET orden = %s, es_principal = %s "
+                "WHERE id = %s AND estudio_id = 1",
                 (f.orden, f.es_principal, f.id),
             )
         conn.commit()
         fotos = _get_fotos(conn)
 
     return {"fotos": fotos}
+
+
+# ── Trabajos / producciones (galería "en acción") ────────────────────────────
+
+def _trabajo_path(suffix: str) -> str:
+    ts = int(time.time() * 1000)
+    return f"estudio/trabajos/{ts}_{suffix}.webp"
+
+
+@router.get("/admin/estudio/trabajos")
+def admin_list_trabajos(request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        return {"trabajos": _get_trabajos(conn, solo_activos=False)}
+
+
+@router.post("/admin/estudio/trabajos/fetch-meta")
+async def fetch_trabajo_meta(request: Request):
+    """Dado un link de YouTube o Instagram, retorna metadata (titulo, realizador, thumbnail).
+    YouTube usa oEmbed oficial. Instagram usa og:tags (best-effort)."""
+    require_admin(request)
+    import httpx
+    body = await request.json()
+    url = (body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "url requerida")
+
+    # YouTube — oEmbed oficial, muy confiable
+    if "youtu" in url:
+        try:
+            resp = httpx.get(
+                "https://www.youtube.com/oembed",
+                params={"url": url, "format": "json"},
+                timeout=8.0,
+            )
+            if resp.status_code == 200:
+                d = resp.json()
+                return {
+                    "titulo": d.get("title"),
+                    "realizador": d.get("author_name"),
+                    "thumbnail_url": d.get("thumbnail_url"),
+                    "fuente": "youtube",
+                }
+        except Exception:
+            pass
+
+    # Instagram / cualquier otro — og:tags (best-effort)
+    meta = _fetch_og_meta(url)
+    if meta:
+        # og:title de IG: "Nombre (@handle) • Fotos y videos de Instagram"
+        raw_title = meta.get("title") or ""
+        realizador = None
+        m = _re.match(r"^(.+?)\s*[•·(@]", raw_title)
+        if m:
+            realizador = m.group(1).strip()
+        return {
+            "titulo": None,
+            "realizador": realizador,
+            "thumbnail_url": meta.get("image"),
+            "descripcion": meta.get("description"),
+            "fuente": "og",
+        }
+
+    return {"fuente": "desconocido"}
+
+
+class TrabajoLinkInput(BaseModel):
+    url: str
+    # `tipo` lo decide el server (`_resolve_links`); se acepta pero se ignora.
+    tipo: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+
+
+class TrabajoCreate(BaseModel):
+    titulo: str = ""
+    realizador: str = ""
+    realizador_instagram: Optional[str] = None
+    realizador_web: Optional[str] = None
+    categorias: list[str] = []
+    descripcion: str = ""
+    links: list[TrabajoLinkInput] = []
+    activo: bool = True
+
+
+@router.post("/admin/estudio/trabajos")
+def admin_create_trabajo(body: TrabajoCreate, request: Request):
+    require_admin(request)
+    # Resolver links (baja + procesa thumbnails) ANTES de abrir la conexión del
+    # insert — `_process_remote_thumbnail` usa su propia conexión corta.
+    links = _resolve_links([l.dict() for l in body.links], existing=[])
+    tipo = "video" if links else "fotos"
+    cats = _clean_categorias(body.categorias)
+    with get_db() as conn:
+        cur = conn.execute(
+            "SELECT COALESCE(MAX(orden), -1) + 1 AS next FROM estudio_trabajos"
+        )
+        orden = cur.fetchone()["next"]
+        cur2 = conn.execute(
+            "INSERT INTO estudio_trabajos "
+            "(titulo, realizador, realizador_instagram, realizador_web, "
+            "categoria, categorias_json, descripcion, tipo, links_json, orden, activo) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (body.titulo, body.realizador, body.realizador_instagram, body.realizador_web,
+             cats[0] if cats else "", json.dumps(cats), body.descripcion, tipo,
+             json.dumps(links), orden, body.activo),
+        )
+        new_id = cur2.fetchone()["id"]
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        return next(r for r in rows if r["id"] == new_id)
+
+
+class TrabajoUpdate(BaseModel):
+    titulo: Optional[str] = None
+    realizador: Optional[str] = None
+    realizador_instagram: Optional[str] = None
+    realizador_web: Optional[str] = None
+    categorias: Optional[list[str]] = None
+    descripcion: Optional[str] = None
+    links: Optional[list[TrabajoLinkInput]] = None
+    activo: Optional[bool] = None
+
+
+class TrabajoOrdenItem(BaseModel):
+    id: int
+    orden: int
+
+
+class TrabajoReorderBody(BaseModel):
+    trabajos: list[TrabajoOrdenItem]
+
+
+# OJO: la ruta literal `/orden` va ANTES que la dinámica `/{trabajo_id}` — si no,
+# FastAPI matchea `PATCH /trabajos/orden` contra `{trabajo_id}` con "orden" y
+# falla la conversión a int (422). Static-before-dynamic.
+@router.patch("/admin/estudio/trabajos/orden")
+def admin_reorder_trabajos(body: TrabajoReorderBody, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        for t in body.trabajos:
+            conn.execute(
+                "UPDATE estudio_trabajos SET orden = %s WHERE id = %s",
+                (t.orden, t.id),
+            )
+        conn.commit()
+        return {"trabajos": _get_trabajos(conn, solo_activos=False)}
+
+
+@router.patch("/admin/estudio/trabajos/{trabajo_id}")
+def admin_update_trabajo(trabajo_id: int, body: TrabajoUpdate, request: Request):
+    require_admin(request)
+    updates = {
+        k: v for k, v in body.dict(exclude={"links", "categorias"}).items() if v is not None
+    }
+    # Tags: `categorias is not None` distingue "no tocar" de "vaciar". Escribe la
+    # fuente única (categorias_json) + la columna legacy `categoria` (primer tag).
+    if body.categorias is not None:
+        cats = _clean_categorias(body.categorias)
+        updates["categorias_json"] = json.dumps(cats)
+        updates["categoria"] = cats[0] if cats else ""
+    # Los links se manejan aparte: `links is not None` distingue "no tocar"
+    # (None) de "vaciar" ([]). Se resuelven antes de abrir la conexión del UPDATE.
+    if body.links is not None:
+        with get_db() as conn:
+            cur = conn.execute(
+                "SELECT links_json, youtube_url, instagram_reel_url, thumbnail_url "
+                "FROM estudio_trabajos WHERE id = %s",
+                (trabajo_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(404, "Trabajo no encontrado")
+            existing = _trabajo_links(row)
+        resolved = _resolve_links([l.dict() for l in body.links], existing=existing)
+        updates["links_json"] = json.dumps(resolved)
+        updates["tipo"] = "video" if resolved else "fotos"
+        # Migración on-write: las columnas legacy quedan vacías una vez que la
+        # fila pasó por links_json.
+        updates["youtube_url"] = None
+        updates["instagram_reel_url"] = None
+        updates["thumbnail_url"] = None
+    if not updates:
+        raise HTTPException(400, "Nada que actualizar")
+    with get_db() as conn:
+        set_parts = [f"{k} = %s" for k in updates]
+        set_parts.append("updated_at = %s")
+        vals = list(updates.values()) + [datetime.now(tz=timezone.utc), trabajo_id]
+        conn.execute(
+            f"UPDATE estudio_trabajos SET {', '.join(set_parts)} WHERE id = %s",
+            vals,
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        match = next((r for r in rows if r["id"] == trabajo_id), None)
+        if not match:
+            raise HTTPException(404, "Trabajo no encontrado")
+        return match
+
+
+@router.delete("/admin/estudio/trabajos/{trabajo_id}")
+def admin_delete_trabajo(trabajo_id: int, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        conn.execute("DELETE FROM estudio_trabajos WHERE id = %s", (trabajo_id,))
+        conn.commit()
+    return {"ok": True}
+
+
+@router.post("/admin/estudio/trabajos/{trabajo_id}/upload-foto")
+async def admin_upload_trabajo_foto(
+    trabajo_id: int, request: Request, background_tasks: BackgroundTasks
+):
+    require_admin(request)
+    path = _trabajo_path(f"foto_{trabajo_id}")
+    result = await media_http(
+        request,
+        background_tasks,
+        path=path,
+        presets=[
+            DISPLAY_KEEP_ASPECT,
+            DISPLAY_KEEP_ASPECT_SM,
+            DISPLAY_KEEP_ASPECT_AVIF,
+            DISPLAY_KEEP_ASPECT_SM_AVIF,
+        ],
+    )
+    nueva_foto = {
+        "url": result[DISPLAY_KEEP_ASPECT]["url"],
+        "url_sm": result[DISPLAY_KEEP_ASPECT_SM]["url"],
+        "url_avif": result[DISPLAY_KEEP_ASPECT_AVIF]["url"],
+        "url_sm_avif": result[DISPLAY_KEEP_ASPECT_SM_AVIF]["url"],
+        "path": path,
+    }
+    with get_db() as conn:
+        cur = conn.execute(
+            "SELECT fotos_json FROM estudio_trabajos WHERE id = %s", (trabajo_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Trabajo no encontrado")
+        fotos = _parse_json_field(row["fotos_json"]) or []
+        fotos.append(nueva_foto)
+        conn.execute(
+            "UPDATE estudio_trabajos SET fotos_json = %s, updated_at = %s WHERE id = %s",
+            (json.dumps(fotos), datetime.now(tz=timezone.utc), trabajo_id),
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        return next(r for r in rows if r["id"] == trabajo_id)
+
+
+@router.delete("/admin/estudio/trabajos/{trabajo_id}/fotos/{foto_idx}")
+def admin_delete_trabajo_foto(trabajo_id: int, foto_idx: int, request: Request):
+    require_admin(request)
+    with get_db() as conn:
+        cur = conn.execute(
+            "SELECT fotos_json FROM estudio_trabajos WHERE id = %s", (trabajo_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Trabajo no encontrado")
+        fotos = _parse_json_field(row["fotos_json"]) or []
+        if foto_idx < 0 or foto_idx >= len(fotos):
+            raise HTTPException(400, f"Índice de foto inválido: {foto_idx}")
+        fotos.pop(foto_idx)
+        conn.execute(
+            "UPDATE estudio_trabajos SET fotos_json = %s, updated_at = %s WHERE id = %s",
+            (json.dumps(fotos), datetime.now(tz=timezone.utc), trabajo_id),
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        return next(r for r in rows if r["id"] == trabajo_id)
+
+
+@router.post("/admin/estudio/trabajos/{trabajo_id}/upload-logo")
+async def admin_upload_trabajo_logo(
+    trabajo_id: int, request: Request, background_tasks: BackgroundTasks
+):
+    require_admin(request)
+    path = _trabajo_path(f"logo_{trabajo_id}")
+    result = await media_http(
+        request,
+        background_tasks,
+        path=path,
+        presets=[DISPLAY_KEEP_ASPECT, DISPLAY_KEEP_ASPECT_SM],
+    )
+    logo_url = result[DISPLAY_KEEP_ASPECT]["url"]
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE estudio_trabajos SET realizador_logo_url = %s, updated_at = %s WHERE id = %s",
+            (logo_url, datetime.now(tz=timezone.utc), trabajo_id),
+        )
+        conn.commit()
+        rows = _get_trabajos(conn, solo_activos=False)
+        match = next((r for r in rows if r["id"] == trabajo_id), None)
+        if not match:
+            raise HTTPException(404, "Trabajo no encontrado")
+        return match
 
 
 # ── Reserva del estudio por horas (E2 / E2.1) ─────────────────────────────────
@@ -448,11 +1119,11 @@ def _centinela_libre(conn, equipo_id: int, fecha_desde, fecha_hasta,
         SELECT COUNT(*) AS cnt
         FROM alquiler_items pi
         JOIN alquileres p ON p.id = pi.pedido_id
-        WHERE pi.equipo_id = ?
+        WHERE pi.equipo_id = %s
           AND p.estado IN {ESTADOS_RESERVADO}
-          AND (? IS NULL OR p.id != ?)
-          AND p.fecha_desde < ?
-          AND p.fecha_hasta > ?
+          AND (%s IS NULL OR p.id != %s)
+          AND p.fecha_desde < %s
+          AND p.fecha_hasta > %s
         """,
         (equipo_id, exclude_pedido_id, exclude_pedido_id, hi, lo),
     ).fetchone()
@@ -505,7 +1176,7 @@ def _pack_disponible(conn, fecha_desde, fecha_hasta, exclude_pedido_id: int | No
         f"""
         SELECT e.id, e.nombre, e.foto_url, {MARCA_SUBQUERY}
         FROM equipos e
-        WHERE e.id = ANY(?)
+        WHERE e.id = ANY(%s)
         ORDER BY e.nombre
         """,
         (list(libres.keys()),),
@@ -570,7 +1241,7 @@ def agregar_pack_equipo(body: PackEquipoCreate, request: Request):
     with get_db() as conn:
         try:
             eq = conn.execute(
-                "SELECT id, es_recurso_interno, eliminado_at FROM equipos WHERE id = ?",
+                "SELECT id, es_recurso_interno, eliminado_at FROM equipos WHERE id = %s",
                 (body.equipo_id,),
             ).fetchone()
             if not eq or eq["eliminado_at"] is not None:
@@ -582,7 +1253,7 @@ def agregar_pack_equipo(body: PackEquipoCreate, request: Request):
             ).fetchone()["next"]
             conn.execute(
                 "INSERT INTO estudio_pack_equipos (estudio_id, equipo_id, orden) "
-                "VALUES (1, ?, ?) ON CONFLICT (estudio_id, equipo_id) DO NOTHING",
+                "VALUES (1, %s, %s) ON CONFLICT (estudio_id, equipo_id) DO NOTHING",
                 (body.equipo_id, orden),
             )
             conn.commit()
@@ -598,7 +1269,7 @@ def quitar_pack_equipo(equipo_id: int, request: Request):
     with get_db() as conn:
         try:
             conn.execute(
-                "DELETE FROM estudio_pack_equipos WHERE estudio_id = 1 AND equipo_id = ?",
+                "DELETE FROM estudio_pack_equipos WHERE estudio_id = 1 AND equipo_id = %s",
                 (equipo_id,),
             )
             conn.commit()
@@ -655,7 +1326,37 @@ def _primer_dia_semana(year: int, month: int, dia_semana: int) -> datetime:
     return base + timedelta(days=offset)
 
 
-def _slot_bloqueante(conn, fecha_desde, fecha_hasta) -> Optional[str]:
+# Namespace del advisory lock para operaciones que validan+escriben en el estudio
+# (slots y talleres). Privado de este flujo; evita colisión con el NS de pedidos.
+_ADVISORY_NS_ESTUDIO = 5390413
+
+
+def _sesiones_de_slot(slot: dict) -> list:
+    """Genera todas las fechas con `dia_semana` en el rango de meses del slot,
+    como lista de dicts {fecha, hora_inicio, hora_fin}. Usada para validar
+    disponibilidad antes de crear o editar un slot."""
+    y0, m0 = int(slot["mes_desde"][:4]), int(slot["mes_desde"][5:7])
+    y1, m1 = int(slot["mes_hasta"][:4]), int(slot["mes_hasta"][5:7])
+    import calendar as _cal
+    sesiones = []
+    cur = (y0, m0)
+    while cur <= (y1, m1):
+        y, m = cur
+        _, last_day = _cal.monthrange(y, m)
+        d = _primer_dia_semana(y, m, slot["dia_semana"]).date()
+        while d.month == m:
+            sesiones.append({
+                "fecha": d,
+                "hora_inicio": slot["hora_desde"],
+                "hora_fin": slot["hora_hasta"],
+            })
+            d = d + timedelta(weeks=1)
+        cur = (y + 1, 1) if m == 12 else (y, m + 1)
+    return sesiones
+
+
+def _slot_bloqueante(conn, fecha_desde, fecha_hasta,
+                     exclude_slot_id: Optional[int] = None) -> Optional[str]:
     """Si la franja cae en un slot fijo activo (mismo día de semana, dentro del
     rango de meses y con solape horario), devuelve el `cliente` del slot. Regla
     del slot — NO usa el motor de reservas."""
@@ -669,17 +1370,91 @@ def _slot_bloqueante(conn, fecha_desde, fecha_hasta) -> Optional[str]:
     fin = int((fecha_hasta - dia_base).total_seconds() // 60)
     rows = conn.execute(
         """
-        SELECT cliente, hora_desde, hora_hasta
+        SELECT id, cliente, hora_desde, hora_hasta
         FROM estudio_slots_fijos
-        WHERE activo = TRUE AND dia_semana = ?
-          AND mes_desde <= ? AND mes_hasta >= ?
+        WHERE activo = TRUE AND dia_semana = %s
+          AND mes_desde <= %s AND mes_hasta >= %s
+          AND (%s IS NULL OR id != %s)
         """,
-        (dia, mes, mes),
+        (dia, mes, mes, exclude_slot_id, exclude_slot_id),
     ).fetchall()
     for r in rows:
         if ini < r["hora_hasta"] * 60 and fin > r["hora_desde"] * 60:
             return r["cliente"]
     return None
+
+
+def _taller_bloqueante(conn, fecha_desde, fecha_hasta,
+                       exclude_taller_id: Optional[int] = None) -> Optional[str]:
+    """Si la franja solapa una sesión de un taller activo, devuelve el nombre del
+    taller. Compara contra la fecha literal — no deriva weekday ni rango.
+    Minutos desde medianoche (igual que _slot_bloqueante; hora_fin=24 OK).
+    Consulta clases_taller (modelo vigente; taller_sesiones era el modelo anterior)."""
+    dia = fecha_desde.date()
+    dia_base = fecha_desde.replace(hour=0, minute=0, second=0, microsecond=0)
+    ini = int((fecha_desde - dia_base).total_seconds() // 60)
+    fin = int((fecha_hasta - dia_base).total_seconds() // 60)
+    rows = conn.execute(
+        """
+        SELECT t.nombre, c.hora_inicio, c.hora_fin
+        FROM clases_taller c
+        JOIN ediciones_taller e ON e.id = c.edicion_id
+        JOIN talleres t ON t.id = e.taller_id
+        WHERE t.activo = TRUE
+          AND c.fecha = %s
+          AND (%s IS NULL OR t.id != %s)
+        """,
+        (dia, exclude_taller_id, exclude_taller_id),
+    ).fetchall()
+    for r in rows:
+        if ini < r["hora_fin"] * 60 and fin > r["hora_inicio"] * 60:
+            return r["nombre"]
+    return None
+
+
+def _estudio_disponible(conn, estudio, fecha_desde, fecha_hasta,
+                        exclude_pedido_id: Optional[int] = None,
+                        exclude_taller_id: Optional[int] = None,
+                        exclude_slot_id: Optional[int] = None) -> tuple:
+    """Engine de lectura unificada. Orden: slot → taller → centinela.
+    Devuelve (True, None) si libre; (False, motivo) si ocupado."""
+    s = _slot_bloqueante(conn, fecha_desde, fecha_hasta, exclude_slot_id=exclude_slot_id)
+    if s:
+        return False, f"slot fijo «{s}»"
+    t = _taller_bloqueante(conn, fecha_desde, fecha_hasta, exclude_taller_id=exclude_taller_id)
+    if t:
+        return False, f"taller «{t}»"
+    if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
+                            estudio["buffer_horas"], exclude_pedido_id=exclude_pedido_id):
+        return False, "ya reservado en esa franja"
+    return True, None
+
+
+def verificar_sesiones_disponibles(conn, estudio, sesiones: list,
+                                   exclude_pedido_id: Optional[int] = None,
+                                   exclude_taller_id: Optional[int] = None,
+                                   exclude_slot_id: Optional[int] = None) -> None:
+    """Valida cada sesión futura contra _estudio_disponible. Lanza 409 al primer
+    conflicto. Usada por talleres (sesiones explícitas) y slots (sesiones generadas)."""
+    hoy = now_ar().date()
+    for s in sesiones:
+        if s["fecha"] < hoy:
+            continue
+        base = datetime(s["fecha"].year, s["fecha"].month, s["fecha"].day)
+        desde = base + timedelta(hours=s["hora_inicio"])
+        hasta = base + timedelta(hours=s["hora_fin"])
+        libre, motivo = _estudio_disponible(
+            conn, estudio, desde, hasta,
+            exclude_pedido_id=exclude_pedido_id,
+            exclude_taller_id=exclude_taller_id,
+            exclude_slot_id=exclude_slot_id,
+        )
+        if not libre:
+            raise HTTPException(
+                409,
+                f"El estudio no está libre el "
+                f"{s['fecha'].strftime('%d/%m/%Y')} de {s['hora_inicio']} a {s['hora_fin']} hs: {motivo}",
+            )
 
 
 def _regenerar_pedidos_slot(conn, slot: dict) -> None:
@@ -690,7 +1465,7 @@ def _regenerar_pedidos_slot(conn, slot: dict) -> None:
     slot_id = slot["id"]
     mes_actual = _mes_actual_ar()
     existentes = conn.execute(
-        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = ?",
+        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = %s",
         (slot_id,),
     ).fetchall()
 
@@ -701,7 +1476,7 @@ def _regenerar_pedidos_slot(conn, slot: dict) -> None:
         if mes_e < mes_actual or (e["monto_pagado"] or 0) > 0:
             conservados.add(mes_e)  # pasado o con pagos → intocable
         else:
-            conn.execute("DELETE FROM alquileres WHERE id = ?", (e["id"],))
+            conn.execute("DELETE FROM alquileres WHERE id = %s", (e["id"],))
 
     if not slot["activo"]:
         return
@@ -722,7 +1497,7 @@ def _regenerar_pedidos_slot(conn, slot: dict) -> None:
             """
             INSERT INTO alquileres (cliente_nombre, fecha_desde, fecha_hasta, monto_total,
                                     estado, fuente, tipo, numero_pedido, estudio_slot_id)
-            VALUES (?,?,?,?,?,?,?,?,?)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             (slot["cliente"], fd, fh, slot["valor_mensual"], "confirmado",
              "estudio", "estudio_fijo", num, slot_id),
@@ -735,14 +1510,14 @@ def _borrar_pedidos_futuros_impagos(conn, slot_id: int) -> None:
     el slot, vía FK ON DELETE SET NULL)."""
     mes_actual = _mes_actual_ar()
     rows = conn.execute(
-        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = ?",
+        "SELECT id, fecha_desde, monto_pagado FROM alquileres WHERE estudio_slot_id = %s",
         (slot_id,),
     ).fetchall()
     for e in rows:
         fd = to_datetime(e["fecha_desde"])
         mes_e = f"{fd.year:04d}-{fd.month:02d}"
         if mes_e >= mes_actual and (e["monto_pagado"] or 0) == 0:
-            conn.execute("DELETE FROM alquileres WHERE id = ?", (e["id"],))
+            conn.execute("DELETE FROM alquileres WHERE id = %s", (e["id"],))
 
 
 @router.get("/estudio/disponibilidad")
@@ -771,6 +1546,10 @@ def estudio_disponibilidad(
         slot_cliente = _slot_bloqueante(conn, fecha_desde, fecha_hasta)
         if slot_cliente:
             return {"libre": False, "motivo": f"Reservado: {slot_cliente}", "pack": []}
+
+        taller_nombre = _taller_bloqueante(conn, fecha_desde, fecha_hasta)
+        if taller_nombre:
+            return {"libre": False, "motivo": f"Taller: {taller_nombre}", "pack": []}
 
         if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
                                 estudio["buffer_horas"]):
@@ -805,7 +1584,7 @@ def _agregar_items_pack(conn, pedido_id: int, fecha_desde, fecha_hasta, pack_ids
             conn.execute(
                 """
                 INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-                VALUES (?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s)
                 """,
                 (pedido_id, eid, qty, 0, 0),
             )
@@ -823,6 +1602,10 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
     FOR UPDATE (su buffer propio), no con el motor. Los EQUIPOS del pack son
     equipos reales: se validan con el motor sagrado (_check_stock, buffer global).
     Criterio ante race del pack: best-effort — todo lo disponible al confirmar."""
+    # Import diferido (mismo motivo que `_require_cliente`): evita acoplar el
+    # módulo a toda la cadena del portal en import-time y romper ciclos.
+    from routes.cliente_portal import cliente_verificado, IDENTIDAD_NO_VERIFICADA_MSG
+
     session = _require_cliente(request)
     cliente_id = session["cliente_id"]
 
@@ -834,11 +1617,15 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
 
             # Datos del cliente desde la cuenta (no del body), mismo formato que create_pedido.
             cli = conn.execute(
-                "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = ?",
+                "SELECT nombre, apellido, email, telefono FROM clientes WHERE id = %s",
                 (cliente_id,),
             ).fetchone()
             if not cli:
                 raise HTTPException(401, "Sesión de cliente inválida")
+            # Gate de identidad: mismo criterio que /api/cliente/pedidos, vía la
+            # fuente única `cliente_verificado` (no se duplica el chequeo de dni).
+            if not cliente_verificado(conn, cliente_id):
+                raise HTTPException(403, IDENTIDAD_NO_VERIFICADA_MSG)
             cliente_nombre = nombre_completo_cliente(cli["nombre"], cli["apellido"])
             cliente_email = cli["email"]
             cliente_telefono = cli["telefono"]
@@ -859,18 +1646,22 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
             if slot_cliente:
                 raise HTTPException(409, f"Esa franja está reservada de forma fija ({slot_cliente})")
 
+            taller_nombre = _taller_bloqueante(conn, fecha_desde, fecha_hasta)
+            if taller_nombre:
+                raise HTTPException(409, f"Esa franja está reservada para el taller «{taller_nombre}»")
+
             con_pack = bool(body.con_pack) and bool(estudio["pack_activo"])
             monto_total = (estudio["precio_hora"] or 0) * body.horas
             if con_pack:
                 monto_total += estudio["pack_precio"] or 0
 
             next_num = _next_numero_pedido(conn)
-            cur = conn.execute(
+            pedido_id = conn.insert_returning(
                 """
                 INSERT INTO alquileres (cliente_id, cliente_nombre, cliente_email, cliente_telefono,
                                         fecha_desde, fecha_hasta, monto_total, estado,
                                         fuente, tipo, estudio_con_pack, numero_pedido)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (
                     cliente_id, cliente_nombre, cliente_email, cliente_telefono,
@@ -878,7 +1669,6 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                     "estudio", "estudio", con_pack, next_num,
                 ),
             )
-            pedido_id = cur.lastrowid
 
             # ── Pack PRIMERO (antes del ítem centinela) ─────────────────────────────
             # Así _check_stock solo ve los equipos reales del pack y nunca el
@@ -888,7 +1678,7 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                 if pack_ids:
                     # Lock de las filas del pack: serializa contra otras reservas que
                     # toquen estos equipos (su _check_stock también las lockea).
-                    conn.execute("SELECT id FROM equipos WHERE id = ANY(?) FOR UPDATE", (pack_ids,))
+                    conn.execute("SELECT id FROM equipos WHERE id = ANY(%s) FOR UPDATE", (pack_ids,))
                     _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
                     # Gate del motor (FOR UPDATE). Best-effort: si algo se lo llevó
                     # otro entre el snapshot y el lock, re-snapshoteamos bajo el lock
@@ -897,7 +1687,7 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
                     fd_iso, fh_iso = fecha_desde.isoformat(), fecha_hasta.isoformat()
                     if _check_stock(conn, pedido_id, fd_iso, fh_iso):
                         conn.execute(
-                            "DELETE FROM alquiler_items WHERE pedido_id = ? AND equipo_id = ANY(?)",
+                            "DELETE FROM alquiler_items WHERE pedido_id = %s AND equipo_id = ANY(%s)",
                             (pedido_id, pack_ids),
                         )
                         _agregar_items_pack(conn, pedido_id, fecha_desde, fecha_hasta, pack_ids)
@@ -906,13 +1696,13 @@ def crear_reserva_estudio(body: EstudioReservaCreate, request: Request, backgrou
             conn.execute(
                 """
                 INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-                VALUES (?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s)
                 """,
                 (pedido_id, estudio["equipo_id"], 1, 0, 0),
             )
             # Lock del centinela (recurso único) + chequeo con SU buffer propio. Una
             # 2da reserva concurrente espera el lock y ve la 1ra commiteada.
-            conn.execute("SELECT id FROM equipos WHERE id = ? FOR UPDATE", (estudio["equipo_id"],))
+            conn.execute("SELECT id FROM equipos WHERE id = %s FOR UPDATE", (estudio["equipo_id"],))
             if not _centinela_libre(conn, estudio["equipo_id"], fecha_desde, fecha_hasta,
                                     estudio["buffer_horas"], exclude_pedido_id=pedido_id):
                 raise HTTPException(409, "El estudio no está disponible en esa franja")
@@ -971,7 +1761,7 @@ def _validar_slot(d: dict) -> None:
 
 
 def _get_slot(conn, slot_id: int) -> dict:
-    row = conn.execute("SELECT * FROM estudio_slots_fijos WHERE id = ?", (slot_id,)).fetchone()
+    row = conn.execute("SELECT * FROM estudio_slots_fijos WHERE id = %s", (slot_id,)).fetchone()
     if not row:
         raise HTTPException(404, "Slot no encontrado")
     return _slot_to_dict(row)
@@ -994,17 +1784,23 @@ def crear_slot(body: SlotFijoCreate, request: Request):
     _validar_slot(data)
     with get_db() as conn:
         try:
-            cur = conn.execute(
+            estudio = _get_estudio_row(conn)
+            if not estudio["equipo_id"]:
+                raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+            conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
+            if data.get("activo", True):
+                verificar_sesiones_disponibles(conn, estudio, _sesiones_de_slot(data))
+            slot_id = conn.insert_returning(
                 """
                 INSERT INTO estudio_slots_fijos
                     (cliente, dia_semana, hora_desde, hora_hasta, valor_mensual,
                      mes_desde, mes_hasta, activo)
-                VALUES (?,?,?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (data["cliente"], data["dia_semana"], data["hora_desde"], data["hora_hasta"],
                  data["valor_mensual"], data["mes_desde"], data["mes_hasta"], data["activo"]),
             )
-            slot = _get_slot(conn, cur.lastrowid)
+            slot = _get_slot(conn, slot_id)
             _regenerar_pedidos_slot(conn, slot)
             conn.commit()
             return slot
@@ -1022,11 +1818,20 @@ def actualizar_slot(slot_id: int, body: SlotFijoUpdate, request: Request):
             actual = _get_slot(conn, slot_id)
             merged = {**actual, **updates}
             _validar_slot(merged)
+            estudio = _get_estudio_row(conn)
+            if not estudio["equipo_id"]:
+                raise HTTPException(409, "El estudio todavía no tiene un recurso asociado")
+            conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_ESTUDIO, 1))
+            if merged.get("activo", True):
+                verificar_sesiones_disponibles(
+                    conn, estudio, _sesiones_de_slot(merged),
+                    exclude_slot_id=slot_id,
+                )
             if updates:
                 updates["updated_at"] = now_ar()
-                set_parts = ", ".join(f"{k} = ?" for k in updates)
+                set_parts = ", ".join(f"{k} = %s" for k in updates)
                 conn.execute(
-                    f"UPDATE estudio_slots_fijos SET {set_parts} WHERE id = ?",
+                    f"UPDATE estudio_slots_fijos SET {set_parts} WHERE id = %s",
                     (*updates.values(), slot_id),
                 )
             slot = _get_slot(conn, slot_id)
@@ -1047,7 +1852,7 @@ def borrar_slot(slot_id: int, request: Request):
             # Borra los pedidos futuros impagos; los pasados/pagados quedan (su
             # estudio_slot_id pasa a NULL por la FK ON DELETE SET NULL).
             _borrar_pedidos_futuros_impagos(conn, slot_id)
-            conn.execute("DELETE FROM estudio_slots_fijos WHERE id = ?", (slot_id,))
+            conn.execute("DELETE FROM estudio_slots_fijos WHERE id = %s", (slot_id,))
             conn.commit()
             return {"ok": True}
         except Exception:

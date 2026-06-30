@@ -7,6 +7,7 @@ Cubre:
   sin fila committeada (rollback en el caller)
 - collect_asset_keys: carga keys sin modificar DB
 - purge_r2: best-effort deletes, nunca eleva aunque R2 falle
+- slug sanit del kind: path traversal y chars inválidos rechazados con 400
 """
 import pytest
 
@@ -32,7 +33,7 @@ class _FakeR2Client:
         self.deletes: list[str] = []
         self._fail_on_key = fail_on_key
 
-    def put_object(self, *, Bucket, Key, Body, ContentType, CacheControl):
+    def put_object(self, *, Bucket, Key, Body, ContentType, CacheControl, **_):
         if self._fail_on_key and Key == self._fail_on_key:
             raise RuntimeError(f"R2 PUT forzado a fallar para '{Key}'")
         self.puts.append(Key)
@@ -42,16 +43,23 @@ class _FakeR2Client:
 
 
 class _FakeConn:
-    """Minimal fake DB connection + cursor que soporta INSERT RETURNING id."""
+    """Minimal fake DB connection + cursor.
+
+    - INSERT ... RETURNING id → devuelve {"id": next_id} (autoincrement).
+    - SELECT / UPDATE / CREATE → devuelve None (no rows found / not applicable).
+    """
 
     def __init__(self):
         self._next_id = 1
         self.executed: list[tuple] = []
-        self._rows: dict = {}  # key → value para fetchone mocks
 
     def execute(self, sql: str, params=()):
         self.executed.append((sql.strip(), params))
-        return _FakeCursor(self._consume_next_id())
+        sql_upper = sql.strip().upper()
+        is_insert_returning = sql_upper.startswith("INSERT") and "RETURNING" in sql_upper
+        if is_insert_returning:
+            return _FakeCursorWithRow({"id": self._consume_next_id()})
+        return _FakeCursorEmpty()
 
     def _consume_next_id(self) -> int:
         n = self._next_id
@@ -68,12 +76,20 @@ class _FakeConn:
         pass
 
 
-class _FakeCursor:
-    def __init__(self, row_id: int):
-        self._row_id = row_id
+class _FakeCursorWithRow:
+    def __init__(self, row: dict):
+        self._row = row
 
     def fetchone(self):
-        return {"id": self._row_id}
+        return self._row
+
+    def fetchall(self):
+        return [self._row]
+
+
+class _FakeCursorEmpty:
+    def fetchone(self):
+        return None
 
     def fetchall(self):
         return []
@@ -86,6 +102,7 @@ def _patch_r2(monkeypatch, fake_client: _FakeR2Client):
     monkeypatch.setattr(storage_mod, "_r2_config", lambda: {
         "account_id": "test", "access_key_id": "k", "secret_key": "s",
         "bucket": "test-bucket", "public_base": "https://cdn.example.com",
+        "private_bucket": "",  # sin bucket privado separado en tests
     })
     monkeypatch.setattr(storage_mod, "_get_r2_client", lambda cfg: fake_client)
 
@@ -123,6 +140,27 @@ class TestStoreUploadHappyPath:
         # URL pública debe contener la public_base
         assert display.url.startswith("https://cdn.example.com/")
 
+    def test_genera_variante_display_sm_para_srcset(self, monkeypatch):
+        """El upload de equipo deriva display (1200) + display-sm (600) para srcset."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE, DISPLAY_SQUARE_SM
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        raw = _png_bytes(2000, 2000)
+        conn = _FakeConn()
+        asset = store_upload(
+            raw, kind="equipo", derive_specs=[DISPLAY_SQUARE, DISPLAY_SQUARE_SM], conn=conn
+        )
+
+        display = asset.variant("display")
+        sm = asset.variant("display-sm")
+        assert display is not None and sm is not None
+        assert display.width == 1200 and sm.width == 600  # srcset: 600w + 1200w
+        assert sm.key.endswith("/display-sm.webp")
+        assert sm.bytes < display.bytes  # la variante chica pesa menos
+
     def test_asset_id_en_la_key(self, monkeypatch):
         from services.media.service import store_upload
         from services.media.specs import DISPLAY_KEEP_ASPECT
@@ -136,38 +174,99 @@ class TestStoreUploadHappyPath:
         assert f"/{asset.id}/" in asset.original_key
         assert f"/{asset.id}/" in asset.variants[0].key
 
+    def test_asset_tiene_content_hash(self, monkeypatch):
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+        conn = _FakeConn()
+        asset = store_upload(_png_bytes(), kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn)
+
+        assert asset.content_hash is not None
+        assert len(asset.content_hash) == 64  # SHA-256 hex
+
+
+# ── dedup por hash ────────────────────────────────────────────────────────────
+
+class TestDedup:
+    def test_dedup_devuelve_existente_sin_tocar_r2(self, monkeypatch):
+        """Si la misma imagen ya existe para ese kind, store_upload devuelve el asset
+        existente sin hacer ningún PUT a R2."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+        from services.media.models import MediaAsset
+
+        existing_asset = MediaAsset(
+            id=42, kind="estudio",
+            original_key="media/estudio/42/original.png",
+            original_ct="image/png", width=400, height=300, bytes=1234,
+            content_hash="abc123",
+            variants=[],
+        )
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        # Parchamos find_by_hash para simular un hit de dedup.
+        import services.media.repository as repo_mod
+        monkeypatch.setattr(repo_mod, "find_by_hash", lambda conn, kind, h: existing_asset)
+
+        conn = _FakeConn()
+        result = store_upload(_png_bytes(), kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn)
+
+        # Debe devolver el asset existente
+        assert result.id == 42
+        assert result.original_key == "media/estudio/42/original.png"
+        # Y NO hacer ningún PUT (0 subidas a R2)
+        assert fake.puts == []
+
+    def test_no_dedup_si_imagen_distinta(self, monkeypatch):
+        """Dos imágenes distintas → dos assets distintos."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+        import services.media.repository as repo_mod
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        # find_by_hash devuelve None (no hay dedup)
+        monkeypatch.setattr(repo_mod, "find_by_hash", lambda conn, kind, h: None)
+
+        conn = _FakeConn()
+        asset = store_upload(_png_bytes(w=100, h=80), kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn)
+
+        # Nuevo asset creado, PUT realizado
+        assert asset.id is not None
+        assert len(fake.puts) >= 1  # original + variante(s)
+
 
 # ── fallo parcial ─────────────────────────────────────────────────────────────
 
 class TestStoreUploadFalloParcial:
     def test_fallo_en_put_variante_limpia_original_y_eleva(self, monkeypatch):
+        """put_private (original) OK, put (variante) falla → cleanup borra el original."""
         from services.media.errors import MediaError
         from services.media.service import store_upload
         from services.media.specs import DISPLAY_KEEP_ASPECT
 
-        # El cliente falla al subir la variante display (key contiene 'display')
-        # El asset_id será 1 (primer id del FakeConn)
         fake = _FakeR2Client(fail_on_key=None)
         _patch_r2(monkeypatch, fake)
 
-        # Interceptar put para fallar en el segundo PUT (variante)
+        # El original usa put_private (OK), la variante usa put (falla).
         import services.media.storage as storage_mod
-        call_count = {"n": 0}
         original_put = storage_mod.put
 
-        def _put_that_fails_second(key, content, content_type):
-            call_count["n"] += 1
-            if call_count["n"] == 2:
-                raise Exception("R2 falla en variante")
-            return original_put(key, content, content_type)
+        def _put_that_always_fails(key, content, content_type):
+            raise Exception("R2 falla en variante")
 
-        monkeypatch.setattr(storage_mod, "put", _put_that_fails_second)
+        monkeypatch.setattr(storage_mod, "put", _put_that_always_fails)
 
         conn = _FakeConn()
         with pytest.raises((MediaError, Exception)):
             store_upload(_png_bytes(), kind="estudio", derive_specs=[DISPLAY_KEEP_ASPECT], conn=conn)
 
-        # El original debe haberse limpiado (delete_object)
+        # El original (subido con put_private) debe haberse limpiado (delete_object)
         assert len(fake.deletes) >= 1
 
 
@@ -237,3 +336,166 @@ class TestMediaFastapi:
         with media_http():
             result.append(1)
         assert result == [1]
+
+
+# ── slug sanit del kind ───────────────────────────────────────────────────────
+
+class TestKindSlugSanit:
+    """kind va directo a la R2 key — solo [a-z0-9-] permitidos."""
+
+    @pytest.mark.parametrize("bad_kind", [
+        "../admin",       # path traversal
+        "foo/bar",        # slash
+        "EQUIPO",         # mayúsculas
+        "equipo foto",    # espacio
+        "",               # vacío
+        "a" * 65,         # demasiado largo
+        ".hidden",        # empieza con punto
+        "-lead",          # empieza con guión
+    ])
+    def test_kind_invalido_eleva_400(self, bad_kind, monkeypatch):
+        from services.media.errors import MediaError
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        raw = _png_bytes()
+        with pytest.raises(MediaError) as exc:
+            store_upload(raw, kind=bad_kind, derive_specs=[DISPLAY_KEEP_ASPECT], conn=_FakeConn())
+        assert exc.value.status == 400
+
+    @pytest.mark.parametrize("good_kind", [
+        "equipo",
+        "estudio",
+        "marca",
+        "workshop-foto",
+        "instructor123",
+    ])
+    def test_kind_valido_pasa(self, good_kind, monkeypatch):
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_KEEP_ASPECT
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        asset = store_upload(_png_bytes(), kind=good_kind, derive_specs=[DISPLAY_KEEP_ASPECT], conn=_FakeConn())
+        assert good_kind in asset.original_key
+
+
+# ── AVIF + background derivation (F0g) ────────────────────────────────────────
+
+class TestAvifDerivation:
+    def test_avif_variante_con_content_type_avif(self, monkeypatch):
+        """store_upload con spec AVIF produce variante con content_type image/avif (o webp si fallback)."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE_AVIF
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        asset = store_upload(_png_bytes(), kind="equipo", derive_specs=[DISPLAY_SQUARE_AVIF], conn=_FakeConn())
+        assert len(asset.variants) == 1
+        v = asset.variants[0]
+        assert v.name == "display-avif"
+        assert v.content_type in ("image/avif", "image/webp"), f"inesperado: {v.content_type}"
+        # Extensión de la key debe coincidir con el content_type
+        if v.content_type == "image/avif":
+            assert v.key.endswith(".avif"), v.key
+        else:
+            assert v.key.endswith(".webp"), v.key
+
+    def test_avif_y_webp_juntos_produce_dos_variantes(self, monkeypatch):
+        """El par display + display-avif coexiste en el mismo asset."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE, DISPLAY_SQUARE_AVIF
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        asset = store_upload(
+            _png_bytes(), kind="equipo",
+            derive_specs=[DISPLAY_SQUARE, DISPLAY_SQUARE_AVIF], conn=_FakeConn()
+        )
+        names = {v.name for v in asset.variants}
+        assert "display" in names
+        assert "display-avif" in names
+
+    def test_avif_processing_fallback_a_webp_si_codec_no_disponible(self, monkeypatch):
+        """Si AVIF falla (codec no disponible), _optimize_image cae a WebP sin elevar."""
+        from services.media import processing
+
+        original_save = None
+
+        def patched_save(self, fp, format=None, **kwargs):
+            if format == "AVIF":
+                raise RuntimeError("AVIF codec not available")
+            return original_save(self, fp, format=format, **kwargs)
+
+        try:
+            from PIL import Image
+            original_save = Image.Image.save
+            monkeypatch.setattr(Image.Image, "save", patched_save)
+        except ImportError:
+            pytest.skip("PIL no disponible")
+
+        result = processing._optimize_image(_png_bytes(400, 300), square=True, fmt="avif")
+        content, ct, w, h = result
+        assert ct == "image/webp", f"esperaba webp fallback, got {ct}"
+        assert len(content) > 0
+
+
+class TestBackgroundDerivation:
+    def test_background_true_devuelve_status_pending_sin_variantes(self, monkeypatch):
+        """background=True → asset.status='pending', variants=[]."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        conn = _FakeConn()
+        asset = store_upload(
+            _png_bytes(), kind="equipo",
+            derive_specs=[DISPLAY_SQUARE], conn=conn, background=True,
+        )
+        assert asset.status == "pending"
+        assert asset.variants == []
+        # Original sí debe subirse
+        assert any("original" in k for k in fake.puts)
+        # Variantes NO deben subirse todavía
+        assert not any("display" in k for k in fake.puts), f"puts: {fake.puts}"
+
+    def test_background_false_devuelve_status_ready_con_variantes(self, monkeypatch):
+        """background=False (default) → status='ready', variantes presentes."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        asset = store_upload(
+            _png_bytes(), kind="equipo",
+            derive_specs=[DISPLAY_SQUARE], conn=_FakeConn(),
+        )
+        assert asset.status == "ready"
+        assert len(asset.variants) == 1
+
+    def test_insert_asset_usa_status_pending_en_modo_background(self, monkeypatch):
+        """En background=True, el INSERT a la DB incluye status='pending'."""
+        from services.media.service import store_upload
+        from services.media.specs import DISPLAY_SQUARE
+
+        fake = _FakeR2Client()
+        _patch_r2(monkeypatch, fake)
+
+        conn = _FakeConn()
+        store_upload(_png_bytes(), kind="equipo", derive_specs=[DISPLAY_SQUARE], conn=conn, background=True)
+
+        # Buscar la query de INSERT con status
+        insert_sqls = [sql for sql, _ in conn.executed if "INSERT INTO MEDIA_ASSETS" in sql.upper()]
+        assert insert_sqls, f"No se encontró INSERT INTO media_assets. SQL ejecutados: {[s for s, _ in conn.executed]}"
+        # Los parámetros del INSERT incluyen 'pending'
+        insert_params = [params for sql, params in conn.executed if "INSERT INTO MEDIA_ASSETS" in sql.upper()]
+        assert any("pending" in str(p) for p in insert_params), f"params: {insert_params}"

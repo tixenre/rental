@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from database import get_db, MARCA_SUBQUERY
-from admin_guard import require_admin
+from auth.guards import require_admin
 
 router = APIRouter()
 
@@ -325,7 +325,7 @@ def ignorar_sugerencia(body: AplicarSugerenciaBody, _admin: dict = Depends(requi
     with get_db() as conn:
         conn.execute("""
             INSERT INTO sugerencias_ignoradas (tipo, ref)
-            VALUES (?, ?)
+            VALUES (%s, %s)
             ON CONFLICT (tipo, ref) DO NOTHING
         """, (body.tipo, body.ref))
         conn.commit()
@@ -361,7 +361,7 @@ def _apply_fusionar_marcas(conn, clave: str) -> dict:
     rows = conn.execute("""
         SELECT id, nombre, cant_pedidos
         FROM marcas
-        WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?))
+        WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(%s))
         ORDER BY cant_pedidos DESC, id ASC
     """, (clave,)).fetchall()
     if len(rows) <= 1:
@@ -376,7 +376,7 @@ def _apply_fusionar_marcas(conn, clave: str) -> dict:
     # en database.py.
     _ = canonical_nombre  # se mantiene en el response, no se persiste en equipos
     conn.execute(
-        f"UPDATE equipos SET brand_id = ? WHERE brand_id IN ({placeholders})",
+        f"UPDATE equipos SET brand_id = %s WHERE brand_id IN ({placeholders})",
         (canonical_id, *duplicados_ids),
     )
     conn.execute(
@@ -397,13 +397,13 @@ def _apply_asignar_categoria(conn, equipo_id: int, categoria_id: int) -> dict:
     desde el detector (que ya elige la más específica disponible en la BD)
     así que acá solo verificamos que ambos existan e insertamos."""
     eq = conn.execute(
-        "SELECT id FROM equipos WHERE id = ? AND eliminado_at IS NULL",
+        "SELECT id FROM equipos WHERE id = %s AND eliminado_at IS NULL",
         (equipo_id,),
     ).fetchone()
     if not eq:
         raise HTTPException(404, "Equipo no encontrado.")
     cat = conn.execute(
-        "SELECT id, nombre FROM categorias WHERE id = ?",
+        "SELECT id, nombre FROM categorias WHERE id = %s",
         (categoria_id,),
     ).fetchone()
     if not cat:
@@ -411,7 +411,7 @@ def _apply_asignar_categoria(conn, equipo_id: int, categoria_id: int) -> dict:
     conn.execute(
         """
         INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-        VALUES (?, ?, 0)
+        VALUES (%s, %s, 0)
         ON CONFLICT (equipo_id, categoria_id) DO NOTHING
         """,
         (equipo_id, categoria_id),
@@ -424,7 +424,7 @@ def _apply_calcular_usd(conn) -> dict:
     """Computa precio_usd = precio_jornada / usd_rate para los equipos
     sin USD. Lee usd_rate de app_settings."""
     rate_row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", ("usd_rate",)
+        "SELECT value FROM app_settings WHERE key = %s", ("usd_rate",)
     ).fetchone()
     if not rate_row:
         raise HTTPException(400, "usd_rate no configurado en settings.")
@@ -438,7 +438,7 @@ def _apply_calcular_usd(conn) -> dict:
     # precio_jornada hace inverso. Por ahora cálculo simple: USD = ARS / rate.
     result = conn.execute("""
         UPDATE equipos
-        SET precio_usd = ROUND((precio_jornada / ?)::numeric, 2)
+        SET precio_usd = ROUND((precio_jornada / %s)::numeric, 2)
         WHERE eliminado_at IS NULL
           AND precio_jornada IS NOT NULL
           AND precio_jornada > 0

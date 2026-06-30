@@ -15,11 +15,11 @@ _SAMPLE_HTML = """<!doctype html><html><head>
 <title>Rambla Rental — default</title>
 <meta property="og:title" content="Rambla Rental — default" />
 <meta property="og:description" content="desc default" />
-<meta property="og:image" content="https://www.ramblarental.com.ar/icon-512.png" />
-<meta property="og:url" content="https://www.ramblarental.com.ar/" />
+<meta property="og:image" content="https://rambla.house/icon-512.png" />
+<meta property="og:url" content="https://rambla.house/" />
 <meta name="twitter:title" content="Rambla Rental — default" />
 <meta name="twitter:description" content="desc default" />
-<meta name="twitter:image" content="https://www.ramblarental.com.ar/icon-512.png" />
+<meta name="twitter:image" content="https://rambla.house/icon-512.png" />
 </head><body><div id="root"></div></body></html>"""
 
 
@@ -29,12 +29,12 @@ def test_inject_og_meta_reemplaza_tags():
         title="Cámara RED KOMODO-X — Rambla Rental",
         description="Cámara de cine digital Super35.",
         image="https://cdn.example.com/komodo.webp",
-        url="https://www.ramblarental.com.ar/equipo/red-komodo-x-331",
+        url="https://rambla.house/equipo/red-komodo-x-331",
     )
     # OG por equipo, no el default
     assert '<meta property="og:title" content="Cámara RED KOMODO-X — Rambla Rental" />' in out
     assert '<meta property="og:image" content="https://cdn.example.com/komodo.webp" />' in out
-    assert '<meta property="og:url" content="https://www.ramblarental.com.ar/equipo/red-komodo-x-331" />' in out
+    assert '<meta property="og:url" content="https://rambla.house/equipo/red-komodo-x-331" />' in out
     assert "Cámara de cine digital Super35." in out
     # Twitter también
     assert '<meta name="twitter:image" content="https://cdn.example.com/komodo.webp" />' in out

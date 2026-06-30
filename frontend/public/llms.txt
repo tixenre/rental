@@ -1,0 +1,41 @@
+# Rambla
+
+> Alquiler de equipos audiovisuales, estudio de foto y video, y workshops de producción en Mar del Plata, Argentina.
+
+## Qué es Rambla
+
+Rambla es un negocio audiovisual en Mar del Plata (Argentina) con tres servicios:
+
+1. **Rental** — alquiler de equipos audiovisuales por jornada (cámaras, lentes, iluminación, audio, soportes, accesorios). Catálogo completo en `/rental`.
+2. **El Estudio** — estudio de foto y video por horas. Espacio equipado para producción profesional. Detalles en `/estudio`.
+3. **Workshops** — talleres de producción audiovisual con instructores especializados. Listado en `/workshops`.
+
+## Navegación
+
+- Catálogo de equipos: `/rental`
+- Detalle de equipo: `/equipo/{slug}` (ej. `/equipo/sony-fx3-cuerpo-47`)
+- Categorías: `/categoria/{slug}` (ej. `/categoria/camaras`)
+- Estudio: `/estudio`
+- Workshops: `/workshops` y `/workshops/{slug}`
+- Preguntas frecuentes: `/preguntas-frecuentes`
+- Sitemap completo: `/sitemap.xml`
+
+## Contacto y ubicación
+
+- Dirección: Chaco 1392, Mar del Plata, Buenos Aires, Argentina (CP 7600)
+- Teléfono: +54 9 223 585-2510
+- Email: ramblarental@gmail.com
+- Instagram: [@ramblarental](https://instagram.com/ramblarental)
+- Horario: lunes a viernes 10:00–19:00, sábados 10:00–14:00
+
+## Zona de cobertura
+
+Servicio de alquiler orientado a producciones en Mar del Plata y la costa atlántica bonaerense. Consultar disponibilidad de envíos.
+
+## Precios
+
+Los precios de alquiler son por jornada (en ARS). El catálogo muestra el precio por jornada y el total según las fechas seleccionadas. Para clientes registrados el sistema calcula IVA según perfil fiscal.
+
+## Política de privacidad
+
+El portal cliente (`/cliente`) requiere registro. Las áreas privadas (`/admin`, `/cliente`) no son indexables.

@@ -3,7 +3,7 @@
 El dueño puede pegar en el admin tres formatos distintos:
 
 1. **iframe HTML** — el código que da Google en "Compartir → Insertar mapa":
-   `<iframe src="https://www.google.com/maps/embed?pb=..." ...></iframe>`
+   `<iframe src="https://www.google.com/maps/embed%spb=..." ...></iframe>`
    → extraemos el `src` y lo usamos como embed URL.
 
 2. **Shortlink** — `https://maps.app.goo.gl/xxxxx` (lo que da el botón compartir
@@ -32,6 +32,7 @@ import httpx
 _ALLOWED_HOSTS = {
     "maps.app.goo.gl",
     "goo.gl",
+    "share.google",
     "consent.google.com",
     "consent.youtube.com",  # raros pero pueden aparecer
     "google.com",
@@ -53,6 +54,8 @@ _IFRAME_SRC_RE = re.compile(r'<iframe[^>]*\bsrc=["\']([^"\']+)["\']', re.IGNOREC
 _COORDS_AT_RE = re.compile(r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?)z)?")
 # Coords en query `q=lat,lng` o `ll=lat,lng`.
 _COORDS_Q_RE = re.compile(r"[?&](?:q|ll)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
+# Coords en parámetro `pb=` del embed: `!2d<lng>!3d<lat>`.
+_COORDS_PB_RE = re.compile(r"!2d(-?\d+(?:\.\d+)?).*?!3d(-?\d+(?:\.\d+)?)")
 
 
 class MapsParseError(ValueError):
@@ -88,22 +91,43 @@ def _coords_from_url(url: str) -> Optional[tuple[float, float]]:
     m = _COORDS_Q_RE.search(url)
     if m:
         return float(m.group(1)), float(m.group(2))
+    m = _COORDS_PB_RE.search(url)
+    if m:
+        lng, lat = float(m.group(1)), float(m.group(2))
+        return lat, lng  # convención: (lat, lng)
     return None
 
 
-def _embed_from_long_url(long_url: str) -> str:
-    """Convierte una URL larga de google.com/maps a una URL embebible.
+def _nav_url_from_embed(embed_src: str) -> str:
+    """Devuelve una URL de navegación a partir de una URL de embed de Google Maps.
 
-    Si la URL tiene coords (@lat,lng o q=lat,lng), se arma un embed centrado ahí.
-    Si no, se cae a `?q=<original>&output=embed` (Google sabe interpretar la URL).
+    Si tiene coords (caso `pb=`), arma google.com/maps/dir/?api=1&destination=lat,lng.
+    Si no, devuelve la URL de embed tal cual (el frontend la filtra).
+    """
+    coords = _coords_from_url(embed_src)
+    if coords:
+        lat, lng = coords
+        return f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
+    return embed_src
+
+
+def _embed_from_long_url(long_url: str) -> str:
+    """Convierte una URL larga de google.com/maps a una URL embebible via OpenStreetMap.
+
+    El formato legacy `output=embed` de Google ya no funciona sin API key.
+    Cuando la URL tiene coords extraemos bbox y marker para OSM.
+    Sin coords levantamos error: el admin debe pegar el código iframe directamente.
     """
     coords = _coords_from_url(long_url)
     if coords:
         lat, lng = coords
-        return f"https://www.google.com/maps?q={lat},{lng}&output=embed"
-    # Fallback: dejamos que Google interprete la URL como query (suele funcionar
-    # con URLs /maps/place/... ya que el slug es legible).
-    return f"https://www.google.com/maps?q={long_url}&output=embed"
+        margin = 0.006  # ~600 m de margen alrededor del punto
+        bbox = f"{lng - margin},{lat - margin},{lng + margin},{lat + margin}"
+        return f"https://www.openstreetmap.org/export/embed.html?bbox={bbox}&layer=mapnik&marker={lat},{lng}"
+    raise MapsParseError(
+        "no pude extraer coordenadas del link. "
+        "Usá 'Compartir → Insertar mapa' en Google Maps y pegá el código <iframe> completo."
+    )
 
 
 def _resolve_shortlink(url: str, *, max_redirects: int = 5, timeout: float = 4.0) -> str:
@@ -156,7 +180,8 @@ def parse_maps_input(raw: str) -> ParsedMaps:
         src = m.group(1).strip()
         if not _is_allowed_host(src, _ALLOWED_EMBED_HOSTS):
             raise MapsParseError(f"el iframe apunta a un host no permitido: {_host_of(src)}")
-        return ParsedMaps(embed_url=src, raw_url=src)
+        # raw_url = URL de navegación (no la de embed, que no se puede abrir directo).
+        return ParsedMaps(embed_url=src, raw_url=_nav_url_from_embed(src))
 
     # 2. Si pegó una URL: validar host y resolver shortlinks.
     if not (s.startswith("http://") or s.startswith("https://")):
@@ -166,7 +191,7 @@ def parse_maps_input(raw: str) -> ParsedMaps:
 
     final_url = s
     host = _host_of(s)
-    if host in {"maps.app.goo.gl", "goo.gl"} or host.endswith(".goo.gl"):
+    if host in {"maps.app.goo.gl", "goo.gl", "share.google"} or host.endswith(".goo.gl"):
         final_url = _resolve_shortlink(s)
         if not _is_allowed_host(final_url, _ALLOWED_HOSTS):
             raise MapsParseError(f"el link resuelve a un host no permitido: {_host_of(final_url)}")

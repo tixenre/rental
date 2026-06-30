@@ -7,9 +7,14 @@ from typing import Optional
 from fastapi import APIRouter, Query, HTTPException, Request
 from pydantic import BaseModel
 
+from urllib.parse import quote
+
 from database import get_db, row_to_dict
-from admin_guard import require_admin
+from auth.guards import require_admin
+from auth import magic
 from busqueda import construir
+from config import settings
+from identity import merge
 
 router = APIRouter()
 
@@ -113,12 +118,12 @@ def list_clientes(
             select_params = pred.score_params + params + [per_page, offset]
             rows = conn.execute(
                 f"SELECT c.*, ({pred.score}) AS _score FROM clientes c {where} "
-                f"ORDER BY _score DESC, c.apellido, c.nombre LIMIT ? OFFSET ?",
+                f"ORDER BY _score DESC, c.apellido, c.nombre LIMIT %s OFFSET %s",
                 select_params,
             ).fetchall()
         else:
             rows = conn.execute(
-                f"SELECT c.* FROM clientes c {where} ORDER BY c.apellido, c.nombre LIMIT ? OFFSET ?",
+                f"SELECT c.* FROM clientes c {where} ORDER BY c.apellido, c.nombre LIMIT %s OFFSET %s",
                 params + [per_page, offset],
             ).fetchall()
         items = []
@@ -129,11 +134,113 @@ def list_clientes(
         return {"total": total, "page": page, "per_page": per_page, "items": items}
 
 
+# ── Fusión de duplicados (Fase 2 identidad #1098) ─────────────────────────────
+# El back-office para deduplicar clientes que son la misma persona. Cablea al motor
+# `identity/merge` (transaccional, con guardas). Destructivo → require_admin.
+# ⚠️ ORDEN: la GET estática va ANTES de `/clientes/{id}` — si no, `/{id}` captura
+# "duplicados" como id y tira 422 (colisión de rutas — cazada por el supervisor; el
+# test_clientes_merge_route la clava a nivel HTTP).
+
+@router.get("/clientes/duplicados")
+def clientes_duplicados(request: Request):
+    """Grupos de clientes que comparten un CUIL verificado — candidatos a fusionar
+    (justo lo que el índice único de CUIL rechaza). Enriquece cada id con nombre,
+    contacto, estado y nº de pedidos para que el admin elija cuál conservar."""
+    require_admin(request)
+    with get_db() as conn:
+        out = []
+        for g in merge.candidatos_duplicados(conn):
+            clientes = []
+            for cid in g["ids"]:
+                row = conn.execute(
+                    """SELECT c.id, c.nombre, c.apellido, c.email, c.telefono,
+                              c.nombre_completo_renaper, c.dni_validado_at, c.created_at,
+                              (SELECT COUNT(*) FROM alquileres a WHERE a.cliente_id = c.id) AS pedidos
+                         FROM clientes c WHERE c.id = %s""",
+                    (cid,),
+                ).fetchone()
+                if row:
+                    clientes.append(row_to_dict(row))
+            out.append({"cuil": g["cuil"], "clientes": clientes})
+        return out
+
+
+class MergeClientesIn(BaseModel):
+    source: int  # se absorbe y se borra
+    target: int  # sobrevive con su identidad
+
+
+@router.post("/clientes/merge")
+def merge_clientes(body: MergeClientesIn, request: Request):
+    """Fusiona dos clientes que son la MISMA persona: mueve pedidos / datos / llaves /
+    bitácora de `source` a `target` y borra `source`. **Destructivo e irreversible** →
+    require_admin + las guardas del motor (rehúsa perder una identidad verificada o unir
+    dos personas con CUIL distinto → 400)."""
+    require_admin(request)
+    if body.source == body.target:
+        raise HTTPException(400, "No se puede fusionar un cliente consigo mismo")
+    try:
+        merge.merge_accounts(source=body.source, target=body.target)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "merged_into": body.target}
+
+
+class InvitarClienteIn(BaseModel):
+    email: str
+    nombre: Optional[str] = None
+    telefono: Optional[str] = None
+
+
+@router.post("/clientes/invitar")
+def invitar_cliente(body: InvitarClienteIn, request: Request):
+    """Crea (o reusa) una cuenta por email y devuelve un LINK de invitación single-use
+    para que el cliente la reclame (active la cuenta + registre su passkey). El admin lo
+    manda por donde quiera — mismo patrón que el link de verificación (no se manda mail
+    desde acá: el motor de mail es por plantilla; el admin copia el link). El email se
+    valida/locked recién con Didit; el nombre/teléfono del admin son provisionales."""
+    require_admin(request)
+    email = (body.email or "").strip().lower()
+    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+        raise HTTPException(400, "Email inválido")
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT id, dni_validado_at FROM clientes WHERE LOWER(email) = LOWER(%s)", (email,)
+        ).fetchone()
+        if row:
+            # Anti-takeover: una cuenta YA verificada (identidad + pagos) NO se invita por
+            # link — si se filtra, quien lo abra entra con todo adentro. Esas se recuperan
+            # por Didit/CUIL (Fase 3, no se puede falsificar). Sí se invita lo no-verificado
+            # (incluso clientes viejos con pedidos pero sin Didit → caso de migración).
+            if row["dni_validado_at"] is not None:
+                raise HTTPException(
+                    400,
+                    "Esa cuenta ya está verificada — el cliente la recupera por su identidad "
+                    "(Didit), no por un link de invitación.",
+                )
+            cliente_id, ya_existia = row["id"], True
+        else:
+            cliente_id = conn.insert_returning(
+                "INSERT INTO clientes (email, nombre, telefono, cuenta_estado) "
+                "VALUES (%s, %s, %s, 'liviana')",
+                (email, (body.nombre or "").strip() or None, (body.telefono or "").strip() or None),
+            )
+            conn.commit()
+            ya_existia = False
+    token = magic.crear(email=email, purpose="invitacion", cliente_id=cliente_id)
+    return {
+        "ok": True,
+        "cliente_id": cliente_id,
+        "ya_existia": ya_existia,
+        "url": f"{settings.SITE_URL}/cliente/claim?t={quote(token, safe='')}",
+    }
+
+
 @router.get("/clientes/{id}")
 def get_cliente(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
-        row  = conn.execute("SELECT * FROM clientes WHERE id=?", (id,)).fetchone()
+        row  = conn.execute("SELECT * FROM clientes WHERE id=%s", (id,)).fetchone()
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
         return row_to_dict(row)
@@ -143,7 +250,7 @@ def get_cliente(id: int, request: Request):
 def get_cliente_pedidos(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
-        if not conn.execute("SELECT id FROM clientes WHERE id=?", (id,)).fetchone():
+        if not conn.execute("SELECT id FROM clientes WHERE id=%s", (id,)).fetchone():
             raise HTTPException(404, "Cliente no encontrado")
         rows = conn.execute("""
             SELECT p.id, p.numero_pedido, p.estado, p.fecha_desde, p.fecha_hasta,
@@ -152,7 +259,7 @@ def get_cliente_pedidos(id: int, request: Request):
             FROM alquileres p
             LEFT JOIN alquiler_items pi ON pi.pedido_id = p.id
             LEFT JOIN equipos e ON e.id = pi.equipo_id
-            WHERE p.cliente_id = ?
+            WHERE p.cliente_id = %s
             GROUP BY p.id, p.numero_pedido, p.estado, p.fecha_desde, p.fecha_hasta,
                      p.monto_total, p.monto_pagado, p.descuento_pct, p.created_at
             ORDER BY p.created_at DESC NULLS LAST, p.numero_pedido DESC
@@ -165,14 +272,14 @@ def create_cliente(data: ClienteCreate, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            cur  = conn.execute("""
+            cliente_id = conn.insert_returning("""
                 INSERT INTO clientes (nombre, apellido, telefono, email, direccion, cuit,
                                       descuento, perfil_impuestos, notas, direccion_maps_url)
-                VALUES (?,?,?,?,?,?,?,?,?,?)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """, (data.nombre, data.apellido, data.telefono, data.email, data.direccion,
                   data.cuit, data.descuento, data.perfil_impuestos, data.notas, data.direccion_maps_url))
             conn.commit()
-            row = conn.execute("SELECT * FROM clientes WHERE id=?", (cur.lastrowid,)).fetchone()
+            row = conn.execute("SELECT * FROM clientes WHERE id=%s", (cliente_id,)).fetchone()
             return row_to_dict(row)
         except Exception:
             conn.rollback()
@@ -184,14 +291,14 @@ def update_cliente(id: int, data: ClienteUpdate, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            actual = conn.execute("SELECT descuento FROM clientes WHERE id=?", (id,)).fetchone()
+            actual = conn.execute("SELECT descuento FROM clientes WHERE id=%s", (id,)).fetchone()
             if not actual:
                 raise HTTPException(404, "Cliente no encontrado")
             updates = data.model_dump(exclude_unset=True)
             if not updates:
                 raise HTTPException(400, "Nada para actualizar")
             set_clause = ", ".join(f"{k}=?" for k in updates) + ", updated_at=CURRENT_TIMESTAMP"
-            conn.execute(f"UPDATE clientes SET {set_clause} WHERE id=?", list(updates.values()) + [id])
+            conn.execute(f"UPDATE clientes SET {set_clause} WHERE id=%s", list(updates.values()) + [id])
             # Si cambió el descuento del cliente, propagarlo a sus presupuestos
             # (pedidos NO confirmados). Los confirmados/cerrados quedan congelados
             # con su snapshot — lock de precio. Misma transacción → atómico.
@@ -199,7 +306,7 @@ def update_cliente(id: int, data: ClienteUpdate, request: Request):
                 from routes.alquileres import propagar_descuento_a_presupuestos
                 propagar_descuento_a_presupuestos(conn, id, updates["descuento"] or 0)
             conn.commit()
-            row = conn.execute("SELECT * FROM clientes WHERE id=?", (id,)).fetchone()
+            row = conn.execute("SELECT * FROM clientes WHERE id=%s", (id,)).fetchone()
             return row_to_dict(row)
         except Exception:
             conn.rollback()
@@ -211,10 +318,12 @@ def delete_cliente(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
         try:
-            if not conn.execute("SELECT id FROM clientes WHERE id=?", (id,)).fetchone():
+            if not conn.execute("SELECT id FROM clientes WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Cliente no encontrado")
-            conn.execute("DELETE FROM clientes WHERE id=?", (id,))
+            conn.execute("DELETE FROM clientes WHERE id=%s", (id,))
             conn.commit()
         except Exception:
             conn.rollback()
             raise
+
+

@@ -88,14 +88,14 @@ def construir(campos: list[str], query: str, *, fuzzy: bool = True) -> Predicado
     # AND entre tokens; cada token OR entre campos (substring sin acento).
     token_clauses = []
     for tok in tokens:
-        ors = " OR ".join(f"{e} LIKE ?" for e in exprs)
+        ors = " OR ".join(f"{e} LIKE %s" for e in exprs)
         token_clauses.append(f"({ors})")
         where_params += [f"%{tok}%"] * len(exprs)
     where = " AND ".join(token_clauses)
 
     # Red fuzzy (typos): el query entero contra cada campo por trigramas.
     if fuzzy and len(qnorm) >= MIN_FUZZY_LEN:
-        fuzz = " OR ".join(f"word_similarity(?, {e}) >= ?" for e in exprs)
+        fuzz = " OR ".join(f"word_similarity(%s, {e}) >= %s" for e in exprs)
         where = f"({where}) OR ({fuzz})"
         for _ in exprs:
             where_params += [qnorm, UMBRAL_FUZZY]
@@ -108,9 +108,9 @@ def construir(campos: list[str], query: str, *, fuzzy: bool = True) -> Predicado
     por_campo = []
     for e in exprs:
         por_campo.append(
-            f"((CASE WHEN {e} LIKE ? THEN 3 ELSE 0 END)"
-            f" + (CASE WHEN {e} LIKE ? THEN 2 ELSE 0 END)"
-            f" + word_similarity(?, {e}))"
+            f"((CASE WHEN {e} LIKE %s THEN 3 ELSE 0 END)"
+            f" + (CASE WHEN {e} LIKE %s THEN 2 ELSE 0 END)"
+            f" + word_similarity(%s, {e}))"
         )
         score_params += [f"{qnorm}%", f"%{qnorm}%", qnorm]
     score = por_campo[0] if len(por_campo) == 1 else "GREATEST(" + ", ".join(por_campo) + ")"

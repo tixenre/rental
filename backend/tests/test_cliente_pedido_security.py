@@ -51,7 +51,9 @@ class FakeConn:
         self._pending_eq_id = None
         if eq_id is None or eq_id not in self._precios:
             return None
-        return FakeRow(precio_jornada=self._precios[eq_id])
+        # `tipo` lo lee `precio_jornada_efectivo` (resuelve combo vs. precio propio).
+        # Equipo simple → toma su `precio_jornada` tal cual (el del catálogo).
+        return FakeRow(precio_jornada=self._precios[eq_id], tipo="simple")
 
     def fetchall(self):
         return []
@@ -71,9 +73,11 @@ def test_cliente_no_decide_precio_jornada(monkeypatch):
     """Caso atacante: el body manda precio_jornada=1 pero el server
     debe usar el del catálogo (50000) al construir el PedidoCreate."""
 
-    # 1. Sesión cliente válida (saltea require_cliente).
+    # 1. Sesión cliente válida y verificada (saltea require_cliente_verificado,
+    #    que el handler usa como gate: existencia + identidad). Este test aísla la
+    #    lógica de precio, no el gate.
     monkeypatch.setattr(
-        "routes.cliente_portal.require_cliente",
+        "routes.cliente_portal.pedidos.require_cliente_verificado",
         lambda req: {"cliente_id": 42, "email": "cliente@test.com"},
     )
 
@@ -86,21 +90,22 @@ def test_cliente_no_decide_precio_jornada(monkeypatch):
     # 3. Conn fake con precio de catálogo conocido.
     precios_catalogo = {7: 50000}
     monkeypatch.setattr(
-        "routes.cliente_portal.get_db",
+        "routes.cliente_portal.pedidos.get_db",
         lambda: FakeConn(precios_catalogo),
     )
 
-    # 4. Interceptar `create_pedido` (no la ejecutamos de verdad) para
-    #    capturar el payload que recibió.
+    # 4. Interceptar `create_pedido_retry` —la puerta ÚNICA de creación que usa
+    #    el endpoint (envuelve a `create_pedido` con reintento de deadlock)— sin
+    #    ejecutarla de verdad, para capturar el payload que recibió.
     captured = {}
 
-    def fake_create_pedido(payload, background=None):
+    def fake_create_pedido_retry(payload, background=None):
         captured["payload"] = payload
         return {"id": 1, "ok": True}
 
     monkeypatch.setattr(
-        "routes.alquileres.create_pedido",
-        fake_create_pedido,
+        "routes.alquileres.create_pedido_retry",
+        fake_create_pedido_retry,
     )
 
     # 5. Llamar al endpoint con un body que intenta colar precio_jornada=1.
@@ -129,7 +134,7 @@ def test_equipo_inexistente_devuelve_404(monkeypatch):
     from fastapi import HTTPException
 
     monkeypatch.setattr(
-        "routes.cliente_portal.require_cliente",
+        "routes.cliente_portal.pedidos.require_cliente_verificado",
         lambda req: {"cliente_id": 42, "email": "cliente@test.com"},
     )
     monkeypatch.setattr(
@@ -137,7 +142,7 @@ def test_equipo_inexistente_devuelve_404(monkeypatch):
         lambda conn, desde, hasta: None,
     )
     monkeypatch.setattr(
-        "routes.cliente_portal.get_db",
+        "routes.cliente_portal.pedidos.get_db",
         lambda: FakeConn({}),  # catálogo vacío
     )
 

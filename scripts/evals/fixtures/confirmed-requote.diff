@@ -1,0 +1,15 @@
+# Fixture señal B (catch del supervisor) — diff sintético. CASO DIFÍCIL: drift SUTIL, sin frase-gatillo
+# literal en el digest (la regla es de principio, no un "el supervisor marca X"). Testea el límite
+# digest-vs-log: ¿alcanza la regla del digest o hay que abrir DECISIONES?
+# El "esperado" vive en scripts/evals/README.md, fuera del fixture, para no contaminar la medición.
+
+--- a/backend/routes/alquileres/core.py
++++ b/backend/routes/alquileres/core.py
+@@ -204,9 +204,8 @@ def _enriquecer_pedido(pedido):
+     pedido = _enriquecer_pedido_con_cliente(pedido)
+-    # presupuestos se recotizan; confirmados/cerrados conservan su snapshot de plata
+-    if pedido["estado"] == "presupuesto":
+-        pedido["precio_total"] = _recotizar(pedido)
++    # recotizar siempre, así el total refleja la tarifa vigente
++    pedido["precio_total"] = _recotizar(pedido)
+     return pedido

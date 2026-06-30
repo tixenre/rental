@@ -96,7 +96,7 @@ def obtener_cuenta(conn, cuenta_id: int) -> dict | None:
     row = conn.execute(
         """SELECT id, nombre, tipo, socio, moneda, saldo_inicial, fecha_apertura, activa, orden,
                   created_by, created_at, updated_by, updated_at
-           FROM cuentas WHERE id = ?""",
+           FROM cuentas WHERE id = %s""",
         (cuenta_id,),
     ).fetchone()
     return row_to_dict(row) if row else None
@@ -106,7 +106,7 @@ def crear_cuenta(conn, *, nombre, tipo, socio=None, moneda="ARS", saldo_inicial=
                  fecha_apertura=None, orden=0, por=None) -> dict:
     """Crea una cuenta (valida primero). Devuelve la cuenta creada.
 
-    `fecha_apertura` None → default de la tabla (clean start 2026-06-01).
+    `fecha_apertura` None → clean start de la liquidación (`LIQUIDACION_INICIO`).
     `moneda` ARS (default) o USD.
     """
     moneda = (moneda or "ARS")
@@ -115,12 +115,16 @@ def crear_cuenta(conn, *, nombre, tipo, socio=None, moneda="ARS", saldo_inicial=
     validar_cuenta(data)
     socio_val = data["socio"] if tipo == "socio" else None
 
+    # Default de `fecha_apertura` = el clean start de la liquidación (constante única
+    # en reportes/), como bound param (DAL: nada de literales de valor en el SQL).
+    from reportes.liquidacion import LIQUIDACION_INICIO
+
     cur = conn.execute(
         """INSERT INTO cuentas (nombre, tipo, socio, moneda, saldo_inicial, fecha_apertura, orden, created_by, updated_by)
-           VALUES (?, ?, ?, ?, ?, COALESCE(?::date, '2026-06-01'::date), ?, ?, ?)
+           VALUES (%s, %s, %s, %s, %s, COALESCE(%s::date, %s::date), %s, %s, %s)
            RETURNING id""",
         (data["nombre"], tipo, socio_val, moneda, data["saldo_inicial"], fecha_apertura,
-         int(orden or 0), por, por),
+         LIQUIDACION_INICIO, int(orden or 0), por, por),
     )
     new_id = cur.fetchone()[0]
     return obtener_cuenta(conn, new_id)
@@ -147,20 +151,20 @@ def editar_cuenta(conn, cuenta_id: int, *, campos: dict, por=None) -> dict:
             valor = (valor or "").strip()
         propuesta[campo] = valor
         if campo == "fecha_apertura":
-            sets.append("fecha_apertura = ?::date")
+            sets.append("fecha_apertura = %s::date")
         else:
-            sets.append(f"{campo} = ?")
+            sets.append(f"{campo} = %s")
         params.append(valor)
 
     if not sets:
         return actual
 
     validar_cuenta(propuesta)  # tipo/socio se conservan del actual → valida coherencia
-    sets.append("updated_by = ?")
+    sets.append("updated_by = %s")
     params.append(por)
     sets.append("updated_at = CURRENT_TIMESTAMP")
     params.append(cuenta_id)
-    conn.execute(f"UPDATE cuentas SET {', '.join(sets)} WHERE id = ?", tuple(params))
+    conn.execute(f"UPDATE cuentas SET {', '.join(sets)} WHERE id = %s", tuple(params))
     return obtener_cuenta(conn, cuenta_id)
 
 
@@ -183,7 +187,7 @@ def desactivar_cuenta(conn, cuenta_id: int, por=None) -> dict:
         )
 
     conn.execute(
-        "UPDATE cuentas SET activa = FALSE, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE cuentas SET activa = FALSE, updated_by = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
         (por, cuenta_id),
     )
     return obtener_cuenta(conn, cuenta_id)

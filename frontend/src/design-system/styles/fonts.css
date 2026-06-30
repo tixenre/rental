@@ -1,0 +1,90 @@
+/* ============================================================
+   Rambla Rental — @font-face  (CANONICAL)
+   Fuentes vendoreadas en /public/fonts/woff2/. Self-hosted.
+   URL absoluta (/fonts/...) → mismo origin, sin hash de Vite, estable
+   para deduplicar con el preload en index.html.
+
+   Familia TT Commons: 400/500/600/700/800/900 normal + 400 italic.
+   Champ Black para display/wordmark.
+   JetBrains Mono 400/500 para monospace (precios, labels).
+
+   Subset: U+0000-00FF, U+0100-017F, U+2000-206F, U+20A0-20CF
+   (latin + es: á/é/í/ó/ú/ü/ñ/¿/¡ + punctuation + currency).
+   Comando de regeneración:
+     python3 -m fontTools.subset input.otf --flavor=woff2
+       --unicodes="U+0000-00FF,U+0100-017F,U+2000-206F,U+20A0-20CF,U+2190-21FF,U+2600-26FF,U+2700-27BF"
+       --layout-features=kern,liga,calt,locl,mark,mkmk,ccmp
+       --desubroutinize
+   OTF/TTF originales conservados en assets/fonts/ (no se sirven).
+   ============================================================ */
+
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/woff2/tt-commons-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  src: url("/fonts/woff2/tt-commons-400i.woff2") format("woff2");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/woff2/tt-commons-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/woff2/tt-commons-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/woff2/tt-commons-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/woff2/tt-commons-800.woff2") format("woff2");
+}
+@font-face {
+  font-family: "TT Commons";
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/woff2/tt-commons-900.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Champ Black";
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/woff2/champ-black-900.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/woff2/jetbrains-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/woff2/jetbrains-mono-500.woff2") format("woff2");
+}

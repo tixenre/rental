@@ -57,6 +57,10 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
    en silencio.
    - Atención especial a **decisiones con disparador ⏰** (ej. la regla de minutos de Actions que se
      activa si el repo vuelve a privado): si el contexto sugiere que el disparador se cumplió, avisalo.
+   - **Migraciones Alembic**: si el PR incluye una migración nueva, verificar que su `down_revision`
+     apunte a la última migración presente en `dev` (no a otra del mismo branch ni a una más vieja).
+     Una cadena rota produce "Multiple heads" y bloquea el CI. Correr `git log origin/dev --oneline
+     -- backend/migrations/versions/` para ver cuál es la última migración en dev.
 4. **Preferencias** — ¿respeta las preferencias del dueño registradas en `docs/MEMORIA.md`?
 5. **Curación de la memoria** — la memoria (digest `MEMORIA.md` + log `DECISIONES.md`) es la verdad
    curada del presente, no un append-only (el log inmutable es git). Toda propuesta de curación toca
@@ -69,6 +73,13 @@ Leé estos archivos (son tu fuente de verdad) y el diff de la rama:
      contradice a la vieja).
    Siempre lo **proponés** en tu salida; **no editás** — el dueño aprueba. Ver decisión
    *2026-05-26 — Curación de la memoria*.
+6. **Principios (filosofía de trabajo)** — ¿el lote **confirma, tensiona o suma** a alguno de los principios
+   de `CLAUDE.md` (sección "Filosofía de trabajo")? Distinguí:
+   - **Excepción puntual** — el dueño fue en contra una vez, con su confirmación (ej. un hotfix que no suele
+     querer): **no propongas nada**, el principio sigue intacto. No lo trates como ley rígida.
+   - **Drift recurrente / cambio de criterio explícito** — el patrón se repite o el dueño dijo "cambié de
+     criterio": ahí **proponé mutar** el principio en "Propuestas de memoria". Ver
+     *2026-06-27 — Filosofía de trabajo derivada*.
 
 ## Clasificación de tamaño (para el modo de merge)
 

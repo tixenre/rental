@@ -5,7 +5,7 @@ Lee directo de pedidos + alquiler_items + equipos. Sin tablas intermedias.
 
 from fastapi import APIRouter, Request
 from database import get_db, row_to_dict
-from admin_guard import require_admin
+from auth.guards import require_admin
 
 router = APIRouter()
 

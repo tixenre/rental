@@ -14,7 +14,10 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
-from routes.auth import get_session
+# Guard CANÓNICO reexportado bajo el nombre del paquete (`_require_admin`): valida
+# email ∈ ADMIN_EMAILS (→ 403), no solo que exista sesión. Una copia local débil
+# dejaba pasar a cualquier logueado, incluido un cliente del portal.
+from auth.guards import require_admin as _require_admin
 
 
 router = APIRouter()
@@ -32,15 +35,6 @@ class UnidadUpdate(BaseModel):
     simbolo: Optional[str] = None
     nombre: Optional[str] = None
     dimension: Optional[str] = None
-
-
-# ── Auth helper ─────────────────────────────────────────────────────────
-
-def _require_admin(request: Request) -> dict:
-    session = get_session(request)
-    if not session:
-        raise HTTPException(401, "No autenticado")
-    return session
 
 
 # ── CRUD ────────────────────────────────────────────────────────────────
@@ -73,7 +67,7 @@ def crear_unidad(payload: UnidadInput, request: Request):
             cur = conn.execute(
                 """
                 INSERT INTO unidades (simbolo, nombre, dimension)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
                 RETURNING id
                 """,
                 (simbolo, nombre, dimension),
@@ -106,14 +100,14 @@ def actualizar_unidad(unidad_id: int, payload: UnidadUpdate, request: Request):
         updates["dimension"] = v or None
     with get_db() as conn:
         existing = conn.execute(
-            "SELECT id FROM unidades WHERE id = ?", (unidad_id,)
+            "SELECT id FROM unidades WHERE id = %s", (unidad_id,)
         ).fetchone()
         if not existing:
             raise HTTPException(404, "Unidad no existe")
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        set_clause = ", ".join(f"{k} = %s" for k in updates)
         try:
             conn.execute(
-                f"UPDATE unidades SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                f"UPDATE unidades SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                 list(updates.values()) + [unidad_id],
             )
             conn.commit()
@@ -133,9 +127,9 @@ def borrar_unidad(unidad_id: int, request: Request):
     _require_admin(request)
     with get_db() as conn:
         existing = conn.execute(
-            "SELECT id FROM unidades WHERE id = ?", (unidad_id,)
+            "SELECT id FROM unidades WHERE id = %s", (unidad_id,)
         ).fetchone()
         if not existing:
             raise HTTPException(404, "Unidad no existe")
-        conn.execute("DELETE FROM unidades WHERE id = ?", (unidad_id,))
+        conn.execute("DELETE FROM unidades WHERE id = %s", (unidad_id,))
         conn.commit()

@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # ── URLs ────────────────────────────────────────────────────────────
     # URL pública del sitio (dominio canónico). Override con env var SITE_URL
     # por ambiente (prod ya la tiene seteada; este default cubre local/dev).
-    SITE_URL: str = "https://www.ramblarental.com.ar"
+    SITE_URL: str = "https://rambla.house"
 
     # ── Auth / seguridad ────────────────────────────────────────────────
     # Firma de la cookie de sesión. Sin esto la app no puede autenticar:
@@ -57,8 +57,11 @@ class Settings(BaseSettings):
     RAILWAY_ENVIRONMENT: Optional[str] = None
     # Error tracking; opcional (dev/CI no lo necesitan).
     SENTRY_DSN: Optional[str] = None
-    # Orígenes permitidos para CORS con credenciales (coma-separados).
-    FRONTEND_ORIGINS: str = "http://localhost:5173,http://localhost:8000"
+    # Orígenes permitidos para CORS con credenciales (coma-separados). Incluye el
+    # puerto del `vite dev` (:3000) además del default de Vite (:5173): es el origin
+    # que el navegador reporta en la assertion de passkey, sin él WebAuthn falla en
+    # local. En Railway se setea por env (dominio real).
+    FRONTEND_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:8000"
 
     # ── Didit — verificación de identidad (DNI + selfie → RENAPER) ──────────
     # Se activa por configuración: si DIDIT_API_KEY está vacía, los endpoints de

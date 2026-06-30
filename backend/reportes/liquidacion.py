@@ -65,7 +65,7 @@ def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
         en_rango AS (
             SELECT pedido_id, fecha_saldado
             FROM saldado
-            WHERE fecha_saldado::date BETWEEN ?::date AND ?::date
+            WHERE fecha_saldado::date BETWEEN %s::date AND %s::date
         ),
         tot AS (
             SELECT pedido_id, SUM(subtotal) AS suma_items

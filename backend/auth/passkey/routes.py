@@ -1,0 +1,391 @@
+"""auth/passkey/routes.py — endpoints de login con passkey (WebAuthn/FIDO2).
+
+**Transporte** del motor `auth/passkey/`: registro (usuario YA logueado por
+Google registra una passkey), login discoverable (entrar con la passkey), y
+gestión (listar/borrar/renombrar). Aditivo a Google OAuth — la sesión que se
+mintea al loguear es la MISMA cookie firmada (`auth.session._make_session_response`),
+no una sesión paralela.
+
+Recuperación de cuenta: trivial — Google es el anchor (registrar passkey exige
+estar logueado por Google), así que perder el dispositivo = entrar por Google y
+re-registrar. No hay flujo de recovery extra.
+"""
+import logging
+import secrets
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+import psycopg.errors
+from webauthn.helpers import bytes_to_base64url
+
+from auth.guards import is_admin_email, require_admin
+from database import get_db
+from auth.session import COOKIE_SECURE, _make_session_response
+from auth.guards import require_cliente
+from auth.passkey import ceremonies, store
+from auth.ratelimit import _check_rate, _record_event, _record_fail
+from auth.stepup import mark_stepup
+from net_utils import get_client_ip
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+_REG_COOKIE = "wa_chal_reg"
+_AUTH_COOKIE = "wa_chal_auth"
+_SIGNUP_COOKIE = "wa_chal_signup"
+_STEPUP_COOKIE = "wa_chal_stepup"
+
+
+class RegisterCompleteIn(BaseModel):
+    credential: dict
+    device_name: str | None = None
+
+
+class LoginCompleteIn(BaseModel):
+    credential: dict
+
+
+class RenameIn(BaseModel):
+    device_name: str
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _admin_identity(admin: dict) -> tuple[str, str]:
+    """(email, display_name) del admin a partir del dict de `require_admin`."""
+    email = admin["email"]
+    name = (admin.get("session") or {}).get("name") or email
+    return email, name
+
+
+def _set_challenge(res, cookie: str, token: str) -> None:
+    res.set_cookie(
+        cookie, token, httponly=True, samesite="lax",
+        secure=COOKIE_SECURE, max_age=ceremonies.CHALLENGE_MAX_AGE,
+    )
+
+
+def _extract_transports(credential: dict) -> str | None:
+    t = (credential.get("response") or {}).get("transports")
+    if isinstance(t, list) and t:
+        return ",".join(str(x) for x in t)
+    return None
+
+
+# ── Registro (begin/complete) — admin y cliente ──────────────────────────────
+
+def _register_begin(*, owner_type: str, owner_email: str, cliente_id, display_name: str):
+    owner_key = owner_email.lower() if owner_type == "admin" else str(cliente_id)
+    uh = ceremonies.user_handle_for(owner_type, owner_key)
+    exclude = store.credential_ids_for_owner(
+        owner_type, owner_email=owner_email, cliente_id=cliente_id
+    )
+    options, challenge_b64 = ceremonies.build_registration_options(
+        user_name=owner_email, user_display_name=display_name,
+        user_handle_b64=uh, exclude_ids=exclude,
+    )
+    res = JSONResponse(options)
+    _set_challenge(res, _REG_COOKIE,
+                   ceremonies.sign_challenge(challenge_b64, ot=owner_type, ok=owner_key, uh=uh))
+    return res
+
+
+def _register_complete(request: Request, body: RegisterCompleteIn, *, owner_type, owner_email,
+                       cliente_id, owner_key):
+    data = ceremonies.read_challenge(request.cookies.get(_REG_COOKIE) or "")
+    if not data or data.get("ot") != owner_type or data.get("ok") != owner_key:
+        raise HTTPException(400, "Challenge inválido o expirado. Reintentá.")
+    try:
+        reg = ceremonies.verify_registration(credential=body.credential, challenge_b64=data["challenge"])
+    except Exception as e:  # noqa: BLE001 — la lib lanza varios tipos; todos = registro inválido
+        logger.warning("passkey register verify falló: %s", e)
+        raise HTTPException(400, "No se pudo verificar la passkey.")
+    device_name = (body.device_name or "").strip() or "Passkey"
+    try:
+        new_id = store.insert_credential(
+            owner_type=owner_type, owner_email=owner_email, cliente_id=cliente_id,
+            credential_id=reg["credential_id"], public_key=reg["public_key"],
+            sign_count=reg["sign_count"], transports=_extract_transports(body.credential),
+            aaguid=reg["aaguid"], device_name=device_name, user_handle=data["uh"],
+        )
+    except psycopg.errors.UniqueViolation:
+        raise HTTPException(409, "Esa passkey ya está registrada.")
+    res = JSONResponse({"ok": True, "id": new_id, "device_name": device_name})
+    res.delete_cookie(_REG_COOKIE)
+    # Registrar una passkey es un evento de auth FRESCA (Face ID/huella/PIN, owner-scoped):
+    # vale como step-up reciente. Así "enrolar una llave" es un modo más de prueba de
+    # presencia del motor de auth (junto a login y step-up) → habilita la firma on-the-fly
+    # de UN toque (creás la llave y eso ya firma) y deja la ventana que `require_recent_auth`
+    # exige. Solo cliente (el step-up es del portal; el admin no firma nada).
+    if owner_type == "cliente" and cliente_id is not None:
+        mark_stepup(res, cliente_id)
+    return res
+
+
+@router.post("/auth/passkey/register/begin")
+def admin_register_begin(request: Request):
+    email, name = _admin_identity(require_admin(request))
+    return _register_begin(owner_type="admin", owner_email=email, cliente_id=None, display_name=name)
+
+
+@router.post("/auth/passkey/register/complete")
+def admin_register_complete(body: RegisterCompleteIn, request: Request):
+    email, _ = _admin_identity(require_admin(request))
+    return _register_complete(request, body, owner_type="admin", owner_email=email,
+                              cliente_id=None, owner_key=email.lower())
+
+
+@router.post("/cliente/auth/passkey/register/begin")
+def cliente_register_begin(request: Request):
+    sess = require_cliente(request)
+    return _register_begin(owner_type="cliente", owner_email=sess["email"],
+                           cliente_id=sess["cliente_id"],
+                           display_name=sess.get("name") or sess["email"])
+
+
+@router.post("/cliente/auth/passkey/register/complete")
+def cliente_register_complete(body: RegisterCompleteIn, request: Request):
+    sess = require_cliente(request)
+    return _register_complete(request, body, owner_type="cliente", owner_email=sess["email"],
+                              cliente_id=sess["cliente_id"], owner_key=str(sess["cliente_id"]))
+
+
+# ── Alta passwordless (signup) — registrar passkey SIN cuenta previa ──────────
+# El usuario DESLOGUEADO crea una passkey y se le mintea una cuenta-cliente
+# **liviana** (sin nombre/mail/datos): la cuenta nace solo con `id` + passkey.
+# La identidad/contacto los completa Didit al primer pedido (gate
+# `require_cliente_verificado` la deja inerte hasta verificar → no puede pedir).
+# Anti-spam: rate-limit por IP (el alta crea filas). El `user_handle` es aleatorio
+# (no hay cliente_id todavía); el login discoverable resuelve por credential_id.
+
+@router.post("/auth/passkey/signup/begin")
+def signup_begin(request: Request):
+    _check_rate(get_client_ip(request))  # comparte el bucket por-IP con login/OAuth/staging
+    uh = bytes_to_base64url(secrets.token_bytes(32))
+    options, challenge_b64 = ceremonies.build_registration_options(
+        user_name="Cliente Rambla", user_display_name="Cliente Rambla",
+        user_handle_b64=uh, exclude_ids=[],
+    )
+    res = JSONResponse(options)
+    _set_challenge(res, _SIGNUP_COOKIE,
+                   ceremonies.sign_challenge(challenge_b64, signup=True, uh=uh))
+    return res
+
+
+@router.post("/auth/passkey/signup/complete")
+def signup_complete(body: RegisterCompleteIn, request: Request):
+    ip = get_client_ip(request)
+    _check_rate(ip)
+    data = ceremonies.read_challenge(request.cookies.get(_SIGNUP_COOKIE) or "")
+    if not data or not data.get("signup"):
+        _record_fail(ip)
+        raise HTTPException(400, "Challenge inválido o expirado. Reintentá.")
+    try:
+        reg = ceremonies.verify_registration(credential=body.credential, challenge_b64=data["challenge"])
+    except Exception as e:  # noqa: BLE001 — la lib lanza varios tipos; todos = registro inválido
+        _record_fail(ip)
+        logger.warning("passkey signup verify falló: %s", e)
+        raise HTTPException(400, "No se pudo verificar la passkey.")
+    device_name = (body.device_name or "").strip() or "Passkey"
+    # Cuenta liviana + passkey en UNA transacción: si el insert de la credencial
+    # falla, no queda una cuenta huérfana (atómico). owner_email="" (la cuenta no
+    # tiene mail todavía; la columna es NOT NULL → string vacío).
+    try:
+        with get_db() as conn:
+            with conn.transaction():
+                cliente_id = conn.insert_returning(
+                    "INSERT INTO clientes (cuenta_estado) VALUES (%s)", ("liviana",)
+                )
+                conn.execute(
+                    """INSERT INTO passkey_credentials
+                           (owner_type, owner_email, cliente_id, credential_id, public_key,
+                            sign_count, transports, aaguid, device_name, user_handle)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    ("cliente", "", cliente_id, reg["credential_id"], reg["public_key"],
+                     reg["sign_count"], _extract_transports(body.credential), reg["aaguid"],
+                     device_name, data["uh"]),
+                )
+    except psycopg.errors.UniqueViolation:
+        # credential_id UNIQUE: esa passkey ya existe → no recreamos cuenta. Entrá con ella.
+        raise HTTPException(409, "Esa passkey ya está registrada. Entrá con ella.")
+    _record_event(ip)  # anti-spam: una creación exitosa también consume cupo por-IP
+    logger.info("alta passwordless: cuenta liviana creada id=%s", cliente_id)
+    res = _make_session_response(
+        email="", name="", extra={"role": "cliente", "cliente_id": cliente_id}, request=request,
+    )
+    res.delete_cookie(_SIGNUP_COOKIE)
+    return res
+
+
+# ── Login (begin/complete) — discoverable, un solo flujo para admin y cliente ─
+
+@router.post("/auth/passkey/login/begin")
+def login_begin(request: Request):
+    _check_rate(get_client_ip(request))  # comparte el bucket por-IP con OAuth/staging
+    options, challenge_b64 = ceremonies.build_authentication_options()
+    res = JSONResponse(options)
+    _set_challenge(res, _AUTH_COOKIE, ceremonies.sign_challenge(challenge_b64))
+    return res
+
+
+@router.post("/auth/passkey/login/complete")
+def login_complete(body: LoginCompleteIn, request: Request):
+    ip = get_client_ip(request)
+    _check_rate(ip)  # DoS: el verify WebAuthn es caro → acota intentos por IP
+    data = ceremonies.read_challenge(request.cookies.get(_AUTH_COOKIE) or "")
+    if not data:
+        _record_fail(ip)
+        raise HTTPException(400, "Challenge inválido o expirado. Reintentá.")
+    cred_id = body.credential.get("id") or body.credential.get("rawId")
+    if not cred_id:
+        _record_fail(ip)
+        raise HTTPException(400, "Credencial inválida.")
+    row = store.get_by_credential_id(cred_id)
+    if not row:
+        _record_fail(ip)
+        raise HTTPException(401, "Passkey no reconocida.")
+    try:
+        new_count = ceremonies.verify_authentication(
+            credential=body.credential, challenge_b64=data["challenge"],
+            public_key_b64=row["public_key"], current_sign_count=row["sign_count"],
+        )
+    except Exception as e:  # noqa: BLE001
+        _record_fail(ip)
+        logger.warning("passkey auth verify falló: %s", e)
+        raise HTTPException(401, "No se pudo verificar la passkey.")
+    if ceremonies.es_replay(row["sign_count"], new_count):
+        _record_fail(ip)
+        logger.warning("passkey replay/clonación id=%s stored=%s new=%s",
+                       row["id"], row["sign_count"], new_count)
+        raise HTTPException(401, "Passkey rechazada (contador inválido).")
+    store.update_sign_count(row["id"], new_count)
+    res = _mint_session_for_owner(row, request)
+    res.delete_cookie(_AUTH_COOKIE)
+    return res
+
+
+# ── Step-up ("confirmá que sos vos") — passkey fresca para acciones sensibles ─
+# No es un login (ya hay sesión): verifica una passkey de ESTA cuenta y deja la marca
+# `stepup` (corta vida) que exige `require_recent_auth`. Hoy lo usa el borrado de llaves;
+# es reusable (futuro: confirmar un pedido).
+
+@router.post("/cliente/auth/passkey/stepup/begin")
+def cliente_stepup_begin(request: Request):
+    require_cliente(request)
+    options, challenge_b64 = ceremonies.build_authentication_options()
+    res = JSONResponse(options)
+    _set_challenge(res, _STEPUP_COOKIE, ceremonies.sign_challenge(challenge_b64))
+    return res
+
+
+@router.post("/cliente/auth/passkey/stepup/complete")
+def cliente_stepup_complete(body: LoginCompleteIn, request: Request):
+    sess = require_cliente(request)
+    ip = get_client_ip(request)
+    _check_rate(ip)
+    data = ceremonies.read_challenge(request.cookies.get(_STEPUP_COOKIE) or "")
+    if not data:
+        _record_fail(ip)
+        raise HTTPException(400, "Challenge inválido o expirado. Reintentá.")
+    cred_id = body.credential.get("id") or body.credential.get("rawId")
+    row = store.get_by_credential_id(cred_id) if cred_id else None
+    # La passkey TIENE que ser de esta cuenta (no vale la de otro) → step-up scopeado.
+    if not row or row["owner_type"] != "cliente" or row["cliente_id"] != sess["cliente_id"]:
+        _record_fail(ip)
+        raise HTTPException(401, "Passkey no reconocida.")
+    try:
+        new_count = ceremonies.verify_authentication(
+            credential=body.credential, challenge_b64=data["challenge"],
+            public_key_b64=row["public_key"], current_sign_count=row["sign_count"],
+        )
+    except Exception as e:  # noqa: BLE001
+        _record_fail(ip)
+        logger.warning("passkey stepup verify falló: %s", e)
+        raise HTTPException(401, "No se pudo verificar la passkey.")
+    if ceremonies.es_replay(row["sign_count"], new_count):
+        _record_fail(ip)
+        raise HTTPException(401, "Passkey rechazada (contador inválido).")
+    store.update_sign_count(row["id"], new_count)
+    res = JSONResponse({"ok": True})
+    res.delete_cookie(_STEPUP_COOKIE)
+    mark_stepup(res, sess["cliente_id"])  # deja la marca de step-up reciente
+    return res
+
+
+def _mint_session_for_owner(row: dict, request: Request):
+    """Mintea la MISMA cookie de sesión que el OAuth, resolviendo el rol como
+    siempre (admin por `is_admin_email`; cliente con role+cliente_id). Los datos
+    vivos (email/nombre del cliente) salen por `cliente_id` (clave estable).
+    `request` aporta el user_agent para etiquetar el dispositivo en la sesión."""
+    if row["owner_type"] == "admin":
+        email = row["owner_email"]
+        if not is_admin_email(email):
+            raise HTTPException(403, "Tu cuenta ya no tiene permisos de administración.")
+        return _make_session_response(email=email, name=email, request=request)
+    with get_db() as conn:
+        c = conn.execute(
+            "SELECT id, email, nombre, apellido FROM clientes WHERE id = %s",
+            (row["cliente_id"],),
+        ).fetchone()
+    if not c:
+        raise HTTPException(401, "Cliente no encontrado.")
+    # Cuenta liviana (alta passwordless): email/nombre/apellido pueden ser NULL
+    # hasta que Didit los complete → fallback a "" (la sesión no necesita un mail).
+    name = f"{c['nombre'] or ''} {c['apellido'] or ''}".strip() or (c["email"] or "")
+    return _make_session_response(
+        email=c["email"] or "", name=name, extra={"role": "cliente", "cliente_id": c["id"]},
+        request=request,
+    )
+
+
+# ── Gestión (listar/borrar/renombrar) — scopeado al dueño ────────────────────
+
+@router.get("/auth/passkey/credentials")
+def admin_list(request: Request):
+    email, _ = _admin_identity(require_admin(request))
+    return {"credentials": store.list_for_owner("admin", owner_email=email)}
+
+
+@router.delete("/auth/passkey/credentials/{cred_id}")
+def admin_delete(cred_id: int, request: Request):
+    email, _ = _admin_identity(require_admin(request))
+    if not store.delete_for_owner(cred_id, "admin", owner_email=email):
+        raise HTTPException(404, "Passkey no encontrada.")
+    return {"ok": True}
+
+
+@router.patch("/auth/passkey/credentials/{cred_id}")
+def admin_rename(cred_id: int, body: RenameIn, request: Request):
+    email, _ = _admin_identity(require_admin(request))
+    name = body.device_name.strip()
+    if not name:
+        raise HTTPException(400, "Nombre vacío.")
+    if not store.rename_for_owner(cred_id, name, "admin", owner_email=email):
+        raise HTTPException(404, "Passkey no encontrada.")
+    return {"ok": True}
+
+
+@router.get("/cliente/auth/passkey/credentials")
+def cliente_list(request: Request):
+    sess = require_cliente(request)
+    return {"credentials": store.list_for_owner("cliente", cliente_id=sess["cliente_id"])}
+
+
+@router.delete("/cliente/auth/passkey/credentials/{cred_id}")
+def cliente_delete(cred_id: int, request: Request):
+    sess = require_cliente(request)
+    if not store.delete_for_owner(cred_id, "cliente", cliente_id=sess["cliente_id"]):
+        raise HTTPException(404, "Passkey no encontrada.")
+    return {"ok": True}
+
+
+@router.patch("/cliente/auth/passkey/credentials/{cred_id}")
+def cliente_rename(cred_id: int, body: RenameIn, request: Request):
+    sess = require_cliente(request)
+    name = body.device_name.strip()
+    if not name:
+        raise HTTPException(400, "Nombre vacío.")
+    if not store.rename_for_owner(cred_id, name, "cliente", cliente_id=sess["cliente_id"]):
+        raise HTTPException(404, "Passkey no encontrada.")
+    return {"ok": True}

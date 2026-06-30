@@ -26,10 +26,14 @@ VERSIONS_DIR = BACKEND_ROOT / "migrations" / "versions"
 
 
 def test_database_py_contiene_alter_aliases():
-    """database.py debe tener el ALTER TABLE que agrega la columna aliases."""
-    db_src = (BACKEND_ROOT / "database.py").read_text(encoding="utf-8")
+    """init_db (paquete `database/`) debe tener el ALTER TABLE que agrega la columna aliases."""
+    # `database.py` se partió en el paquete `database/` (#501 Fase 5): init_db vive
+    # en `database/schema.py`. Se lee todo el paquete para no acoplarse al submódulo.
+    db_src = "\n".join(
+        p.read_text(encoding="utf-8") for p in (BACKEND_ROOT / "database").rglob("*.py")
+    )
     assert "ADD COLUMN IF NOT EXISTS aliases" in db_src, (
-        "database.py no tiene el ALTER TABLE para aliases en spec_definitions. "
+        "init_db (database/) no tiene el ALTER TABLE para aliases en spec_definitions. "
         "El seeder falla si Alembic no llega a b3d5e7f9a1c2."
     )
     # Verificar también que tiene el default JSON array correcto.

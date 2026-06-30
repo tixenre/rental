@@ -59,7 +59,7 @@ def import_marcas(
         cur = conn.execute(
             """
             INSERT INTO marcas (nombre, logo_url, visible, orden, destacada)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (nombre) DO UPDATE SET
                 logo_url = EXCLUDED.logo_url,
                 visible = EXCLUDED.visible,
@@ -100,7 +100,7 @@ def import_categorias(
             """
             INSERT INTO categorias (nombre, prioridad, parent_id, visible,
                                     grupo_visual, nombre_publico_template)
-            VALUES (?, ?, NULL, ?, ?, ?)
+            VALUES (%s, %s, NULL, %s, %s, %s)
             ON CONFLICT (nombre) DO NOTHING
             RETURNING id
             """,
@@ -131,7 +131,7 @@ def import_categorias(
                 f"que no existe (debe estar en el mismo JSON)"
             )
         conn.execute(
-            "UPDATE categorias SET parent_id = ? WHERE nombre = ? AND parent_id IS NULL",
+            "UPDATE categorias SET parent_id = %s WHERE nombre = %s AND parent_id IS NULL",
             (parent_id, c.nombre),
         )
     return stats
@@ -151,7 +151,7 @@ def import_etiquetas(
         cur = conn.execute(
             """
             INSERT INTO etiquetas (nombre, prioridad)
-            VALUES (?, ?)
+            VALUES (%s, %s)
             ON CONFLICT (nombre) DO UPDATE SET prioridad = EXCLUDED.prioridad
             RETURNING (xmax = 0) AS inserted
             """,
@@ -213,7 +213,7 @@ def import_spec_definitions(
                      ayuda, es_compatibilidad, compatibilidad_modo, rol_compatibilidad,
                      validado, tabla_columnas, output_config, favorito, en_nombre,
                      en_filtros, prioridad)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (categoria_raiz_id, spec_key) DO UPDATE SET
                     label = EXCLUDED.label,
                     tipo = EXCLUDED.tipo,
@@ -246,19 +246,19 @@ def import_spec_definitions(
             # porque el ON CONFLICT no aplica al partial index.
             existing = conn.execute(
                 "SELECT id FROM spec_definitions "
-                "WHERE categoria_raiz_id IS NULL AND spec_key = ?",
+                "WHERE categoria_raiz_id IS NULL AND spec_key = %s",
                 (sd.spec_key,),
             ).fetchone()
             if existing:
                 conn.execute(
                     """
                     UPDATE spec_definitions SET
-                        label = ?, tipo = ?, unidad = ?, enum_options = ?,
-                        ayuda = ?, es_compatibilidad = ?, compatibilidad_modo = ?,
-                        rol_compatibilidad = ?, validado = ?, tabla_columnas = ?,
-                        output_config = ?, favorito = ?, en_nombre = ?,
-                        en_filtros = ?, prioridad = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
+                        label = %s, tipo = %s, unidad = %s, enum_options = %s,
+                        ayuda = %s, es_compatibilidad = %s, compatibilidad_modo = %s,
+                        rol_compatibilidad = %s, validado = %s, tabla_columnas = %s,
+                        output_config = %s, favorito = %s, en_nombre = %s,
+                        en_filtros = %s, prioridad = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
                     """,
                     (
                         sd.label, sd.tipo, sd.unidad, enum_json, sd.ayuda,
@@ -277,7 +277,7 @@ def import_spec_definitions(
                          ayuda, es_compatibilidad, compatibilidad_modo, rol_compatibilidad,
                          validado, tabla_columnas, output_config, favorito, en_nombre,
                          en_filtros, prioridad)
-                    VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         sd.spec_key, sd.label, sd.tipo, sd.unidad, enum_json,
@@ -331,7 +331,7 @@ def import_categoria_spec_templates(
             INSERT INTO categoria_spec_templates
                 (categoria_id, spec_def_id, prioridad, destacado, obligatorio,
                  visible_en_card, visible_en_filtros, visible_en_nombre, ayuda)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (categoria_id, spec_def_id) DO UPDATE SET
                 prioridad = EXCLUDED.prioridad,
                 destacado = EXCLUDED.destacado,
@@ -383,7 +383,7 @@ def import_equipos(
         if brand_id is None and (eq.marca_nombre or eq.marca):
             nombre_marca = (eq.marca_nombre or eq.marca).strip()
             conn.execute(
-                "INSERT INTO marcas (nombre) VALUES (?) ON CONFLICT (nombre) DO NOTHING",
+                "INSERT INTO marcas (nombre) VALUES (%s) ON CONFLICT (nombre) DO NOTHING",
                 (nombre_marca,),
             )
             resolver.refresh_marcas()
@@ -398,7 +398,7 @@ def import_equipos(
                 dueno, visible_catalogo, estado, ficha_completa, eliminado_at,
                 nombre_publico_override, nombre_publico_revisado, relevancia_manual
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (slug) DO UPDATE SET
                 nombre = EXCLUDED.nombre,
                 modelo = EXCLUDED.modelo,
@@ -447,7 +447,7 @@ def import_equipos(
         # ── M2M: categorias ──────────────────────────────────────────────
         if prune_m2m:
             conn.execute(
-                "DELETE FROM equipo_categorias WHERE equipo_id = ?", (equipo_id,)
+                "DELETE FROM equipo_categorias WHERE equipo_id = %s", (equipo_id,)
             )
         for cat_ref in eq.categorias:
             cat_id = resolver.categoria_id(cat_ref.nombre)
@@ -458,7 +458,7 @@ def import_equipos(
             conn.execute(
                 """
                 INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
                 ON CONFLICT (equipo_id, categoria_id) DO UPDATE SET
                     orden = EXCLUDED.orden
                 """,
@@ -468,7 +468,7 @@ def import_equipos(
         # ── M2M: etiquetas ───────────────────────────────────────────────
         if prune_m2m:
             conn.execute(
-                "DELETE FROM equipo_etiquetas WHERE equipo_id = ?", (equipo_id,)
+                "DELETE FROM equipo_etiquetas WHERE equipo_id = %s", (equipo_id,)
             )
         for et_ref in eq.etiquetas:
             et_id = resolver.etiqueta_id(et_ref.nombre)
@@ -477,7 +477,7 @@ def import_equipos(
                 conn.execute(
                     """
                     INSERT INTO etiquetas (nombre, prioridad)
-                    VALUES (?, 100)
+                    VALUES (%s, 100)
                     ON CONFLICT (nombre) DO NOTHING
                     """,
                     (et_ref.nombre,),
@@ -491,7 +491,7 @@ def import_equipos(
             conn.execute(
                 """
                 INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, origen, orden)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
                 ON CONFLICT (equipo_id, etiqueta_id) DO UPDATE SET
                     origen = EXCLUDED.origen,
                     orden = EXCLUDED.orden
@@ -528,7 +528,7 @@ def import_equipo_specs(
         cur = conn.execute(
             """
             INSERT INTO equipo_specs (equipo_id, spec_def_id, value)
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
             ON CONFLICT (equipo_id, spec_def_id) DO UPDATE SET
                 value = EXCLUDED.value
             RETURNING (xmax = 0) AS inserted
@@ -564,17 +564,16 @@ def import_equipo_fichas(
             INSERT INTO equipo_fichas (
                 equipo_id, descripcion, notas,
                 keywords_json, nombre_publico_template,
-                incluye_json, conectividad_json,
+                conectividad_json,
                 compatible_con_json, video_url, precio_bh_usd, fuente_url,
                 fuente_titulo, enriquecido_at, enriquecido_fuente
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (equipo_id) DO UPDATE SET
                 descripcion = EXCLUDED.descripcion,
                 notas = EXCLUDED.notas,
                 keywords_json = EXCLUDED.keywords_json,
                 nombre_publico_template = EXCLUDED.nombre_publico_template,
-                incluye_json = EXCLUDED.incluye_json,
                 conectividad_json = EXCLUDED.conectividad_json,
                 compatible_con_json = EXCLUDED.compatible_con_json,
                 video_url = EXCLUDED.video_url,
@@ -589,7 +588,7 @@ def import_equipo_fichas(
             (
                 equipo_id, f.descripcion, f.notas,
                 f.keywords_json, f.nombre_publico_template,
-                f.incluye_json, f.conectividad_json,
+                f.conectividad_json,
                 f.compatible_con_json, f.video_url, f.precio_bh_usd,
                 f.fuente_url, f.fuente_titulo, f.enriquecido_at,
                 f.enriquecido_fuente,
@@ -623,7 +622,7 @@ def import_clientes(
         # Pre-check: ¿existe por email? Email case-insensitive
         # (el índice idx_clientes_email_lower lo permite).
         existing = conn.execute(
-            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(?) LIMIT 1",
+            "SELECT id FROM clientes WHERE LOWER(email) = LOWER(%s) LIMIT 1",
             (c.email,),
         ).fetchone()
 
@@ -631,12 +630,12 @@ def import_clientes(
             conn.execute(
                 """
                 UPDATE clientes SET
-                    nombre = ?, apellido = ?, telefono = ?, direccion = ?,
-                    direccion_maps_url = ?, cuit = ?, descuento = ?,
-                    perfil_impuestos = ?, razon_social = ?, domicilio_fiscal = ?,
-                    email_facturacion = ?, notas = ?,
+                    nombre = %s, apellido = %s, telefono = %s, direccion = %s,
+                    direccion_maps_url = %s, cuit = %s, descuento = %s,
+                    perfil_impuestos = %s, razon_social = %s, domicilio_fiscal = %s,
+                    email_facturacion = %s, notas = %s,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (c.nombre, c.apellido, c.telefono, c.direccion,
                  c.direccion_maps_url, c.cuit, c.descuento, c.perfil_impuestos,
@@ -652,7 +651,7 @@ def import_clientes(
                     direccion_maps_url, cuit, descuento, perfil_impuestos,
                     razon_social, domicilio_fiscal, email_facturacion, notas
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (c.email, c.nombre, c.apellido, c.telefono, c.direccion,
                  c.direccion_maps_url, c.cuit, c.descuento, c.perfil_impuestos,
@@ -666,8 +665,8 @@ def import_clientes(
             try:
                 conn.execute("SAVEPOINT sp_uid")
                 conn.execute(
-                    "UPDATE clientes SET supabase_uid = ?::uuid "
-                    "WHERE LOWER(email) = LOWER(?)",
+                    "UPDATE clientes SET supabase_uid = %s::uuid "
+                    "WHERE LOWER(email) = LOWER(%s)",
                     (c.supabase_uid, c.email),
                 )
                 conn.execute("RELEASE SAVEPOINT sp_uid")
@@ -700,7 +699,7 @@ def import_alquileres(
         # se preserva con los campos cliente_* denormalizados (snapshot).
 
         existing = conn.execute(
-            "SELECT id FROM alquileres WHERE numero_pedido = ? LIMIT 1",
+            "SELECT id FROM alquileres WHERE numero_pedido = %s LIMIT 1",
             (a.numero_pedido,),
         ).fetchone()
 
@@ -709,12 +708,12 @@ def import_alquileres(
             conn.execute(
                 """
                 UPDATE alquileres SET
-                    cliente_id = ?, cliente_nombre = ?, cliente_email = ?,
-                    cliente_telefono = ?, notas = ?, estado = ?,
-                    fecha_desde = ?, fecha_hasta = ?, monto_total = ?,
-                    monto_pagado = ?, descuento_pct = ?, fuente = ?,
+                    cliente_id = %s, cliente_nombre = %s, cliente_email = %s,
+                    cliente_telefono = %s, notas = %s, estado = %s,
+                    fecha_desde = %s, fecha_hasta = %s, monto_total = %s,
+                    monto_pagado = %s, descuento_pct = %s, fuente = %s,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (cliente_id, a.cliente_nombre, a.cliente_email, a.cliente_telefono,
                  a.notas, a.estado, a.fecha_desde, a.fecha_hasta, a.monto_total,
@@ -730,7 +729,7 @@ def import_alquileres(
                     cliente_telefono, notas, estado, fecha_desde, fecha_hasta,
                     monto_total, monto_pagado, descuento_pct, fuente
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (a.numero_pedido, cliente_id, a.cliente_nombre, a.cliente_email,
@@ -742,7 +741,7 @@ def import_alquileres(
 
         # Items: replace. Borrar todos los del pedido y reinsertar.
         conn.execute(
-            "DELETE FROM alquiler_items WHERE pedido_id = ?", (alq_id,)
+            "DELETE FROM alquiler_items WHERE pedido_id = %s", (alq_id,)
         )
         for it in a.items:
             equipo_id = resolver.equipo_id(it.equipo_slug)
@@ -755,20 +754,20 @@ def import_alquileres(
                 """
                 INSERT INTO alquiler_items
                     (pedido_id, equipo_id, cantidad, precio_jornada, subtotal)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s)
                 """,
                 (alq_id, equipo_id, it.cantidad, it.precio_jornada, it.subtotal),
             )
 
         # Pagos: replace. Idem.
         conn.execute(
-            "DELETE FROM alquiler_pagos WHERE pedido_id = ?", (alq_id,)
+            "DELETE FROM alquiler_pagos WHERE pedido_id = %s", (alq_id,)
         )
         for p in a.pagos:
             conn.execute(
                 """
                 INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
                 """,
                 (alq_id, p.monto, p.concepto, p.fecha),
             )
@@ -915,7 +914,7 @@ def import_app_settings(
         cur = conn.execute(
             """
             INSERT INTO app_settings (key, value, updated_by)
-            VALUES (?, ?, 'dataio-import')
+            VALUES (%s, %s, 'dataio-import')
             ON CONFLICT (key) DO UPDATE SET
                 value = EXCLUDED.value,
                 updated_at = CURRENT_TIMESTAMP,
@@ -938,7 +937,7 @@ def import_email_templates(
         cur = conn.execute(
             """
             INSERT INTO email_templates (key, subject, body_html, body_text, updated_by)
-            VALUES (?, ?, ?, ?, 'dataio-import')
+            VALUES (%s, %s, %s, %s, 'dataio-import')
             ON CONFLICT (key) DO UPDATE SET
                 subject = EXCLUDED.subject,
                 body_html = EXCLUDED.body_html,
@@ -963,7 +962,7 @@ def import_descuentos_jornada(
         cur = conn.execute(
             """
             INSERT INTO descuentos_jornada (jornadas, pct)
-            VALUES (?, ?)
+            VALUES (%s, %s)
             ON CONFLICT (jornadas) DO UPDATE SET pct = EXCLUDED.pct
             RETURNING (xmax = 0) AS inserted
             """,

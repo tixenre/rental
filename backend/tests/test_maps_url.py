@@ -16,10 +16,22 @@ from services.maps_url import MapsParseError, parse_maps_input
 def test_iframe_html_extrae_src():
     """El código que Google da en 'Compartir → Insertar mapa'."""
     html = (
-        '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12" '
+        '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3'
+        '!1d100!2d-57.566!3d-37.986" '
         'width="600" height="450" style="border:0;" allowfullscreen="" '
         'loading="lazy"></iframe>'
     )
+    result = parse_maps_input(html)
+    assert "maps/embed?pb=" in result.embed_url
+    # raw_url debe ser una URL de navegación, no la de embed.
+    assert "dir/?api=1" in result.raw_url
+    assert "-37.986" in result.raw_url
+    assert "-57.566" in result.raw_url
+
+
+def test_iframe_sin_coords_usa_embed_como_fallback():
+    """Si el iframe no tiene coords, raw_url queda como el src (el frontend lo filtra)."""
+    html = '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12" loading="lazy"></iframe>'
     result = parse_maps_input(html)
     assert result.embed_url == "https://www.google.com/maps/embed?pb=!1m18!1m12"
     assert result.raw_url == result.embed_url
@@ -32,14 +44,15 @@ def test_iframe_con_host_no_permitido_rechaza():
 
 
 def test_url_larga_con_coords_construye_embed():
-    """URL larga con `@lat,lng,zoom` — extraemos coords y armamos embed."""
+    """URL larga con `@lat,lng,zoom` — extraemos coords y armamos embed OSM."""
     long_url = (
         "https://www.google.com/maps/place/Rambla+Rental/"
         "@-38.0011,-57.5500,17z/data=!3m1!4b1"
     )
     result = parse_maps_input(long_url)
-    assert "-38.0011,-57.55" in result.embed_url
-    assert "output=embed" in result.embed_url
+    assert "openstreetmap.org" in result.embed_url
+    assert "-38.0011" in result.embed_url
+    assert "-57.55" in result.embed_url
     # raw_url queda el original (lo que pegó el dueño).
     assert result.raw_url == long_url
 
@@ -103,8 +116,9 @@ def test_shortlink_resuelve_con_mock(monkeypatch):
     monkeypatch.setattr(mod.httpx, "Client", FakeClient)
 
     result = parse_maps_input("https://maps.app.goo.gl/abc123")
-    assert "-38.5,-57.6" in result.embed_url
-    assert "output=embed" in result.embed_url
+    assert "openstreetmap.org" in result.embed_url
+    assert "-38.5" in result.embed_url
+    assert "-57.6" in result.embed_url
     # El raw_url debe quedar el shortlink original (más corto, abre la app móvil).
     assert result.raw_url == "https://maps.app.goo.gl/abc123"
 

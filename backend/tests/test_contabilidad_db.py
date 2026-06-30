@@ -66,7 +66,7 @@ def _saldo(conn, nombre: str):
 
 
 def _cuenta_id(conn, nombre: str):
-    row = conn.execute("SELECT id FROM cuentas WHERE nombre = ?", (nombre,)).fetchone()
+    row = conn.execute("SELECT id FROM cuentas WHERE nombre = %s", (nombre,)).fetchone()
     return row[0] if row else None
 
 
@@ -75,13 +75,13 @@ def _pedido_y_pago(conn, monto, destinatario, fecha="2026-06-15T10:00:00",
     conn.execute(
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
-           VALUES (?,?,?,?,?,?,?)""",
+           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
         (ped, "Cliente contab", "finalizado", fecha_desde,
          "2026-06-06T20:00:00", monto, monto),
     )
     conn.execute(
         """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
-           VALUES (?,?,?,?,?,?)""",
+           VALUES (%s,%s,%s,%s,%s,%s)""",
         (ped, monto, "pago", destinatario, "transferencia", fecha),
     )
 
@@ -89,7 +89,7 @@ def _pedido_y_pago(conn, monto, destinatario, fecha="2026-06-15T10:00:00",
 def _mov(conn, tipo, monto, origen=None, destino=None):
     conn.execute(
         """INSERT INTO movimientos (tipo, monto, cuenta_origen_id, cuenta_destino_id, created_by)
-           VALUES (?,?,?,?,?)""",
+           VALUES (%s,%s,%s,%s,%s)""",
         (tipo, monto, origen, destino, "test"),
     )
 
@@ -200,7 +200,7 @@ def test_desactivar_falla_si_la_cuenta_tiene_saldo(conn):
 
 
 def _categoria_id(conn, nombre="Otros"):
-    row = conn.execute("SELECT id FROM gasto_categorias WHERE nombre = ?", (nombre,)).fetchone()
+    row = conn.execute("SELECT id FROM gasto_categorias WHERE nombre = %s", (nombre,)).fetchone()
     return row[0] if row else None
 
 
@@ -255,6 +255,46 @@ def test_reporte_mensual_gasto_si_baja_ganancia(conn):
     assert reporte_mensual(conn, mes)["ganancia_neta"] == gan_base - 20000
 
 
+def test_reporte_ganancia_descuenta_comision_de_duenos(conn):
+    # Núcleo del fix de plata: un pedido saldado de $100k con equipo de Pablo. Del
+    # reparto, a Rambla le tocan $45k (45%); Pablo+Tincho se llevan $55k. La
+    # ganancia parte de los $45k de Rambla, NO de los $100k facturados — la comisión
+    # de los dueños es un COSTO, no ganancia de Rambla.
+    from contabilidad.reporte_mensual import reporte_mensual
+
+    EQ, PEDX = 9_400_700, 9_400_701
+    conn.execute(
+        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
+        (EQ, "Equipo Pablo gan", 1, "Pablo"),
+    )
+    conn.execute(
+        """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
+                                   monto_total, monto_pagado)
+           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+        (PEDX, "Cli gan", "finalizado", "2026-06-05T08:00:00", "2026-06-06T20:00:00",
+         100000, 100000),
+    )
+    conn.execute(
+        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (%s,%s,%s,%s)",
+        (PEDX, EQ, 1, 100000),
+    )
+    conn.execute(
+        """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
+           VALUES (%s,%s,%s,%s,%s,%s)""",
+        (PEDX, 100000, "pago", "Rambla", "transferencia", "2026-06-15T10:00:00"),
+    )
+
+    rep = reporte_mensual(conn, "2026-06")
+    assert rep["devengado"]["total"] == 100000  # se facturó el total
+    assert rep["devengado"]["por_socio"]["Rambla"] == 45000  # a Rambla le toca el 45%
+    assert rep["comisiones_duenos"] == 55000  # Pablo 50k + Tincho 5k
+    assert rep["ganancia_neta"] == 45000  # parte de Rambla − 0 gastos (NO los 100k)
+    # Invariante del modelo: ganancia = facturado − comisiones − gastos.
+    assert rep["ganancia_neta"] == (
+        rep["devengado"]["total"] - rep["comisiones_duenos"] - rep["gastos"]["total"]
+    )
+
+
 def test_listar_movimientos_resuelve_nombres(conn):
     from contabilidad.movimientos import crear_movimiento, listar_movimientos
 
@@ -287,23 +327,23 @@ def test_rendicion_cierra_en_cero_y_saldar(conn):
     MES = "2026-09"
     EQ, PED2 = 9_400_900, 9_400_901
     conn.execute(
-        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (?,?,?,?)",
+        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
         (EQ, "Equipo Rend", 3, "Pablo"),
     )
     conn.execute(
         """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
                                    monto_total, monto_pagado)
-           VALUES (?,?,?,?,?,?,?)""",
+           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
         (PED2, "Cli rend", "finalizado", "2026-09-05T08:00:00", "2026-09-06T20:00:00",
          100000, 100000),
     )
     conn.execute(
-        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (?,?,?,?)",
+        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (%s,%s,%s,%s)",
         (PED2, EQ, 1, 100000),
     )
     conn.execute(
         """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
-           VALUES (?,?,?,?,?,?)""",
+           VALUES (%s,%s,%s,%s,%s,%s)""",
         (PED2, 100000, "pago", "Tincho", "transferencia", "2026-09-15T10:00:00"),
     )
 

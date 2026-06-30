@@ -30,7 +30,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from database import get_db, row_to_dict
-from admin_guard import require_admin
+from auth.guards import require_admin
 from rate_limit import limiter
 from busqueda import MAX_LEN, normalizar_para_registro
 
@@ -66,7 +66,7 @@ def log_search(body: SearchLogBody, request: Request):
     with get_db() as conn:
         row = conn.execute(
             "INSERT INTO search_queries (query_text, query_norm, result_count) "
-            "VALUES (?, ?, ?) RETURNING id",
+            "VALUES (%s, %s, %s) RETURNING id",
             (texto, norm, max(0, int(body.result_count))),
         ).fetchone()
         conn.commit()
@@ -81,7 +81,7 @@ def log_click(body: SearchClickBody, request: Request):
     with get_db() as conn:
         try:
             conn.execute(
-                "INSERT INTO search_clicks (query_id, equipo_id) VALUES (?, ?)",
+                "INSERT INTO search_clicks (query_id, equipo_id) VALUES (%s, %s)",
                 (body.query_id, body.equipo_id),
             )
             conn.commit()
@@ -108,7 +108,7 @@ def admin_busquedas(request: Request, dias: Optional[int] = None):
     where = ""
     params: list = []
     if dias and dias > 0:
-        where = "WHERE created_at >= ?"
+        where = "WHERE created_at >= %s"
         params.append(datetime.utcnow() - timedelta(days=dias))
 
     with get_db() as conn:

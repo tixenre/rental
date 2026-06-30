@@ -20,7 +20,21 @@ pytestmark = pytest.mark.unit
 from services.spec_persist import persistir_specs
 
 
-def _setup_db() -> sqlite3.Connection:
+class _SQLiteAdapter:
+    """Wraps sqlite3.Connection translating %s placeholders to ? so unit tests
+    keep using in-memory SQLite after the service migrated to %s nativo."""
+    def __init__(self, conn: sqlite3.Connection):
+        self._conn = conn
+        self.row_factory = conn.row_factory
+
+    def execute(self, sql: str, params=()):
+        return self._conn.execute(sql.replace("%s", "?"), params)
+
+    def commit(self):
+        return self._conn.commit()
+
+
+def _setup_db() -> _SQLiteAdapter:
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     conn.executescript("""
@@ -41,7 +55,7 @@ def _setup_db() -> sqlite3.Connection:
             PRIMARY KEY (equipo_id, spec_def_id)
         );
     """)
-    return conn
+    return _SQLiteAdapter(conn)
 
 
 # ── _coerce_enum: match difuso por substring ─────────────────────────────────

@@ -16,6 +16,7 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 _SESSION_ENDPOINT = "https://verification.didit.me/v3/session/"
+_DECISION_ENDPOINT = "https://verification.didit.me/v3/session/{session_id}/decision/"
 
 
 class DiditNotConfiguredError(Exception):
@@ -69,6 +70,48 @@ def create_session(*, return_url: str, vendor_data: str) -> DiditSession:
         json=payload,
         timeout=30.0,
     )
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        # El body de Didit contiene el mensaje real (ej. {"workflow_id": "Invalid workflow_id."}).
+        # raise_for_status() lo descartaría — lo logueamos antes de re-lanzar.
+        logger.error(
+            "didit: HTTP %s al crear sesión — body=%s workflow_id=%s",
+            exc.response.status_code,
+            exc.response.text,
+            settings.DIDIT_WORKFLOW_ID,
+        )
+        raise
     data = resp.json()
     return DiditSession(session_id=data["session_id"], url=data["url"])
+
+
+def retrieve_decision(session_id: str) -> dict:
+    """Recupera la decisión final de una sesión — fuente canónica de los datos
+    extraídos (mismo schema que `payload["decision"]` del webhook).
+
+    Se usa como respaldo: el webhook normalmente ya trae `decision` embebido,
+    pero si llegara 'liviano' (solo status), pedimos la decisión por API con
+    nuestra `x-api-key` (server-to-server, autenticado → datos confiables).
+
+    Args:
+        session_id: ID de la sesión de Didit (viene en el webhook).
+
+    Returns:
+        El objeto `decision` (dict con `id_verifications`, etc.).
+
+    Raises:
+        DiditNotConfiguredError: DIDIT_API_KEY vacía.
+        httpx.HTTPStatusError:   La API de Didit devolvió un error HTTP.
+        httpx.TimeoutException:  Timeout de red.
+    """
+    if not settings.DIDIT_API_KEY:
+        raise DiditNotConfiguredError("DIDIT_API_KEY no configurada")
+
+    resp = httpx.get(
+        _DECISION_ENDPOINT.format(session_id=session_id),
+        headers={"x-api-key": settings.DIDIT_API_KEY},
+        timeout=10.0,
+    )
+    resp.raise_for_status()
+    return resp.json()

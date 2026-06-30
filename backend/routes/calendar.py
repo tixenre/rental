@@ -24,7 +24,7 @@ from config import SITE_URL
 from database import get_db, now_ar, MARCA_NOMBRE_EXPR
 from rate_limit import limiter
 from services.ical import build_vcalendar, reserva_to_vevent
-from routes.settings import require_admin
+from auth.guards import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ _ESTADOS_FEED = ("confirmado", "retirado", "devuelto", "finalizado")
 
 def _get_token(conn) -> str:
     row = conn.execute(
-        "SELECT value FROM app_settings WHERE key = ?", (_TOKEN_KEY,)
+        "SELECT value FROM app_settings WHERE key = %s", (_TOKEN_KEY,)
     ).fetchone()
     return (row["value"] or "").strip() if row else ""
 
@@ -53,7 +53,7 @@ def _set_token(conn, token: str, actor: str) -> None:
     conn.execute(
         """
         INSERT INTO app_settings (key, value, updated_at, updated_by)
-        VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+        VALUES (%s, %s, CURRENT_TIMESTAMP, %s)
         ON CONFLICT (key) DO UPDATE
         SET value = EXCLUDED.value,
             updated_at = CURRENT_TIMESTAMP,
@@ -103,8 +103,8 @@ def feed_ical(request: Request, token: str = ""):
                 SELECT id, numero_pedido, cliente_nombre, estado, tipo,
                        fecha_desde, fecha_hasta
                 FROM alquileres
-                WHERE estado IN ({','.join('?' for _ in _ESTADOS_FEED)})
-                  AND fecha_hasta >= ?
+                WHERE estado IN ({','.join('%s' for _ in _ESTADOS_FEED)})
+                  AND fecha_hasta >= %s
                 ORDER BY fecha_desde
                 """,
                 (*_ESTADOS_FEED, corte),
@@ -138,7 +138,7 @@ def _items_por_pedido(conn, pedido_ids: list[int]) -> dict[int, list[dict]]:
     """Trae los equipos de varios pedidos en una query (evita N+1)."""
     if not pedido_ids:
         return {}
-    placeholders = ",".join("?" for _ in pedido_ids)
+    placeholders = ",".join("%s" for _ in pedido_ids)
     rows = conn.execute(
         f"""
         SELECT pi.pedido_id, pi.cantidad, e.nombre, {MARCA_NOMBRE_EXPR} AS marca
@@ -169,8 +169,8 @@ def _actor(session) -> str:
 @router.get("/api/admin/calendar/feed")
 def get_calendar_feed(request: Request):
     """Devuelve la URL del feed (genera el token la primera vez)."""
-    session = require_admin(request)
-    actor = _actor(session)
+    guard = require_admin(request)
+    actor = _actor(guard)
     with get_db() as conn:
         token = _ensure_token(conn, actor)
     return {"url": _feed_url(token), "token": token, "enabled": bool(token)}
@@ -179,8 +179,8 @@ def get_calendar_feed(request: Request):
 @router.post("/api/admin/calendar/feed/regenerate")
 def regenerate_calendar_feed(request: Request):
     """Rota el token → la URL anterior deja de funcionar."""
-    session = require_admin(request)
-    actor = _actor(session)
+    guard = require_admin(request)
+    actor = _actor(guard)
     with get_db() as conn:
         token = secrets.token_urlsafe(32)
         _set_token(conn, token, actor)

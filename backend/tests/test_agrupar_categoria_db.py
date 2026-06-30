@@ -64,7 +64,7 @@ def setup():
         #        Lentes(raíz, prio 20) → Zoom(hija); Iluminación(raíz, prio 30).
         conn.execute(
             "INSERT INTO categorias (id, nombre, prioridad, parent_id) VALUES "
-            "(?,?,?,?),(?,?,?,?),(?,?,?,?),(?,?,?,?),(?,?,?,?),(?,?,?,?)",
+            "(%s,%s,%s,%s),(%s,%s,%s,%s),(%s,%s,%s,%s),(%s,%s,%s,%s),(%s,%s,%s,%s),(%s,%s,%s,%s)",
             (
                 C_ROOT_CAM, "ZZ-Cámaras-test", 10, None,
                 C_HIJA_VIDEO, "ZZ-Video-test", 10, C_ROOT_CAM,
@@ -75,14 +75,14 @@ def setup():
             ),
         )
         for eq in ALL_EQ:
-            conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (eq, f"eq-{eq}", 1))
+            conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (eq, f"eq-{eq}", 1))
         # EQ_NIETA → nieta (Cine) ⇒ raíz Cámaras
         # EQ_HIJA  → hija (Zoom)  ⇒ raíz Lentes
         # EQ_RAIZ  → raíz directa (Iluminación)
         # EQ_SIN   → sin categoría ⇒ 'Otros'
-        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?,?,0)", (EQ_NIETA, C_NIETA_CINE))
-        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?,?,0)", (EQ_HIJA, C_HIJA_ZOOM))
-        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (?,?,0)", (EQ_RAIZ, C_ROOT_LUZ))
+        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (%s,%s,0)", (EQ_NIETA, C_NIETA_CINE))
+        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (%s,%s,0)", (EQ_HIJA, C_HIJA_ZOOM))
+        conn.execute("INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (%s,%s,0)", (EQ_RAIZ, C_ROOT_LUZ))
         conn.commit()
     finally:
         conn.close()

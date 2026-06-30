@@ -50,8 +50,11 @@ class _Conn:
     def execute(self, sql, params=()):
         s = " ".join(sql.split()).upper()
         self.calls.append((s, params))
-        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s:
-            return FakeCursor([FakeRow({0: self.directo})])
+        # reservado_directo (escalar) delega en reservado_directo_batch → IN + GROUP BY;
+        # params = (*equipo_ids, excl, fh_buf, fd_buf).
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID IN" in s:
+            eq_ids = params[:-3]
+            return FakeCursor([FakeRow({0: e, 1: self.directo}) for e in eq_ids])
         return FakeCursor([])
 
 
@@ -77,9 +80,10 @@ class _RevConn:
                 for (eq, cant, ese) in plist
             ]
             return FakeCursor(rows)
-        # reservado_directo.
-        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s:
-            return FakeCursor([FakeRow({0: self.directas.get(params[0], 0)})])
+        # reservado_directo (escalar → reservado_directo_batch): IN + GROUP BY.
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID IN" in s:
+            eq_ids = params[:-3]
+            return FakeCursor([FakeRow({0: e, 1: self.directas.get(e, 0)}) for e in eq_ids])
         return FakeCursor([])
 
 
@@ -95,8 +99,8 @@ def test_params_van_como_bound_y_en_orden():
     sql, params = c.calls[-1]
     # equipo_id, excl_pedido_id, fh_buf, fd_buf — en ese orden, como bound params.
     assert params == (42, 7, "FH", "FD")
-    # SQL parametrizado: placeholders ? presentes y sin {…} sin sustituir.
-    assert "?" in sql and "{" not in sql
+    # SQL parametrizado: placeholders %s presentes (uppercased → %S) y sin {…} sin sustituir.
+    assert "%S" in sql and "{" not in sql
 
 
 # ── reservado_total — conteo de consumo recursivo (C4) ───────────────────────
@@ -204,10 +208,12 @@ class _HipoteticoConn:
 
     def execute(self, sql, params=()):
         s = " ".join(sql.split()).upper()
-        if "FROM APP_SETTINGS WHERE KEY = ?" in s:
+        if "FROM APP_SETTINGS WHERE KEY = %S" in s:
             return FakeCursor([FakeRow(value=str(self.buffer_horas))])
+        # Mantenimiento batcheado (#626): IN + GROUP BY; este conn no modela
+        # mantenimiento → sin filas (el gate default-ea a 0).
         if "FROM EQUIPO_MANTENIMIENTO" in s:
-            return FakeCursor([FakeRow({0: 0})])
+            return FakeCursor([])
         if s.startswith("SELECT EQUIPO_ID, COMPONENTE_ID, CANTIDAD") and "FROM KIT_COMPONENTES" in s:
             return FakeCursor([
                 FakeRow(equipo_id=e, componente_id=c, cantidad=q, esencial=es)
@@ -217,11 +223,13 @@ class _HipoteticoConn:
             return FakeCursor([
                 FakeRow(id=i, nombre=self.nombres.get(i, f"eq{i}")) for i in self.stock
             ])
-        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = %S FOR UPDATE" in s:
             i = params[0]
             return FakeCursor([FakeRow(cantidad=self.stock[i])] if i in self.stock else [])
-        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s:
-            return FakeCursor([FakeRow({0: self.directas.get(params[0], 0)})])
+        # reservado directo batcheado (#626): (*equipo_ids, excl, fh_buf, fd_buf).
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID IN" in s:
+            eq_ids = params[:-3]
+            return FakeCursor([FakeRow({0: e, 1: self.directas.get(e, 0)}) for e in eq_ids])
         return FakeCursor([])
 
     def commit(self):

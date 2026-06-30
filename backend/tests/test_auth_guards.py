@@ -10,7 +10,7 @@ Es regresión del crítico de seguridad #55 (22 endpoints sin require_admin).
 import pytest
 from fastapi import HTTPException
 
-from admin_guard import is_admin_email, require_admin, ADMIN_EMAILS
+from auth.guards import is_admin_email, require_admin, ADMIN_EMAILS
 from routes.cliente_portal import require_cliente
 
 
@@ -50,7 +50,7 @@ class TestIsAdminEmail:
 class TestRequireAdmin:
     def test_sin_sesion_401(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         with pytest.raises(HTTPException) as exc:
             require_admin(FakeRequest())
@@ -59,7 +59,7 @@ class TestRequireAdmin:
     def test_sesion_sin_email_admin_403(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
         monkeypatch.setattr(
-            "admin_guard.get_session",
+            "auth.guards.get_session",
             lambda req: {"email": "cliente.random@gmail.com", "role": "cliente"},
         )
 
@@ -73,7 +73,7 @@ class TestRequireAdmin:
             pytest.skip("No hay ADMIN_EMAILS configurado")
         admin_email = next(iter(ADMIN_EMAILS))
         monkeypatch.setattr(
-            "admin_guard.get_session",
+            "auth.guards.get_session",
             lambda req: {"email": admin_email, "role": "admin"},
         )
 
@@ -92,7 +92,7 @@ class TestRequireAdmin:
         # esté seteada por error → no debe haber puerta abierta de cara al público.
         monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
         monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
         with pytest.raises(HTTPException) as exc:
             require_admin(FakeRequest())
         assert exc.value.status_code == 401  # sin bypass → exige sesión
@@ -101,7 +101,7 @@ class TestRequireAdmin:
         # "0", "false", "" → NO bypass
         for val in ["0", "false", "no", ""]:
             monkeypatch.setenv("ADMIN_BYPASS_AUTH", val)
-            monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+            monkeypatch.setattr("auth.guards.get_session", lambda req: None)
             with pytest.raises(HTTPException) as exc:
                 require_admin(FakeRequest())
             assert exc.value.status_code == 401, f"ADMIN_BYPASS_AUTH={val!r} no debería ser bypass"
@@ -111,7 +111,7 @@ class TestRequireAdmin:
 
 class TestRequireCliente:
     def test_sin_sesion_401(self, monkeypatch):
-        monkeypatch.setattr("routes.cliente_portal.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         with pytest.raises(HTTPException) as exc:
             require_cliente(FakeRequest())
@@ -121,7 +121,7 @@ class TestRequireCliente:
         # Regresión del bug #31/#55: sesiones de admin NO deben ser tratadas
         # como cliente. role debe ser exactamente "cliente".
         monkeypatch.setattr(
-            "routes.cliente_portal.get_session",
+            "auth.guards.get_session",
             lambda req: {"email": "admin@rambla.com", "role": "admin"},
         )
 
@@ -132,7 +132,7 @@ class TestRequireCliente:
     def test_sesion_sin_role_rechaza(self, monkeypatch):
         # Sesión vieja sin role definido → tratar como no-cliente
         monkeypatch.setattr(
-            "routes.cliente_portal.get_session",
+            "auth.guards.get_session",
             lambda req: {"email": "x@y.com"},
         )
 
@@ -142,7 +142,7 @@ class TestRequireCliente:
 
     def test_sesion_cliente_valida_pasa(self, monkeypatch):
         monkeypatch.setattr(
-            "routes.cliente_portal.get_session",
+            "auth.guards.get_session",
             lambda req: {"email": "cliente@gmail.com", "role": "cliente", "cliente_id": 42},
         )
 
@@ -162,7 +162,7 @@ class TestSafeNextPath:
     """
 
     def _safe(self, raw):
-        from routes.auth import _safe_next_path
+        from auth.google import _safe_next_path
         return _safe_next_path(raw)
 
     def test_none_y_vacio_devuelven_none(self):
@@ -212,7 +212,7 @@ class TestDevBypassEnabled:
     """El bypass de dev NUNCA debe estar activo en producción (Railway)."""
 
     def test_activo_en_dev(self, monkeypatch):
-        from routes.auth import dev_bypass_enabled
+        from auth.session import dev_bypass_enabled
 
         monkeypatch.delenv("RAILWAY_ENVIRONMENT", raising=False)
         for v in ("1", "true", "TRUE", "yes"):
@@ -220,14 +220,14 @@ class TestDevBypassEnabled:
             assert dev_bypass_enabled() is True, v
 
     def test_prod_gana_sobre_bypass(self, monkeypatch):
-        from routes.auth import dev_bypass_enabled
+        from auth.session import dev_bypass_enabled
 
         monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
         monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
         assert dev_bypass_enabled() is False
 
     def test_sin_bypass(self, monkeypatch):
-        from routes.auth import dev_bypass_enabled
+        from auth.session import dev_bypass_enabled
 
         monkeypatch.delenv("RAILWAY_ENVIRONMENT", raising=False)
         for v in ("", "0", "no", "false"):
@@ -236,7 +236,7 @@ class TestDevBypassEnabled:
 
     def test_dev_login_403_en_prod(self, monkeypatch):
         from fastapi import HTTPException
-        from routes.auth import auth_dev_login
+        from auth.staging import auth_dev_login
 
         monkeypatch.setenv("ADMIN_BYPASS_AUTH", "1")
         monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
@@ -301,11 +301,10 @@ class TestAuthMiddlewareStaticAssets:
         assert await self._classify("/api/equipos", method="GET") == "PASS"
 
     @pytest.mark.parametrize("path", [
-        "/estudio/Rambla_Estudio_S7V9470.jpg",
-        "/estudio/Rambla_Estudio_S7V9519-HDR.jpg",
         "/favicon.png",
         "/apple-touch-icon.png",
         "/icon-512.png",
+        "/og-image.png",
         "/manifest-admin.json",
         "/robots.txt",
         "/wordmark.svg",
@@ -331,6 +330,15 @@ class TestAuthMiddlewareStaticAssets:
         res = await self._classify(path)
         assert isinstance(res, JSONResponse)
         assert res.status_code == 401
+
+    @pytest.mark.parametrize("method", ["POST", "GET"])
+    async def test_webhook_es_publico(self, method):
+        """Regresión: los webhooks server-to-server (Didit) los llama un tercero
+        SIN cookie de sesión y se autentican por HMAC DENTRO del handler. Si el
+        middleware los corta con 401 (como pasaba), el handler nunca corre y la
+        verificación de identidad nunca se persiste. Deben PASAR el middleware
+        (POST incluido) → el HMAC decide adentro."""
+        assert await self._classify("/api/webhooks/didit", method=method) == "PASS"
 
 
 # ── Regresión por-endpoint del fix de authz de /api/equipos (#795) ──

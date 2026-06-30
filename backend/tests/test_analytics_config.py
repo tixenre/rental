@@ -101,7 +101,13 @@ def test_analytics_config_id_vacio_devuelve_null(monkeypatch):
 
 
 def _admin(monkeypatch, mod):
-    monkeypatch.setattr(mod, "get_session", lambda request: {"email": "admin@test.com"})
+    # `update_setting` usa el guard CANÓNICO (`admin_guard.require_admin`), que
+    # resuelve la sesión vía `admin_guard.get_session` y exige email ∈ ADMIN_EMAILS
+    # (admin@test.com en el entorno de tests). `mod` se mantiene por compat de firma.
+    import auth.guards as admin_guard
+
+    monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
+    monkeypatch.setattr(admin_guard, "get_session", lambda request: {"email": "admin@test.com"})
 
 
 def test_update_ga4_valido_normaliza_mayusculas(monkeypatch):

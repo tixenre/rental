@@ -171,7 +171,9 @@ No hace falta endpoint nuevo para el flujo del cliente. Referencia de campos: el
 - **La lógica de polling** del estado "confirmando": **ya implementada**. Claude Design diseña el
   _visual_ del estado; la mecánica existe.
 - **Las pantallas de Didit** (DNI + selfie): son de Didit, no se diseñan acá.
-- **El gate de pedidos** (no se puede pedir sin verificar): es lógica de backend, ya está.
+- **El gate de pedidos** (no se puede pedir sin verificar): implementado en PR1 — gate real en el
+  backend (`require_cliente_verificado` en pedidos + estudio) + paso de verificación inline en el flujo
+  de checkout con retorno al punto de origen. Ver `docs/plan-verificacion-identidad.md`.
 
 ## Relacionado (posible follow-up, no en este brief)
 

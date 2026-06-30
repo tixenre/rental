@@ -57,7 +57,7 @@ class DispFakeConn:
         s = " ".join(sql.split()).upper()
 
         # Buffer global (setting).
-        if "FROM APP_SETTINGS WHERE KEY = ?" in s:
+        if "FROM APP_SETTINGS WHERE KEY = %S" in s:
             return FakeCursor([FakeRow(value=str(self.buffer_horas))])
 
         # Stock propio de cada equipo.

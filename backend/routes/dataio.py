@@ -28,7 +28,7 @@ from pathlib import Path
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from admin_guard import require_admin
+from auth.guards import require_admin
 from database import get_db
 from dataio import orchestrator
 from dataio.csv_exporters import CSV_EXPORTERS
@@ -128,9 +128,9 @@ def export_dataio(
 
         try:
             rows = orchestrator.export_entity(conn, entity)
-        except Exception as e:
+        except Exception:
             logger.exception("export_entity falló para %r", entity)
-            raise HTTPException(500, f"Export {entity} falló: {type(e).__name__}: {e}")
+            raise HTTPException(500, f"Export {entity} falló")
 
         ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         return JSONResponse(
@@ -262,14 +262,14 @@ def _create_placeholder_equipos(conn, zip_bytes: bytes) -> int:
         # placeholder, pero los datasets son chicos (<100) y evita el
         # quilombo del ON CONFLICT con partial vs full index.
         exists = conn.execute(
-            "SELECT 1 FROM equipos WHERE slug = ? LIMIT 1", (slug,)
+            "SELECT 1 FROM equipos WHERE slug = %s LIMIT 1", (slug,)
         ).fetchone()
         if exists:
             continue
         conn.execute(
             """
             INSERT INTO equipos (slug, nombre, cantidad, visible_catalogo, estado)
-            VALUES (?, ?, 0, 0, 'historico')
+            VALUES (%s, %s, 0, 0, 'historico')
             """,
             (slug, nombre),
         )
@@ -360,9 +360,10 @@ def reset_operacional(
                 },
                 "sequences_reset": list(_OPERACIONAL_SEQUENCES),
             }
-        except Exception as e:
+        except Exception:
             try:
                 conn.rollback()
             except Exception:
                 pass
-            raise HTTPException(500, f"Reset falló: {e}")
+            logger.exception("Reset de la base operacional falló")
+            raise HTTPException(500, "Reset falló")

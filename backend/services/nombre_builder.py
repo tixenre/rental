@@ -215,9 +215,7 @@ def _spec_value_str(label: str, value: str, *, with_label: bool = True) -> Optio
         return label_norm
 
     # Sin label cuando ya viene "todo en el valor": apertura "f/1.4",
-    # capacidad "150Wh", etc. (heurística simple: si v ya tiene letras
-    # de unidad, no repetimos el label).
-    looks_self_describing = bool(re.search(r"[a-zA-Z]", v))
+    # capacidad "150Wh", etc.
     label_lc = label_norm.lower()
 
     # Casos donde el valor solo es suficiente

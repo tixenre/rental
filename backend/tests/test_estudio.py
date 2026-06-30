@@ -135,7 +135,7 @@ class TestEstudioAdminGuards:
 
     def test_patch_estudio_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         from routes.estudio import patch_estudio, EstudioUpdate
 
@@ -145,7 +145,7 @@ class TestEstudioAdminGuards:
 
     def test_delete_foto_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         from routes.estudio import delete_foto
 
@@ -155,7 +155,7 @@ class TestEstudioAdminGuards:
 
     def test_reorder_fotos_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         from routes.estudio import reorder_fotos, ReorderBody
 
@@ -165,7 +165,7 @@ class TestEstudioAdminGuards:
 
     def test_upload_from_url_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
 
         from routes.estudio import upload_foto_from_url, UploadFromUrlBody
 
@@ -175,7 +175,7 @@ class TestEstudioAdminGuards:
 
     def test_listar_pack_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
         from routes.estudio import listar_pack
 
         with pytest.raises(HTTPException) as exc:
@@ -184,7 +184,7 @@ class TestEstudioAdminGuards:
 
     def test_agregar_pack_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
         from routes.estudio import agregar_pack_equipo, PackEquipoCreate
 
         with pytest.raises(HTTPException) as exc:
@@ -193,7 +193,7 @@ class TestEstudioAdminGuards:
 
     def test_quitar_pack_requiere_admin(self, monkeypatch):
         monkeypatch.delenv("ADMIN_BYPASS_AUTH", raising=False)
-        monkeypatch.setattr("admin_guard.get_session", lambda req: None)
+        monkeypatch.setattr("auth.guards.get_session", lambda req: None)
         from routes.estudio import quitar_pack_equipo
 
         with pytest.raises(HTTPException) as exc:
@@ -276,15 +276,15 @@ class EstudioConflictoFakeConn:
         s = " ".join(sql.split()).upper()
 
         # Buffer global (setting app_settings) — separado del buffer del estudio.
-        if "FROM APP_SETTINGS WHERE KEY = ?" in s:
+        if "FROM APP_SETTINGS WHERE KEY = %S" in s:
             return _Cur([{"value": str(self.buffer_global)}])
 
-        # Mantenimiento — ninguno.
+        # Mantenimiento — ninguno (batcheado #626: sin filas → el gate default-ea a 0).
         if "FROM EQUIPO_MANTENIMIENTO" in s:
-            return _Cur([{0: 0}])
+            return _Cur([])
 
         # Items del pedido (1ra query del gate): el centinela.
-        if s.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = ?"):
+        if s.startswith("SELECT EQUIPO_ID, CANTIDAD FROM ALQUILER_ITEMS WHERE PEDIDO_ID = %S"):
             return _Cur([{"equipo_id": self.centinela_id, "cantidad": 1}])
 
         # Grafo de composición (componentes_de / parientes_de) — el centinela no es kit.
@@ -296,19 +296,21 @@ class EstudioConflictoFakeConn:
             return _Cur([{"id": self.centinela_id, "nombre": "Estudio (espacio)"}])
 
         # Lock + stock del centinela.
-        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = ? FOR UPDATE" in s:
+        if "SELECT CANTIDAD FROM EQUIPOS WHERE ID = %S FOR UPDATE" in s:
             return _Cur([{"cantidad": self.stock}])
 
         # Reservas directas: sumamos las que se pisan con el rango consultado.
-        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID = ?" in s:
-            _eq, _excl, fh_consulta, fd_consulta = params
+        # Batcheado (#626): IN + GROUP BY, params = (*equipo_ids, excl, fh_buf, fd_buf).
+        if "FROM ALQUILER_ITEMS PI2 JOIN ALQUILERES P ON P.ID = PI2.PEDIDO_ID WHERE PI2.EQUIPO_ID IN" in s:
+            eq_ids = params[:-3]
+            fh_consulta, fd_consulta = params[-2], params[-1]
             fh_c = self._parse(fh_consulta)
             fd_c = self._parse(fd_consulta)
             total = 0
             for (fd_e, fh_e) in self.reservas:
                 if self._parse(fd_e) < fh_c and self._parse(fh_e) > fd_c:
                     total += 1
-            return _Cur([{0: total}])
+            return _Cur([{0: e, 1: total} for e in eq_ids])
 
         return _Cur([])
 
@@ -365,7 +367,7 @@ class CentinelaFakeConn:
             )
 
         # Lock del centinela (FOR UPDATE) en el POST.
-        if s.startswith("SELECT ID FROM EQUIPOS WHERE ID = ? FOR UPDATE"):
+        if s.startswith("SELECT ID FROM EQUIPOS WHERE ID = %S FOR UPDATE"):
             return _Cur([{"id": params[0]}])
 
         # Query dedicada de overlap del centinela.
@@ -537,7 +539,7 @@ class _NamesConn(_ConnCM):
 
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
-        if "FROM EQUIPOS E WHERE E.ID = ANY(?)" in su:
+        if "FROM EQUIPOS E WHERE E.ID = ANY(" in su:
             ids = params[0]
             return _Cur(
                 [{"id": i, "nombre": self.names[i][0], "marca": self.names[i][1],
@@ -703,11 +705,17 @@ class _RecordingConn(_ConnCM):
 
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
-        if su.startswith("SELECT NOMBRE, APELLIDO, EMAIL, TELEFONO FROM CLIENTES"):
+        if su.startswith("SELECT NOMBRE, APELLIDO, EMAIL, TELEFONO") and "FROM CLIENTES" in su:
+            # Datos de contacto del cliente (sin dni: el gate de identidad ahora
+            # lo resuelve la fuente única `cliente_verificado`, query aparte).
             return _Cur([{
                 "nombre": "Tester", "apellido": "Estudio",
                 "email": "tester@example.com", "telefono": "1122334455",
             }])
+        if su.startswith("SELECT DNI_VALIDADO_AT FROM CLIENTES"):
+            # Gate de identidad vía `cliente_verificado`: verificado (dni seteado)
+            # → pasa el gate; estos tests aíslan la ORQUESTACIÓN, no el gate.
+            return _Cur([{"dni_validado_at": "2026-06-01T10:00:00"}])
         if su.startswith("INSERT INTO ALQUILERES"):
             self.alquiler_params = params
             return _CurLastrowid([], lastrowid=self.pedido_id)
@@ -719,6 +727,10 @@ class _RecordingConn(_ConnCM):
         if su.startswith("DELETE FROM ALQUILER_ITEMS"):
             return _Cur([])
         return _Cur([])
+
+    def insert_returning(self, sql, params=(), *, column="id"):
+        self.execute(sql, params)
+        return self.pedido_id
 
     def commit(self):
         self.committed = True
@@ -839,7 +851,7 @@ class _SlotBloqueoConn(_ConnCM):
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
         if "FROM ESTUDIO_SLOTS_FIJOS" in su and "WHERE ACTIVO" in su:
-            dia, mes, _mes2 = params
+            dia, mes, _mes2, *_ = params
             res = [
                 s for s in self.slots
                 if s["activo"] and s["dia_semana"] == dia
@@ -917,7 +929,7 @@ class _SlotRegenConn(_ConnCM):
 
     def execute(self, sql, params=()):
         su = " ".join(sql.split()).upper()
-        if "FROM ALQUILERES WHERE ESTUDIO_SLOT_ID = ?" in su:
+        if "FROM ALQUILERES WHERE ESTUDIO_SLOT_ID = " in su:
             return _Cur(self.existing)
         if "NEXTVAL" in su:
             self._num += 1
@@ -928,7 +940,7 @@ class _SlotRegenConn(_ConnCM):
         if su.startswith("INSERT INTO ALQUILER_ITEMS"):
             self.item_inserts += 1
             return _Cur([])
-        if su.startswith("DELETE FROM ALQUILERES WHERE ID = ?"):
+        if su.startswith("DELETE FROM ALQUILERES WHERE ID = "):
             self.deleted.append(params[0])
             return _Cur([])
         return _Cur([])

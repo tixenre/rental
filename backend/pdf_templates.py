@@ -27,7 +27,7 @@ Qué cambia respecto del template anterior
 
 Fuentes
 -------
-TT Commons y Champ Black están vendoreadas en el repo (src/assets/fonts/).
+TT Commons y Champ Black están vendoreadas en el repo (frontend/src/assets/fonts/).
 Playwright renderiza con base `about:blank`, así que las embebemos en base64
 vía `_fonts_css()`. Ajustá `FONTS_DIR` si tu layout difiere. JetBrains Mono
 se trae de Google Fonts (igual que el catálogo).
@@ -63,12 +63,12 @@ OWNER_CUIL      = os.getenv("OWNER_CUIL",      "23-37389102-9")
 OWNER_DIRECCION = os.getenv("OWNER_DIRECCION", "Falucho 4625, Mar del Plata")
 OWNER_TELEFONO  = os.getenv("OWNER_TELEFONO",  "223 590-9080")
 OWNER_EMAIL     = os.getenv("OWNER_EMAIL",     "ramblarental@gmail.com")
-OWNER_WEB       = os.getenv("OWNER_WEB",       "ramblarental.com.ar")
+OWNER_WEB       = os.getenv("OWNER_WEB",       "rambla.house")
 
 # Directorio de fuentes vendoreadas (ajustar al layout real del repo)
 FONTS_DIR = os.getenv(
     "PDF_FONTS_DIR",
-    os.path.join(os.path.dirname(__file__), "..", "src", "assets", "fonts"),
+    os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "assets", "fonts"),
 )
 
 # Archivo : (family, weight)  — TT Commons familia + Champ Black display
@@ -131,7 +131,7 @@ def _active_wordmark() -> str:
         conn = get_db()
         try:
             row = conn.execute(
-                "SELECT value FROM app_settings WHERE key = ?", ("wordmark_svg",)
+                "SELECT value FROM app_settings WHERE key = %s", ("wordmark_svg",)
             ).fetchone()
         finally:
             conn.close()
@@ -429,11 +429,16 @@ def _nombre_con_incluye(item, formal=False, mark=False):
 
 def _thumb(item, sm=False):
     cls = "eq-thumb sm" if sm else "eq-thumb"
-    # Resolvé foto_url con el helper canónico de pdf.py (absolutiza paths
-    # relativos para Playwright, que renderiza con base about:blank). Import
+    # Usa la variante más liviana disponible (thumb > sm > original) para
+    # evitar cargar imágenes full-size en thumbnails de 36-46px. Import
     # perezoso: rompe el ciclo (pdf.py importa este módulo).
     from pdf import _abs_image_url
-    url = _abs_image_url((item.get("foto_url") or "").strip())
+    raw = (
+        (item.get("foto_url_thumb") or "").strip()
+        or (item.get("foto_url_sm") or "").strip()
+        or (item.get("foto_url") or "").strip()
+    )
+    url = _abs_image_url(raw)
     if url:
         return f'<img class="{cls}" src="{html.escape(url)}" alt="">'
     cam = ('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" '

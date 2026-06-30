@@ -70,7 +70,9 @@ def sitemap():
     # Páginas estáticas con priority/changefreq.
     urls: list[dict] = [
         {"loc": f"{SITE_URL}/", "lastmod": today, "changefreq": "daily", "priority": "1.0"},
+        {"loc": f"{SITE_URL}/rental", "lastmod": today, "changefreq": "daily", "priority": "0.9"},
         {"loc": f"{SITE_URL}/estudio", "lastmod": today, "changefreq": "monthly", "priority": "0.8"},
+        {"loc": f"{SITE_URL}/workshops", "lastmod": today, "changefreq": "weekly", "priority": "0.8"},
         {"loc": f"{SITE_URL}/preguntas-frecuentes", "lastmod": today, "changefreq": "monthly", "priority": "0.6"},
     ]
 
@@ -99,6 +101,10 @@ def sitemap():
                   )
                 ORDER BY c.nombre
             """).fetchall()
+            # Workshops individuales — indexables por Google y agentes LLM.
+            talleres = conn.execute(
+                "SELECT slug FROM talleres WHERE activo = TRUE ORDER BY slug"
+            ).fetchall()
 
         for r in equipos:
             lastmod_raw = r["lastmod"]
@@ -127,6 +133,16 @@ def sitemap():
                 "changefreq": "weekly",
                 "priority": "0.8",
             })
+
+        for r in talleres:
+            taller_slug = (r["slug"] or "").strip()
+            if taller_slug:
+                urls.append({
+                    "loc": f"{SITE_URL}/workshops/{taller_slug}",
+                    "lastmod": today,
+                    "changefreq": "monthly",
+                    "priority": "0.7",
+                })
     except Exception:
         logger.error("sitemap: error al generar URLs de equipos y categorías desde BD", exc_info=True)
 
@@ -147,3 +163,4 @@ def sitemap():
         media_type="application/xml",
         headers={"Cache-Control": "public, max-age=3600"},  # 1h cache
     )
+

@@ -58,11 +58,11 @@ def setup():
     conn = get_db()
     try:
         _limpiar(conn)
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (HOJA, "Hoja 808", 1))
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (KIT, "Kit 808", 9999))
-        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (?,?,?)", (MULTI, "Multi 808", 2))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (HOJA, "Hoja 808", 1))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (KIT, "Kit 808", 9999))
+        conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s,%s,%s)", (MULTI, "Multi 808", 2))
         conn.execute(
-            "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (?,?,?)",
+            "INSERT INTO kit_componentes (equipo_id, componente_id, cantidad) VALUES (%s,%s,%s)",
             (KIT, HOJA, 1),
         )
         conn.commit()
@@ -79,11 +79,11 @@ def setup():
 
 def _reservar(conn, equipo_id, cant):
     conn.execute(
-        "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (?,?,?,?,?)",
+        "INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta) VALUES (%s,%s,%s,%s,%s)",
         (PK, "Cliente 808", "confirmado", FD, FH),
     )
     conn.execute(
-        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (?,?,?)",
+        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad) VALUES (%s,%s,%s)",
         (PK, equipo_id, cant),
     )
 

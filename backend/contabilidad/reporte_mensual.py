@@ -5,8 +5,11 @@ Cada capa sale de UNA sola fuente del paquete:
 - **Devengado** (lo que se ganó): la liquidación del mes (`reportes/`).
 - **Percibido** (lo que entró): los cobros del mes por cobrador (`alquiler_pagos`).
 - **Gastos del mes**: movimientos `tipo='gasto'`, por categoría.
-- **Ganancia neta**: devengado − gastos. NO incluye los cargos a socios (son
-  préstamos al socio, no gastos del negocio → no tocan la ganancia).
+- **Comisiones a dueños**: lo facturado que NO es de Rambla (la parte de Pablo/
+  Tincho/terceros del reparto). Es un COSTO de Rambla, no ganancia.
+- **Ganancia neta**: parte de Rambla − gastos (= facturado − comisiones − gastos).
+  NO incluye los cargos a socios (son préstamos al socio, no gastos del negocio →
+  no tocan la ganancia).
 - **Cargos / pagos de socios del mes**: transferencias entre una caja y la cuenta
   corriente del socio (caja→socio = le cargué/sube deuda; socio→caja = me pagó/baja).
 - **Cuenta corriente (al día)**: deudor/acreedor de cada socio.
@@ -25,7 +28,7 @@ PARTES = ("Pablo", "Tincho", "Rambla")
 def _movimientos_socios_mes(conn, desde: str, hasta: str) -> dict:
     """Por socio humano: lo que Rambla le CARGÓ (caja→socio, sube deuda) y lo que el
     socio PAGÓ/rindió (socio→caja, baja deuda) este mes. Transferencias no anuladas."""
-    ph = ", ".join("?" for _ in SOCIOS_HUMANOS)
+    ph = ", ".join("%s" for _ in SOCIOS_HUMANOS)
     rows = conn.execute(
         f"""
         SELECT cd.socio AS cargo_socio, co.socio AS pago_socio, m.monto
@@ -33,7 +36,7 @@ def _movimientos_socios_mes(conn, desde: str, hasta: str) -> dict:
         LEFT JOIN cuentas co ON co.id = m.cuenta_origen_id
         LEFT JOIN cuentas cd ON cd.id = m.cuenta_destino_id
         WHERE m.tipo = 'transferencia' AND NOT m.anulado
-          AND m.fecha BETWEEN ?::date AND ?::date
+          AND m.fecha BETWEEN %s::date AND %s::date
           AND (cd.socio IN ({ph}) OR co.socio IN ({ph}))
         """,
         (desde, hasta, *SOCIOS_HUMANOS, *SOCIOS_HUMANOS),
@@ -84,7 +87,8 @@ def reporte_mensual(conn, mes: str) -> dict:
     cob = ingresos_derivados(conn, desde, hasta)
     cobrado = {p: int(cob.get(p, 0)) for p in PARTES}
 
-    # Gastos + ganancia (devengado − gastos). La ganancia NO incluye cargos a socios.
+    # Gastos + ganancia. La ganancia es la PARTE DE RAMBLA − gastos: la comisión
+    # de los dueños es un costo, no ganancia. No incluye cargos a socios.
     gan = ganancia_neta(conn, mes)
 
     return {
@@ -95,6 +99,7 @@ def reporte_mensual(conn, mes: str) -> dict:
         "devengado": devengado,
         "cobrado": {"por_socio": cobrado, "total": sum(cobrado.values())},
         "gastos": {"total": int(gan["gastos"]), "por_categoria": gan["gastos_por_categoria"]},
+        "comisiones_duenos": int(gan["comisiones_duenos"]),
         "ganancia_neta": int(gan["ganancia_neta"]),
         "socios_mes": _movimientos_socios_mes(conn, desde, hasta),
         "cuenta_corriente": saldos(conn)["socios"],

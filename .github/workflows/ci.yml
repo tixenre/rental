@@ -21,15 +21,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typecheck:
-    name: TypeScript typecheck
+  no-content-images:
+    name: Guardrail — cero fotos de contenido en el repo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      # Bloquea imágenes de contenido (equipos/marcas/etc.) fuera del allowlist.
+      # Fotos de contenido van a R2, no al repo. Allowlist en el propio script.
+      - run: node scripts/check-no-content-images.mjs
+
+  typecheck:
+    name: TypeScript typecheck
+    runs-on: ubuntu-latest
+    # El frontend vive en frontend/ (simétrico a backend/) → los npm corren ahí.
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
           cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
       # Guardrail de ruteo: una ruta "parent" (con sub-rutas) DEBE proveer <Outlet/>,
@@ -39,18 +56,22 @@ jobs:
   lint:
     name: Lint + formato (eslint/prettier)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       # eslint corre prettier embebido (formato = error, reglas de React = aviso)
       - run: npm run lint
 
   python-syntax:
-    name: Python syntax check
+    name: Python lint + syntax
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +80,21 @@ jobs:
           python-version: "3.11"
       - name: Compile all Python files
         run: python -m compileall -q backend/
+      - name: Ruff (lint — caza nombres indefinidos / imports al mover código)
+        run: |
+          # El gate que compileall no da: F821 (nombre indefinido) / F401 al
+          # refactorizar. Config conservadora en backend/ruff.toml. Versión
+          # pineada (= requirements-dev.txt) para que el gate sea reproducible.
+          pip install ruff==0.15.18
+          cd backend && ruff check .
+      - name: pip-audit (CVEs en dependencias de producción — informativo)
+        # NO bloquea el merge a propósito: un CVE nuevo en una dep transitiva sin
+        # fix disponible no debe frenar todos los PRs. Surfacea el hallazgo en el
+        # log; el equipo decide cuándo actuar (bump / ignore puntual).
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          cd backend && pip-audit -r requirements.txt
 
   python-tests:
     name: Python tests (pytest)
@@ -128,6 +164,29 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export ALEMBIC_DB_TEST=1
           python -m pytest tests/test_alembic_upgrade_db.py -v --tb=short -m integration
+      - name: Identidades de login + magic-link contra Postgres real (Fase 1 identidad)
+        run: |
+          cd backend
+          # login_identities (lookup por sub, link/unlink scopeado, backfill de Google
+          # por mail) + el backfill de la migración. Postgres real: el SQL toca UNIQUE
+          # y FKs que el FakeConn no captura.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_login_identities_db.py -v --tb=short -m integration
+      - name: Alta passwordless → cuenta liviana contra Postgres real (Fase 4 identidad)
+        run: |
+          cd backend
+          # Alta con passkey sin cuenta previa: NOT NULL relajados de clientes,
+          # UNIQUE(email) que tolera múltiples NULL, owner_email='' en la passkey, y
+          # la cuenta inerte (cliente_verificado=False) hasta Didit. El FakeConn no
+          # captura los constraints reales del esquema.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_clientes_livianas_db.py -v --tb=short -m integration
       - name: Tests de liquidación contra Postgres real (#88)
         run: |
           cd backend
@@ -148,15 +207,90 @@ jobs:
           export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
           export RESERVAS_DB_TEST=1
           python -m pytest tests/test_agrupar_categoria_db.py -v --tb=short -m integration
+      - name: Concurrencia del gate de reservas contra Postgres real (núcleo sagrado)
+        run: |
+          cd backend
+          # Núcleo SAGRADO: prueba la serialización REAL del FOR UPDATE + el conteo
+          # batcheado (#626) contra Postgres — race por la última unidad y
+          # overbooking en combos anidados (forward/backward/profundo). Los unit con
+          # FakeConn no capturan la semántica real del lock; esto la fija en CI.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_reservas_concurrency_db.py tests/test_reservas_nested_db.py -v --tb=short -m integration
+      - name: Puerta única de contenido contra Postgres real (services/contenido)
+        run: |
+          cd backend
+          # Clava que la puerta de display (contenido_de) deriva de la MISMA tabla
+          # kit_componentes que el gate (== componentes_de, restringido a equipos no
+          # eliminados) y que el display es 1 nivel (no la expansión recursiva del
+          # stock). Garantía estructural: lo mostrado no se desincroniza de lo reservado.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_contenido_puerta_db.py -v --tb=short -m integration
+      - name: Calendario recursivo vía compuestos contra Postgres real (#934)
+        run: |
+          cd backend
+          # Verifica que reservar un combo cuenta como consumo en todas las hojas
+          # anidadas (combo → kit → hoja). Sin Postgres, el FOR UPDATE de psycopg2
+          # y la semántica de reservado_total() no se puede ejercer.
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_equipo_calendario_db.py -v --tb=short -m integration
+      - name: dataio read-only + round-trip contra Postgres real (#922/#862)
+        run: |
+          cd backend
+          # #922: export no muta slugs (read-only). #862 round-trip: export→import→export
+          # es byte-idéntico (export/import son inversos; el slug sobrevive el viaje).
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_dataio_export_readonly_db.py tests/test_dataio_roundtrip_db.py -v --tb=short -m integration
+      - name: ranking_service + guard admin contra Postgres real (#862)
+        run: |
+          cd backend
+          # ranking_service: recalcular_ranking_todos asigna score 100 al equipo con
+          # pedidos, 0 al equipo sin pedidos; dry_run no muta.
+          # guard anti-#55: los 53 endpoints admin de _ADMIN_EXIST devuelven 4xx
+          # (auth/validación) para un no-admin — nunca 2xx (guard ausente) ni 5xx
+          # (DB antes del guard, indistinguible de 403 sin Postgres).
+          export SECRET_KEY=ci-test-secret-not-for-production
+          export ADMIN_EMAILS=admin@test.com
+          export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rambla_rental_test
+          export RESERVAS_DB_TEST=1
+          python -m pytest tests/test_ranking_service_db.py tests/test_routes_admin_guard_db.py -v --tb=short -m integration
 
   build:
     name: Build frontend
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      # Gate de lockfile bun: Railway buildea con `bun install --frozen-lockfile`
+      # (bun.lock), mientras el resto del CI usa npm (package-lock.json). Sin este
+      # check, un dep agregado a package.json sin regenerar bun.lock pasa el CI pero
+      # ROMPE el deploy de staging (cazado: #1095 sumó @simplewebauthn sin tocar
+      # bun.lock → "lockfile had changes, but lockfile is frozen"). Corre el MISMO
+      # check que Railway, en seco (sin instalar), antes del build.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.13"
+      - run: bun install --frozen-lockfile --dry-run
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+      # Budget de performance: falla si el bundle supera los umbrales de .size-limit.json
+      # (entry/vendors/CSS, brotli). Frena el "engorde silencioso" del peso de la web.
+      - run: npm run size

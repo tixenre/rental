@@ -40,11 +40,11 @@ GET /api/equipos/{id}/disponibilidad-calendario?desde=YYYY-MM-DD&hasta=YYYY-MM-D
 
 ## Reuse-first (recordatorio — la librería vive en el repo, no en el bundle)
 
-- **Ya existe un calendario:** `src/components/ui/calendar.tsx` (wrapper de `react-day-picker`, soporta
+- **Ya existe un calendario:** `src/design-system/ui/calendar.tsx` (wrapper de `react-day-picker`, soporta
   `modifiers` + classNames). Lo usa el date-picker del carrito (`DateRangePickerModal`). **Reusalo** —
   no diseñes un calendario desde cero; pensá los 3 estados como `modifiers` sobre ese componente.
 - **Solo tokens del DS** (nada de hex; el guardrail de ESLint rompe el CI). Los 3 estados van a
-  **colores semánticos** del sistema (mirá `src/styles/tokens/*` y `docs/DESIGN_SYSTEM.md`).
+  **colores semánticos** del sistema (mirá `src/design-system/styles/tokens/*` y `docs/DESIGN_SYSTEM.md`).
 - Voz **"vos"**; fechas tipo `lun 2 jun.`; targets táctiles ≥ 44px; `font-mono` para números/fechas.
 
 ## Dónde va

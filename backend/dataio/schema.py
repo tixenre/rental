@@ -194,7 +194,6 @@ class EquipoFicha(_Base):
     notas: str | None = None
     keywords_json: str | None = None
     nombre_publico_template: str | None = None
-    incluye_json: str | None = None
     conectividad_json: str | None = None
     compatible_con_json: str | None = None
     video_url: str | None = None
