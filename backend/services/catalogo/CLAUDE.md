@@ -25,12 +25,12 @@ existen.
 - **No accede directo a `kit_componentes`** (va vía `services.contenido`).
   El candado `test_contenido_sql_safety.py` falla si se bypasea.
 
-## Candado C1 (PR-B): `main.py` no hace FROM equipos
+## Candado C1: `main.py` no hace FROM equipos
 
-Cuando `proyectar_seed` esté adoptado en `main.py`, el test
-`test_catalogo_motor_shape.py::TestSeedShape::test_main_no_query_equipos`
-verificará que `main._get_initial_catalog` delega en `proyectar_seed` (y
-no arma su propio SQL contra `equipos`). Hasta entonces, ambos coexisten.
+El test `test_catalogo_candados.py::TestSeedShape::test_main_no_query_equipos`
+(inspección de fuente, corre sin BD) verifica que `main._get_initial_catalog`
+delega en `proyectar_seed` (y no arma su propio SQL contra `equipos`).
+Adoptado en PR-A (Fase 1).
 
 ## Nota de performance: GLOBAL FIXED COST
 

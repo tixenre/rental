@@ -65,7 +65,7 @@ def _stock_sin_reservas(conn) -> dict:
     raw = {
         r["id"]: r["cantidad"]
         for r in conn.execute(
-            "SELECT id, cantidad FROM equipos WHERE eliminado_at IS NULL"
+            "SELECT e.id, e.cantidad FROM equipos e WHERE e.eliminado_at IS NULL"
         ).fetchall()
     }
     return _derivar_compuestos(raw, componentes_de(conn))

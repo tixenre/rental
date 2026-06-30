@@ -152,10 +152,15 @@ class TestListaShape:
             "Actualizá _KIT_KEYS_LISTA si fue intencional."
         )
 
-    def test_lista_admin_incluye_campos_internos(self, client):
-        """La lista admin devuelve los mismos items (solo cambia Cache-Control)."""
+    def test_lista_con_cookie_invalida_devuelve_catalogo_publico(self, client):
+        """Una cookie firmada con jti inexistente en auth_sessions → get_session
+        retorna None → is_admin=False → se sirve el catálogo público (200 con items).
+
+        NOTA: este test NO verifica el path admin (que requiere un jti vivo en la
+        tabla). El path admin se cubre en tests de integración con staging-login.
+        """
         from auth.session import signer
-        cookie = signer.dumps({"email": "admin@test.com", "role": "admin", "jti": "shape-admin"})
+        cookie = signer.dumps({"email": "admin@test.com", "role": "admin", "jti": "jti-inexistente"})
         r = client.get("/api/equipos", cookies={"session": cookie})
         assert r.status_code == 200
         assert "items" in r.json()
