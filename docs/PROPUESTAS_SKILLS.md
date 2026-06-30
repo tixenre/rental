@@ -65,3 +65,16 @@ jornadas→precios) — evitó mover lógica de dominio por "parece fecha". Repe
 Por qué: en #1136 un 3er call-site de `CartDrawerView` (`catalogo-organismos.tsx`) llegó de `dev` después del merge
 → `tsc` local pasó (cache) pero el CI del PR falló; costó 2 vueltas de CI. Pasó **dos veces** en la misma sesión
 (dev se movió 3×). Sumar a la disciplina de "verificar antes de cantar verde".
+
+2026-06-30 · design-system · Caso testigo (autoría de specimens de la vitrina): un componente de
+producción afinado para su contenedor real —`content-visibility` + `aspect-ratio` + intrinsic-size
+(ej. `EquipmentCard`: `aspect-square` + `content-visibility:auto` con `contain-intrinsic-size 280px`,
+pensado para la grilla **angosta** del catálogo)— se **rompe visualmente** en el lienzo genérico
+(ancho) de la vitrina: la foto cuadrada se dispara (~600px) y las cards se solapan. Regla a sumar al
+método: al embeber un componente real en la vitrina, **espejar las restricciones de su contenedor de
+producción** (ancho de grilla / columnas), no un grid genérico ancho. · Por qué: el specimen de
+`EquipmentCard` se shippeó a staging con las cards pisándose (`grid-cols-1→sm:2→xl:3`, demasiado
+ancho); lo cazó el **dueño visualmente**, no los checks estáticos (tsc/eslint/prettier no ven layout,
+y la ruta `/admin/diseño` es admin-gated → no se renderiza local). Fix `f465a18d`: espejar
+`categoria.$slug.tsx` (`grid-cols-2→md:4` + cap de ancho). Repetible para cualquier futuro specimen de
+un componente container-coupled.
