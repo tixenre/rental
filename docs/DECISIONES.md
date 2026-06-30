@@ -1763,3 +1763,38 @@ cancel-in-progress` ya cancela corridas viejas.
 - **Decisión.** Módulo validador puro `backend/services/checkout/` que corre todos los checks **fail-not-fast** y devuelve `{listo, faltan}`. Wired a `POST /api/checkout/validar` (body: `session_id` UUID v4 + `session_confirmed` bool; el route computa `firma_ok = has_recent_stepup OR session_confirmed`). T&C separado en `POST /api/checkout/aceptar-tyc` (idempotente; tabla `aceptaciones_tyc` `UNIQUE(cliente_id, version)`). Los 2 checks cableado-apagado retornan siempre OK hasta que el issue los active.
 - **Why.** Separa concerns: validar ANTES, crear después — el `FOR UPDATE` + advisory lock de `create_pedido_retry` sigue intacto. El fail-not-fast es el corazón: la UI necesita la lista completa de problemas para que el cliente los resuelva de una. La firma con passkey es más fuerte pero no bloquea a clientes sin passkey: el `session_confirmed` es un fallback consciente y documentado (weaker, no una laguna — el cliente declaró intención en la misma sesión). El stock-preflight no tiene lock (solo lectura): puede dar verde y que el gate falle después, documentado como "preflight" para no confundir. El contacto viene de `*_renaper` (no del usuario): si Didit no terminó, el check falla — correcto y explícito.
 - **Consecuencias.** `aceptaciones_tyc` en `init_db()` + migración Alembic `b1a2c3d4e5f6` (convención _2026-06-03_); clasificada en `identity/merge.py::TABLAS_REASIGNADAS` con dedup-on-reassign por el `UNIQUE`. 31 tests unitarios sin DB real (fake conn configurable). El check `logueado` lo hace el route vía `require_cliente` — el servicio recibe `cliente_id` y asume cliente válido. El supervisor marca validación de checkout ad-hoc fuera de la puerta, un fail-fast en el medio de `validar_checkout`, o `session_confirmed` aceptado sin documentar como fallback de firma. PR #1128 (servicio) + #1129 (routes).
+
+### 2026-06-30 — Firma con passkey: presencia de un toque (on-the-fly) + gate del checkout reusa el portero; presencia ≠ firma legal
+
+- **Contexto.** El dueño pidió poder **firmar/confirmar el pedido con passkey** sin fricción — "como cuando desbloqueás
+  el celular, que cree la passkey de un saque, simple". La base ya existía (step-up _2026-06-29_: cookie `stepup` +
+  `require_recent_auth`), pero (a) el cliente **sin** passkey caía a un fallback débil, y (b) la firma vivía solo en el
+  pre-flight advisory `/checkout/validar`, **no** en el gate real de creación (`POST /api/cliente/pedidos`, que solo
+  exigía identidad). Aparte, el dueño aclaró que la firma **legal** (no-repudio del contrato) la construye en **otra
+  sesión** — esto es "más un acepto los términos y condiciones".
+- **Decisión.** Tres piezas. **(1) On-the-fly de un toque:** registrar una passkey de cliente **deja la marca `stepup`**
+  (`_register_complete`→`mark_stepup` cuando `owner_type=="cliente"`) — registrar exige el mismo gesto biométrico que
+  una assertion, así que **vale como presencia fresca**; es un **modo más de auth** (junto a login/step-up) y **crear
+  la llave ya firma**. Helper **único** `firmarConPasskey(tienePasskey)` en `lib/passkey.ts` (step-up si tiene llave,
+  register on-the-fly si no — un toque en ambos); se borró el island `lib/firma.ts`. **(2) Gate en la creación
+  reusando el portero:** `faltan_firma_tyc(conn, cliente_id, firma_ok)` corre los **mismos** `_check_tyc`+`_check_firma`
+  del portero (no re-implementa); el route computa `firma_ok = has_recent_stepup OR session_confirmed`. **No** usa el
+  portero completo (lee `carritos_activos`, no siempre sincronizado → 422-earía pedidos válidos); el stock/precio los
+  enforza `create_pedido_retry` (motor sagrado intacto). **Cableado-apagado** (`FIRMA_CHECKOUT_OBLIGATORIA=False`) hasta
+  que la UI del checkout mande la señal. **(3) Presencia ≠ firma legal:** frontera explícita.
+- **Why.** "Reusar no recrear": el gate reusa los checks del portero, el helper se pliega al cliente de auth, y
+  registrar-como-firma evita un segundo prompt → un toque siempre. El cableado-apagado (patrón #1125/#1126 + _⏰ LEGACY
+  2026-06-25_) deja la firma lista sin romper el flujo vivo (que aún no manda la señal). La distinción **presencia ≠
+  firma legal** es la que más valió: la marca `stepup` prueba "hay un humano con el dispositivo ahora" (alcanza para el
+  checkout = acepto T&C + confirmo, liviano); la **firma legal del contrato** (no-repudio **atada al hash**, Ley
+  25.506) se logra **extendiendo la misma ceremonia** de `auth/passkey/` para firmar el `doc_hash` — **no un sistema
+  paralelo**. Se difirió a contratos/ARCA (su lugar natural: ahí existe el documento que se hashea) y la construye otra
+  sesión que **reusa** estos primitivos (nota de handoff en #1098 + `SISTEMA_AUTH.md` §3).
+- **Consecuencias.** La firma del checkout queda en `services/checkout` (gate liviano), separada de la firma legal. El
+  supervisor marca: una firma de presencia recreada fuera de `auth/stepup`+`firmarConPasskey`; el gate del checkout
+  re-implementando los checks en vez de reusar el portero; o una firma de contrato con ceremonia paralela en vez de
+  firmar el `doc_hash` sobre la ceremonia existente. **Pendiente:** prender `FIRMA_CHECKOUT_OBLIGATORIA` con la UI del
+  checkout (otra sesión); la firma legal atada al hash (contratos/ARCA). Candados: `test_passkey` (registrar cliente
+  deja `stepup`, admin no) + `test_checkout_portero::faltan_firma_tyc`. En el retro salió como caso testigo un flake de
+  timezone (`test_check_fechas_pasada_cliente` usaba `date.today()` UTC vs `now_ar()` del código) → buzón de
+  `calidad-tests`. Cómo → [`SISTEMA_AUTH.md`](SISTEMA_AUTH.md) §3; historia → #1131 (on-the-fly + gate), #1132 (handoff).
