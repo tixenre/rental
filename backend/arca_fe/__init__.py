@@ -1,4 +1,4 @@
-"""afip_fe — core PORTABLE de facturación electrónica AFIP/ARCA.
+"""arca_fe — core PORTABLE de facturación electrónica ARCA (ex-AFIP).
 
 Diseñado para ser una LIBRERÍA reusable: este paquete NO importa `backend.*` ni
 ningún framework (FastAPI, psycopg, etc.). Solo data plana + (en wsaa/wsfe) zeep

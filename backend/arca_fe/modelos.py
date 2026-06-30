@@ -1,4 +1,4 @@
-"""afip_fe.modelos — data plana del core (dataclasses + enums). PORTABLE.
+"""arca_fe.modelos — data plana del core (dataclasses + enums). PORTABLE.
 
 No importa nada de `backend.*` ni de frameworks. El consumidor arma estos objetos
 y se los pasa al core.
