@@ -8,7 +8,7 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, KeyRound, CheckCircle2, XCircle, Pencil, ChevronDown } from "lucide-react";
+import { Plus, KeyRound, CheckCircle2, XCircle, Pencil, ChevronDown, Upload } from "lucide-react";
 
 import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
 import { useDocumentTitle } from "@/lib/use-document-title";
@@ -360,28 +360,20 @@ function EmisorFormModal({
                 </span>
               </p>
               <div className="space-y-3">
-                <Field label={`Certificado PEM${certOk ? " ✓" : ""}`}>
-                  {/* eslint-disable-next-line no-restricted-syntax -- textarea para pegar PEM multilínea */}
-                  <textarea
-                    rows={4}
-                    value={cert}
-                    onChange={(e) => setCert(e.target.value)}
-                    placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
-                    className="w-full rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs font-mono resize-none"
-                    spellCheck={false}
-                  />
-                </Field>
-                <Field label={`Clave privada PEM${keyOk ? " ✓" : ""}`}>
-                  {/* eslint-disable-next-line no-restricted-syntax -- textarea para pegar PEM multilínea */}
-                  <textarea
-                    rows={4}
-                    value={key}
-                    onChange={(e) => setKey(e.target.value)}
-                    placeholder={"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"}
-                    className="w-full rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs font-mono resize-none"
-                    spellCheck={false}
-                  />
-                </Field>
+                <PemFileField
+                  label="Certificado PEM"
+                  value={cert}
+                  onChange={setCert}
+                  placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
+                  isValid={certOk}
+                />
+                <PemFileField
+                  label="Clave privada PEM"
+                  value={key}
+                  onChange={setKey}
+                  placeholder={"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"}
+                  isValid={keyOk}
+                />
                 {withCert && !certOk && (
                   <p className="text-xs text-destructive">
                     El certificado debe incluir los encabezados BEGIN / END CERTIFICATE.
@@ -457,28 +449,20 @@ function CertFormModal({
         nunca se expone en texto.
       </p>
       <div className="space-y-3">
-        <Field label={`Certificado${certOk ? " ✓" : ""}`}>
-          {/* eslint-disable-next-line no-restricted-syntax -- textarea para pegar PEM multilínea; DS Textarea no soporta spellCheck + font-mono */}
-          <textarea
-            rows={6}
-            value={cert}
-            onChange={(e) => setCert(e.target.value)}
-            placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
-            className="w-full rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs font-mono resize-none"
-            spellCheck={false}
-          />
-        </Field>
-        <Field label={`Clave privada${keyOk ? " ✓" : ""}`}>
-          {/* eslint-disable-next-line no-restricted-syntax -- textarea para pegar PEM multilínea */}
-          <textarea
-            rows={6}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder={"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"}
-            className="w-full rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs font-mono resize-none"
-            spellCheck={false}
-          />
-        </Field>
+        <PemFileField
+          label="Certificado"
+          value={cert}
+          onChange={setCert}
+          placeholder={"-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"}
+          isValid={certOk}
+        />
+        <PemFileField
+          label="Clave privada"
+          value={key}
+          onChange={setKey}
+          placeholder={"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"}
+          isValid={keyOk}
+        />
       </div>
       <div className="flex justify-end gap-2 mt-5">
         <button
@@ -531,5 +515,68 @@ function Field({
       {hint && <p className="text-xs text-muted-foreground/70 -mt-0.5">{hint}</p>}
       {children}
     </div>
+  );
+}
+
+function PemFileField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  isValid,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  isValid: boolean;
+}) {
+  const [fileName, setFileName] = useState<string | null>(null);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => onChange((ev.target?.result as string) ?? "");
+    reader.readAsText(file);
+    // reset so same file can be re-picked
+    e.target.value = "";
+  };
+
+  const displayLabel = isValid ? `${label} ✓` : label;
+
+  return (
+    <Field label={displayLabel}>
+      <div className="space-y-1.5">
+        {/* File picker */}
+        {/* eslint-disable-next-line no-restricted-syntax -- label wrapping file input es patrón estándar; no hay DS equivalente */}
+        <label className="flex items-center gap-2 h-9 px-3 rounded-md border hairline bg-surface-elevated text-sm cursor-pointer hover:bg-muted/20 w-full">
+          <Upload className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className={cn("truncate text-sm", fileName ? "text-ink" : "text-muted-foreground")}>
+            {fileName ?? "Elegir archivo .pem / .crt / .key"}
+          </span>
+          <input
+            type="file"
+            accept=".pem,.crt,.key,.cer"
+            onChange={handleFile}
+            className="sr-only"
+          />
+        </label>
+        {/* Paste fallback */}
+        {/* eslint-disable-next-line no-restricted-syntax -- textarea para PEM multilínea */}
+        <textarea
+          rows={3}
+          value={value}
+          onChange={(e) => {
+            setFileName(null);
+            onChange(e.target.value);
+          }}
+          placeholder={placeholder}
+          className="w-full rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs font-mono resize-none text-muted-foreground"
+          spellCheck={false}
+        />
+      </div>
+    </Field>
   );
 }
