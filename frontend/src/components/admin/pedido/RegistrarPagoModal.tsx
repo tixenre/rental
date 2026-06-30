@@ -35,11 +35,9 @@ export function RegistrarPagoModal({
   type Preset = "sena" | "saldo" | "otro";
   const sena50 = Math.round(total * 0.5);
 
-  const [preset, setPreset] = useState<Preset>(pagado === 0 ? "sena" : "saldo");
-  const [montoInput, setMontoInput] = useState<string>(
-    pagado === 0 ? String(sena50) : String(saldo),
-  );
-  const [concepto, setConcepto] = useState(pagado === 0 ? "Seña" : "Saldo final");
+  const [preset, setPreset] = useState<Preset>("saldo");
+  const [montoInput, setMontoInput] = useState<string>(String(saldo));
+  const [concepto, setConcepto] = useState("Saldo final");
   // A quién se cobró y cómo. Default del dueño: Tincho + transferencia.
   const [destinatario, setDestinatario] = useState<string>("Rambla");
   const [metodo, setMetodo] = useState<string>("transferencia");
@@ -51,18 +49,12 @@ export function RegistrarPagoModal({
   // editarse desde que se montó el modal → los presets deben reflejar lo vigente).
   useEffect(() => {
     if (!open) return;
-    setDestinatario("Tincho");
+    setDestinatario("Rambla");
     setMetodo("transferencia");
     setFecha(new Date().toISOString().slice(0, 10));
-    if (pagado === 0) {
-      setPreset("sena");
-      setMontoInput(String(Math.round(total * 0.5)));
-      setConcepto("Seña");
-    } else {
-      setPreset("saldo");
-      setMontoInput(String(Math.max(0, total - pagado)));
-      setConcepto("Saldo final");
-    }
+    setPreset("saldo");
+    setMontoInput(String(Math.max(0, total - pagado)));
+    setConcepto("Saldo final");
   }, [open, total, pagado]);
 
   const selectPreset = (p: Preset) => {
