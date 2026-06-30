@@ -16,6 +16,7 @@ import { RankingSection } from "@/components/admin/settings/RankingSection";
 import { CambioYPreciosSection } from "@/components/admin/settings/CambioYPreciosSection";
 import { PasskeysSection } from "@/components/admin/settings/PasskeysSection";
 import { SessionsSection } from "@/components/admin/settings/SessionsSection";
+import { FacturacionSection } from "@/components/admin/settings/FacturacionSection";
 
 export const Route = createLazyFileRoute("/admin/settings")({
   component: SettingsPage,
@@ -89,6 +90,14 @@ function SettingsPage() {
 
         <AdminSection title="Emails" storageKey="settings:emails" defaultOpen={false}>
           <EmailsAdmin />
+        </AdminSection>
+
+        <AdminSection
+          title="Facturación ARCA"
+          storageKey="settings:facturacion"
+          defaultOpen={false}
+        >
+          <FacturacionSection />
         </AdminSection>
       </div>
     </AdminPage>

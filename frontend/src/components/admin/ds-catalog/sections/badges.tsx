@@ -11,6 +11,7 @@ import { PagoBadge } from "@/design-system/ui/PagoBadge";
 import { ClienteAvatar } from "@/design-system/ui/ClienteAvatar";
 import { TipoMovimientoBadge } from "@/components/admin/badges";
 import { Badge } from "@/design-system/ui/badge";
+import { FacturaBadge } from "@/design-system/ui/FacturaBadge";
 import type { EstadoPedido } from "@/design-system/ui/types";
 
 const ESTADOS: EstadoPedido[] = [
@@ -123,6 +124,20 @@ export const badgesSection: CatalogSection = {
               <span className="font-mono text-2xs text-muted-foreground">{n}</span>
             </div>
           ))}
+        </Row>
+      ),
+    },
+    {
+      name: "FacturaBadge",
+      files: ["design-system/ui/FacturaBadge.tsx"],
+      blurb:
+        "Estado de factura electrónica ARCA. Los 4 estados: pendiente / emitida / error / anulada.",
+      render: () => (
+        <Row>
+          <FacturaBadge estado="pendiente" />
+          <FacturaBadge estado="emitida" />
+          <FacturaBadge estado="error" />
+          <FacturaBadge estado="anulada" />
         </Row>
       ),
     },

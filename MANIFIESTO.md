@@ -284,6 +284,7 @@ Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`
 | [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Rúbrica de auditoría + mobile gate (método de mantenimiento → skill `mantenimiento`) |
 | [`docs/DEPLOY_RAILWAY.md`](docs/DEPLOY_RAILWAY.md) | Deploy y rollback |
 | [`docs/SISTEMA_SPECS.md`](docs/SISTEMA_SPECS.md) | **Manual técnico del sistema de specs / catálogo / datasets / autocompletar / compat** |
+| [`docs/SISTEMA_FACTURACION.md`](docs/SISTEMA_FACTURACION.md) | **Manual técnico del sistema de facturación electrónica ARCA** |
 | [`docs/SISTEMA_FOTOS.md`](docs/SISTEMA_FOTOS.md) | **Manual técnico del sistema de fotos / media: motor (procesar) + componentes (mostrar)** |
 | [`docs/SISTEMA_CONTENIDO.md`](docs/SISTEMA_CONTENIDO.md) | **Manual técnico del contenido de producto: puerta única "qué incluye un kit/combo" (`services/contenido`)** |
 | [`docs/SISTEMA_CARRITO.md`](docs/SISTEMA_CARRITO.md) | **Manual técnico del carrito: módulo único de la lógica (`services/carrito`) — selección / activos / readiness; carrito = intención, gate = verdad** |

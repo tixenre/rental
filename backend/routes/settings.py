@@ -171,6 +171,9 @@ ALLOWED_SETTINGS_KEYS = {
     "business_instagram",      # Handle de IG sin @ ("ramblarental").
     # ── Analítica ────────────────────────────────────────────────────
     "ga4_measurement_id",      # Measurement ID de Google Analytics 4 ("G-XXXXXXXXXX"). Vacío = GA apagado.
+    # ── Facturación electrónica ARCA (#1139) ─────────────────────────
+    # Emisores, CUIT, PtoVta y cert+clave se gestionan en la tabla `emisores_arca`
+    # desde /admin/facturacion/emisores. No hay settings de AFIP aquí.
     # ── Reportes ─────────────────────────────────────────────────────
     "comisiones_modelo",       # Reparto de ingresos por dueño (#88). JSON {dueño: {beneficiario: %}}.
     # ── Recordatorio de retiro (Fase B mails) ────────────────────────

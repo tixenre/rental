@@ -76,6 +76,7 @@ from routes.email_templates  import router as email_templates_router
 from routes.dataio           import router as dataio_router
 from routes.estudio          import router as estudio_router
 from routes.didit            import router as didit_router
+from routes.facturacion      import router as facturacion_router
 from routes.talleres         import router as talleres_router
 from routes.carritos         import router as carritos_router
 from routes.checkout         import router as checkout_router
@@ -338,6 +339,7 @@ app.include_router(email_templates_router, prefix="/api")
 app.include_router(dataio_router,         prefix="/api")
 app.include_router(estudio_router,        prefix="/api")
 app.include_router(didit_router,          prefix="/api")
+app.include_router(facturacion_router,    prefix="/api")
 app.include_router(talleres_router,       prefix="/api")
 app.include_router(carritos_router,       prefix="/api")
 app.include_router(checkout_router,       prefix="/api")
