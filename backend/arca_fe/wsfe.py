@@ -7,6 +7,8 @@ Deps: zeep (SOAP), ya en requirements.txt.
 """
 from __future__ import annotations
 
+import ssl
+import urllib3
 from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, Any, Optional
@@ -14,8 +16,11 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from .modelos import CaeResult
 
+import requests
 import zeep
 import zeep.helpers
+import zeep.transports
+from requests.adapters import HTTPAdapter
 
 # WSDLs oficiales ARCA
 _WSDL_HOMO = "https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL"
@@ -25,12 +30,33 @@ _WSDL_PROD = "https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL"
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
 
 
+class _AfipSSLAdapter(HTTPAdapter):
+    """Los servidores de prod de AFIP usan parámetros DH cortos (DH_KEY_TOO_SMALL).
+    SECLEVEL=1 los acepta sin bajar la verificación de certificado."""
+
+    def init_poolmanager(self, num_pools, maxsize, block=False):
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
+        self.poolmanager = urllib3.PoolManager(
+            num_pools=num_pools,
+            maxsize=maxsize,
+            block=block,
+            ssl_context=ctx,
+        )
+
+
+def _afip_transport() -> zeep.transports.Transport:
+    session = requests.Session()
+    session.mount("https://", _AfipSSLAdapter())
+    return zeep.transports.Transport(session=session)
+
+
 def _get_client(endpoint: str) -> zeep.Client:
     """Devuelve el cliente zeep (cacheado en memoria por proceso)."""
     ep = endpoint.rstrip("/")
     if ep not in _CLIENT_CACHE:
         wsdl = _WSDL_HOMO if "homo" in ep or "wswhomo" in ep else _WSDL_PROD
-        _CLIENT_CACHE[ep] = zeep.Client(wsdl)
+        _CLIENT_CACHE[ep] = zeep.Client(wsdl, transport=_afip_transport())
     return _CLIENT_CACHE[ep]
 
 
