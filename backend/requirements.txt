@@ -34,5 +34,9 @@ slowapi>=0.1.9
 # Error tracking en producción. Solo activo si SENTRY_DSN está seteado.
 sentry-sdk[fastapi]>=2.0.0
 
+# Cliente SOAP para ARCA/AFIP (facturación electrónica #1139).
+# lxml es la dependencia de parseo XML de zeep (viene incluida pero la fijamos explícita).
+zeep>=4.2.1
+
 # Tests (no se instalan en prod; el CI corre `pip install -r requirements-dev.txt`).
 # Mantener acá los runtime deps; los test deps van en requirements-dev.txt.

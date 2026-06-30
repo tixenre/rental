@@ -32,6 +32,8 @@ from .modelos import (
 )
 from .comprobante import tipo_comprobante, calcular_importes, armar_fecae
 from .qr import armar_qr
+from .wsaa import construir_tra, firmar_tra, login, login_con_cert
+from .wsfe import WsfeClient
 
 __all__ = [
     "__version__",
@@ -54,4 +56,11 @@ __all__ = [
     "calcular_importes",
     "armar_fecae",
     "armar_qr",
+    # auth WSAA
+    "construir_tra",
+    "firmar_tra",
+    "login",
+    "login_con_cert",
+    # cliente WSFEv1
+    "WsfeClient",
 ]
