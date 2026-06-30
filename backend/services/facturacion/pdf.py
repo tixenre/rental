@@ -198,7 +198,6 @@ def factura_html(factura, pedido: dict) -> str:
 <div class="header-top">
   <div>
     <div style="color:#1a1a1a">{wordmark_svg}</div>
-    <div style="font-size:10px; color:#888; margin-top:4px">ALQUILER DE EQUIPOS AUDIOVISUALES</div>
     <div style="margin-top:8px">
       <div class="label">Emisor</div>
       <div class="value">{_e(emisor_nombre)}</div>

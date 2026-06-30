@@ -36,7 +36,7 @@ def _row_to_emisor(row: dict) -> EmisorArca:
         condicion_iva=row["condicion_iva"],
         cert_cargado=bool(row["cert_enc"] and row["key_enc"]),
         activo=row["activo"],
-        razon_social=row.get("razon_social"),
+        razon_social=row["razon_social"],
         notas=row["notas"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
