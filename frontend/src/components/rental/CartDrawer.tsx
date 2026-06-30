@@ -11,6 +11,9 @@ import { stepUpWithPasskey, passkeyErrorMessage } from "@/lib/passkey";
 import { aceptarTyc, validarCheckout } from "@/lib/checkout";
 import { toLocalISO } from "@/lib/rental-dates";
 import { useCotizacion } from "@/lib/cotizacion";
+import { useAntelacionMinimaHoras } from "@/hooks/useSettings";
+import { useBusinessPhone } from "@/lib/business";
+import { whatsappLink } from "@/lib/whatsapp";
 import { CartDrawerView } from "./CartDrawerView";
 
 const FOCUSABLE =
@@ -125,6 +128,22 @@ export function CartDrawer({
     totalNeto,
     conIva,
   } = totales;
+
+  // Lead-time (#1126): el backend es la fuente de verdad (lo enforza el portero +
+  // el backstop de creación). Acá solo leemos el setting para avisar ANTES de tocar
+  // el botón: si el retiro cae dentro de la ventana mínima, mostramos un disclaimer
+  // con CTA de WhatsApp y deshabilitamos "Confirmar". El umbral lo decide el back.
+  const leadTimeHoras = useAntelacionMinimaHoras();
+  const businessPhone = useBusinessPhone();
+  const dentroDeLeadTime =
+    leadTimeHoras > 0 &&
+    !!startDate &&
+    new Date(toLocalISO(startDate, startTime)).getTime() < Date.now() + leadTimeHoras * 3_600_000;
+  const urgenciaWhatsappUrl = whatsappLink({
+    phone: businessPhone,
+    message:
+      "¡Hola! Necesito un alquiler con urgencia (dentro del plazo mínimo de antelación). ¿Me pueden ayudar?",
+  });
 
   // Lock scroll del body + guardar foco al abrir, restaurar al cerrar
   useEffect(() => {
@@ -346,6 +365,9 @@ export function CartDrawer({
       onSubmit={handleSubmit}
       hayNoDisponible={hayNoDisponible}
       nombresSinDisp={nombresSinDisp}
+      dentroDeLeadTime={dentroDeLeadTime}
+      leadTimeHoras={leadTimeHoras}
+      urgenciaWhatsappUrl={urgenciaWhatsappUrl}
       needsLogin={needsLogin}
       onLogin={goToLogin}
       onRegister={goToRegister}

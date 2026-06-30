@@ -238,6 +238,9 @@ function CartDrawerDemo() {
         onSubmit={() => toast.success("Confirmar pedido (demo — en la app crea el pedido real)")}
         hayNoDisponible={false}
         nombresSinDisp={[]}
+        dentroDeLeadTime={false}
+        leadTimeHoras={0}
+        urgenciaWhatsappUrl={null}
         needsLogin={false}
         onLogin={() => {}}
         onRegister={() => {}}

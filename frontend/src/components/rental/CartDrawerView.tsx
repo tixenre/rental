@@ -6,6 +6,7 @@ import {
   ChevronDown,
   AlertCircle,
   Trash2,
+  MessageCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -82,6 +83,9 @@ export function CartDrawerView({
   onSubmit,
   hayNoDisponible,
   nombresSinDisp,
+  dentroDeLeadTime,
+  leadTimeHoras,
+  urgenciaWhatsappUrl,
   // auth / verificación
   needsLogin,
   onLogin,
@@ -131,6 +135,9 @@ export function CartDrawerView({
   onSubmit: () => void;
   hayNoDisponible: boolean;
   nombresSinDisp: string[];
+  dentroDeLeadTime: boolean;
+  leadTimeHoras: number;
+  urgenciaWhatsappUrl: string | null;
   needsLogin: boolean;
   onLogin: () => void;
   onRegister: () => void;
@@ -467,7 +474,7 @@ export function CartDrawerView({
                   variant="amber"
                   size="lg"
                   className="w-full uppercase tracking-widest"
-                  disabled={list.length === 0 || hayNoDisponible}
+                  disabled={list.length === 0 || hayNoDisponible || dentroDeLeadTime}
                   loading={submitting}
                   onClick={onSubmit}
                 >
@@ -486,7 +493,39 @@ export function CartDrawerView({
                   )}
                 </Button>
 
-                {list.length > 0 && !hayNoDisponible && (
+                {/* Lead-time (#1126): el retiro cae dentro de la ventana de antelación
+                    mínima → no se puede confirmar online; ofrecemos WhatsApp para
+                    coordinar la urgencia. El backend es el que enforza (portero +
+                    backstop); esto avisa antes de tocar el botón. */}
+                {dentroDeLeadTime && (
+                  <div
+                    role="alert"
+                    className="space-y-2 rounded-lg border border-amber/40 bg-amber-soft p-3 text-center"
+                  >
+                    <p className="flex items-center justify-center gap-1.5 text-xs font-semibold text-ink">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber" />
+                      Tu retiro es en menos de {leadTimeHoras} h
+                    </p>
+                    <p className="text-xs leading-snug text-muted-foreground">
+                      Por la antelación no podemos confirmar el pedido online. Si es urgente
+                      escribinos: aunque figure stock en la web no lo garantizamos — cada pedido se
+                      revisa y se acepta a mano.
+                    </p>
+                    {urgenciaWhatsappUrl && (
+                      <a
+                        href={urgenciaWhatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-ink/15 bg-background px-4 py-2 text-xs font-semibold text-ink hover:bg-surface"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        Escribinos por WhatsApp
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {list.length > 0 && !hayNoDisponible && !dentroDeLeadTime && (
                   <p className="text-center text-xs text-muted-foreground leading-tight">
                     Al confirmar con Face ID / huella aceptás nuestros{" "}
                     <a
