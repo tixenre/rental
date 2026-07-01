@@ -255,3 +255,11 @@ def marcar_anulada(factura_id: int, conn) -> None:
         "UPDATE facturas SET estado = 'anulada' WHERE id = %s",
         (factura_id,),
     )
+
+
+def revertir_anulacion(factura_id: int, conn) -> None:
+    """Vuelve la factura original a 'emitida' si la NC que la iba a anular falló ante ARCA."""
+    conn.execute(
+        "UPDATE facturas SET estado = 'emitida' WHERE id = %s",
+        (factura_id,),
+    )

@@ -44,6 +44,7 @@ from services.facturacion.repo import (
     update_error,
     update_pdf_key,
     marcar_anulada,
+    revertir_anulacion,
 )
 from arca_fe.wsfe import WsfeClient
 
@@ -395,6 +396,12 @@ def emitir_nota_credito(
         iva_int = int(round(float(importes["iva"])))
         total_int = int(round(float(importes["total"])))
 
+        # Anular la original ANTES de insertar la NC: el índice único parcial
+        # uq_factura_vigente_por_pedido permite una sola fila 'pendiente'/'emitida'
+        # por pedido — insertar la NC (pendiente) mientras la original sigue
+        # 'emitida' viola ese índice. Si ARCA rechaza la NC más abajo, se revierte.
+        marcar_anulada(factura_id, conn)
+
         nc_id = insert_factura(
             conn=conn,
             pedido_id=original.pedido_id,
@@ -454,13 +461,14 @@ def emitir_nota_credito(
                 raw_response={"resultado": "A", "cae": cae_result.cae},
                 estado="emitida",
             )
-            marcar_anulada(factura_id, conn)
         else:
             update_error(
                 nc_id, conn,
                 errores=list(cae_result.errores),
                 raw_response={"resultado": cae_result.resultado, "errores": list(cae_result.errores)},
             )
+            # ARCA rechazó la NC: la original nunca se anuló de verdad, revertir.
+            revertir_anulacion(factura_id, conn)
         conn.commit()
 
     with get_db() as conn:
