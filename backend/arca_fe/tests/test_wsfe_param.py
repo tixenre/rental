@@ -9,6 +9,8 @@ from datetime import date
 from typing import Optional
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 # ---------------------------------------------------------------------------
 # Tests de _parse_fecha
@@ -215,3 +217,52 @@ def test_consultar_no_existe_devuelve_none():
         result = client.consultar(1, 1, 9999)
 
     assert result is None
+
+
+def test_consultar_no_existe_por_error_602_combinacion_virgen():
+    """602 = "no existen datos" para (pto_vta, cbte_tipo) SIN historial (ej. la
+    primera Nota de Crédito de un punto de venta) — debe tratarse igual que
+    10016, no como error real. Bug de prod: bloqueaba con un 503 espurio."""
+    from arca_fe.wsfe import WsfeClient
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    err = MagicMock()
+    err.Code = 602
+    err.Msg = "No existen datos en nuestros registros para los parámetros ingresados."
+    err_container = MagicMock()
+    err_container.Err = [err]
+    mock_resp = MagicMock()
+    mock_resp.Errors = err_container
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.FECompConsultar.return_value = mock_resp
+        mock_client_fn.return_value.service = mock_service
+
+        result = client.consultar(2, 13, 1)
+
+    assert result is None
+
+
+def test_consultar_error_real_no_se_confunde_con_no_existe():
+    """Un error de AFIP que NO es 10016/602 tiene que seguir levantando."""
+    from arca_fe.wsfe import WsfeClient
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    err = MagicMock()
+    err.Code = 500
+    err.Msg = "Error interno de AFIP"
+    err_container = MagicMock()
+    err_container.Err = [err]
+    mock_resp = MagicMock()
+    mock_resp.Errors = err_container
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.FECompConsultar.return_value = mock_resp
+        mock_client_fn.return_value.service = mock_service
+
+        with pytest.raises(RuntimeError, match="500"):
+            client.consultar(2, 13, 1)
