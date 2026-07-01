@@ -64,12 +64,15 @@ def construir_tra(
 
 
 # ---------------------------------------------------------------------------
-# Firma CMS (PKCS#7 detached)
+# Firma CMS (PKCS#7, TRA embebido — NO detached)
 # ---------------------------------------------------------------------------
 
 
 def firmar_tra(tra: bytes, cert_pem: bytes, key_pem: bytes) -> bytes:
-    """Firma el TRA con CMS/PKCS#7 (signed-data, detached) usando el cert ARCA.
+    """Firma el TRA con CMS/PKCS#7 (signed-data, TRA embebido) usando el cert ARCA.
+
+    AFIP rechaza una firma detached (`ns1:cms.sign.invalid`) — el TRA tiene
+    que viajar embebido dentro del blob CMS.
 
     Devuelve el mensaje CMS como bytes DER, que luego va en base64 al endpoint
     WSAA `LoginCms`.
