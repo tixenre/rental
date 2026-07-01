@@ -39,6 +39,7 @@ from services.categorias import (
     sql_filtro_equipos_por_categoria,
     buscar_id_por_nombre,
 )
+from services.specs.queries.search_source import specs_search_expr
 from services.categorias.errors import CategoriaNoExiste
 # `delete_equipo` limpia el blob HTML scrapeado en R2 al borrar un equipo; los
 # endpoints de fotos viven en `routes.equipos.fotos` (importan estos mismos
@@ -50,14 +51,19 @@ router = APIRouter()
 
 
 # Campos buscables del equipo (motor único backend/busqueda). Incluye la marca
-# (subquery por brand_id) y los textos de la ficha (descripción + keywords) para
-# que la barra siga siendo un "find anything" — buscás "log3" o "iso 25600" y
-# aparece aunque la palabra viva en un spec, no en el nombre.
+# (subquery por brand_id), los textos de la ficha (descripción + keywords), y
+# las specs estructuradas (#1163 F4: value+label+aliases de cada spec, vía el
+# embudo de alias de valor) — la barra es un "find anything": buscás "log3",
+# "iso 25600" o "FF" y aparece aunque la palabra viva en un spec, no en el
+# nombre ni en la ficha.
 _FICHA_EXPR = (
     "(SELECT string_agg(coalesce(ef.descripcion, '') || ' ' || coalesce(ef.keywords_json, ''), ' ') "
     "FROM equipo_fichas ef WHERE ef.equipo_id = e.id)"
 )
-CAMPOS_EQUIPO = ["e.nombre", MARCA_NOMBRE_EXPR, "e.modelo", "e.serie", _FICHA_EXPR]
+CAMPOS_EQUIPO = [
+    "e.nombre", MARCA_NOMBRE_EXPR, "e.modelo", "e.serie", _FICHA_EXPR,
+    specs_search_expr(),
+]
 
 
 # ── Modelos ──────────────────────────────────────────────────────────────────

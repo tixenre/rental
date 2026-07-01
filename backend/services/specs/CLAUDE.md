@@ -1,24 +1,29 @@
-# `services/specs/` — motor de specs (en construcción, Fase 3 hecha — parcial)
+# `services/specs/` — motor de specs (en construcción, Fase 4 hecha)
 
-> **Estado: el embudo está ENCENDIDO en la boca de persistir (la que importa en vivo).**
-> `registry/`, `queries/validation.py` y `commands/{coerce,persist,seed}.py` son código
-> real, movido verbatim desde los paths viejos (shims ⏰ LEGACY hasta la **Fase 6**).
-> `commands/persist.py::persistir_specs` — el choke-point real, el mismo que llama
-> `PUT /admin/equipos/{id}/specs` — ahora prueba `mapear_valor` para `tipo="enum"` ANTES
-> de la coerción vieja (fail-open: si no matchea, cae al comportamiento de siempre). Dos
-> specs de compat "jerarquía" (`formato` en Cámaras y en Lentes) ya tienen `value_aliases`
-> reales sembrados (`FF`→Full-frame, `S35`→Super 35) — el resto del catálogo sigue sin
-> curar (tarea aparte, de criterio del dueño).
+> **Estado de las 4 bocas del embudo: 3 activas, 1 diferida a propósito.**
+> `registry/`, `queries/{validation,search_source}.py` y `commands/{coerce,persist,seed}.py`
+> son código real, movido verbatim desde los paths viejos (shims ⏰ LEGACY hasta la
+> **Fase 6**).
 >
-> **`queries/validation.py::validate_dataset` (boca "validar") quedó SIN enchufar a
-> propósito** — no tiene ningún llamador en vivo (solo un test que lintea fixtures contra
-> el registry Python, sin tocar DB nunca) y no recibe `conn`; forzarle DB-coupling para
-> una boca sin consumidor real es más cambio de diseño del que pide esta fase. Se retoma
-> si/cuando esa función tenga un caller real. Boca "buscar" (`queries/aliases.py`,
-> `search_source.py`) sigue siendo Fase 4, no existe. Boca "compat" no necesitó código —
-> vino gratis en cuanto la boca de persistir empezó a guardar valores canónicos.
-> Plan completo + fases → [`docs/PLAN_SPECS_REDISENO.md`](../../../docs/PLAN_SPECS_REDISENO.md)
-> · tracking → issue [#1163](https://github.com/tixenre/rental/issues/1163).
+> - **Persistir** ✅ — `commands/persist.py::persistir_specs` (el choke-point real, el
+>   mismo que llama `PUT /admin/equipos/{id}/specs`) prueba `mapear_valor` para
+>   `tipo="enum"` antes de la coerción vieja (fail-open).
+> - **Compat** ✅ — gratis, sin código: viene de que persistir ahora guarda canónico.
+> - **Buscar** ✅ — `queries/search_source.py::specs_search_expr()` es un campo más de
+>   `busqueda.construir` en `routes/equipos/core.py::CAMPOS_EQUIPO`. En vivo, no
+>   materializada (mismo patrón que `_FICHA_EXPR`, sin índice — medir en staging si pesa).
+> - **Validar** ❌ diferida — `queries/validation.py::validate_dataset` no tiene ningún
+>   llamador en vivo (solo un test que lintea fixtures, sin `conn`); forzarle DB-coupling
+>   para cero consumidores reales es más cambio de diseño del que pide esta iniciativa.
+>   Se retoma si/cuando tenga un caller real.
+>
+> `formato` (Cámaras y Lentes) tiene `value_aliases` reales sembrados
+> (`FF`→Full-frame, `S35`→Super 35) — el resto del catálogo sigue sin curar (tarea
+> aparte, de criterio del dueño). `queries/aliases.py` (expansión de término, un
+> refinamiento sobre lo que `search_source.py` ya cubre) sigue sin existir — no bloqueaba
+> tener algo real para probar. Plan completo + fases →
+> [`docs/PLAN_SPECS_REDISENO.md`](../../../docs/PLAN_SPECS_REDISENO.md) · tracking →
+> issue [#1163](https://github.com/tixenre/rental/issues/1163).
 
 ## Por qué existe (antes de tener código)
 
@@ -44,11 +49,11 @@ services/specs/
     seed.py        #   seed_all_categorias + _sync_value_aliases           ✓ Fase 1+2
     value_aliases.py  # CRUD ad-hoc de spec_value_aliases (admin/cola IA) ✗ no existe, sin fase asignada
   queries/         # lectura — nunca mutan
-    validation.py  #   validate_dataset — SIN enchufar (sin conn, sin caller vivo)  ✓ Fase 1
+    validation.py     # validate_dataset — SIN enchufar (sin conn, sin caller vivo)  ✓ Fase 1
+    search_source.py  # specs_search_expr() — campo más de CAMPOS_EQUIPO           ✓ Fase 4
     definitions.py     # ✗ no existe — mapear_valor hace su propia lectura de spec_definitions
     equipo_specs.py    # ✗ Fase futura, no existe
-    search_source.py   # proyección specs→texto buscable                ✗ Fase 4, no existe
-    aliases.py          # expansión de término para búsqueda            ✗ Fase 4, no existe
+    aliases.py          # expansión de término (refinamiento; search_source.py ya cubre lo básico) ✗ no existe, sin fase asignada
   normalize/
     value_funnel.py    # mapear_valor(conn, spec_def_id, raw) — EXISTE, llamado desde persist.py  ✓ Fase 2+3
 ```
@@ -110,6 +115,19 @@ services/specs/
   archivo se arma a mano (no corre `init_db()`), así que toda tabla nueva que un choke-point
   empiece a consultar hay que agregarla ahí también. Buscar `CREATE TABLE spec_definitions`
   en `tests/*.py` antes de tocar un choke-point, para encontrar estos fakes.
+
+## Gotchas de la Fase 4
+
+- **`seed_categoria_from_registry(conn, nombre, ...)` necesita que `nombre` matchee EXACTO
+  una categoría que ya existe en la DB** — el seeder solo resuelve, nunca crea (ver
+  `_ensure_categoria_raiz`). Un test que ancla sus datos con un nombre sintético
+  (`"ZZ-Algo-test"`, para no chocar con datos reales — convención de los `*_db.py`) y
+  después llama al seeder pidiendo `"Cámaras"` falla en silencio: `raiz_id=None`, no
+  crea ningún spec, y el fetch de `spec_def_id` de ese test explota con
+  `NoneType is not subscriptable`. Para tests de specs que no necesitan el catálogo REAL
+  (solo necesitan *algún* spec enum con aliases), construir uno sintético directo con
+  `_upsert_spec_definition` + `_sync_value_aliases` bajo la categoría-ancla — no depender
+  del seeder + nombre real (`test_specs_search_source_db.py`, `test_specs_value_aliases_db.py`).
 
 ## Qué NO hacer
 
