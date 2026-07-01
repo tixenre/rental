@@ -125,6 +125,12 @@ def iniciar_verificacion(cliente_id: int, request: Request):
             "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
             (sesion.session_id, now_ar(), cliente_id),
         )
+        # Registramos la creación YA — no esperamos al webhook (puede no llegar
+        # nunca, es la falla de origen que motiva el recheck). Sin esto, una
+        # sesión sin ningún webhook procesado queda invisible para
+        # `_sesiones_conocidas` aunque el cliente la haya usado y Didit la
+        # haya decidido.
+        kyc.registrar_evento(conn, cliente_id, "iniciado", session_id=sesion.session_id)
         conn.commit()
 
     logger.info("didit: sesión creada session_id=%s cliente_id=%s", sesion.session_id, cliente_id)
@@ -163,8 +169,16 @@ def _sesiones_conocidas(conn, cliente_id: int) -> list:
     return [row_to_dict(r)["session_id"] for r in rows]
 
 
+class RecheckVerificacionIn(BaseModel):
+    """`session_id` opcional: override manual para saltar la búsqueda por
+    historial y re-chequear una sesión puntual (p. ej. una copiada del
+    dashboard de Didit que no dejó ningún rastro en `kyc_events` — sesiones
+    creadas antes del fix que empezó a registrar cada `iniciado`)."""
+    session_id: Optional[str] = None
+
+
 @router.post("/admin/verificacion/recheck/{cliente_id}")
-def recheck_verificacion(cliente_id: int, request: Request):
+def recheck_verificacion(cliente_id: int, request: Request, body: Optional[RecheckVerificacionIn] = None):
     """Re-consulta a Didit el estado ACTUAL de la sesión del cliente y aplica el
     resultado (aprobar / rechazar / en revisión) por la pluma única `identity.kyc`
     — sin que el admin tenga que validar la identidad a mano.
@@ -183,10 +197,17 @@ def recheck_verificacion(cliente_id: int, request: Request):
     antes de aplicarla (así `identity.kyc.aprobar` sigue validando `_session_coincide`
     contra el mismo campo, sin relajar esa defensa).
 
+    Si el body trae `session_id`, se salta la búsqueda y re-chequea ESA sesión
+    puntual directamente — para el caso límite de una sesión que ni siquiera
+    dejó un evento "iniciado" (creada antes de ese fix, o creada fuera de
+    nuestro flujo) y por eso el historial no la puede encontrar sola.
+
     404 si el cliente no existe. 409 si nunca inició una verificación (sin
-    ninguna sesión conocida). 503 si Didit no está configurado o no responde.
+    ninguna sesión conocida y sin override). 503 si Didit no está configurado
+    o no responde.
     """
     require_admin(request)
+    override = (body.session_id or "").strip() if body and body.session_id else None
 
     with get_db() as conn:
         row = conn.execute(
@@ -195,10 +216,13 @@ def recheck_verificacion(cliente_id: int, request: Request):
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
         actual = row_to_dict(row).get("didit_session_id")
-        historial = _sesiones_conocidas(conn, cliente_id)
+        historial = [] if override else _sesiones_conocidas(conn, cliente_id)
 
-    # La sesión actual primero (la más probable) + el resto del historial sin duplicar.
-    candidatos = ([actual] if actual else []) + [s for s in historial if s != actual]
+    if override:
+        candidatos = [override]
+    else:
+        # La sesión actual primero (la más probable) + el resto del historial sin duplicar.
+        candidatos = ([actual] if actual else []) + [s for s in historial if s != actual]
     if not candidatos:
         raise HTTPException(409, "El cliente todavía no inició una verificación con Didit")
 
@@ -310,6 +334,8 @@ def cliente_iniciar_verificacion(request: Request, body: Optional[SesionVerifica
             "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
             (sesion.session_id, now_ar(), cliente_id),
         )
+        # Ídem admin: registrar la creación ya, sin depender de que el webhook llegue.
+        kyc.registrar_evento(conn, cliente_id, "iniciado", session_id=sesion.session_id)
         conn.commit()
 
     # El cliente inició su propia verificación → consentimiento explícito del KYC (Ley 25.326).
