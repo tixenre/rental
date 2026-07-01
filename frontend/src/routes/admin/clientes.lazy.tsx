@@ -278,6 +278,7 @@ function ClientesPage() {
             setViewing(null);
             setEditing(c);
           }}
+          onUpdated={(c) => setViewing(c)}
         />
 
         <AlertDialog
@@ -315,20 +316,46 @@ function ClienteHistorialSheet({
   cliente,
   onOpenChange,
   onEdit,
+  onUpdated,
 }: {
   cliente: Cliente | null;
   onOpenChange: (v: boolean) => void;
   onEdit: (c: Cliente) => void;
+  onUpdated: (c: Cliente) => void;
 }) {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [linkVerif, setLinkVerif] = useState<string | null>(null);
   const [generando, setGenerando] = useState(false);
   const [copiado, setCopiado] = useState(false);
+  const [rechequeando, setRechequeando] = useState(false);
 
   useEffect(() => {
     setLinkVerif(null);
     setCopiado(false);
   }, [cliente?.id]);
+
+  async function rechequearVerificacion() {
+    if (!cliente) return;
+    setRechequeando(true);
+    try {
+      const r = await adminApi.rechequearVerificacion(cliente.id);
+      const actualizado = await adminApi.getCliente(cliente.id);
+      onUpdated(actualizado);
+      qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
+      if (actualizado.dni_validado_at) {
+        toast.success("Didit ya lo tiene aprobado — identidad verificada.");
+      } else if (r.status === "Declined") {
+        toast.error("Didit lo sigue mostrando rechazado.");
+      } else {
+        toast.message(`Didit responde: ${r.status || "sin novedades"}.`);
+      }
+    } catch {
+      toast.error("No se pudo re-chequear con Didit");
+    } finally {
+      setRechequeando(false);
+    }
+  }
 
   const pedidosQ = useQuery({
     queryKey: ["admin", "cliente-pedidos", cliente?.id],
@@ -455,7 +482,31 @@ function ClienteHistorialSheet({
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <ShieldAlert className="h-4 w-4 shrink-0" />
                   Identidad sin verificar
+                  {cliente.dni_verificacion_estado === "rechazado" && " — rechazada por Didit"}
+                  {cliente.dni_verificacion_estado === "en_revision" && " — en revisión en Didit"}
                 </div>
+                {cliente.dni_verificacion_motivo && (
+                  <p className="text-xs text-muted-foreground">{cliente.dni_verificacion_motivo}</p>
+                )}
+                {(cliente.dni_verificacion_estado === "rechazado" ||
+                  cliente.dni_verificacion_estado === "en_revision") && (
+                  <div className="space-y-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={rechequeando}
+                      onClick={rechequearVerificacion}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
+                    </Button>
+                    <p className="text-2xs text-muted-foreground">
+                      Le vuelve a preguntar a Didit el estado actual — útil si ya lo aprobaste a
+                      mano en su dashboard.
+                    </p>
+                  </div>
+                )}
                 {linkVerif ? (
                   <div className="space-y-1.5">
                     <p className="text-xs text-muted-foreground">

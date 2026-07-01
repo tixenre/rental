@@ -36,7 +36,7 @@ from pydantic import BaseModel
 
 from auth.guards import require_admin
 from config import settings
-from database import get_db, now_ar
+from database import get_db, now_ar, row_to_dict
 from routes.cliente_portal import require_cliente
 from services.didit import (
     DiditNotConfiguredError,
@@ -129,6 +129,84 @@ def iniciar_verificacion(cliente_id: int, request: Request):
 
     logger.info("didit: sesión creada session_id=%s cliente_id=%s", sesion.session_id, cliente_id)
     return {"session_id": sesion.session_id, "url": sesion.url}
+
+
+# ── Admin: re-chequear el estado actual en Didit ─────────────────────────────
+
+# Estados de sesión que Didit puede devolver (GET .../decision/, campo top-level
+# `status`, distinto del `id_verifications[].status` por-feature). Normalizamos
+# a minúsculas + espacio→guion-bajo antes de comparar (los valores del webhook
+# vienen "In_review"/"Under_review"; la API directa documenta "In Review").
+_ESTADOS_EN_REVISION = {"in_review", "under_review", "processing", "in_progress"}
+
+
+@router.post("/admin/verificacion/recheck/{cliente_id}")
+def recheck_verificacion(cliente_id: int, request: Request):
+    """Re-consulta a Didit el estado ACTUAL de la sesión del cliente y aplica el
+    resultado (aprobar / rechazar / en revisión) por la pluma única `identity.kyc`
+    — sin que el admin tenga que validar la identidad a mano.
+
+    Caso de uso: Didit rechazó automáticamente por una razón menor (ej. foto
+    oscura), el admin revisó el caso a mano *en el dashboard de Didit* y lo
+    aprobó ahí — pero el webhook de esa revisión manual no siempre llega (o ya
+    llegó y se perdió). Este endpoint refleja en Rambla lo que Didit devuelve
+    HOY, en vez de que el admin tenga que marcarlo aprobado él mismo.
+
+    404 si el cliente no existe. 409 si nunca inició una verificación (sin
+    `didit_session_id`). 503 si Didit no está configurado o no responde.
+    """
+    require_admin(request)
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT didit_session_id FROM clientes WHERE id=%s", (cliente_id,)
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "Cliente no encontrado")
+    session_id = row_to_dict(row).get("didit_session_id")
+    if not session_id:
+        raise HTTPException(409, "El cliente todavía no inició una verificación con Didit")
+
+    try:
+        decision = retrieve_decision(session_id)
+    except DiditNotConfiguredError:
+        raise HTTPException(503, "Verificación de identidad no habilitada (DIDIT_API_KEY)")
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "didit: %s al re-chequear session_id=%s cliente_id=%s",
+            exc.response.status_code, session_id, cliente_id,
+        )
+        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
+    except Exception as exc:
+        logger.error(
+            "didit: error al re-chequear session_id=%s cliente_id=%s — %s",
+            session_id, cliente_id, exc,
+        )
+        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
+
+    status = (decision.get("status") or "").strip()
+    status_key = status.lower().replace(" ", "_")
+    logger.info("didit recheck: cliente_id=%s session_id=%s status=%s", cliente_id, session_id, status)
+
+    aplicado: Optional[bool]
+    if status_key == "approved":
+        datos = extraer_datos_renaper(decision)
+        contactos = extraer_contactos(decision)
+        aplicado = kyc.aprobar(cliente_id=cliente_id, session_id=session_id, datos=datos, contactos=contactos)
+    elif status_key == "declined":
+        motivo = decision.get("decline_reason") or decision.get("comment") or None
+        if motivo:
+            motivo = str(motivo)[:500]
+        aplicado = kyc.actualizar_estado(
+            cliente_id=cliente_id, session_id=session_id, estado="rechazado", motivo=motivo
+        )
+    elif status_key in _ESTADOS_EN_REVISION:
+        aplicado = kyc.actualizar_estado(cliente_id=cliente_id, session_id=session_id, estado="en_revision")
+    else:
+        # Expired / Abandoned / Not_Started / Kyc_Expired u otro estado no accionable.
+        aplicado = None
+
+    return {"status": status, "aplicado": aplicado}
 
 
 # ── Cliente: crear sesión propia ─────────────────────────────────────────────

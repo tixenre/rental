@@ -173,8 +173,15 @@ El boundary del KYC. El payload crudo **muere acá**; `identity/` recibe datos n
 |---|---|
 | `decision.py` | Parser **puro**: `extraer_datos_renaper(decision)` → `DatosRenaper` (DNI/CUIL/nombre legal/dirección/…); `extraer_contactos(decision)` → `ContactosVerificados` (mail de `email_verifications[]`, teléfono E.164 de `phone_verifications[]`, con `is_disposable`/`is_virtual`/`is_breached`). |
 | `webhook.py` | Verifica la firma **HMAC-SHA256** (`X-Signature` sobre el body crudo + freshness por `X-Timestamp`). |
-| `client.py` | `retrieve_decision(session_id)` — GET por API (respaldo si el webhook llega 'liviano'). |
+| `client.py` | `retrieve_decision(session_id)` — GET por API (respaldo si el webhook llega 'liviano'; también fuente del re-chequeo admin). |
 | `routes/didit.py` | Transporte fino: crea sesión (admin/cliente, guarda `didit_session_id`), recibe el webhook y **delega** en `identity/kyc`. |
+
+**Re-chequeo admin (`POST /api/admin/verificacion/recheck/{cliente_id}`):** para el caso "Didit rechazó
+por algo menor (foto oscura) y el admin lo revisó/aprobó a mano *en el dashboard de Didit*, pero ese
+cambio no llegó a Rambla" — re-consulta `retrieve_decision(session_id)` (el mismo GET, fuente canónica; el
+objeto trae un **`status` top-level** — Approved/Declined/In Review/… — distinto del `id_verifications[].status`
+por-feature) y aplica el resultado por la pluma única `identity.kyc.aprobar`/`actualizar_estado`. **Nunca
+aprueba a mano**: solo refleja lo que Didit devuelve ahora. 409 si el cliente no tiene `didit_session_id`.
 
 **`vendor_data`** (lo que el route pasa a Didit al crear la sesión) = hoy `str(cliente_id)`, protegido por el
 **HMAC del webhook + el binding de `session_id`**. El **token opaco server-side** (no el `cliente_id` crudo) es
