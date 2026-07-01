@@ -3,8 +3,13 @@
 Implementa la secuencia robusta de `emitir_factura` y `emitir_nota_credito`:
 - Advisory lock por (pto_vta, cbte_tipo) durante TODA la llamada SOAP
 - Idempotencia via UNIQUE parcial + FECompConsultar ante timeout
-- TX atómica para persistir CAE; PDF en best-effort fuera de la TX
+- TX atómica para persistir CAE
 - Nunca 500: error ARCA → estado='error', reintentable
+
+El PDF NO se genera ni se guarda acá: se renderiza al vuelo cuando hace
+falta verlo/descargarlo/mandarlo por mail (`routes/facturacion.py`), a
+partir de los datos ya persistidos — la factura no cambia una vez emitida,
+así que regenerar el PDF siempre da el mismo resultado.
 
 Reglas invariantes (no violar):
 - Nunca DELETE de una factura emitida
@@ -13,9 +18,7 @@ Reglas invariantes (no violar):
 """
 from __future__ import annotations
 
-import asyncio
 import hashlib
-import logging
 from typing import Optional
 
 from database import get_db, now_ar
@@ -45,13 +48,10 @@ from services.facturacion.repo import (
     insert_factura,
     update_cae,
     update_error,
-    update_pdf_key,
     marcar_anulada,
     revertir_anulacion,
 )
 from arca_fe.wsfe import WsfeClient
-
-logger = logging.getLogger(__name__)
 
 # Namespace de advisory lock para facturas (≠ pedidos, que usan el suyo)
 _LOCK_NS = 0xFA0C0000
@@ -281,53 +281,7 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
     if factura is None:
         raise RuntimeError(f"factura_id={factura_id} desapareció tras commit")
 
-    # 10. Best-effort: PDF → R2
-    if factura.estado == "emitida":
-        _generar_pdf_background(factura, pedido)
-
     return factura
-
-
-def _generar_pdf_background(factura: Factura, pedido: dict) -> None:
-    """Genera el PDF y lo sube a R2 (best-effort, no lanza si falla).
-
-    Crea su propio browser Playwright via asyncio.run() para no conflictuar
-    con el _browser_lock del loop de uvicorn (este código corre en un thread sync).
-    """
-    try:
-        from services.facturacion.pdf import factura_html
-        html_str = factura_html(factura, pedido)
-
-        async def _render() -> bytes:
-            from playwright.async_api import async_playwright
-            async with async_playwright() as pw:
-                browser = await pw.chromium.launch(headless=True, args=["--no-sandbox"])
-                try:
-                    page = await browser.new_page()
-                    try:
-                        await page.set_content(html_str, wait_until="networkidle")
-                        return await page.pdf(
-                            format="A4",
-                            margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
-                            print_background=True,
-                        )
-                    finally:
-                        await page.close()
-                finally:
-                    await browser.close()
-
-        pdf_bytes = asyncio.run(_render())
-
-        from services.media.storage import put
-        key = f"facturas/{factura.pedido_id}/{factura.cbte_nro or factura.id}.pdf"
-        put(key, pdf_bytes, "application/pdf")
-
-        with get_db() as conn:
-            update_pdf_key(factura.id, conn, pdf_key=key)
-            conn.commit()
-        factura.pdf_key = key
-    except Exception:
-        logger.exception("PDF de factura %d falló (best-effort, no crítico)", factura.id)
 
 
 # ---------------------------------------------------------------------------

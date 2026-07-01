@@ -242,13 +242,6 @@ def update_error(
     )
 
 
-def update_pdf_key(factura_id: int, conn, *, pdf_key: str) -> None:
-    conn.execute(
-        "UPDATE facturas SET pdf_key = %s WHERE id = %s",
-        (pdf_key, factura_id),
-    )
-
-
 def marcar_anulada(factura_id: int, conn) -> None:
     """Marca la factura original como 'anulada' (su CAE sigue válido; la NC es la anulación)."""
     conn.execute(

@@ -119,7 +119,6 @@ def _patch_common(monkeypatch, wsfe_instance):
     monkeypatch.setattr(engine, "WsfeClient", lambda **kw: wsfe_instance)
     monkeypatch.setattr(engine, "get_factura_vigente", lambda pedido_id, conn: None)
     monkeypatch.setattr(engine, "insert_factura", lambda **kw: 99)
-    monkeypatch.setattr(engine, "_generar_pdf_background", lambda factura, pedido: None)
 
     calls = {}
 
