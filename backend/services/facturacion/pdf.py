@@ -464,10 +464,10 @@ def _factura_clasica_html(f: dict) -> str:
 def _factura_mobile_html(f: dict) -> str:
     tipo_banner = "Nota de crédito electrónica · Original" if f["es_nc"] else "Factura electrónica · Original"
 
-    qr_block = _qr_img(f["qr"]["url"], 120)
+    qr_block = _qr_img(f["qr"]["url"], 92)
 
     conceptos_html = "".join(f"""
-        <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid #f2f5f7;">
+        <div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-top:1px solid #f2f5f7;">
           <div style="min-width:0;">
             <div style="font-size:14px;font-weight:600;">{_e(c['desc'])}</div>
             <div style="font-size:12px;color:#8a97a3;margin-top:1px;">{_e(c['detalle'])}</div>
@@ -477,76 +477,76 @@ def _factura_mobile_html(f: dict) -> str:
 
     if f["tot"]["discrimina"]:
         totales_iva = f"""
-        <div style="display:flex;justify-content:space-between;font-size:14px;color:#5b6875;padding:2.5px 0;"><span>Neto gravado</span><span style="font-variant-numeric:tabular-nums;letter-spacing:0.04em;">{_e(f['tot']['netoStr'])}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:14px;color:#5b6875;padding:2.5px 0;"><span>IVA {_e(f['tot']['ivaPct'])}</span><span style="font-variant-numeric:tabular-nums;letter-spacing:0.04em;">{_e(f['tot']['ivaStr'])}</span></div>
-        <div style="height:1px;background:#eef1f4;margin:10px 0;"></div>"""
+        <div style="display:flex;justify-content:space-between;font-size:14px;color:#5b6875;padding:2px 0;"><span>Neto gravado</span><span style="font-variant-numeric:tabular-nums;letter-spacing:0.04em;">{_e(f['tot']['netoStr'])}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;color:#5b6875;padding:2px 0;"><span>IVA {_e(f['tot']['ivaPct'])}</span><span style="font-variant-numeric:tabular-nums;letter-spacing:0.04em;">{_e(f['tot']['ivaStr'])}</span></div>
+        <div style="height:1px;background:#eef1f4;margin:6px 0;"></div>"""
     else:
         totales_iva = ""
 
     body = f"""
-    <div style="padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div style="padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div style="min-width:0;display:flex;align-items:center;">
-        <div style="width:132px;color:#16202b;">{_arca_logo(132)}</div>
+        <div style="width:120px;color:#16202b;">{_arca_logo(120)}</div>
       </div>
-      <div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;height:60px;border:1.5px solid #16202b;border-radius:10px;">
-        <span style="font-size:31px;font-weight:800;line-height:1;">{_e(f['letra'])}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.08em;margin-top:2px;">COD {_e(f['cod'])}</span>
+      <div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:48px;height:54px;border:1.5px solid #16202b;border-radius:9px;">
+        <span style="font-size:28px;font-weight:800;line-height:1;">{_e(f['letra'])}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:7.5px;letter-spacing:0.08em;margin-top:2px;">COD {_e(f['cod'])}</span>
       </div>
     </div>
 
-    <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:8px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">{_e(tipo_banner)}</div>
+    <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:6px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">{_e(tipo_banner)}</div>
 
-    <div style="padding:11px 20px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px 14px;">
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Punto de venta</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['emisor']['ptoVta'])}</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Comp. Nro</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['comp']['nro'])}</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Fecha de emisión</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['comp']['fecha'])}</div></div>
-      <div style="grid-column:span 2;"><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Período facturado</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['periodo']['desde'])} → {_e(f['periodo']['hasta'])}</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Vto. de pago</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['periodo']['vto'])}</div></div>
+    <div style="padding:8px 20px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 14px;">
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Punto de venta</div><div style="font-size:13px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['emisor']['ptoVta'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Comp. Nro</div><div style="font-size:13px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['comp']['nro'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Fecha de emisión</div><div style="font-size:13px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['comp']['fecha'])}</div></div>
+      <div style="grid-column:span 2;"><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Período facturado</div><div style="font-size:13px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['periodo']['desde'])} → {_e(f['periodo']['hasta'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Vto. de pago</div><div style="font-size:13px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['periodo']['vto'])}</div></div>
     </div>
 
-    <div style="padding:14px 20px;border-bottom:1px solid #eef1f4;display:flex;flex-direction:column;gap:12px;">
+    <div style="padding:10px 20px;border-bottom:1px solid #eef1f4;display:flex;flex-direction:column;gap:8px;">
       <div style="display:flex;gap:8px;">
-        <div style="flex:none;width:42px;height:19px;display:flex;align-items:center;gap:5px;">
+        <div style="flex:none;width:42px;height:16px;display:flex;align-items:center;gap:5px;">
           <span style="width:6px;height:6px;border-radius:999px;background:#1c5fb8;flex:none;"></span>
           <span style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#98a3ae;">De</span>
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:16px;font-weight:700;line-height:1.19;">{_e(f['emisor']['razonSocial'])}</div>
-          <div style="font-size:12.5px;color:#5b6875;margin-top:3px;font-variant-numeric:tabular-nums;">CUIT <span style="font-weight:600;color:#16202b;">{_e(f['emisor']['cuit'])}</span> · {_e(f['emisor']['cond'])}</div>
-          <div style="font-size:12.5px;color:#5b6875;">{_e(f['emisor']['dom'])}</div>
+          <div style="font-size:15px;font-weight:700;line-height:1.15;">{_e(f['emisor']['razonSocial'])}</div>
+          <div style="font-size:12px;color:#5b6875;margin-top:2px;font-variant-numeric:tabular-nums;">CUIT <span style="font-weight:600;color:#16202b;">{_e(f['emisor']['cuit'])}</span> · {_e(f['emisor']['cond'])}</div>
+          <div style="font-size:12px;color:#5b6875;">{_e(f['emisor']['dom'])}</div>
         </div>
       </div>
       <div style="display:flex;gap:8px;">
-        <div style="flex:none;width:42px;height:19px;display:flex;align-items:center;gap:5px;">
+        <div style="flex:none;width:42px;height:16px;display:flex;align-items:center;gap:5px;">
           <span style="width:6px;height:6px;border-radius:999px;background:#16202b;flex:none;"></span>
           <span style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#98a3ae;">Para</span>
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:16px;font-weight:700;line-height:1.19;">{_e(f['receptor']['nombre'])}</div>
-          <div style="font-size:12.5px;color:#5b6875;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['receptor']['docLabel'])} <span style="font-weight:600;color:#16202b;">{_e(f['receptor']['docNro'])}</span> · {_e(f['receptor']['cond'])}</div>
-          <div style="font-size:12.5px;color:#5b6875;">{_e(f['receptor']['dom'])}</div>
+          <div style="font-size:15px;font-weight:700;line-height:1.15;">{_e(f['receptor']['nombre'])}</div>
+          <div style="font-size:12px;color:#5b6875;margin-top:2px;font-variant-numeric:tabular-nums;">{_e(f['receptor']['docLabel'])} <span style="font-weight:600;color:#16202b;">{_e(f['receptor']['docNro'])}</span> · {_e(f['receptor']['cond'])}</div>
+          <div style="font-size:12px;color:#5b6875;">{_e(f['receptor']['dom'])}</div>
         </div>
       </div>
     </div>
 
-    <div style="padding:14px 20px;border-bottom:1px solid #eef1f4;">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:#8a97a3;margin-bottom:6px;">Conceptos</div>{conceptos_html}
+    <div style="padding:10px 20px;border-bottom:1px solid #eef1f4;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:#8a97a3;margin-bottom:4px;">Conceptos</div>{conceptos_html}
     </div>
 
-    <div style="padding:14px 20px 16px;border-bottom:1px solid #eef1f4;">{totales_iva}
+    <div style="padding:10px 20px 12px;border-bottom:1px solid #eef1f4;">{totales_iva}
       <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <span style="font-size:15px;font-weight:700;">Total</span>
-        <span style="font-size:26px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
+        <span style="font-size:14px;font-weight:700;">Total</span>
+        <span style="font-size:23px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
       </div>
     </div>
 
-    <div style="padding:14px 20px 18px;background:#f5f7f9;display:flex;gap:14px;align-items:center;">
-      <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:10px;padding:7px;">{qr_block}</div>
-      <div style="flex:1;min-width:0;font-size:12.5px;color:#5b6875;line-height:1.4;">
-        <div style="font-weight:600;color:#16202b;margin-bottom:3px;">Comprobante autorizado</div>
+    <div style="padding:10px 16px 12px;background:#f5f7f9;display:flex;gap:12px;align-items:center;">
+      <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:9px;padding:6px;">{qr_block}</div>
+      <div style="flex:1;min-width:0;font-size:11.5px;color:#5b6875;line-height:1.3;">
+        <div style="font-weight:600;color:#16202b;margin-bottom:2px;">Comprobante autorizado</div>
         <div>CAE N° <span style="color:#16202b;font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
         <div>Vto. CAE <span style="color:#16202b;font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
-        <div style="margin-top:5px;">Escaneá el QR para validar en arca.gob.ar</div>
+        <div style="margin-top:4px;">Escaneá el QR para validar en arca.gob.ar</div>
       </div>
     </div>
 """
