@@ -235,7 +235,6 @@ def _build_ctx(factura, pedido: dict) -> dict:
 
     letra = _CBTE_TIPO_LABEL.get(factura.cbte_tipo, "C")
     es_nc = _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False)
-    es_prod = factura.ambiente == "produccion"
     cod = f"{factura.cbte_tipo:02d}"
 
     doc_label = _DOC_TIPO_LABEL.get(factura.doc_tipo, "Documento")
@@ -263,7 +262,6 @@ def _build_ctx(factura, pedido: dict) -> dict:
     return {
         "letra": letra, "cod": cod, "es_nc": es_nc,
         "titulo": ("NOTA DE CRÉDITO " if es_nc else "FACTURA ") + letra,
-        "homologacion": not es_prod,
         "emisor": {
             "razonSocial": em_row["razon_social"] or "—",
             "cuit": em_row["cuit"] or "—",
@@ -315,12 +313,6 @@ def _qr_img(url: str, size: int) -> str:
 
 
 def _factura_clasica_html(f: dict) -> str:
-    banner = (
-        '<div style="background:#fef3c7;border-bottom:1px solid #f59e0b;color:#b45309;'
-        'text-align:center;font-weight:700;font-size:10px;padding:5px;">'
-        '⚠ COMPROBANTE DE HOMOLOGACIÓN — NO VÁLIDO FISCALMENTE</div>'
-    ) if f["homologacion"] else ""
-
     if f["qr"]["has"]:
         qr_block = _qr_img(f["qr"]["url"], 112)
     else:
@@ -353,7 +345,6 @@ def _factura_clasica_html(f: dict) -> str:
 
     body = f"""
         <div style="position:absolute;top:10px;right:14px;font-size:9px;letter-spacing:0.05em;z-index:3;">ORIGINAL</div>
-        {banner}
         <div style="display:grid;grid-template-columns:1fr 1fr;position:relative;border-bottom:1px solid #000;">
           <div style="position:absolute;left:50%;top:0;transform:translate(-50%,-1px);width:58px;height:60px;background:#fff;border:1px solid #000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;">
             <span style="font-size:34px;font-weight:700;line-height:1;">{_e(f['letra'])}</span>
@@ -453,11 +444,6 @@ def _factura_clasica_html(f: dict) -> str:
 
 
 def _factura_mobile_html(f: dict) -> str:
-    banner = (
-        '<div style="background:#fef3c7;color:#b45309;text-align:center;font-weight:700;'
-        'font-size:10px;letter-spacing:0.04em;padding:6px;">HOMOLOGACIÓN — NO VÁLIDO FISCALMENTE</div>'
-    ) if f["homologacion"] else ""
-
     if f["qr"]["has"]:
         qr_block = _qr_img(f["qr"]["url"], 120)
     else:
@@ -484,7 +470,6 @@ def _factura_mobile_html(f: dict) -> str:
         totales_iva = ""
 
     body = f"""
-    {banner}
     <div style="padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div style="min-width:0;display:flex;align-items:center;">
         <div style="width:132px;color:#16202b;">{_arca_logo(132)}</div>
@@ -576,11 +561,6 @@ def _factura_mobile_html(f: dict) -> str:
 
 
 def _factura_formal_html(f: dict) -> str:
-    banner = (
-        '<div style="background:#fef3c7;color:#b45309;text-align:center;font-weight:700;'
-        'font-size:12px;letter-spacing:0.06em;padding:9px;">HOMOLOGACIÓN — NO VÁLIDO FISCALMENTE</div>'
-    ) if f["homologacion"] else ""
-
     if f["qr"]["has"]:
         qr_block = _qr_img(f["qr"]["url"], 150)
     else:
@@ -605,7 +585,6 @@ def _factura_formal_html(f: dict) -> str:
         totales_iva = ""
 
     body = f"""
-        {banner}
         <div style="padding:38px 44px 24px;display:flex;justify-content:space-between;align-items:center;">
           {_arca_logo(212)}
           <div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:78px;height:88px;border:2px solid #16202b;border-radius:12px;">
