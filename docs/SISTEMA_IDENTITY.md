@@ -181,7 +181,18 @@ por algo menor (foto oscura) y el admin lo revisó/aprobó a mano *en el dashboa
 cambio no llegó a Rambla" — re-consulta `retrieve_decision(session_id)` (el mismo GET, fuente canónica; el
 objeto trae un **`status` top-level** — Approved/Declined/In Review/… — distinto del `id_verifications[].status`
 por-feature) y aplica el resultado por la pluma única `identity.kyc.aprobar`/`actualizar_estado`. **Nunca
-aprueba a mano**: solo refleja lo que Didit devuelve ahora. 409 si el cliente no tiene `didit_session_id`.
+aprueba a mano**: solo refleja lo que Didit devuelve ahora. 409 si el cliente no tiene ninguna sesión conocida.
+
+**Historial, no solo la sesión actual:** un cliente puede reintentar la verificación varias veces
+*mientras* el admin revisa una sesión anterior en el dashboard de Didit — cada reintento pisa
+`clientes.didit_session_id` con la sesión nueva, así que la que terminó aprobada deja de ser la "actual".
+`_sesiones_conocidas` junta todos los `session_id` con al menos un evento propio en `kyc_events`
+(ya scopeado a `cliente_id`) y el recheck los revisa del más reciente al más viejo hasta encontrar una
+Aprobada (o se queda con la respuesta de la sesión actual, sin nada mejor que ofrecer). Si la aprobada no
+es la que se venía rastreando, el endpoint **mueve el puntero** (`UPDATE clientes SET didit_session_id=…`)
+antes de llamar a `kyc.aprobar` — así `_session_coincide` la sigue validando contra ese mismo campo, sin
+relajar esa defensa. Una sesión del historial que ya expiró/no existe en Didit (404) no aborta la
+búsqueda: se saltea y sigue con las demás.
 
 **`vendor_data`** (lo que el route pasa a Didit al crear la sesión) = hoy `str(cliente_id)`, protegido por el
 **HMAC del webhook + el binding de `session_id`**. El **token opaco server-side** (no el `cliente_id` crudo) es
