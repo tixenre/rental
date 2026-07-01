@@ -544,6 +544,7 @@ def _factura_mobile_html(f: dict) -> str:
         <div style="font-weight:600;color:#16202b;margin-bottom:1px;">Comprobante autorizado</div>
         <div>CAE N° <span style="color:#16202b;font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
         <div>Vto. CAE <span style="color:#16202b;font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
+        <div style="margin-top:2px;">Escaneá el QR para validar en arca.gob.ar</div>
               </div>
     </div>
 """
