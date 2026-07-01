@@ -1,17 +1,13 @@
-"""Una categoría = un módulo. Cada uno expone `CAT` (instancia de
-CategoriaRegistry) con sus specs y sub-cats.
+"""⏰ LEGACY — shim. Ver services/specs/registry/catalogo/ (Fase 1, #1163)."""
 
-`specs.__init__` los combina en el REGISTRY global. Agregar una cat nueva:
-crear `categorias/nueva.py` exportando `CAT`, y agregarlo al dict de
-REGISTRY en `specs/__init__.py`.
-"""
-
-from .adaptadores import CAT as ADAPTADORES
-from .camaras import CAT as CAMARAS
-from .filtros import CAT as FILTROS
-from .iluminacion import CAT as ILUMINACION
-from .lentes import CAT as LENTES
-from .modificadores import CAT as MODIFICADORES
+from services.specs.registry.catalogo import (
+    ADAPTADORES,
+    CAMARAS,
+    FILTROS,
+    ILUMINACION,
+    LENTES,
+    MODIFICADORES,
+)
 
 __all__ = [
     "CAMARAS", "LENTES", "ILUMINACION",

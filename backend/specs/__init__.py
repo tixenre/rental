@@ -1,74 +1,26 @@
-"""Single source of truth para definición de specs por categoría.
+"""⏰ LEGACY — shim. El registry real vive en `services.specs` desde la Fase 1
+del rediseño (docs/PLAN_SPECS_REDISENO.md, issue #1163). Este path se borra en
+la Fase 6; no agregar código nuevo acá, importar de `services.specs`."""
 
-Arquitectura modular (PR fase Z1):
-    backend/specs/
-    ├── models.py              SpecDef, CategoriaRegistry, Registry, ...
-    ├── validation.py          validate_dataset
-    ├── shared/                Specs/enums reusables entre cats
-    │   ├── enums.py           FORMATO_ENUM, LENS_MOUNT_ENUM, MONTURA_LUZ_ENUM
-    │   └── physical.py        factory: peso_g(), dimensions_mm(), materials()
-    └── categorias/
-        ├── camaras.py         CAT (CategoriaRegistry)
-        ├── lentes.py          CAT
-        ├── iluminacion.py     CAT
-        ├── modificadores.py   CAT
-        ├── adaptadores.py     CAT
-        └── filtros.py         CAT
-
-Uso típico:
-    from specs import REGISTRY, get_categoria, get_spec
-    cat = REGISTRY.get("Cámaras")
-    for spec in cat.specs:
-        ...
-"""
-
-from .categorias import (
-    ADAPTADORES,
-    CAMARAS,
-    FILTROS,
-    ILUMINACION,
-    LENTES,
-    MODIFICADORES,
-)
-from .models import (
+from services.specs import (
     CategoriaRegistry,
     CompatMode,
     CompatRol,
+    FORMATO_ENUM,
+    LENS_MOUNT_ENUM,
+    MONTURA_LUZ_ENUM,
+    REGISTRY,
     Registry,
     SpecDef,
     SpecTipo,
     SubCategoria,
-)
-from .shared import FORMATO_ENUM, LENS_MOUNT_ENUM, MONTURA_LUZ_ENUM
-from .validation import (
     ValidationError,
+    all_categorias,
+    get_categoria,
+    get_spec,
     validate_dataset,
     validate_or_raise,
 )
-
-
-REGISTRY: Registry = Registry(categorias={
-    "Cámaras":       CAMARAS,
-    "Lentes":        LENTES,
-    "Iluminación":   ILUMINACION,
-    "Modificadores": MODIFICADORES,
-    "Adaptadores":   ADAPTADORES,
-    "Filtros":       FILTROS,
-})
-
-
-def all_categorias() -> list[CategoriaRegistry]:
-    return list(REGISTRY.categorias.values())
-
-
-def get_categoria(nombre: str) -> CategoriaRegistry | None:
-    return REGISTRY.get(nombre)
-
-
-def get_spec(categoria_raiz: str, spec_key: str) -> SpecDef | None:
-    cat = REGISTRY.get(categoria_raiz)
-    return cat.get_spec(spec_key) if cat else None
-
 
 __all__ = [
     "CategoriaRegistry", "CompatMode", "CompatRol", "Registry",

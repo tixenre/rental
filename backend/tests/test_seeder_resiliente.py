@@ -6,6 +6,13 @@ Cubre:
 2. purge_stale_specs efectivamente elimina specs cuya key ya no está en el
    registry (complementa test_shutter_split_purge — acá enfocado en la purga
    como parte del flujo de seeding completo).
+
+Los `patch(...)` de `seed_categoria_from_registry` apuntan a
+`services.specs.commands.seed` (Fase 1 del rediseño, #1163), NO a
+`seeds.registry_seeder` (ese path ahora es un shim ⏰ LEGACY): mock.patch
+reemplaza el atributo en el módulo indicado, y `seed_all_categorias` llama a
+`seed_categoria_from_registry` como global de SU PROPIO módulo — patchear el
+shim no intercepta esa llamada interna.
 """
 
 from unittest.mock import MagicMock, patch
@@ -53,7 +60,7 @@ def test_seed_all_categorias_usa_savepoints():
     conn = _make_conn_tracking()
 
     # Parchamos seed_categoria_from_registry para que no toque la DB real.
-    with patch("seeds.registry_seeder.seed_categoria_from_registry") as mock_seed:
+    with patch("services.specs.commands.seed.seed_categoria_from_registry") as mock_seed:
         mock_seed.return_value = {
             "raiz_id": 1, "subcat_ids": {}, "spec_def_ids": {},
             "stats": {"specs_creadas": 0, "specs_purgadas": 0},
@@ -92,7 +99,7 @@ def test_seed_all_categorias_continua_si_una_falla():
         }
 
     conn = _make_conn_tracking()
-    with patch("seeds.registry_seeder.seed_categoria_from_registry", side_effect=fake_seed):
+    with patch("services.specs.commands.seed.seed_categoria_from_registry", side_effect=fake_seed):
         result = seed_all_categorias(conn, dry_run=False)
 
     # La categoría rota no aparece en el resultado pero las demás sí.
@@ -109,7 +116,7 @@ def test_seed_all_categorias_continua_si_una_falla():
 def test_seed_all_categorias_dry_run_no_savepoints():
     """En dry_run no se emiten SAVEPOINTs (no hay transacción real)."""
     conn = _make_conn_tracking()
-    with patch("seeds.registry_seeder.seed_categoria_from_registry") as mock_seed:
+    with patch("services.specs.commands.seed.seed_categoria_from_registry") as mock_seed:
         mock_seed.return_value = {
             "raiz_id": None, "subcat_ids": {}, "spec_def_ids": {},
             "stats": {"specs_creadas": 0, "specs_purgadas": 0},
