@@ -147,6 +147,29 @@ def _upsert_template(
     return cur.fetchone() is not None
 
 
+def _sync_value_aliases(conn, spec_def_id: int, spec: SpecDef, dry_run: bool = False) -> int:
+    """Vuelca spec.value_aliases a spec_value_aliases. Idempotente (upsert por
+    fila); no purga alias retirados del registry (todavía sin consumidor real
+    — Fase 2, embudo apagado; se agrega purga cuando haga falta de verdad).
+    Devuelve cuántas filas se escribieron."""
+    if dry_run or not spec.value_aliases:
+        return 0
+    n = 0
+    for canonico, alias_list in spec.value_aliases.items():
+        for alias in alias_list:
+            conn.execute(
+                """
+                INSERT INTO spec_value_aliases (spec_def_id, alias, valor_canonico)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (spec_def_id, alias) DO UPDATE SET
+                    valor_canonico = EXCLUDED.valor_canonico
+                """,
+                (spec_def_id, alias, canonico),
+            )
+            n += 1
+    return n
+
+
 def seed_categoria_from_registry(
     conn, categoria_raiz: str, dry_run: bool = False
 ) -> dict:
@@ -168,6 +191,7 @@ def seed_categoria_from_registry(
         "specs_creadas": 0,
         "subcategorias_creadas": 0,
         "asignaciones_creadas": 0,
+        "value_aliases_creados": 0,
         "dry_run": dry_run,
     }
 
@@ -205,6 +229,10 @@ def seed_categoria_from_registry(
             if sid is not None:
                 spec_def_ids[spec.key] = sid
                 stats["specs_creadas"] += 1
+                if sid > 0:
+                    stats["value_aliases_creados"] += _sync_value_aliases(
+                        conn, sid, spec, dry_run
+                    )
 
         # 4) categoria_spec_templates — asignación a la categoría raíz.
         # Las sub-cats heredan via UI (queries que walk parent → cat).

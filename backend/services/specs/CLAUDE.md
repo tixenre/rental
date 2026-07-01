@@ -1,13 +1,16 @@
-# `services/specs/` — motor de specs (en construcción, Fase 1 hecha)
+# `services/specs/` — motor de specs (en construcción, Fase 2 hecha)
 
-> **Estado: registry + persistencia movidos, embudo/búsqueda todavía no.** `registry/`,
-> `queries/validation.py` y `commands/{coerce,persist,seed}.py` son el código real, movido
-> verbatim desde `backend/specs/`, `backend/services/spec_coerce.py`,
-> `backend/services/spec_persist.py` y `backend/seeds/registry_seeder.py`. Esos paths viejos
-> quedan como shims ⏰ LEGACY (re-exportan desde acá) hasta la **Fase 6**, que los borra.
-> `commands/value_aliases.py`, `normalize/value_funnel.py` (el embudo) y
-> `queries/{search_source,aliases}.py` (búsqueda derivada) son **Fases 2-4, todavía no
-> existen**. Plan completo + fases → [`docs/PLAN_SPECS_REDISENO.md`](../../../docs/PLAN_SPECS_REDISENO.md)
+> **Estado: registry + persistencia movidos, el embudo EXISTE pero está APAGADO.**
+> `registry/`, `queries/validation.py` y `commands/{coerce,persist,seed}.py` son código
+> real, movido verbatim desde `backend/specs/`, `backend/services/spec_coerce.py`,
+> `backend/services/spec_persist.py` y `backend/seeds/registry_seeder.py` (paths viejos =
+> shims ⏰ LEGACY hasta la **Fase 6**). La tabla `spec_value_aliases` y
+> `normalize/value_funnel.py::mapear_valor` ya existen y funcionan (Fase 2) — pero
+> **nadie los llama todavía**: `commands/coerce.py` y `queries/validation.py` no invocan
+> `mapear_valor`. Eso es la **Fase 3** ("enchufar el embudo a las 4 bocas"). Hoy
+> `spec_value_aliases` nace vacía (ningún `SpecDef` del catálogo declara `value_aliases`
+> real todavía — la curación de qué alias vale la pena es trabajo aparte, no de esta
+> fase). Plan completo + fases → [`docs/PLAN_SPECS_REDISENO.md`](../../../docs/PLAN_SPECS_REDISENO.md)
 > · tracking → issue [#1163](https://github.com/tixenre/rental/issues/1163).
 
 ## Por qué existe (antes de tener código)
@@ -29,18 +32,18 @@ services/specs/
     catalogo/      #   camaras/lentes/iluminacion/modificadores/adaptadores/filtros
     shared/        #   enums/lighting/optica/physical
   commands/        # escritura — única puerta de mutación
-    persist.py     #   persistir_specs — choke-point del embudo         ✓ Fase 1 (mudado)
-    coerce.py      #   coerce_and_serialize                              ✓ Fase 1 (mudado)
-    seed.py        #   seed_all_categorias — MOVE VERBATIM del seeder    ✓ Fase 1 (mudado)
-    value_aliases.py  # CRUD de spec_value_aliases                       ✗ Fase 2/3, no existe
+    persist.py     #   persistir_specs — todavía NO llama al embudo      ✓ Fase 1 (mudado)
+    coerce.py      #   coerce_and_serialize — todavía NO llama al embudo ✓ Fase 1 (mudado)
+    seed.py        #   seed_all_categorias + _sync_value_aliases         ✓ Fase 1+2
+    value_aliases.py  # CRUD ad-hoc de spec_value_aliases (admin/cola IA) ✗ no existe, sin fase asignada
   queries/         # lectura — nunca mutan
-    validation.py  #   validate_dataset — _check_value mapeará vía el embudo en Fase 3  ✓ Fase 1 (mudado)
-    definitions.py     # ✗ Fase futura, no existe
+    validation.py  #   validate_dataset — _check_value todavía NO llama al embudo (Fase 3)  ✓ Fase 1
+    definitions.py     # ✗ no existe — mapear_valor hace su propia lectura de spec_definitions
     equipo_specs.py    # ✗ Fase futura, no existe
     search_source.py   # proyección specs→texto buscable                ✗ Fase 4, no existe
     aliases.py          # expansión de término para búsqueda            ✗ Fase 4, no existe
   normalize/
-    value_funnel.py    # mapear_valor(conn, spec_def_id, raw) — el embudo ✗ Fase 2/3, no existe
+    value_funnel.py    # mapear_valor(conn, spec_def_id, raw) — EXISTE, funciona, nadie lo llama todavía  ✓ Fase 2
 ```
 
 ## Reglas (van a regir desde que haya código; se aplican ya al diseñar cada fase)
@@ -56,6 +59,16 @@ services/specs/
   da una puerta de lectura limpia, pero la lógica de matching queda donde está.
 - `spec_value_aliases` es **tabla**, no columna JSONB en `spec_definitions` — se consulta
   en las dos direcciones (alias→canónico al persistir, canónico→[alias] al buscar).
+- **`mapear_valor` compara SIEMPRE vía `busqueda.normalizar.normalizar`, en los dos
+  lados** (el `raw` de entrada Y cada canónico/alias leído de la DB) — nunca se
+  reimplementa el "sin acentos/case-insensitive" en SQL. Es la misma fuente única que ya
+  usa el motor de búsqueda (`backend/busqueda/`, decisión 2026-06-06); un segundo
+  normalizador en paralelo es el tipo de drift que esa decisión evitó.
+- `SpecDef.value_aliases` (Python) solo declara — **el seeder es quien escribe**
+  `spec_value_aliases` (`commands/seed.py::_sync_value_aliases`, llamado desde
+  `seed_categoria_from_registry` tras `_upsert_spec_definition`). Si agregás
+  `value_aliases` a un `SpecDef` y no corre el seeder, la tabla no se entera — mismo
+  gotcha que `categorias.total` en el módulo categorias (campo declarado sin writer).
 
 ## Gotchas de la Fase 1 (para F2-F6, no repetirlos)
 
@@ -80,7 +93,10 @@ services/specs/
 - No agregar lógica nueva de specs en `routes/specs/*.py` — pasa a `commands/`/`queries/`
   a medida que cada fase las mueve.
 - No inventar un segundo mecanismo de normalización de valores en paralelo al embudo
-  (`normalize/value_funnel.py`) cuando exista.
+  (`normalize/value_funnel.py`) — ya existe, úsalo.
+- No cargar `value_aliases` "reales" en el catálogo (`registry/catalogo/*.py`) como parte
+  de trabajo de infraestructura — la curación (qué sinónimos vale la pena declarar) es
+  una tarea aparte, de criterio del dueño, no algo que se decide de paso.
 - No mover el motor de compatibilidad ni reescribir el seeder "ya que estamos" — no lo
   pide ningún objetivo de la iniciativa; es exactamente el riesgo que el plan evitó a
   propósito.

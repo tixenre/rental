@@ -48,6 +48,14 @@ class SpecDef(BaseModel):
     # Se seedean a spec_definitions.aliases (JSONB). Single source: vive acá.
     aliases: list[str] = Field(default_factory=list)
 
+    # Sinónimos de VALOR (no de concepto): {"Full-frame": ["FF", "full frame"]}.
+    # Distinto de `aliases` (arriba, matchea la COLUMNA "Weight"→peso_g); esto
+    # matchea el VALOR de una columna enum ("FF"→"Full-frame"). Se seedea a
+    # `spec_value_aliases` (tabla, no JSONB — ver services/specs/CLAUDE.md).
+    # Solo válido en tipo enum/multi_enum, y cada clave debe ser un canónico
+    # real (∈ enum_options) — se valida abajo.
+    value_aliases: dict[str, list[str]] = Field(default_factory=dict)
+
     # Compatibilidad (qué role juega esta spec en el motor de matching)
     es_compatibilidad: bool = False
     compatibilidad_modo: CompatMode | None = None
@@ -67,6 +75,18 @@ class SpecDef(BaseModel):
             raise ValueError(
                 f"spec '{self.key}' es_compatibilidad=True requiere compatibilidad_modo"
             )
+        if self.value_aliases:
+            if self.tipo not in ("enum", "multi_enum"):
+                raise ValueError(
+                    f"spec '{self.key}' tipo={self.tipo} no debe tener value_aliases "
+                    "(solo enum/multi_enum)"
+                )
+            invalidos = sorted(set(self.value_aliases) - set(self.enum_options or []))
+            if invalidos:
+                raise ValueError(
+                    f"spec '{self.key}': value_aliases tiene claves fuera de "
+                    f"enum_options: {invalidos}"
+                )
         return self
 
 

@@ -856,6 +856,30 @@ def _init_db_schema(conn):
         "ON equipo_specs(equipo_id)"
     )
 
+    # Embudo de alias de valor (rediseño de specs, #1163, Fase 2). Sinónimos
+    # que apuntan a un value canónico de un spec enum/multi_enum (ej. "FF" →
+    # "Full-frame"). Sirve cuádruple: normaliza al persistir, valida
+    # mapeando, alimenta la búsqueda, y de paso arregla la compatibilidad
+    # (el motor matchea por igualdad exacta de value — con el embudo, dos
+    # equipos que dijeron "FF" y "Full-frame" terminan guardando lo mismo).
+    # Tabla (no columna JSONB en spec_definitions): se consulta en las dos
+    # direcciones (alias→canónico al persistir, canónico→[alias] al
+    # buscar). Todavía sin consumidor (Fase 2, el embudo está apagado) —
+    # services/specs/normalize/value_funnel.py la lee, pero coerce/validation
+    # no lo llaman hasta la Fase 3. Ver docs/PLAN_SPECS_REDISENO.md.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS spec_value_aliases (
+            spec_def_id    INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE CASCADE,
+            alias          TEXT NOT NULL,
+            valor_canonico TEXT NOT NULL,
+            PRIMARY KEY (spec_def_id, alias)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_value_alias_canon "
+        "ON spec_value_aliases(spec_def_id, valor_canonico)"
+    )
+
     # ── Mantenimiento log por equipo ─────────────────────────────────────
     # Una fila por evento de mantenimiento (revisión, reparación, limpieza,
     # etc.). proxima_revision opcional para recordatorios.
