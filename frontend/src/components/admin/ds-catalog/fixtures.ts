@@ -182,9 +182,9 @@ const FECHAS_PEDIDO = {
   monto_total: 390000,
 } as const;
 
-const SIN_DOCS = { remito: false, contrato: false, albaran: false };
-const DOCS_PARCIAL = { remito: true, contrato: true, albaran: false };
-const DOCS_COMPLETOS = { remito: true, contrato: true, albaran: true };
+const SIN_DOCS = { remito: false, contrato: false, albaran: false, factura: false };
+const DOCS_PARCIAL = { remito: true, contrato: true, albaran: false, factura: false };
+const DOCS_COMPLETOS = { remito: true, contrato: true, albaran: true, factura: true };
 
 /** Pedido SIN INICIAR — recién solicitado: presupuesto, nada pagado, sin docs. */
 export const pedidoPresupuesto: Pedido = {

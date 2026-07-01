@@ -75,7 +75,12 @@ export type Pedido = {
   items: Item[];
   pagos?: Pago[];
   solicitudes?: SolicitudPortal[];
-  documentos_disponibles: { remito: boolean; contrato: boolean; albaran: boolean };
+  documentos_disponibles: {
+    remito: boolean;
+    contrato: boolean;
+    albaran: boolean;
+    factura: boolean;
+  };
   bruto?: number;
   descuento_monto?: number;
   monto_neto?: number;
@@ -87,7 +92,7 @@ export type Pedido = {
 };
 
 export type PortalTab = "pedidos" | "listas" | "notificaciones" | "perfil";
-export type DocTipo = "remito" | "contrato" | "albaran";
+export type DocTipo = "remito" | "contrato" | "albaran" | "factura";
 export type Filtro = "todos" | "activos" | "historial";
 
 // ── Constantes compartidas con el componente principal ───────────────────────
@@ -96,7 +101,7 @@ export const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "
 export const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
 export const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
 
-export const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran"];
+export const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran", "factura"];
 
 export const TAB_OPTIONS: { value: Filtro; label: string }[] = [
   { value: "todos", label: "Todos" },

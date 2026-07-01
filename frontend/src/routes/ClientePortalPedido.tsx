@@ -25,6 +25,7 @@ import {
   FileText,
   FileSignature,
   Truck,
+  Receipt,
   MessageCircle,
   Search,
   CircleCheckBig,
@@ -76,17 +77,21 @@ const DOC_LABEL: Record<DocTipo, string> = {
   remito: "Remito",
   contrato: "Contrato",
   albaran: "Albarán",
+  factura: "Factura",
 };
 const DOC_DESCRIPTION: Partial<Record<DocTipo, string>> = {
   contrato: "Es el documento de alquiler firmado entre vos y nosotros.",
   albaran: "Te sirve para tener constancia ante tu aseguradora.",
+  factura: "Tu factura electrónica, ya autorizada por ARCA.",
 };
-const DOC_ICONS: Record<"remito" | "contrato" | "albaran", string> = {
+const DOC_ICONS: Record<"remito" | "contrato" | "albaran" | "factura", string> = {
   remito:
     "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
   contrato: "M9 11l3 3 8-8 M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11",
   albaran:
     "M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z",
+  factura:
+    "M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z M8 7h8 M8 11h8 M8 15h5",
 };
 
 // ── Timeline constants (solo usadas aquí) ────────────────────────────────────
@@ -773,7 +778,7 @@ export function PedidoCard({
 
           {/* ── Side (derecha): documentos → totales → pagos → notas ── */}
           <aside className="[grid-area:side] flex flex-col gap-4 min-w-0">
-            {(docs.remito || docs.contrato || docs.albaran) && (
+            {(docs.remito || docs.contrato || docs.albaran || docs.factura) && (
               <section
                 className="rounded-md border px-3 py-3"
                 style={{
@@ -804,6 +809,15 @@ export function PedidoCard({
                       tipo="albaran"
                       label="Albarán"
                       description={DOC_DESCRIPTION.albaran}
+                    />
+                  )}
+                  {docs.factura && (
+                    <DocActions
+                      pedidoId={pedido.id}
+                      numero={numero}
+                      tipo="factura"
+                      label="Factura"
+                      description={DOC_DESCRIPTION.factura}
                     />
                   )}
                 </div>
@@ -990,7 +1004,7 @@ function DocActions({
 }: {
   pedidoId: number;
   numero: string;
-  tipo: "remito" | "contrato" | "albaran";
+  tipo: "remito" | "contrato" | "albaran" | "factura";
   label: string;
   description?: string;
 }) {
@@ -1181,7 +1195,13 @@ export function DocAvailablePopup({
         <ul className="space-y-2.5 my-2">
           {visibles.map((d) => {
             const Icon =
-              d.tipo === "contrato" ? FileSignature : d.tipo === "albaran" ? Truck : FileText;
+              d.tipo === "contrato"
+                ? FileSignature
+                : d.tipo === "albaran"
+                  ? Truck
+                  : d.tipo === "factura"
+                    ? Receipt
+                    : FileText;
             return (
               <li
                 key={`${d.pedidoId}-${d.tipo}`}

@@ -10,7 +10,12 @@ import { authedFetch, authedJson } from "@/lib/authedFetch";
 import type { Pedido } from "@/lib/admin/api";
 
 export type ClientePedidoFull = Pedido & {
-  documentos_disponibles?: { remito: boolean; contrato: boolean; albaran: boolean };
+  documentos_disponibles?: {
+    remito: boolean;
+    contrato: boolean;
+    albaran: boolean;
+    factura: boolean;
+  };
   solicitudes?: SolicitudModificacion[];
 };
 
