@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
+from services.categorias import crear_si_no_existe, asignar_padre_si_no_tiene, asignar_categorias
 from . import schema
 from .natural_keys import KeyResolver
 
@@ -90,38 +91,20 @@ def import_categorias(
     items = _validate_rows(rows, schema.Categoria, "categorias")
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
 
-    # Pase 1: insertar las categorías que FALTEN. NO se sobreescriben las
-    # existentes — el catálogo es web-managed; el arranque solo bootstrapea lo
-    # que no está. Así las ediciones (nombre/prioridad/visible/grupo/parent)
-    # hechas en la web persisten entre deploys.
     pending: list[schema.Categoria] = []
     for c in items:
-        cur = conn.execute(
-            """
-            INSERT INTO categorias (nombre, prioridad, parent_id, visible,
-                                    grupo_visual, nombre_publico_template)
-            VALUES (%s, %s, NULL, %s, %s, %s)
-            ON CONFLICT (nombre) DO NOTHING
-            RETURNING id
-            """,
-            (
-                c.nombre,
-                c.prioridad,
-                c.visible,
-                c.grupo_visual,
-                c.nombre_publico_template,
-            ),
+        _, was_inserted = crear_si_no_existe(
+            conn, c.nombre, prioridad=c.prioridad,
+            visible=c.visible, grupo_visual=c.grupo_visual,
+            nombre_publico_template=c.nombre_publico_template,
         )
-        row = cur.fetchone()
-        if row:
+        if was_inserted:
             stats["inserted"] += 1
         else:
             stats["skipped"] += 1
         if c.parent_path:
             pending.append(c)
 
-    # Pase 2: setear parent_id SOLO de las que no tienen parent (recién
-    # insertadas). No pisa el árbol que armaste en la web.
     resolver.refresh_categorias()
     for c in pending:
         parent_id = resolver.categoria_id(c.parent_path)
@@ -130,10 +113,7 @@ def import_categorias(
                 f"categorias: '{c.nombre}' referencia parent_path='{c.parent_path}' "
                 f"que no existe (debe estar en el mismo JSON)"
             )
-        conn.execute(
-            "UPDATE categorias SET parent_id = %s WHERE nombre = %s AND parent_id IS NULL",
-            (parent_id, c.nombre),
-        )
+        asignar_padre_si_no_tiene(conn, c.nombre, parent_id)
     return stats
 
 
@@ -445,25 +425,15 @@ def import_equipos(
             resolver._equipos[eq.slug] = equipo_id
 
         # ── M2M: categorias ──────────────────────────────────────────────
-        if prune_m2m:
-            conn.execute(
-                "DELETE FROM equipo_categorias WHERE equipo_id = %s", (equipo_id,)
-            )
+        cat_ids = []
         for cat_ref in eq.categorias:
             cat_id = resolver.categoria_id(cat_ref.nombre)
             if cat_id is None:
                 raise ImportError_(
                     f"equipos[{eq.slug}].categorias: '{cat_ref.nombre}' no existe"
                 )
-            conn.execute(
-                """
-                INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (equipo_id, categoria_id) DO UPDATE SET
-                    orden = EXCLUDED.orden
-                """,
-                (equipo_id, cat_id, cat_ref.orden),
-            )
+            cat_ids.append(cat_id)
+        asignar_categorias(conn, equipo_id, cat_ids)
 
         # ── M2M: etiquetas ───────────────────────────────────────────────
         if prune_m2m:

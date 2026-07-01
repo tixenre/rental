@@ -670,74 +670,7 @@ def _init_db_schema(conn):
         CREATE INDEX IF NOT EXISTS idx_eq_cat_categoria ON equipo_categorias(categoria_id)
     """)
 
-    # Seed del árbol de categorías (en la tabla `categorias`, no en etiquetas).
-    # Sólo se ejecuta cuando la tabla está vacía — un install fresco arranca
-    # con el árbol sugerido, pero una DB con categorías existentes queda
-    # intacta. Antes corría en cada startup como "idempotente con ON CONFLICT",
-    # pero pisaba parent_id y resucitaba categorías borradas por el admin.
-    existing_cat_count = 0
-    try:
-        row = conn.execute("SELECT COUNT(*) AS n FROM categorias").fetchone()
-        existing_cat_count = int(row["n"] if isinstance(row, dict) else row[0])
-    except Exception:
-        existing_cat_count = 0
-    SEED_TREE = [] if existing_cat_count > 0 else [
-        # (prioridad, nombre_padre, [hijos…])
-        (10,  "Cámaras",              ["Video", "Foto", "Acción"]),
-        (20,  "Lentes",               ["Zoom", "Fijo", "Vintage", "Especiales"]),
-        (25,  "Adaptadores",          []),  # sub-cats por montura (E/RF/EF/M42) on-the-fly
-        (27,  "Filtros",              []),  # sub-cats por diámetro (82mm/77mm) on-the-fly
-        (30,  "Iluminación",          ["LED daylight/bicolor", "LED RGB", "Tungsteno",
-                                       "Fluorescente", "On-camera / Flash", "Práctica / efecto"]),
-        (40,  "Modificadores",        ["Softbox", "Difusión / Frame", "Reflectores", "Banderas"]),
-        (50,  "Soportes",             ["Trípodes video", "Trípodes foto", "C-Stands",
-                                       "Estabilización", "Slider / Dolly / Riel", "Car Mount"]),
-        (60,  "Grip",                 ["Brazos", "Clamps", "Wall plates / pins",
-                                       "Pinzas", "Líneas de seguridad", "Sopapa", "Lastre"]),
-        (70,  "Sonido",               ["Inalámbricos / Lavalier", "Shotgun / Boom",
-                                       "On-camera (sonido)", "Estudio / Podcast", "Intercom"]),
-        (80,  "Monitores y Video",    ["Monitores", "Grabadores",
-                                       "Transmisión inalámbrica", "Follow Focus / Matebox"]),
-        (90,  "Energía",              ["V-Mount", "NP / LP-E6", "Distribución eléctrica"]),
-        (100, "Media y Datos",        ["Tarjetas SD", "Tarjetas CFexpress", "Lectores"]),
-        (110, "Estudio y Producción", ["Set / Backdrops", "Paquetes"]),
-    ]
 
-    # Set de todos los nombres del árbol — se usa abajo para migrar etiquetas
-    # legacy (las que actualmente viven en `etiquetas` como nodos del árbol)
-    # hacia `categorias`.
-    SEED_NAMES: set[str] = set()
-    for pri, parent_name, children in SEED_TREE:
-        SEED_NAMES.add(parent_name)
-        SEED_NAMES.update(children)
-
-    for pri, parent_name, children in SEED_TREE:
-        conn.execute("""
-            INSERT INTO categorias (nombre, prioridad, parent_id)
-            VALUES (%s, %s, NULL)
-            ON CONFLICT (nombre) DO UPDATE
-                SET prioridad = CASE
-                        WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad
-                        ELSE categorias.prioridad
-                    END,
-                    parent_id = NULL
-        """, (parent_name, pri))
-        prow = conn.execute(
-            "SELECT id FROM categorias WHERE nombre = %s", (parent_name,)
-        ).fetchone()
-        parent_cat_id = prow["id"]
-        for idx, child_name in enumerate(children, start=1):
-            child_pri = idx * 10
-            conn.execute("""
-                INSERT INTO categorias (nombre, prioridad, parent_id)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (nombre) DO UPDATE
-                    SET parent_id = EXCLUDED.parent_id,
-                        prioridad = CASE
-                            WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad
-                            ELSE categorias.prioridad
-                        END
-            """, (child_name, child_pri, parent_cat_id))
 
     # ── Migración: mover nodos del árbol que viven en `etiquetas` → `categorias` ──
     # Esta migración corre una sola vez por el ciclo de vida de cada nombre:
@@ -750,7 +683,8 @@ def _init_db_schema(conn):
         JOIN categorias c ON c.nombre = et.nombre
     """).fetchall()
     for r in legacy_rows:
-        # Copiar asignaciones: equipo_etiquetas → equipo_categorias.
+        # LEGACY MIGRATION — ver AUD-001: refactorizar a asignar_categorias()
+        # del módulo gobernanza_categorias, o borrar si ya no corre.
         conn.execute("""
             INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
             SELECT equipo_id, %s, orden
@@ -1452,26 +1386,29 @@ def _init_db_schema(conn):
     # que equipo_specs y categoria_spec_templates quedan intactos (FK por id, no por key).
     # Guard NOT EXISTS: evita violar UNIQUE(categoria_raiz_id, spec_key) si la canónica
     # ya existiera (un merge real se resolvería en migración, no acá).
+    from services.categorias.queries.ancestry import buscar_id_por_nombre
+    camaras_id = buscar_id_por_nombre(conn, 'Cámaras')
+    lentes_id = buscar_id_por_nombre(conn, 'Lentes')
     conn.execute("""
         UPDATE spec_definitions sd
            SET spec_key = 'consumo_w', label = 'Consumo eléctrico', updated_at = NOW()
          WHERE sd.spec_key = 'power_consumption_w'
-           AND sd.categoria_raiz_id = (SELECT id FROM categorias WHERE nombre = 'Cámaras')
+           AND sd.categoria_raiz_id = %s
            AND NOT EXISTS (
                SELECT 1 FROM spec_definitions x
                 WHERE x.categoria_raiz_id = sd.categoria_raiz_id AND x.spec_key = 'consumo_w'
            )
-    """)
+    """, (camaras_id,))
     conn.execute("""
         UPDATE spec_definitions sd
            SET spec_key = 'distancia_minima_cm', updated_at = NOW()
          WHERE sd.spec_key = 'distancia_minima_m'
-           AND sd.categoria_raiz_id = (SELECT id FROM categorias WHERE nombre = 'Lentes')
+           AND sd.categoria_raiz_id = %s
            AND NOT EXISTS (
                SELECT 1 FROM spec_definitions x
                 WHERE x.categoria_raiz_id = sd.categoria_raiz_id AND x.spec_key = 'distancia_minima_cm'
            )
-    """)
+    """, (lentes_id,))
 
     # Fechas TEXT → tipo nativo (migración e2c6f4a8b1d7). Las fechas se
     # guardaban como strings ISO; ahora son TIMESTAMP/DATE. Idempotente: solo

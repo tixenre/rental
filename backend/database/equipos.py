@@ -67,25 +67,11 @@ def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
     """Agrega `categorias` (lista de {id, nombre, parent_id}) a cada equipo."""
     if not equipos:
         return equipos
+    from services.categorias.queries.ancestry import categorias_de_equipos
     ids = [e["id"] for e in equipos]
-    placeholders = ",".join(["%s"] * len(ids))
-    cur = conn.cursor()
-    cur.execute(f"""
-        SELECT ec.equipo_id, c.id, c.nombre, c.parent_id
-        FROM equipo_categorias ec
-        JOIN categorias c ON c.id = ec.categoria_id
-        WHERE ec.equipo_id IN ({placeholders})
-        ORDER BY ec.equipo_id, ec.orden
-    """, ids)
-    rows = cur.fetchall()
-    cat_map: dict[int, list] = {e["id"]: [] for e in equipos}
-    for r in rows:
-        cat_map[r["equipo_id"]].append({
-            "id": r["id"], "nombre": r["nombre"], "parent_id": r["parent_id"],
-        })
+    cat_map = categorias_de_equipos(conn, ids)
     for e in equipos:
-        e["categorias"] = cat_map[e["id"]]
-    cur.close()
+        e["categorias"] = cat_map.get(e["id"], [])
     return equipos
 
 

@@ -62,13 +62,13 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
 
         template: list[dict] = []
         if categoria_specs:
-            cat_row = conn.execute(
-                "SELECT id FROM categorias WHERE nombre = %s AND parent_id IS NULL",
-                (categoria_specs,),
-            ).fetchone()
-            if cat_row:
-                raiz_id = row_to_dict(cat_row)["id"]
-                template_rows = conn.execute(
+            from services.categorias import buscar_id_por_nombre
+            cat_id = buscar_id_por_nombre(conn, categoria_specs)
+            if cat_id:
+                from services.categorias import root_of_categoria
+                if root_of_categoria(conn, cat_id) == cat_id:
+                    raiz_id = cat_id
+                    template_rows = conn.execute(
                     """
                     SELECT
                         sd.id AS spec_def_id,

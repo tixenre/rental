@@ -26,30 +26,18 @@ def _categorias_de(conn, equipo_id: int) -> tuple[Optional[str], Optional[str]]:
     clasificación masiva), prioriza la subcategoría como la "asignación
     real". Si solo está en la raíz, sub es None.
     """
-    # Preferir subcategoría (parent_id NOT NULL) si existe.
-    row = conn.execute(
-        """
-        WITH cat_eq AS (
-            SELECT c.id, c.nombre, c.parent_id, c.prioridad, ec.orden
-            FROM equipo_categorias ec
-            JOIN categorias c ON c.id = ec.categoria_id
-            WHERE ec.equipo_id = %s
-        )
-        SELECT nombre, parent_id,
-               (SELECT nombre FROM categorias WHERE id = ce.parent_id) AS parent_nombre
-        FROM cat_eq ce
-        ORDER BY
-            (parent_id IS NULL),    -- false (sub) primero, true (raíz) después
-            orden, prioridad, nombre
-        LIMIT 1
-        """,
-        (equipo_id,),
-    ).fetchone()
-    if not row:
+    from services.categorias import categorias_de_equipos, categoria_por_id, root_of_categoria
+    cat_map = categorias_de_equipos(conn, [equipo_id])
+    cats = cat_map.get(equipo_id, [])
+    if not cats:
         return None, None
-    if row["parent_id"] is None:
-        return row["nombre"], None
-    return row["parent_nombre"], row["nombre"]
+    first = cats[0]
+    if first["parent_id"] is None:
+        return first["nombre"], None
+    root_id = root_of_categoria(conn, first["id"])
+    root = categoria_por_id(conn, root_id) if root_id else None
+    root_name = root["nombre"] if root else None
+    return root_name, first["nombre"]
 
 
 def _specs_en_nombre_de(conn, equipo_id: int) -> list[dict]:

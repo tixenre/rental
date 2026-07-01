@@ -734,15 +734,10 @@ def equipo_page(id_or_slug: str):
                 (equipo_id,),
             ).fetchone()
             # Primera categoría del equipo (para BreadcrumbList).
-            cat_row = conn.execute(
-                """
-                SELECT c.nombre FROM categorias c
-                JOIN equipo_categorias ec ON ec.categoria_id = c.id
-                WHERE ec.equipo_id = %s
-                ORDER BY ec.id LIMIT 1
-                """,
-                (equipo_id,),
-            ).fetchone()
+            from services.categorias import categorias_de_equipos
+            cat_map = categorias_de_equipos(conn, [equipo_id])
+            cat_list = cat_map.get(equipo_id, [])
+            cat_row = {"nombre": cat_list[0]["nombre"]} if cat_list else None
         finally:
             conn.close()
         if not row:

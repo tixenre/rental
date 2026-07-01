@@ -25,6 +25,8 @@ y `categorias.popularidad_score` con los mismos criterios (cant_pedidos
 
 
 
+from services.categorias import actualizar_ranking, expandir_a_ancestros_por_equipo, root_of_categoria
+
 # Ventana de tiempo para el cálculo de popularidad (últimos N días).
 # 180 días = 6 meses. Captura tendencia reciente sin que un boom de hace
 # 2 años distorsione el ranking actual.
@@ -32,19 +34,16 @@ VENTANA_DIAS_DEFAULT = 180
 
 
 def _categorias_raiz_de(conn, equipo_id: int) -> list[int]:
-    """Devuelve los IDs de las categorías raíz a las que pertenece el equipo
-    (subiendo desde subcategorías si hace falta)."""
-    rows = conn.execute(
-        """
-        SELECT DISTINCT
-            CASE WHEN c.parent_id IS NULL THEN c.id ELSE c.parent_id END AS raiz_id
-        FROM equipo_categorias ec
-        JOIN categorias c ON c.id = ec.categoria_id
-        WHERE ec.equipo_id = %s
-        """,
-        (equipo_id,),
-    ).fetchall()
-    return [r["raiz_id"] for r in rows]
+    """Devuelve los IDs de las categorías raíz a las que pertenece el equipo,
+    trepando correctamente por todo el árbol."""
+    ancestors = expandir_a_ancestros_por_equipo(conn, [equipo_id])
+    all_ids = ancestors.get(equipo_id, [])
+    raices: set[int] = set()
+    for cid in all_ids:
+        raiz = root_of_categoria(conn, cid)
+        if raiz is not None:
+            raices.add(raiz)
+    return list(raices)
 
 
 def calcular_estadisticas_equipo(
@@ -290,17 +289,7 @@ def _recalcular_ranking_categorias(
                 "despues": {"score": nuevo_score, "pedidos": pedidos, "ingreso": ingreso},
             })
             if not dry_run:
-                conn.execute(
-                    """
-                    UPDATE categorias
-                    SET popularidad_score = %s,
-                        cant_pedidos = %s,
-                        ingreso_total_ars = %s,
-                        ranking_actualizado = CURRENT_TIMESTAMP
-                    WHERE id = %s
-                    """,
-                    (nuevo_score, pedidos, ingreso, r["id"]),
-                )
+                actualizar_ranking(conn, r["id"], nuevo_score, pedidos, ingreso)
     return cambios
 
 

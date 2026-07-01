@@ -65,7 +65,6 @@ _ADMIN_GUARD = [
     ("DELETE", "/api/admin/etiquetas/1"),
     ("GET", "/api/admin/categorias"),
     ("DELETE", "/api/admin/categorias/1"),
-    ("POST", "/api/admin/categorias/clasificar"),
     ("POST", "/api/admin/equipos/1/upload-foto"),
     ("GET", "/api/admin/equipos/1/fotos"),
     ("POST", "/api/admin/equipos/1/fotos"),

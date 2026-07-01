@@ -37,6 +37,9 @@ if TYPE_CHECKING:
     pass
 
 
+from services.categorias.queries.ancestry import buscar_id_por_nombre
+
+
 def _ensure_categoria_raiz(
     conn,
     nombre: str,
@@ -53,10 +56,7 @@ def _ensure_categoria_raiz(
     `seed_categoria_from_registry`). Las specs son un sistema aparte que se
     mantiene solo; las categorías no.
     """
-    row = conn.execute(
-        "SELECT id FROM categorias WHERE nombre = %s", (nombre,)
-    ).fetchone()
-    return row["id"] if row else None
+    return buscar_id_por_nombre(conn, nombre)
 
 
 def _ensure_subcategoria(
@@ -68,8 +68,7 @@ def _ensure_subcategoria(
     Las subcategorías no alimentan el sistema de specs (las specs cuelgan de la
     raíz), así que una subcat ausente no tiene consecuencia para el seeder.
     """
-    row = conn.execute("SELECT id FROM categorias WHERE nombre = %s", (nombre,)).fetchone()
-    return row["id"] if row else None
+    return buscar_id_por_nombre(conn, nombre)
 
 
 def _upsert_spec_definition(
@@ -257,13 +256,9 @@ def purge_stale_specs(conn, categoria_raiz: str, dry_run: bool = True) -> dict:
     if cat_reg is None:
         raise ValueError(f"Categoría '{categoria_raiz}' no está en el registry")
 
-    raiz_row = conn.execute(
-        "SELECT id FROM categorias WHERE nombre = %s", (categoria_raiz,)
-    ).fetchone()
-    if raiz_row is None:
+    raiz_id = buscar_id_por_nombre(conn, categoria_raiz)
+    if raiz_id is None:
         return {"to_delete": [], "kept": 0, "deleted": 0, "dry_run": dry_run}
-
-    raiz_id = raiz_row["id"] if isinstance(raiz_row, dict) else raiz_row[0]
 
     registry_keys = {s.key for s in cat_reg.specs}
 

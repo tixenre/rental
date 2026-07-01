@@ -50,21 +50,14 @@ def _auto_tags_from_parts(equipo: dict, categoria_nombres) -> list[str]:
 
 def _auto_tags_for_equipo(conn, equipo: dict) -> list[str]:
     """Calcula la lista de strings que deberían ser etiquetas auto para un equipo."""
-    # Nombres de categorías asignadas + sus padres (árbol completo hacia arriba).
-    cat_rows = conn.execute("""
-        WITH RECURSIVE up AS (
-            SELECT c.id, c.nombre, c.parent_id
-            FROM equipo_categorias ec
-            JOIN categorias c ON c.id = ec.categoria_id
-            WHERE ec.equipo_id = %s
-            UNION
-            SELECT p.id, p.nombre, p.parent_id
-            FROM categorias p
-            JOIN up ON up.parent_id = p.id
-        )
-        SELECT DISTINCT nombre FROM up
-    """, (equipo["id"],)).fetchall()
-    return _auto_tags_from_parts(equipo, [r["nombre"] for r in cat_rows])
+    from services.categorias import expandir_a_ancestros, categoria_ids_de_equipo, categoria_nombres_por_ids
+    cat_ids = categoria_ids_de_equipo(conn, equipo["id"])
+    if cat_ids:
+        ancestor_ids = expandir_a_ancestros(conn, cat_ids)
+        if ancestor_ids:
+            name_map = categoria_nombres_por_ids(conn, ancestor_ids)
+            return _auto_tags_from_parts(equipo, list(name_map.values()))
+    return _auto_tags_from_parts(equipo, [])
 
 
 def regenerate_auto_tags(conn, equipo_id: int) -> int:
@@ -170,24 +163,22 @@ def _regenerate_auto_tags_chunk(conn, ids) -> int:
         (found_ids,),
     )
 
-    # 3) Árbol de categorías (con ancestros) de TODOS los equipos en UNA query
-    #    recursiva, arrastrando equipo_id para atribuir cada nombre a su equipo.
-    cat_rows = conn.execute("""
-        WITH RECURSIVE up AS (
-            SELECT ec.equipo_id, c.id, c.nombre, c.parent_id
-            FROM equipo_categorias ec
-            JOIN categorias c ON c.id = ec.categoria_id
-            WHERE ec.equipo_id = ANY(%s)
-            UNION
-            SELECT up.equipo_id, p.id, p.nombre, p.parent_id
-            FROM categorias p
-            JOIN up ON up.parent_id = p.id
-        )
-        SELECT DISTINCT equipo_id, nombre FROM up
-    """, (found_ids,)).fetchall()
+    # 3) Árbol de categorías (con ancestros) de TODOS los equipos.
+    from services.categorias import expandir_a_ancestros_por_equipo
+    ancestors_by_equipo = expandir_a_ancestros_por_equipo(conn, found_ids)
+
+    # Resolver nombres de categorías
+    all_ids: set[int] = set()
+    for ids in ancestors_by_equipo.values():
+        all_ids.update(ids)
+    name_map: dict[int, str] = {}
+    if all_ids:
+        from services.categorias import categoria_nombres_por_ids
+        name_map = categoria_nombres_por_ids(conn, list(all_ids))
+
     cats_por_equipo: dict = {}
-    for r in cat_rows:
-        cats_por_equipo.setdefault(r["equipo_id"], []).append(r["nombre"])
+    for eid, ids in ancestors_by_equipo.items():
+        cats_por_equipo[eid] = [name_map[i] for i in ids if i in name_map]
 
     # 4) Calcular el bag de tags por equipo (misma pieza que el camino por-equipo)
     #    y juntar el universo de nombres de etiquetas de toda la tanda.

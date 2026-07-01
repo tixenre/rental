@@ -18,7 +18,6 @@ import type {
   CategoriaAdmin,
   EtiquetaAdmin,
   MarcaAdmin,
-  ClasificarResult,
 } from "./types";
 
 export const equiposMethods = {
@@ -301,9 +300,4 @@ export const equiposMethods = {
     const data = (await res.json()) as { public_url: string };
     return data.public_url;
   },
-
-  adminClasificarDryRun: () =>
-    authedPostJson<ClasificarResult>("/api/admin/categorias/clasificar?apply=0", {}),
-  adminClasificarApply: () =>
-    authedPostJson<ClasificarResult>("/api/admin/categorias/clasificar?apply=1", {}),
 };

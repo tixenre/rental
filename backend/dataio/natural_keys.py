@@ -86,8 +86,9 @@ class KeyResolver:
     # ── categorias ───────────────────────────────────────────────────────────
 
     def _load_categorias(self) -> dict[str, int]:
-        rows = self.conn.execute("SELECT id, nombre FROM categorias").fetchall()
-        return {r["nombre"]: r["id"] for r in rows}
+        from services.categorias import listar_categorias_flat
+        cats = listar_categorias_flat(self.conn)
+        return {c["nombre"]: c["id"] for c in cats}
 
     def categoria_id(self, nombre: str | None) -> int | None:
         if not nombre:

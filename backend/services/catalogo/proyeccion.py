@@ -34,6 +34,7 @@ from reservas import calcular_disponibilidad
 from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de
 from services.contenido import contenido_de
+from services.categorias import listar_categorias_flat
 
 
 # ── Constantes de ordenamiento (espejo de routes/equipos/core.py) ─────────────
@@ -295,10 +296,7 @@ def proyectar_seed(conn) -> dict:
         item.setdefault("kit", [])
         items.append(item)
 
-    cats = conn.execute(
-        "SELECT id, nombre, COALESCE(total, 0) AS total, prioridad, parent_id "
-        "FROM categorias ORDER BY COALESCE(prioridad, 999), nombre"
-    ).fetchall()
+    cats = listar_categorias_flat(conn)
 
     estudio_fotos = conn.execute(
         "SELECT url, url_sm, url_avif, url_sm_avif, es_principal, orden "

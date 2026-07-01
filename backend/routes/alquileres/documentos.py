@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from database import get_db, row_to_dict, MARCA_SUBQUERY
 from services.contenido import contenido_de_batch
+from services.categorias import root_of_categoria, categorias_por_ids
 from pdf import _pedido_html, _albaran_html, _contrato_html, _packing_list_html, _render_pdf, _pedido_filename
 from auth.guards import require_admin
 from services.email import send_email, send_raw_email, render_template, wrap_preview, Attachment
@@ -107,38 +108,35 @@ def _agrupar_items_por_categoria(conn, items: list[dict]) -> list[dict]:
     cat_de_equipo: dict[int, tuple] = {}
     if eq_ids:
         ph = ",".join("%s" for _ in eq_ids)
-        # `first_cat`: la primera categoría de cada equipo (misma convención que
-        # arriba). `climb`: trepa recursivamente por `parent_id` hasta la raíz
-        # (parent_id IS NULL) — soporta cualquier profundidad (hija/nieta/…).
-        rows = conn.execute(f"""
-            WITH RECURSIVE first_cat AS (
-                SELECT equipo_id, categoria_id FROM (
-                    SELECT ec.equipo_id, ec.categoria_id,
-                           ROW_NUMBER() OVER (
-                               PARTITION BY ec.equipo_id
-                               ORDER BY ec.orden, c.prioridad, c.id
-                           ) AS rn
-                    FROM equipo_categorias ec
-                    JOIN categorias c ON c.id = ec.categoria_id
-                    WHERE ec.equipo_id IN ({ph})
-                ) t WHERE rn = 1
-            ),
-            climb AS (
-                SELECT fc.equipo_id, c.id, c.parent_id
-                FROM first_cat fc
-                JOIN categorias c ON c.id = fc.categoria_id
-                UNION ALL
-                SELECT cl.equipo_id, p.id, p.parent_id
-                FROM climb cl
-                JOIN categorias p ON p.id = cl.parent_id
-            )
-            SELECT cl.equipo_id, c.nombre, c.prioridad
-            FROM climb cl
-            JOIN categorias c ON c.id = cl.id
-            WHERE cl.parent_id IS NULL
+        first_cats = conn.execute(f"""
+            SELECT ec.equipo_id, ec.categoria_id FROM (
+                SELECT ec.equipo_id, ec.categoria_id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY ec.equipo_id
+                           ORDER BY ec.orden, c.prioridad, c.id
+                       ) AS rn
+                FROM equipo_categorias ec
+                JOIN categorias c ON c.id = ec.categoria_id
+                WHERE ec.equipo_id IN ({ph})
+            ) t WHERE rn = 1
         """, tuple(eq_ids)).fetchall()
-        for r in rows:
-            cat_de_equipo[r["equipo_id"]] = (r["prioridad"], r["nombre"])
+
+        root_ids: dict[int, int] = {}
+        for r in first_cats:
+            root = root_of_categoria(conn, r["categoria_id"])
+            if root is not None:
+                root_ids[r["equipo_id"]] = root
+
+        if root_ids:
+            distinct_roots = list(set(root_ids.values()))
+            if distinct_roots:
+                root_rows = categorias_por_ids(conn, distinct_roots)
+                root_info = {r["id"]: (r["prioridad"], r["nombre"]) for r in root_rows}
+            else:
+                root_info = {}
+            for eq_id, rid in root_ids.items():
+                if rid in root_info:
+                    cat_de_equipo[eq_id] = root_info[rid]
     return _ordenar_items_en_grupos(items, cat_de_equipo)
 
 
