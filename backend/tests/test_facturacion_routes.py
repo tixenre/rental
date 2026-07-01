@@ -181,7 +181,7 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
         "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
 
-    async def _fake_render_pdf(html):
+    async def _fake_render_pdf(html, **_):
         return b"%PDF-FAKE%"
 
     monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)

@@ -322,9 +322,9 @@ async def descargar_pdf_factura(
         return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
 
     from pdf import _render_pdf
-    from services.facturacion.pdf import factura_filename
+    from services.facturacion.pdf import factura_filename, page_size_for_layout
     try:
-        pdf_bytes = await _render_pdf(html_str)
+        pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF: {e}")
 

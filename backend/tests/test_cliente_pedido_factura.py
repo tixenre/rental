@@ -138,7 +138,7 @@ def test_factura_format_pdf_default_devuelve_inline(monkeypatch):
         "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
 
-    async def _fake_render_pdf(html):
+    async def _fake_render_pdf(html, **_):
         return b"%PDF-FAKE%"
 
     monkeypatch.setattr("routes.cliente_portal.documentos._render_pdf", _fake_render_pdf)
