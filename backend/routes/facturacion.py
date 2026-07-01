@@ -298,7 +298,11 @@ def _factura_html_o_404(factura_id: int, conn, layout: str = "clasica"):
         raise HTTPException(400, "Solo se pueden ver/descargar/enviar facturas emitidas")
 
     pedido = _get_pedido(conn, factura.pedido_id)
-    return factura, factura_html(factura, pedido, layout=layout)
+    try:
+        html_str = factura_html(factura, pedido, layout=layout)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return factura, html_str
 
 
 @router.get("/facturas/{factura_id}/pdf")

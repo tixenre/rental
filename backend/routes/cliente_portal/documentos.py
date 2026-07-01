@@ -189,7 +189,10 @@ async def cliente_pedido_factura(
         from services.facturacion.engine import _get_pedido
         from services.facturacion.pdf import factura_html, factura_filename, page_size_for_layout
         pedido_data = _get_pedido(conn, id)
-        html_str = factura_html(factura, pedido_data, layout=layout)
+        try:
+            html_str = factura_html(factura, pedido_data, layout=layout)
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
 
     return await _doc_response_or_pdf(
         html_str, factura_filename(factura, layout=layout), format,

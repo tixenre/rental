@@ -125,23 +125,33 @@ def test_factura_a_discrimina_iva_si_hay_monto():
     assert "IVA 21%" in html
 
 
-# ── QR ausente: placeholder, nunca un hueco en blanco ───────────────────────
+# ── Datos de ARCA incompletos: fallar fuerte, nunca un comprobante a medias ──
+# (decisión explícita del dueño: mejor un 503 que una factura que "parece"
+# válida sin serlo — ni placeholder de QR ni "—" en el CAE)
 
 
 @pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
-def test_sin_qr_payload_muestra_placeholder(layout):
+def test_sin_qr_payload_falla_fuerte(layout):
     sin_qr = _factura(qr_payload=None)
-    html = factura_html(sin_qr, _pedido(), layout=layout)
-    assert "<img" not in html or "QR AFIP" not in html
+    with pytest.raises(RuntimeError, match="qr_payload"):
+        factura_html(sin_qr, _pedido(), layout=layout)
 
 
 @pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
-def test_si_falla_la_generacion_del_qr_no_deja_un_hueco_en_blanco(layout, monkeypatch):
-    """Hay payload (has=True) pero segno/la generación de la imagen falla —
-    tiene que caer al placeholder, no a un <img> roto o un div vacío."""
+def test_si_falla_la_generacion_del_qr_propaga_el_error(layout, monkeypatch):
+    """Hay payload pero segno/la generación de la imagen falla — tiene que
+    propagar el error (el route lo convierte en 503), no devolver un HTML
+    con un hueco donde debería ir el QR exigido por RG4892."""
     def _boom(url):
         raise RuntimeError("segno no disponible")
 
     monkeypatch.setattr("arca_fe.qr._build_qr_image_data_uri", _boom)
-    html = factura_html(_factura(), _pedido(), layout=layout)
-    assert "<img" not in html
+    with pytest.raises(RuntimeError, match="segno no disponible"):
+        factura_html(_factura(), _pedido(), layout=layout)
+
+
+@pytest.mark.parametrize("campo", ["cae", "cbte_nro", "cae_vto", "qr_payload"])
+def test_falta_cualquier_dato_de_arca_falla_fuerte(campo):
+    incompleta = _factura(**{campo: None})
+    with pytest.raises(RuntimeError, match=campo):
+        factura_html(incompleta, _pedido())

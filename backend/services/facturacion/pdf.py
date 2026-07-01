@@ -232,7 +232,29 @@ def _conceptos(pedido: dict, factura) -> list[dict]:
     return out
 
 
+def _validar_datos_arca(factura) -> None:
+    """El comprobante NUNCA sale incompleto: si a una factura 'emitida' le
+    falta CAE/número/vencimiento/QR es un bug de datos, no un detalle visual
+    — mejor un 503 explícito que un PDF que parece válido y no lo es."""
+    faltantes = [
+        campo for campo, val in (
+            ("cae", factura.cae),
+            ("cbte_nro", factura.cbte_nro),
+            ("cae_vto", factura.cae_vto),
+            ("qr_payload", factura.qr_payload),
+        )
+        if not val
+    ]
+    if faltantes:
+        raise RuntimeError(
+            f"Factura {factura.id} está 'emitida' pero le faltan datos de ARCA "
+            f"({', '.join(faltantes)}) — no se puede generar un comprobante válido."
+        )
+
+
 def _build_ctx(factura, pedido: dict) -> dict:
+    _validar_datos_arca(factura)
+
     em_key = factura.emisor if factura.emisor in _EMISORES_DATA else "santini"
     em_data = _EMISORES_DATA[em_key]
     em_row = _emisor_row(factura.emisor)
@@ -258,10 +280,6 @@ def _build_ctx(factura, pedido: dict) -> dict:
     vto_pago = fecha_desde
 
     mostrar_iva = letra in ("A", "B") and factura.imp_iva > 0
-
-    qr_url = ""
-    if factura.qr_payload:
-        qr_url = factura.qr_payload
 
     return {
         "letra": letra, "cod": cod, "es_nc": es_nc,
@@ -295,20 +313,20 @@ def _build_ctx(factura, pedido: dict) -> dict:
             "subStr": _money(factura.imp_neto), "otrosStr": _money(0),
             "totalStr": _money(factura.imp_total), "ivaPct": "21%",
         },
-        "cae": {"nro": factura.cae or "—", "vto": _fdate(factura.cae_vto)},
-        "qr": {"url": qr_url, "has": bool(qr_url), "pending": not qr_url},
+        "cae": {"nro": factura.cae, "vto": _fdate(factura.cae_vto)},
+        "qr": {"url": factura.qr_payload},
     }
 
 
 def _qr_img(url: str, size: int) -> str:
-    try:
-        from arca_fe.qr import _build_qr_image_data_uri
-        return (
-            f'<img src="{_build_qr_image_data_uri(url)}" width="{size}" height="{size}" '
-            f'alt="QR AFIP" style="display:block">'
-        )
-    except Exception:
-        return ""
+    """Nunca atrapa errores: si `segno` no puede generar la imagen, el caller
+    (`factura_html`) tiene que fallar fuerte, no entregar un comprobante con
+    un hueco donde debería ir el QR exigido por RG4892."""
+    from arca_fe.qr import _build_qr_image_data_uri
+    return (
+        f'<img src="{_build_qr_image_data_uri(url)}" width="{size}" height="{size}" '
+        f'alt="QR AFIP" style="display:block">'
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -317,13 +335,7 @@ def _qr_img(url: str, size: int) -> str:
 
 
 def _factura_clasica_html(f: dict) -> str:
-    qr_block = _qr_img(f["qr"]["url"], 112) if f["qr"]["has"] else ""
-    if not qr_block:
-        # Sin payload O la generación falló (nunca dejar un hueco en blanco).
-        qr_block = (
-            '<div style="width:112px;height:112px;border:1px solid #000;display:flex;'
-            'align-items:center;justify-content:center;font-size:9px;color:#666;">QR</div>'
-        )
+    qr_block = _qr_img(f["qr"]["url"], 112)
 
     iibb_line = (
         f'<div style="margin-bottom:4px;"><span style="font-weight:700;">Ingresos Brutos:</span> {_e(f["emisor"]["iibb"])}</div>'
@@ -459,12 +471,7 @@ def _factura_clasica_html(f: dict) -> str:
 def _factura_mobile_html(f: dict) -> str:
     tipo_banner = "Nota de crédito electrónica · Original" if f["es_nc"] else "Factura electrónica · Original"
 
-    qr_block = _qr_img(f["qr"]["url"], 120) if f["qr"]["has"] else ""
-    if not qr_block:
-        qr_block = (
-            '<div style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;'
-            'font-family:\'JetBrains Mono\',monospace;font-size:10px;color:#8a97a3;">QR…</div>'
-        )
+    qr_block = _qr_img(f["qr"]["url"], 120)
 
     conceptos_html = "".join(f"""
         <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid #f2f5f7;">
@@ -577,12 +584,7 @@ def _factura_mobile_html(f: dict) -> str:
 def _factura_formal_html(f: dict) -> str:
     tipo_banner = "Nota de crédito electrónica · Original" if f["es_nc"] else "Factura electrónica · Original"
 
-    qr_block = _qr_img(f["qr"]["url"], 150) if f["qr"]["has"] else ""
-    if not qr_block:
-        qr_block = (
-            '<div style="width:150px;height:150px;display:flex;align-items:center;justify-content:center;'
-            'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#8a97a3;">QR…</div>'
-        )
+    qr_block = _qr_img(f["qr"]["url"], 150)
 
     iibb_line = (
         f'<div><span style="font-weight:600;color:#16202b;">Ingresos Brutos:</span> {_e(f["emisor"]["iibb"])}</div>'

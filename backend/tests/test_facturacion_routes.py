@@ -147,6 +147,28 @@ def test_descargar_pdf_400_si_no_emitida(monkeypatch):
     assert ei.value.status_code == 400
 
 
+def test_descargar_pdf_503_si_faltan_datos_de_arca(monkeypatch):
+    """factura_html falla fuerte (RuntimeError) si a una 'emitida' le faltan
+    datos de ARCA — el route lo convierte en 503, nunca en un 500 crudo."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_by_id", lambda factura_id, conn: _fake_factura()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+
+    def _raise(*a, **kw):
+        raise RuntimeError("Factura 1 está 'emitida' pero le faltan datos de ARCA (qr_payload)")
+
+    monkeypatch.setattr("services.facturacion.pdf.factura_html", _raise)
+
+    with pytest.raises(HTTPException) as ei:
+        asyncio.run(facturacion_routes.descargar_pdf_factura(1, _fake_request()))
+    assert ei.value.status_code == 503
+
+
 def test_descargar_pdf_format_html_devuelve_preview_sin_renderer(monkeypatch):
     """`format=html` no debe pasar por Playwright — devuelve el HTML tal cual."""
     monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
