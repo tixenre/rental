@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import base64
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -73,18 +73,21 @@ def test_tra_contiene_servicio():
 
 
 def test_tra_tiempos_razonables():
-    from arca_fe.wsaa import construir_tra
+    from arca_fe.wsaa import construir_tra, _TRA_TTL_SECONDS
 
     ahora = datetime(2024, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
     tra = construir_tra("wsfe", ahora=ahora)
     root = ET.fromstring(tra)
     header = root.find("header")
-    gen_time = header.find("generationTime").text
-    exp_time = header.find("expirationTime").text
-    # genTime debe ser 10 min antes de ahora
-    assert "2024-06-15T11:50:00" in gen_time
-    # expTime debe ser ~36h después
-    assert "2024-06-17" in exp_time
+    gen_time = datetime.fromisoformat(header.find("generationTime").text)
+    exp_time = datetime.fromisoformat(header.find("expirationTime").text)
+
+    # Hora argentina explícita (AFIP interpreta un timestamp sin tz como local)
+    assert gen_time.utcoffset() == timedelta(hours=-3)
+    assert exp_time.utcoffset() == timedelta(hours=-3)
+    # genTime = 10 min antes de `ahora`; expTime = ahora + TTL configurado
+    assert gen_time.astimezone(timezone.utc) == ahora - timedelta(minutes=10)
+    assert exp_time.astimezone(timezone.utc) == ahora + timedelta(seconds=_TRA_TTL_SECONDS)
 
 
 def test_tra_unique_id_en_rango():

@@ -132,3 +132,46 @@ def _parse_fecha(s) -> Optional[date]:
         return date.fromisoformat(s)
     except ValueError:
         return None
+
+
+def construir_comprobante_nc(
+    original,  # services.facturacion.repo.Factura
+    pedido: dict,
+    emisor_obj: Emisor,
+    *,
+    fecha: date,
+    cbtes_asoc: tuple[CbteAsoc, ...],
+) -> ComprobanteRequest:
+    """Arma el ComprobanteRequest de la Nota de Crédito que anula `original`.
+
+    A diferencia de `construir_comprobante`, los importes y el receptor salen
+    del snapshot YA PERSISTIDO en `original` — NO se recalculan desde el pedido
+    en vivo. Una NC tiene que cancelar EXACTAMENTE lo que se facturó ante ARCA;
+    si el pedido cambió de precio/descuento después de emitida la factura, una
+    NC recalculada dejaría un remanente sin cancelar en la cuenta de ARCA.
+    Las fechas de servicio sí vienen del pedido (no son plata, son estables).
+    """
+    receptor = Receptor(
+        doc_tipo=DocTipo(original.doc_tipo),
+        doc_nro=int(original.doc_nro) if str(original.doc_nro).isdigit() else 0,
+        condicion_iva=CondicionIva(original.condicion_iva_receptor),
+    )
+    importe_neto = Decimal(original.imp_neto)
+    alicuota = IVA_21 if original.imp_iva > 0 else None
+
+    fecha_desde = _parse_fecha(pedido.get("fecha_desde"))
+    fecha_hasta = _parse_fecha(pedido.get("fecha_hasta"))
+
+    return ComprobanteRequest(
+        emisor=emisor_obj,
+        receptor=receptor,
+        concepto=Concepto.SERVICIOS,
+        importe_neto=importe_neto,
+        alicuota=alicuota,
+        fecha=fecha,
+        fecha_serv_desde=fecha_desde,
+        fecha_serv_hasta=fecha_hasta,
+        fecha_vto_pago=fecha_hasta,
+        es_nota_credito=True,
+        cbtes_asoc=cbtes_asoc,
+    )

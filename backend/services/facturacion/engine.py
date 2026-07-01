@@ -34,7 +34,10 @@ from arca_fe import (
 from services.facturacion.config import credenciales
 from services.facturacion.emisores import emisor_para
 from services.facturacion.wsaa_cache import get_ta
-from services.facturacion.comprobante_pedido import construir_comprobante
+from services.facturacion.comprobante_pedido import (
+    construir_comprobante,
+    construir_comprobante_nc,
+)
 from services.facturacion.repo import (
     Factura,
     get_factura_vigente,
@@ -149,12 +152,7 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
         doc_tipo = int(req.receptor.doc_tipo)
         doc_nro = str(req.receptor.doc_nro)
         cond_iva_rec = int(req.receptor.condicion_iva)
-        neto_int = int(importes["neto"] * 100)   # céntimos no — ARCA trabaja en ARS enteros
-        # ARCA usa valores en pesos con 2 decimales pero los almacenamos en centavos? No.
-        # La tabla usa "enteros ARS" = pesos sin centavos (igual que alquiler_pagos)
-        # calcular_importes devuelve Decimal("1234.56") → int(1234.56) = 1234 (trunca)
-        # Para preservar los 2 decimales: multiplicamos por 100 y guardamos centavos? No,
-        # la tabla no tiene esa convención. Usamos round() en enteros de pesos.
+        # La tabla usa "enteros ARS" = pesos sin centavos (igual que alquiler_pagos).
         neto_int = int(round(float(importes["neto"])))
         iva_int = int(round(float(importes["iva"])))
         total_int = int(round(float(importes["total"])))
@@ -195,35 +193,45 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
             sign=sign,
         )
 
-        ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
-        numero_a_emitir = ultimo + 1
+        try:
+            ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
+            numero_a_emitir = ultimo + 1
 
-        # Idempotencia post-timeout: si un intento anterior de ESTE pedido ya
-        # le pidió a ARCA el número `numero_a_emitir` y la respuesta se perdió
-        # por timeout de nuestro lado, ARCA ya lo tiene autorizado → lo
-        # recuperamos en vez de pedir un CAE nuevo (evitaría "comprobante ya
-        # autorizado"). Consultamos el PRÓXIMO número, no el último ya
-        # autorizado — `ultimo` por definición siempre devuelve Resultado='A'
-        # (no es nuestro, es el de la factura previa) y reusarlo duplicaría
-        # número+CAE entre pedidos distintos (bug encontrado en prod).
-        recuperado: Optional[CaeResult] = None
-        consultado = wsfe.consultar(emisor_obj.punto_venta, int(cbte_tipo), numero_a_emitir)
-        if consultado and (consultado.get("Resultado") or "R") == "A":
-            cae_consulta = consultado.get("CodAutorizacion")
-            if cae_consulta:
-                vto_raw = consultado.get("CAEFchVto", "")
-                from arca_fe.wsfe import _parse_fecha
-                recuperado = CaeResult(
-                    resultado="A",
-                    cae=str(cae_consulta),
-                    cae_vto=_parse_fecha(vto_raw),
-                    numero=numero_a_emitir,
-                )
+            # Idempotencia post-timeout: si un intento anterior de ESTE pedido ya
+            # le pidió a ARCA el número `numero_a_emitir` y la respuesta se perdió
+            # por timeout de nuestro lado, ARCA ya lo tiene autorizado → lo
+            # recuperamos en vez de pedir un CAE nuevo (evitaría "comprobante ya
+            # autorizado"). Consultamos el PRÓXIMO número, no el último ya
+            # autorizado — `ultimo` por definición siempre devuelve Resultado='A'
+            # (no es nuestro, es el de la factura previa) y reusarlo duplicaría
+            # número+CAE entre pedidos distintos (bug encontrado en prod).
+            recuperado: Optional[CaeResult] = None
+            consultado = wsfe.consultar(emisor_obj.punto_venta, int(cbte_tipo), numero_a_emitir)
+            if consultado and (consultado.get("Resultado") or "R") == "A":
+                cae_consulta = consultado.get("CodAutorizacion")
+                if cae_consulta:
+                    vto_raw = consultado.get("CAEFchVto", "")
+                    from arca_fe.wsfe import _parse_fecha
+                    recuperado = CaeResult(
+                        resultado="A",
+                        cae=str(cae_consulta),
+                        cae_vto=_parse_fecha(vto_raw),
+                        numero=numero_a_emitir,
+                    )
 
-        cae_result: Optional[CaeResult] = recuperado
-        if cae_result is None:
-            fecae_payload = armar_fecae(req, numero_a_emitir)
-            cae_result = wsfe.solicitar_cae(fecae_payload)
+            cae_result: Optional[CaeResult] = recuperado
+            if cae_result is None:
+                fecae_payload = armar_fecae(req, numero_a_emitir)
+                cae_result = wsfe.solicitar_cae(fecae_payload)
+        except (RuntimeError, ValueError):
+            raise
+        except Exception as exc:
+            # Falla de red/SOAP no controlada (invariante "nunca 500" del módulo):
+            # la TX nunca llegó a commitear (nada quedó en 'pendiente' zombie).
+            raise RuntimeError(
+                f"Error al comunicarse con WSFEv1 ({cred.endpoint_wsfe}): "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
 
         # 8. TX atómica: persistir CAE
         if cae_result.resultado == "A" and cae_result.cae:
@@ -378,12 +386,11 @@ def emitir_nota_credito(
         )
 
         hoy = now_ar().date()
-        req = construir_comprobante(
+        req = construir_comprobante_nc(
+            original,
             pedido,
             emisor_obj,
-            emisor_obj.condicion_iva,
             fecha=hoy,
-            es_nota_credito=True,
             cbtes_asoc=(cbte_asoc,),
         )
         cbte_tipo_nc = tipo_comprobante(req)
@@ -436,9 +443,37 @@ def emitir_nota_credito(
             sign=sign,
         )
 
-        ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo_nc))
-        fecae = armar_fecae(req, ultimo + 1)
-        cae_result = wsfe.solicitar_cae(fecae)
+        try:
+            ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo_nc))
+            numero_a_emitir = ultimo + 1
+
+            # Misma idempotencia post-timeout que emitir_factura (consultar el
+            # PRÓXIMO número, nunca el último ya autorizado — ver comentario ahí).
+            recuperado: Optional[CaeResult] = None
+            consultado = wsfe.consultar(emisor_obj.punto_venta, int(cbte_tipo_nc), numero_a_emitir)
+            if consultado and (consultado.get("Resultado") or "R") == "A":
+                cae_consulta = consultado.get("CodAutorizacion")
+                if cae_consulta:
+                    vto_raw = consultado.get("CAEFchVto", "")
+                    from arca_fe.wsfe import _parse_fecha
+                    recuperado = CaeResult(
+                        resultado="A",
+                        cae=str(cae_consulta),
+                        cae_vto=_parse_fecha(vto_raw),
+                        numero=numero_a_emitir,
+                    )
+
+            cae_result: Optional[CaeResult] = recuperado
+            if cae_result is None:
+                fecae = armar_fecae(req, numero_a_emitir)
+                cae_result = wsfe.solicitar_cae(fecae)
+        except (RuntimeError, ValueError):
+            raise
+        except Exception as exc:
+            raise RuntimeError(
+                f"Error al comunicarse con WSFEv1 ({cred.endpoint_wsfe}): "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
 
         if cae_result.resultado == "A" and cae_result.cae:
             qr_url = armar_qr(
