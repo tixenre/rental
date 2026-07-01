@@ -330,17 +330,19 @@ function ClienteHistorialSheet({
   const [generando, setGenerando] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [rechequeando, setRechequeando] = useState(false);
+  const [sessionIdManual, setSessionIdManual] = useState("");
 
   useEffect(() => {
     setLinkVerif(null);
     setCopiado(false);
+    setSessionIdManual("");
   }, [cliente?.id]);
 
-  async function rechequearVerificacion() {
+  async function rechequearVerificacion(sessionIdOverride?: string) {
     if (!cliente) return;
     setRechequeando(true);
     try {
-      const r = await adminApi.rechequearVerificacion(cliente.id);
+      const r = await adminApi.rechequearVerificacion(cliente.id, sessionIdOverride);
       const actualizado = await adminApi.getCliente(cliente.id);
       onUpdated(actualizado);
       qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
@@ -500,7 +502,7 @@ function ClienteHistorialSheet({
                     variant="outline"
                     size="sm"
                     disabled={rechequeando}
-                    onClick={rechequearVerificacion}
+                    onClick={() => rechequearVerificacion()}
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
                     {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
@@ -510,6 +512,29 @@ function ClienteHistorialSheet({
                     cliente, no solo el último, así encuentra la sesión aprobada aunque haya
                     reintentado después. Si nunca inició una verificación, no hace nada.
                   </p>
+                  <details className="text-2xs">
+                    <summary className="cursor-pointer text-muted-foreground select-none">
+                      ¿Sabés el session_id exacto? Consultalo directo
+                    </summary>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <Input
+                        value={sessionIdManual}
+                        onChange={(e) => setSessionIdManual(e.target.value)}
+                        placeholder="session_id de Didit (ej. de una sesión sin historial acá)"
+                        className="flex-1 font-mono text-xs"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={rechequeando || !sessionIdManual.trim()}
+                        onClick={() => rechequearVerificacion(sessionIdManual.trim())}
+                        className="shrink-0"
+                      >
+                        Consultar
+                      </Button>
+                    </div>
+                  </details>
                 </div>
                 {linkVerif ? (
                   <div className="space-y-1.5">

@@ -194,6 +194,17 @@ antes de llamar a `kyc.aprobar` — así `_session_coincide` la sigue validando 
 relajar esa defensa. Una sesión del historial que ya expiró/no existe en Didit (404) no aborta la
 búsqueda: se saltea y sigue con las demás.
 
+**El historial depende de que la sesión haya dejado un rastro** en `kyc_events` — y antes solo se
+registraba un evento ahí cuando un *webhook* se procesaba (approved/rechazado/en_revision/consent). Una
+sesión sin ningún webhook (ni siquiera el inicial) quedaba invisible para `_sesiones_conocidas` aunque
+Didit la hubiera decidido — exactamente la falla de origen de todo este endpoint, aplicada también al
+registro. Por eso `iniciar_verificacion`/`cliente_iniciar_verificacion` ahora registran un evento
+**"iniciado"** (`kyc.registrar_evento(..., session_id=...)`) en el momento mismo de crear la sesión, sin
+esperar a ningún webhook. **Override manual** (`POST recheck` con body `{session_id}`): salta la búsqueda
+por historial y re-chequea esa sesión puntual directo — para sesiones creadas *antes* del fix de
+"iniciado" (o fuera de nuestro flujo) que el historial nunca podría encontrar solo; el admin la pega
+copiándola del dashboard de Didit.
+
 **`vendor_data`** (lo que el route pasa a Didit al crear la sesión) = hoy `str(cliente_id)`, protegido por el
 **HMAC del webhook + el binding de `session_id`**. El **token opaco server-side** (no el `cliente_id` crudo) es
 una mejora de **Fase 3** (la recuperación nuclear lo necesita: ahí no hay `cliente_id` que anclar).
