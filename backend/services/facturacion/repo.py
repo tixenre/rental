@@ -242,16 +242,17 @@ def update_error(
     )
 
 
-def update_pdf_key(factura_id: int, conn, *, pdf_key: str) -> None:
-    conn.execute(
-        "UPDATE facturas SET pdf_key = %s WHERE id = %s",
-        (pdf_key, factura_id),
-    )
-
-
 def marcar_anulada(factura_id: int, conn) -> None:
     """Marca la factura original como 'anulada' (su CAE sigue válido; la NC es la anulación)."""
     conn.execute(
         "UPDATE facturas SET estado = 'anulada' WHERE id = %s",
+        (factura_id,),
+    )
+
+
+def revertir_anulacion(factura_id: int, conn) -> None:
+    """Vuelve la factura original a 'emitida' si la NC que la iba a anular falló ante ARCA."""
+    conn.execute(
+        "UPDATE facturas SET estado = 'emitida' WHERE id = %s",
         (factura_id,),
     )

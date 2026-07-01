@@ -137,6 +137,43 @@ client = zeep.Client(wsdl, transport=transport)
 
 **Importante:** el cert de producción **no funciona** en el endpoint de homologación (error `cms.cert.untrusted`). Son CAs distintas.
 
+### Idempotencia post-timeout: consultar el PRÓXIMO número, nunca el último (bug de prod)
+
+`emitir_factura` inserta la fila `pendiente` y recién después llama a ARCA — si la
+respuesta de `FECAESolicitar` se pierde por timeout de nuestro lado, un reintento no
+puede simplemente volver a pedir el mismo número (ARCA ya lo tiene autorizado y
+rechaza el duplicado). Antes de reintentar, se consulta con `FECompConsultar` si el
+número que estamos por pedir ya fue autorizado:
+
+```python
+# ✅ correcto — consultar el PRÓXIMO número (el que estamos por pedir)
+ultimo = wsfe.ultimo_autorizado(pto_vta, cbte_tipo)
+numero_a_emitir = ultimo + 1
+consultado = wsfe.consultar(pto_vta, cbte_tipo, numero_a_emitir)
+if consultado and consultado["Resultado"] == "A":
+    ...  # nuestro propio reintento ya se autorizó: recuperar ese CAE
+
+# ❌ incorrecto — consultar `ultimo` (el ÚLTIMO ya autorizado)
+consultado = wsfe.consultar(pto_vta, cbte_tipo, ultimo)
+if consultado and consultado["Resultado"] == "A":  # SIEMPRE True: "último autorizado"
+    ...                                             # por definición ya está autorizado
+```
+
+`ultimo_autorizado` devuelve, por definición, un comprobante **ya autorizado** — no es
+"nuestro", es el de la factura anterior (de otro pedido). Consultarlo directamente
+hace que la condición sea siempre verdadera, así que después de la primera factura
+real el sistema nunca vuelve a llamar `FECAESolicitar`: le copia a cada pedido nuevo
+el número y el CAE de la factura anterior. Encontrado en prod: dos pedidos distintos
+con el mismo `00002-00000001` y el mismo CAE. Fix + regresión en `services/facturacion/engine.py` (`emitir_factura`/`emitir_nota_credito`) y `tests/test_facturacion_engine.py`.
+
+### Timeout en las llamadas WSFE (zeep no lo aplica por defecto)
+
+A diferencia de WSAA (`httpx` con `timeout=30.0` explícito), el `Transport` de zeep no
+tiene límite de tiempo salvo que se configure `operation_timeout`. Sin eso, si AFIP se
+cuelga, la llamada espera indefinidamente sosteniendo el advisory lock del engine +
+el `FOR UPDATE` de `afip_ta` — bloquea TODA la facturación de ese emisor hasta que el
+proceso se reinicie. `arca_fe/wsfe.py::_afip_transport()` pasa `operation_timeout=30`.
+
 ---
 
 ## 4. Alta del certificado en AFIP (resumen)

@@ -1059,6 +1059,15 @@ function FacturacionRailSection({
           {principal.estado === "emitida" && (
             <div className="flex items-center gap-3">
               <a
+                href={`/api/facturas/${principal.id}/pdf?format=html`}
+                target="_blank"
+                rel="noreferrer"
+                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+              >
+                <Eye className="h-3 w-3" /> Ver
+              </a>
+              <a
                 href={`/api/facturas/${principal.id}/pdf`}
                 target="_blank"
                 rel="noreferrer"

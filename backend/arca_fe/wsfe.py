@@ -45,10 +45,19 @@ class _AfipSSLAdapter(HTTPAdapter):
         )
 
 
+_TIMEOUT_SECONDS = 30.0
+
+
 def _afip_transport() -> zeep.transports.Transport:
     session = requests.Session()
     session.mount("https://", _AfipSSLAdapter())
-    return zeep.transports.Transport(session=session)
+    # operation_timeout: sin esto zeep no aplica límite a las llamadas SOAP —
+    # si AFIP se cuelga, la llamada espera indefinidamente sosteniendo el
+    # advisory lock + el FOR UPDATE de afip_ta (bloquea TODA la facturación
+    # de ese emisor). `timeout` cubre el fetch inicial del WSDL.
+    return zeep.transports.Transport(
+        session=session, timeout=_TIMEOUT_SECONDS, operation_timeout=_TIMEOUT_SECONDS
+    )
 
 
 def _get_client(endpoint: str) -> zeep.Client:

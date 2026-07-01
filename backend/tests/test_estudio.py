@@ -946,10 +946,25 @@ class _SlotRegenConn(_ConnCM):
         return _Cur([])
 
 
+def _mes_offset_ym(n: int) -> tuple[int, int]:
+    """(year, month) del mes actual + n meses — relativo a `hoy`, no hardcodeado
+    (un `mes_desde`/`mes_hasta` fijo se pudre apenas el reloj cruza ese mes)."""
+    from routes.estudio import _mes_actual_ar
+    y, m = (int(x) for x in _mes_actual_ar().split("-"))
+    total = (y * 12 + (m - 1)) + n
+    return total // 12, total % 12 + 1
+
+
+def _mes_offset(n: int) -> str:
+    y, m = _mes_offset_ym(n)
+    return f"{y:04d}-{m:02d}"
+
+
 def _slot_full(**ov):
     s = {
         "id": 1, "cliente": "Filmar", "dia_semana": 2, "hora_desde": 8, "hora_hasta": 20,
-        "valor_mensual": 50000, "mes_desde": "2026-06", "mes_hasta": "2026-08", "activo": True,
+        "valor_mensual": 50000, "mes_desde": _mes_offset(0), "mes_hasta": _mes_offset(2),
+        "activo": True,
     }
     s.update(ov)
     return s
@@ -959,7 +974,7 @@ class TestRegenerarPedidosSlot:
     def test_genera_un_pedido_por_mes_con_el_valor(self):
         from routes.estudio import _regenerar_pedidos_slot
         conn = _SlotRegenConn(existing=[])
-        _regenerar_pedidos_slot(conn, _slot_full())  # jun, jul, ago 2026 (todos futuros)
+        _regenerar_pedidos_slot(conn, _slot_full())  # mes actual + los 2 siguientes (todos futuros)
         assert len(conn.inserted) == 3
         for p in conn.inserted:
             # (cliente, fd, fh, monto, estado, fuente, tipo, num, slot_id)
@@ -975,15 +990,17 @@ class TestRegenerarPedidosSlot:
     def test_editar_regenera_futuros_sin_tocar_pagados(self):
         from datetime import datetime
         from routes.estudio import _regenerar_pedidos_slot
+        y0, m0 = _mes_offset_ym(0)  # primer mes del slot (mes actual)
+        y1, m1 = _mes_offset_ym(1)  # mes del medio
         existing = [
-            {"id": 90, "fecha_desde": datetime(2026, 7, 1, 8), "monto_pagado": 10000},  # pagado → conservar
-            {"id": 91, "fecha_desde": datetime(2026, 6, 3, 8), "monto_pagado": 0},       # futuro impago → borrar+recrear
+            {"id": 90, "fecha_desde": datetime(y1, m1, 1, 8), "monto_pagado": 10000},  # pagado → conservar
+            {"id": 91, "fecha_desde": datetime(y0, m0, 3, 8), "monto_pagado": 0},       # futuro impago → borrar+recrear
         ]
         conn = _SlotRegenConn(existing=existing)
-        _regenerar_pedidos_slot(conn, _slot_full())  # rango jun-ago
+        _regenerar_pedidos_slot(conn, _slot_full())  # rango: mes actual .. mes actual + 2
         assert 91 in conn.deleted       # impago borrado
         assert 90 not in conn.deleted   # pagado intocable
-        # Recrea jun (borrado) + ago (nuevo); jul queda conservado.
+        # Recrea el primer mes (borrado) + el tercero (nuevo); el del medio queda conservado.
         assert len(conn.inserted) == 2
 
     def test_slot_inactivo_no_genera(self):
@@ -998,7 +1015,7 @@ class TestRegenerarPedidosSlot:
         from routes.estudio import _regenerar_pedidos_slot
         conn = _SlotRegenConn(existing=[])
         _regenerar_pedidos_slot(conn, _slot_full(hora_desde=20, hora_hasta=24))
-        assert len(conn.inserted) == 3  # jun, jul, ago
+        assert len(conn.inserted) == 3  # mes actual + los 2 siguientes
         for p in conn.inserted:
             fd, fh = p[1], p[2]
             assert fd.hour == 20
