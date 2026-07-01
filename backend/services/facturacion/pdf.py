@@ -704,6 +704,18 @@ _LAYOUTS = {
     "formal": _factura_formal_html,
 }
 
+# Ancho fijo del comprobante "celular" (mismo valor que el `width` del body
+# en `_factura_mobile_html`). Alto = None → `pdf._render_pdf` mide el alto
+# real del contenido (el comprobante no es A4, es una tarjeta angosta que
+# tiene que terminar donde termina el contenido, no a media hoja).
+MOBILE_PAGE_WIDTH = 392
+
+
+def page_size_for_layout(layout: str) -> tuple[int, int | None] | None:
+    """Tamaño de página para `pdf._render_pdf(html, page_size=...)`.
+    None → A4 (default, clásica/formal). Un tuple → tamaño propio (celular)."""
+    return (MOBILE_PAGE_WIDTH, None) if layout == "celular" else None
+
 
 def factura_html(factura, pedido: dict, layout: str = "clasica") -> str:
     """Genera el HTML completo de la factura (Factura A/B/C o Nota de Crédito).
