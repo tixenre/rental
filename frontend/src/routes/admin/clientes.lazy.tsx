@@ -344,12 +344,13 @@ function ClienteHistorialSheet({
       const actualizado = await adminApi.getCliente(cliente.id);
       onUpdated(actualizado);
       qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
+      const sesionCorta = r.session_id ? ` (sesión ${r.session_id.slice(0, 8)}…)` : "";
       if (actualizado.dni_validado_at) {
         toast.success("Didit ya lo tiene aprobado — identidad verificada.");
       } else if (r.status === "Declined") {
-        toast.error("Didit lo sigue mostrando rechazado.");
+        toast.error(`Didit lo sigue mostrando rechazado${sesionCorta}.`);
       } else {
-        toast.message(`Didit responde: ${r.status || "sin novedades"}.`);
+        toast.message(`Didit responde: ${r.status || "sin novedades"}${sesionCorta}.`);
       }
     } catch (err) {
       toast.error(
