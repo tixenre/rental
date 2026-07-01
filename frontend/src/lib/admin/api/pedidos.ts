@@ -182,6 +182,11 @@ export const pedidosMethods = {
     authedJson<{ session_id: string; url: string }>(`/api/admin/verificacion/sesion/${clienteId}`, {
       method: "POST",
     }),
+  rechequearVerificacion: (clienteId: number) =>
+    authedJson<{ status: string; aplicado: boolean | null }>(
+      `/api/admin/verificacion/recheck/${clienteId}`,
+      { method: "POST" },
+    ),
 
   // clientes — fusión de duplicados (mismo CUIL verificado)
   getClientesDuplicados: () => authedJson<GrupoDuplicado[]>(`/api/clientes/duplicados`),

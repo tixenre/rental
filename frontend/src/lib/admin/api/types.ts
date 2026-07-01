@@ -944,6 +944,8 @@ export type Cliente = {
   perfil_impuestos: string | null;
   // Verificación de identidad Didit
   dni_validado_at: string | null;
+  dni_verificacion_estado?: string | null;
+  dni_verificacion_motivo?: string | null;
   dni: string | null;
   cuil: string | null;
   nombre_renaper: string | null;
