@@ -15,7 +15,7 @@ conocido (`kyc_events`), no solo la sesión actual.
 import pytest
 from fastapi import HTTPException
 
-from routes.didit import recheck_verificacion
+from routes.didit import RecheckVerificacionIn, recheck_verificacion
 
 pytestmark = pytest.mark.unit
 
@@ -248,3 +248,47 @@ def test_sesion_del_historial_expirada_no_aborta_la_busqueda(monkeypatch):
     )
     res = recheck_verificacion(13, request=object())
     assert res == {"status": "Approved", "aplicado": True, "session_id": "sess-aprobada"}
+
+
+def test_override_salta_el_historial_y_chequea_la_sesion_pedida(monkeypatch):
+    """Sesión que no dejó NINGÚN rastro en kyc_events (creada antes del fix que
+    registra "iniciado", o fuera de nuestro flujo) — el historial nunca la
+    encontraría sola. El admin la pega a mano y el recheck la consulta directo,
+    sin construir el historial."""
+    aprobar_calls = []
+    decisiones = {
+        "sess-actual": {"status": "In Review"},
+        "sess-fantasma-aprobada": {
+            "status": "Approved",
+            "id_verifications": [{"status": "Approved", "document_number": "42", "full_name": "Z"}],
+        },
+    }
+    # Ojo: "sess-fantasma-aprobada" NO está en historial_session_ids — simula
+    # que jamás tuvo un evento propio en kyc_events.
+    _setup(
+        monkeypatch,
+        session_row={"didit_session_id": "sess-actual"},
+        decisiones=decisiones,
+        historial_session_ids=["sess-actual"],
+        aprobar_calls=aprobar_calls,
+    )
+    res = recheck_verificacion(
+        14, request=object(), body=RecheckVerificacionIn(session_id="sess-fantasma-aprobada")
+    )
+    assert res == {"status": "Approved", "aplicado": True, "session_id": "sess-fantasma-aprobada"}
+    assert aprobar_calls[0]["session_id"] == "sess-fantasma-aprobada"
+
+
+def test_override_sin_ninguna_sesion_guardada_no_tira_409(monkeypatch):
+    """Con override, ni siquiera hace falta que el cliente tenga
+    `didit_session_id` ni historial — se consulta la sesión pedida igual."""
+    decisiones = {"sess-pegada": {"status": "Declined"}}
+    estado_calls = []
+    _setup(
+        monkeypatch,
+        session_row={"didit_session_id": None},
+        decisiones=decisiones,
+        estado_calls=estado_calls,
+    )
+    res = recheck_verificacion(15, request=object(), body=RecheckVerificacionIn(session_id="sess-pegada"))
+    assert res == {"status": "Declined", "aplicado": True, "session_id": "sess-pegada"}
