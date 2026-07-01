@@ -27,14 +27,18 @@ _EMISORES_DATA: dict[str, dict] = {
     "pablo": {
         "cond_iva_label": "IVA Responsable Inscripto",
         "domicilio": os.getenv("AFIP_PABLO_DOMICILIO", "Mar del Plata, Buenos Aires"),
-        "iibb": os.getenv("AFIP_PABLO_IIBB", "—"),
-        "inicio_actividades": os.getenv("AFIP_PABLO_INICIO_ACTIVIDADES", "—"),
+        # No son obligatorios para que la factura electrónica sea válida (la
+        # validez la da el CAE/QR de ARCA, no estos datos) — son la
+        # convención "clásica" del talonario impreso. Sin configurar → el
+        # renglón entero se omite (nunca se muestra un "—" vacío).
+        "iibb": os.getenv("AFIP_PABLO_IIBB", ""),
+        "inicio_actividades": os.getenv("AFIP_PABLO_INICIO_ACTIVIDADES", ""),
     },
     "santini": {
         "cond_iva_label": "Responsable Monotributo",
         "domicilio": os.getenv("AFIP_SANTINI_DOMICILIO", "Falucho 4625, Mar del Plata"),
-        "iibb": os.getenv("AFIP_SANTINI_IIBB", "—"),
-        "inicio_actividades": os.getenv("AFIP_SANTINI_INICIO_ACTIVIDADES", "—"),
+        "iibb": os.getenv("AFIP_SANTINI_IIBB", ""),
+        "inicio_actividades": os.getenv("AFIP_SANTINI_INICIO_ACTIVIDADES", ""),
     },
 }
 
@@ -321,6 +325,15 @@ def _factura_clasica_html(f: dict) -> str:
             'align-items:center;justify-content:center;font-size:9px;color:#666;">QR</div>'
         )
 
+    iibb_line = (
+        f'<div style="margin-bottom:4px;"><span style="font-weight:700;">Ingresos Brutos:</span> {_e(f["emisor"]["iibb"])}</div>'
+        if f["emisor"]["iibb"] else ""
+    )
+    inicio_line = (
+        f'<div><span style="font-weight:700;">Fecha de Inicio de Actividades:</span> {_e(f["emisor"]["inicio"])}</div>'
+        if f["emisor"]["inicio"] else ""
+    )
+
     filas_items = "".join(f"""
       <div style="display:grid;grid-template-columns:52px 1fr 62px 74px 96px 58px 100px;font-size:10px;">
         <div style="padding:7px 6px;border-right:1px solid #000;">{_e(c['codigo'])}</div>
@@ -362,8 +375,8 @@ def _factura_clasica_html(f: dict) -> str:
             <div style="margin-bottom:4px;"><span style="font-weight:700;">Punto de Venta: </span>{_e(f['emisor']['ptoVta'])}<span style="font-weight:700;margin-left:16px;">Comp. Nro: </span>{_e(f['comp']['nro'])}</div>
             <div style="margin-bottom:4px;"><span style="font-weight:700;">Fecha de Emisión:</span> {_e(f['comp']['fecha'])}</div>
             <div style="margin-bottom:4px;"><span style="font-weight:700;">CUIT:</span> {_e(f['emisor']['cuit'])}</div>
-            <div style="margin-bottom:4px;"><span style="font-weight:700;">Ingresos Brutos:</span> {_e(f['emisor']['iibb'])}</div>
-            <div><span style="font-weight:700;">Fecha de Inicio de Actividades:</span> {_e(f['emisor']['inicio'])}</div>
+            {iibb_line}
+            {inicio_line}
           </div>
         </div>
 
@@ -569,6 +582,15 @@ def _factura_formal_html(f: dict) -> str:
             'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#8a97a3;">QR…</div>'
         )
 
+    iibb_line = (
+        f'<div><span style="font-weight:600;color:#16202b;">Ingresos Brutos:</span> {_e(f["emisor"]["iibb"])}</div>'
+        if f["emisor"]["iibb"] else ""
+    )
+    inicio_line = (
+        f'<div><span style="font-weight:600;color:#16202b;">Inicio de Actividades:</span> {_e(f["emisor"]["inicio"])}</div>'
+        if f["emisor"]["inicio"] else ""
+    )
+
     filas_items = "".join(f"""
       <div style="display:grid;grid-template-columns:1fr 90px 150px 150px;gap:0;padding:12px 0;border-bottom:1px solid #eef1f4;align-items:baseline;">
         <div><div style="font-size:15px;font-weight:600;">{_e(c['desc'])}</div><div style="font-size:12.5px;color:#8a97a3;margin-top:2px;">{_e(c['detalle'])}</div></div>
@@ -603,8 +625,8 @@ def _factura_formal_html(f: dict) -> str:
               <div><span style="font-weight:600;color:#16202b;">CUIT:</span> {_e(f['emisor']['cuit'])}</div>
               <div><span style="font-weight:600;color:#16202b;">Condición frente al IVA:</span> {_e(f['emisor']['cond'])}</div>
               <div><span style="font-weight:600;color:#16202b;">Domicilio Comercial:</span> {_e(f['emisor']['dom'])}</div>
-              <div><span style="font-weight:600;color:#16202b;">Ingresos Brutos:</span> {_e(f['emisor']['iibb'])}</div>
-              <div><span style="font-weight:600;color:#16202b;">Inicio de Actividades:</span> {_e(f['emisor']['inicio'])}</div>
+              {iibb_line}
+              {inicio_line}
             </div>
           </div>
           <div>
