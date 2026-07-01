@@ -1,16 +1,23 @@
-# `services/specs/` — motor de specs (en construcción, Fase 2 hecha)
+# `services/specs/` — motor de specs (en construcción, Fase 3 hecha — parcial)
 
-> **Estado: registry + persistencia movidos, el embudo EXISTE pero está APAGADO.**
+> **Estado: el embudo está ENCENDIDO en la boca de persistir (la que importa en vivo).**
 > `registry/`, `queries/validation.py` y `commands/{coerce,persist,seed}.py` son código
-> real, movido verbatim desde `backend/specs/`, `backend/services/spec_coerce.py`,
-> `backend/services/spec_persist.py` y `backend/seeds/registry_seeder.py` (paths viejos =
-> shims ⏰ LEGACY hasta la **Fase 6**). La tabla `spec_value_aliases` y
-> `normalize/value_funnel.py::mapear_valor` ya existen y funcionan (Fase 2) — pero
-> **nadie los llama todavía**: `commands/coerce.py` y `queries/validation.py` no invocan
-> `mapear_valor`. Eso es la **Fase 3** ("enchufar el embudo a las 4 bocas"). Hoy
-> `spec_value_aliases` nace vacía (ningún `SpecDef` del catálogo declara `value_aliases`
-> real todavía — la curación de qué alias vale la pena es trabajo aparte, no de esta
-> fase). Plan completo + fases → [`docs/PLAN_SPECS_REDISENO.md`](../../../docs/PLAN_SPECS_REDISENO.md)
+> real, movido verbatim desde los paths viejos (shims ⏰ LEGACY hasta la **Fase 6**).
+> `commands/persist.py::persistir_specs` — el choke-point real, el mismo que llama
+> `PUT /admin/equipos/{id}/specs` — ahora prueba `mapear_valor` para `tipo="enum"` ANTES
+> de la coerción vieja (fail-open: si no matchea, cae al comportamiento de siempre). Dos
+> specs de compat "jerarquía" (`formato` en Cámaras y en Lentes) ya tienen `value_aliases`
+> reales sembrados (`FF`→Full-frame, `S35`→Super 35) — el resto del catálogo sigue sin
+> curar (tarea aparte, de criterio del dueño).
+>
+> **`queries/validation.py::validate_dataset` (boca "validar") quedó SIN enchufar a
+> propósito** — no tiene ningún llamador en vivo (solo un test que lintea fixtures contra
+> el registry Python, sin tocar DB nunca) y no recibe `conn`; forzarle DB-coupling para
+> una boca sin consumidor real es más cambio de diseño del que pide esta fase. Se retoma
+> si/cuando esa función tenga un caller real. Boca "buscar" (`queries/aliases.py`,
+> `search_source.py`) sigue siendo Fase 4, no existe. Boca "compat" no necesitó código —
+> vino gratis en cuanto la boca de persistir empezó a guardar valores canónicos.
+> Plan completo + fases → [`docs/PLAN_SPECS_REDISENO.md`](../../../docs/PLAN_SPECS_REDISENO.md)
 > · tracking → issue [#1163](https://github.com/tixenre/rental/issues/1163).
 
 ## Por qué existe (antes de tener código)
@@ -32,18 +39,18 @@ services/specs/
     catalogo/      #   camaras/lentes/iluminacion/modificadores/adaptadores/filtros
     shared/        #   enums/lighting/optica/physical
   commands/        # escritura — única puerta de mutación
-    persist.py     #   persistir_specs — todavía NO llama al embudo      ✓ Fase 1 (mudado)
-    coerce.py      #   coerce_and_serialize — todavía NO llama al embudo ✓ Fase 1 (mudado)
-    seed.py        #   seed_all_categorias + _sync_value_aliases         ✓ Fase 1+2
+    persist.py     #   persistir_specs — LLAMA a mapear_valor para enum    ✓ Fase 3
+    coerce.py      #   coerce_and_serialize — fallback si el embudo no matchea  ✓ Fase 1
+    seed.py        #   seed_all_categorias + _sync_value_aliases           ✓ Fase 1+2
     value_aliases.py  # CRUD ad-hoc de spec_value_aliases (admin/cola IA) ✗ no existe, sin fase asignada
   queries/         # lectura — nunca mutan
-    validation.py  #   validate_dataset — _check_value todavía NO llama al embudo (Fase 3)  ✓ Fase 1
+    validation.py  #   validate_dataset — SIN enchufar (sin conn, sin caller vivo)  ✓ Fase 1
     definitions.py     # ✗ no existe — mapear_valor hace su propia lectura de spec_definitions
     equipo_specs.py    # ✗ Fase futura, no existe
     search_source.py   # proyección specs→texto buscable                ✗ Fase 4, no existe
     aliases.py          # expansión de término para búsqueda            ✗ Fase 4, no existe
   normalize/
-    value_funnel.py    # mapear_valor(conn, spec_def_id, raw) — EXISTE, funciona, nadie lo llama todavía  ✓ Fase 2
+    value_funnel.py    # mapear_valor(conn, spec_def_id, raw) — EXISTE, llamado desde persist.py  ✓ Fase 2+3
 ```
 
 ## Reglas (van a regir desde que haya código; se aplican ya al diseñar cada fase)
@@ -88,15 +95,33 @@ services/specs/
   que los *imports* resuelvan, no que un `mock.patch` de una llamada interna siga
   interceptando — para eso hay que patchear donde la función CALLER vive ahora.
 
+## Gotchas de la Fase 3
+
+- **`enum_options` no siempre llega como lista Python.** En Postgres real (JSONB) el
+  driver lo auto-decodea a `list`; en fakes de test (SQLite, `enum_options TEXT`) llega
+  como JSON string crudo. `coerce_and_serialize` ya lo manejaba (`_parse_opts`);
+  `mapear_valor` al principio NO — asumía lista y hubiera iterado caracter por caracter de
+  un string sin explotar (resultado silenciosamente mal, no un error visible). Se arregló
+  reusando `_parse_opts` (mismo parseo, no uno segundo) — `normalize/` SÍ puede importar
+  de `commands/` para esto (no es un ciclo: `commands/coerce.py` no importa de `normalize/`).
+- **Los mocks de schema hecho-a-mano (`tests/test_persistir_specs_6a.py`, SQLite
+  in-memory) no tienen las tablas nuevas.** Enchufar el embudo en `persistir_specs` hizo
+  que ese test explotara con `no such table: spec_value_aliases` — el fake schema de ese
+  archivo se arma a mano (no corre `init_db()`), así que toda tabla nueva que un choke-point
+  empiece a consultar hay que agregarla ahí también. Buscar `CREATE TABLE spec_definitions`
+  en `tests/*.py` antes de tocar un choke-point, para encontrar estos fakes.
+
 ## Qué NO hacer
 
 - No agregar lógica nueva de specs en `routes/specs/*.py` — pasa a `commands/`/`queries/`
   a medida que cada fase las mueve.
 - No inventar un segundo mecanismo de normalización de valores en paralelo al embudo
   (`normalize/value_funnel.py`) — ya existe, úsalo.
-- No cargar `value_aliases` "reales" en el catálogo (`registry/catalogo/*.py`) como parte
-  de trabajo de infraestructura — la curación (qué sinónimos vale la pena declarar) es
-  una tarea aparte, de criterio del dueño, no algo que se decide de paso.
+- No hacer una pasada de curación amplia de `value_aliases` como parte de trabajo de
+  infraestructura — eso es tarea aparte, de criterio del dueño. Sí está bien sembrar un
+  puñado mínimo, bien justificado (abreviaturas de uso real conocido, no adivinadas) al
+  enchufar una boca nueva, para tener algo concreto que probar — como `formato` en
+  Fase 3 (`FF`/`S35`). La curación real y amplia sigue pendiente.
 - No mover el motor de compatibilidad ni reescribir el seeder "ya que estamos" — no lo
   pide ningún objetivo de la iniciativa; es exactamente el riesgo que el plan evitó a
   propósito.

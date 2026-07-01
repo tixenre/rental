@@ -94,6 +94,7 @@ def persistir_specs(
 
     Returns: {"persisted": int, "discarded": list[dict]}
     """
+    from ..normalize.value_funnel import mapear_valor
     from .coerce import coerce_and_serialize
 
     conn.execute("DELETE FROM equipo_specs WHERE equipo_id = %s", (equipo_id,))
@@ -121,12 +122,20 @@ def persistir_specs(
             if persist_value == "[]":
                 continue
         elif coerce:
-            persist_value = coerce_and_serialize(
-                value,
-                tipo,
-                sd.get("unidad") if sd else None,
-                sd.get("enum_options") if sd else None,
-            )
+            # Embudo de alias de valor (#1163 F3): para enum, probar primero
+            # el mapeo canónico+alias (case/acento/guión-insensible, más
+            # cualquier sinónimo curado en spec_value_aliases). Fail-open:
+            # si no matchea nada, cae al coerce_and_serialize de siempre —
+            # nunca hace peor que antes. Todavía no cubre multi_enum (cada
+            # parte necesitaría su propio mapeo; queda para cuando haga falta).
+            persist_value = mapear_valor(conn, spec_def_id, str(value)) if tipo == "enum" else None
+            if persist_value is None:
+                persist_value = coerce_and_serialize(
+                    value,
+                    tipo,
+                    sd.get("unidad") if sd else None,
+                    sd.get("enum_options") if sd else None,
+                )
             if persist_value is None:
                 discarded.append({
                     "spec_def_id": spec_def_id,

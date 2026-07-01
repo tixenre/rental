@@ -51,6 +51,9 @@ CAT = CategoriaRegistry(
             es_compatibilidad=True, compatibilidad_modo="jerarquia",
             rol_compatibilidad="contenido",
             aliases=["Sensor Type", "Sensor Format", "Sensor Size", "Sensor Size Type"],
+            # Sinónimos de VALOR (embudo #1163 F3) — abreviaturas de uso real,
+            # no variantes de formato (esas ya matchean por normalización).
+            value_aliases={"Full-frame": ["FF"], "Super 35": ["S35"]},
         ),
         SpecDef(
             key="resolucion_max", label="Resolución máxima", tipo="enum",

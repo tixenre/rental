@@ -1,13 +1,16 @@
-"""Embudo de alias de valor contra Postgres REAL (#1163 Fase 2).
+"""Embudo de alias de valor contra Postgres REAL (#1163 Fases 2-3).
 
 Cubre lo que test_specs_value_aliases_model.py no puede sin DB:
 1. _sync_value_aliases escribe filas, es idempotente (ON CONFLICT), y no
    escribe nada en dry_run.
 2. mapear_valor resuelve: value ya canónico (con distinto casing/acentos/
    guiones), alias conocido, y None cuando no matchea nada.
-
-Todavía sin consumidor real (coerce/validation no llaman a mapear_valor
-hasta la Fase 3) — este test verifica el mecanismo en aislamiento.
+3. (Fase 3) persistir_specs — el choke-point real, el mismo que llama
+   PUT /admin/equipos/{id}/specs — usa el embudo para tipo=enum: guardar
+   "FF" persiste "Full-frame", y dos equipos que tipearon distinto (uno
+   "FF", otro "Full-frame") terminan con el mismo value guardado — que es
+   lo que hace que el motor de compat (matchea por igualdad exacta) los
+   vea compatibles.
 
 OPT-IN y SEGURO POR DEFECTO (mismo gating que los otros *_db.py): se saltea
 salvo RESERVAS_DB_TEST=1 + DATABASE_URL con 'test' en el nombre. Ids altos
@@ -18,6 +21,7 @@ from urllib.parse import urlparse
 
 import pytest
 
+from services.specs.commands.persist import persistir_specs
 from services.specs.commands.seed import _sync_value_aliases, _upsert_spec_definition
 from services.specs.normalize.value_funnel import mapear_valor
 from services.specs.registry.models import SpecDef
@@ -46,9 +50,11 @@ pytestmark = [
 # Categoría ancla de id fijo alto — spec_definitions/spec_value_aliases cuelgan
 # de acá por FK CASCADE, así que borrar la categoría limpia todo.
 C_ANCLA = 9_400_201
+EQ_TIPEO_FF, EQ_TIPEO_CANONICO = 9_400_301, 9_400_302
 
 
 def _limpiar(conn):
+    conn.execute("DELETE FROM equipos WHERE id IN (%s, %s)", (EQ_TIPEO_FF, EQ_TIPEO_CANONICO))
     conn.execute("DELETE FROM categorias WHERE id = %s", (C_ANCLA,))
 
 
@@ -158,3 +164,55 @@ class TestMapearValor:
 
         with get_db() as conn:
             assert mapear_valor(conn, 999_999_999, "FF") is None
+
+
+class TestPersistirSpecsConElEmbudo:
+    """Fase 3: el choke-point real (el mismo que llama la ruta HTTP) usa el
+    embudo — no solo mapear_valor en aislamiento."""
+
+    def test_ff_se_persiste_como_full_frame(self, spec_def_id):
+        from database import get_db
+
+        with get_db() as conn:
+            conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s, %s, 1)", (EQ_TIPEO_FF, "eq-ff-test"))
+            sd = conn.execute(
+                "SELECT id, label, tipo, enum_options, unidad FROM spec_definitions WHERE id = %s",
+                (spec_def_id,),
+            ).fetchone()
+            result = persistir_specs(conn, EQ_TIPEO_FF, {str(spec_def_id): "FF"}, {spec_def_id: dict(sd)})
+            conn.commit()
+
+            assert result == {"persisted": 1, "discarded": []}
+            row = conn.execute(
+                "SELECT value FROM equipo_specs WHERE equipo_id = %s AND spec_def_id = %s",
+                (EQ_TIPEO_FF, spec_def_id),
+            ).fetchone()
+            assert row["value"] == "Full-frame"
+
+    def test_dos_equipos_con_distinto_tipeo_quedan_compatibles(self, spec_def_id):
+        """El motor de compat matchea por igualdad EXACTA de value — este es
+        el caso concreto que el embudo arregla: antes 'FF' y 'Full-frame'
+        guardaban distinto y la compat nunca los veía como iguales."""
+        from database import get_db
+
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO equipos (id, nombre, cantidad) VALUES (%s, %s, 1), (%s, %s, 1)",
+                (EQ_TIPEO_FF, "eq-ff-test", EQ_TIPEO_CANONICO, "eq-canonico-test"),
+            )
+            sd = conn.execute(
+                "SELECT id, label, tipo, enum_options, unidad FROM spec_definitions WHERE id = %s",
+                (spec_def_id,),
+            ).fetchone()
+            defs_by_id = {spec_def_id: dict(sd)}
+
+            persistir_specs(conn, EQ_TIPEO_FF, {str(spec_def_id): "FF"}, defs_by_id)
+            persistir_specs(conn, EQ_TIPEO_CANONICO, {str(spec_def_id): "Full-frame"}, defs_by_id)
+            conn.commit()
+
+            valores = conn.execute(
+                "SELECT DISTINCT value FROM equipo_specs WHERE equipo_id IN (%s, %s) AND spec_def_id = %s",
+                (EQ_TIPEO_FF, EQ_TIPEO_CANONICO, spec_def_id),
+            ).fetchall()
+            assert len(valores) == 1
+            assert valores[0]["value"] == "Full-frame"

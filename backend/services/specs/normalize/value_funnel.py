@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from busqueda.normalizar import normalizar
 
+from ..commands.coerce import _parse_opts
+
 
 def mapear_valor(conn, spec_def_id: int, raw: str) -> str | None:
     """Dado un value crudo, devuelve el canónico correspondiente o None.
@@ -45,7 +47,11 @@ def mapear_valor(conn, spec_def_id: int, raw: str) -> str | None:
     if not def_row:
         return None
 
-    for canonico in (def_row["enum_options"] or []):
+    # enum_options viene ya-lista en Postgres real (JSONB auto-decodeado por
+    # el driver) pero como JSON string crudo en algunos fakes de test (sqlite)
+    # — _parse_opts (mismo helper que usa coerce_and_serialize) normaliza los
+    # dos casos. Fuente única, no un segundo parseo paralelo.
+    for canonico in _parse_opts(def_row["enum_options"]):
         if normalizar(canonico) == raw_norm:
             return canonico
 

@@ -51,6 +51,9 @@ CAT = CategoriaRegistry(
             es_compatibilidad=True, compatibilidad_modo="jerarquia",
             rol_compatibilidad="contenedor",
             aliases=["Image Circle", "Coverage", "Sensor Coverage"],
+            # Sinónimos de VALOR (embudo #1163 F3) — abreviaturas de uso real,
+            # no variantes de formato (esas ya matchean por normalización).
+            value_aliases={"Full-frame": ["FF"], "Super 35": ["S35"]},
         ),
         diametro_filtro(
             prioridad=55,
