@@ -284,15 +284,6 @@ def listar_facturas(
 _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
 
-def _factura_filename(factura) -> str:
-    cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
-        factura.cbte_tipo, "X"
-    )
-    es_nc = factura.cbte_tipo in (3, 8, 13)
-    prefijo = "NC" if es_nc else "Factura"
-    return f"{prefijo}-{cbte_tipo_letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}.pdf"
-
-
 def _factura_html_o_404(factura_id: int, conn):
     """Carga la factura + renderiza su HTML al vuelo. La factura no cambia una
     vez emitida, así que no hace falta guardar el PDF: regenerar da lo mismo."""
@@ -324,6 +315,7 @@ async def descargar_pdf_factura(factura_id: int, request: Request, format: str =
         return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
 
     from pdf import _render_pdf
+    from services.facturacion.pdf import factura_filename
     try:
         pdf_bytes = await _render_pdf(html_str)
     except Exception as e:
@@ -333,7 +325,7 @@ async def descargar_pdf_factura(factura_id: int, request: Request, format: str =
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="{_factura_filename(factura)}"',
+            "Content-Disposition": f'attachment; filename="{factura_filename(factura)}"',
             **_DOC_NO_CACHE,
         },
     )
@@ -372,6 +364,7 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     nombre_cliente = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip() or email_cliente
 
     from pdf import _render_pdf
+    from services.facturacion.pdf import factura_filename
     try:
         pdf_bytes = await _render_pdf(html_str)
     except Exception as e:
@@ -380,7 +373,7 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
         factura.cbte_tipo, "X"
     )
-    filename = _factura_filename(factura)
+    filename = factura_filename(factura)
 
     nro = f"{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}"
     subject = f"Tu factura {cbte_tipo_letra} Nº {nro} — Rambla Rental"

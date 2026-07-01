@@ -210,6 +210,11 @@ def cliente_pedidos(request: Request):
         from routes.alquileres import _batch_get_alquiler_items
         items_por_pedido = _batch_get_alquiler_items(conn, [p["id"] for p in pedidos])
 
+        from services.facturacion.repo import pedidos_con_factura_emitida
+        pedidos_con_factura = pedidos_con_factura_emitida(
+            [p["id"] for p in pedidos], conn
+        )
+
         result = []
         for p in pedidos:
             d = row_to_dict(p)
@@ -238,7 +243,10 @@ def cliente_pedidos(request: Request):
             """, (p["id"],)).fetchall()
             d["solicitudes"] = [row_to_dict(s) for s in solic]
 
-            d["documentos_disponibles"] = _documentos_disponibles(d.get("estado", ""))
+            d["documentos_disponibles"] = {
+                **_documentos_disponibles(d.get("estado", "")),
+                "factura": p["id"] in pedidos_con_factura,
+            }
 
             result.append(d)
         return result
@@ -281,7 +289,11 @@ def cliente_pedido_detalle(id: int, request: Request):
         """, (id,)).fetchall()
         d["solicitudes"] = [row_to_dict(s) for s in solicitudes]
 
-        d["documentos_disponibles"] = _documentos_disponibles(d.get("estado", ""))
+        from services.facturacion.repo import get_factura_principal_emitida
+        d["documentos_disponibles"] = {
+            **_documentos_disponibles(d.get("estado", "")),
+            "factura": get_factura_principal_emitida(id, conn) is not None,
+        }
 
         # Desglose canónico (neto/IVA/total con IVA) vía services/precios.
         # Mismo helper que admin/PDF/carrito → totales coinciden en las 4

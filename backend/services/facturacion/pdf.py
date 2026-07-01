@@ -149,6 +149,13 @@ def _google_fonts() -> str:
 # ---------------------------------------------------------------------------
 
 
+def factura_filename(factura) -> str:
+    """Nombre de archivo canónico del PDF de una factura/NC (admin + portal cliente)."""
+    letra = _CBTE_TIPO_LABEL.get(factura.cbte_tipo, "X")
+    prefijo = "NC" if _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False) else "Factura"
+    return f"{prefijo}-{letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}.pdf"
+
+
 def factura_html(factura, pedido: dict) -> str:
     """Genera el HTML completo de la factura (Factura A/C o Nota de Crédito).
 
