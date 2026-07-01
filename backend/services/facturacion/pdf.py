@@ -317,9 +317,9 @@ def _qr_img(url: str, size: int) -> str:
 
 
 def _factura_clasica_html(f: dict) -> str:
-    if f["qr"]["has"]:
-        qr_block = _qr_img(f["qr"]["url"], 112)
-    else:
+    qr_block = _qr_img(f["qr"]["url"], 112) if f["qr"]["has"] else ""
+    if not qr_block:
+        # Sin payload O la generación falló (nunca dejar un hueco en blanco).
         qr_block = (
             '<div style="width:112px;height:112px;border:1px solid #000;display:flex;'
             'align-items:center;justify-content:center;font-size:9px;color:#666;">QR</div>'
@@ -457,9 +457,10 @@ def _factura_clasica_html(f: dict) -> str:
 
 
 def _factura_mobile_html(f: dict) -> str:
-    if f["qr"]["has"]:
-        qr_block = _qr_img(f["qr"]["url"], 120)
-    else:
+    tipo_banner = "Nota de crédito electrónica · Original" if f["es_nc"] else "Factura electrónica · Original"
+
+    qr_block = _qr_img(f["qr"]["url"], 120) if f["qr"]["has"] else ""
+    if not qr_block:
         qr_block = (
             '<div style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;'
             'font-family:\'JetBrains Mono\',monospace;font-size:10px;color:#8a97a3;">QR…</div>'
@@ -493,7 +494,7 @@ def _factura_mobile_html(f: dict) -> str:
       </div>
     </div>
 
-    <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:8px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">Factura electrónica · Original</div>
+    <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:8px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">{_e(tipo_banner)}</div>
 
     <div style="padding:11px 20px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px 14px;">
       <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Punto de venta</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['emisor']['ptoVta'])}</div></div>
@@ -574,9 +575,10 @@ def _factura_mobile_html(f: dict) -> str:
 
 
 def _factura_formal_html(f: dict) -> str:
-    if f["qr"]["has"]:
-        qr_block = _qr_img(f["qr"]["url"], 150)
-    else:
+    tipo_banner = "Nota de crédito electrónica · Original" if f["es_nc"] else "Factura electrónica · Original"
+
+    qr_block = _qr_img(f["qr"]["url"], 150) if f["qr"]["has"] else ""
+    if not qr_block:
         qr_block = (
             '<div style="width:150px;height:150px;display:flex;align-items:center;justify-content:center;'
             'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#8a97a3;">QR…</div>'
@@ -615,7 +617,7 @@ def _factura_formal_html(f: dict) -> str:
           </div>
         </div>
 
-        <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:0.2em;text-transform:uppercase;padding:11px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">Factura electrónica · Original</div>
+        <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:0.2em;text-transform:uppercase;padding:11px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">{_e(tipo_banner)}</div>
 
         <div style="padding:30px 44px;display:grid;grid-template-columns:1fr 1fr;gap:36px;border-bottom:1px solid #eef1f4;">
           <div>
