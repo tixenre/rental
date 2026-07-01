@@ -214,20 +214,32 @@ async def _get_browser():
     return _browser
 
 
-async def _render_pdf(html: str) -> bytes:
-    """Renderiza un HTML como PDF A4 usando Playwright.
+async def _render_pdf(html: str, *, page_size: tuple[int, int | None] | None = None) -> bytes:
+    """Renderiza un HTML como PDF usando Playwright.
 
     Reutiliza un único proceso Chromium; abre y cierra una page por request.
+    Por default exporta A4 (documentos de pedido/reportes). `page_size`
+    (width_px, height_px) fuerza un tamaño de página propio en vez de A4 —
+    para piezas que no son A4 (p.ej. la factura "celular", pensada para
+    compartir por WhatsApp). `height_px=None` mide el alto real del
+    contenido (`document.body.scrollHeight`) para que la página termine
+    justo donde termina el comprobante, sin cortar ni dejar espacio de más.
     """
     browser   = await _get_browser()
     page      = await browser.new_page()
     try:
         await page.set_content(html, wait_until="networkidle")
-        pdf_bytes = await page.pdf(
-            format="A4",
-            margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
-            print_background=True,
-        )
+        margin = {"top": "0", "bottom": "0", "left": "0", "right": "0"}
+        if page_size:
+            width_px, height_px = page_size
+            if height_px is None:
+                height_px = await page.evaluate("document.body.scrollHeight")
+            pdf_bytes = await page.pdf(
+                width=f"{width_px}px", height=f"{height_px}px",
+                margin=margin, print_background=True,
+            )
+        else:
+            pdf_bytes = await page.pdf(format="A4", margin=margin, print_background=True)
     finally:
         await page.close()
     return pdf_bytes

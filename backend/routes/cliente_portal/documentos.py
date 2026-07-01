@@ -106,11 +106,11 @@ def _doc_response(
     return None  # caller sigue con PDF
 
 
-async def _doc_response_or_pdf(html_str: str, pdf_filename: str, format: str):
+async def _doc_response_or_pdf(html_str: str, pdf_filename: str, format: str, page_size=None):
     preview = _doc_response(html_str, pdf_filename, format)
     if preview is not None:
         return preview
-    pdf_bytes = await _render_pdf(html_str)
+    pdf_bytes = await _render_pdf(html_str, page_size=page_size)
     from fastapi.responses import Response
     return Response(
         content=pdf_bytes,
@@ -163,11 +163,16 @@ async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf")
 
 @router.get("/api/cliente/pedidos/{id}/factura.pdf")
 @router.get("/api/cliente/pedidos/{id}/factura")
-async def cliente_pedido_factura(id: int, request: Request, format: str = "pdf"):
+async def cliente_pedido_factura(
+    id: int, request: Request, format: str = "pdf", layout: str = "clasica"
+):
     """Factura ARCA del pedido. A diferencia de remito/contrato/albarán, no
     depende del estado del pedido sino de si la factura ya fue emitida —
-    aparece como documento recién ahí, no antes (y desaparece si se anula)."""
+    aparece como documento recién ahí, no antes (y desaparece si se anula).
+    `layout`: 'clasica' (default) · 'celular' (para compartir por WhatsApp) · 'formal'."""
     session = require_cliente(request)
+    if layout not in ("clasica", "celular", "formal"):
+        layout = "clasica"
     with get_db() as conn:
         row = conn.execute(
             "SELECT id FROM alquileres WHERE id = %s AND cliente_id = %s",
@@ -182,9 +187,12 @@ async def cliente_pedido_factura(id: int, request: Request, format: str = "pdf")
             raise HTTPException(404, "Todavía no hay factura para este pedido.")
 
         from services.facturacion.engine import _get_pedido
-        from services.facturacion.pdf import factura_html, factura_filename
+        from services.facturacion.pdf import factura_html, factura_filename, page_size_for_layout
         pedido_data = _get_pedido(conn, id)
-        html_str = factura_html(factura, pedido_data)
+        html_str = factura_html(factura, pedido_data, layout=layout)
 
-    return await _doc_response_or_pdf(html_str, factura_filename(factura), format)
+    return await _doc_response_or_pdf(
+        html_str, factura_filename(factura, layout=layout), format,
+        page_size=page_size_for_layout(layout),
+    )
 

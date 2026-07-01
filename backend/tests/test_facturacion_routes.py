@@ -158,7 +158,7 @@ def test_descargar_pdf_format_html_devuelve_preview_sin_renderer(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido: "<html>FACTURA-X</html>"
+        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html>FACTURA-X</html>"
     )
 
     resp = asyncio.run(
@@ -178,10 +178,10 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido: "<html></html>"
+        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
 
-    async def _fake_render_pdf(html):
+    async def _fake_render_pdf(html, **_):
         return b"%PDF-FAKE%"
 
     monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
