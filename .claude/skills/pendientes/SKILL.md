@@ -31,9 +31,10 @@ Qué reusás de los otros (NO lo re-expliques acá):
 - **Labels** → `docs/ISSUE_LABELS.md` es la fuente única de las 3 dimensiones obligatorias + cross-cutting.
 - **Workflow / `Closes #N` / auto-cierre en `dev→main`** → MEMORIA *2026-06-08 — Issues* y *Workflow de cambios*.
 
-> **Herramientas.** Acá **no hay `gh` CLI** → todo por `mcp__github__*` (`list_issues`, `list_commits`,
-> `list_pull_requests`, `search_issues`, `issue_write`, `add_issue_comment`). Ojo: `list_issues` devuelve
-> `{issues, totalCount, pageInfo}` (un **dict**, no una lista).
+> **Herramientas.** Depende del entorno — **no asumas**: si `gh` CLI está disponible (app de Mac /
+> terminal), usalo directo (más rápido); si no (sesión web/nube), caé a `mcp__github__*` (`list_issues`,
+> `list_commits`, `list_pull_requests`, `search_issues`, `issue_write`, `add_issue_comment`). Ojo:
+> `list_issues` devuelve `{issues, totalCount, pageInfo}` (un **dict**, no una lista).
 
 ## El método: reconciliar → triagear → deduplicar → etiquetar → intake → reportar
 

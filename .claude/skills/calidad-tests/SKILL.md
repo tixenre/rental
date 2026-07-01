@@ -106,6 +106,22 @@ grep -rn 'assert.*response.*json\|assert.*"id"\|assert.*"precio"' backend/tests/
 
 Ratio alto de "solo 200 OK" vs "verifica el contenido" → tests superficiales.
 
+**3d. ¿Un test de fecha usa el reloj del repo (`now_ar()`) o el del sistema (`date.today()`)?**
+
+**Caso testigo:** un test que compara contra "hoy"/"ahora" pero construye la fecha con
+`datetime.date.today()` (hora del sistema, **UTC** en CI) en vez de `now_ar()` (la convención del
+repo, hora de Argentina) **flakea** en la ventana ~00:00–03:00 UTC — ahí UTC ya es el día siguiente
+que AR, así que "hoy" difiere entre el test y el código bajo prueba. Pasó de verdad dos veces: como
+flake de test (`test_check_fechas_pasada_cliente`, #1131 — tapó el CI verde de un cambio no
+relacionado) y como **bug real en producción** (`tablero.mes_actual()`, `movimientos._mes_de_fecha`,
+`pagos.py` usaban `date.today()` donde debía ir `now_ar()`; corregido en #1136 vía
+`services.fechas.mes_actual_ar`). Patrón repetible: **el ahora/hoy del repo es `now_ar()`, nunca
+`date.today()`** — vale tanto para el código bajo prueba como para el test que lo verifica.
+
+```bash
+grep -rn 'date\.today()\|datetime\.now()' backend/tests/ backend/ --include="*.py" | grep -v now_ar
+```
+
 ### 4 · Identificar gaps críticos
 
 Los edge cases más peligrosos que frecuentemente no están testeados:
