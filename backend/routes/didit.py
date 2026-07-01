@@ -139,6 +139,29 @@ def iniciar_verificacion(cliente_id: int, request: Request):
 # vienen "In_review"/"Under_review"; la API directa documenta "In Review").
 _ESTADOS_EN_REVISION = {"in_review", "under_review", "processing", "in_progress"}
 
+# Tope de sesiones históricas a re-consultar (barato: GETs de un admin action
+# puntual, no hot-path — pero sin cap un cliente con decenas de reintentos
+# podría disparar demasiados GETs a Didit de un solo click).
+_MAX_SESIONES_HISTORIAL = 20
+
+
+def _sesiones_conocidas(conn, cliente_id: int) -> list:
+    """`session_id` de Didit con al menos un evento propio para este cliente
+    (`kyc_events`, ya scopeado a `cliente_id`), del más reciente al más viejo.
+
+    Un cliente puede reintentar la verificación varias veces mientras un admin
+    revisa a mano una sesión anterior en el dashboard de Didit — cada reintento
+    pisa `clientes.didit_session_id` con la sesión nueva (siempre la más
+    reciente), así que la sesión que el admin terminó aprobando puede ya no ser
+    la "actual". Este historial es lo que le permite al recheck encontrarla."""
+    rows = conn.execute(
+        """SELECT session_id FROM kyc_events
+           WHERE cliente_id=%s AND session_id IS NOT NULL
+           GROUP BY session_id ORDER BY MAX(id) DESC LIMIT %s""",
+        (cliente_id, _MAX_SESIONES_HISTORIAL),
+    ).fetchall()
+    return [row_to_dict(r)["session_id"] for r in rows]
+
 
 @router.post("/admin/verificacion/recheck/{cliente_id}")
 def recheck_verificacion(cliente_id: int, request: Request):
@@ -152,8 +175,16 @@ def recheck_verificacion(cliente_id: int, request: Request):
     llegó y se perdió). Este endpoint refleja en Rambla lo que Didit devuelve
     HOY, en vez de que el admin tenga que marcarlo aprobado él mismo.
 
+    Revisa TODO el historial conocido de sesiones del cliente (`_sesiones_conocidas`),
+    no solo la que `clientes.didit_session_id` sigue rastreando: si el cliente
+    reintentó la verificación mientras el admin la revisaba, la sesión actual ya
+    no es la aprobada — la búsqueda encuentra la que sí lo está en cualquier
+    punto del historial y **mueve el puntero** (`didit_session_id`) hacia ella
+    antes de aplicarla (así `identity.kyc.aprobar` sigue validando `_session_coincide`
+    contra el mismo campo, sin relajar esa defensa).
+
     404 si el cliente no existe. 409 si nunca inició una verificación (sin
-    `didit_session_id`). 503 si Didit no está configurado o no responde.
+    ninguna sesión conocida). 503 si Didit no está configurado o no responde.
     """
     require_admin(request)
 
@@ -161,35 +192,62 @@ def recheck_verificacion(cliente_id: int, request: Request):
         row = conn.execute(
             "SELECT didit_session_id FROM clientes WHERE id=%s", (cliente_id,)
         ).fetchone()
-    if not row:
-        raise HTTPException(404, "Cliente no encontrado")
-    session_id = row_to_dict(row).get("didit_session_id")
-    if not session_id:
+        if not row:
+            raise HTTPException(404, "Cliente no encontrado")
+        actual = row_to_dict(row).get("didit_session_id")
+        historial = _sesiones_conocidas(conn, cliente_id)
+
+    # La sesión actual primero (la más probable) + el resto del historial sin duplicar.
+    candidatos = ([actual] if actual else []) + [s for s in historial if s != actual]
+    if not candidatos:
         raise HTTPException(409, "El cliente todavía no inició una verificación con Didit")
 
-    try:
-        decision = retrieve_decision(session_id)
-    except DiditNotConfiguredError:
-        raise HTTPException(503, "Verificación de identidad no habilitada (DIDIT_API_KEY)")
-    except httpx.HTTPStatusError as exc:
-        logger.error(
-            "didit: %s al re-chequear session_id=%s cliente_id=%s",
-            exc.response.status_code, session_id, cliente_id,
-        )
-        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
-    except Exception as exc:
-        logger.error(
-            "didit: error al re-chequear session_id=%s cliente_id=%s — %s",
-            session_id, cliente_id, exc,
-        )
-        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
+    mejor: Optional[tuple] = None  # (session_id, decision, status, status_key)
+    for candidato in candidatos:
+        try:
+            decision = retrieve_decision(candidato)
+        except DiditNotConfiguredError:
+            raise HTTPException(503, "Verificación de identidad no habilitada (DIDIT_API_KEY)")
+        except httpx.HTTPStatusError as exc:
+            # Una sesión puntual del historial puede haber expirado/borrado en Didit
+            # — no aborta la búsqueda, seguimos con las demás candidatas.
+            logger.warning(
+                "didit: %s al re-chequear session_id=%s cliente_id=%s (historial)",
+                exc.response.status_code, candidato, cliente_id,
+            )
+            continue
+        except Exception as exc:
+            logger.warning(
+                "didit: error al re-chequear session_id=%s cliente_id=%s (historial) — %s",
+                candidato, cliente_id, exc,
+            )
+            continue
 
-    status = (decision.get("status") or "").strip()
-    status_key = status.lower().replace(" ", "_")
+        status = (decision.get("status") or "").strip()
+        status_key = status.lower().replace(" ", "_")
+        if status_key == "approved":
+            mejor = (candidato, decision, status, status_key)
+            break  # encontramos la aprobada — no hace falta seguir revisando el historial
+        if mejor is None:
+            mejor = (candidato, decision, status, status_key)  # primera respuesta válida, de fallback
+
+    if mejor is None:
+        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
+    session_id, decision, status, status_key = mejor
     logger.info("didit recheck: cliente_id=%s session_id=%s status=%s", cliente_id, session_id, status)
 
     aplicado: Optional[bool]
     if status_key == "approved":
+        if session_id != actual:
+            # Encontramos la aprobación en una sesión distinta a la que veníamos
+            # rastreando (el cliente reintentó de nuevo mientras se revisaba) —
+            # movemos el puntero para que _session_coincide la reconozca.
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
+                    (session_id, now_ar(), cliente_id),
+                )
+                conn.commit()
         datos = extraer_datos_renaper(decision)
         contactos = extraer_contactos(decision)
         aplicado = kyc.aprobar(cliente_id=cliente_id, session_id=session_id, datos=datos, contactos=contactos)

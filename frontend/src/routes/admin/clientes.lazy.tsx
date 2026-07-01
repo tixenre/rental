@@ -506,9 +506,9 @@ function ClienteHistorialSheet({
                     {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
                   </Button>
                   <p className="text-2xs text-muted-foreground">
-                    Le vuelve a preguntar a Didit el estado actual de la sesión — útil si ya lo
-                    aprobaste a mano en su dashboard. Si el cliente nunca inició una verificación,
-                    no hace nada.
+                    Le vuelve a preguntar a Didit — revisa todo el historial de intentos del
+                    cliente, no solo el último, así encuentra la sesión aprobada aunque haya
+                    reintentado después. Si nunca inició una verificación, no hace nada.
                   </p>
                 </div>
                 {linkVerif ? (
