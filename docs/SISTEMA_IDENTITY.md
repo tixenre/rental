@@ -173,8 +173,37 @@ El boundary del KYC. El payload crudo **muere acá**; `identity/` recibe datos n
 |---|---|
 | `decision.py` | Parser **puro**: `extraer_datos_renaper(decision)` → `DatosRenaper` (DNI/CUIL/nombre legal/dirección/…); `extraer_contactos(decision)` → `ContactosVerificados` (mail de `email_verifications[]`, teléfono E.164 de `phone_verifications[]`, con `is_disposable`/`is_virtual`/`is_breached`). |
 | `webhook.py` | Verifica la firma **HMAC-SHA256** (`X-Signature` sobre el body crudo + freshness por `X-Timestamp`). |
-| `client.py` | `retrieve_decision(session_id)` — GET por API (respaldo si el webhook llega 'liviano'). |
+| `client.py` | `retrieve_decision(session_id)` — GET por API (respaldo si el webhook llega 'liviano'; también fuente del re-chequeo admin). |
 | `routes/didit.py` | Transporte fino: crea sesión (admin/cliente, guarda `didit_session_id`), recibe el webhook y **delega** en `identity/kyc`. |
+
+**Re-chequeo admin (`POST /api/admin/verificacion/recheck/{cliente_id}`):** para el caso "Didit rechazó
+por algo menor (foto oscura) y el admin lo revisó/aprobó a mano *en el dashboard de Didit*, pero ese
+cambio no llegó a Rambla" — re-consulta `retrieve_decision(session_id)` (el mismo GET, fuente canónica; el
+objeto trae un **`status` top-level** — Approved/Declined/In Review/… — distinto del `id_verifications[].status`
+por-feature) y aplica el resultado por la pluma única `identity.kyc.aprobar`/`actualizar_estado`. **Nunca
+aprueba a mano**: solo refleja lo que Didit devuelve ahora. 409 si el cliente no tiene ninguna sesión conocida.
+
+**Historial, no solo la sesión actual:** un cliente puede reintentar la verificación varias veces
+*mientras* el admin revisa una sesión anterior en el dashboard de Didit — cada reintento pisa
+`clientes.didit_session_id` con la sesión nueva, así que la que terminó aprobada deja de ser la "actual".
+`_sesiones_conocidas` junta todos los `session_id` con al menos un evento propio en `kyc_events`
+(ya scopeado a `cliente_id`) y el recheck los revisa del más reciente al más viejo hasta encontrar una
+Aprobada (o se queda con la respuesta de la sesión actual, sin nada mejor que ofrecer). Si la aprobada no
+es la que se venía rastreando, el endpoint **mueve el puntero** (`UPDATE clientes SET didit_session_id=…`)
+antes de llamar a `kyc.aprobar` — así `_session_coincide` la sigue validando contra ese mismo campo, sin
+relajar esa defensa. Una sesión del historial que ya expiró/no existe en Didit (404) no aborta la
+búsqueda: se saltea y sigue con las demás.
+
+**El historial depende de que la sesión haya dejado un rastro** en `kyc_events` — y antes solo se
+registraba un evento ahí cuando un *webhook* se procesaba (approved/rechazado/en_revision/consent). Una
+sesión sin ningún webhook (ni siquiera el inicial) quedaba invisible para `_sesiones_conocidas` aunque
+Didit la hubiera decidido — exactamente la falla de origen de todo este endpoint, aplicada también al
+registro. Por eso `iniciar_verificacion`/`cliente_iniciar_verificacion` ahora registran un evento
+**"iniciado"** (`kyc.registrar_evento(..., session_id=...)`) en el momento mismo de crear la sesión, sin
+esperar a ningún webhook. **Override manual** (`POST recheck` con body `{session_id}`): salta la búsqueda
+por historial y re-chequea esa sesión puntual directo — para sesiones creadas *antes* del fix de
+"iniciado" (o fuera de nuestro flujo) que el historial nunca podría encontrar solo; el admin la pega
+copiándola del dashboard de Didit.
 
 **`vendor_data`** (lo que el route pasa a Didit al crear la sesión) = hoy `str(cliente_id)`, protegido por el
 **HMAC del webhook + el binding de `session_id`**. El **token opaco server-side** (no el `cliente_id` crudo) es

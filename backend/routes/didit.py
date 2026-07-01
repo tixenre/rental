@@ -36,7 +36,7 @@ from pydantic import BaseModel
 
 from auth.guards import require_admin
 from config import settings
-from database import get_db, now_ar
+from database import get_db, now_ar, row_to_dict
 from routes.cliente_portal import require_cliente
 from services.didit import (
     DiditNotConfiguredError,
@@ -125,10 +125,170 @@ def iniciar_verificacion(cliente_id: int, request: Request):
             "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
             (sesion.session_id, now_ar(), cliente_id),
         )
+        # Registramos la creación YA — no esperamos al webhook (puede no llegar
+        # nunca, es la falla de origen que motiva el recheck). Sin esto, una
+        # sesión sin ningún webhook procesado queda invisible para
+        # `_sesiones_conocidas` aunque el cliente la haya usado y Didit la
+        # haya decidido.
+        kyc.registrar_evento(conn, cliente_id, "iniciado", session_id=sesion.session_id)
         conn.commit()
 
     logger.info("didit: sesión creada session_id=%s cliente_id=%s", sesion.session_id, cliente_id)
     return {"session_id": sesion.session_id, "url": sesion.url}
+
+
+# ── Admin: re-chequear el estado actual en Didit ─────────────────────────────
+
+# Estados de sesión que Didit puede devolver (GET .../decision/, campo top-level
+# `status`, distinto del `id_verifications[].status` por-feature). Normalizamos
+# a minúsculas + espacio→guion-bajo antes de comparar (los valores del webhook
+# vienen "In_review"/"Under_review"; la API directa documenta "In Review").
+_ESTADOS_EN_REVISION = {"in_review", "under_review", "processing", "in_progress"}
+
+# Tope de sesiones históricas a re-consultar (barato: GETs de un admin action
+# puntual, no hot-path — pero sin cap un cliente con decenas de reintentos
+# podría disparar demasiados GETs a Didit de un solo click).
+_MAX_SESIONES_HISTORIAL = 20
+
+
+def _sesiones_conocidas(conn, cliente_id: int) -> list:
+    """`session_id` de Didit con al menos un evento propio para este cliente
+    (`kyc_events`, ya scopeado a `cliente_id`), del más reciente al más viejo.
+
+    Un cliente puede reintentar la verificación varias veces mientras un admin
+    revisa a mano una sesión anterior en el dashboard de Didit — cada reintento
+    pisa `clientes.didit_session_id` con la sesión nueva (siempre la más
+    reciente), así que la sesión que el admin terminó aprobando puede ya no ser
+    la "actual". Este historial es lo que le permite al recheck encontrarla."""
+    rows = conn.execute(
+        """SELECT session_id FROM kyc_events
+           WHERE cliente_id=%s AND session_id IS NOT NULL
+           GROUP BY session_id ORDER BY MAX(id) DESC LIMIT %s""",
+        (cliente_id, _MAX_SESIONES_HISTORIAL),
+    ).fetchall()
+    return [row_to_dict(r)["session_id"] for r in rows]
+
+
+class RecheckVerificacionIn(BaseModel):
+    """`session_id` opcional: override manual para saltar la búsqueda por
+    historial y re-chequear una sesión puntual (p. ej. una copiada del
+    dashboard de Didit que no dejó ningún rastro en `kyc_events` — sesiones
+    creadas antes del fix que empezó a registrar cada `iniciado`)."""
+    session_id: Optional[str] = None
+
+
+@router.post("/admin/verificacion/recheck/{cliente_id}")
+def recheck_verificacion(cliente_id: int, request: Request, body: Optional[RecheckVerificacionIn] = None):
+    """Re-consulta a Didit el estado ACTUAL de la sesión del cliente y aplica el
+    resultado (aprobar / rechazar / en revisión) por la pluma única `identity.kyc`
+    — sin que el admin tenga que validar la identidad a mano.
+
+    Caso de uso: Didit rechazó automáticamente por una razón menor (ej. foto
+    oscura), el admin revisó el caso a mano *en el dashboard de Didit* y lo
+    aprobó ahí — pero el webhook de esa revisión manual no siempre llega (o ya
+    llegó y se perdió). Este endpoint refleja en Rambla lo que Didit devuelve
+    HOY, en vez de que el admin tenga que marcarlo aprobado él mismo.
+
+    Revisa TODO el historial conocido de sesiones del cliente (`_sesiones_conocidas`),
+    no solo la que `clientes.didit_session_id` sigue rastreando: si el cliente
+    reintentó la verificación mientras el admin la revisaba, la sesión actual ya
+    no es la aprobada — la búsqueda encuentra la que sí lo está en cualquier
+    punto del historial y **mueve el puntero** (`didit_session_id`) hacia ella
+    antes de aplicarla (así `identity.kyc.aprobar` sigue validando `_session_coincide`
+    contra el mismo campo, sin relajar esa defensa).
+
+    Si el body trae `session_id`, se salta la búsqueda y re-chequea ESA sesión
+    puntual directamente — para el caso límite de una sesión que ni siquiera
+    dejó un evento "iniciado" (creada antes de ese fix, o creada fuera de
+    nuestro flujo) y por eso el historial no la puede encontrar sola.
+
+    404 si el cliente no existe. 409 si nunca inició una verificación (sin
+    ninguna sesión conocida y sin override). 503 si Didit no está configurado
+    o no responde.
+    """
+    require_admin(request)
+    override = (body.session_id or "").strip() if body and body.session_id else None
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT didit_session_id FROM clientes WHERE id=%s", (cliente_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Cliente no encontrado")
+        actual = row_to_dict(row).get("didit_session_id")
+        historial = [] if override else _sesiones_conocidas(conn, cliente_id)
+
+    if override:
+        candidatos = [override]
+    else:
+        # La sesión actual primero (la más probable) + el resto del historial sin duplicar.
+        candidatos = ([actual] if actual else []) + [s for s in historial if s != actual]
+    if not candidatos:
+        raise HTTPException(409, "El cliente todavía no inició una verificación con Didit")
+
+    mejor: Optional[tuple] = None  # (session_id, decision, status, status_key)
+    for candidato in candidatos:
+        try:
+            decision = retrieve_decision(candidato)
+        except DiditNotConfiguredError:
+            raise HTTPException(503, "Verificación de identidad no habilitada (DIDIT_API_KEY)")
+        except httpx.HTTPStatusError as exc:
+            # Una sesión puntual del historial puede haber expirado/borrado en Didit
+            # — no aborta la búsqueda, seguimos con las demás candidatas.
+            logger.warning(
+                "didit: %s al re-chequear session_id=%s cliente_id=%s (historial)",
+                exc.response.status_code, candidato, cliente_id,
+            )
+            continue
+        except Exception as exc:
+            logger.warning(
+                "didit: error al re-chequear session_id=%s cliente_id=%s (historial) — %s",
+                candidato, cliente_id, exc,
+            )
+            continue
+
+        status = (decision.get("status") or "").strip()
+        status_key = status.lower().replace(" ", "_")
+        if status_key == "approved":
+            mejor = (candidato, decision, status, status_key)
+            break  # encontramos la aprobada — no hace falta seguir revisando el historial
+        if mejor is None:
+            mejor = (candidato, decision, status, status_key)  # primera respuesta válida, de fallback
+
+    if mejor is None:
+        raise HTTPException(503, "No se pudo conectar con el servicio de verificación")
+    session_id, decision, status, status_key = mejor
+    logger.info("didit recheck: cliente_id=%s session_id=%s status=%s", cliente_id, session_id, status)
+
+    aplicado: Optional[bool]
+    if status_key == "approved":
+        if session_id != actual:
+            # Encontramos la aprobación en una sesión distinta a la que veníamos
+            # rastreando (el cliente reintentó de nuevo mientras se revisaba) —
+            # movemos el puntero para que _session_coincide la reconozca.
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
+                    (session_id, now_ar(), cliente_id),
+                )
+                conn.commit()
+        datos = extraer_datos_renaper(decision)
+        contactos = extraer_contactos(decision)
+        aplicado = kyc.aprobar(cliente_id=cliente_id, session_id=session_id, datos=datos, contactos=contactos)
+    elif status_key == "declined":
+        motivo = decision.get("decline_reason") or decision.get("comment") or None
+        if motivo:
+            motivo = str(motivo)[:500]
+        aplicado = kyc.actualizar_estado(
+            cliente_id=cliente_id, session_id=session_id, estado="rechazado", motivo=motivo
+        )
+    elif status_key in _ESTADOS_EN_REVISION:
+        aplicado = kyc.actualizar_estado(cliente_id=cliente_id, session_id=session_id, estado="en_revision")
+    else:
+        # Expired / Abandoned / Not_Started / Kyc_Expired u otro estado no accionable.
+        aplicado = None
+
+    return {"status": status, "aplicado": aplicado, "session_id": session_id}
 
 
 # ── Cliente: crear sesión propia ─────────────────────────────────────────────
@@ -174,6 +334,8 @@ def cliente_iniciar_verificacion(request: Request, body: Optional[SesionVerifica
             "UPDATE clientes SET didit_session_id=%s, updated_at=%s WHERE id=%s",
             (sesion.session_id, now_ar(), cliente_id),
         )
+        # Ídem admin: registrar la creación ya, sin depender de que el webhook llegue.
+        kyc.registrar_evento(conn, cliente_id, "iniciado", session_id=sesion.session_id)
         conn.commit()
 
     # El cliente inició su propia verificación → consentimiento explícito del KYC (Ley 25.326).
