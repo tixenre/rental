@@ -84,7 +84,7 @@ def test_didit_ahora_dice_approved_aplica_kyc_aprobar(monkeypatch):
         aprobar_calls=aprobar_calls,
     )
     res = recheck_verificacion(7, request=object())
-    assert res == {"status": "Approved", "aplicado": True}
+    assert res == {"status": "Approved", "aplicado": True, "session_id": "sess-1"}
     assert len(aprobar_calls) == 1
     assert aprobar_calls[0]["cliente_id"] == 7
     assert aprobar_calls[0]["session_id"] == "sess-1"
@@ -101,7 +101,7 @@ def test_didit_sigue_declined_no_re_aprueba(monkeypatch):
         estado_calls=estado_calls,
     )
     res = recheck_verificacion(8, request=object())
-    assert res == {"status": "Declined", "aplicado": True}
+    assert res == {"status": "Declined", "aplicado": True, "session_id": "sess-2"}
     assert estado_calls[0]["estado"] == "rechazado"
     assert estado_calls[0]["motivo"] == "Foto oscura"
 
@@ -117,7 +117,7 @@ def test_estado_no_accionable_no_llama_kyc(monkeypatch):
         estado_calls=estado_calls,
     )
     res = recheck_verificacion(9, request=object())
-    assert res == {"status": "Abandoned", "aplicado": None}
+    assert res == {"status": "Abandoned", "aplicado": None, "session_id": "sess-3"}
     assert aprobar_calls == [] and estado_calls == []
 
 
@@ -132,5 +132,5 @@ def test_in_review_normaliza_espacio_a_guion_bajo(monkeypatch):
         estado_calls=estado_calls,
     )
     res = recheck_verificacion(10, request=object())
-    assert res == {"status": "In Review", "aplicado": True}
+    assert res == {"status": "In Review", "aplicado": True, "session_id": "sess-4"}
     assert estado_calls[0]["estado"] == "en_revision"

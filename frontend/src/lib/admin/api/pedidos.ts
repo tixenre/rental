@@ -183,7 +183,7 @@ export const pedidosMethods = {
       method: "POST",
     }),
   rechequearVerificacion: (clienteId: number) =>
-    authedJson<{ status: string; aplicado: boolean | null }>(
+    authedJson<{ status: string; aplicado: boolean | null; session_id: string }>(
       `/api/admin/verificacion/recheck/${clienteId}`,
       { method: "POST" },
     ),

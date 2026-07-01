@@ -206,7 +206,7 @@ def recheck_verificacion(cliente_id: int, request: Request):
         # Expired / Abandoned / Not_Started / Kyc_Expired u otro estado no accionable.
         aplicado = None
 
-    return {"status": status, "aplicado": aplicado}
+    return {"status": status, "aplicado": aplicado, "session_id": session_id}
 
 
 # ── Cliente: crear sesión propia ─────────────────────────────────────────────
