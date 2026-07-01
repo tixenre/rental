@@ -284,7 +284,7 @@ def listar_facturas(
 _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
 
-def _factura_html_o_404(factura_id: int, conn):
+def _factura_html_o_404(factura_id: int, conn, layout: str = "clasica"):
     """Carga la factura + renderiza su HTML al vuelo. La factura no cambia una
     vez emitida, así que no hace falta guardar el PDF: regenerar da lo mismo."""
     from services.facturacion.repo import get_by_id
@@ -298,17 +298,24 @@ def _factura_html_o_404(factura_id: int, conn):
         raise HTTPException(400, "Solo se pueden ver/descargar/enviar facturas emitidas")
 
     pedido = _get_pedido(conn, factura.pedido_id)
-    return factura, factura_html(factura, pedido)
+    return factura, factura_html(factura, pedido, layout=layout)
 
 
 @router.get("/facturas/{factura_id}/pdf")
-async def descargar_pdf_factura(factura_id: int, request: Request, format: str = "pdf"):
+async def descargar_pdf_factura(
+    factura_id: int, request: Request, format: str = "pdf", layout: str = "clasica"
+):
     """PDF de una factura, renderizado on-demand. `format=html` devuelve el preview
-    (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py)."""
+    (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py).
+    `layout`: 'clasica' (default, réplica oficial AFIP/ARCA) · 'celular' (compacta,
+    para compartir por WhatsApp) · 'formal' (A4, identidad de la celular)."""
     require_admin(request)
 
+    if layout not in ("clasica", "celular", "formal"):
+        layout = "clasica"
+
     with get_db() as conn:
-        factura, html_str = _factura_html_o_404(factura_id, conn)
+        factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
 
     if format == "html":
         from fastapi.responses import HTMLResponse
@@ -325,7 +332,7 @@ async def descargar_pdf_factura(factura_id: int, request: Request, format: str =
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="{factura_filename(factura)}"',
+            "Content-Disposition": f'attachment; filename="{factura_filename(factura, layout=layout)}"',
             **_DOC_NO_CACHE,
         },
     )
