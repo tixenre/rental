@@ -41,6 +41,16 @@ export function nuevoUidLinea(prefix = "tmp"): string {
   return `${prefix}-${Date.now()}-${_uidSeq}`;
 }
 
+/** Subtotal de una línea del draft — espeja `services.precios.bruto_linea`
+ * del backend: una línea personalizada `cobro_modo='fijo'` (ej. flete, #805)
+ * NO se multiplica por jornadas. Única fuente — antes `PedidoPageCards.tsx` y
+ * `PedidoPageHelpers.tsx` tenían cada uno su propia fórmula, y ya habían
+ * divergido (Cards ignoraba `cobro_modo`). Auditoría cruzada de plata, 2026-07-02. */
+export function subtotalDraftItem(it: DraftItem, jornadas: number): number {
+  const fijo = (it.cobro_modo ?? "jornada") === "fijo";
+  return it.precio_jornada * it.cantidad * (fijo ? 1 : Math.max(1, jornadas));
+}
+
 export type DraftDatos = {
   cliente_id: number | null;
   cliente_nombre: string;

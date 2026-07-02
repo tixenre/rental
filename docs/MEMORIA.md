@@ -704,6 +704,30 @@ en el dashboard admin — es el gap de gobernanza más directo detrás del miedo
 supervisor marca un motor de plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o
 un PR de fix de plata reportado como shippeado sin confirmar merge real a `dev`/`main`.
 
+### 2026-07-02 — `backend/services/finanzas_flujo/` = módulo orquestador de plata (Fase 1: desglose de pedido)
+
+El dueño pidió que el mapa de `SISTEMA_PLATA.md` (renombrado **`docs/SISTEMA_FINANZAS_FLUJO.md`**, mismo
+patrón 1:1 manual↔módulo que `SISTEMA_CARRITO.md`↔`services/carrito/`) fuera **código real, no solo
+prosa** — un módulo que sea el único punto de entrada para preguntar un número de plata, para que un
+consumidor nuevo no tenga que saber a cuál motor llamar. Nace **`backend/services/finanzas_flujo/`**:
+facade de **solo lectura** (nunca escribe — las mutaciones siguen en cada motor directo), cada función
+delega 1:1 al motor dueño (`services.precios`, `reportes.liquidacion`, `contabilidad.queries`,
+`services.facturacion`), sin reimplementar. **Fase 1 (primera pieza, implementada):**
+`finanzas_flujo/pedido.py::desglose_de_pedido` fixea el bug de `cobro_modo` (una línea personalizada
+`cobro_modo='fijo'`, ej. flete #805, se multiplicaba igual por jornadas) en los 6 consumidores reales:
+`_enriquecer_pedido_con_total` (`routes/alquileres/core.py`) ahora es un wrapper que delega en la
+fachada; `services/facturacion/engine.py` migró a importarla directo (antes importaba de
+`routes.alquileres` — un service dependiendo de un route). Mismo bug arreglado en `pdf_templates.py`
+(`_bruto_item_pdf`, nuevo helper cobro_modo-aware, reemplaza la reimplementación inline en
+`_pedido_html`/`_sum_bruto`). Frontend: `PedidoPageCards.tsx`/`PedidoPageHelpers.tsx` (que habían
+divergido — Cards ignoraba `cobro_modo`) ahora importan `subtotalDraftItem` desde `usePedidoDraft.ts` —
+misma función, no pueden volver a divergir. **Candado:** `test_finanzas_flujo_source_scan.py` verifica
+que `pdf_templates.py` usa el helper y que `services/facturacion/engine.py` importa la fachada, no
+`routes.alquileres`. El resto de las fases (liquidación, contabilidad, facturación, reconciliación) del
+módulo quedan para PRs siguientes, mismo patrón. El supervisor marca un consumidor nuevo que reimplemente
+el desglose de un pedido en vez de llamar a `finanzas_flujo.pedido.desglose_de_pedido`, o un `service` que
+importe de un `route`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
