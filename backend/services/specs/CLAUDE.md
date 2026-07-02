@@ -34,6 +34,17 @@
 > **nunca muta el registry** — `aplicar_propuesta` solo cierra el ítem de la cola después
 > de que el humano ya editó el registry a mano (código = fuente única) y re-sembró.
 >
+> **`queries/equipo_specs.py::get_equipo_specs_rows`** (2026-07, aditivo, no una fase propia):
+> query único del JOIN equipo_specs+spec_definitions+categoria_spec_templates para "specs ya
+> persistidas de un lote de equipos" — antes vivía duplicado inline en `database/equipos.py`
+> (`attach_specs_estructuradas` para la ficha pública, `attach_specs_destacados` para los
+> quick facts de card), cada uno con su propio SQL contra las mismas 3 tablas. Devuelve rows
+> crudos; cada caller sigue decidiendo su propia política de display (bool=false se omite en
+> la ficha, se muestra "No" explícito en el preview pre-persist de `specs_ingesta`, es un
+> checkbox en el form admin — 3 audiencias, 3 decisiones de UX legítimas, NO drift). Lo que
+> estaba mal no era la política, era el query duplicado — encontrado auditando por qué un
+> bool=false se trataba "distinto en cada lugar" tras cargar specs reales (Iniciativa A).
+>
 > **`CategoriaRegistry` ya no declara navegación** (Fase 6, desenredo categorías↔specs):
 > solo `nombre` (ancla a una categoría real por nombre) + `specs`. `sub_categorias`/
 > `grupo_visual`/`prioridad` a nivel categoría se sacaron — eran parámetros que el
@@ -73,7 +84,7 @@ services/specs/
     search_source.py  # specs_search_expr() — campo más de CAMPOS_EQUIPO           ✓ Fase 4
     propuestas.py      # listar_propuestas_pendientes — Canal C                    ✓ aditivo 2026-07
     definitions.py     # ✗ no existe — mapear_valor hace su propia lectura de spec_definitions
-    equipo_specs.py    # ✗ Fase futura, no existe
+    equipo_specs.py    # get_equipo_specs_rows — specs YA PERSISTIDAS de un lote de equipos ✓ aditivo 2026-07
     aliases.py          # expansión de término (refinamiento; search_source.py ya cubre lo básico) ✗ no existe, sin fase asignada
   normalize/
     value_funnel.py    # mapear_valor(conn, spec_def_id, raw) — EXISTE, llamado desde persist.py  ✓ Fase 2+3
