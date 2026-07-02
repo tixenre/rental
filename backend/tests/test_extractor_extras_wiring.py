@@ -1,4 +1,4 @@
-"""Tests del wiring extras → specs persistibles en `_build_result`.
+"""Tests del wiring extras → specs persistibles en `build_result`.
 
 La ficha técnica se nutre del bucket curado (`specs`) + la cola larga del
 parser (`extras`). Sólo se promueven las keys de `extras` que correspondan a
@@ -10,7 +10,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-from services.equipo_html_extractor import _build_result
+from services.specs_ingesta.queries.resultado import build_result
 
 
 def _labels(result: dict) -> set[str]:
@@ -26,7 +26,7 @@ def test_extras_que_matchean_registry_se_promueven():
         "battery": "NP-FZ100",              # key alineada
         "video_io": "HDMI / SDI",           # key alineada
     }
-    r = _build_result(
+    r = build_result(
         marca="Sony", modelo="FX6", specs=specs, extras=extras,
         image=None, url="http://x", title="Sony FX6",
         secciones={}, categoria_sugerida="Cámaras",
@@ -39,7 +39,7 @@ def test_extras_que_matchean_registry_se_promueven():
 def test_extras_sin_spec_en_registry_se_descartan():
     specs = {"camera_subtipo": "Cinema"}
     extras = {"sensor_size": "35.6 x 23.8mm", "viewfinder_coverage": "100%"}
-    r = _build_result(
+    r = build_result(
         marca="Sony", modelo="FX6", specs=specs, extras=extras,
         image=None, url="http://x", title="Sony FX6",
         secciones={}, categoria_sugerida="Cámaras",
@@ -53,7 +53,7 @@ def test_bucket_curado_gana_en_colision():
     # Si una key está en specs y en extras, gana el valor curado.
     specs = {"video_io": "curado"}
     extras = {"video_io": "extra"}
-    r = _build_result(
+    r = build_result(
         marca="X", modelo="Y", specs=specs, extras=extras,
         image=None, url="http://x", title="X Y",
         secciones={}, categoria_sugerida="Cámaras",

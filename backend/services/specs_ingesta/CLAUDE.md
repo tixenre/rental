@@ -1,16 +1,15 @@
-# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F5 completas)
+# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F6 completas)
 
-> **Estado: F0-F5 completas.** `parse/` (primitivas HTML) + `parsers/` (los 4 parsers grandes,
-> movidos de `tools/`) + `queries/{resultado,bespoke,generic,detectar,extraer}.py` ya son la fuente
-> única — `equipo_html_extractor.py`/`luces_html_extractor.py`/`generic_html_extractor.py` son shims
-> ⏰ LEGACY delgados que delegan acá, **cero `sys.path.insert()` hacks, cero lógica duplicada, cero
-> dispatcher fuera de `queries/extraer.py`**. `tools/*_parser.py` quedan como shims CLI-únicamente
-> (⏰ LEGACY-adyacente) para los `*_rebuild.sh` y 2 tests que importan por nombre.
-> `specs_ingesta.extract_from_html` (el barrel) importa DIRECTO de `queries/extraer.py` — el
-> `__getattr__` lazy de F1 ya no hace falta (el ciclo que lo motivaba desapareció junto con el
-> dispatcher viejo). `cli.py` es el entry point offline — mismo `queries/extraer`, verificado
-> byte-idéntico al del endpoint sobre el mismo HTML. La capa `llm/` (suplemento offline-only) todavía
-> no existe — eso es F7.
+> **Estado: F0-F6 completas.** Los 3 wrapper viejos (`services/{equipo,luces,generic}_html_extractor.py`)
+> **ya no existen** — se borraron en F6. `parse/` (primitivas HTML) + `parsers/` (los 4 parsers
+> grandes, movidos de `tools/`) + `queries/{resultado,bespoke,generic,detectar,extraer}.py` son la
+> fuente única, sin shims por delante — **cero `sys.path.insert()` hacks, cero lógica duplicada, cero
+> dispatcher fuera de `queries/extraer.py`**. `tools/*_parser.py` siguen como shims CLI-únicamente
+> (⏰ LEGACY-adyacente, no tocados por F6) para los `*_rebuild.sh` y 2 tests que importan por nombre.
+> `specs_ingesta.extract_from_html` (el barrel) importa DIRECTO de `queries/extraer.py`. `cli.py` es
+> el entry point offline — mismo `queries/extraer`, verificado byte-idéntico al del endpoint sobre el
+> mismo HTML. La capa `llm/` (suplemento offline-only) todavía no existe — eso es F7, la única fase
+> que falta.
 > Plan completo + fases → [`docs/PLAN_SPECS_INGESTA.md`](../../../docs/PLAN_SPECS_INGESTA.md) ·
 > tracking → issue [#1176](https://github.com/tixenre/rental/issues/1176) · rama aislada
 > `feature/specs-ingesta`, PR sin mergear hasta completar el módulo (convención "PR como hoja de ruta").
@@ -48,7 +47,7 @@ importa `specs_ingesta`. Tres canales (detalle en el plan):
 - **`llm/` SOLO lo importa `cli.py`.** Si algo en `queries/` o `parse/` importa de `llm/`, es un bug —
   rompe el split de runtime.
 
-## Estructura (F0-F5 completas; se sigue poblando fase a fase)
+## Estructura (F0-F6 completas; solo falta F7)
 
 ```
 services/specs_ingesta/
@@ -143,3 +142,24 @@ services/specs_ingesta/
   valor sospechoso, confirmar si el HTML fuente ya lo trae roto; en ese caso no hay fix razonable del
   lado del parser (headers/JSON-LD malformados de terceros son la realidad de scrapear/parsear la web) y
   el bucket `extras` (cola larga, no curada) ya tolera esto por diseño — no se promueve a `specs`.
+- **F6 — podar un shim de test puede ser la oportunidad de testear lo REAL, no solo mudar el import.**
+  `_specs_dict_to_array` (el shim ⏰ LEGACY de F2) no tenía equivalente exacto en el módulo nuevo — su
+  firma simplificada (`registry_labels` dict a mano) nunca fue lo que corre en producción, solo un
+  stand-in de cuando el test se escribió. En vez de preservarla artificialmente, los 5 tests que la
+  usaban se reescribieron contra `parse/serialize.py::specs_dict_to_array` (la función real, con
+  `categoria` en vez de un dict a mano) — mismas invariantes, pero ahora ejercitando el código que
+  efectivamente corre. Regla: podar un shim de test no es "encontrar dónde pegar el import nuevo" —
+  es la oportunidad de preguntarse si el test debería ejercitar la función real en primer lugar.
+- **F6 — un `sys.path` hack puede sobrevivir escondido DENTRO de un test**, no solo en código de
+  producción. F1/F3 habían limpiado los hacks de `services/`/`tools/`, pero
+  `test_spec_key_normalization.py::test_parser_luz_no_emite_keys_huerfanas` tenía su propio
+  `sys.path.insert()` apuntando a `tools/iluminacion_parser` — invisible a un grep que solo mira
+  `services/`. Verificar `tests/` con la misma exhaustividad que el código de producción, no asumir
+  que los hacks solo viven del lado no-test.
+- **F6 — borrar un archivo puede exponer que un doc lo describía mal desde antes.** `docs/SISTEMA_SPECS.md`
+  §1 describía un flujo Firecrawl+LLM (`/admin/equipos/autocompletar`, `/batch-enriquecer`) que ya no
+  existía — ni siquiera era el dispatcher pre-`specs_ingesta`, era una capa MÁS vieja todavía. Nadie lo
+  había notado porque nadie leyó ese doc buscando algo relacionado hasta que F6 borró el archivo que
+  citaba. Reescrito con el flujo real (§1 arriba). El resto de la staleness ya conocida de ese doc
+  (§2/§5/§6, el workflow de seeders viejo) se dejó como estaba — está fuera del alcance de esta
+  iniciativa y ya tiene su propio disclaimer.

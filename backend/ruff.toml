@@ -11,9 +11,9 @@ target-version = "py311"
 # E9 = errores de sintaxis (E999, etc.).
 select = ["F", "E9"]
 # F841 (variable local asignada sin usar): hay 3 pre-existentes en módulos de
-# lógica (una posible bug latente — `prod_id` que nunca llega a `_build_result`
-# en services/equipo_html_extractor.py). Se difiere a una revisión aparte para no
-# mezclar edits de lógica con este cambio de CI; no es un riesgo de refactor.
+# lógica (ej. `prev_str` en services/specs_ingesta/parsers/normalizar.py). Se
+# difiere a una revisión aparte para no mezclar edits de lógica con este
+# cambio de CI; no es un riesgo de refactor.
 ignore = ["F841"]
 
 [lint.per-file-ignores]

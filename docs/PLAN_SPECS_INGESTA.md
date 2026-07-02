@@ -265,7 +265,22 @@ no importan ni uno ni otro. `llm/` solo lo importa `cli.py`.
   viejo). **Verificado el invariante "online == offline"**: `cli.py` y el endpoint dan resultado
   byte-idéntico sobre el mismo HTML. `specs_ingesta/__init__.py` ya no necesita el `__getattr__` lazy
   (F1) — import directo, sin ciclo. Suite completa: 2481 passed / 20 pre-existentes no relacionados.
-- **F6** — podar shims LEGACY.
+- **F6** ✅ (riesgo medio) — borrados los 3 `*_html_extractor.py` (`equipo`/`luces`/`generic`). Los 5
+  tests que importaban por nombre (`test_extractor_extras_wiring.py`, `test_generic_extractor.py`,
+  `test_spec_key_normalization.py`, ~30 call-sites en total) se migraron a importar de
+  `services.specs_ingesta` directo — incluida una decisión de fondo: en vez de preservar
+  `_specs_dict_to_array` (un shim simplificado sin equivalente real en el módulo nuevo), esos 5 tests
+  se **reescribieron para ejercitar `parse/serialize.py::specs_dict_to_array`** (la función que
+  REALMENTE corre en producción), probando las mismas invariantes (shape, fallback label, cero
+  descartes) contra el código real en vez de una copia de test. Un `sys.path` hack más apareció
+  DENTRO de un test (`test_parser_luz_no_emite_keys_huerfanas`, apuntaba a `tools/iluminacion_parser`
+  directo) — no lo había cazado ninguna fase anterior porque el grep de F1/F3 buscó en `services/`,
+  no en `tests/`; re-apuntado a `services.specs_ingesta.parsers.*`. `tools/*_rebuild.sh` confirmado
+  **no afectado** (ya dependían solo de `parsers/`, desde F3) — migrarlos a invocar `cli.py` queda
+  diferido, no bloqueaba esta fase. De paso: corregida una referencia stale en `ruff.toml` (citaba el
+  archivo borrado) y reescrita `docs/SISTEMA_SPECS.md` §1 (describía un flujo Firecrawl+LLM con
+  endpoints que ya no existen — predata incluso el dispatcher viejo). Suite completa: 2481 passed / 20
+  pre-existentes no relacionados.
 - **F7** — el embudo que aprende (`commands/proponer.py`) + capa LLM offline.
 
 Cada fase: verificar (pyflakes + suite + Postgres real vía clon local) antes de commit. Supervisor antes del PR
