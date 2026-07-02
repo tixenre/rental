@@ -515,7 +515,7 @@ def _factura_mobile_html(f: dict) -> str:
           <div style="font-size:20px;font-weight:800;letter-spacing:-0.01em;line-height:1.1;">{_e(tipo_txt.upper())}</div>
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;margin-top:2px;">Cód. {_e(f['cod'])}</div>
         </div>
-        <div style="flex:none;display:flex;align-items:center;justify-content:center;width:64px;height:64px;border:1.5px solid #16202b;border-radius:12px;">
+        <div style="flex:none;display:flex;align-items:center;justify-content:center;width:64px;height:64px;border:2px solid #16202b;border-radius:18px;">
           <span style="font-size:34px;font-weight:800;line-height:1;">{_e(f['letra'])}</span>
         </div>
       </div>
@@ -582,12 +582,14 @@ def _factura_mobile_html(f: dict) -> str:
 {_fonts_css()}
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
-  html,body {{ background:#fff; }}
-  body {{ width:{MOBILE_PAGE_WIDTH}px; background:#fff; font-family:'TT Commons',ui-sans-serif,sans-serif;
+  html,body {{ background:{_MOBILE_PAGE_BG}; }}
+  body {{ width:{MOBILE_PAGE_WIDTH}px; padding:{_MOBILE_CARD_MARGIN}px; font-family:'TT Commons',ui-sans-serif,sans-serif;
           color:#16202b; }}
+  .card {{ width:{_MOBILE_CARD_WIDTH}px; background:#fff; border-radius:28px; border:1px solid #ecebe8;
+           box-shadow:0 1px 3px rgba(22,32,43,0.06); overflow:hidden; }}
 </style>
 </head>
-<body>{body}
+<body><div class="card">{body}</div>
 </body>
 </html>"""
 
@@ -725,11 +727,15 @@ _LAYOUTS = {
     "formal": _factura_formal_html,
 }
 
-# Ancho fijo del comprobante "celular" (mismo valor que el `width` del body
-# en `_factura_mobile_html`). Alto = None → `pdf._render_pdf` mide el alto
-# real del contenido (el comprobante no es A4, es una tarjeta que tiene que
-# terminar donde termina el contenido, no a media hoja).
-MOBILE_PAGE_WIDTH = 640
+# La celular es una TARJETA de esquinas redondeadas flotando sobre un fondo
+# (no un rectángulo a página completa) — el ancho de página incluye el
+# margen visible alrededor de la tarjeta en los 4 lados. Alto = None →
+# `pdf._render_pdf` mide el alto real del contenido, la página termina donde
+# termina la tarjeta, no a media hoja.
+_MOBILE_CARD_WIDTH = 640
+_MOBILE_CARD_MARGIN = 24
+_MOBILE_PAGE_BG = "#f4f2ef"
+MOBILE_PAGE_WIDTH = _MOBILE_CARD_WIDTH + 2 * _MOBILE_CARD_MARGIN
 
 
 def page_size_for_layout(layout: str) -> tuple[int, int | None] | None:
