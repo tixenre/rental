@@ -129,6 +129,20 @@ def test_preview_factura_value_error_es_400(monkeypatch):
     assert ei.value.status_code == 400
 
 
+def test_preview_factura_runtime_error_es_503_nunca_500(monkeypatch):
+    """El preview llama a ARCA (FECompUltimoAutorizado) — si ARCA está caída
+    o el cert venció, tiene que ser 503, no un 500 crudo."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.engine.previsualizar_factura",
+        lambda pedido_id, conn: (_ for _ in ()).throw(RuntimeError("ARCA caída")),
+    )
+    with pytest.raises(HTTPException) as ei:
+        facturacion_routes.preview_factura(1, _fake_request())
+    assert ei.value.status_code == 503
+
+
 def test_nota_credito_value_error_es_400(monkeypatch):
     monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
     monkeypatch.setattr(

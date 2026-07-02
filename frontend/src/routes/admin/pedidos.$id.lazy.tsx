@@ -1177,7 +1177,11 @@ function FacturacionRailSection({
               )}
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Comprobante</span>
-                <span className="font-mono">Factura {preview.data.comprobante.letra}</span>
+                <span className="font-mono">
+                  Factura {preview.data.comprobante.letra}{" "}
+                  {String(preview.data.comprobante.pto_vta).padStart(5, "0")}-
+                  {String(preview.data.comprobante.numero_a_emitir).padStart(8, "0")}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Emisor</span>

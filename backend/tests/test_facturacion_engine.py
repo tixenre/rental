@@ -369,33 +369,36 @@ def test_vto_pago_de_la_nc_tambien_respeta_la_fecha_del_comprobante():
     assert req.fecha_vto_pago == date(2026, 8, 1)
 
 
-# ── previsualizar_factura: arma el comprobante SIN tocar ARCA ───────────────
+# ── previsualizar_factura: arma el comprobante + consulta ARCA (solo lectura,
+# NUNCA pide CAE) ────────────────────────────────────────────────────────────
 
 
-def _patch_preview_common(monkeypatch):
+def _patch_preview_common(monkeypatch, wsfe_instance):
     monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: _fake_pedido())
     monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
     monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: wsfe_instance)
 
 
-def test_preview_no_llama_a_arca_ni_a_wsaa(monkeypatch):
-    """El preview arma el comprobante localmente — no debe pedir un TA ni
-    tocar WsfeClient (eso solo pasa en emitir_factura)."""
-    _patch_preview_common(monkeypatch)
+def test_preview_consulta_ultimo_autorizado_pero_nunca_pide_cae(monkeypatch):
+    """El preview SÍ llama a ARCA (FECompUltimoAutorizado, de solo lectura —
+    valida credenciales y muestra el número real), pero jamás a solicitar_cae
+    ni consultar (eso es exclusivo de emitir_factura)."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    wsfe.ultimo = 4
+    _patch_preview_common(monkeypatch, wsfe)
     monkeypatch.setattr(engine, "now_ar", lambda: datetime(2026, 7, 15))
-
-    def _explota(*a, **kw):
-        raise AssertionError("previsualizar_factura no debería llamar a get_ta/WsfeClient")
-
-    monkeypatch.setattr(engine, "get_ta", _explota)
-    monkeypatch.setattr(engine, "WsfeClient", _explota)
 
     result = engine.previsualizar_factura(1, conn=_FakeConn())
 
     assert result["comprobante"]["letra"] == "C"  # monotributo → Factura C
+    assert result["comprobante"]["numero_a_emitir"] == 5
     assert result["emisor"]["nombre"] == "santini"
     assert result["receptor"]["doc_tipo"] == "DNI"
     assert result["fechas"]["vto_pago"] == "2026-07-15"  # fecha_hasta (07-01) ya pasó → hoy
+    assert wsfe.solicitar_calls == [], "el preview NUNCA debe pedir un CAE"
+    assert wsfe.consultar_calls == [], "consultar() es de la idempotencia de emitir_factura, no del preview"
 
 
 def test_preview_pedido_no_confirmado_levanta_value_error(monkeypatch):
@@ -403,4 +406,18 @@ def test_preview_pedido_no_confirmado_levanta_value_error(monkeypatch):
         engine, "_get_pedido", lambda conn, pedido_id: {**_fake_pedido(), "estado": "presupuesto"}
     )
     with pytest.raises(ValueError, match="presupuesto"):
+        engine.previsualizar_factura(1, conn=_FakeConn())
+
+
+def test_preview_arca_caida_propaga_runtime_error(monkeypatch):
+    """Si ARCA no responde (o el cert está vencido), el preview lo dice de
+    entrada en vez de que el admin confirme y recién ahí se entere."""
+    _patch_preview_common(monkeypatch, wsfe_instance=None)
+
+    def _explota(emisor, conn):
+        raise RuntimeError("Certificado de 'santini' no cargado.")
+
+    monkeypatch.setattr(engine, "get_ta", _explota)
+
+    with pytest.raises(RuntimeError, match="Certificado"):
         engine.previsualizar_factura(1, conn=_FakeConn())

@@ -70,7 +70,7 @@ export type PreviewFactura = {
   ambiente: "homologacion" | "produccion";
   emisor: { nombre: string; cuit: number; condicion_iva: string };
   receptor: { doc_tipo: string; doc_nro: string; condicion_iva: string; razon_social: string };
-  comprobante: { letra: string; tipo_nro: number };
+  comprobante: { letra: string; tipo_nro: number; numero_a_emitir: number; pto_vta: number };
   importes: { neto: number; iva: number; total: number };
   fechas: {
     emision: string;

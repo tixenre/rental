@@ -226,6 +226,8 @@ def preview_factura(pedido_id: int, request: Request):
             return previsualizar_factura(pedido_id, conn)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
 
 
 # ---------------------------------------------------------------------------

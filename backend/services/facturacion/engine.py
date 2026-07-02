@@ -97,14 +97,18 @@ def _get_pedido(conn, pedido_id: int) -> dict:
 
 
 def previsualizar_factura(pedido_id: int, conn) -> dict:
-    """Arma el `ComprobanteRequest` y calcula sus importes SIN llamar a ARCA.
+    """Arma el `ComprobanteRequest`, calcula sus importes, y consulta a ARCA
+    el próximo número de comprobante — SIN pedir CAE.
 
-    Corre exactamente los mismos pasos 1-3 de `emitir_factura` (validar
-    estado, resolver emisor/receptor, construir el comprobante) pero se
-    detiene ahí — nada de advisory lock, nada de INSERT, nada de SOAP. Deja
-    ver los datos que se van a facturar (CUIT/razón social del receptor,
-    letra del comprobante, importes, vencimiento de pago) para confirmar
-    antes de pedir un CAE real — irreversible salvo Nota de Crédito."""
+    Corre los mismos pasos 1-3 de `emitir_factura` (validar estado, resolver
+    emisor/receptor, construir el comprobante) y agrega UNA llamada SOAP de
+    solo lectura (`FECompUltimoAutorizado`, la misma que ya usa el paso 7 de
+    la emisión real): no crea ni modifica nada en ARCA, pero sirve para dos
+    cosas — mostrar el número real que le va a tocar al comprobante, y
+    validar que el certificado/las credenciales funcionan ANTES de
+    comprometerse a pedir un CAE real (irreversible salvo Nota de Crédito).
+    Nada de advisory lock, nada de INSERT — eso sigue siendo exclusivo de
+    `emitir_factura`."""
     pedido = _get_pedido(conn, pedido_id)
 
     estado = (pedido.get("estado") or "").lower()
@@ -133,6 +137,16 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     cbte_tipo = tipo_comprobante(req)
     importes = calcular_importes(req)
 
+    # Único llamado a ARCA del preview: de solo lectura, no pide CAE. Si el
+    # cert está vencido o ARCA no responde, mejor enterarse acá (RuntimeError
+    # → 503) que después de que el admin ya confirmó.
+    token, sign = get_ta(nombre_emisor, conn)
+    wsfe = WsfeClient(
+        endpoint=cred.endpoint_wsfe, cuit=cred.cuit, token=token, sign=sign,
+    )
+    ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
+    numero_a_emitir = ultimo + 1
+
     from services.facturacion.pdf import _CBTE_TIPO_LABEL
 
     return {
@@ -151,6 +165,8 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
         "comprobante": {
             "letra": _CBTE_TIPO_LABEL.get(int(cbte_tipo), "?"),
             "tipo_nro": int(cbte_tipo),
+            "numero_a_emitir": numero_a_emitir,
+            "pto_vta": emisor_obj.punto_venta,
         },
         "importes": {
             "neto": float(importes["neto"]),
