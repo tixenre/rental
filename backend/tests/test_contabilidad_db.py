@@ -719,3 +719,23 @@ def test_gasto_contra_cuenta_socio_cuenta_en_pyl_y_baja_deuda(conn):
     despues = next(f for f in saldos(conn)["socios"] if f["nombre"] == "Caja Pablo")["saldo"]
     assert despues == antes - 7000  # baja su deuda (o lo acerca a acreedor)
     assert reporte_mensual(conn, mes)["gastos"]["total"] == gastos_base + 7000  # cuenta en el P&L
+
+
+def test_editar_movimiento_no_puede_reapuntar_retiro_a_cuenta_socio(conn):
+    # El bloqueo de retiro/aporte contra una cuenta de socio vive en
+    # _validar_cuentas_y_categoria, compartida por crear_movimiento Y
+    # editar_movimiento — pero solo estaba probado por el camino de creación.
+    # Mismo patrón de gap que el bug original de editar_movimiento (auditoría
+    # 2026-07-02): no alcanza con que "debería andar igual", hay que confirmarlo.
+    from contabilidad.commands.movimientos import crear_movimiento, editar_movimiento
+
+    efectivo = _cuenta_id(conn, "Efectivo")
+    caja_pablo = _cuenta_id(conn, "Caja Pablo")
+
+    retiro = crear_movimiento(conn, tipo="retiro", monto=1000, cuenta_origen_id=efectivo, por="test")
+    with pytest.raises(ValueError, match="retiro"):
+        editar_movimiento(conn, retiro["id"], campos={"cuenta_origen_id": caja_pablo}, por="test")
+
+    aporte = crear_movimiento(conn, tipo="aporte", monto=1000, cuenta_destino_id=efectivo, por="test")
+    with pytest.raises(ValueError, match="aporte"):
+        editar_movimiento(conn, aporte["id"], campos={"cuenta_destino_id": caja_pablo}, por="test")
