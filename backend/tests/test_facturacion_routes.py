@@ -271,6 +271,51 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
     assert "Factura-C-00002-00000001.pdf" in resp.headers["content-disposition"]
 
 
+def test_descargar_pdf_firma_real_no_explota_dentro_de_un_loop_corriendo(monkeypatch):
+    """Regresión de prod: `asegurar_pdf` firma con pyhanko, cuyo `sign_pdf`
+    sync hace `asyncio.run()` internamente — si se lo llama directo desde
+    este handler async (que ya corre dentro del loop de FastAPI), explota
+    con "asyncio.run() cannot be called from a running event loop". El test
+    de arriba mockea `asegurar_pdf` entero y nunca ejercita la firma real;
+    acá se la deja correr de verdad, dentro de un loop real (`asyncio.run`
+    sobre el propio handler), para reproducir el bug si se revierte el fix
+    (`asyncio.to_thread` en el route)."""
+    import fitz
+
+    from services.facturacion.pdf_seguridad import _generar_cert_autofirmado
+
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_by_id", lambda factura_id, conn: _fake_factura()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+    monkeypatch.setattr(
+        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+    )
+
+    def _pdf_minimo() -> bytes:
+        doc = fitz.open()
+        doc.new_page().insert_text((72, 72), "Factura de prueba")
+        return doc.tobytes()
+
+    async def _fake_render_pdf(html, **_):
+        return _pdf_minimo()
+
+    cert_pem, key_pem = _generar_cert_autofirmado("test")
+    monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
+    monkeypatch.setattr(
+        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        lambda conn: (cert_pem, key_pem),
+    )
+
+    resp = asyncio.run(facturacion_routes.descargar_pdf_factura(1, _fake_request()))
+    assert resp.status_code == 200
+    assert resp.body.startswith(b"%PDF")
+
+
 # ── consultar_padron: autocompletar CUIT — nunca rompe, {encontrado: false} ─
 
 
