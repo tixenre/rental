@@ -1072,13 +1072,12 @@ function FacturacionRailSection({
           )}
 
           {principal.estado === "emitida" && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap gap-1.5">
               <a
                 href={`/api/facturas/${principal.id}/pdf?format=html`}
                 target="_blank"
                 rel="noreferrer"
-                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
               >
                 <Eye className="h-3 w-3" /> Ver
               </a>
@@ -1086,8 +1085,7 @@ function FacturacionRailSection({
                 href={`/api/facturas/${principal.id}/pdf`}
                 target="_blank"
                 rel="noreferrer"
-                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
               >
                 <Download className="h-3 w-3" /> Descargar PDF
               </a>
@@ -1096,8 +1094,7 @@ function FacturacionRailSection({
                 target="_blank"
                 rel="noreferrer"
                 title="Versión compacta para compartir por WhatsApp"
-                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
               >
                 <Smartphone className="h-3 w-3" /> Para WhatsApp
               </a>
@@ -1105,8 +1102,7 @@ function FacturacionRailSection({
                 type="button"
                 onClick={() => enviarMail.mutate(principal.id)}
                 disabled={enviarMail.isPending}
-                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink disabled:opacity-50"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 disabled:opacity-50"
               >
                 <Mail className="h-3 w-3" />
                 {enviarMail.isPending ? "Enviando…" : "Enviar por mail"}
