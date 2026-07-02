@@ -460,17 +460,10 @@ def _factura_clasica_html(f: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
-_MOBILE_MAX_CONCEPTOS = 2
-
-
 def _factura_mobile_html(f: dict) -> str:
     tipo_txt = "Nota de crédito" if f["es_nc"] else "Factura"
 
     qr_block = _qr_img(f["qr"]["url"], 165)
-
-    conceptos = f["conceptos"]
-    visibles = conceptos[:_MOBILE_MAX_CONCEPTOS]
-    restantes = len(conceptos) - len(visibles)
 
     conceptos_html = "".join(f"""
         <div style="padding:10px 0;border-top:1px solid #eef1f4;">
@@ -479,13 +472,7 @@ def _factura_mobile_html(f: dict) -> str:
             <span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;">{_e(c['importeStr'])}</span>
           </div>
           {f'<div style="font-size:12.5px;color:#8a97a3;margin-top:2px;">{_e(c["detalle"])}</div>' if c["detalle"] else ""}
-        </div>""" for c in visibles)
-
-    mas_html = (
-        f'<div style="font-size:12.5px;font-style:italic;color:#8a97a3;padding-top:8px;">'
-        f'+ {restantes} concepto{"s" if restantes != 1 else ""} más — ver comprobante completo</div>'
-        if restantes > 0 else ""
-    )
+        </div>""" for c in f["conceptos"])
 
     iibb_line = (
         f'<div style="font-size:12px;color:#5b6875;margin-top:2px;">IIBB {_e(f["emisor"]["iibb"])}</div>'
@@ -560,10 +547,9 @@ def _factura_mobile_html(f: dict) -> str:
     <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;">
       <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Conceptos · <span style="color:#16202b;">Servicios</span></div>
       {conceptos_html}
-      {mas_html}
     </div>
 
-    <div style="padding:20px 28px 24px;background:#f7f8fa;display:flex;gap:20px;align-items:flex-end;">
+    <div style="padding:20px 28px 24px;background:#f7f8fa;display:flex;gap:20px;align-items:flex-start;">
       <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:12px;padding:8px;">{qr_block}</div>
       <div style="flex:1;min-width:0;">{totales_iva}
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
