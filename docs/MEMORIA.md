@@ -704,6 +704,20 @@ en el dashboard admin — es el gap de gobernanza más directo detrás del miedo
 supervisor marca un motor de plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o
 un PR de fix de plata reportado como shippeado sin confirmar merge real a `dev`/`main`.
 
+### 2026-07-02 — `enviar_mail_factura` roto por 2 bugs encadenados (columna inexistente + kwarg inexistente)
+
+Fase 4 de la hoja de ruta de plata. `routes/facturacion.py::enviar_mail_factura` consultaba
+`c.owner_email` (columna que no existe en `clientes`, vive en `passkey_credentials`/`auth_sessions`) →
+`UndefinedColumn` siempre. Fix: `c.owner_email` → `c.email`. Al arreglarlo, apareció un **segundo bug
+detrás del primero**, nunca antes ejecutado: `Attachment(..., content_type=...)` — el campo real del
+dataclass es `mimetype` (confirmado contra los otros 3 usos de `Attachment` en el repo:
+`routes/reportes.py`, `routes/alquileres/documentos.py`, `routes/alquileres/core.py`). Sin arreglar los
+dos, la función seguía completamente rota — un bug tapaba al otro. Candado:
+`test_facturacion_routes.py::test_enviar_mail_factura_no_rompe_con_undefined_column` +
+`test_enviar_mail_factura_400_si_sin_email` (gap de test real: `test_facturacion_routes.py` no
+ejercitaba este endpoint antes). El supervisor marca un fix de columna/kwarg sin ejercer el código que
+queda DESPUÉS de esa línea — un segundo bug latente puede estar escondido detrás del primero.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

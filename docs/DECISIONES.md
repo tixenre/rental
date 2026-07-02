@@ -2152,3 +2152,34 @@ cancel-in-progress` ya cancela corridas viejas.
   de `contabilidad/`: primero el mapa completo, después la rama de fixes). El supervisor marca un motor de
   plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
   reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.
+
+### 2026-07-02 — `enviar_mail_factura` roto por 2 bugs encadenados (columna inexistente + kwarg inexistente)
+
+- **Contexto.** Fase 4 de la hoja de ruta de plata (`services/finanzas_flujo/`, ver entradas anteriores de
+  esta misma fecha). El hallazgo #3 de la auditoría cruzada (`docs/SISTEMA_PLATA.md`) marcaba
+  `routes/facturacion.py::enviar_mail_factura` con un `UndefinedColumn`: la query consultaba `c.owner_email`,
+  columna que no existe en `clientes` (vive en otras tablas — `passkey_credentials`/`auth_sessions` tienen
+  su propio `owner_email` para otro propósito). La función rompía **siempre** que se invocaba.
+- **Decisión.** Fix directo: `SELECT c.owner_email, ...` → `SELECT c.email, ...` (+ las referencias
+  derivadas de esa fila, `row["owner_email"]` → `row["email"]`).
+- **Segundo bug encontrado al escribir el test de regresión.** Al ejercitar la función completa por primera
+  vez (el test viejo de `test_facturacion_routes.py` nunca cubría este endpoint — gap de test real, no solo
+  de código), apareció un **segundo bug** nunca antes ejecutado, escondido detrás del primero: la construcción
+  del adjunto usaba `Attachment(filename=filename, content=pdf_bytes, content_type="application/pdf")`, pero
+  el dataclass real (`services/email/base.py::Attachment`) tiene el campo `mimetype`, no `content_type` — un
+  `TypeError` en cuanto se corregía el primer bug. Confirmado contra los otros 3 usos reales de `Attachment`
+  en el repo (`routes/reportes.py`, `routes/alquileres/documentos.py`, `routes/alquileres/core.py`), los tres
+  usan `mimetype`. Fix: `content_type=` → `mimetype=`.
+- **Why.** Sin arreglar los dos, la función seguía completamente rota — el primer fix por sí solo no era
+  suficiente para dejarla funcionando, solo movía el punto de falla más adelante. Refuerza con un corolario
+  concreto la decisión _2026-06-22 — Los hallazgos de una auditoría son hipótesis_: confirmar un fix no es
+  solo confirmar que la línea señalada compila, es ejecutar la función **completa** hasta el final — un bug
+  puede estar tapado por otro que se ejecuta primero.
+- **Consecuencias.** `test_facturacion_routes.py` suma `_FakeRow`/`_FakeConnConEmail` (fake de conexión con
+  `execute().fetchone()` para simular la fila de `clientes`) + `test_enviar_mail_factura_no_rompe_con_undefined_column`
+  (ejercita la función completa: SELECT → PDF → mail, confirma que no rompe y que el destinatario es el email
+  real) + `test_enviar_mail_factura_400_si_sin_email` (cliente sin email → 400, no un crash). 22/22 tests de
+  `test_facturacion_routes.py` en verde; suite completa 2720 (mismos 6 fallos preexistentes no relacionados
+  de `test_catalogo_motor_shape.py`). El supervisor marca un fix de columna/kwarg que no ejercite el código
+  que queda DESPUÉS de esa línea — un segundo bug latente puede estar escondido detrás del primero. Rama
+  `fix/facturacion-owner-email` → PR scoped (sin mergear, hoja de ruta); tracking #1184.

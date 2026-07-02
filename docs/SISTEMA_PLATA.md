@@ -99,9 +99,15 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
 2. **Mismo bug en el PDF** — `pdf_templates.py` (fila de subtotal del presupuesto) multiplica
    `precio_jornada × cantidad × jornadas` sin mirar `cobro_modo` — un cliente puede ver la fila
    "Flete" no sumar con el total del PDF.
-3. **`routes/facturacion.py` (`enviar_mail_factura`)** — consulta `c.owner_email`, columna que **no
-   existe** en `clientes` (vive en otra tabla). Rompe con `UndefinedColumn` cada vez que un admin usa
-   "enviar factura por mail". Sin test que lo cubra. Fix trivial: `c.owner_email` → `c.email`.
+3. ~~**`routes/facturacion.py` (`enviar_mail_factura`)**~~ — **RESUELTO.** Consultaba `c.owner_email`,
+   columna que no existe en `clientes` (vive en otra tabla) — rompía con `UndefinedColumn` cada vez
+   que un admin usaba "enviar factura por mail". Fix: `c.owner_email` → `c.email`. **Segundo bug
+   encontrado detrás del primero**: `Attachment(..., content_type=...)` — el kwarg real del
+   dataclass es `mimetype` (confirmado contra los otros 3 usos de `Attachment` en el repo) — nunca
+   se había ejecutado esa línea porque el query de email crasheaba antes. Sin el primer fix, el
+   segundo bug seguía dejando la función completamente rota. Candado:
+   `test_facturacion_routes.py::test_enviar_mail_factura_no_rompe_con_undefined_column` +
+   `test_enviar_mail_factura_400_si_sin_email`.
 4. **`reportes/liquidacion.py::filas_atribucion`** — si `suma_items = 0` pero `monto_total > 0` (ítems
    con subtotal 0, ej. 100% descuento a nivel ítem), el prorrateo da `NULL` → se trata como 0 → la
    plata de ese pedido **desaparece en silencio** del reporte de liquidación, sin que ningún chequeo
