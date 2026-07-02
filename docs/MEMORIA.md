@@ -728,6 +728,25 @@ módulo quedan para PRs siguientes, mismo patrón. El supervisor marca un consum
 el desglose de un pedido en vez de llamar a `finanzas_flujo.pedido.desglose_de_pedido`, o un `service` que
 importe de un `route`.
 
+### 2026-07-02 — Fase 2 (última): reconciliación proactiva — mail al dueño + chequeo `desglose_divergente`
+
+Cierra la hoja de ruta de plata (#1184). El semáforo de reconciliación pasa de **100% manual** a
+**proactivo**: `services/finanzas_flujo/reconciliacion.py::estado(conn)` une los dos `reconciliar()`
+existentes (`reportes.reconciliacion` + `contabilidad.queries.reconciliacion`, que ya anidaba al
+primero) en un solo `ok`, sin reimplementar ningún chequeo. Nuevo job **`jobs/reconciliacion.py::chequear_reconciliacion_y_alertar`**,
+corrido 1×/día desde el mismo thread in-process del scheduler (junto a
+`enviar_recordatorios_retiro`/`purgar_cuentas_livianas_stale`, cero costo de infra nuevo): si `ok=False`,
+manda un mail resumen a cada `settings.admin_emails` vía `send_raw_email` — nunca propaga un fallo de
+envío ni tumba el scheduler. Nuevo chequeo **`desglose_divergente`** en `reportes/reconciliacion.py`:
+compara `alquileres.monto_total` persistido contra el desglose recalculado con el precio de línea YA
+PERSISTIDO de cada ítem (vía `finanzas_flujo.pedido.desglose_de_pedido`, no el de catálogo) — la red
+genérica que hubiera cazado el patrón del bug #405 sola, sin depender de que el dueño notara un reporte
+puntual. Candados: `test_finanzas_flujo_reconciliacion.py` (la fachada une bien los dos semáforos),
+`test_jobs_reconciliacion.py` (el job manda mail solo cuando corresponde, a cada admin, nunca propaga),
+`test_reportes_liquidacion_db.py::test_reconciliacion_caza_desglose_divergente_del_pedido` (Postgres
+real). El supervisor marca: un chequeo de reconciliación nuevo fuera de la fachada `finanzas_flujo`, o
+un job que repare en vez de solo avisar (el job es de alerta, no de reparación automática).
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

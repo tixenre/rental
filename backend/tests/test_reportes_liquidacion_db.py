@@ -233,3 +233,66 @@ def test_reconciliacion_caza_pagado_sin_ledger(setup):
     # P_SOBRE se cobró por encima de su total actual → sobrepagado.
     assert P_SOBRE in rec["sobrepagados"]["ids"], rec["sobrepagados"]
     assert rec["ok"] is False
+
+
+def test_reconciliacion_caza_desglose_divergente_del_pedido():
+    """Fase 2 (#1184): generaliza el patrón del bug #405. Si `monto_total`
+    persistido NO coincide con el desglose recalculado a partir del precio de
+    línea YA PERSISTIDO del ítem (vía `finanzas_flujo.pedido.desglose_de_pedido`),
+    el chequeo `desglose_divergente` lo caza — sin depender de un reporte puntual
+    del dueño. Aislado de la fixture `setup` compartida (equipo/pedido propios)."""
+    from database import get_db, init_db
+    from reportes.reconciliacion import reconciliar
+
+    E_DIV = 9_300_901
+    P_DIVERGENTE = 9_300_902
+
+    def _limpiar_local(conn):
+        conn.execute("DELETE FROM alquiler_items WHERE pedido_id = %s", (P_DIVERGENTE,))
+        conn.execute("DELETE FROM alquileres WHERE id = %s", (P_DIVERGENTE,))
+        conn.execute("DELETE FROM equipos WHERE id = %s", (E_DIV,))
+
+    init_db()
+    conn = get_db()
+    try:
+        _limpiar_local(conn)
+        conn.execute(
+            "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
+            (E_DIV, "Equipo desglose divergente", 5, "Rambla"),
+        )
+        # 1 ítem, 1 jornada, precio_jornada=50000, cobro_modo='jornada' → el
+        # desglose recalculado (sin descuento) da monto_neto=50000. Pero
+        # monto_total persistido queda deliberadamente en 40000 (drift simulado,
+        # mismo patrón que #405: el editor mostraba/facturaba un desglose que no
+        # coincidía con lo persistido).
+        conn.execute(
+            """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
+                                       monto_total, monto_pagado, descuento_pct)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (P_DIVERGENTE, "Cliente desglose", "finalizado",
+             "2026-06-05T08:00:00", "2026-06-05T20:00:00", 40000, 40000, 0),
+        )
+        conn.execute(
+            """INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, cobro_modo)
+               VALUES (%s,%s,%s,%s,%s)""",
+            (P_DIVERGENTE, E_DIV, 1, 50000, "jornada"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    try:
+        conn = get_db()
+        try:
+            rec = reconciliar(conn)
+        finally:
+            conn.close()
+        assert P_DIVERGENTE in rec["desglose_divergente"]["ids"], rec["desglose_divergente"]
+        assert rec["ok"] is False
+    finally:
+        conn = get_db()
+        try:
+            _limpiar_local(conn)
+            conn.commit()
+        finally:
+            conn.close()
