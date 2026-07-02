@@ -237,6 +237,37 @@ def cargar_cert(emisor_id: int, request: Request, body: dict):
     return {"ok": True, "cert_cargado": emisor.cert_cargado}
 
 
+@router.get("/admin/emisores-arca/{emisor_id}/cert-info")
+def info_cert_emisor(emisor_id: int, request: Request):
+    """Metadata del certificado cargado (Subject, Nº de serie, vigencia) —
+    NUNCA el PEM/clave privada. Sirve para comparar 1 a 1 contra el
+    "Computador Fiscal" que figura delegado en el Administrador de
+    Relaciones de Clave Fiscal de ARCA: si el número de serie no coincide,
+    la relación fue delegada a un certificado DISTINTO del que este emisor
+    usa hoy para autenticar — causa real de prod: ARCA respondía sin datos
+    ni motivo aunque la relación estuviera bien delegada, porque estaba
+    delegada al certificado viejo."""
+    require_admin(request)
+
+    from cryptography import x509
+
+    from services.facturacion.emisores_repo import get_cert_pem
+
+    try:
+        with get_db() as conn:
+            cert_pem, _ = get_cert_pem(emisor_id, conn)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    cert = x509.load_pem_x509_certificate(cert_pem)
+    return {
+        "subject": cert.subject.rfc4514_string(),
+        "numero_serie": format(cert.serial_number, "X"),
+        "vigente_desde": cert.not_valid_before_utc.date().isoformat(),
+        "vigente_hasta": cert.not_valid_after_utc.date().isoformat(),
+    }
+
+
 @router.get("/admin/emisores-arca/{emisor_id}/puntos-venta")
 def consultar_puntos_venta_emisor(emisor_id: int, request: Request):
     """Consulta a ARCA (WSFE `FEParamGetPtosVenta`) los puntos de venta

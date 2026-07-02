@@ -132,6 +132,15 @@ export const facturacionApi = {
   // Puntos de venta habilitados en ARCA para ESTE emisor (requiere cert cargado).
   consultarPuntosVenta: (id: number) =>
     authedJson<{ puntos_venta: { nro: number }[] }>(`/api/admin/emisores-arca/${id}/puntos-venta`),
+  // Metadata del cert cargado (subject/serie/vigencia) — para comparar contra
+  // el "Computador Fiscal" delegado en el Administrador de Relaciones de ARCA.
+  consultarCertInfo: (id: number) =>
+    authedJson<{
+      subject: string;
+      numero_serie: string;
+      vigente_desde: string;
+      vigente_hasta: string;
+    }>(`/api/admin/emisores-arca/${id}/cert-info`),
 
   // Facturas
   previewFactura: (pedidoId: number) =>

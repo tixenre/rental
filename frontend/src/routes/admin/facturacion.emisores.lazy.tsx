@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Upload,
   Search,
+  Fingerprint,
 } from "lucide-react";
 
 import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
@@ -160,6 +161,11 @@ function EmisorCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const certInfo = useMutation({
+    mutationFn: () => facturacionApi.consultarCertInfo(emisor.id),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const condLabel =
     CONDICIONES.find((c) => c.value === emisor.condicion_iva)?.label ?? emisor.condicion_iva;
 
@@ -197,6 +203,18 @@ function EmisorCard({
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {emisor.cert_cargado && (
+            <button
+              type="button"
+              onClick={() => certInfo.mutate()}
+              disabled={certInfo.isPending}
+              title="Ver Nº de serie del certificado — comparar contra el Computador Fiscal delegado en ARCA"
+              className="h-8 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5"
+            >
+              <Fingerprint className="h-3.5 w-3.5" />
+              {certInfo.isPending ? "Leyendo…" : "Ver cert"}
+            </button>
+          )}
           <button
             type="button"
             onClick={onCert}
@@ -223,6 +241,26 @@ function EmisorCard({
           </button>
         </div>
       </div>
+      {certInfo.data && (
+        <div className="rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs space-y-1 font-mono">
+          <div>
+            <span className="text-muted-foreground">Nº de serie: </span>
+            {certInfo.data.numero_serie}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Subject: </span>
+            {certInfo.data.subject}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Vigencia: </span>
+            {certInfo.data.vigente_desde} → {certInfo.data.vigente_hasta}
+          </div>
+          <div className="text-muted-foreground/70">
+            Comparar el Nº de serie contra el "Computador Fiscal" en Administración de Certificados
+            Digitales de ARCA.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

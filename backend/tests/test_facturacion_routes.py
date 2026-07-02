@@ -72,6 +72,7 @@ class _FakeConn:
         ("DELETE", "/api/admin/emisores-arca/1"),
         ("POST", "/api/admin/emisores-arca/1/cert"),
         ("GET", "/api/admin/emisores-arca/1/puntos-venta"),
+        ("GET", "/api/admin/emisores-arca/1/cert-info"),
         ("GET", "/api/admin/arca/padron/20301234567"),
         ("GET", "/api/alquileres/1/facturar/preview"),
     ],
@@ -444,6 +445,42 @@ def test_consultar_puntos_venta_arca_caida_es_503_nunca_500(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
     assert exc.value.status_code == 503
+
+
+# ── info_cert_emisor: Nº de serie para comparar contra ARCA ─────────────────
+
+
+def test_info_cert_emisor_devuelve_subject_y_serie(monkeypatch):
+    from services.facturacion.pdf_seguridad import _generar_cert_autofirmado
+
+    cert_pem, key_pem = _generar_cert_autofirmado("Comprobantes — Motor de Facturación")
+
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_cert_pem",
+        lambda emisor_id, conn: (cert_pem, key_pem),
+    )
+
+    result = facturacion_routes.info_cert_emisor(1, _fake_request())
+
+    assert "Comprobantes" in result["subject"]
+    assert result["numero_serie"]
+    assert result["vigente_desde"] < result["vigente_hasta"]
+
+
+def test_info_cert_emisor_sin_cert_es_400(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+
+    def _boom(emisor_id, conn):
+        raise ValueError("Emisor 1 no tiene certificado cargado.")
+
+    monkeypatch.setattr("services.facturacion.emisores_repo.get_cert_pem", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.info_cert_emisor(1, _fake_request())
+    assert exc.value.status_code == 400
 
 
 # ── refrescar_catalogos_arca: actualiza las etiquetas del PDF desde ARCA ────
