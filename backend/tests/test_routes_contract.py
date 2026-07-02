@@ -71,7 +71,7 @@ _ADMIN = [
     ("DELETE", "/api/alquileres/1"),
     ("GET", "/api/alquileres/1/pagos"),
     ("POST", "/api/alquileres/1/pagos"),
-    ("DELETE", "/api/alquileres/1/pagos/1"),
+    ("POST", "/api/alquileres/1/pagos/1/anular"),
     ("GET", "/api/admin/pagos"),
     ("POST", "/api/admin/descuentos-jornada"),
     ("DELETE", "/api/admin/descuentos-jornada/1"),
@@ -135,6 +135,7 @@ _TODOS = _PROTEGIDOS + _PUBLICOS
 _VALIDA_ANTES_DEL_GUARD = {
     ("PATCH", "/api/alquileres/1"),
     ("POST", "/api/alquileres/1/pagos"),
+    ("POST", "/api/alquileres/1/pagos/1/anular"),
     ("POST", "/api/admin/descuentos-jornada"),
     ("PUT", "/api/alquileres/1/items"),
     ("POST", "/api/alquileres/1/enviar-documentos"),

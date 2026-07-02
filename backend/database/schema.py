@@ -1064,6 +1064,16 @@ def _init_db_schema(conn):
     conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS destinatario TEXT")
     conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS metodo TEXT")
 
+    # Actor + soft-delete con motivo — mismo patrón que `movimientos` (#809),
+    # esquema en dos capas (también en la migración a3b4c5d6e7f8). Auditoría
+    # 2026-07-02 (#1184): la tabla que alimenta todo el motor contable no
+    # respetaba "la plata no se borra" que el resto del motor sí respeta.
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS created_by TEXT")
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS anulado BOOLEAN NOT NULL DEFAULT FALSE")
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS anulado_por TEXT")
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS anulado_at TIMESTAMP")
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS anulado_motivo TEXT")
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS solicitudes_modificacion (
             id                SERIAL PRIMARY KEY,

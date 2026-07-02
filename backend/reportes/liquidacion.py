@@ -42,6 +42,7 @@ SALDADO_CTE = f"""
                        PARTITION BY ap.pedido_id ORDER BY ap.fecha, ap.id
                    ) AS acumulado
             FROM alquiler_pagos ap
+            WHERE NOT ap.anulado
         ),
         saldado AS (
             SELECT a.pedido_id, MIN(a.fecha) AS fecha_saldado

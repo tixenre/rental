@@ -102,7 +102,7 @@ def cobros_mensuales(conn, desde=None, hasta=None, cobrador=None) -> list[dict]:
                COUNT(*) AS cantidad
         FROM alquiler_pagos ap
         JOIN alquileres al ON al.id = ap.pedido_id
-        WHERE ap.destinatario IS NOT NULL AND al.fecha_desde >= %s::date
+        WHERE ap.destinatario IS NOT NULL AND NOT ap.anulado AND al.fecha_desde >= %s::date
     """
     params: list = [LIQUIDACION_INICIO]
     if cobrador:

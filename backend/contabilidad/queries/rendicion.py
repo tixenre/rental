@@ -75,6 +75,7 @@ def cobrado_por_socio(conn, desde: str, hasta: str) -> dict:
         SELECT COALESCE(ap.destinatario, '__sin__') AS quien, COALESCE(SUM(ap.monto), 0) AS monto
         FROM alquiler_pagos ap
         JOIN en_rango r ON r.pedido_id = ap.pedido_id
+        WHERE NOT ap.anulado
         GROUP BY 1
     """
     out = {p: 0 for p in PARTES}  # Pablo, Tincho, Rambla — los tres pueden cobrar

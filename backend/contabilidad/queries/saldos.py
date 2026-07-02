@@ -61,6 +61,7 @@ def ingresos_derivados(conn, desde: str | None = None, hasta: str | None = None)
         FROM alquiler_pagos ap
         JOIN alquileres al ON al.id = ap.pedido_id
         WHERE ap.destinatario IS NOT NULL
+          AND NOT ap.anulado
           AND al.fecha_desde >= %s::date
     """
     params: list = [LIQUIDACION_INICIO]

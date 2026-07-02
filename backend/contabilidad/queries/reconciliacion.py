@@ -31,7 +31,8 @@ def reconciliar(conn) -> dict:
         f"""SELECT COUNT(*) AS n, COALESCE(SUM(ap.monto), 0) AS m
            FROM alquiler_pagos ap
            JOIN alquileres al ON al.id = ap.pedido_id
-           WHERE al.fecha_desde >= %s::date
+           WHERE NOT ap.anulado
+             AND al.fecha_desde >= %s::date
              AND (ap.destinatario IS NULL OR ap.destinatario NOT IN ({_ph}))""",
         (LIQUIDACION_INICIO, *COBRADORES),
     ).fetchone()
