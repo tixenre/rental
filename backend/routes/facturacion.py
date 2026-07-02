@@ -82,14 +82,19 @@ def refrescar_catalogos_arca(request: Request):
 def consultar_padron(cuit: str, request: Request):
     """Autocompleta razón social/domicilio/condición IVA desde el padrón de
     ARCA (ws_sr_constancia_inscripcion) — mismo autocompletado que hace el
-    facturador oficial al tipear un CUIT. Best-effort: {encontrado: false} si
-    AFIP no responde o el CUIT no tiene datos, nunca un error — el formulario
-    sigue siendo editable a mano."""
+    facturador oficial al tipear un CUIT. Best-effort: nunca un error HTTP —
+    el formulario sigue siendo editable a mano. `{encontrado: false}` sin
+    `motivo` = ARCA no tiene datos para ese CUIT; CON `motivo` = no pudimos
+    ni completar la consulta (WSAA/relación/cert/red) — se muestra tal cual,
+    es más útil para diagnosticar que un genérico "sin datos"."""
     require_admin(request)
 
     from services.facturacion.padron import resolver_persona
     with get_db() as conn:
-        persona = resolver_persona(cuit, conn)
+        try:
+            persona = resolver_persona(cuit, conn)
+        except RuntimeError as e:
+            return {"encontrado": False, "motivo": str(e)}
 
     if persona is None:
         return {"encontrado": False}
@@ -402,7 +407,7 @@ def listar_facturas(
 _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
 
-def _factura_html_o_404(factura_id: int, conn, layout: str = "clasica"):
+def _factura_html_o_404(factura_id: int, conn, layout: str = "celular"):
     """Carga la factura + renderiza su HTML al vuelo. La factura no cambia una
     vez emitida, así que no hace falta guardar el PDF: regenerar da lo mismo."""
     from services.facturacion.repo import get_by_id
@@ -425,16 +430,16 @@ def _factura_html_o_404(factura_id: int, conn, layout: str = "clasica"):
 
 @router.get("/facturas/{factura_id}/pdf")
 async def descargar_pdf_factura(
-    factura_id: int, request: Request, format: str = "pdf", layout: str = "clasica"
+    factura_id: int, request: Request, format: str = "pdf", layout: str = "celular"
 ):
     """PDF de una factura, renderizado on-demand. `format=html` devuelve el preview
     (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py).
-    `layout`: 'clasica' (default, réplica oficial AFIP/ARCA) · 'celular' (compacta,
-    para compartir por WhatsApp) · 'formal' (A4, identidad de la celular)."""
+    `layout`: 'celular' (default de Rambla — compacta 4:5) · 'clasica' (réplica
+    oficial AFIP/ARCA, A4) · 'formal' (A4, identidad de la celular)."""
     require_admin(request)
 
     if layout not in ("clasica", "celular", "formal"):
-        layout = "clasica"
+        layout = "celular"
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)

@@ -73,7 +73,9 @@ export type PadronResult =
       condicion_iva: string;
       estado_clave: string;
     }
-  | { encontrado: false };
+  // `motivo` presente = no pudimos ni completar la consulta (WSAA/relación/
+  // cert/red) — distinto de "ARCA no tiene datos para este CUIT" (sin motivo).
+  | { encontrado: false; motivo?: string };
 
 export type ChequeoPreview = { check: string; ok: boolean; bloqueante: boolean; mensaje: string };
 

@@ -3,10 +3,14 @@ IVA a partir de un CUIT, vía el padrón de ARCA (WSDL personaServiceA5, servici
 WSAA "ws_sr_constancia_inscripcion" — antes "ws_sr_padron_a5", deprecado).
 
 Es una comodidad de carga (lo mismo que hace el facturador oficial de ARCA al
-tipear un CUIT) — NUNCA crítico: si el padrón no responde, no está configurado,
-o el CUIT no tiene datos, el caller degrada a "no se pudo autocompletar" y el
-usuario carga los datos a mano como siempre. No participa del flujo de emisión
-de comprobantes (no toca `arca_fe.wsfe`/`engine.py`).
+tipear un CUIT) — NUNCA bloquea: el formulario sigue siendo editable a mano
+pase lo que pase. Pero "ARCA no tiene datos para este CUIT" y "no pudimos ni
+preguntarle a ARCA" son cosas MUY distintas para diagnosticar (la primera es
+un hecho de AFIP; la segunda es nuestro/su lado — WSAA no autoriza, relación
+no delegada, cert vencido, red) — `resolver_persona` las distingue: None solo
+para la primera (o sin emisor autenticador), RuntimeError con el motivo real
+para la segunda, que el route (admin-only) muestra tal cual. No participa del
+flujo de emisión de comprobantes (no toca `arca_fe.wsfe`/`engine.py`).
 
 Cualquier emisor activo con cert cargado sirve para autenticar la consulta —
 el padrón responde por CUALQUIER CUIT consultado, no solo el que autentica.
@@ -22,8 +26,17 @@ _PADRON_PROD = "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5?w
 
 
 def resolver_persona(cuit_buscado: str, conn) -> Optional[PersonaArca]:
-    """Consulta el padrón para `cuit_buscado`. None si no se pudo resolver
-    (sin emisor autenticador disponible, AFIP no respondió, o sin datos)."""
+    """Consulta el padrón para `cuit_buscado`.
+
+    None: no hay ningún emisor con cert para autenticar, o AFIP respondió que
+    no tiene datos para ese CUIT (`arca_fe.padron.PadronClient.get_persona` ya
+    distingue esto de un fault real — ver sus tests).
+
+    Levanta RuntimeError con el motivo real para cualquier OTRA falla (WSAA no
+    autoriza el servicio, relación no delegada, cert vencido, red, timeout) —
+    NO se swallowea: decirle al admin "ARCA no tiene datos" cuando en realidad
+    no pudimos ni completar la consulta es engañoso y no se puede diagnosticar
+    desde afuera. El caller (route, admin-only) decide qué mostrar."""
     from services.facturacion.config import credenciales
     from services.facturacion.wsaa_cache import get_ta
 
@@ -41,8 +54,8 @@ def resolver_persona(cuit_buscado: str, conn) -> Optional[PersonaArca]:
             endpoint=endpoint, cuit_representada=cred.cuit, token=token, sign=sign
         )
         return client.get_persona(cuit_buscado)
-    except Exception:
-        # Autocompletado best-effort: cualquier falla (AFIP caído, relación de
-        # padrón no delegada, cert vencido) degrada a "no se pudo", no rompe
-        # el formulario que está pidiendo el dato.
-        return None
+    except Exception as exc:
+        raise RuntimeError(
+            f"No se pudo consultar el padrón con el emisor '{emisor_autenticador}': "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
