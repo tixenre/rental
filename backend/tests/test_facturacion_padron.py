@@ -91,3 +91,38 @@ def test_falla_real_levanta_runtime_error_con_motivo(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="cert vencido"):
         resolver_persona("30712345678", conn=object())
+
+
+def test_bloqueo_de_negocio_de_afip_se_propaga_sin_doble_envoltorio(monkeypatch):
+    """`get_persona` puede levantar RuntimeError con el mensaje de negocio de
+    AFIP en texto plano (ej. bloqueo por Domicilio Fiscal Electrónico, RG
+    3990-E) — resolver_persona lo deja pasar tal cual, sin envolverlo de
+    nuevo con el genérico "No se pudo consultar el padrón con el emisor...",
+    que le restaría legibilidad al mensaje que el admin tiene que leer."""
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.list_emisores",
+        lambda conn: [_emisor()],
+    )
+
+    class _FakeCred:
+        ambiente = "homologacion"
+        cuit = 20300000000
+
+    monkeypatch.setattr(
+        "services.facturacion.config.credenciales", lambda emisor, conn: _FakeCred()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.wsaa_cache.get_ta",
+        lambda emisor, conn, servicio=None: ("tok", "sign"),
+    )
+    mensaje_afip = (
+        "No consta en nuestros registros que Ud. ha cumplido con la adhesión "
+        "al domicilio fiscal electrónico"
+    )
+    monkeypatch.setattr(
+        "arca_fe.padron.PadronClient.get_persona",
+        lambda self, cuit: (_ for _ in ()).throw(RuntimeError(mensaje_afip)),
+    )
+
+    with pytest.raises(RuntimeError, match=mensaje_afip):
+        resolver_persona("23373891029", conn=object())
