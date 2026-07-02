@@ -17,15 +17,18 @@ El parser que usa lee:
   - Title del <head> — para marca/modelo
 """
 
-import html as html_lib
 import json
 import re
 import sys
 from pathlib import Path
-from typing import Any
+
+from services.specs_ingesta.parse import jsonld as _jsonld
+from services.specs_ingesta.parse.garbage import is_garbage as _is_garbage
 
 # Importar el parser core desde tools/ (es código script-style ya probado).
 # El seed lo usa idéntico — esto garantiza paridad de calidad.
+# ⏰ LEGACY (F3 del rediseño de ingesta): este sys.path.insert se elimina cuando
+# los parsers se mudan a services/specs_ingesta/parsers/. Ver issue #1176.
 _TOOLS_DIR = Path(__file__).parent.parent.parent / "tools"
 sys.path.insert(0, str(_TOOLS_DIR))
 
@@ -43,78 +46,6 @@ from iluminacion_normalizar import (  # noqa: E402  type: ignore
     canon_modelo,
     clean_extras,
 )
-
-
-# ── JSON-LD extraction (igual al seed) ──────────────────────────────────────
-
-def _jsonld_props(html_content: str) -> dict[str, Any]:
-    """Extrae {label: value} desde Product.additionalProperty del JSON-LD."""
-    blocks = re.findall(
-        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html_content, re.DOTALL,
-    )
-    for b in blocks:
-        try:
-            data = json.loads(b)
-        except json.JSONDecodeError:
-            continue
-        if not (isinstance(data, dict) and data.get("@type") == "Product"):
-            continue
-        ap = data.get("additionalProperty", {})
-        props_list = ap.get("value", []) if isinstance(ap, dict) else (ap if isinstance(ap, list) else [])
-        result: dict[str, Any] = {}
-        for pv in props_list:
-            if isinstance(pv, dict):
-                name = pv.get("name")
-                value = pv.get("value")
-                if name:
-                    if isinstance(value, list):
-                        value = [
-                            html_lib.unescape(x.replace(" ", " "))
-                            if isinstance(x, str) else x
-                            for x in value
-                        ]
-                    elif isinstance(value, str):
-                        value = html_lib.unescape(value.replace(" ", " "))
-                    result[name] = value
-        return result
-    return {}
-
-
-def _jsonld_image(html_content: str) -> str | None:
-    blocks = re.findall(
-        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html_content, re.DOTALL,
-    )
-    for b in blocks:
-        try:
-            data = json.loads(b)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(data, dict) and data.get("@type") == "Product":
-            img = data.get("image")
-            if isinstance(img, list) and img:
-                return img[0]
-            if isinstance(img, str):
-                return img
-    return None
-
-
-def _jsonld_url(html_content: str) -> str | None:
-    blocks = re.findall(
-        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html_content, re.DOTALL,
-    )
-    for b in blocks:
-        try:
-            data = json.loads(b)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(data, dict) and data.get("@type") == "Product":
-            url = data.get("url")
-            if isinstance(url, str):
-                return url
-    return None
 
 
 # ── Extractor principal ─────────────────────────────────────────────────────
@@ -145,15 +76,18 @@ def extract_from_html(html_content: str) -> dict:
     marca = canon_brand(_extract_brand(title))
     modelo = canon_modelo(_extract_modelo(title))
 
-    # 2) URL canónica del producto (preferir JSON-LD; fallback al comentario "saved from url")
-    url = _jsonld_url(html_content)
+    # 2) Parsear el JSON-LD UNA vez (antes: 3 pasadas separadas por url/imagen/props)
+    product = _jsonld.jsonld_product(html_content)
+
+    # URL canónica del producto (preferir JSON-LD; fallback al comentario "saved from url")
+    url = _jsonld.url(product)
     if not url:
         saved = re.search(r"saved from url=\(\d+\)(https%s://\S+)", html_content)
         if saved:
             url = saved.group(1).strip()
 
     # 3) Image URL
-    image = _jsonld_image(html_content)
+    image = _jsonld.image(product)
 
     # 4) Parser DOM + JSON-LD merge → secciones {sec: [{label, value}]}
     parser = BHSpecsParser()
@@ -161,12 +95,7 @@ def extract_from_html(html_content: str) -> dict:
     secciones = dict(parser.secciones)
 
     # Si tenemos JSON-LD, lo agregamos en una sección "Specs" — más rico que DOM
-    jsonld_props = _jsonld_props(html_content)
-    # Filtro de valores basura (mismo criterio que BHSpecsParser DOM)
-    _GARBAGE_VALUES = {"1 x", "1x", ":", "—", "-", "N/A", "n/a", ""}
-    def _is_garbage(v: str) -> bool:
-        v = (v or "").strip()
-        return v in _GARBAGE_VALUES or v.lower().startswith("not specified")
+    jsonld_props = _jsonld.additional_properties_as_dict(product)
 
     if jsonld_props:
         jsonld_items = []

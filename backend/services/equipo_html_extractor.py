@@ -16,13 +16,14 @@ Entrada principal:
     extract_from_html(html_content, categoria_hint=None) -> dict
 """
 
-import html as html_lib
 import json
 import logging
 import re
 import sys
 from pathlib import Path
-from typing import Any
+
+from services.specs_ingesta.parse import jsonld as _jsonld
+from services.specs_ingesta.parse.garbage import is_garbage
 
 logger = logging.getLogger(__name__)
 
@@ -78,77 +79,6 @@ def _detect_categoria(html_content: str, title: str = "") -> str:
 
     return "Desconocido"
 
-
-# ── JSON-LD helpers (compartidos) ───────────────────────────────────────
-
-def _jsonld_props(html_content: str) -> dict[str, Any]:
-    """Extrae {label: value} desde Product.additionalProperty del JSON-LD."""
-    blocks = re.findall(
-        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html_content, re.DOTALL,
-    )
-    for b in blocks:
-        try:
-            data = json.loads(b)
-        except json.JSONDecodeError:
-            continue
-        if not (isinstance(data, dict) and data.get("@type") == "Product"):
-            continue
-        ap = data.get("additionalProperty", {})
-        props_list = ap.get("value", []) if isinstance(ap, dict) else (ap if isinstance(ap, list) else [])
-        result: dict[str, Any] = {}
-        for pv in props_list:
-            if isinstance(pv, dict):
-                name = pv.get("name")
-                value = pv.get("value")
-                if name and name not in result:  # primera ocurrencia gana
-                    if isinstance(value, list):
-                        value = [
-                            html_lib.unescape(x.replace(" ", " "))
-                            if isinstance(x, str) else x
-                            for x in value
-                        ]
-                    elif isinstance(value, str):
-                        value = html_lib.unescape(value.replace(" ", " "))
-                    result[name] = value
-        return result
-    return {}
-
-
-def _jsonld_image(html_content: str) -> str | None:
-    blocks = re.findall(
-        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html_content, re.DOTALL,
-    )
-    for b in blocks:
-        try:
-            data = json.loads(b)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(data, dict) and data.get("@type") == "Product":
-            img = data.get("image")
-            if isinstance(img, list) and img:
-                return img[0]
-            if isinstance(img, str):
-                return img
-    return None
-
-
-def _jsonld_url(html_content: str) -> str | None:
-    blocks = re.findall(
-        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html_content, re.DOTALL,
-    )
-    for b in blocks:
-        try:
-            data = json.loads(b)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(data, dict) and data.get("@type") == "Product":
-            url = data.get("url")
-            if isinstance(url, str):
-                return url
-    return None
 
 
 # ── Adapter común: convierte specs dict → array [{spec_key, label, value}] ──
@@ -221,19 +151,19 @@ def _extract_via_lentes_parser(html_content: str) -> dict:
     parser.feed(html_content)
     secciones = dict(parser.secciones)
     title = _clean_title(parser.title or "")
-    image = _jsonld_image(html_content)
-    url = _jsonld_url(html_content) or ""
+    product = _jsonld.jsonld_product(html_content)
+    image = _jsonld.image(product)
+    url = _jsonld.url(product) or ""
 
-    # Mergear JSON-LD (autoritativo)
-    jsonld = _jsonld_props(html_content)
+    jsonld = _jsonld.additional_properties_as_dict(product)
     if jsonld:
         items = []
         for name, value in jsonld.items():
             if isinstance(value, list):
-                clean = [str(v) for v in value if str(v).strip() and str(v) not in ("1 x", "—", "n/a")]
+                clean = [str(v) for v in value if not is_garbage(str(v))]
                 if clean:
                     items.append({"label": name, "value": "\n".join(clean)})
-            elif value and str(value).strip() and str(value) not in ("1 x", "—", "n/a"):
+            elif value and not is_garbage(str(value)):
                 items.append({"label": name, "value": str(value)})
         if items:
             secciones = {"Specs (JSON-LD)": items, **secciones}
@@ -281,19 +211,19 @@ def _extract_via_modificadores_parser(html_content: str) -> dict:
     parser.feed(html_content)
     secciones = dict(parser.secciones)
     title = _clean_title(parser.title or "")
-    image = _jsonld_image(html_content)
-    url = _jsonld_url(html_content) or ""
+    product = _jsonld.jsonld_product(html_content)
+    image = _jsonld.image(product)
+    url = _jsonld.url(product) or ""
 
-    # Mergear JSON-LD (autoritativo sobre el DOM)
-    jsonld = _jsonld_props(html_content)
+    jsonld = _jsonld.additional_properties_as_dict(product)
     if jsonld:
         items = []
         for name, value in jsonld.items():
             if isinstance(value, list):
-                clean = [str(v) for v in value if str(v).strip() and str(v) not in ("1 x", "—", "n/a")]
+                clean = [str(v) for v in value if not is_garbage(str(v))]
                 if clean:
                     items.append({"label": name, "value": "\n".join(clean)})
-            elif value and str(value).strip() and str(value) not in ("1 x", "—", "n/a"):
+            elif value and not is_garbage(str(value)):
                 items.append({"label": name, "value": str(value)})
         if items:
             secciones = {"Specs (JSON-LD)": items, **secciones}
@@ -320,19 +250,19 @@ def _extract_via_camaras_parser(html_content: str) -> dict:
     parser.feed(html_content)
     secciones = dict(parser.secciones)
     title = _clean_title(parser.title or "")
-    image = _jsonld_image(html_content)
-    url = _jsonld_url(html_content) or ""
+    product = _jsonld.jsonld_product(html_content)
+    image = _jsonld.image(product)
+    url = _jsonld.url(product) or ""
 
-    # Mergear JSON-LD
-    jsonld = _jsonld_props(html_content)
+    jsonld = _jsonld.additional_properties_as_dict(product)
     if jsonld:
         items = []
         for name, value in jsonld.items():
             if isinstance(value, list):
-                clean = [str(v) for v in value if str(v).strip() and str(v) not in ("1 x", "—", "n/a")]
+                clean = [str(v) for v in value if not is_garbage(str(v))]
                 if clean:
                     items.append({"label": name, "value": "\n".join(clean)})
-            elif value and str(value).strip() and str(value) not in ("1 x", "—", "n/a"):
+            elif value and not is_garbage(str(value)):
                 items.append({"label": name, "value": str(value)})
         if items:
             secciones = {"Specs (JSON-LD)": items, **secciones}
