@@ -7,8 +7,9 @@ Cubre la validación de cuentas y el cálculo de saldos (la matemática: saldo_i
 
 import pytest
 
-from contabilidad.cuentas import COBRADORES, TIPOS_CUENTA, validar_cuenta
-from contabilidad.saldos import calcular_saldos
+from contabilidad.constants import COBRADORES, TIPOS_CUENTA
+from contabilidad.commands.cuentas import validar_cuenta
+from contabilidad.queries.saldos import calcular_saldos
 
 
 class TestValidarCuenta:
@@ -120,7 +121,7 @@ class TestCalcularSaldos:
         assert calcular_saldos([], [], {}) == []
 
     def test_totales_por_moneda_no_mezcla(self):
-        from contabilidad.saldos import _totales_por_moneda
+        from contabilidad.queries.saldos import _totales_por_moneda
 
         filas = [
             {"moneda": "ARS", "saldo": 100},

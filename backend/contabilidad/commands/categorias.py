@@ -1,7 +1,7 @@
-"""Categorías de gasto (#809) — rubros editables para clasificar egresos.
+"""Escritura de categorías de gasto (#809) — única puerta de mutación.
 
-Tabla `gasto_categorias` (creada en Fase 1). Acá viven el listado y el alta. Los
-gastos (`movimientos.tipo='gasto'`) referencian una categoría por FK.
+Tabla `gasto_categorias` (creada en Fase 1). Los gastos (`movimientos.tipo='gasto'`)
+referencian una categoría por FK. Lectura → `queries/categorias.py`.
 """
 
 
@@ -14,17 +14,6 @@ def validar_categoria(nombre) -> str:
     if len(nombre) > 80:
         raise ValueError("El nombre de la categoría es demasiado largo.")
     return nombre
-
-
-def listar_categorias(conn, incluir_inactivas: bool = False) -> list[dict]:
-    """Categorías de gasto ordenadas por `orden, nombre`."""
-    from database import row_to_dict
-
-    sql = "SELECT id, nombre, activa, orden FROM gasto_categorias"
-    if not incluir_inactivas:
-        sql += " WHERE activa = TRUE"
-    sql += " ORDER BY orden, nombre"
-    return [row_to_dict(r) for r in conn.execute(sql).fetchall()]
 
 
 def crear_categoria(conn, nombre) -> dict:

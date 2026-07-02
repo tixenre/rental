@@ -1877,3 +1877,214 @@ cancel-in-progress` ya cancela corridas viejas.
   única sana, y el buffer del motor de reservas es regla de overlap (no genérica). **Pendiente menor** (no es de
   fechas): `cuentas.py` hardcodea `'2026-06-01'` en vez de `LIQUIDACION_INICIO` (drift latente del clean-start). PR
   #1136; tracking #1126.
+
+### 2026-07-02 — El editor de pedidos admin cotiza con el precio de línea congelado, no con el de catálogo
+
+- **Contexto.** El dueño reportó el pedido #405 marcado como "sobrepagado" en la reconciliación mensual pese a
+  que la pantalla del pedido mostraba "Cobranza $163.860 de $163.860 · pagado". Investigado: la reconciliación
+  (`reportes/reconciliacion.py`, chequeo 3) compara `alquileres.monto_pagado` contra `alquileres.monto_total`
+  — dos columnas persistidas de la base. La pantalla del pedido (`pedidos.$id.lazy.tsx`) NO lee esa columna: arma
+  su propio total llamando en vivo a `POST /api/cotizar`, que para ítems de catálogo **siempre** recotiza contra
+  el precio **actual** de `equipos` (`cotizacion.py`, comentario: "no se confía en lo que mande el front") — no
+  contra el `precio_jornada` que ya está persistido/editado en `alquiler_items` del pedido. Dos cálculos
+  independientes del mismo "total" para el mismo pedido, que pueden divergir en cualquier momento en que el
+  precio de catálogo de algún ítem cambie desde que el pedido se armó.
+- **Decisión.** `POST /api/cotizar` acepta un flag nuevo `respetar_precio_item` (solo lo honra una sesión
+  admin, mismo patrón que `cliente_id`/`descuento_pct`): si viene en `true`, usa el `precio_jornada` que manda
+  cada ítem de catálogo en vez de re-buscarlo en `equipos`. El editor de pedidos (`useCotizacion` con
+  `respetarPrecioItem: true`) lo activa siempre — así el total que ve el admin mientras edita es el MISMO que
+  persiste `_recalcular_total_pedido` al guardar, que es el mismo que lee la reconciliación. Además, la pantalla
+  de Cobranza dejaba de mostrar un excedente cobrado (`restante = Math.max(0, total - pagadoMonto)` clampeaba a
+  0 cualquier sobrepago): ahora un `excedente = Math.max(0, pagadoMonto - total)` se muestra explícito en rojo
+  ("de más $X") con una nota sugiriendo devolución/crédito, en vez de esconderse detrás de un "pagado" falso.
+- **Why.** Se evaluaron dos caminos: (a) bloquear la edición de precio/descuento en pedidos ya
+  confirmados/cobrados (snapshot-lock estricto, matching la letra de la decisión 2026-06-06 "Datos del pedido:
+  plata congelada"), o (b) mantener la edición permitida (uso real del dueño: dar un descuento retroactivo tras
+  cobrar) pero eliminar la fuente de verdad duplicada. El dueño explícitamente pidió (b): "quiero poder editar
+  las cosas y que estén todas bien, no sincronizadas" — la solución no es restringir el flujo de trabajo, es que
+  no haya DOS cálculos del mismo número. El caso #405 en sí (dinero ya cobrado por encima del total actual tras
+  un descuento retroactivo) sigue siendo una situación real de negocio que el dueño resuelve a mano (crédito o
+  devolución) — no es un bug de datos, es información que antes estaba oculta.
+- **Consecuencias.** Ningún cambio de contrato público: `respetar_precio_item` default `False` (el carrito
+  público/`CartDrawer`/`CatalogoMovil` siguen cotizando contra catálogo, sin tocar). Regresión: verificado
+  manualmente que `es_admin` se resuelve antes del loop de ítems (antes solo se calculaba dentro del bloque
+  `if tiene_fechas:`, se hoisteó). PR #1181, sin tests nuevos (cambio de UI + flag de query ya cubierto por el
+  test de contrato de `/api/cotizar`); plan de prueba manual en el PR.
+
+### 2026-07-02 — `backend/contabilidad/` reorganizado CQRS-lite (`queries/`+`commands/`), espejo de `services/specs/`
+
+- **Contexto.** A raíz de investigar el caso #405 (ver decisión anterior), el dueño pidió explícitamente aplicarle
+  a `backend/contabilidad/` "el CQRS liviano que estamos implementando en el repo" (ya usado en
+  `services/specs/` y `services/specs_ingesta/`) y auditar el módulo para que este tipo de bug no vuelva a pasar.
+  El módulo (10 archivos, ~1400 líneas, `#809`) era plano: cada archivo mezclaba lectura y escritura sin
+  frontera física.
+- **Decisión.** Split **move-verbatim** (cero cambio de lógica/SQL) en `queries/` (lectura, nunca muta) +
+  `commands/` (única puerta de mutación) + `constants.py` (top-level: `TIPOS_CUENTA`, `COBRADORES`,
+  `SOCIOS_HUMANOS`, `MONEDAS`, `TIPOS_MOVIMIENTO`, `METODOS_MOVIMIENTO`, `PARTES` — viven fuera de `queries/`/
+  `commands/` porque `queries/` los necesita y no puede importarlos del lado de escritura). Mapeo: de los 10
+  archivos viejos salieron 10 `queries/*.py` + 5 `commands/*.py` (categorías, cuentas, movimientos, cierres,
+  rendición). `PARTES` estaba duplicada byte-idéntica en `rendicion.py` y `reporte_mensual.py` — consolidada
+  en `constants.py` (una sola forma). Actualizados los 2 callers (`routes/contabilidad.py`,
+  `routes/alquileres/pagos.py`) y los 4 archivos de test que importaban rutas viejas.
+- **Why.** El motor resultó ser mayormente de lectura: de ~35 funciones públicas, solo 10 mutan de verdad
+  (`crear_categoria`, `crear_cuenta`/`editar_cuenta`/`desactivar_cuenta`, `crear_movimiento`/`editar_movimiento`/
+  `anular_movimiento`, `cerrar_mes`/`reabrir_mes`, `saldar`). Confirmado al hacer el split: **ningún** query del
+  paquete necesitaba nada de `commands/` — la invariante "`commands/` importa de `queries/`; `queries/` nunca de
+  `commands/`" se cumple sin fricción, igual que en `specs`/`specs_ingesta`. Separar físicamente lectura de
+  escritura hace más fácil auditar visualmente "¿esto puede mutar plata?" con solo mirar en qué carpeta vive —
+  reduce la clase de bug de #405 (que fue un bug del LADO CLIENTE del total, no de este módulo, pero la misma
+  disciplina de "una sola fuente, nunca dos caminos" es la que lo hubiera prevenido si hubiera vivido acá).
+- **Consecuencias.** Candado: 51 tests puros (sin DB) + 29 tests de integración (Postgres real, todo el árbol
+  `test_contabilidad_db.py`/`test_reportes_cierres_db.py`/`test_init_db_cuentas_seed_db.py`) pasan en verde
+  byte-a-byte contra el comportamiento pre-split — confirma que fue mecánico, no una reescritura. `pyflakes`
+  limpio sobre el paquete completo (sin imports muertos ni nombres indefinidos). Suite completa del backend:
+  2684 passed (los 3 failed + 3 error de `test_catalogo_motor_shape.py` son preexistentes, no tocan
+  `contabilidad` — sin datos de catálogo sembrados en la DB de prueba local). **Auditoría del patrón "dos
+  cálculos del mismo número"** (lo que causó #405) sobre el módulo: no se encontró una segunda instancia dentro
+  de `contabilidad/` — el propio `queries/reconciliacion.py::reconciliar` ya es el semáforo que cazaría ese
+  patrón (hereda `reportes/reconciliacion.py`, que tiene 3 chequeos: pagados-sin-ledger, `monto_pagado`
+  divergente del ledger real, y sobrepagados). Rama aislada `feature/contabilidad-cqrs`, PR sin mergear
+  (convención "PR como hoja de ruta"); tracking #1184.
+
+### 2026-07-02 — Auditoría de `backend/contabilidad/`: bordes reforzados (edición, locking, auditoría de pagos)
+
+- **Contexto.** Tras cerrar el split CQRS-lite, el dueño pidió una segunda pasada: "¿qué está mal, flojo, poco
+  seguro, bien, qué falta, qué sobra?". Se lanzaron 3 auditorías en paralelo (agentes `Explore` independientes,
+  sin compartir contexto entre sí para evitar sesgo de confirmación): corrección contable/concurrencia,
+  seguridad de la capa HTTP (`routes/contabilidad.py` + `routes/alquileres/pagos.py`), y duplicación/gaps de
+  cobertura de tests. Encontraron 19 hallazgos, priorizados en 4 tiers. El dueño, tras ver el diagnóstico
+  completo, pidió implementar los 19 en una rama aislada.
+- **Decisión — Tier 1 (3 bugs reales):**
+  1. `editar_movimiento` (`commands/movimientos.py`) no repetía las validaciones de `crear_movimiento`
+     (existencia+actividad de cuenta, misma moneda entre origen/destino, categoría existente+activa) — extraídas
+     a `_validar_cuentas_y_categoria(conn, origen, destino, categoria_id)`, llamada por ambas funciones. Antes,
+     `PATCH .../movimientos/{id}` con `cuenta_destino_id` de otra moneda pasaba sin error — violación directa de
+     "ARS y USD no se mezclan". Verificado: `grep` confirmó cero call-sites de `updateMovimiento` en el
+     frontend hoy — el fix es de riesgo cero para flujos en producción, cierra un hueco de la API.
+  2. `alquiler_pagos` (la tabla que alimenta `ingresos_derivados`/`saldos`/`rendicion`/`reporte_mensual`/
+     liquidación) no tenía columna de actor y `eliminar_pago` hacía `DELETE` real sin motivo — contradecía "la
+     plata no se borra" que `movimientos` sí respeta. Fix: migración `a3b4c5d6e7f8` agrega `created_by` +
+     `anulado`/`anulado_por`/`anulado_at`/`anulado_motivo` (mismo patrón que `movimientos`, espejado en
+     `schema.py`). `agregar_pago` captura `admin.get("email")`. `DELETE /pagos/{id}` → `POST .../{id}/anular`
+     con `motivo` obligatorio (soft-delete). **7 queries** que sumaban `alquiler_pagos` sin filtrar ahora llevan
+     `AND NOT anulado`: `ingresos_derivados`, `cobros_mensuales`, el chequeo `pagos_sin_socio` de
+     `contabilidad/queries/reconciliacion.py`, `cobrado_por_socio` (rendición — hallazgo adicional, no estaba en
+     la lista original de la auditoría, encontrado al mapear el fix), el `SALDADO_CTE` de
+     `reportes/liquidacion.py` (compartido por 3 consumidores — el filtro va UNA vez ahí, no repetido), los 2
+     chequeos de `reportes/reconciliacion.py` (`sin_ledger`/`divergentes`, que además ahora comparan contra la
+     MISMA fuente que `monto_pagado` — sin esto, cada pago anulado marcaría un falso divergente), y los 2
+     listados de pagos del portal cliente. De regalo: el chequeo "mes cerrado desactualizado" ahora también
+     detecta un pago anulado DESPUÉS del cierre (`ap.anulado_at > c.cerrado_at`) — antes imposible de distinguir
+     porque el hard-delete no dejaba rastro temporal. Frontend: `deletePago`→`anularPago` (pide motivo vía
+     `window.prompt`, mismo patrón que `AnularMovimiento`); los pagos anulados quedan visibles tachados
+     (`line-through`+`opacity-50`) en vez de desaparecer — mismo lenguaje visual que ya usa la pantalla de
+     movimientos. `test_routes_contract.py` actualizado al nuevo contrato (sumado a `_VALIDA_ANTES_DEL_GUARD`,
+     mismo patrón que los demás POST con body requerido).
+  3. `subir_comprobante` (`routes/contabilidad.py`) escribía `UPDATE movimientos` directo, saltándose el motor
+     — exactamente el escenario que el propio `contabilidad/CLAUDE.md` advertía textualmente ("un endpoint que
+     escriba `movimientos` por fuera se saltearía el candado"). No llamaba `_exigir_mes_abierto`, no chequeaba
+     `anulado`, no capturaba actor. Fix: nueva `commands.movimientos.actualizar_comprobante(conn, mov_id, *,
+     key, por)` que sí pasa por las 3 validaciones; el route la llama en vez del `UPDATE` inline.
+- **Decisión — Tier 2 (robustez, concurrencia):**
+  - `pg_advisory_xact_lock` (mismo patrón exacto que `services/facturacion/engine.py` y `routes/talleres.py`/
+    `routes/alquileres/core.py` ya usan) entre `cerrar_mes`/`reabrir_mes` y `crear_movimiento`/
+    `editar_movimiento`/`anular_movimiento` (vía `_exigir_mes_abierto`) del mismo mes. Namespace
+    `_ADVISORY_NS_CONTAB_MES = 5390420` (siguiente libre después de `_ADVISORY_NS_PEDIDO`/`_ADVISORY_NS_ESTUDIO`),
+    key = `'YYYY-MM'` convertido a entero natural (`YYYYMM`). **Verificado con un test de concurrencia real de
+    dos conexiones psycopg + threading** (no solo en teoría, siguiendo "los hallazgos de una auditoría son
+    hipótesis hasta confirmarlos" — 2026-06-22): con un monkeypatch que demora `gastos_por_categoria` dentro de
+    `cerrar_mes` para exponer la ventana entre tomar el lock y el commit interno, un `crear_movimiento`
+    concurrente del mismo mes BLOQUEÓ 4 segundos reales (esperando el lock) y, al desbloquear, fue rechazado
+    correctamente por "mes cerrado" — confirmando que la carrera (un gasto colándose en la foto de un cierre en
+    curso) queda cerrada.
+  - `desactivar_cuenta` (`commands/cuentas.py`) toma `SELECT ... FOR UPDATE` antes de leer el saldo — un
+    `crear_movimiento` concurrente contra la misma cuenta toma un lock `FOR KEY SHARE` implícito por la FK, que
+    conflictúa. **También verificado con dos conexiones reales**: el `crear_movimiento` concurrente esperó los
+    5 segundos completos que la transacción de A mantuvo el lock abierto.
+  - Rate limiting: `ADMIN_WRITE_LIMIT = "60/minute"` / `ADMIN_UPLOAD_LIMIT = "20/minute"` (nuevas constantes en
+    `rate_limit.py`) aplicadas a los **13 endpoints de escritura reales** (10 en `contabilidad.py` + `pagos.py`
+    tenía 2, más `subir_comprobante` con el límite de upload) — el patrón `@limiter.limit` ya existía en el
+    repo mas solo para endpoints públicos.
+  - Cotas `Field(...)` en los 8 modelos Pydantic de ambos routes: topes de longitud en texto libre, y
+    `lt=2_147_483_647` en todo id de cuenta/categoría (el techo real de `INTEGER`/int4 de Postgres — sin esto,
+    un id gigante pasaba Pydantic y reventaba en el bind de psycopg con `NumericValueOutOfRange`, no
+    `ValueError`). El chequeo manual `monto<=0` de `agregar_pago` se eliminó (redundante con `Field(gt=0)`).
+    Decorator nuevo `@map_pg_errors` (`routes/contabilidad.py`, reusado por `pagos.py` — sin ciclo de imports,
+    verificado) que envuelve cada endpoint y traduce `psycopg.errors.UniqueViolation`/`NumericValueOutOfRange`
+    a 400 limpio — antes, lo que las cotas de arriba no llegaban a prevenir subía crudo al handler global
+    (`main.py`), que expone `f"{type(exc).__name__}: {exc}"` (mensaje interno de Postgres) al cliente.
+- **Decisión — Tier 3 (limpieza barata, un commit):** `idx_cuentas_socio` pasa a único **solo entre activas**
+  (migración `b4c5d6e7f8g9`, simétrica con `cuentas_nombre_activa_uq`) — antes dar de baja una cuenta de socio
+  bloqueaba para siempre crear una nueva ACTIVA con ese mismo socio (verificado que el target-less
+  `ON CONFLICT DO NOTHING` del seed, fix histórico de #932, sigue funcionando igual con el nuevo predicado).
+  Comentario incorrecto corregido en `queries/saldos.py`. `ingresos_devengados` (0 usos confirmados) borrada.
+  `SELECT socio FROM cuentas` crudo en el route reemplazado por `obtener_cuenta`. Ambigüedad tipo-cuenta-vs-
+  tipo-movimiento (¿puede un `retiro`/`aporte`/`gasto`/`ajuste` tocar una cuenta CORRIENTE de socio, no una caja
+  real?) **documentada en el docstring de `validar_estructura_movimiento`, NO bloqueada**: una validación dura
+  ahí rompería `commands/rendicion.py::saldar`, que necesita crear `transferencia`s contra cuentas de socio por
+  diseño — la regla de negocio no es obvia (un `ajuste` contra una cuenta de socio puede ser una corrección
+  legítima), así que se fija el comportamiento actual con un test en vez de adivinar la regla correcta.
+- **Decisión — Tier 4 (8 tests candado):** `editar_cuenta` (cero tests pese a usarse en producción para editar
+  `saldo_inicial` de socios), `editar_movimiento` con cambio de moneda (el candado directo del bug #1), `ajuste`
+  con origen y destino simultáneos (puro + DB — único hueco combinatorio real entre los 5 tipos), fallback de
+  `saldo_de_cuenta` (cuenta inactiva/inexistente), anular un saldado de rendición ya registrado (documenta que
+  `ya_transferido()` excluye el anulado —el pendiente reaparece, correcto— pero `_movimientos_rendicion` —el log
+  de auditoría— lo sigue mostrando, intencional, no una divergencia accidental), `reabrir_mes` con assert
+  explícito del retorno en sus 3 casos, y el test de la ambigüedad tipo-cuenta documentada arriba.
+- **Why.** El patrón que emergió de las 3 auditorías independientes: **el núcleo (fórmulas, derivación,
+  soft-delete, multi-moneda en creación) está sano y bien testeado — los problemas reales viven en los BORDES**
+  (el camino de edición no repite las validaciones del camino de creación, un endpoint se salteaba el motor,
+  faltaba locking donde el resto del repo ya lo usa, y una tabla vecina no respetaba el invariante de auditoría
+  que el propio motor sí respeta). Dos hallazgos (`editar_movimiento` sin revalidar, `alquiler_pagos` sin
+  actor/soft-delete) los marcaron DOS agentes de forma independiente sin verse entre sí — señal fuerte de que no
+  eran ruido. Ningún hallazgo implica pérdida de plata YA OCURRIDA — son gaps que dejarían un descuadre si se
+  daban las condiciones (una carrera real, o alguien editando vía API cruda en vez de la UI). Se prefirió
+  verificar los dos locks con concurrencia REAL (dos conexiones, no solo leer el código y confiar) siguiendo el
+  principio de que un hallazgo de auditoría es hipótesis hasta confirmarlo en vivo.
+- **Consecuencias.** 2689 tests en verde (2681 + 8 nuevos), suite completa, sin regresiones. Dos migraciones
+  Alembic nuevas (`a3b4c5d6e7f8`, `b4c5d6e7f8g9`), ambas con `upgrade`/`downgrade` verificados limpios contra
+  Postgres real. `pyflakes` limpio en los ~18 archivos backend tocados; `eslint`/`tsc` limpios en los 4 archivos
+  frontend tocados. Cambio de contrato HTTP: `DELETE /alquileres/{id}/pagos/{pago_id}` → `POST
+  .../{pago_id}/anular` (body `{motivo}`) — sin otro consumidor confirmado por grep. Rama aislada
+  `fix/contabilidad-auditoria` sobre `feature/contabilidad-cqrs` (convención "PR como hoja de ruta", PR sin
+  mergear); tracking #1184.
+
+### 2026-07-02 — Tipo de movimiento vs tipo de cuenta: retiro/aporte bloqueados contra un socio, gasto permitido a propósito
+
+- **Contexto.** La auditoría de bordes (entrada anterior) dejó a propósito sin bloquear la ambigüedad de qué
+  TIPO de cuenta puede tocar cada TIPO de movimiento — la regla de negocio no estaba clara desde el código
+  solo. En la sesión siguiente, conversando con el dueño sobre casos reales ("Rambla pagó algo de Pablo",
+  "Pablo pagó algo de Rambla"), confirmó el modelo: los socios (Pablo/Tincho) tienen sus bancos propios,
+  **totalmente separados del sistema** — la cuenta que Rambla les lleva acá es **puro balance de deuda**
+  (quién le debe a quién), nunca plata física que el sistema administre.
+- **Decisión.**
+  - **`retiro`/`aporte` quedan BLOQUEADOS contra una cuenta de socio** (`_validar_cuentas_y_categoria`,
+    `commands/movimientos.py`, gana un parámetro `tipo`): representan plata física entrando/saliendo de una
+    caja real — no tienen sentido de negocio contra un balance de deuda que no es caja.
+  - **`transferencia`/`ajuste` siguen permitidos sin cambios** contra una cuenta de socio (`saldar()` los
+    necesita; un `ajuste` puede ser una corrección legítima de arranque).
+  - **`gasto` queda PERMITIDO a propósito** contra una cuenta de socio, como origen (nunca tuvo destino) —
+    resuelve el caso real "el socio pagó un gasto de Rambla con su propia plata". Verificado en el código
+    (`gastos_por_categoria` en `queries/movimientos.py`, `ganancia_neta` en `queries/pyl.py`): ninguno de los
+    dos filtra por TIPO de cuenta origen, solo por `moneda = 'ARS'` — así que un `gasto` con origen una
+    cuenta de socio **cuenta automáticamente en el P&L categorizado** Y **baja la deuda del socio en el mismo
+    movimiento** (`egresos` resta en la fórmula de cuenta corriente de `queries/saldos.py` — Rambla ahora le
+    debe eso). Un solo movimiento cubre el caso completo, sin inventar un tipo de movimiento nuevo.
+  - El caso inverso ("Rambla pagó algo de Pablo") ya se resolvía sin cambios con 2 movimientos: `gasto` desde
+    una caja real (categorizado, plata real que salió) + `ajuste` con destino=cuenta del socio (le sube la
+    deuda) — patrón que ya funcionaba con las reglas existentes, no necesitó tocarse.
+- **Why.** El check necesita leer `cuentas.socio` de la DB (`SOCIOS_HUMANOS`), así que no puede vivir en
+  `validar_estructura_movimiento` (PURA, sin DB) — va en `_validar_cuentas_y_categoria`, el mismo punto único
+  que ya cerró el bug de mayor impacto de la auditoría anterior (`editar_movimiento` sin revalidar). Se
+  descartó bloquear `gasto` junto con `retiro`/`aporte` (opción más simple/uniforme) porque hubiera cerrado
+  la única forma limpia de que un gasto pagado por un socio impacte el P&L sin necesitar un tipo de movimiento
+  nuevo — el análisis del código (`gastos_por_categoria` sin filtro de tipo de cuenta) mostró que la regla
+  "permitido" ya encajaba con la infraestructura existente, sin construir nada nuevo.
+- **Consecuencias.** `test_movimiento_tipo_vs_tipo_cuenta_sin_restriccion` (fijaba el comportamiento viejo, sin
+  restricción) reemplazado por `test_retiro_aporte_bloqueados_contra_cuenta_socio` (confirma el rechazo) +
+  `test_gasto_contra_cuenta_socio_cuenta_en_pyl_y_baja_deuda` (confirma el permiso y el efecto doble: P&L +
+  deuda). Docstring del módulo (`commands/movimientos.py`) reescrito de "ambigüedad sin resolver" a la regla
+  resuelta. Suite completa en verde (2693 tests). Mismo commit/rama que la auditoría de bordes
+  (`fix/contabilidad-auditoria` → PR #1195, sin mergear); tracking #1184. Frontend sin cambios — el gate es
+  100% backend, el formulario de movimientos no filtra cuentas por tipo hoy y no hacía falta agregarlo para
+  este alcance.

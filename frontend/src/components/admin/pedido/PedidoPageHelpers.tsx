@@ -18,14 +18,21 @@ export function PagoRow({
   pago,
   pedidoId,
 }: {
-  pago: { id: number; monto: number; concepto: string | null; fecha: string };
+  pago: {
+    id: number;
+    monto: number;
+    concepto: string | null;
+    fecha: string;
+    anulado?: boolean;
+    anulado_motivo?: string | null;
+  };
   pedidoId: number;
 }) {
   const qc = useQueryClient();
   const delMut = useMutation({
-    mutationFn: () => adminApi.deletePago(pedidoId, pago.id),
+    mutationFn: (motivo: string) => adminApi.anularPago(pedidoId, pago.id, motivo),
     onSuccess: () => {
-      toast.success("Pago eliminado");
+      toast.success("Pago anulado");
       qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
     },
@@ -33,21 +40,35 @@ export function PagoRow({
   });
 
   return (
-    <div className="flex items-center justify-between text-xs mt-1">
+    <div
+      className={cn("flex items-center justify-between text-xs mt-1", pago.anulado && "opacity-50")}
+    >
       <span className="text-muted-foreground">
-        {pago.concepto || "Pago"} · {formatFechaCorta(pago.fecha)}
+        <span className={cn(pago.anulado && "line-through")}>
+          {pago.concepto || "Pago"} · {formatFechaCorta(pago.fecha)}
+        </span>
+        {pago.anulado && pago.anulado_motivo && (
+          <span className="text-destructive"> · Anulado: {pago.anulado_motivo}</span>
+        )}
       </span>
       <div className="flex items-center gap-1">
-        <span className="font-mono">{formatARS(pago.monto)}</span>
-        <IconButton
-          aria-label="Eliminar pago"
-          size="xs"
-          onClick={() => delMut.mutate()}
-          disabled={delMut.isPending}
-          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-        >
-          <X className="h-3 w-3" />
-        </IconButton>
+        <span className={cn("font-mono", pago.anulado && "line-through")}>
+          {formatARS(pago.monto)}
+        </span>
+        {!pago.anulado && (
+          <IconButton
+            aria-label="Anular pago"
+            size="xs"
+            onClick={() => {
+              const motivo = window.prompt("Motivo de la anulación del pago:");
+              if (motivo && motivo.trim()) delMut.mutate(motivo.trim());
+            }}
+            disabled={delMut.isPending}
+            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          >
+            <X className="h-3 w-3" />
+          </IconButton>
+        )}
       </div>
     </div>
   );

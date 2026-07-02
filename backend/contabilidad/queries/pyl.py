@@ -1,4 +1,4 @@
-"""Ganancia neta del mes (#809) — la parte de Rambla menos los gastos.
+"""Ganancia neta del mes (#809) — la parte de Rambla menos los gastos. Nunca muta.
 
 Criterio (decisión del dueño): la **ganancia de Rambla** es lo que le toca a
 Rambla de los alquileres MENOS los gastos operativos. La comisión que se llevan
@@ -19,6 +19,8 @@ a propósito. Si el mes está cerrado (#721) el devengado sale de la foto congel
 from reportes.cierres import rango_mes, snapshot_de
 from reportes.liquidacion import liquidar
 
+from contabilidad.queries.movimientos import gastos_por_categoria
+
 
 def _resumen_devengado(conn, mes: str) -> dict:
     """Resumen de la liquidación del mes (foto si está cerrado): `total` + `por_beneficiario`."""
@@ -28,11 +30,6 @@ def _resumen_devengado(conn, mes: str) -> dict:
     return data["resumen"]
 
 
-def ingresos_devengados(conn, mes: str) -> int:
-    """Total facturado (devengado) del mes — bruto, antes del reparto (foto si está cerrado)."""
-    return int(_resumen_devengado(conn, mes)["total"])
-
-
 def ganancia_neta(conn, mes: str) -> dict:
     """Ganancia de Rambla del mes = **parte de Rambla − gastos**. Expone el desglose
     completo: facturado (devengado total), comisiones a dueños y gastos por categoría.
@@ -40,8 +37,6 @@ def ganancia_neta(conn, mes: str) -> dict:
     La comisión de los dueños NO se cuenta como ganancia de Rambla: se descuenta
     (vía usar la parte de Rambla en lugar del total facturado).
     """
-    from contabilidad.movimientos import gastos_por_categoria
-
     desde, hasta = rango_mes(mes)
     resumen = _resumen_devengado(conn, mes)
     facturado = int(resumen["total"])
