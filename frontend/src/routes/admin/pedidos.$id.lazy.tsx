@@ -1013,7 +1013,13 @@ function FacturacionRailSection({
     (f: Factura) => f.nota_credito_de == null && f.estado !== "anulada",
   );
   const nc = facturas.find((f: Factura) => f.nota_credito_de != null);
-  const puedeFacturar = ESTADOS_FACTURABLES.includes(estadoPedido) && !principal;
+  // Un intento previo en estado 'error' es reintentable — el backend inserta
+  // un nuevo intento y vuelve a pedirle el CAE a ARCA (`get_factura_vigente`
+  // solo considera 'pendiente'/'emitida', el índice único parcial excluye
+  // 'error'). Sin este chequeo, un primer intento fallido dejaba el pedido
+  // sin forma de facturar nunca más (bug real de prod).
+  const puedeFacturar =
+    ESTADOS_FACTURABLES.includes(estadoPedido) && (!principal || principal.estado === "error");
   const puedeAnular = principal?.estado === "emitida" && !nc;
 
   const cbteLetra = principal
@@ -1130,7 +1136,7 @@ function FacturacionRailSection({
         </div>
       )}
 
-      {!principal && !q.isLoading && (
+      {(!principal || principal.estado === "error") && !q.isLoading && (
         <Button
           variant="outline"
           size="sm"
@@ -1147,7 +1153,7 @@ function FacturacionRailSection({
           }}
         >
           <Receipt className="h-3.5 w-3.5 mr-1" />
-          {preview.isPending ? "Calculando…" : "Facturar"}
+          {preview.isPending ? "Calculando…" : principal ? "Reintentar" : "Facturar"}
         </Button>
       )}
 
