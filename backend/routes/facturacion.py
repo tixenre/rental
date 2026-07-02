@@ -82,14 +82,19 @@ def refrescar_catalogos_arca(request: Request):
 def consultar_padron(cuit: str, request: Request):
     """Autocompleta razón social/domicilio/condición IVA desde el padrón de
     ARCA (ws_sr_constancia_inscripcion) — mismo autocompletado que hace el
-    facturador oficial al tipear un CUIT. Best-effort: {encontrado: false} si
-    AFIP no responde o el CUIT no tiene datos, nunca un error — el formulario
-    sigue siendo editable a mano."""
+    facturador oficial al tipear un CUIT. Best-effort: nunca un error HTTP —
+    el formulario sigue siendo editable a mano. `{encontrado: false}` sin
+    `motivo` = ARCA no tiene datos para ese CUIT; CON `motivo` = no pudimos
+    ni completar la consulta (WSAA/relación/cert/red) — se muestra tal cual,
+    es más útil para diagnosticar que un genérico "sin datos"."""
     require_admin(request)
 
     from services.facturacion.padron import resolver_persona
     with get_db() as conn:
-        persona = resolver_persona(cuit, conn)
+        try:
+            persona = resolver_persona(cuit, conn)
+        except RuntimeError as e:
+            return {"encontrado": False, "motivo": str(e)}
 
     if persona is None:
         return {"encontrado": False}

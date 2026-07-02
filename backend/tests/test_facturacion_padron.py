@@ -74,9 +74,13 @@ def test_usa_el_primer_emisor_activo_con_cert(monkeypatch):
     assert captured["servicio"] == WSAA_SERVICIO == "ws_sr_constancia_inscripcion"
 
 
-def test_cualquier_excepcion_degrada_a_none(monkeypatch):
-    """AFIP caído / relación de padrón no delegada / cert vencido — nunca
-    levanta, el formulario sigue editable a mano."""
+def test_falla_real_levanta_runtime_error_con_motivo(monkeypatch):
+    """AFIP caído / relación de padrón no delegada / cert vencido — NO se
+    swallowea a None: eso diría "ARCA no tiene datos" cuando en realidad no
+    pudimos ni preguntarle, imposible de diagnosticar desde afuera. Levanta
+    RuntimeError con el motivo real; el route (admin-only) lo muestra tal
+    cual — nunca rompe el formulario (sigue editable a mano), pero ya no
+    miente sobre la causa."""
     monkeypatch.setattr(
         "services.facturacion.emisores_repo.list_emisores",
         lambda conn: [_emisor()],
@@ -85,4 +89,5 @@ def test_cualquier_excepcion_degrada_a_none(monkeypatch):
         "services.facturacion.config.credenciales",
         lambda emisor, conn: (_ for _ in ()).throw(RuntimeError("cert vencido")),
     )
-    assert resolver_persona("30712345678", conn=object()) is None
+    with pytest.raises(RuntimeError, match="cert vencido"):
+        resolver_persona("30712345678", conn=object())

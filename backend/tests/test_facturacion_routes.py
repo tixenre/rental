@@ -361,6 +361,22 @@ def test_consultar_padron_no_encontrado_no_es_error(monkeypatch):
     assert result == {"encontrado": False}
 
 
+def test_consultar_padron_error_real_incluye_motivo(monkeypatch):
+    """Distinto de "sin datos": si resolver_persona no pudo ni completar la
+    consulta (WSAA/relación/cert/red), el route sigue sin romper (nunca un
+    error HTTP) pero incluye el `motivo` real — más útil para diagnosticar
+    que un genérico {encontrado: false}."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: (_ for _ in ()).throw(RuntimeError("WSAA rechazó: cert vencido")),
+    )
+
+    result = facturacion_routes.consultar_padron("30712345678", _fake_request())
+    assert result == {"encontrado": False, "motivo": "WSAA rechazó: cert vencido"}
+
+
 # ── consultar_puntos_venta_emisor: validar/elegir en vez de cargar a mano ───
 
 

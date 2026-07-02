@@ -345,11 +345,13 @@ function EmisorFormModal({
         <Field
           label="CUIT"
           hint={
-            padron.noEncontrado
-              ? "ARCA no tiene datos para este CUIT — cargá a mano."
-              : padron.inactivo
-                ? "⚠️ Este CUIT figura inactivo en AFIP."
-                : undefined
+            padron.motivo
+              ? `⚠️ No se pudo consultar ARCA: ${padron.motivo}`
+              : padron.noEncontrado
+                ? "ARCA no tiene datos para este CUIT — cargá a mano."
+                : padron.inactivo
+                  ? "⚠️ Este CUIT figura inactivo en AFIP."
+                  : undefined
           }
         >
           <div className="flex gap-1.5">

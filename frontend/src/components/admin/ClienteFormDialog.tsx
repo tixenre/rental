@@ -160,7 +160,12 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-            {padron.noEncontrado && (
+            {padron.motivo && (
+              <p className="text-xs text-destructive">
+                ⚠️ No se pudo consultar ARCA: {padron.motivo}
+              </p>
+            )}
+            {!padron.motivo && padron.noEncontrado && (
               <p className="text-xs text-muted-foreground">
                 ARCA no tiene datos para este CUIT — cargá a mano.
               </p>

@@ -27,6 +27,11 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
   // CUIT encontrado pero dado de baja en AFIP — aviso, no bloquea nada
   // (el dueño decide si igual quiere seguir).
   const [inactivo, setInactivo] = useState(false);
+  // Distinto de noEncontrado: no pudimos ni completar la consulta (WSAA no
+  // autoriza, relación no delegada, cert vencido, red) — el motivo real de
+  // ARCA/nuestro lado, no "ARCA no tiene datos para este CUIT" (que sería
+  // engañoso acá).
+  const [motivo, setMotivo] = useState<string | null>(null);
 
   const buscar = async (cuit: string) => {
     const digits = cuit.replace(/\D/g, "");
@@ -34,6 +39,7 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
     setBuscando(true);
     setNoEncontrado(false);
     setInactivo(false);
+    setMotivo(null);
     try {
       const result = await facturacionApi.consultarPadron(digits);
       if (result.encontrado) {
@@ -45,6 +51,8 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
           condicion_iva: result.condicion_iva,
         });
         setInactivo(!!result.estado_clave && result.estado_clave !== "ACTIVO");
+      } else if (result.motivo) {
+        setMotivo(result.motivo);
       } else {
         setNoEncontrado(true);
       }
@@ -55,5 +63,5 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
     }
   };
 
-  return { buscar, buscando, noEncontrado, inactivo };
+  return { buscar, buscando, noEncontrado, inactivo, motivo };
 }
