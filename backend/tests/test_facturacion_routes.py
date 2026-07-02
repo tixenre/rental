@@ -67,6 +67,7 @@ class _FakeConn:
         ("PUT", "/api/admin/emisores-arca/1"),
         ("DELETE", "/api/admin/emisores-arca/1"),
         ("POST", "/api/admin/emisores-arca/1/cert"),
+        ("GET", "/api/admin/emisores-arca/1/puntos-venta"),
         ("GET", "/api/admin/arca/padron/20301234567"),
         ("GET", "/api/alquileres/1/facturar/preview"),
     ],
@@ -309,3 +310,85 @@ def test_consultar_padron_no_encontrado_no_es_error(monkeypatch):
 
     result = facturacion_routes.consultar_padron("30712345678", _fake_request())
     assert result == {"encontrado": False}
+
+
+# ── consultar_puntos_venta_emisor: validar/elegir en vez de cargar a mano ───
+
+
+def _fake_emisor_arca(nombre="pablo"):
+    from datetime import datetime
+    from services.facturacion.emisores_repo import EmisorArca
+
+    return EmisorArca(
+        id=1, nombre=nombre, cuit="20300000000", pto_vta=2,
+        condicion_iva="responsable_inscripto", cert_cargado=True,
+        activo=True, razon_social=None, domicilio=None, iibb=None,
+        inicio_actividades=None, notas=None,
+        created_at=datetime(2026, 1, 1), updated_at=datetime(2026, 1, 1),
+    )
+
+
+def test_consultar_puntos_venta_devuelve_lista(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_by_id",
+        lambda emisor_id, conn: _fake_emisor_arca(),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.puntos_venta.consultar_puntos_venta",
+        lambda nombre_emisor, conn: [{"nro": 2}, {"nro": 5}],
+    )
+
+    result = facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert result == {"puntos_venta": [{"nro": 2}, {"nro": 5}]}
+
+
+def test_consultar_puntos_venta_emisor_no_encontrado_es_404(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_by_id", lambda emisor_id, conn: None
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert exc.value.status_code == 404
+
+
+def test_consultar_puntos_venta_sin_cert_es_400(monkeypatch):
+    """Emisor existe pero no tiene cert cargado — `credenciales()` (dentro
+    del service) levanta ValueError; la route lo mapea a 400, no a 500."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_by_id",
+        lambda emisor_id, conn: _fake_emisor_arca(),
+    )
+
+    def _boom(nombre_emisor, conn):
+        raise ValueError("Certificado no cargado")
+
+    monkeypatch.setattr("services.facturacion.puntos_venta.consultar_puntos_venta", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert exc.value.status_code == 400
+
+
+def test_consultar_puntos_venta_arca_caida_es_503_nunca_500(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_by_id",
+        lambda emisor_id, conn: _fake_emisor_arca(),
+    )
+
+    def _boom(nombre_emisor, conn):
+        raise RuntimeError("WSAA no respondió")
+
+    monkeypatch.setattr("services.facturacion.puntos_venta.consultar_puntos_venta", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert exc.value.status_code == 503

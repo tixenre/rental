@@ -166,9 +166,7 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
               </p>
             )}
             {padron.inactivo && (
-              <p className="text-xs text-destructive">
-                ⚠️ Este CUIT figura inactivo en AFIP.
-              </p>
+              <p className="text-xs text-destructive">⚠️ Este CUIT figura inactivo en AFIP.</p>
             )}
           </div>
           <div className="space-y-1">

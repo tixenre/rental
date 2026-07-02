@@ -202,6 +202,31 @@ def cargar_cert(emisor_id: int, request: Request, body: dict):
     return {"ok": True, "cert_cargado": emisor.cert_cargado}
 
 
+@router.get("/admin/emisores-arca/{emisor_id}/puntos-venta")
+def consultar_puntos_venta_emisor(emisor_id: int, request: Request):
+    """Consulta a ARCA (WSFE `FEParamGetPtosVenta`) los puntos de venta
+    habilitados de este emisor — para validar/elegir el número en vez de
+    cargarlo a mano y descubrir recién al pedir el primer CAE que estaba mal.
+    Requiere que el emisor ya tenga cert cargado."""
+    require_admin(request)
+
+    from services.facturacion.emisores_repo import get_by_id
+    from services.facturacion.puntos_venta import consultar_puntos_venta
+
+    with get_db() as conn:
+        emisor = get_by_id(emisor_id, conn)
+        if emisor is None:
+            raise HTTPException(404, "Emisor no encontrado")
+        try:
+            puntos = consultar_puntos_venta(emisor.nombre, conn)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+
+    return {"puntos_venta": puntos}
+
+
 @router.delete("/admin/emisores-arca/{emisor_id}", status_code=204)
 def desactivar_emisor(emisor_id: int, request: Request):
     """Marca el emisor como inactivo (soft-delete). Las facturas existentes no se tocan."""

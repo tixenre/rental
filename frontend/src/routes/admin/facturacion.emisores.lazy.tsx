@@ -271,6 +271,14 @@ function EmisorFormModal({
   const keyOk = key.includes("PRIVATE KEY");
   const withCert = isNew && (cert.length > 0 || key.length > 0);
 
+  const puntosVenta = useMutation({
+    mutationFn: async () => {
+      const { puntos_venta } = await facturacionApi.consultarPuntosVenta(emisor!.id);
+      return puntos_venta;
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const qc = useQueryClient();
   const save = useMutation({
     mutationFn: async () => {
@@ -366,16 +374,60 @@ function EmisorFormModal({
             </button>
           </div>
         </Field>
-        <Field label="Punto de Venta">
-          {/* eslint-disable-next-line no-restricted-syntax -- input nativo type="number"; DS Input no soporta este tipo */}
-          <input
-            type="number"
-            value={ptoVta}
-            onChange={(e) => setPtoVta(e.target.value)}
-            placeholder="1"
-            min={1}
-            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
-          />
+        <Field
+          label="Punto de Venta"
+          hint={
+            puntosVenta.isError ? "No se pudo consultar ARCA — cargá el número a mano." : undefined
+          }
+        >
+          <div className="flex gap-1.5">
+            {/* eslint-disable-next-line no-restricted-syntax -- input nativo type="number"; DS Input no soporta este tipo */}
+            <input
+              type="number"
+              value={ptoVta}
+              onChange={(e) => setPtoVta(e.target.value)}
+              placeholder="1"
+              min={1}
+              className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+            />
+            {!isNew && emisor?.cert_cargado && (
+              <button
+                type="button"
+                onClick={() => puntosVenta.mutate()}
+                disabled={puntosVenta.isPending}
+                title="Consultar los puntos de venta habilitados en ARCA para este emisor"
+                className="shrink-0 h-9 px-3 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5 disabled:opacity-40"
+              >
+                <Search className="h-3.5 w-3.5" />
+                {puntosVenta.isPending ? "Consultando…" : "Consultar en ARCA"}
+              </button>
+            )}
+          </div>
+          {puntosVenta.data && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {puntosVenta.data.length === 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  ARCA no tiene puntos de venta electrónicos habilitados para este CUIT.
+                </span>
+              ) : (
+                puntosVenta.data.map((p) => (
+                  <button
+                    key={p.nro}
+                    type="button"
+                    onClick={() => setPtoVta(String(p.nro))}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md border hairline text-xs font-mono",
+                      String(p.nro) === ptoVta
+                        ? "bg-ink text-background border-ink"
+                        : "bg-surface-elevated text-muted-foreground hover:text-ink",
+                    )}
+                  >
+                    {String(p.nro).padStart(5, "0")}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </Field>
         <Field label="Condición IVA del emisor">
           <div className="relative">

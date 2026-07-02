@@ -116,6 +116,9 @@ export const facturacionApi = {
     }),
   desactivarEmisor: (id: number) =>
     authedJson<void>(`/api/admin/emisores-arca/${id}`, { method: "DELETE" }),
+  // Puntos de venta habilitados en ARCA para ESTE emisor (requiere cert cargado).
+  consultarPuntosVenta: (id: number) =>
+    authedJson<{ puntos_venta: { nro: number }[] }>(`/api/admin/emisores-arca/${id}/puntos-venta`),
 
   // Facturas
   previewFactura: (pedidoId: number) =>
