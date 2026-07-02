@@ -704,6 +704,18 @@ en el dashboard admin — es el gap de gobernanza más directo detrás del miedo
 supervisor marca un motor de plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o
 un PR de fix de plata reportado como shippeado sin confirmar merge real a `dev`/`main`.
 
+### 2026-07-02 — `reportes/liquidacion.py::filas_atribucion` perdía plata en silencio con `suma_items = 0`
+
+Fase 5 de la hoja de ruta de plata (#1184). Cuando todos los ítems de un pedido tenían `subtotal = 0`
+(ej. 100% de descuento a nivel ítem) pero `monto_total > 0`, el prorrateo (`monto_total * subtotal /
+NULLIF(suma_items, 0)`) daba `NULL` → se trataba como 0 → esa plata **desaparecía en silencio** del
+reporte de liquidación, sin que ningún chequeo de reconciliación lo cazara. Fix: cuando `suma_items = 0`,
+se reparte el `monto_total` en **partes iguales** entre los ítems del pedido (no hay base real de
+prorrateo cuando todos los subtotales son 0 — repartir parejo es el fallback neutral, no arbitrario
+hacia un dueño). Candado: `test_reportes_liquidacion_db.py::test_suma_items_cero_no_pierde_plata`
+(Postgres real). El supervisor marca cualquier prorrateo de plata con `NULLIF`/división que pueda dar
+`NULL`/0 sin un fallback explícito que garantice que el total nunca se pierde.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

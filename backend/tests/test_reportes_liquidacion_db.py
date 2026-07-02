@@ -39,11 +39,11 @@ pytestmark = [
 
 # Equipos: Rambla, Pablo, Tincho. Pedidos. Ids altos para no chocar con datos.
 E_RAMBLA, E_PABLO, E_TINCHO = 9_300_001, 9_300_002, 9_300_003
-P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE, P_PREJUNIO = (
-    9_300_101, 9_300_102, 9_300_103, 9_300_104, 9_300_105, 9_300_106,
+P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE, P_PREJUNIO, P_SUBTOTAL_CERO = (
+    9_300_101, 9_300_102, 9_300_103, 9_300_104, 9_300_105, 9_300_106, 9_300_107,
 )
 ALL_EQ = (E_RAMBLA, E_PABLO, E_TINCHO)
-ALL_PED = (P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE, P_PREJUNIO)
+ALL_PED = (P_CRUCE, P_PARCIAL, P_MIXTO, P_LEGACY, P_SOBRE, P_PREJUNIO, P_SUBTOTAL_CERO)
 
 
 def _limpiar(conn):
@@ -233,3 +233,36 @@ def test_reconciliacion_caza_pagado_sin_ledger(setup):
     # P_SOBRE se cobró por encima de su total actual → sobrepagado.
     assert P_SOBRE in rec["sobrepagados"]["ids"], rec["sobrepagados"]
     assert rec["ok"] is False
+
+
+def test_suma_items_cero_no_pierde_plata():
+    """Fase 5 (#1184): P_SUBTOTAL_CERO tiene AMBOS ítems con subtotal 0 (ej. 100%
+    de descuento a nivel ítem) pero monto_total=30000. Antes, `NULLIF(suma_items, 0)`
+    daba NULL → esos 30k desaparecían en silencio del reporte de liquidación. Ahora
+    se reparten en partes iguales entre los ítems del pedido — la plata no se pierde.
+    Aislado de la fixture `setup` para no alterar sus totales/aserciones."""
+    from database import get_db, init_db
+
+    init_db()
+    conn = get_db()
+    try:
+        _limpiar(conn)
+        _equipo(conn, E_TINCHO, "Equipo Tincho", "Tincho")
+        _pedido(conn, P_SUBTOTAL_CERO, 30000, [(E_TINCHO, 0), (E_TINCHO, 0)], monto_pagado=30000)
+        _pago(conn, P_SUBTOTAL_CERO, 30000, "2026-06-25T10:00:00", "pago")
+        conn.commit()
+    finally:
+        conn.close()
+
+    try:
+        junio = _liquidar("2026-06-01", "2026-06-30")
+        assert junio["resumen"]["total"] == 30000, junio["resumen"]
+        pb = junio["resumen"]["por_beneficiario"]
+        assert sum(pb.values()) == 30000, pb
+    finally:
+        conn = get_db()
+        try:
+            _limpiar(conn)
+            conn.commit()
+        finally:
+            conn.close()
