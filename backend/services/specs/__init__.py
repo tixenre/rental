@@ -32,8 +32,10 @@ from .registry import (
     get_spec,
 )
 from .queries.validation import ValidationError, validate_dataset, validate_or_raise
+from .queries.propuestas import listar_propuestas_pendientes
 from .commands.coerce import coerce_and_serialize
 from .commands.persist import persistir_specs
+from .commands.propuestas import aplicar_propuesta, descartar_propuesta, encolar_propuesta
 from .commands.seed import (
     purge_stale_specs,
     seed_all_categorias,
@@ -49,8 +51,10 @@ __all__ = [
     "all_categorias", "get_categoria", "get_spec",
     # queries
     "ValidationError", "validate_dataset", "validate_or_raise",
+    "listar_propuestas_pendientes",
     # commands
     "coerce_and_serialize", "persistir_specs",
     "purge_stale_specs", "seed_all_categorias",
     "seed_categoria_from_registry", "serialize_spec_value",
+    "encolar_propuesta", "aplicar_propuesta", "descartar_propuesta",
 ]
