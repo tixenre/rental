@@ -57,6 +57,12 @@ class TestValidarEstructura:
         with pytest.raises(ValueError):
             validar_estructura_movimiento("ajuste", 100, None, None, None)
 
+    def test_ajuste_con_origen_y_destino_ok(self):
+        # Único hueco combinatorio real entre los 5 tipos sin cubrir hasta la
+        # auditoría 2026-07-02: origen Y destino a la vez (conciliación entre
+        # dos cajas, sin ser una "transferencia" strictamente).
+        validar_estructura_movimiento("ajuste", 100, 3, 4, None)
+
     def test_tipo_desconocido_falla(self):
         with pytest.raises(ValueError):
             validar_estructura_movimiento("regalo", 100, 1, None, None)
