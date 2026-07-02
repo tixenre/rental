@@ -7,6 +7,7 @@ Fase 7: CRUD emisores (credenciales dinámicas, cifradas).
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -452,7 +453,11 @@ async def descargar_pdf_factura(
     from services.facturacion.pdf_seguridad import asegurar_pdf
     try:
         pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
-        pdf_bytes = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
+        # asegurar_pdf firma con pyhanko, cuyo sign_pdf sync internamente hace
+        # asyncio.run() — explota si se llama directo desde acá (ya estamos
+        # dentro del loop de FastAPI). to_thread lo corre en un thread aparte,
+        # sin loop activo, donde ese asyncio.run() interno sí puede crear el suyo.
+        pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF: {e}")
 
@@ -505,7 +510,7 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     from services.facturacion.pdf_seguridad import asegurar_pdf
     try:
         pdf_bytes = await _render_pdf(html_str)
-        pdf_bytes = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
+        pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF para el mail: {e}")
 
