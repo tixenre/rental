@@ -19,13 +19,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Upload,
-  Plus,
   Trash2,
   Search,
   Link as LinkIcon,
   Image as ImageIcon,
   FileCode,
-  X,
   Printer,
 } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
@@ -170,9 +168,11 @@ export function EquipoFormDialogV2({
   const [specs, setSpecs] = useState<Spec[]>([]);
   // B1 #635: contenido incluido (dim. 3)
   const [contenidoIncluido, setContenidoIncluido] = useState<ContenidoIncluidoItem[]>([]);
-  // Keywords editoriales (chips) — se guardan en ficha.keywords_json.
+  // keywords_json ya no se edita a mano acá — se calcula solo desde las specs
+  // (compute_keywords, ver services/nombre_builder.py). El form solo lo
+  // carga y lo reenvía sin tocar (round-trip), para no pisarlo a null en
+  // cada guardado — nunca se renderiza ni se muta desde la UI.
   const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
 
   // ── Nombre público ─────────────────────────────────────────────────
   // Input libre + toggle "generar automático desde categoría" (ver nombre-publico.ts).
@@ -701,20 +701,6 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
-  // Tags (keywords editoriales)
-  // ════════════════════════════════════════════════════════════════════
-  const addTag = () => {
-    const v = tagInput.trim().toLowerCase();
-    if (!v) return;
-    if (tags.includes(v)) {
-      setTagInput("");
-      return;
-    }
-    setTags([...tags, v]);
-    setTagInput("");
-  };
-
-  // ════════════════════════════════════════════════════════════════════
   // Submit — mismo flow que el viejo (delegamos en adminApi).
   // ════════════════════════════════════════════════════════════════════
   // Keyboard shortcut: Cmd/Ctrl+S guarda el form (Esc lo maneja el Dialog).
@@ -1014,7 +1000,7 @@ export function EquipoFormDialogV2({
   // specs propuestos del autocompletar, ficha externa importada, archivo
   // de foto pendiente de upload. Cubre los casos típicos de pérdida de
   // datos en silencio. Falsos negativos posibles: cambios SOLO en
-  // descripcion/notas/tags/specs manuales sin tocar form fields.
+  // descripcion/notas/specs manuales sin tocar form fields.
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const hasUnsavedChanges =
     form.formState.isDirty || specsPropuestos.length > 0 || pendingFile !== null;
@@ -1509,43 +1495,6 @@ export function EquipoFormDialogV2({
               setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
             }}
           />
-
-          <Field label="Etiquetas">
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap gap-1">
-                {tags.map((t) => (
-                  <Badge key={t} variant="secondary" className="text-2xs gap-1">
-                    {t}
-                    <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-                {tags.length === 0 && (
-                  <span className="text-xs text-muted-foreground italic">Sin etiquetas</span>
-                )}
-              </div>
-              <div className="flex gap-1">
-                <Input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addTag();
-                    }
-                  }}
-                  placeholder="Etiqueta y Enter… (ej. 4K, full frame, cinema)"
-                />
-                <Button type="button" size="icon" variant="outline" onClick={addTag}>
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Se usan para búsqueda y como chips visibles en la ficha pública.
-              </p>
-            </div>
-          </Field>
         </div>
       </CollapsibleSection>
 
