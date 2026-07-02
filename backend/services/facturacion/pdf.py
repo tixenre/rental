@@ -546,13 +546,18 @@ def _factura_mobile_html(f: dict) -> str:
       {conceptos_html}
     </div>
 
-    <div style="padding:20px 28px 24px;background:#f7f8fa;display:flex;gap:20px;align-items:flex-start;">
-      <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:12px;padding:8px;">{qr_block}</div>
-      <div style="flex:1;min-width:0;">{totales_iva}
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;">
-          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Total</span>
-          <span style="font-size:34px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
+    <div style="padding:20px 28px 24px;background:#f7f8fa;">
+      <div style="display:flex;gap:20px;align-items:flex-start;">
+        <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:12px;padding:8px;">{qr_block}</div>
+        <div style="flex:1;min-width:0;">{totales_iva}
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Total</span>
+            <span style="font-size:34px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
+          </div>
         </div>
+      </div>
+      <div style="margin-top:16px;font-size:12px;color:#98a3ae;">
+        Comprobante autorizado por ARCA · Verificá la validez escaneando el QR o en <span style="color:#5b6875;font-weight:600;">www.arca.gob.ar</span>
       </div>
     </div>
 """
