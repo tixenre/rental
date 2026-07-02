@@ -238,7 +238,13 @@ def test_get_persona_sin_datosgenerales_ni_error_sigue_devolviendo_none():
         assert client.get_persona("23373891029") is None
 
 
-def test_get_persona_fault_sin_resultados_devuelve_none():
+def test_get_persona_fault_levanta_con_el_texto_de_afip():
+    """Regresión: ANTES se filtraban por substring los Fault que mencionaban
+    "no se encuentran datos"/"sin resultados", tratándolos como silencio
+    limpio (None) — eso escondía motivos reales indistinguibles entre sí (un
+    CUIT real bloqueado por WSAA/relación/cert se leía IGUAL que un CUIT
+    inexistente). Ahora CUALQUIER Fault levanta RuntimeError con el texto de
+    AFIP tal cual, sin heurística de por medio."""
     import zeep.exceptions
     from arca_fe.padron import PadronClient
 
@@ -251,10 +257,11 @@ def test_get_persona_fault_sin_resultados_devuelve_none():
         )
         mock_client_fn.return_value.service = mock_service
 
-        assert client.get_persona("20999999999") is None
+        with pytest.raises(RuntimeError, match="No se encuentran datos"):
+            client.get_persona("20999999999")
 
 
-def test_get_persona_fault_desconocido_propaga():
+def test_get_persona_fault_desconocido_tambien_levanta_con_su_texto():
     import zeep.exceptions
     from arca_fe.padron import PadronClient
 
@@ -265,7 +272,7 @@ def test_get_persona_fault_desconocido_propaga():
         mock_service.getPersona.side_effect = zeep.exceptions.Fault("coe.alreadyAuthenticated")
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(zeep.exceptions.Fault):
+        with pytest.raises(RuntimeError, match="coe.alreadyAuthenticated"):
             client.get_persona("20999999999")
 
 
