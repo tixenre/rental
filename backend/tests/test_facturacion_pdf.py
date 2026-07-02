@@ -209,6 +209,35 @@ def test_concepto_servicios_sigue_siendo_el_default_de_rambla():
 # válida sin serlo — ni placeholder de QR ni "—" en el CAE)
 
 
+# ── Ley 27.743 / RG 5614 — Transparencia Fiscal al Consumidor: leyenda +
+# desglose de IVA y otros impuestos nacionales indirectos, obligatoria en
+# toda venta a consumidor final (Facturas B/C). La Factura A es RI-a-RI
+# (no consumidor final por definición) y queda fuera del alcance de la norma.
+
+
+@pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
+def test_factura_c_incluye_leyenda_transparencia_fiscal(layout):
+    html = factura_html(_factura(cbte_tipo=11, imp_iva=0), _pedido(), layout=layout)
+    assert "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)" in html
+    assert "IVA Contenido" in html
+    assert "Otros Impuestos Nacionales Indirectos" in html
+
+
+@pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
+def test_factura_a_no_lleva_leyenda_transparencia_fiscal(layout):
+    """La A es RI-a-RI (nunca consumidor final en este motor) — la norma no
+    aplica y no hay que sumarle una leyenda que no le corresponde."""
+    fa = _factura(cbte_tipo=1, imp_neto=4711, imp_iva=989, imp_total=5700, condicion_iva_receptor=1)
+    html = factura_html(fa, _pedido(), layout=layout)
+    assert "Transparencia Fiscal" not in html
+
+
+def test_leyenda_transparencia_fiscal_usa_el_iva_real_no_hardcodeado():
+    fb = _factura(cbte_tipo=6, imp_neto=10000, imp_iva=2100, imp_total=12100, condicion_iva_receptor=5)
+    html = factura_html(fb, _pedido(), layout="clasica")
+    assert "IVA Contenido: $ 2.100,00" in html
+
+
 @pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
 def test_sin_qr_payload_falla_fuerte(layout):
     sin_qr = _factura(qr_payload=None)

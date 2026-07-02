@@ -302,6 +302,11 @@ def _build_ctx(factura, pedido: dict) -> dict:
 
     mostrar_iva = letra in ("A", "B") and factura.imp_iva > 0
     concepto_label = _CONCEPTO_LABEL.get(factura.concepto, "Servicios")
+    # Ley 27.743 / RG 5614: leyenda de Transparencia Fiscal al Consumidor,
+    # obligatoria en toda venta/locación/prestación A CONSUMIDOR FINAL — en
+    # este motor eso son las Facturas B/C (la A es RI-a-RI, no consumidor
+    # final por definición, así que queda fuera del alcance de la norma).
+    transparencia_fiscal = letra in ("B", "C")
 
     return {
         "letra": letra, "cod": cod, "es_nc": es_nc, "concepto": concepto_label,
@@ -331,6 +336,7 @@ def _build_ctx(factura, pedido: dict) -> dict:
         "conceptos": _conceptos(pedido, factura),
         "tot": {
             "discrimina": mostrar_iva,
+            "transparencia": transparencia_fiscal,
             "netoStr": _money(factura.imp_neto), "ivaStr": _money(factura.imp_iva),
             "subStr": _money(factura.imp_neto), "otrosStr": _money(0),
             "totalStr": _money(factura.imp_total),
@@ -339,6 +345,20 @@ def _build_ctx(factura, pedido: dict) -> dict:
         "cae": {"nro": factura.cae, "vto": _fdate(factura.cae_vto)},
         "qr": {"url": factura.qr_payload},
     }
+
+
+def _transparencia_fiscal_lines(f: dict) -> tuple[str, str, str]:
+    """Texto de la leyenda de Transparencia Fiscal al Consumidor (Ley 27.743 /
+    RG 5614), con los importes REALES de la factura — nunca hardcodeados.
+    `otrosStr` es el mismo total de "otros tributos" que ya existe en el
+    comprobante (hoy siempre $0 para Rambla: no hay impuestos internos ni
+    tributos municipales en el rubro); un tenant que sí los tenga cargaría
+    ese mismo campo (`ImpTrib`) y esta leyenda lo reflejaría sin cambios."""
+    return (
+        "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)",
+        f"IVA Contenido: {f['tot']['ivaStr']}",
+        f"Otros Impuestos Nacionales Indirectos: {f['tot']['otrosStr']}",
+    )
 
 
 def _qr_img(url: str, size: int) -> str:
@@ -367,6 +387,16 @@ def _factura_clasica_html(f: dict) -> str:
         f'<div><span style="font-weight:700;">Fecha de Inicio de Actividades:</span> {_e(f["emisor"]["inicio"])}</div>'
         if f["emisor"]["inicio"] else ""
     )
+
+    transparencia_block = ""
+    if f["tot"]["transparencia"]:
+        titulo_tf, iva_tf, otros_tf = _transparencia_fiscal_lines(f)
+        transparencia_block = f"""
+        <div style="margin-top:8px;font-size:7.5px;line-height:1.5;max-width:118px;">
+          <div style="font-weight:700;">{_e(titulo_tf)}</div>
+          <div>{_e(iva_tf)}</div>
+          <div>{_e(otros_tf)}</div>
+        </div>"""
 
     filas_items = "".join(f"""
       <div style="display:grid;grid-template-columns:52px 1fr 62px 74px 96px 58px 100px;font-size:10px;">
@@ -456,7 +486,7 @@ def _factura_clasica_html(f: dict) -> str:
         </div>
 
         <div style="border-top:1px solid #000;padding:14px 22px 18px;display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:center;">
-          <div>{qr_block}</div>
+          <div>{qr_block}{transparencia_block}</div>
           <div style="align-self:flex-end;text-align:right;">
             <div style="margin-bottom:9px;">{_arca_logo(120)}</div>
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:2px;"><span style="font-weight:700;">CAE N°:</span><span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
@@ -520,6 +550,16 @@ def _factura_mobile_html(f: dict) -> str:
         f'<div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f["emisor"]["inicio"])}</div></div>'
         if f["emisor"]["inicio"] else ""
     )
+
+    transparencia_block = ""
+    if f["tot"]["transparencia"]:
+        titulo_tf, iva_tf, otros_tf = _transparencia_fiscal_lines(f)
+        transparencia_block = f"""
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e6e9ec;font-size:10.5px;color:#98a3ae;line-height:1.5;">
+        <div style="font-weight:700;color:#5b6875;">{_e(titulo_tf)}</div>
+        <div>{_e(iva_tf)}</div>
+        <div>{_e(otros_tf)}</div>
+      </div>"""
 
     body = f"""
     <div style="padding:24px 28px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
@@ -589,6 +629,7 @@ def _factura_mobile_html(f: dict) -> str:
       <div style="margin-top:16px;font-size:12px;color:#98a3ae;">
         Comprobante autorizado por ARCA · Verificá la validez escaneando el QR o en <span style="color:#5b6875;font-weight:600;">www.arca.gob.ar</span>
       </div>
+      {transparencia_block}
     </div>
 """
 
@@ -630,6 +671,16 @@ def _factura_formal_html(f: dict) -> str:
         f'<div><span style="font-weight:600;color:#16202b;">Inicio de Actividades:</span> {_e(f["emisor"]["inicio"])}</div>'
         if f["emisor"]["inicio"] else ""
     )
+
+    transparencia_block = ""
+    if f["tot"]["transparencia"]:
+        titulo_tf, iva_tf, otros_tf = _transparencia_fiscal_lines(f)
+        transparencia_block = f"""
+        <div style="padding:0 44px 28px;margin-top:-14px;font-size:12.5px;color:#8a97a3;line-height:1.5;">
+          <div style="font-weight:700;color:#5b6875;">{_e(titulo_tf)}</div>
+          <div>{_e(iva_tf)}</div>
+          <div>{_e(otros_tf)}</div>
+        </div>"""
 
     filas_items = "".join(f"""
       <div style="display:grid;grid-template-columns:1fr 90px 150px 150px;gap:0;padding:12px 0;border-bottom:1px solid #eef1f4;align-items:baseline;">
@@ -715,6 +766,7 @@ def _factura_formal_html(f: dict) -> str:
             <div style="font-size:13px;color:#8a97a3;line-height:1.45;">Verificá la validez de este comprobante escaneando el QR o en www.arca.gob.ar</div>
           </div>
         </div>
+        {transparencia_block}
 """
 
     return f"""<!DOCTYPE html>
