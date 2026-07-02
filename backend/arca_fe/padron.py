@@ -1,11 +1,20 @@
 """arca_fe.padron — cliente del webservice de Padrón — Constancia de
-Inscripción (ws_sr_padron_a5) de ARCA. PORTABLE.
+Inscripción (WSDL personaServiceA5) de ARCA. PORTABLE.
 
 Dado un CUIT, devuelve razón social / nombre, domicilio fiscal y condición
 frente al IVA — lo mismo que autocompleta el facturador oficial de ARCA al
 tipear un CUIT. Reusa el mismo mecanismo de autenticación que WSFE (un TA de
-`arca_fe.wsaa`, pero pedido para el servicio "ws_sr_padron_a5" en vez de
-"wsfe" — son TAs distintos, no intercambiables).
+`arca_fe.wsaa`, pero pedido para el servicio "ws_sr_constancia_inscripcion" en
+vez de "wsfe" — son TAs distintos, no intercambiables).
+
+**El id del servicio para pedir el TA a WSAA NO es "ws_sr_padron_a5"** (verificado
+contra el manual oficial de ARCA, "WS_SR_constancia_inscripcion" v3.7): ese id
+está DEPRECADO — AFIP renombró el servicio a "ws_sr_constancia_inscripcion". El
+WSDL (`personaServiceA5`) es el mismo de siempre; lo único que cambió es el
+nombre que hay que usar al solicitar el Ticket de Acceso — pedirlo con el id
+viejo hace que WSAA no emita un TA válido para este servicio, y la consulta
+degrada silenciosamente a "no se pudo autocompletar" (bug real de prod: un
+CUIT real, registrado y habilitado, aparecía como "ARCA no tiene datos").
 
 **Por qué A5 y no A13** (verificado contra el WSDL real de AFIP, homologación
 y producción — ambos idénticos): A13 (`personaServiceA13`) devuelve un
@@ -22,9 +31,11 @@ consultado sea el mismo que autentica. Por eso alcanza con el cert de
 CUALQUIER emisor ya configurado para resolver el padrón de un CUIT nuevo
 (típicamente al dar de alta un emisor o un cliente).
 
-Requiere que el CUIT autenticador tenga la relación "Consulta de padrón"
-(ws_sr_padron_a5) delegada en AFIP con clave fiscal — es un paso administrativo
-en el portal de AFIP, no algo que el código resuelva.
+Requiere que el CUIT autenticador tenga la relación **"Consulta Constancia de
+Inscripción"** delegada en AFIP con clave fiscal (Administrador de Relaciones
+de Clave Fiscal → Adherir servicio → buscar "Constancia de Inscripción", NO
+"Padrón" — ese nombre viejo ya no aparece en el buscador de AFIP) — es un paso
+administrativo en el portal de AFIP, no algo que el código resuelva.
 
 Nunca crítico: si el padrón no responde o el CUIT no tiene datos, el caller
 degrada a "no se pudo autocompletar" (no bloquea nada — es una comodidad de
@@ -47,7 +58,7 @@ import zeep.helpers
 import zeep.transports
 from requests.adapters import HTTPAdapter
 
-WSAA_SERVICIO = "ws_sr_padron_a5"
+WSAA_SERVICIO = "ws_sr_constancia_inscripcion"
 
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
 

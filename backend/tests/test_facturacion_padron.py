@@ -9,6 +9,7 @@ from datetime import datetime
 
 import pytest
 
+from arca_fe.padron import WSAA_SERVICIO
 from services.facturacion.emisores_repo import EmisorArca
 from services.facturacion.padron import resolver_persona
 
@@ -65,7 +66,12 @@ def test_usa_el_primer_emisor_activo_con_cert(monkeypatch):
 
     assert result.razon_social == "Empresa XYZ"
     assert captured["emisor"] == "pablo"
-    assert captured["servicio"] == "ws_sr_padron_a5"
+    # Regresión: "ws_sr_padron_a5" es el id VIEJO — AFIP lo deprecó y renombró
+    # el servicio a "ws_sr_constancia_inscripcion" (manual oficial
+    # WS_SR_constancia_inscripcion v3.7); pedirle el TA a WSAA con el id viejo
+    # hace que la relación no matchee y la consulta degrade silenciosamente a
+    # "no se pudo autocompletar" — bug real de prod con un CUIT válido.
+    assert captured["servicio"] == WSAA_SERVICIO == "ws_sr_constancia_inscripcion"
 
 
 def test_cualquier_excepcion_degrada_a_none(monkeypatch):

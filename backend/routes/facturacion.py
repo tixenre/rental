@@ -81,10 +81,10 @@ def refrescar_catalogos_arca(request: Request):
 @router.get("/admin/arca/padron/{cuit}")
 def consultar_padron(cuit: str, request: Request):
     """Autocompleta razón social/domicilio/condición IVA desde el padrón de
-    ARCA (ws_sr_padron_a5) — mismo autocompletado que hace el facturador
-    oficial al tipear un CUIT. Best-effort: {encontrado: false} si AFIP no
-    responde o el CUIT no tiene datos, nunca un error — el formulario sigue
-    siendo editable a mano."""
+    ARCA (ws_sr_constancia_inscripcion) — mismo autocompletado que hace el
+    facturador oficial al tipear un CUIT. Best-effort: {encontrado: false} si
+    AFIP no responde o el CUIT no tiene datos, nunca un error — el formulario
+    sigue siendo editable a mano."""
     require_admin(request)
 
     from services.facturacion.padron import resolver_persona
