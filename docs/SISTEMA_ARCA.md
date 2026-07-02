@@ -187,14 +187,31 @@ trata ambos códigos (`_CODES_NO_EXISTE = (10016, 602)`) como "no existe".
 
 ---
 
-## 4. Alta del certificado en AFIP (resumen)
+## 4. Requisitos externos en AFIP (resumen)
 
-Ver guía paso a paso: [`GUIA_ARCA_CERT.md`](GUIA_ARCA_CERT.md)
+Ver guía paso a paso, con screenshots reales de cada pantalla: [`GUIA_ARCA_CERT.md`](GUIA_ARCA_CERT.md).
+Dos relaciones independientes por emisor — un emisor puede tener una sin la otra:
 
-Pasos clave:
+**Parte A — cert + servicio `wsfe`** (bloquea facturar si falta):
 1. Generar CSR (openssl) + subir al portal AFIP → descargar `.crt`
 2. En "Administrador de Relaciones de Clave Fiscal": incorporar relación entre el CUIT del emisor y el servicio `wsfe` usando el cert.
 3. Cargar el `.crt` + la clave privada (`.key`) en el back-office → Facturación → Emisores → Cargar cert.
+
+**Parte B — "Consulta de constancia de inscripción"** (no bloquea; sin esto el
+autocompletado de CUIT degrada a carga manual): adherir el servicio buscando
+**"constancia"** (no "padron" — nombre deprecado) y autohabilitarlo para el
+propio CUIT, eligiendo el mismo Computador Fiscal que ya usa `wsfe`.
+
+### Padrón: AFIP renombró `ws_sr_padron_a5` → `ws_sr_constancia_inscripcion` (2026-07, PR #1188)
+
+El WSDL (`personaServiceA5`) es el mismo de siempre — lo que cambió es el **id de
+servicio que hay que usar al pedirle el Ticket de Acceso a WSAA** (verificado
+contra el manual oficial "WS_SR_constancia_inscripcion" v3.7). Pedir el TA con el
+id viejo hace que WSAA no autorice la relación → la consulta degrada
+silenciosamente a "no se pudo autocompletar", **incluso con un CUIT real,
+registrado y con la relación de padrón ya delegada bajo el nombre viejo**: hay que
+re-delegarla en AFIP con el nombre nuevo (Parte B de la guía). `arca_fe/padron.py::WSAA_SERVICIO`
+es la fuente única del id — no hardcodear el string en otro lado.
 
 ---
 
