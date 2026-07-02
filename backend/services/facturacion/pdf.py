@@ -502,8 +502,8 @@ def _factura_mobile_html(f: dict) -> str:
           <div style="font-size:20px;font-weight:800;letter-spacing:-0.01em;line-height:1.1;">{_e(tipo_txt.upper())}</div>
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;margin-top:2px;">Cód. {_e(f['cod'])}</div>
         </div>
-        <div style="flex:none;display:flex;align-items:center;justify-content:center;width:64px;height:64px;border:2px solid #16202b;border-radius:14px;overflow:hidden;">
-          <span style="font-size:82px;font-weight:800;line-height:1;position:relative;top:8px;">{_e(f['letra'])}</span>
+        <div style="flex:none;display:flex;align-items:center;justify-content:center;width:64px;height:64px;border:1.5px solid #16202b;border-radius:10px;overflow:hidden;">
+          <span style="font-size:72px;font-weight:800;line-height:1;position:relative;top:8px;">{_e(f['letra'])}</span>
         </div>
       </div>
     </div>
