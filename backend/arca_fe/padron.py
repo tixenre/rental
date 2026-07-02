@@ -29,6 +29,10 @@ en el portal de AFIP, no algo que el código resuelva.
 Nunca crítico: si el padrón no responde o el CUIT no tiene datos, el caller
 degrada a "no se pudo autocompletar" (no bloquea nada — es una comodidad de
 carga, no un dato exigido por RG4892 como el QR/CAE de la factura).
+
+Igual que `arca_fe.wsfe`: este módulo NO guarda su propia copia de las URLs
+de homologación/producción — el caller (`services/facturacion/padron.py`)
+las resuelve según ambiente y pasa la URL completa del WSDL ya armada.
 """
 from __future__ import annotations
 
@@ -44,9 +48,6 @@ import zeep.transports
 from requests.adapters import HTTPAdapter
 
 WSAA_SERVICIO = "ws_sr_padron_a5"
-
-_WSDL_HOMO = "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
-_WSDL_PROD = "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
 
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
 
@@ -82,10 +83,11 @@ def _afip_transport() -> zeep.transports.Transport:
 
 
 def _get_client(endpoint: str) -> zeep.Client:
+    """`endpoint` es la URL COMPLETA del WSDL, ya resuelta por el caller
+    según ambiente (ver docstring del módulo)."""
     ep = endpoint.rstrip("/")
     if ep not in _CLIENT_CACHE:
-        wsdl = _WSDL_HOMO if "homo" in ep else _WSDL_PROD
-        _CLIENT_CACHE[ep] = zeep.Client(wsdl, transport=_afip_transport())
+        _CLIENT_CACHE[ep] = zeep.Client(ep, transport=_afip_transport())
     return _CLIENT_CACHE[ep]
 
 

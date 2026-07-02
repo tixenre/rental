@@ -1,7 +1,10 @@
 """arca_fe.wsfe — cliente WSFEv1 (Facturación Electrónica) de ARCA. PORTABLE.
 
 Construye el cliente zeep on-demand a partir del endpoint. No cachea; no persiste.
-El caller (services/facturacion/) maneja la sesión y la BD.
+El caller (services/facturacion/) maneja la sesión y la BD — INCLUIDA la URL del
+WSDL: este módulo no guarda su propia copia de las URLs de homologación/producción
+(vivían duplicadas acá y en services/facturacion/config.py, con un match de string
+frágil para elegir una u otra) — recibe la URL ya resuelta y la usa tal cual.
 
 Deps: zeep (SOAP), ya en requirements.txt.
 """
@@ -21,10 +24,6 @@ import zeep
 import zeep.helpers
 import zeep.transports
 from requests.adapters import HTTPAdapter
-
-# WSDLs oficiales ARCA
-_WSDL_HOMO = "https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL"
-_WSDL_PROD = "https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL"
 
 # Caché local de clientes SOAP (por endpoint, dentro del proceso)
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
@@ -66,11 +65,11 @@ def _afip_transport() -> zeep.transports.Transport:
 
 
 def _get_client(endpoint: str) -> zeep.Client:
-    """Devuelve el cliente zeep (cacheado en memoria por proceso)."""
+    """Devuelve el cliente zeep (cacheado en memoria por proceso). `endpoint`
+    es la URL COMPLETA del WSDL, ya resuelta por el caller según ambiente."""
     ep = endpoint.rstrip("/")
     if ep not in _CLIENT_CACHE:
-        wsdl = _WSDL_HOMO if "homo" in ep or "wswhomo" in ep else _WSDL_PROD
-        _CLIENT_CACHE[ep] = zeep.Client(wsdl, transport=_afip_transport())
+        _CLIENT_CACHE[ep] = zeep.Client(ep, transport=_afip_transport())
     return _CLIENT_CACHE[ep]
 
 

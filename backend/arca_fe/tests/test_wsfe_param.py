@@ -245,6 +245,34 @@ def test_consultar_no_existe_por_error_602_combinacion_virgen():
     assert result is None
 
 
+# ── _get_client: usa el endpoint tal cual, sin URLs propias duplicadas ──────
+
+
+def test_get_client_usa_el_endpoint_tal_cual_y_lo_cachea(monkeypatch):
+    """`endpoint` es la URL completa del WSDL, ya resuelta por el caller según
+    ambiente — `_get_client` no debe tener su propia copia de las URLs de
+    homologación/producción ni adivinar cuál usar por matching de substring
+    (regresión: antes, un endpoint que no contuviera "homo"/"wswhomo" caía
+    siempre a la URL de PRODUCCIÓN hardcodeada acá, sin importar qué URL le
+    hubiera pasado el caller)."""
+    from arca_fe import wsfe
+
+    monkeypatch.setattr(wsfe, "_CLIENT_CACHE", {})
+    calls = []
+
+    class _FakeZeepClient:
+        def __init__(self, wsdl, transport=None):
+            calls.append(wsdl)
+
+    monkeypatch.setattr(wsfe.zeep, "Client", _FakeZeepClient)
+
+    cliente1 = wsfe._get_client("https://ejemplo-cualquiera.test/wsdl")
+    cliente2 = wsfe._get_client("https://ejemplo-cualquiera.test/wsdl")
+
+    assert calls == ["https://ejemplo-cualquiera.test/wsdl"]
+    assert cliente1 is cliente2
+
+
 def test_consultar_error_real_no_se_confunde_con_no_existe():
     """Un error de AFIP que NO es 10016/602 tiene que seguir levantando."""
     from arca_fe.wsfe import WsfeClient

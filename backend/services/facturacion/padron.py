@@ -16,8 +16,8 @@ from typing import Optional
 
 from arca_fe.padron import PadronClient, PersonaArca, WSAA_SERVICIO
 
-_PADRON_HOMO = "awshomo.afip.gov.ar"
-_PADRON_PROD = "aws.afip.gov.ar"
+_PADRON_HOMO = "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
+_PADRON_PROD = "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
 
 
 def resolver_persona(cuit_buscado: str, conn) -> Optional[PersonaArca]:

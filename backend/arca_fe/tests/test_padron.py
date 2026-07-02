@@ -213,3 +213,28 @@ def test_get_persona_fault_desconocido_propaga():
 
         with pytest.raises(zeep.exceptions.Fault):
             client.get_persona("20999999999")
+
+
+# ── _get_client: usa el endpoint tal cual, sin URLs propias duplicadas ──────
+
+
+def test_get_client_usa_el_endpoint_tal_cual_y_lo_cachea(monkeypatch):
+    """Mismo criterio que arca_fe.wsfe: `endpoint` es la URL completa del
+    WSDL ya resuelta por el caller — sin copia propia de homologación/
+    producción ni matching de substring para elegir."""
+    from arca_fe import padron
+
+    monkeypatch.setattr(padron, "_CLIENT_CACHE", {})
+    calls = []
+
+    class _FakeZeepClient:
+        def __init__(self, wsdl, transport=None):
+            calls.append(wsdl)
+
+    monkeypatch.setattr(padron.zeep, "Client", _FakeZeepClient)
+
+    cliente1 = padron._get_client("https://ejemplo-cualquiera.test/wsdl")
+    cliente2 = padron._get_client("https://ejemplo-cualquiera.test/wsdl")
+
+    assert calls == ["https://ejemplo-cualquiera.test/wsdl"]
+    assert cliente1 is cliente2
