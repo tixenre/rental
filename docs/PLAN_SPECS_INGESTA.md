@@ -230,8 +230,24 @@ no importan ni uno ni otro. `llm/` solo lo importa `cli.py`.
   VALOR con `conn` se difiere a F7 (ver Canal A). 164 diffs encontrados y verificados contra el registry
   (todas mejoras: unidad correcta donde antes faltaba, join `" · "` consistente, bool explícito Sí/No
   — `spec_render` colapsa `false` a `""` por diseño, pero acá es información real; corregido).
-- **F3** (riesgo alto) — mover los 4 parsers verbatim, matar ambos `sys.path` hacks.
-- **F4** — unificar los 4 builders del resultado + maximizar el genérico (los 2 casos de ruido de B0).
+- **F3** ✅ — 4 parsers movidos verbatim a `parsers/`, ambos `sys.path` hacks muertos. AST (no grep) para
+  partir archivos — un slice manual perdió `_TIPO_KEYWORDS` (constante a nivel módulo entre 2 funciones);
+  un scanner de dependencias por nombre de archivo perdió referencias a nombres importados; un grep de
+  imports de test se comió `_parse_temperatura` (solo lo agarró correr el test real). Las 3 lecciones →
+  `CLAUDE.md` del módulo.
+- **F4** ✅ — unificados los 4 builders (`resultado.py::build_result`/`generic_fallback_result`,
+  `bespoke.py`, `generic.py` con el filtro de ruido) + reescrito el merge JSON-LD (`parse/secciones.py`).
+  **Hallazgo mayor (reversión de diseño):** la primera versión de `secciones.py` adoptó el criterio de
+  luces (dedupe — solo agregar si el label no estaba ya) por "parecer más seguro"; contra las 103 páginas
+  de Luces reales perdía datos en 111 casos (JSON-LD trae el valor completo, ej. "Manual\nPush Auto\nAuto",
+  el DOM uno resumido para el mismo label — el dedupe se quedaba con el resumido). Se revirtió al criterio
+  de `equipo` (JSON-LD siempre primero) — más simple Y correcto, reverificado 0 diffs inesperados en
+  equipo y confirmado mejora también en luces. Unificar `luces` en `build_result` corrigió 2 bugs reales
+  preexistentes (`peso` buscaba la key "peso" en vez de "peso_g" → siempre None; `keywords` hardcodeado a
+  `[]` en vez de `compute_keywords`) — verificado 0 spec_key perdido de verdad en las 277 páginas del
+  dataset completo, todo diff es una mejora ya explicada. Wireado a los 3 archivos viejos
+  (`equipo_html_extractor.py`/`luces_html_extractor.py`/`generic_html_extractor.py`, ahora shims ⏰ LEGACY
+  delgados). Suite completa: 2481 passed / 20 pre-existentes no relacionados (mismo baseline que F1-F3).
 - **F5** (riesgo alto) — entry point único + maximizar detección + `cli.py` + call-site.
 - **F6** — podar shims LEGACY.
 - **F7** — el embudo que aprende (`commands/proponer.py`) + capa LLM offline.

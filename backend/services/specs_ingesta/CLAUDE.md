@@ -1,12 +1,15 @@
-# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F3 completas)
+# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F4 completas)
 
-> **Estado: F0-F3 completas.** `parse/` (primitivas HTML) + `parsers/` (los 4 parsers grandes,
-> movidos de `tools/`) ya son la fuente única — `equipo_html_extractor.py`/`luces_html_extractor.py`
-> consumen de acá, **cero `sys.path.insert()` hacks**. `tools/*_parser.py` quedan como shims
-> CLI-únicamente (⏰ LEGACY-adyacente) para los `*_rebuild.sh` y 2 tests que importan por nombre.
-> `queries/extraer.py` (el entry point que reemplaza `extract_from_html`) todavía no existe — eso es
-> F5. Hasta entonces `extract_from_html` acá es un re-export lazy (`__getattr__`, PEP 562) del viejo
-> `equipo_html_extractor`.
+> **Estado: F0-F4 completas.** `parse/` (primitivas HTML) + `parsers/` (los 4 parsers grandes,
+> movidos de `tools/`) + `queries/{resultado,bespoke,generic}.py` (los builders unificados) ya son la
+> fuente única — `equipo_html_extractor.py`/`luces_html_extractor.py`/`generic_html_extractor.py` son
+> shims ⏰ LEGACY delgados que delegan acá, **cero `sys.path.insert()` hacks, cero lógica duplicada**.
+> `tools/*_parser.py` quedan como shims CLI-únicamente (⏰ LEGACY-adyacente) para los `*_rebuild.sh` y
+> 2 tests que importan por nombre.
+> `queries/extraer.py` (el entry point único que reemplaza el dispatcher de `equipo_html_extractor.py`)
+> todavía no existe — eso es F5, junto con maximizar `_detect_categoria` y el `cli.py` offline. Hasta
+> entonces `specs_ingesta.extract_from_html` (el barrel) sigue siendo un re-export lazy (`__getattr__`,
+> PEP 562) de `equipo_html_extractor.extract_from_html` — que ya delega internamente en `queries/`.
 > Plan completo + fases → [`docs/PLAN_SPECS_INGESTA.md`](../../../docs/PLAN_SPECS_INGESTA.md) ·
 > tracking → issue [#1176](https://github.com/tixenre/rental/issues/1176) · rama aislada
 > `feature/specs-ingesta`, PR sin mergear hasta completar el módulo (convención "PR como hoja de ruta").
@@ -43,7 +46,7 @@ importa `specs_ingesta`. Tres canales (detalle en el plan):
 - **`llm/` SOLO lo importa `cli.py`.** Si algo en `queries/` o `parse/` importa de `llm/`, es un bug —
   rompe el split de runtime.
 
-## Estructura (F0-F3 completas; se sigue poblando fase a fase)
+## Estructura (F0-F4 completas; se sigue poblando fase a fase)
 
 ```
 services/specs_ingesta/
@@ -56,8 +59,13 @@ services/specs_ingesta/
   parsers/        # DOMINIO — verbatim ex-tools/ (los 4 parsers grandes)         ✓ F3
     base.py       #   BHSpecsParser + helpers compartidos (antes en iluminacion_parser)
     camaras.py · lentes.py · iluminacion.py · modificadores.py · normalizar.py
-  queries/        # LECTURA — lo que corre en Railway, nunca muta                ✗ F4-F5
-    resolver.py   #   ya existe (F1) — resolve_pairs, el matcheo label→spec_key
+  queries/        # LECTURA — lo que corre en Railway, nunca muta                ✓ F4 (falta F5)
+    resolver.py   #   resolve_pairs, el matcheo label→spec_key                   ✓ F1
+    resultado.py  #   build_result/generic_fallback_result — fuente única AutocompletarResult ✓ F4
+    bespoke.py    #   4 categorías con parser (cámaras/lentes/modificadores/iluminación)       ✓ F4
+    generic.py    #   categorías sin parser — + filtro de ruido (package_weight, etc.)         ✓ F4
+    extraer.py    #   entry point único (reemplaza el dispatcher de equipo_html_extractor.py)  ✗ F5
+    detectar.py   #   detección de categoría maximizada (hoy vive en equipo_html_extractor.py) ✗ F5
   commands/       # ESCRITURA — el embudo que aprende (propone-aprobás)         ✗ F7
 ```
 
@@ -85,9 +93,29 @@ services/specs_ingesta/
   de test, no matchea un grep ingenuo de `^from`. Verificar con `grep -oP` exhaustivo antes de armar
   el `__all__` de un shim, y correr los tests afectados — no asumir que "no apareció" = "no se usa".
 - **B0 (diagnóstico) corrió** sobre las 54 páginas reales: 87% detección OK, 2 casos de ruido real
-  (RED KOMODO Production Pack, Canon Mount Adapter 0.71x — pendiente F4), 6 casos "0 specs" todos
-  explicados por fuente no-B&H (3 eBay + 3 fabricante directo — confirma la necesidad de
-  `parse/fuentes/` pluggable). Detalle → comentario en issue #1176.
+  (RED KOMODO Production Pack, Canon Mount Adapter 0.71x), 6 casos "0 specs" todos explicados por
+  fuente no-B&H (3 eBay + 3 fabricante directo — confirma la necesidad de `parse/fuentes/` pluggable).
+  Detalle → comentario en issue #1176. **F4 resolvió el filtro de ruido genérico** (`package_weight`/
+  `box_dimensions` — Canon Mount Adapter queda 100% limpio) **pero NO el caso RED KOMODO** — ese tiene
+  ~30 specs de ruido MÁS ALLÁ de shipping (son specs de los accesorios del bundle, mezclados en el
+  mismo JSON-LD/DOM); la causa real es que el título no matchea el regex de detección de cámaras y cae
+  al genérico en vez del parser de cámaras (que solo extrae specs conocidos) — se ataca en F5.
 - **F3 no movió `camaras_normalizar.py`/`lentes_normalizar.py`/`*_patches.py`** — confirmado que
   ningún código en vivo los importa (solo el pipeline offline de `_rebuild.sh`, que F3 no tocó).
   Quedan en `tools/` sin shim; se revisan si/cuando F5 cablea `cli.py`.
+- **F4 — el "criterio más seguro" no lo era: probarlo contra data real lo refutó.** El merge JSON-LD
+  tenía 2 criterios distintos en el código viejo — `equipo` anteponía JSON-LD siempre primero, `luces`
+  hacía dedupe (solo agregaba si el label no estaba ya en el DOM). La primera versión de
+  `parse/secciones.py` adoptó el de luces asumiendo que "no pisar nada" era más conservador — **al
+  probarlo contra las 103 páginas reales de Luces perdía datos en 111 casos**: JSON-LD trae el valor
+  RICO (ej. multi-línea con las 4 combinaciones de ángulo×CCT), el DOM uno resumido para el mismo
+  label, y el dedupe se quedaba con el resumido por haber llegado "primero". Se revirtió al criterio de
+  `equipo` (más simple, además de correcto). Lección: cuando dos implementaciones viejas discrepan y hay
+  que elegir una, "la que parece más cautelosa" es una hipótesis igual que cualquier otra — se prueba
+  contra data real, no se elige por intuición aunque suene razonable.
+- **F4 — unificar destapó 2 bugs reales que llevaban tiempo silenciosos en `luces_html_extractor.py`**
+  (nunca se habrían visto sin el diff empírico completo, no alcanzaba con leer el código): `peso` SIEMPRE
+  daba `None` en la ficha de una luz porque el código buscaba la key `"peso"` en el dict de specs, pero
+  el mapper real emite `"peso_g"`; `keywords` SIEMPRE daba `[]` porque estaba hardcodeado en vez de llamar
+  `compute_keywords()` (sin ninguna razón category-specific — la función es genérica). Ambos se
+  corrigieron gratis al pasar luces por el mismo `build_result` que ya usaban las otras 3 categorías.
