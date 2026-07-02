@@ -94,7 +94,8 @@ def test_refrescar_catalogos_persiste_los_3_catalogos(monkeypatch):
             "A": [{"Id": 1, "Desc": "IVA Responsable Inscripto"}],
             "B": [{"Id": 5, "Desc": "Consumidor Final"}],
             "C": [{"Id": 6, "Desc": "Responsable Monotributo"}],
-            "M": [],
+            "ALEY": [],
+            "49": [],
         },
     )
 
@@ -113,7 +114,7 @@ def test_refrescar_catalogos_persiste_los_3_catalogos(monkeypatch):
 
 def test_refrescar_catalogos_unifica_condicion_iva_de_todas_las_clases(monkeypatch):
     """FEParamGetCondicionIvaReceptor no tiene un valor "todas" — hay que
-    pedir A/B/C/M y unificar sin duplicar ids repetidos entre clases."""
+    pedir A/B/C/ALEY/49 y unificar sin duplicar ids repetidos entre clases."""
     conn = _FakeAppSettingsConn()
     _patch_auth(monkeypatch)
     _patch_wsfe(
@@ -122,13 +123,25 @@ def test_refrescar_catalogos_unifica_condicion_iva_de_todas_las_clases(monkeypat
             "A": [{"Id": 1, "Desc": "IVA Responsable Inscripto"}],
             "B": [{"Id": 1, "Desc": "IVA Responsable Inscripto"}, {"Id": 5, "Desc": "Consumidor Final"}],
             "C": [{"Id": 5, "Desc": "Consumidor Final"}],
-            "M": [],
+            "ALEY": [],
+            "49": [],
         },
     )
 
     resultado = refrescar_catalogos(conn)
     ids = [c["id"] for c in resultado["condicion_iva_receptor"]]
     assert sorted(ids) == [1, 5]
+
+
+def test_refrescar_catalogos_no_pide_clase_m_invalida(monkeypatch):
+    """Regresión: "M" NO es una ClaseCmp válida para
+    FEParamGetCondicionIvaReceptor — ARCA devuelve 10244 ("El valor
+    ingresado para la clase de comprobante no es valido... solo puede ser
+    'A', 'B', 'C', 'ALEY' o '49'"), bug real de prod post-#1180. Si alguna
+    clase pedida no es una de esas 5, este test la cacha."""
+    from services.facturacion.catalogos import _CLASES_CMP
+
+    assert set(_CLASES_CMP) <= {"A", "B", "C", "ALEY", "49"}
 
 
 def test_refrescar_catalogos_sin_emisor_con_cert_levanta_value_error(monkeypatch):
