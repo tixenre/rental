@@ -1,8 +1,9 @@
-"""Tests de services.facturacion.padron — resolver_persona() es best-effort:
-elige cualquier emisor activo con cert para autenticar, y CUALQUIER falla
-(sin emisor disponible, AFIP caído, CUIT sin datos) degrada a None, nunca
-levanta — es una comodidad de autocompletado, no algo que pueda romper un
-formulario."""
+"""Tests de services.facturacion.padron — resolver_persona() elige cualquier
+emisor activo con cert para autenticar y devuelve la PersonaArca si AFIP la
+encontró; CUALQUIER otra cosa (sin emisor disponible, AFIP caído, CUIT sin
+datos ni motivo) levanta RuntimeError con el motivo real — nunca degrada a
+None en silencio. Nunca rompe el FORMULARIO (el caller/route lo atrapa y
+sigue siendo editable a mano), pero tampoco esconde la causa."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -36,6 +37,36 @@ def test_sin_emisor_activo_con_cert_levanta_con_motivo(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="ningún emisor activo con certificado"):
         resolver_persona("20301234567", conn=object())
+
+
+def test_afip_sin_datos_ni_motivo_levanta_nombrando_el_emisor_autenticador(monkeypatch):
+    """Caso real de prod: un CUIT activo, con Constancia de Inscripción
+    vigente confirmada en el propio portal de AFIP, seguía devolviendo "sin
+    datos" acá — la causa más probable es que el CUIT del EMISOR
+    AUTENTICADOR (no el buscado) no tenga la relación de este servicio
+    delegada. El mensaje ahora nombra ESE emisor/CUIT para que se pueda
+    verificar del lado correcto en vez de asumir que el CUIT buscado es el
+    problema."""
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.list_emisores",
+        lambda conn: [_emisor(nombre="pablo")],
+    )
+
+    class _FakeCred:
+        ambiente = "homologacion"
+        cuit = 20300000000
+
+    monkeypatch.setattr(
+        "services.facturacion.config.credenciales", lambda emisor, conn: _FakeCred()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.wsaa_cache.get_ta",
+        lambda emisor, conn, servicio=None: ("tok", "sign"),
+    )
+    monkeypatch.setattr("arca_fe.padron.PadronClient.get_persona", lambda self, cuit: None)
+
+    with pytest.raises(RuntimeError, match="pablo.*20300000000"):
+        resolver_persona("23373891029", conn=object())
 
 
 def test_usa_el_primer_emisor_activo_con_cert(monkeypatch):

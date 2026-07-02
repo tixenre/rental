@@ -348,19 +348,6 @@ def test_consultar_padron_encontrado(monkeypatch):
     }
 
 
-def test_consultar_padron_no_encontrado_no_es_error(monkeypatch):
-    """AFIP caído / sin datos / sin emisor autenticador — nunca un error, el
-    formulario sigue siendo editable a mano."""
-    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
-    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
-    monkeypatch.setattr(
-        "services.facturacion.padron.resolver_persona", lambda cuit, conn: None
-    )
-
-    result = facturacion_routes.consultar_padron("30712345678", _fake_request())
-    assert result == {"encontrado": False}
-
-
 def test_consultar_padron_error_real_incluye_motivo(monkeypatch):
     """Distinto de "sin datos": si resolver_persona no pudo ni completar la
     consulta (WSAA/relación/cert/red), el route sigue sin romper (nunca un
