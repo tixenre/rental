@@ -537,6 +537,18 @@ def _parse_filtro_densidad(secciones: dict) -> str | None:
     return val.strip()
 
 
+def _parse_filtro_light_loss(secciones: dict) -> float | None:
+    """'Exposure Reduction: 1.2-Stop' → 1.2 (en stops). Mismo patrón que
+    modificadores._parse_light_loss. Se usa para filtros NO-ND (polarizador/
+    difusión/UV) — ahí la pérdida de luz es una propiedad incidental, no la
+    "densidad ND" del producto (ver map_filtro_specs: gatea por subtipo)."""
+    val = _find_value(secciones, "Exposure Reduction")
+    if not val:
+        return None
+    m = re.search(r"([\d.]+)\s*-?\s*stop", val, re.IGNORECASE)
+    return float(m.group(1)) if m else None
+
+
 def _parse_filtro_diametro(secciones: dict, title: str = "") -> int | None:
     val = _find_value(secciones, "Size", "Filter Size")
     if val:
@@ -600,9 +612,16 @@ def map_filtro_specs(secciones: dict, title: str = "") -> dict:
         if val is not None and val != "" and val != []:
             result[key] = val
 
-    _add("filtro_subtipo", _parse_filtro_tipo(secciones, title))
+    subtipo = _parse_filtro_tipo(secciones, title)
+    _add("filtro_subtipo", subtipo)
     _add("diametro_filtro", _parse_filtro_diametro(secciones, title))
-    _add("densidad", _parse_filtro_densidad(secciones))
+    # "Exposure Reduction" es el mismo raw label para dos conceptos
+    # distintos según el subtipo — ver el comentario de light_loss_stops
+    # en el registry (services/specs/registry/catalogo/filtros.py).
+    if subtipo in ("Filtro ND", "Filtro variable"):
+        _add("densidad", _parse_filtro_densidad(secciones))
+    else:
+        _add("light_loss_stops", _parse_filtro_light_loss(secciones))
     _add("material", _parse_filtro_material(secciones))
     _add("grade", _parse_filtro_grade(title))
     _add("peso_g", _parse_peso_g(secciones))

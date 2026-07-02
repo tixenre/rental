@@ -32,9 +32,23 @@ CAT = CategoriaRegistry(
                 ayuda="Algunos filtros aceptan otros filtros encima (ej. 82mm front threading)"),
         SpecDef(key="densidad", label="Densidad ND", tipo="string",
                 prioridad=30, en_filtros=True, en_nombre=True,
-                ayuda="Ej: 1.2-Stop, 2-8 Stop (variable)",
+                ayuda="SOLO Filtro ND/variable — ej: 1.2-Stop, 2-8 Stop (variable). "
+                      "Para pérdida de luz de OTROS subtipos (polarizador, difusión) "
+                      "usar light_loss_stops, no este campo.",
                 aliases=["Optical Density", "ND Density", "Density", "Stop Reduction",
                          "Filter Factor"]),
+        # Mismo concepto que Modificadores.light_loss_stops (número plano en
+        # stops), pero acá vive aparte: "densidad" arriba es semánticamente
+        # la DENSIDAD ND del producto (su identidad como filtro ND), mientras
+        # que esto es la pérdida de luz incidental de CUALQUIER filtro
+        # (ej. un polarizador circular pierde ~1.2 stops sin ser "ND").
+        # B&H reporta ambos bajo el mismo label "Exposure Reduction" —
+        # el parser (map_filtro_specs) desambigua por filtro_subtipo, no
+        # renombra el campo según lo que sea más conveniente.
+        SpecDef(key="light_loss_stops", label="Pérdida de luz", tipo="number",
+                unidad="stops", prioridad=32, en_filtros=True,
+                ayuda="Pérdida de exposición del filtro en stops (no es densidad ND)",
+                aliases=["Exposure Reduction", "Light Loss"]),
         SpecDef(
             key="material", label="Material", tipo="enum",
             enum_options=["Vidrio", "Resina", "Polímero"],
