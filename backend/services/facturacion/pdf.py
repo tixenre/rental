@@ -392,7 +392,7 @@ def _factura_clasica_html(f: dict) -> str:
     if f["tot"]["transparencia"]:
         titulo_tf, iva_tf, otros_tf = _transparencia_fiscal_lines(f)
         transparencia_block = f"""
-        <div style="margin-top:8px;font-size:7.5px;line-height:1.5;max-width:118px;">
+        <div style="margin-top:10px;font-size:8px;line-height:1.5;">
           <div style="font-weight:700;">{_e(titulo_tf)}</div>
           <div>{_e(iva_tf)}</div>
           <div>{_e(otros_tf)}</div>
@@ -486,13 +486,14 @@ def _factura_clasica_html(f: dict) -> str:
         </div>
 
         <div style="border-top:1px solid #000;padding:14px 22px 18px;display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:center;">
-          <div>{qr_block}{transparencia_block}</div>
+          <div>{qr_block}</div>
           <div style="align-self:flex-end;text-align:right;">
             <div style="margin-bottom:9px;">{_arca_logo(120)}</div>
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:2px;"><span style="font-weight:700;">CAE N°:</span><span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
             <div style="display:flex;justify-content:flex-end;gap:8px;"><span style="font-weight:700;">Fecha de Vto. de CAE:</span><span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
             <div style="margin-top:10px;font-size:9px;color:#333;">Comprobante Autorizado — Verifique la validez de este comprobante en www.arca.gob.ar</div>
             <div style="margin-top:4px;font-size:9px;color:#333;">Pág. 1/1</div>
+            {transparencia_block}
           </div>
         </div>
 """
@@ -624,12 +625,12 @@ def _factura_mobile_html(f: dict) -> str:
             <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Total</span>
             <span style="font-size:34px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
           </div>
+          <div style="margin-top:14px;font-size:11.5px;color:#98a3ae;line-height:1.4;">
+            Comprobante autorizado por ARCA · Verificá la validez escaneando el QR o en <span style="color:#5b6875;font-weight:600;">www.arca.gob.ar</span>
+          </div>
+          {transparencia_block}
         </div>
       </div>
-      <div style="margin-top:16px;font-size:12px;color:#98a3ae;">
-        Comprobante autorizado por ARCA · Verificá la validez escaneando el QR o en <span style="color:#5b6875;font-weight:600;">www.arca.gob.ar</span>
-      </div>
-      {transparencia_block}
     </div>
 """
 
@@ -676,11 +677,11 @@ def _factura_formal_html(f: dict) -> str:
     if f["tot"]["transparencia"]:
         titulo_tf, iva_tf, otros_tf = _transparencia_fiscal_lines(f)
         transparencia_block = f"""
-        <div style="padding:0 44px 28px;margin-top:-14px;font-size:12.5px;color:#8a97a3;line-height:1.5;">
-          <div style="font-weight:700;color:#5b6875;">{_e(titulo_tf)}</div>
-          <div>{_e(iva_tf)}</div>
-          <div>{_e(otros_tf)}</div>
-        </div>"""
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid #eef1f4;font-size:12.5px;color:#8a97a3;line-height:1.5;">
+              <div style="font-weight:700;color:#5b6875;">{_e(titulo_tf)}</div>
+              <div>{_e(iva_tf)}</div>
+              <div>{_e(otros_tf)}</div>
+            </div>"""
 
     filas_items = "".join(f"""
       <div style="display:grid;grid-template-columns:1fr 90px 150px 150px;gap:0;padding:12px 0;border-bottom:1px solid #eef1f4;align-items:baseline;">
@@ -764,9 +765,9 @@ def _factura_formal_html(f: dict) -> str:
             <div style="font-size:15px;margin-bottom:3px;"><span style="color:#5b6875;">CAE N° </span><span style="font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
             <div style="font-size:15px;margin-bottom:12px;"><span style="color:#5b6875;">Vto. CAE </span><span style="font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
             <div style="font-size:13px;color:#8a97a3;line-height:1.45;">Verificá la validez de este comprobante escaneando el QR o en www.arca.gob.ar</div>
+            {transparencia_block}
           </div>
         </div>
-        {transparencia_block}
 """
 
     return f"""<!DOCTYPE html>
