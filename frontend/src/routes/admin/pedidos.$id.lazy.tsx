@@ -25,6 +25,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Copy,
+  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -1075,6 +1076,16 @@ function FacturacionRailSection({
                 className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
               >
                 <Download className="h-3 w-3" /> Descargar PDF
+              </a>
+              <a
+                href={`/api/facturas/${principal.id}/pdf?layout=celular`}
+                target="_blank"
+                rel="noreferrer"
+                title="Versión compacta para compartir por WhatsApp"
+                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+              >
+                <Smartphone className="h-3 w-3" /> Para WhatsApp
               </a>
               <button
                 type="button"
