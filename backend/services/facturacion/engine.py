@@ -92,6 +92,81 @@ def _get_pedido(conn, pedido_id: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Preview — arma el comprobante sin tocar ARCA (para confirmar antes de emitir)
+# ---------------------------------------------------------------------------
+
+
+def previsualizar_factura(pedido_id: int, conn) -> dict:
+    """Arma el `ComprobanteRequest` y calcula sus importes SIN llamar a ARCA.
+
+    Corre exactamente los mismos pasos 1-3 de `emitir_factura` (validar
+    estado, resolver emisor/receptor, construir el comprobante) pero se
+    detiene ahí — nada de advisory lock, nada de INSERT, nada de SOAP. Deja
+    ver los datos que se van a facturar (CUIT/razón social del receptor,
+    letra del comprobante, importes, vencimiento de pago) para confirmar
+    antes de pedir un CAE real — irreversible salvo Nota de Crédito."""
+    pedido = _get_pedido(conn, pedido_id)
+
+    estado = (pedido.get("estado") or "").lower()
+    if estado not in ("confirmado", "retirado", "devuelto", "finalizado"):
+        raise ValueError(
+            f"El pedido {pedido_id} está en estado '{estado}'; "
+            "solo se puede facturar desde 'confirmado' o posterior"
+        )
+
+    perfil_receptor = (pedido.get("cliente_perfil_impuestos") or "").strip().lower()
+    nombre_emisor = emisor_para(perfil_receptor, conn)
+    cred = credenciales(nombre_emisor, conn)
+
+    emisor_obj = Emisor(
+        cuit=cred.cuit,
+        punto_venta=cred.punto_venta,
+        condicion_iva=(
+            CondicionIva.RESPONSABLE_INSCRIPTO
+            if cred.condicion_iva == "responsable_inscripto"
+            else CondicionIva.MONOTRIBUTO
+        ),
+    )
+
+    hoy = now_ar().date()
+    req = construir_comprobante(pedido, emisor_obj, emisor_obj.condicion_iva, fecha=hoy)
+    cbte_tipo = tipo_comprobante(req)
+    importes = calcular_importes(req)
+
+    from services.facturacion.pdf import _CBTE_TIPO_LABEL
+
+    return {
+        "ambiente": cred.ambiente,
+        "emisor": {
+            "nombre": nombre_emisor,
+            "cuit": cred.cuit,
+            "condicion_iva": cred.condicion_iva,
+        },
+        "receptor": {
+            "doc_tipo": req.receptor.doc_tipo.name,
+            "doc_nro": str(req.receptor.doc_nro),
+            "condicion_iva": req.receptor.condicion_iva.name.lower(),
+            "razon_social": pedido.get("cliente_razon_social") or pedido.get("cliente_nombre") or "",
+        },
+        "comprobante": {
+            "letra": _CBTE_TIPO_LABEL.get(int(cbte_tipo), "?"),
+            "tipo_nro": int(cbte_tipo),
+        },
+        "importes": {
+            "neto": float(importes["neto"]),
+            "iva": float(importes["iva"]),
+            "total": float(importes["total"]),
+        },
+        "fechas": {
+            "emision": hoy.isoformat(),
+            "servicio_desde": req.fecha_serv_desde.isoformat() if req.fecha_serv_desde else None,
+            "servicio_hasta": req.fecha_serv_hasta.isoformat() if req.fecha_serv_hasta else None,
+            "vto_pago": req.fecha_vto_pago.isoformat() if req.fecha_vto_pago else None,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Emisión de factura
 # ---------------------------------------------------------------------------
 

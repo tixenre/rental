@@ -66,6 +66,20 @@ export type PadronResult =
   | { encontrado: true; razon_social: string; domicilio: string; condicion_iva: string }
   | { encontrado: false };
 
+export type PreviewFactura = {
+  ambiente: "homologacion" | "produccion";
+  emisor: { nombre: string; cuit: number; condicion_iva: string };
+  receptor: { doc_tipo: string; doc_nro: string; condicion_iva: string; razon_social: string };
+  comprobante: { letra: string; tipo_nro: number };
+  importes: { neto: number; iva: number; total: number };
+  fechas: {
+    emision: string;
+    servicio_desde: string | null;
+    servicio_hasta: string | null;
+    vto_pago: string | null;
+  };
+};
+
 export const facturacionApi = {
   getEstado: () => authedJson<EstadoFacturacion>("/api/admin/facturacion/estado"),
 
@@ -92,6 +106,8 @@ export const facturacionApi = {
     authedJson<void>(`/api/admin/emisores-arca/${id}`, { method: "DELETE" }),
 
   // Facturas
+  previewFactura: (pedidoId: number) =>
+    authedJson<PreviewFactura>(`/api/alquileres/${pedidoId}/facturar/preview`),
   facturarPedido: (pedidoId: number) =>
     authedPostJson<Factura>(`/api/alquileres/${pedidoId}/facturar`, {}),
   listFacturasPedido: (pedidoId: number) =>

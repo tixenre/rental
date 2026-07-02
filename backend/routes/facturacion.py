@@ -210,6 +210,25 @@ def desactivar_emisor(emisor_id: int, request: Request):
 
 
 # ---------------------------------------------------------------------------
+# GET /alquileres/{id}/facturar/preview
+# ---------------------------------------------------------------------------
+
+
+@router.get("/alquileres/{pedido_id}/facturar/preview")
+def preview_factura(pedido_id: int, request: Request):
+    """Arma el comprobante y calcula sus importes SIN emitir — para que el
+    admin confirme los datos antes de pedir un CAE real (irreversible)."""
+    require_admin(request)
+
+    try:
+        from services.facturacion.engine import previsualizar_factura
+        with get_db() as conn:
+            return previsualizar_factura(pedido_id, conn)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+# ---------------------------------------------------------------------------
 # POST /alquileres/{id}/facturar
 # ---------------------------------------------------------------------------
 

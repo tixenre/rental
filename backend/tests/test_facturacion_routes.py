@@ -68,6 +68,7 @@ class _FakeConn:
         ("DELETE", "/api/admin/emisores-arca/1"),
         ("POST", "/api/admin/emisores-arca/1/cert"),
         ("GET", "/api/admin/arca/padron/20301234567"),
+        ("GET", "/api/alquileres/1/facturar/preview"),
     ],
 )
 def test_rutas_facturacion_gatean_por_admin(method, path):
@@ -99,6 +100,33 @@ def test_facturar_pedido_runtime_error_es_503_nunca_500(monkeypatch):
     with pytest.raises(HTTPException) as ei:
         facturacion_routes.facturar_pedido(1, _fake_request())
     assert ei.value.status_code == 503
+
+
+# ── preview_factura: arma sin emitir, ValueError → 400 ──────────────────────
+
+
+def test_preview_factura_devuelve_el_armado(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.engine.previsualizar_factura",
+        lambda pedido_id, conn: {"comprobante": {"letra": "C"}},
+    )
+
+    result = facturacion_routes.preview_factura(1, _fake_request())
+    assert result == {"comprobante": {"letra": "C"}}
+
+
+def test_preview_factura_value_error_es_400(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.engine.previsualizar_factura",
+        lambda pedido_id, conn: (_ for _ in ()).throw(ValueError("no confirmado")),
+    )
+    with pytest.raises(HTTPException) as ei:
+        facturacion_routes.preview_factura(1, _fake_request())
+    assert ei.value.status_code == 400
 
 
 def test_nota_credito_value_error_es_400(monkeypatch):

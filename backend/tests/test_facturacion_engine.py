@@ -10,7 +10,7 @@ encontrados en producción:
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -367,3 +367,40 @@ def test_vto_pago_de_la_nc_tambien_respeta_la_fecha_del_comprobante():
     )
 
     assert req.fecha_vto_pago == date(2026, 8, 1)
+
+
+# ── previsualizar_factura: arma el comprobante SIN tocar ARCA ───────────────
+
+
+def _patch_preview_common(monkeypatch):
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: _fake_pedido())
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+
+
+def test_preview_no_llama_a_arca_ni_a_wsaa(monkeypatch):
+    """El preview arma el comprobante localmente — no debe pedir un TA ni
+    tocar WsfeClient (eso solo pasa en emitir_factura)."""
+    _patch_preview_common(monkeypatch)
+    monkeypatch.setattr(engine, "now_ar", lambda: datetime(2026, 7, 15))
+
+    def _explota(*a, **kw):
+        raise AssertionError("previsualizar_factura no debería llamar a get_ta/WsfeClient")
+
+    monkeypatch.setattr(engine, "get_ta", _explota)
+    monkeypatch.setattr(engine, "WsfeClient", _explota)
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["comprobante"]["letra"] == "C"  # monotributo → Factura C
+    assert result["emisor"]["nombre"] == "santini"
+    assert result["receptor"]["doc_tipo"] == "DNI"
+    assert result["fechas"]["vto_pago"] == "2026-07-15"  # fecha_hasta (07-01) ya pasó → hoy
+
+
+def test_preview_pedido_no_confirmado_levanta_value_error(monkeypatch):
+    monkeypatch.setattr(
+        engine, "_get_pedido", lambda conn, pedido_id: {**_fake_pedido(), "estado": "presupuesto"}
+    )
+    with pytest.raises(ValueError, match="presupuesto"):
+        engine.previsualizar_factura(1, conn=_FakeConn())
