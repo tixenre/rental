@@ -4,13 +4,16 @@ WSAA "ws_sr_constancia_inscripcion" — antes "ws_sr_padron_a5", deprecado).
 
 Es una comodidad de carga (lo mismo que hace el facturador oficial de ARCA al
 tipear un CUIT) — NUNCA bloquea: el formulario sigue siendo editable a mano
-pase lo que pase. Pero "ARCA no tiene datos para este CUIT" y "no pudimos ni
-preguntarle a ARCA" son cosas MUY distintas para diagnosticar (la primera es
-un hecho de AFIP; la segunda es nuestro/su lado — WSAA no autoriza, relación
-no delegada, cert vencido, red) — `resolver_persona` las distingue: None solo
-para la primera (o sin emisor autenticador), RuntimeError con el motivo real
-para la segunda, que el route (admin-only) muestra tal cual. No participa del
-flujo de emisión de comprobantes (no toca `arca_fe.wsfe`/`engine.py`).
+pase lo que pase. Pero "ARCA no tiene datos para este CUIT" es engañoso para
+dos casos MUY distintos que antes se leían igual: (a) AFIP SÍ conoce el CUIT
+pero bloquea la constancia por una regla de negocio propia (ej. sin adhesión
+a Domicilio Fiscal Electrónico, RG 3990-E — ver manual "WS_SR_constancia_
+inscripcion" §5.3) y (b) no pudimos ni completar la consulta (WSAA no
+autoriza, relación no delegada, cert vencido, red). `resolver_persona`
+distingue las tres: None solo cuando AFIP genuinamente no tiene el CUIT (o no
+hay emisor para autenticar); RuntimeError con el motivo real para (a) y (b),
+que el route (admin-only) muestra tal cual. No participa del flujo de
+emisión de comprobantes (no toca `arca_fe.wsfe`/`engine.py`).
 
 Cualquier emisor activo con cert cargado sirve para autenticar la consulta —
 el padrón responde por CUALQUIER CUIT consultado, no solo el que autentica.
@@ -54,6 +57,11 @@ def resolver_persona(cuit_buscado: str, conn) -> Optional[PersonaArca]:
             endpoint=endpoint, cuit_representada=cred.cuit, token=token, sign=sign
         )
         return client.get_persona(cuit_buscado)
+    except RuntimeError:
+        # `get_persona` ya arma un RuntimeError con el mensaje de negocio de
+        # AFIP en texto plano (ej. "No consta... adhesión al domicilio fiscal
+        # electrónico...") — mostrarlo tal cual, sin envolverlo de nuevo.
+        raise
     except Exception as exc:
         raise RuntimeError(
             f"No se pudo consultar el padrón con el emisor '{emisor_autenticador}': "

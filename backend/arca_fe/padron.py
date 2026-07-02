@@ -137,7 +137,15 @@ class PadronClient:
         return _get_client(self.endpoint)
 
     def get_persona(self, cuit_buscado: str) -> Optional[PersonaArca]:
-        """Consulta el padrón para `cuit_buscado`. None si AFIP no tiene datos."""
+        """Consulta el padrón para `cuit_buscado`. None si AFIP genuinamente no
+        tiene el CUIT. Levanta RuntimeError si AFIP SÍ conoce el CUIT pero
+        bloquea la constancia por una regla de negocio (ej. CUIT sin adhesión
+        a Domicilio Fiscal Electrónico, RG 3990-E) — verificado contra el
+        manual oficial "WS_SR_constancia_inscripcion" v3.7 §5.3: en ese caso
+        `persona` viene SIN `datosGenerales` pero CON `errorConstancia`/
+        `errorRegimenGeneral`/`errorMonotributo` poblado con el motivo real.
+        Sin esto, un CUIT real y activo pero bloqueado por esa regla se leía
+        como "ARCA no tiene datos" — indistinguible de un CUIT que no existe."""
         client = self._client()
         try:
             resp = client.service.getPersona(
@@ -151,14 +159,34 @@ class PadronClient:
                 return None
             raise
 
-        if resp is None or getattr(resp, "persona", None) is None:
+        persona = getattr(resp, "persona", None) if resp is not None else None
+        if persona is None:
             return None
 
-        return _parsear_persona(cuit_buscado, resp.persona)
+        if getattr(persona, "datosGenerales", None) is None:
+            motivo = _error_constancia(persona)
+            if motivo:
+                raise RuntimeError(motivo)
+            return None
+
+        return _parsear_persona(cuit_buscado, persona)
 
 
 def _solo_digitos(s: str) -> str:
     return "".join(c for c in str(s) if c.isdigit())
+
+
+def _error_constancia(persona: Any) -> Optional[str]:
+    """Junta el/los mensaje(s) de error que AFIP puso en `errorConstancia`/
+    `errorRegimenGeneral`/`errorMonotributo` (cada uno con un campo `error`,
+    ver manual §5.3) cuando bloqueó la constancia por una regla de negocio."""
+    mensajes = []
+    for campo in ("errorConstancia", "errorRegimenGeneral", "errorMonotributo"):
+        err = getattr(persona, campo, None)
+        msg = getattr(err, "error", None) if err is not None else None
+        if msg:
+            mensajes.append(str(msg))
+    return "; ".join(mensajes) if mensajes else None
 
 
 def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:

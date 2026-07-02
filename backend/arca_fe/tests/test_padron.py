@@ -184,6 +184,60 @@ def test_get_persona_sin_datos_devuelve_none():
         assert client.get_persona("20999999999") is None
 
 
+def test_get_persona_bloqueada_por_regla_de_negocio_levanta_con_motivo():
+    """AFIP conoce el CUIT pero bloquea la constancia por una regla propia
+    (ej. RG 3990-E, sin adhesión a Domicilio Fiscal Electrónico) — la
+    respuesta viene SIN datosGenerales pero CON errorConstancia poblado
+    (manual "WS_SR_constancia_inscripcion" §5.3). Antes esto se leía igual
+    que "el CUIT no existe"; ahora levanta con el motivo real de AFIP."""
+    from arca_fe.padron import PadronClient
+
+    client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
+    persona = MagicMock(
+        spec=["datosGenerales", "errorConstancia", "errorRegimenGeneral", "errorMonotributo"]
+    )
+    persona.datosGenerales = None
+    persona.errorRegimenGeneral = None
+    persona.errorMonotributo = None
+    err = MagicMock()
+    err.error = "No consta en nuestros registros que Ud. ha cumplido con la adhesión al domicilio fiscal electrónico"
+    persona.errorConstancia = err
+    resp = MagicMock()
+    resp.persona = persona
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.getPersona.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        with pytest.raises(RuntimeError, match="domicilio fiscal electrónico"):
+            client.get_persona("23373891029")
+
+
+def test_get_persona_sin_datosgenerales_ni_error_sigue_devolviendo_none():
+    """Sin datosGenerales Y sin ningún error* poblado — no hay motivo real
+    que mostrar, degrada a None como siempre (no inventa un mensaje)."""
+    from arca_fe.padron import PadronClient
+
+    client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
+    persona = MagicMock(
+        spec=["datosGenerales", "errorConstancia", "errorRegimenGeneral", "errorMonotributo"]
+    )
+    persona.datosGenerales = None
+    persona.errorConstancia = None
+    persona.errorRegimenGeneral = None
+    persona.errorMonotributo = None
+    resp = MagicMock()
+    resp.persona = persona
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.getPersona.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        assert client.get_persona("23373891029") is None
+
+
 def test_get_persona_fault_sin_resultados_devuelve_none():
     import zeep.exceptions
     from arca_fe.padron import PadronClient
