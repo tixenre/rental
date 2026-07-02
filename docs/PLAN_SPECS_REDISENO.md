@@ -192,6 +192,14 @@ esquema; (3) flags y jerarquía intactos.
 propuestas). Es una tarea de diseño **separada**, a abordar **cuando este rediseño esté**. Se le hará su
 propio plan + issue.
 
+**Extraer compatibilidad a `services/compatibilidad/`** — `routes/specs/compatibilidad.py` (856 líneas)
+tiene el motor de matching completo (`_compute_compat` + helpers + cache de familias) puesto directo en
+la route, sin pasar por `commands/`/`queries/`, y con **tablas propias** (`equipo_compatibilidad`,
+`spec_familia_jerarquia`) que no son de specs. El plan lo dejó afuera a propósito ("no lo pide ningún
+objetivo de la iniciativa") — es la continuación natural si se quiere terminar de ordenar el árbol
+completo, mismo patrón "motor único" que `services/contenido/` (lee de otro motor, tiene su propia
+puerta). `someday`, issue [#1174](https://github.com/tixenre/rental/issues/1174).
+
 ## Deuda diferida (issues aparte, NO bloquean)
 
 `unidad` VARCHAR vs `unidad_id` FK (drift de sync); `favorito` vs `destacado` solapados; `multi_enum`
