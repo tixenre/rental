@@ -130,15 +130,22 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
    cliente — **y dado que #1181 tampoco se mergeó, el editor ADMIN también sigue expuesto hoy**.
 
 ### Robustez / concurrencia (mismo patrón ya arreglado en `contabilidad`, sin mitigar acá)
-8. **`reportes/cierres.py::cerrar_mes`** — sin `pg_advisory_xact_lock` contra escrituras concurrentes
-   de `alquiler_pagos` del mismo mes. Mismo tipo de carrera que se cerró en `contabilidad` (2026-07-02)
-   — acá solo hay detección reactiva (`mes_cerrado_desactualizado`), no un candado preventivo.
+8. ✅ **RESUELTO (Fase 3, #1184).** `reportes/cierres.py::cerrar_mes`/`reabrir_mes` — no tenían
+   `pg_advisory_xact_lock` (mismo tipo de carrera ya cerrada en `contabilidad`, 2026-07-02). Fix:
+   `_lock_mes(conn, mes)` (mismo parseo `'YYYY-MM'`→`YYYYMM`, namespace **propio**
+   `_ADVISORY_NS_REPORTES_MES = 5390421` — NO comparte namespace con `_ADVISORY_NS_CONTAB_MES` a
+   propósito, son cierres independientes sobre invariantes distintos) al inicio de ambas funciones.
+   Candado: `test_reportes_cierres_db.py::test_lock_serializa_cerrar_mes_concurrente` (Postgres real,
+   dos conexiones + `threading.Event` — confirma que una segunda conexión que intenta `cerrar_mes` del
+   mismo mes queda bloqueada hasta que la primera libera el lock, no corren en paralelo).
 9. **Reconciliación 100% manual** (ver arriba) — el riesgo de gobernanza más directo: nada avisa
    proactivamente si algo se desincroniza.
 
 ### Seguridad / limpieza (bajo impacto, documentado para no perderlo)
-10. `routes/reportes.py` — sin `@limiter.limit` en los endpoints de escritura (cerrar/reabrir mes,
-    enviar mail) — mismo gap ya cerrado en `contabilidad.py`/`pagos.py`.
+10. ✅ **RESUELTO (Fase 6, #1184).** `routes/reportes.py` — sin `@limiter.limit` en los endpoints de
+    escritura (cerrar/reabrir mes, enviar mail) — mismo gap ya cerrado en `contabilidad.py`/`pagos.py`.
+    Fix: `@limiter.limit(ADMIN_WRITE_LIMIT)` en `enviar_reporte_mail`, `cerrar_mes_liquidacion`,
+    `reabrir_mes_liquidacion`.
 11. `/api/cotizar`, rama de línea personalizada (`equipo_id=None`) — no chequea `es_admin` en ese
     punto específico del código (aunque los endpoints que sí persisten ya exigen `require_admin` por
     fuera). Bajo riesgo real hoy; vale la pena que quede explícito si se toca ese código.

@@ -79,9 +79,34 @@ def snapshot_de(conn, mes: str) -> dict | None:
     return data
 
 
+# Namespace del advisory lock para serializar cerrar_mes/reabrir_mes de la
+# liquidación entre sí (dos cierres concurrentes del mismo mes no deben
+# pisarse: uno podría commitear su foto DESPUÉS de que otro ya reabrió, o dos
+# cierres corriendo out-of-order dejar una foto vieja "ganando"). NUEVO y
+# SEPARADO de `_ADVISORY_NS_CONTAB_MES` (contabilidad/commands/movimientos.py,
+# 5390420) a propósito: el cierre de liquidación (reparto/comisiones) y el
+# cierre contable (cajas/movimientos) son operaciones independientes sobre
+# invariantes distintos — compartir namespace bloquearía sin necesidad un
+# cierre por el otro. Siguiente número libre tras 5390420.
+_ADVISORY_NS_REPORTES_MES = 5390421
+
+
+def _lock_mes(conn, mes: str) -> None:
+    """xact-scoped (se libera solo al commit/rollback de `conn`) — mismo patrón
+    que `contabilidad.commands.movimientos._lock_mes`, namespace propio."""
+    try:
+        anio, mo = mes.split("-")
+        key = int(anio) * 100 + int(mo)   # 'YYYY-MM' → YYYYMM, key natural
+    except (ValueError, AttributeError):
+        key = 0
+    conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_REPORTES_MES, key))
+
+
 def cerrar_mes(conn, mes: str, por: str | None) -> dict:
     """Congela la foto del reporte de `mes` (upsert idempotente: re-cerrar
     recalcula la foto con los datos actuales). Devuelve el snapshot servible."""
+    validar_mes(mes)
+    _lock_mes(conn, mes)
     desde, hasta = rango_mes(mes)
     data = liquidar(conn, desde, hasta)
     snapshot_json = json.dumps(data)
@@ -106,6 +131,7 @@ def reabrir_mes(conn, mes: str) -> bool:
     """Borra el cierre de `mes` → vuelve a calcularse en vivo. Devuelve True si
     había un cierre, False si el mes ya estaba abierto."""
     validar_mes(mes)
+    _lock_mes(conn, mes)
     existia = cierre_de(conn, mes) is not None
     if existia:
         conn.execute("DELETE FROM liquidacion_cierres WHERE mes = %s", (mes,))

@@ -2152,3 +2152,72 @@ cancel-in-progress` ya cancela corridas viejas.
   de `contabilidad/`: primero el mapa completo, después la rama de fixes). El supervisor marca un motor de
   plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
   reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.
+
+### 2026-07-02 — `reportes/liquidacion.py::filas_atribucion` perdía plata en silencio con `suma_items = 0`
+
+- **Contexto.** Fase 5 de la hoja de ruta de plata (#1184; hallazgo #4 de la auditoría cruzada,
+  `docs/SISTEMA_PLATA.md`). El prorrateo del `monto_total` entre los equipos de un pedido se hacía
+  `al.monto_total * pi.subtotal::numeric / NULLIF(t.suma_items, 0)`. Si **todos** los ítems de un pedido
+  tenían `subtotal = 0` (ej. un descuento del 100% aplicado a nivel ítem, no al pedido completo) —
+  `suma_items` daba 0, `NULLIF` lo convertía en `NULL`, y el `monto` resultante era `NULL` para cada
+  ítem. En `agregar()` (la función pura que suma todo), `float(f["monto"] or 0)` trata `NULL` como 0 →
+  esos pesos **desaparecían del reporte sin ningún error ni warning**. Ningún chequeo de reconciliación
+  existente (ni `reportes/reconciliacion.py` ni `contabilidad/queries/reconciliacion.py`) lo detectaba,
+  porque ambos comparan cosas distintas (pagado vs. total del pedido, no el reporte de liquidación
+  agregado vs. la suma de `monto_total` de los pedidos incluidos).
+- **Decisión — fallback de reparto parejo.** `tot` CTE suma también `COUNT(*) AS cant_items`. La query
+  pasa a un `CASE`: si `suma_items = 0`, el monto de cada ítem es `monto_total / cant_items` (reparto
+  **en partes iguales** entre los ítems del pedido); si no, sigue el prorrateo proporcional de siempre.
+  Se descartó "atribuir todo a Rambla por default" (mencionado como opción en el plan original) porque
+  no hay ninguna base real para decidir que la plata "sin subtotal" le pertenece a Rambla en vez de a
+  los dueños de los equipos involucrados — repartir parejo entre los ítems reales del pedido es el
+  fallback más neutral y defendible cuando no hay proporción real que usar.
+- **Why.** La regla dura del sistema de plata es que ningún número puede desaparecer en silencio — un
+  `NULLIF` que colapsa a 0 sin un camino alternativo viola eso. El fix es puramente técnico (garantizar
+  que la suma siempre cuadre); no cambia el reparto en el caso común (`suma_items > 0`), que sigue
+  siendo byte-idéntico.
+- **Consecuencias.** `test_reportes_liquidacion_db.py::test_suma_items_cero_no_pierde_plata` (Postgres
+  real, aislado de la fixture `setup` compartida para no alterar sus totales/aserciones existentes):
+  un pedido con 2 ítems `subtotal=0` y `monto_total=30000` confirma que el reporte de junio sigue
+  incluyendo esos 30000 (total agregado + suma de `por_beneficiario`). Suite completa 2548 passed / 183
+  skipped (sin regresiones); `test_reportes_liquidacion.py` (28 tests puros/DB) también en verde. El
+  supervisor marca cualquier prorrateo de plata con `NULLIF`/división que pueda colapsar a `NULL`/0 sin
+  un fallback explícito que garantice que el total nunca se pierda. Rama `fix/liquidacion-division-cero`
+  → PR scoped (sin mergear, hoja de ruta); tracking #1184.
+
+### 2026-07-02 — Fase 3+6: lock de concurrencia en `reportes/cierres.py` + rate limit en `routes/reportes.py`
+
+- **Contexto.** Últimas dos fases pendientes de la hoja de ruta de plata (#1184; hallazgos #8 y #10 de
+  la auditoría cruzada en `docs/SISTEMA_PLATA.md`). `reportes/cierres.py::cerrar_mes`/`reabrir_mes` no
+  tenían ningún candado de concurrencia — el mismo tipo de carrera que se cerró en `contabilidad`
+  (2026-07-02, `_exigir_mes_abierto`/`_lock_mes`) seguía sin mitigar acá: un `cerrar_mes` podía leer el
+  reporte de un mes en T0 y commitear su foto DESPUÉS de que un pago (`alquiler_pagos`) de ese mismo mes
+  se insertara en otra transacción, dejando una foto que no incluye ese pago. Y `routes/reportes.py`
+  tenía sus 3 endpoints de escritura (enviar mail, cerrar/reabrir mes) sin `@limiter.limit` — mismo gap
+  ya cerrado en `contabilidad.py`/`pagos.py`.
+- **Decisión — lock de concurrencia (Fase 3).** `reportes/cierres.py` gana `_lock_mes(conn, mes)`
+  (`pg_advisory_xact_lock`, mismo parseo `'YYYY-MM'`→`YYYYMM` que
+  `contabilidad/commands/movimientos.py::_lock_mes`), llamada al inicio de `cerrar_mes` y `reabrir_mes`.
+  **Namespace nuevo y separado** — `_ADVISORY_NS_REPORTES_MES = 5390421` — NO reusa
+  `_ADVISORY_NS_CONTAB_MES` (5390420): el cierre de liquidación (reparto/comisiones entre dueños) y el
+  cierre contable (cajas/movimientos) son operaciones independientes sobre invariantes distintos;
+  compartir namespace bloquearía sin necesidad un cierre por el otro (ej. cerrar el mes contable no
+  debería esperar a que termine de cerrarse la liquidación de ese mismo mes).
+- **Decisión — rate limit (Fase 6).** `routes/reportes.py` importa `limiter`/`ADMIN_WRITE_LIMIT` de
+  `rate_limit.py` (ya existente) y agrega `@limiter.limit(ADMIN_WRITE_LIMIT)` a los 3 endpoints de
+  escritura: `enviar_reporte_mail` (POST enviar-mail), `cerrar_mes_liquidacion` (POST cierres/{mes}),
+  `reabrir_mes_liquidacion` (DELETE cierres/{mes}).
+- **Why.** El lock de `reportes/cierres.py` no reemplaza el candado preventivo de `contabilidad` (ese
+  protege movimientos internos; este protege el reporte de liquidación) — son dominios distintos que
+  necesitan su propio candado, mismo patrón, sin compartir key space. El rate limit cierra el mismo gap
+  de superficie de ataque que ya se había cerrado en el resto de los routes de escritura de plata.
+- **Consecuencias.** Nuevo test de concurrencia real con Postgres (no solo en teoría, mismo criterio
+  que la auditoría de `contabilidad`): `test_reportes_cierres_db.py::test_lock_serializa_cerrar_mes_concurrente`
+  — dos conexiones reales + `threading.Event`, una toma el lock del mes y lo retiene, la otra intenta
+  `cerrar_mes` del mismo mes y debe quedar bloqueada hasta que la primera libere (commit); se verifica
+  el orden real de eventos, no solo ausencia de errores. Suite completa 2548 passed / 184 skipped (sin
+  regresiones); `test_reportes_cierres_db.py` completo (4 tests) en verde. El supervisor marca: (1)
+  cualquier escritura nueva en `reportes/cierres.py` que no pase por `_lock_mes`; (2) reusar
+  `_ADVISORY_NS_CONTAB_MES` en vez de un namespace propio para un candado de otro dominio de plata; (3)
+  un endpoint de escritura nuevo en `routes/reportes.py` sin `@limiter.limit`. Rama
+  `fix/reportes-lock-rate-limit` → PR scoped (sin mergear, hoja de ruta); tracking #1184.
