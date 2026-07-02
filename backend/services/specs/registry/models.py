@@ -10,8 +10,10 @@ Diseño:
 - Las "shared" specs (lens_mount, formato, diametro_filtro, peso_g)
   se declaran INDEPENDIENTEMENTE en cada categoría que las usa. El motor
   de compat matchea por igualdad de spec_key + value en JSONB de equipos.
-- `CategoriaRegistry` agrupa los specs de una categoría raíz + su árbol
-  de sub-categorías + metadata de compat (rol contenedor/contenido).
+- `CategoriaRegistry` agrupa los specs de una categoría raíz (ancla por
+  `nombre`) + metadata de compat (rol contenedor/contenido). No declara
+  navegación ni jerarquía visual — eso lo maneja el dueño desde el árbol
+  de categorías del catálogo (#1163 F6, desenredo categorías↔specs).
 """
 
 from __future__ import annotations
@@ -90,22 +92,19 @@ class SpecDef(BaseModel):
         return self
 
 
-class SubCategoria(BaseModel):
-    nombre: str
-    prioridad: int = 100
-    parent: str | None = None  # nombre de sub-cat parent (para taxonomías 2-niveles)
-
-
 class CategoriaRegistry(BaseModel):
-    """Una categoría raíz + su árbol de sub-cats + specs."""
+    """Una categoría raíz (ancla por `nombre` a una `categorias` real) + sus specs.
+
+    Solo declara specs — no navegación ni jerarquía visual (#1163 F6, desenredo
+    de categorías↔specs): el árbol del catálogo (prioridad, grupo_visual,
+    sub-categorías) lo maneja el dueño 100% a mano desde /admin/categorias.
+    El seeder (`commands/seed.py`) solo RESUELVE `nombre` contra una categoría
+    ya existente para colgar los `spec_definitions` de su id — nunca crea ni
+    edita la categoría.
+    """
 
     nombre: str
-    prioridad: int
-    sub_categorias: list[SubCategoria] = Field(default_factory=list)
     specs: list[SpecDef]
-
-    # Opciones para que el sidebar muestre cats agrupadas (ej. "Óptica" para Lentes+Filtros+Adaptadores)
-    grupo_visual: str | None = None
 
     @model_validator(mode="after")
     def _check_unique_spec_keys(self) -> CategoriaRegistry:

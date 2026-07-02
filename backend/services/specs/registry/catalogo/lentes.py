@@ -7,7 +7,7 @@ es el "contenido").
 
 from __future__ import annotations
 
-from ..models import CategoriaRegistry, SpecDef, SubCategoria
+from ..models import CategoriaRegistry, SpecDef
 from ..shared import (
     FORMATO_ENUM, LENS_MOUNT_ENUM,
     autofocus, coating, diametro_filtro, estabilizacion,
@@ -17,15 +17,6 @@ from ..shared import (
 
 CAT = CategoriaRegistry(
     nombre="Lentes",
-    prioridad=20,
-    grupo_visual="Óptica",
-    sub_categorias=[
-        SubCategoria(nombre="Zoom",       prioridad=10),
-        SubCategoria(nombre="Fijo",       prioridad=20),
-        SubCategoria(nombre="Vintage",    prioridad=30),
-        SubCategoria(nombre="Especiales", prioridad=40),
-        # Monturas: se crean on-the-fly según stock
-    ],
     specs=[
         SpecDef(
             key="lens_mount", label="Montura", tipo="enum",

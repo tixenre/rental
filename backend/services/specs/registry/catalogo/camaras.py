@@ -8,22 +8,12 @@ incorporado serio, se agregan acá de vuelta.
 
 from __future__ import annotations
 
-from ..models import CategoriaRegistry, SpecDef, SubCategoria
+from ..models import CategoriaRegistry, SpecDef
 from ..shared import LENS_MOUNT_ENUM, FORMATO_ENUM, autofocus, dimensions_mm, estabilizacion, materials, peso_g
 
 
 CAT = CategoriaRegistry(
     nombre="Cámaras",
-    prioridad=10,
-    sub_categorias=[
-        SubCategoria(nombre="Foto", prioridad=10),
-        SubCategoria(nombre="Video", prioridad=20),
-        SubCategoria(nombre="Acción", prioridad=30),
-        # Video > monturas (taxonomía 2-niveles).
-        SubCategoria(nombre="Montura E",   prioridad=10, parent="Video"),
-        SubCategoria(nombre="Montura RF",  prioridad=20, parent="Video"),
-        SubCategoria(nombre="Montura EF",  prioridad=30, parent="Video"),
-    ],
     specs=[
         # ─── Identidad ────────────────────────────────────────────────
         SpecDef(

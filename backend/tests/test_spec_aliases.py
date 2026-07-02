@@ -20,7 +20,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_specdef_acepta_aliases():
-    from specs.models import SpecDef
+    from services.specs.registry.models import SpecDef
     s = SpecDef(
         key="peso_g", label="Peso", tipo="number", unidad="g",
         aliases=["Weight", "Net Weight"],
@@ -29,7 +29,7 @@ def test_specdef_acepta_aliases():
 
 
 def test_specdef_aliases_default_lista_vacia():
-    from specs.models import SpecDef
+    from services.specs.registry.models import SpecDef
     s = SpecDef(key="cri", label="CRI", tipo="number")
     assert s.aliases == []
 
@@ -38,7 +38,7 @@ def test_specdef_aliases_default_lista_vacia():
 
 
 def test_registry_aliases_nunca_lista_con_strings_vacios():
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     for cat_name, cat_reg in REGISTRY.categorias.items():
         for spec in cat_reg.specs:
             for alias in spec.aliases:
@@ -182,7 +182,7 @@ def test_alias_case_insensitive():
 
 
 def test_registry_peso_g_tiene_alias_weight():
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     for cat_name, cat_reg in REGISTRY.categorias.items():
         spec = cat_reg.get_spec("peso_g")
         if spec is not None:
@@ -192,7 +192,7 @@ def test_registry_peso_g_tiene_alias_weight():
 
 
 def test_registry_consumo_w_iluminacion_tiene_alias_power():
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     cat = REGISTRY.get("Iluminación")
     assert cat is not None
     spec = cat.get_spec("consumo_w")
@@ -203,7 +203,7 @@ def test_registry_consumo_w_iluminacion_tiene_alias_power():
 
 def test_registry_iluminacion_no_tiene_potencia_w():
     """Verificar que el rename consumó_w se completó y potencia_w no existe."""
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     cat = REGISTRY.get("Iluminación")
     assert cat is not None
     assert cat.get_spec("potencia_w") is None, (
@@ -213,7 +213,7 @@ def test_registry_iluminacion_no_tiene_potencia_w():
 
 def test_registry_iluminacion_no_tiene_power_consumption_w():
     """Verificar que el duplicado power_consumption_w en Iluminación fue eliminado."""
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     cat = REGISTRY.get("Iluminación")
     assert cat is not None
     assert cat.get_spec("power_consumption_w") is None, (
@@ -224,7 +224,7 @@ def test_registry_iluminacion_no_tiene_power_consumption_w():
 def test_registry_consumo_w_camaras_canonico():
     """Cámaras usa el spec_key canónico 'consumo_w' (antes 'power_consumption_w'),
     el mismo que Iluminación, con aliases de extracción."""
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     cat = REGISTRY.get("Cámaras")
     assert cat is not None
     assert cat.get_spec("power_consumption_w") is None, (
@@ -239,7 +239,7 @@ def test_registry_consumo_w_camaras_canonico():
 def test_registry_lentes_distancia_minima_cm_canonica():
     """La key de distancia mínima de foco es 'distancia_minima_cm' (alineada con
     su unidad cm), no la vieja 'distancia_minima_m' (#535)."""
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     cat = REGISTRY.get("Lentes")
     assert cat is not None
     assert cat.get_spec("distancia_minima_m") is None, (
@@ -251,7 +251,7 @@ def test_registry_lentes_distancia_minima_cm_canonica():
 
 
 def test_registry_distancia_focal_tiene_alias_focal_length():
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     cat = REGISTRY.get("Lentes")
     assert cat is not None
     spec = cat.get_spec("distancia_focal")

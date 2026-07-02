@@ -4,20 +4,12 @@ Iluminación.montura_luz)."""
 
 from __future__ import annotations
 
-from ..models import CategoriaRegistry, SpecDef, SubCategoria
+from ..models import CategoriaRegistry, SpecDef
 from ..shared import beam_angle, dimensions_mm, materials, montura_luz, peso_g
 
 
 CAT = CategoriaRegistry(
     nombre="Modificadores",
-    prioridad=40,
-    grupo_visual="Iluminación",
-    sub_categorias=[
-        SubCategoria(nombre="Softbox",          prioridad=10),
-        SubCategoria(nombre="Fresnel",          prioridad=20),
-        SubCategoria(nombre="Spotlight",        prioridad=30),
-        SubCategoria(nombre="Difusión / Frame", prioridad=40),
-    ],
     specs=[
         # Subtipo: rol/función del modificador. La forma geométrica va en
         # `forma` por separado (un Softbox puede ser Parabolic, Octagonal,

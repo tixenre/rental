@@ -10,9 +10,6 @@ from ..shared import LENS_MOUNT_ENUM, dimensions_mm, peso_g
 
 CAT = CategoriaRegistry(
     nombre="Adaptadores",
-    prioridad=25,
-    grupo_visual="Óptica",
-    sub_categorias=[],  # monturas on-the-fly
     specs=[
         SpecDef(
             key="adaptador_subtipo", label="Tipo", tipo="enum",

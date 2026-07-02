@@ -110,7 +110,7 @@ _KNOWN_ORPHANS_GLOBAL: set[str] = set()  # 6b-i: bicolor/rgb removidos → color
 
 
 def _registry_all_keys() -> set[str]:
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     keys: set[str] = set()
     for cat_reg in REGISTRY.categorias.values():
         keys.update(s.key for s in cat_reg.specs)
@@ -291,7 +291,7 @@ def test_parser_luz_no_emite_keys_huerfanas():
     sys.path.insert(0, str(_tools))
     from iluminacion_parser import map_luz_specs, BHSpecsParser
 
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     cat = REGISTRY.get("Iluminación")
     registry_keys = {s.key for s in cat.specs}
 

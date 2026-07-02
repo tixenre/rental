@@ -44,7 +44,7 @@ def _build_alias_index() -> dict[str, dict]:
     spec_info contiene: spec_key, label, tipo, unidad, enum_options.
     Incluye: label canónico, spec_key y todos los aliases declarados.
     """
-    from specs import REGISTRY
+    from services.specs import REGISTRY
 
     index: dict[str, dict] = {}
     for cat_reg in REGISTRY.categorias.values():
@@ -213,10 +213,10 @@ def resolve_pairs(
     - matched:   [{spec_key, label, value}] — resueltos y con valor coercionado
     - unmatched: [{label, value}]           — no resolvieron contra ningún alias
     """
-    from services.spec_coerce import coerce_and_serialize
+    from services.specs import coerce_and_serialize
 
     if categoria_hint:
-        from specs import REGISTRY
+        from services.specs import REGISTRY
         cat_reg = REGISTRY.categorias.get(categoria_hint)
         if cat_reg:
             index: dict = {}

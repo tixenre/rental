@@ -386,7 +386,7 @@ def _build_result(*, marca: str, modelo: str, specs: dict, extras: dict,
     specs_para_persistir = dict(specs)
     registry_labels: dict[str, str] = {}
     try:
-        from specs import REGISTRY  # import local: evita ciclos al boot
+        from services.specs import REGISTRY  # import local: evita ciclos al boot
         cat_reg = REGISTRY.get(categoria_sugerida)
         if cat_reg:
             registry_labels = {s.key: s.label for s in cat_reg.specs}

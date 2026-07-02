@@ -141,7 +141,7 @@ def _make_conn(spec_rows, categoria_id=1):
 
 
 def test_purge_removes_stale_specs():
-    from seeds.registry_seeder import purge_stale_specs
+    from services.specs import purge_stale_specs
 
     # DB tiene 'shutter_type' (en registry) + 'old_dead_spec' (no en registry)
     spec_rows = [
@@ -159,7 +159,7 @@ def test_purge_removes_stale_specs():
 
 
 def test_purge_keeps_registry_specs():
-    from seeds.registry_seeder import purge_stale_specs
+    from services.specs import purge_stale_specs
 
     spec_rows = [{"id": 10, "spec_key": "shutter_type"}]
     conn = _make_conn(spec_rows)
@@ -172,7 +172,7 @@ def test_purge_keeps_registry_specs():
 
 
 def test_purge_dry_run_no_delete():
-    from seeds.registry_seeder import purge_stale_specs
+    from services.specs import purge_stale_specs
 
     spec_rows = [
         {"id": 10, "spec_key": "shutter_type"},
@@ -191,7 +191,7 @@ def test_purge_dry_run_no_delete():
 
 
 def test_purge_empty_db():
-    from seeds.registry_seeder import purge_stale_specs
+    from services.specs import purge_stale_specs
 
     conn = _make_conn(spec_rows=[])
     result = purge_stale_specs(conn, "Cámaras", dry_run=False)

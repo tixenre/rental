@@ -71,7 +71,7 @@ def _validar_categoria_specs(v: Optional[str]) -> Optional[str]:
     """Valida que la categoría de specs sea una del registry (o None)."""
     if v is None or v == "":
         return None
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     if v not in REGISTRY.categorias:
         validas = ", ".join(REGISTRY.categorias)
         raise ValueError(f"categoria_specs inválida: '{v}'. Opciones: {validas}")

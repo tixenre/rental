@@ -1125,7 +1125,7 @@ def _run_alembic_migrations() -> None:
 
 
 def _seed_registry() -> None:
-    """Persiste el registry de specs (código `backend/specs/`) a la DB.
+    """Persiste el registry de specs (código `services/specs/registry/`) a la DB.
 
     Idempotente: solo crea/actualiza `spec_definitions` y
     `categoria_spec_templates` con base en lo declarado en el código.
@@ -1138,7 +1138,7 @@ def _seed_registry() -> None:
     """
     from database import get_db
     try:
-        from seeds.registry_seeder import seed_all_categorias
+        from services.specs import seed_all_categorias
         conn = get_db()
         try:
             result = seed_all_categorias(conn)
@@ -1183,8 +1183,8 @@ def init_db_bg():
 
     # Registry de specs → DB (idempotente, siempre corre en boot).
     # Persiste spec_definitions + categoria_spec_templates desde el
-    # código del registry (`backend/specs/categorias/*.py`). Sin esto,
-    # las tablas de specs quedarían vacías.
+    # código del registry (`backend/services/specs/registry/catalogo/*.py`).
+    # Sin esto, las tablas de specs quedarían vacías.
     try:
         _seed_registry()
     except Exception as e:

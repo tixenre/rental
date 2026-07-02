@@ -1,9 +1,10 @@
-# `services/specs/` — motor de specs (en construcción, Fase 4 hecha)
+# `services/specs/` — motor de specs (rediseño F0-F6 completo; categorías queda aparte)
 
 > **Estado de las 4 bocas del embudo: 3 activas, 1 diferida a propósito.**
 > `registry/`, `queries/{validation,search_source}.py` y `commands/{coerce,persist,seed}.py`
-> son código real, movido verbatim desde los paths viejos (shims ⏰ LEGACY hasta la
-> **Fase 6**).
+> son código real. Los 18 shims `⏰ LEGACY` de la Fase 1 (paths viejos `backend/specs/`,
+> `services/spec_coerce.py`, `spec_persist.py`, `seeds/registry_seeder.py`) se **podaron
+> en la Fase 6** — este paquete es la única ubicación, no quedan re-exports.
 >
 > - **Persistir** ✅ — `commands/persist.py::persistir_specs` (el choke-point real, el
 >   mismo que llama `PUT /admin/equipos/{id}/specs`) prueba `mapear_valor` para
@@ -21,9 +22,17 @@
 > (`FF`→Full-frame, `S35`→Super 35) — el resto del catálogo sigue sin curar (tarea
 > aparte, de criterio del dueño). `queries/aliases.py` (expansión de término, un
 > refinamiento sobre lo que `search_source.py` ya cubre) sigue sin existir — no bloqueaba
-> tener algo real para probar. Plan completo + fases →
-> [`docs/PLAN_SPECS_REDISENO.md`](../../../docs/PLAN_SPECS_REDISENO.md) · tracking →
-> issue [#1163](https://github.com/tixenre/rental/issues/1163).
+> tener algo real para probar.
+>
+> **`CategoriaRegistry` ya no declara navegación** (Fase 6, desenredo categorías↔specs):
+> solo `nombre` (ancla a una categoría real por nombre) + `specs`. `sub_categorias`/
+> `grupo_visual`/`prioridad` a nivel categoría se sacaron — eran parámetros que el
+> seeder aceptaba pero nunca escribía (`_ensure_categoria_raiz`/`_ensure_subcategoria`
+> solo resolvían por nombre, nunca creaban ni actualizaban nada con esos valores). El
+> árbol del catálogo lo maneja el dueño 100% a mano desde `/admin/categorias`.
+>
+> Plan completo + fases → [`docs/PLAN_SPECS_REDISENO.md`](../../../docs/PLAN_SPECS_REDISENO.md)
+> · tracking → issue [#1163](https://github.com/tixenre/rental/issues/1163).
 
 ## Por qué existe (antes de tener código)
 
@@ -33,20 +42,20 @@ la organización del código (a CQRS-lite, espejo de `services/categorias/`) y s
 100% aditivo, el **embudo de alias de valor** (normaliza/valida/busca/compat con una sola
 pieza) + la **búsqueda derivada de specs** en vivo.
 
-## Estructura objetivo (se puebla fase a fase — ver el plan)
+## Estructura actual (F0-F6 completas; lo que sigue sin fase asignada)
 
 ```
 services/specs/
   __init__.py      # barrel público. __all__ es el contrato real.        ✓ Fase 1
   errors.py        # ErrorSpec (400), SpecNoExiste (404), ValorNoCanonico (400)  ✓ Fase 0
   registry/        # SpecDef, CategoriaRegistry — mudanza de backend/specs/     ✓ Fase 1
-    models.py
+    models.py      #   CategoriaRegistry: solo nombre + specs (desenredada, Fase 6)
     catalogo/      #   camaras/lentes/iluminacion/modificadores/adaptadores/filtros
     shared/        #   enums/lighting/optica/physical
   commands/        # escritura — única puerta de mutación
     persist.py     #   persistir_specs — LLAMA a mapear_valor para enum    ✓ Fase 3
     coerce.py      #   coerce_and_serialize — fallback si el embudo no matchea  ✓ Fase 1
-    seed.py        #   seed_all_categorias + _sync_value_aliases           ✓ Fase 1+2
+    seed.py        #   seed_all_categorias — solo raíz + specs + templates ✓ Fase 1+2+6
     value_aliases.py  # CRUD ad-hoc de spec_value_aliases (admin/cola IA) ✗ no existe, sin fase asignada
   queries/         # lectura — nunca mutan
     validation.py     # validate_dataset — SIN enchufar (sin conn, sin caller vivo)  ✓ Fase 1
@@ -57,6 +66,9 @@ services/specs/
   normalize/
     value_funnel.py    # mapear_valor(conn, spec_def_id, raw) — EXISTE, llamado desde persist.py  ✓ Fase 2+3
 ```
+
+No hay `services/specs/registry/models.py::SubCategoria` — se borró en Fase 6 junto
+con el campo `sub_categorias` (nadie más lo usaba).
 
 ## Reglas (van a regir desde que haya código; se aplican ya al diseñar cada fase)
 
@@ -128,6 +140,29 @@ services/specs/
   (solo necesitan *algún* spec enum con aliases), construir uno sintético directo con
   `_upsert_spec_definition` + `_sync_value_aliases` bajo la categoría-ancla — no depender
   del seeder + nombre real (`test_specs_search_source_db.py`, `test_specs_value_aliases_db.py`).
+
+## Gotchas de la Fase 6
+
+- **Un parámetro que una función acepta no significa que lo use.**
+  `_ensure_categoria_raiz(conn, nombre, prioridad, grupo_visual, dry_run)` recibía
+  `prioridad`/`grupo_visual` desde `seed_categoria_from_registry`, pero el cuerpo de la
+  función era literalmente `return buscar_id_por_nombre(conn, nombre)` — los ignoraba
+  por completo (la categoría "ya NO se crea", solo se resuelve). Mismo patrón en
+  `_ensure_subcategoria`. El desenredo se confirmó leyendo el CUERPO de la función, no
+  solo su firma — una firma con parámetros no es evidencia de que se usen.
+- **Podar 18 shims con imports repetidos en el mismo archivo → `Edit` con
+  `replace_all` cuando la indentación es idéntica.** La mayoría de los ~50 imports a
+  reescribir eran la misma línea (`from specs import REGISTRY`) repetida dentro de
+  varias funciones de test con la misma indentación (4 espacios) — un `replace_all`
+  por línea-exacta fue seguro y mucho más rápido que editar cada ocurrencia. Cuando la
+  indentación variaba (nivel de función vs. dentro de un `with`), se verificó cada
+  bloque con `Read` antes de decidir si el `replace_all` era seguro.
+- **El shim de `seeds/registry_seeder.py` re-exportaba `REGISTRY`/`CategoriaRegistry`/
+  `SpecDef` además de las funciones del seeder** (documentado en su propio docstring:
+  "porque `tests/test_seeder_resiliente.py` hace `from seeds.registry_seeder import
+  seed_all_categorias, REGISTRY`"). Al podarlo, esos 3 nombres se resuelven contra el
+  barrel (`from services.specs import ...`), no contra `commands/seed.py` — confundir
+  el nuevo home de cada símbolo con el del shim que lo re-exportaba rompe el import.
 
 ## Qué NO hacer
 

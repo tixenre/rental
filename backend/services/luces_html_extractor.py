@@ -195,7 +195,7 @@ def extract_from_html(html_content: str) -> dict:
     # Label sale del registry (fuente única). Fallback: key.replace("_"," ").title().
     registry_labels: dict[str, str] = {}
     try:
-        from specs import REGISTRY  # import local: evita ciclos
+        from services.specs import REGISTRY  # import local: evita ciclos
         cat_reg = REGISTRY.get("Iluminación")
         if cat_reg:
             registry_labels = {s.key: s.label for s in cat_reg.specs}

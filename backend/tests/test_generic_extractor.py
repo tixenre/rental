@@ -208,7 +208,7 @@ def test_extract_generic_todos_items_tienen_spec_key():
 def test_extract_generic_matched_no_emite_keys_huerfanas():
     """Las spec_keys resueltas deben existir en el registry (no huérfanas)."""
     from services.generic_html_extractor import extract_from_html_generic
-    from specs import REGISTRY
+    from services.specs import REGISTRY
 
     all_registry_keys: set[str] = set()
     for cat_reg in REGISTRY.categorias.values():
@@ -294,7 +294,7 @@ def test_todas_las_keys_modificadores_son_emitibles():
     que solo verifica la dirección opuesta (emitidas ⊆ registry).
     """
     from services.generic_html_extractor import extract_from_html_generic
-    from specs import REGISTRY
+    from services.specs import REGISTRY
 
     cat_reg = REGISTRY.categorias.get("Modificadores")
     if cat_reg is None:

@@ -21,7 +21,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-from services.spec_persist import persistir_specs
+from services.specs.commands.persist import persistir_specs
 
 
 class _SQLiteAdapter:
@@ -72,33 +72,33 @@ def _setup_db() -> _SQLiteAdapter:
 
 
 def test_coerce_enum_fuzzy_opt_in_input():
-    from services.spec_coerce import _coerce_enum
+    from services.specs.commands.coerce import _coerce_enum
     opts = ["Wi-Fi", "Bluetooth", "NFC"]
     assert _coerce_enum("Wi-Fi 6 (802.11ax)", opts) == "Wi-Fi"
 
 
 def test_coerce_enum_fuzzy_case_insensitive():
-    from services.spec_coerce import _coerce_enum
+    from services.specs.commands.coerce import _coerce_enum
     opts = ["Wi-Fi", "Bluetooth"]
     assert _coerce_enum("wi-fi 6 (802.11ax)", opts) == "Wi-Fi"
 
 
 
 def test_coerce_enum_fuzzy_no_match_es_none():
-    from services.spec_coerce import _coerce_enum
+    from services.specs.commands.coerce import _coerce_enum
     opts = ["Wi-Fi", "Bluetooth"]
     assert _coerce_enum("Zigbee", opts) is None
 
 
 def test_coerce_enum_fuzzy_no_match_pl_mount():
     # Regresión: "PL-Mount" no matchea "E-Mount" ni "F-Mount" por substring
-    from services.spec_coerce import _coerce_enum
+    from services.specs.commands.coerce import _coerce_enum
     opts = ["E-Mount", "F-Mount"]
     assert _coerce_enum("PL-Mount", opts) is None
 
 
 def test_coerce_enum_fuzzy_lista_vacia_es_none():
-    from services.spec_coerce import _coerce_enum
+    from services.specs.commands.coerce import _coerce_enum
     assert _coerce_enum("Wi-Fi 6", []) is None
 
 
@@ -106,33 +106,33 @@ def test_coerce_enum_fuzzy_lista_vacia_es_none():
 
 
 def test_coerce_multi_enum_bh_slash_raw():
-    from services.spec_coerce import _coerce_multi_enum
+    from services.specs.commands.coerce import _coerce_multi_enum
     opts = ["Wi-Fi", "Bluetooth", "NFC"]
     result = _coerce_multi_enum("Wi-Fi 6 (802.11ax) / Bluetooth", opts)
     assert json.loads(result) == ["Wi-Fi", "Bluetooth"]
 
 
 def test_coerce_multi_enum_match_parcial_descarta_desconocidos():
-    from services.spec_coerce import _coerce_multi_enum
+    from services.specs.commands.coerce import _coerce_multi_enum
     opts = ["Wi-Fi", "Bluetooth"]
     result = _coerce_multi_enum("Wi-Fi 6 (802.11ax) / Zigbee desconocido", opts)
     assert json.loads(result) == ["Wi-Fi"]
 
 
 def test_coerce_multi_enum_nada_mapea_devuelve_none():
-    from services.spec_coerce import _coerce_multi_enum
+    from services.specs.commands.coerce import _coerce_multi_enum
     opts = ["Wi-Fi", "Bluetooth"]
     assert _coerce_multi_enum("Zigbee / Z-Wave", opts) is None
 
 
 def test_coerce_multi_enum_sin_opts_devuelve_raw():
-    from services.spec_coerce import _coerce_multi_enum
+    from services.specs.commands.coerce import _coerce_multi_enum
     result = _coerce_multi_enum("AC, DC, Battery", [])
     assert json.loads(result) == ["AC", "DC", "Battery"]
 
 
 def test_coerce_multi_enum_dedup():
-    from services.spec_coerce import _coerce_multi_enum
+    from services.specs.commands.coerce import _coerce_multi_enum
     opts = ["Wi-Fi", "Bluetooth"]
     result = _coerce_multi_enum("Wi-Fi 6 / Wi-Fi 5", opts)
     assert json.loads(result) == ["Wi-Fi"]

@@ -2,14 +2,17 @@
 
 Lee `services/specs/registry/catalogo/*.py` (via REGISTRY) y escribe a la
 DB en un solo pase idempotente:
-  1. Categoría raíz (la crea si falta)
-  2. Sub-categorías declaradas (Foto/Video/Acción, Zoom/Fijo/..., etc.)
-  3. spec_definitions (composite key: categoria_raiz_id + spec_key)
-  4. categoria_spec_templates (asignaciones a la categoría raíz)
+  1. Categoría raíz (se RESUELVE por nombre, nunca se crea — ver
+     `_ensure_categoria_raiz`)
+  2. spec_definitions (composite key: categoria_raiz_id + spec_key)
+  3. categoria_spec_templates (asignaciones a la categoría raíz)
 
+El registry no declara navegación ni jerarquía visual (#1163 F6, desenredo
+categorías↔specs) — el árbol del catálogo (prioridad, grupo_visual,
+sub-categorías) lo maneja el dueño 100% a mano desde /admin/categorias.
 Las sub-cats "on-the-fly" (monturas en Lentes/Adaptadores, diámetros en
-Filtros) NO se crean acá — se crean al cargar equipos del dataset
-(porque dependen del stock real).
+Filtros) tampoco las crea este seeder — se crean al cargar equipos del
+dataset (porque dependen del stock real).
 
 Llamado desde `main._seed_registry()` en cada boot. La función
 `serialize_spec_value` se reusa también en `tools/specs_import_preview.py`
@@ -28,13 +31,7 @@ from ..registry import REGISTRY, CategoriaRegistry, SpecDef
 from services.categorias.queries.ancestry import buscar_id_por_nombre
 
 
-def _ensure_categoria_raiz(
-    conn,
-    nombre: str,
-    prioridad: int,
-    grupo_visual: str | None = None,
-    dry_run: bool = False,
-) -> int | None:
+def _ensure_categoria_raiz(conn, nombre: str, dry_run: bool = False) -> int | None:
     """Busca la categoría raíz EXISTENTE (para que las specs cuelguen de ella).
     Devuelve su id, o None si no existe.
 
@@ -43,18 +40,6 @@ def _ensure_categoria_raiz(
     existe, esta categoría del registry se saltea en el seeding de specs (ver
     `seed_categoria_from_registry`). Las specs son un sistema aparte que se
     mantiene solo; las categorías no.
-    """
-    return buscar_id_por_nombre(conn, nombre)
-
-
-def _ensure_subcategoria(
-    conn, nombre: str, prioridad: int, parent_id: int, dry_run: bool = False
-) -> int | None:
-    """Busca una sub-categoría EXISTENTE. Devuelve id o None si no existe.
-
-    Ya NO crea subcategorías: el árbol del catálogo lo maneja el dueño a mano.
-    Las subcategorías no alimentan el sistema de specs (las specs cuelgan de la
-    raíz), así que una subcat ausente no tiene consecuencia para el seeder.
     """
     return buscar_id_por_nombre(conn, nombre)
 
@@ -178,9 +163,8 @@ def seed_categoria_from_registry(
     Returns:
         {
             "raiz_id": int,
-            "subcat_ids": {nombre: id, ...},
             "spec_def_ids": {spec_key: id, ...},
-            "stats": {"specs_creadas": N, "subcategorias_creadas": M, ...}
+            "stats": {"specs_creadas": N, "asignaciones_creadas": M, ...}
         }
     """
     cat_reg: CategoriaRegistry | None = REGISTRY.get(categoria_raiz)
@@ -189,7 +173,6 @@ def seed_categoria_from_registry(
 
     stats = {
         "specs_creadas": 0,
-        "subcategorias_creadas": 0,
         "asignaciones_creadas": 0,
         "value_aliases_creados": 0,
         "dry_run": dry_run,
@@ -197,31 +180,16 @@ def seed_categoria_from_registry(
 
     # 1) Raíz — solo se BUSCA, ya no se crea. Si el dueño la borró (o nunca
     #    existió), se saltea esta categoría: no se siembra nada que el usuario ve.
-    raiz_id = _ensure_categoria_raiz(
-        conn,
-        cat_reg.nombre,
-        cat_reg.prioridad,
-        grupo_visual=cat_reg.grupo_visual,
-        dry_run=dry_run,
-    )
+    raiz_id = _ensure_categoria_raiz(conn, cat_reg.nombre, dry_run=dry_run)
     if raiz_id is None:
         stats["categoria_ausente"] = True
         return {
             "raiz_id": None,
-            "subcat_ids": {},
             "spec_def_ids": {},
             "stats": stats,
         }
 
-    # 2) Sub-categorías — solo se RESUELVEN si ya existen (no se crean). No
-    #    alimentan specs, así que el orden/parent no importa: un único lookup.
-    subcat_ids: dict[str, int] = {}
-    for sub in cat_reg.sub_categorias:
-        sid = _ensure_subcategoria(conn, sub.nombre, sub.prioridad, raiz_id, dry_run)
-        if sid is not None:
-            subcat_ids[sub.nombre] = sid
-
-    # 3) spec_definitions
+    # 2) spec_definitions
     spec_def_ids: dict[str, int] = {}
     if raiz_id is not None:
         for spec in cat_reg.specs:
@@ -234,7 +202,7 @@ def seed_categoria_from_registry(
                         conn, sid, spec, dry_run
                     )
 
-        # 4) categoria_spec_templates — asignación a la categoría raíz.
+        # 3) categoria_spec_templates — asignación a la categoría raíz.
         # Las sub-cats heredan via UI (queries que walk parent → cat).
         for spec in cat_reg.specs:
             sdid = spec_def_ids.get(spec.key)
@@ -242,13 +210,12 @@ def seed_categoria_from_registry(
                 if _upsert_template(conn, raiz_id, sdid, spec, dry_run):
                     stats["asignaciones_creadas"] += 1
 
-    # 5) Purgar specs que ya no están en el registry (CASCADE limpia equipo_specs).
+    # 4) Purgar specs que ya no están en el registry (CASCADE limpia equipo_specs).
     purge = purge_stale_specs(conn, categoria_raiz, dry_run=dry_run)
     stats["specs_purgadas"] = purge["deleted"]
 
     return {
         "raiz_id": raiz_id,
-        "subcat_ids": subcat_ids,
         "spec_def_ids": spec_def_ids,
         "stats": stats,
         "purge": purge,

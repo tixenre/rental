@@ -27,7 +27,6 @@ from .registry import (
     Registry,
     SpecDef,
     SpecTipo,
-    SubCategoria,
     all_categorias,
     get_categoria,
     get_spec,
@@ -46,7 +45,7 @@ __all__ = [
     # registry
     "REGISTRY", "CategoriaRegistry", "CompatMode", "CompatRol",
     "FORMATO_ENUM", "LENS_MOUNT_ENUM", "MONTURA_LUZ_ENUM",
-    "Registry", "SpecDef", "SpecTipo", "SubCategoria",
+    "Registry", "SpecDef", "SpecTipo",
     "all_categorias", "get_categoria", "get_spec",
     # queries
     "ValidationError", "validate_dataset", "validate_or_raise",

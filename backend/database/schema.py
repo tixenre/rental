@@ -706,7 +706,7 @@ def _init_db_schema(conn):
     #    raíz es dueña de sus filas; los keys "shared" (lens_mount, formato,
     #    diametro_filtro, peso_g) están duplicados por cat. El motor de
     #    compat matchea por string-equality del spec_key + value.
-    #    Single source of truth: `backend/specs/registry.py`.
+    #    Single source of truth: `backend/services/specs/registry/`.
     #
     # 2) `categoria_spec_templates` — asigna spec_def a una sub-categoría
     #    con flags overriding (prioridad, destacado, en_card/filtros/nombre).

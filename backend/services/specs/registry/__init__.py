@@ -39,7 +39,6 @@ from .models import (
     Registry,
     SpecDef,
     SpecTipo,
-    SubCategoria,
 )
 from .shared import FORMATO_ENUM, LENS_MOUNT_ENUM, MONTURA_LUZ_ENUM
 
@@ -69,7 +68,7 @@ def get_spec(categoria_raiz: str, spec_key: str) -> SpecDef | None:
 
 __all__ = [
     "CategoriaRegistry", "CompatMode", "CompatRol", "Registry",
-    "SpecDef", "SpecTipo", "SubCategoria",
+    "SpecDef", "SpecTipo",
     "REGISTRY", "FORMATO_ENUM", "LENS_MOUNT_ENUM", "MONTURA_LUZ_ENUM",
     "all_categorias", "get_categoria", "get_spec",
 ]

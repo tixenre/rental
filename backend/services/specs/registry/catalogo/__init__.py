@@ -1,9 +1,10 @@
 """Una categoría = un módulo. Cada uno expone `CAT` (instancia de
-CategoriaRegistry) con sus specs y sub-cats.
+CategoriaRegistry) con sus specs, anclada por nombre a una categoría raíz
+real del catálogo.
 
-`specs.__init__` los combina en el REGISTRY global. Agregar una cat nueva:
-crear `categorias/nueva.py` exportando `CAT`, y agregarlo al dict de
-REGISTRY en `specs/__init__.py`.
+`services/specs/registry/__init__.py` los combina en el REGISTRY global.
+Agregar una cat nueva: crear `catalogo/nueva.py` exportando `CAT`, y
+agregarlo al dict de REGISTRY ahí.
 """
 
 from .adaptadores import CAT as ADAPTADORES

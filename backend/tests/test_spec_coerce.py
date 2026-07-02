@@ -1,6 +1,6 @@
 """Tests de Fase 2 — coerción de valores crudos al tipo canónico del registry.
 
-Cubre services/spec_coerce.py:
+Cubre services/specs/commands/coerce.py:
 - _coerce_number: extrae primer número, descarta unidades
 - _coerce_bool: yes/si/sí/true/1 → "true", no/false/0 → "false"
 - _coerce_enum: match case-insensitive contra enum_options
@@ -16,7 +16,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-from services.spec_coerce import (
+from services.specs.commands.coerce import (
     coerce_and_serialize,
     derive_lumens_from_lux,
     _coerce_number,

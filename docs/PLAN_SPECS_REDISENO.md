@@ -1,8 +1,10 @@
 # Plan — Rediseño del módulo `specs` (iniciativa)
 
-> **Estado:** plan **aprobado por el dueño** (2026-07-01), **no implementado todavía**.
-> Documento de trabajo / hoja de ruta. El tracking vivo (progreso por fase) está en el
-> **issue de tracking** de la iniciativa. Este doc es el _porqué_ y el _cómo_; el issue es el _qué falta_.
+> **Estado:** plan **aprobado por el dueño** (2026-07-01), **F0-F6 implementadas** (ver tabla de
+> fases abajo). Documento de trabajo / hoja de ruta — el _porqué_ y el _cómo_; el detalle de qué
+> se hizo en cada fase vive en el issue de tracking [#1163](https://github.com/tixenre/rental/issues/1163)
+> y en `services/specs/CLAUDE.md`. Queda pendiente el rediseño de **categorías** (compartir hijas
+> entre ramas), deliberadamente diferido — ver "Decisiones del dueño" abajo.
 >
 > **Origen:** decidido tras un pase de diseño (mapeo del código real → 3 arquitecturas → juicio → síntesis)
 > y una conversación de diseño con el dueño. Las decisiones acordadas están abajo.
@@ -148,16 +150,16 @@ esquema; (3) flags y jerarquía intactos.
 
 ## Plan por fases (cada una shippa sola y es reversible)
 
-| Fase | Qué | Plan de prueba (dueño, staging) |
+| Fase | Qué | Estado |
 |---|---|---|
-| **F0** | Andamiaje `services/specs/` (barrel + errors + CLAUDE.md) | Nada (plomería; gate = CI verde) |
-| **F1** | **Move verbatim** (registry/coerce/persist/validation/seeder) + shims `⏰ LEGACY` | "Editá specs de un equipo → todo igual. Import CSV → mismo resultado." |
-| **F2** | Tabla `spec_value_aliases` (`init_db` + Alembic) + `mapear_valor` — **apagado** | Nada (prepara terreno; boot idempotente) |
-| **F3** | Enchufar embudo a las 4 bocas + sembrar enums de compat críticos | "Sensor 'FF' → la ficha dice 'Full-frame'. Equipo con FF + equipo con Full-frame → la compat los matchea." |
-| **F3.5** | _(opcional)_ pase batch idempotente que re-normaliza `equipo_specs.value` viejos | "Los equipos viejos con 'FF' ahora dicen 'Full-frame'." |
-| **F4** | Búsqueda derivada (`_SPECS_EXPR` como campo más) | "Buscá 'FF' → full-frame. 'IBIS' → estabilizadas." |
-| **F5** | **Eliminar tags/etiquetas** (PR propio + dump previo) | "Lo que encontrabas por etiquetas sigue apareciendo (vía specs). El form ya no muestra tags." |
-| **F6** | Podar shims `⏰ LEGACY` + desenredo final (sub_categorias/grupo_visual muertos) | Nada (limpieza interna) |
+| **F0** | Andamiaje `services/specs/` (barrel + errors + CLAUDE.md) | ✅ hecha |
+| **F1** | **Move verbatim** (registry/coerce/persist/validation/seeder) + shims `⏰ LEGACY` | ✅ hecha |
+| **F2** | Tabla `spec_value_aliases` (`init_db` + Alembic) + `mapear_valor` — **apagado** | ✅ hecha |
+| **F3** | Enchufar embudo a las 4 bocas + sembrar enums de compat críticos | ✅ hecha (verificación en staging pendiente — ver issue) |
+| **F3.5** | _(opcional)_ pase batch idempotente que re-normaliza `equipo_specs.value` viejos | ⏸ no hecha (opcional, sin necesidad detectada) |
+| **F4** | Búsqueda derivada (`_SPECS_EXPR` como campo más) | ✅ hecha (verificación en staging pendiente — ver issue) |
+| **F5** | **Eliminar tags/etiquetas** (PR propio + dump previo) | ✅ hecha |
+| **F6** | Podar shims `⏰ LEGACY` + desenredo final (sub_categorias/grupo_visual muertos) | ✅ hecha |
 
 ## Trade-offs honestos
 

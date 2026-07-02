@@ -6,20 +6,12 @@ para conectar fixture ↔ softbox/spotlight/fresnel-lens.
 
 from __future__ import annotations
 
-from ..models import CategoriaRegistry, SpecDef, SubCategoria
+from ..models import CategoriaRegistry, SpecDef
 from ..shared import beam_angle, dimensions_mm, materials, montura_luz, peso_g
 
 
 CAT = CategoriaRegistry(
     nombre="Iluminación",
-    prioridad=30,
-    sub_categorias=[
-        SubCategoria(nombre="LED Daylight", prioridad=10),
-        SubCategoria(nombre="LED Bicolor",  prioridad=20),
-        SubCategoria(nombre="LED RGB",      prioridad=30),
-        SubCategoria(nombre="Tungsteno",    prioridad=40),
-        SubCategoria(nombre="Flash",        prioridad=50),
-    ],
     specs=[
         # ─── Identidad ────────────────────────────────────────────────
         SpecDef(

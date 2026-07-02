@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from database import get_db, row_to_dict
 from services.nombre_service import actualizar_nombres_de
-from services.spec_persist import persistir_specs
+from services.specs import persistir_specs
 from routes.specs.core import router, _require_admin
 
 

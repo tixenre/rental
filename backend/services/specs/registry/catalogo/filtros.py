@@ -13,9 +13,6 @@ from ..shared import coating, diametro_filtro, peso_g
 
 CAT = CategoriaRegistry(
     nombre="Filtros",
-    prioridad=27,
-    grupo_visual="Óptica",
-    sub_categorias=[],  # diámetros on-the-fly
     specs=[
         SpecDef(
             key="filtro_subtipo", label="Tipo", tipo="enum",
