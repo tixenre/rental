@@ -144,12 +144,16 @@ def _chequeos_previos(
         ),
     })
 
-    neto_ok = importes["neto"] > 0
+    # total == neto + iva (arca_fe.comprobante.calcular_importes) y el IVA nunca
+    # cambia el signo, así que chequear el total (la cifra que ve el admin) o
+    # el neto da lo mismo matemáticamente — se muestra el total para no meter
+    # jerga fiscal ("neto") en un chequeo pensado para el dueño, no para AFIP.
+    total_ok = importes["total"] > 0
     chequeos.append({
         "check": "importe_positivo",
-        "ok": neto_ok,
+        "ok": total_ok,
         "bloqueante": True,
-        "mensaje": "Importe neto positivo" if neto_ok else "El importe neto es $0 o negativo",
+        "mensaje": "Importe total positivo" if total_ok else "El importe total es $0 o negativo",
     })
 
     fechas_ok = (
