@@ -2088,3 +2088,67 @@ cancel-in-progress` ya cancela corridas viejas.
   (`fix/contabilidad-auditoria` → PR #1195, sin mergear); tracking #1184. Frontend sin cambios — el gate es
   100% backend, el formulario de movimientos no filtra cuentas por tipo hoy y no hacía falta agregarlo para
   este alcance.
+
+### 2026-07-02 — Auditoría cruzada de plata: `docs/SISTEMA_PLATA.md` + el fix de #405 (#1181) nunca se mergeó
+
+- **Contexto.** Tras cerrar la auditoría de `contabilidad/` + el fix de socios, el dueño expresó un miedo
+  concreto: "son muchos lugares donde se toca la plata, y no estoy tan seguro desde donde se gobierna cómo
+  funciona". Pidió (1) un manual que mapee todos los motores de plata y (2) que no fuera solo un mapa de
+  conexiones sino una verificación real de que cada uno funciona correcto — más seguridad/optimización.
+- **Método.** 6 agentes de exploración en paralelo (sin compartir contexto entre sí), cada uno auditando un
+  motor no cubierto por la auditoría de `contabilidad/`: `services/precios` (2 corridas independientes —
+  la primera no delegó bien la tarea y devolvió un resumen genérico en vez del reporte, se reenganchó con
+  una instrucción explícita de "no delegues, hacé el trabajo vos"), `reportes/` completo (liquidación +
+  comisiones + cierres + reconciliación), `services/facturacion`, el camino de congelamiento de precio en
+  la creación/edición de pedidos, y un trace end-to-end de un pedido + estado del semáforo de
+  reconciliación. Se verificó cada hallazgo contra el código real antes de documentarlo (grep directo,
+  no solo confiar en el reporte del agente) — así se descubrió el hallazgo crítico de abajo.
+- **Descubrimiento crítico (de proceso, no de código nuevo).** El **PR #1181** — el fix ORIGINAL del bug
+  #405 (el editor de pedidos admin recotizaba contra el precio de catálogo de hoy en vez del precio de
+  línea ya persistido/congelado, mostrando "100% pagado" mientras la reconciliación mensual marcaba
+  "sobrepagado") — **nunca se mergeó a `dev` ni a `main`**. Sigue abierto (`state: open, merged: false`,
+  `mergeable_state: clean`). Confirmado con `git grep respetar_precio_item` sobre `origin/dev`/`origin/main`
+  y el checkout actual: cero resultados en todos — el símbolo solo existe en la rama del PR sin mergear
+  (`claude/payment-registration-issue-3mi8fk`). La entrada de `MEMORIA.md`/`DECISIONES.md` de la sesión
+  anterior lo registraba como ya shippeado ("PR #1181 (merged branch history...)") — era un error de
+  registro, no un revert; probablemente una confusión entre "el commit existe en una rama" y "esa rama está
+  mergeada". **Consecuencia: el bug #405 está potencialmente activo en producción hoy.** Prioridad
+  recomendada: mergear #1181 antes que cualquier otro hallazgo de esta auditoría.
+- **Decisión — nuevo manual `docs/SISTEMA_PLATA.md`.** Cruza los ~6 motores de plata (precios, reservas,
+  `alquiler_pagos`, `reportes/liquidacion`, `contabilidad`, `facturacion`) con una tabla "fuente única de
+  cada número" + el estado del semáforo de reconciliación. **No repite** los invariantes de cada
+  `CLAUDE.md`/`SISTEMA_*.md` local (`backend/contabilidad/CLAUDE.md`, `backend/reservas/CLAUDE.md`,
+  `docs/SISTEMA_FACTURACION.md`, `docs/SISTEMA_CARRITO.md`) — los referencia. Indexado en `MANIFIESTO.md`
+  §8. Responde directamente al miedo del dueño: antes no había un solo lugar para mirar "¿esto de dónde
+  sale?", ahora sí.
+- **Hallazgos priorizados (14 ítems, documentados con detalle en `SISTEMA_PLATA.md` — no duplicados acá):**
+  el más severo es que `_enriquecer_pedido_con_total` (`routes/alquileres/core.py`) ignora `cobro_modo` en
+  6 call-sites reales incluido el motor de facturación real (`services/facturacion/engine.py`) — una línea
+  personalizada "fijo" (ej. flete) se multiplica igual por jornadas en el desglose mostrado/facturado,
+  aunque `monto_total` persistido (lo que se cobra) sigue siendo correcto. Le siguen: mismo bug en el PDF
+  de presupuesto; un `UndefinedColumn` real en `enviar_mail_factura` (`c.owner_email` no existe en
+  `clientes`, debería ser `c.email`) que rompe siempre que se usa esa función; una división por cero en
+  `reportes/liquidacion.py::filas_atribucion` que puede perder plata en silencio del reporte si todos los
+  ítems de un pedido tienen subtotal 0; 3 lugares en el front que reimplementan cálculo de línea en vez de
+  leer lo que ya devolvió el backend (2 de ellos ya divergidos entre sí); un bug dormido en el editor de
+  pedido del portal cliente (mismo patrón que #405, inalcanzable hoy por un feature flag apagado); falta de
+  lock de concurrencia en `reportes/cierres.py::cerrar_mes` (mismo patrón ya cerrado en `contabilidad`); y
+  la **reconciliación confirmada 100% manual** — ni `reportes/reconciliacion.py` ni
+  `contabilidad/queries/reconciliacion.py::reconciliar` corren en `jobs/scheduler.py` (el único scheduler
+  in-process del repo, que solo corre recordatorios de retiro + cleanup de cuentas livianas), y no hay
+  ningún badge/alerta en el dashboard admin — si nadie abre esa pantalla puntual, un desbalance puede
+  persistir indefinidamente sin que nadie se entere. Es el gap de gobernanza más directo detrás del miedo
+  original del dueño.
+- **Lo que está confirmado BIEN hecho** (no solo ausencia de bug, para el panorama completo): comisiones
+  con `validar_modelo` que fuerza sumar 100% con fallback seguro; `SALDADO_CTE` ya filtra pagos anulados;
+  IVA en `Decimal` con `assert total==neto+iva`, calculado sobre el neto post-descuento; sin secretos
+  hardcodeados en facturación; sin IDOR en la factura del cliente; `create_pedido_retry` persiste la plata
+  de forma atómica; el cliente nunca decide su propio precio (2 caminos reales verificados); cotas de
+  cantidad/descuento en múltiples capas espejadas; y `test_carrito_precio_efectivo.py` hace un source-scan
+  real (no solo unit test) que blinda mecánicamente contra el drift de combos histórico (#635).
+- **Consecuencias / próximos pasos.** Mergear #1181 con prioridad. El resto de los 14 hallazgos quedan
+  priorizados en `SISTEMA_PLATA.md` a la espera de que el dueño decida el orden de implementación (no se
+  arregló nada todavía en esta pasada — fue diagnóstico + manual, siguiendo el mismo patrón de la auditoría
+  de `contabilidad/`: primero el mapa completo, después la rama de fixes). El supervisor marca un motor de
+  plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
+  reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.

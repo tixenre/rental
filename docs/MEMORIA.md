@@ -685,6 +685,25 @@ real + `ajuste` con destino=socio (sin cambios). Mismo commit/rama que la audito
 El supervisor marca un `retiro`/`aporte` nuevo que se le vuelva a permitir a una cuenta de socio, o un tipo de
 movimiento nuevo inventado para el caso "el socio pagó un gasto de Rambla" en vez de reusar `gasto`.
 
+### 2026-07-02 — Auditoría cruzada de plata: `docs/SISTEMA_PLATA.md` + el fix de #405 (#1181) nunca se mergeó
+
+A pedido del dueño, tras la auditoría de `contabilidad/`, ante el miedo de "drift de plata" con muchos
+motores tocando dinero sin un mapa único. 6 auditorías paralelas sobre `services/precios`,
+`reportes/liquidacion`+`comisiones`+`cierres`+`reconciliacion`, `services/facturacion`, el camino de
+congelamiento de precio en pedidos, y un trace end-to-end + estado del semáforo de reconciliación.
+**Hallazgo crítico de proceso:** el PR #1181 (fix original del bug #405 — editor de pedidos admin
+cotizando con precio de catálogo en vez del precio de línea congelado) **nunca se mergeó** a `dev`/`main`
+— `respetar_precio_item` no existe en ningún branch real, solo en la rama del PR sin mergear. La sesión
+anterior lo había registrado como shippeado por error. **El bug #405 sigue potencialmente activo hoy.**
+Nuevo manual **`docs/SISTEMA_PLATA.md`** (fuente única de cada número de plata + el semáforo de
+reconciliación, cruzado entre motores) — no repite invariantes de cada `CLAUDE.md`/`SISTEMA_*.md` local,
+los referencia. Hallazgos priorizados (14 ítems + el PR sin mergear) documentados ahí, no acá — evita
+duplicar y que se desactualice. Reconciliación confirmada **100% manual**: ni `reportes/reconciliacion.py`
+ni `contabilidad/queries/reconciliacion.py::reconciliar` corren en `jobs/scheduler.py`; sin badge/alerta
+en el dashboard admin — es el gap de gobernanza más directo detrás del miedo original del dueño. El
+supervisor marca un motor de plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o
+un PR de fix de plata reportado como shippeado sin confirmar merge real a `dev`/`main`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
