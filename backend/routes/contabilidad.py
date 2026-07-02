@@ -14,11 +14,16 @@ from pydantic import BaseModel
 from database import get_db
 from auth.guards import require_admin
 from contabilidad.commands.cuentas import crear_cuenta, desactivar_cuenta, editar_cuenta
-from contabilidad.queries.cuentas import listar_cuentas
+from contabilidad.queries.cuentas import listar_cuentas, obtener_cuenta
 from contabilidad.queries.saldos import saldos as _saldos
 from contabilidad.commands.categorias import crear_categoria
 from contabilidad.queries.categorias import listar_categorias
-from contabilidad.commands.movimientos import anular_movimiento, crear_movimiento, editar_movimiento
+from contabilidad.commands.movimientos import (
+    actualizar_comprobante,
+    anular_movimiento,
+    crear_movimiento,
+    editar_movimiento,
+)
 from contabilidad.queries.movimientos import (
     beneficiarios_usados,
     cobros_mensuales,
@@ -245,8 +250,8 @@ def get_movimientos(
         if tipo in (None, "", "cobro") and not categoria_id and not beneficiario:
             cobrador = None
             if cuenta_id:
-                row = conn.execute("SELECT socio FROM cuentas WHERE id = %s", (cuenta_id,)).fetchone()
-                cobrador = row["socio"] if row else None
+                cta = obtener_cuenta(conn, cuenta_id)
+                cobrador = cta["socio"] if cta else None
                 # Caja sin cobrador (Efectivo/Banco/Dólares) → no recibe cobros.
                 if not cobrador:
                     cobros = []
@@ -321,7 +326,7 @@ _COMPROBANTE_TIPOS = ("application/pdf", "image/jpeg", "image/png", "image/webp"
 async def subir_comprobante(request: Request, mov_id: int, file: UploadFile = File(...)):
     """Adjunta un comprobante (PDF o imagen) a un movimiento. Sube a R2 reusando
     la infra de media (`services/media/storage`)."""
-    require_admin(request)
+    admin = require_admin(request)
     content = await file.read()
     if len(content) > _COMPROBANTE_MAX:
         raise HTTPException(400, "El comprobante supera los 5 MB.")
@@ -349,16 +354,15 @@ async def subir_comprobante(request: Request, mov_id: int, file: UploadFile = Fi
                 content_type=ctype,
                 presign_expires=3600,
             )
-            conn.execute(
-                "UPDATE movimientos SET comprobante_url = NULL, comprobante_key = %s, "
-                "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (key, mov_id),
-            )
+            actualizar_comprobante(conn, mov_id, key=key, por=admin.get("email"))
             conn.commit()
             return {"comprobante_url": presigned, "comprobante_key": key}
         except HTTPException:
             conn.rollback()
             raise
+        except ValueError as e:
+            conn.rollback()
+            raise HTTPException(400, str(e))
         except Exception:
             conn.rollback()
             logger.exception("No se pudo subir el comprobante")

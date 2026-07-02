@@ -132,14 +132,23 @@ def editar_cuenta(conn, cuenta_id: int, *, campos: dict, por=None) -> dict:
 
 def desactivar_cuenta(conn, cuenta_id: int, por=None) -> dict:
     """Baja lógica de una cuenta. Falla si su saldo actual no es cero (no se da de
-    baja una caja con plata adentro). Devuelve la cuenta desactivada."""
+    baja una caja con plata adentro). Devuelve la cuenta desactivada.
+
+    `FOR UPDATE` sobre la fila ANTES de leer el saldo (auditoría 2026-07-02):
+    sin esto, un `crear_movimiento` concurrente contra esta cuenta podía colarse
+    entre el chequeo de saldo=0 y el `UPDATE activa=FALSE`, dejando la cuenta
+    inactiva con saldo real ≠ 0 (esa plata deja de aparecer en `saldos()` hasta
+    que alguien la reactive o corra la reconciliación). Un INSERT/UPDATE en
+    `movimientos` que referencia esta cuenta toma un lock `FOR KEY SHARE`
+    implícito por la FK, que conflictúa con este `FOR UPDATE` — cierra la
+    ventana sin tocar `crear_movimiento`."""
     from contabilidad.queries.saldos import saldo_de_cuenta
 
-    actual = obtener_cuenta(conn, cuenta_id)
-    if not actual:
+    row = conn.execute("SELECT activa FROM cuentas WHERE id = %s FOR UPDATE", (cuenta_id,)).fetchone()
+    if not row:
         raise ValueError("La cuenta no existe.")
-    if not actual["activa"]:
-        return actual
+    if not row["activa"]:
+        return obtener_cuenta(conn, cuenta_id)
 
     saldo = saldo_de_cuenta(conn, cuenta_id)
     if saldo != 0:

@@ -18,6 +18,21 @@ saldo de cada cuenta se deriva de estos movimientos + esos cobros
 `validar_estructura_movimiento` es pura (testeable sin DB). El resto toca la
 conexión. La plata nunca se borra: `anular_movimiento` hace soft-delete con motivo.
 Lectura → `queries/movimientos.py`.
+
+**Ambigüedad conocida, sin resolver a propósito (auditoría 2026-07-02):** la tabla de
+arriba dice contra qué CANTIDAD de cuentas es válido cada tipo, pero no restringe el
+TIPO de cuenta (`caja`/`banco`/`fondo` vs `socio`, cuenta corriente). Una
+`transferencia` DEBE poder tocar una cuenta `socio` (así funciona
+`commands/rendicion.py::saldar`, que arma transferencias Caja↔Fondo Rambla), y un
+`ajuste` contra una cuenta `socio` puede ser una corrección legítima de arranque de
+cuenta corriente — así que no se agregó una validación dura acá. Ojo: usar
+`retiro`/`aporte`/`gasto` contra una cuenta `socio` (en vez de una caja real) mueve el
+signo de forma CONTRAINTUITIVA respecto del nombre del tipo (ver la fórmula de
+cuenta corriente en `queries/saldos.py`: un "retiro" contra la cuenta de un socio en
+realidad BAJA su deuda, no la sube, porque `egresos` resta en esa fórmula). El
+comportamiento actual (permitido, sin restricción) está fijado por
+`test_movimiento_tipo_vs_tipo_cuenta` — si algún día se agrega la validación dura,
+ese test debe fallar y avisar que es un cambio deliberado, no una regresión.
 """
 
 from contabilidad.constants import METODOS_MOVIMIENTO, TIPOS_MOVIMIENTO
@@ -73,36 +88,12 @@ def _cuentas_validas(conn) -> set[int]:
     return {r["id"] for r in rows}
 
 
-def _mes_de_fecha(fecha) -> str:
-    if not fecha:
-        from services.fechas import mes_actual_ar
-        return mes_actual_ar()
-    return str(fecha)[:7]
-
-
-def _exigir_mes_abierto(conn, fecha) -> None:
-    """Traba tocar un movimiento cuyo mes contable está cerrado (#809 Fase 6)."""
-    from contabilidad.queries.cierres import mes_cerrado
-
-    mes = _mes_de_fecha(fecha)
-    if mes_cerrado(conn, mes):
-        raise ValueError(
-            f"El mes {mes} está cerrado. Reabrilo desde Rendición para tocar movimientos de esa fecha."
-        )
-
-
-def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino_id=None,
-                     categoria_id=None, metodo=None, fecha=None, nota=None, beneficiario=None,
-                     por=None, es_rendicion=False, rendicion_mes=None) -> dict:
-    """Crea un movimiento (valida estructura + existencia de cuentas/categoría).
-    `fecha` None → hoy. `es_rendicion`/`rendicion_mes` marcan un saldado de
-    rendición entre socios (lo usa `commands/rendicion.py::saldar`, no la UI
-    general). Devuelve el movimiento con nombres resueltos."""
-    monto = int(monto or 0)
-    validar_estructura_movimiento(tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id)
-    _validar_metodo(metodo)
-    _exigir_mes_abierto(conn, fecha)
-
+def _validar_cuentas_y_categoria(conn, cuenta_origen_id, cuenta_destino_id, categoria_id) -> None:
+    """Existencia+actividad de las cuentas, misma moneda si hay origen y destino,
+    categoría existente+activa. Toca DB (a diferencia de `validar_estructura_movimiento`,
+    que es pura). La usan `crear_movimiento` Y `editar_movimiento` — antes solo la
+    tenía crear, así que editar podía dejar un movimiento apuntando a una cuenta
+    inactiva/inexistente o mezclando monedas (auditoría 2026-07-02)."""
     validas = _cuentas_validas(conn)
     for cid in (cuenta_origen_id, cuenta_destino_id):
         if cid and cid not in validas:
@@ -123,6 +114,62 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
         ).fetchone()
         if not ok:
             raise ValueError("La categoría indicada no existe o está inactiva.")
+
+
+def _mes_de_fecha(fecha) -> str:
+    if not fecha:
+        from services.fechas import mes_actual_ar
+        return mes_actual_ar()
+    return str(fecha)[:7]
+
+
+# Namespace del advisory lock para serializar cerrar_mes/reabrir_mes contra
+# crear/editar/anular movimiento (y actualizar_comprobante) del mismo mes
+# contable. Arbitrario y privado de este flujo — mismo patrón que
+# _ADVISORY_NS_PEDIDO (routes/alquileres/core.py, 5390412) y
+# _ADVISORY_NS_ESTUDIO (routes/estudio.py, 5390413); siguiente número libre.
+_ADVISORY_NS_CONTAB_MES = 5390420
+
+
+def _lock_mes(conn, mes: str) -> None:
+    """xact-scoped (se libera solo al commit/rollback de `conn`): sin esto, un
+    `cerrar_mes` puede leer los movimientos de un mes en T0 y commitear su foto
+    DESPUÉS de que otro request haya insertado un movimiento con fecha de ese
+    mismo mes (que pasó `_exigir_mes_abierto` porque el cierre todavía no había
+    commiteado) — el mes queda "cerrado" con una foto que no incluye ese
+    movimiento, que además ya no se puede tocar (auditoría 2026-07-02)."""
+    try:
+        anio, mo = mes.split("-")
+        key = int(anio) * 100 + int(mo)   # 'YYYY-MM' → YYYYMM, key natural
+    except (ValueError, AttributeError):
+        key = 0
+    conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_CONTAB_MES, key))
+
+
+def _exigir_mes_abierto(conn, fecha) -> None:
+    """Traba tocar un movimiento cuyo mes contable está cerrado (#809 Fase 6)."""
+    from contabilidad.queries.cierres import mes_cerrado
+
+    mes = _mes_de_fecha(fecha)
+    _lock_mes(conn, mes)
+    if mes_cerrado(conn, mes):
+        raise ValueError(
+            f"El mes {mes} está cerrado. Reabrilo desde Rendición para tocar movimientos de esa fecha."
+        )
+
+
+def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino_id=None,
+                     categoria_id=None, metodo=None, fecha=None, nota=None, beneficiario=None,
+                     por=None, es_rendicion=False, rendicion_mes=None) -> dict:
+    """Crea un movimiento (valida estructura + existencia de cuentas/categoría).
+    `fecha` None → hoy. `es_rendicion`/`rendicion_mes` marcan un saldado de
+    rendición entre socios (lo usa `commands/rendicion.py::saldar`, no la UI
+    general). Devuelve el movimiento con nombres resueltos."""
+    monto = int(monto or 0)
+    validar_estructura_movimiento(tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id)
+    _validar_metodo(metodo)
+    _exigir_mes_abierto(conn, fecha)
+    _validar_cuentas_y_categoria(conn, cuenta_origen_id, cuenta_destino_id, categoria_id)
 
     beneficiario = (beneficiario or "").strip() or None
     cur = conn.execute(
@@ -164,6 +211,10 @@ def editar_movimiento(conn, mov_id: int, *, campos: dict, por=None) -> dict:
         propuesta.get("cuenta_destino_id"), propuesta.get("categoria_id"),
     )
     _validar_metodo(propuesta.get("metodo"))
+    _validar_cuentas_y_categoria(
+        conn, propuesta.get("cuenta_origen_id"),
+        propuesta.get("cuenta_destino_id"), propuesta.get("categoria_id"),
+    )
 
     sets, params = [], []
     for k in _CAMPOS_EDITABLES:
@@ -187,6 +238,25 @@ def editar_movimiento(conn, mov_id: int, *, campos: dict, por=None) -> dict:
     sets.append("updated_at = CURRENT_TIMESTAMP")
     params.append(mov_id)
     conn.execute(f"UPDATE movimientos SET {', '.join(sets)} WHERE id = %s", tuple(params))
+    return obtener_movimiento(conn, mov_id)
+
+
+def actualizar_comprobante(conn, mov_id: int, *, key: str, por=None) -> dict:
+    """Persiste la key del comprobante ya subido a storage (el upload en sí es
+    infra HTTP, se queda en el route). Pasa por el mismo candado que
+    crear/editar/anular — antes el route hacía un UPDATE directo, saltándose
+    `_exigir_mes_abierto` y el chequeo de `anulado` (auditoría 2026-07-02)."""
+    actual = obtener_movimiento(conn, mov_id)
+    if not actual:
+        raise ValueError("El movimiento no existe.")
+    if actual["anulado"]:
+        raise ValueError("No se puede adjuntar un comprobante a un movimiento anulado.")
+    _exigir_mes_abierto(conn, actual["fecha"])
+    conn.execute(
+        "UPDATE movimientos SET comprobante_url = NULL, comprobante_key = %s, "
+        "updated_by = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+        (key, por, mov_id),
+    )
     return obtener_movimiento(conn, mov_id)
 
 
