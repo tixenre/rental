@@ -56,8 +56,13 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
       } else {
         setNoEncontrado(true);
       }
-    } catch {
-      setNoEncontrado(true);
+    } catch (e) {
+      // El route de consultar_padron nunca debería tirar (atrapa RuntimeError
+      // y devuelve {encontrado:false, motivo} en un 200) — si esto se
+      // dispara, es un 500/red real que se estaba perdiendo en un genérico
+      // "sin datos", exactamente lo que este hook existe para evitar.
+      // `authedJson` ya arma el mensaje real (método/ruta/status/detalle).
+      setMotivo(e instanceof Error ? e.message : "Error inesperado consultando ARCA");
     } finally {
       setBuscando(false);
     }
