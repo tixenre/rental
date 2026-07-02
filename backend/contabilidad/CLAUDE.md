@@ -1,7 +1,8 @@
 # `backend/contabilidad/` — motor único de la plata "de adentro"
 
-> Invariantes locales. El _por qué_ completo: `docs/DECISIONES.md` _2026-06-07 — `backend/contabilidad/`_
-> y _2026-07-02 — CQRS-lite en `contabilidad/`_.
+> Invariantes locales. El _por qué_ completo: `docs/DECISIONES.md` _2026-06-07 — `backend/contabilidad/`_,
+> _2026-07-02 — CQRS-lite en `contabilidad/`_ y _2026-07-02 — Auditoría de `backend/contabilidad/`: bordes
+> reforzados_.
 
 **Toda la plata interna del negocio vive acá** (cajas/cuentas, libro de movimientos, saldos,
 rendición entre socios, ganancia/P&L, cierre contable, reconciliación); los routes son solo
@@ -33,8 +34,9 @@ contabilidad/
     categorias.py       # validar_categoria (PURA), crear_categoria
     cuentas.py            # validar_cuenta (PURA), crear_cuenta, editar_cuenta, desactivar_cuenta
     movimientos.py          # validar_estructura_movimiento (PURA), crear_movimiento,
-                             # editar_movimiento, anular_movimiento, _exigir_mes_abierto (guard)
-    cierres.py                # cerrar_mes, reabrir_mes
+                             # editar_movimiento, anular_movimiento, actualizar_comprobante,
+                             # _exigir_mes_abierto (guard, incluye _lock_mes), _validar_cuentas_y_categoria
+    cierres.py                # cerrar_mes, reabrir_mes (ambos toman _lock_mes antes de tocar el mes)
     rendicion.py                 # saldar
 ```
 
@@ -49,7 +51,13 @@ Reglas que NO se rompen:
   caja de un cobrador se calcula sumando sus pagos por `destinatario`. **Nunca** recargar un movimiento
   por un cobro de cliente → cero doble-contabilización por construcción.
 - **La plata no se borra:** anular un movimiento es **soft-delete con motivo** (deja de contar para los
-  saldos pero queda trazable). Auditoría `created_by/updated_by/anulado_por`.
+  saldos pero queda trazable). Auditoría `created_by/updated_by/anulado_por`. **`alquiler_pagos`
+  espeja el mismo patrón** (`created_by`/`anulado`/`anulado_por`/`anulado_at`/`anulado_motivo`,
+  2026-07-02): anular un pago es `POST .../anular` con motivo, nunca `DELETE`; los 7 SELECT que suman
+  `alquiler_pagos` (incluido `SALDADO_CTE` de `reportes/liquidacion.py`) filtran `NOT anulado`.
+- **`editar_movimiento` revalida lo mismo que `crear_movimiento`** (existencia/actividad de cuenta,
+  misma moneda origen↔destino, categoría activa) vía el helper compartido
+  `_validar_cuentas_y_categoria` — editar NO es un camino más laxo que crear.
 - **Enteros ARS** en todo el cálculo (no `NUMERIC`).
 - **Multi-moneda no se mezcla:** cada caja tiene `moneda` (ARS/USD); saldos por moneda; transferencia/
   ajuste exigen misma moneda (sin conversión automática); P&L en ARS. La **moneda es inmutable tras
@@ -61,6 +69,13 @@ Reglas que NO se rompen:
   rendiciones` (>0 DEUDOR le debe a Rambla, <0 ACREEDOR Rambla le debe, 0 saldado); `su parte` sale de
   la liquidación (`reportes/`). **No** suman al total disponible y una **negativa (acreedor) NO es
   error** de reconciliación. Solo **Rambla/Fondo Rambla** es caja de plata real (su parte no se resta).
-- **Candado de mes cerrado:** crear/editar/anular pasa por el motor (`_exigir_mes_abierto`) — un
-  endpoint que escriba `movimientos` por fuera se saltearía el candado. La rendición reusa `SALDADO_CTE`
-  (mismo universo de pedidos que el reporte). Esquema en dos capas (`init_db()` + migración) para toda tabla nueva.
+- **Candado de mes cerrado:** crear/editar/anular/`actualizar_comprobante` pasa por el motor
+  (`_exigir_mes_abierto`) — un endpoint que escriba `movimientos` por fuera se saltearía el candado
+  (era el bug de `subir_comprobante`, corregido 2026-07-02). La rendición reusa `SALDADO_CTE` (mismo
+  universo de pedidos que el reporte). Esquema en dos capas (`init_db()` + migración) para toda tabla nueva.
+- **Concurrencia (2026-07-02, verificado con test de dos conexiones reales):** `_exigir_mes_abierto`
+  toma `pg_advisory_xact_lock(_ADVISORY_NS_CONTAB_MES, mes)` (mismo patrón que
+  `services/facturacion/engine.py`/`routes/talleres.py`) — serializa `cerrar_mes`/`reabrir_mes` contra
+  cualquier escritura del mismo mes, para que un `cerrar_mes` no ignore un movimiento creado a mitad de
+  camino. `desactivar_cuenta` toma `SELECT ... FOR UPDATE` sobre la cuenta antes de desactivarla, para
+  que un `crear_movimiento` concurrente contra esa cuenta espere el lock en vez de correr una carrera.

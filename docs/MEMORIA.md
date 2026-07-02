@@ -627,6 +627,45 @@ verbatim, no rewrite**: cero cambio de lógica/SQL, confirmado por los 51 tests 
 El supervisor marca lógica de escritura nueva agregada a `queries/`, o un query importando de `commands/`.
 Estructura completa → `backend/contabilidad/CLAUDE.md`; tracking #1184.
 
+### 2026-07-02 — Auditoría de `backend/contabilidad/`: bordes reforzados (edición, locking, auditoría de pagos)
+
+A pedido del dueño tras el split CQRS-lite, 3 auditorías en paralelo (corrección/concurrencia, seguridad HTTP,
+duplicación/gaps de tests) sobre `backend/contabilidad/` completo: **el núcleo (fórmulas de saldo, derivación,
+soft-delete, multi-moneda en creación) estaba bien hecho y bien testeado — los problemas reales estaban en los
+bordes.** Se implementaron los 19 hallazgos. Los 3 bugs reales: (1) `editar_movimiento` no repetía las
+validaciones de `crear_movimiento` (existencia/actividad de cuenta, misma moneda, categoría activa) — se podía
+editar una transferencia para que apunte a una cuenta de OTRA moneda sin error, violando ARS≠USD; extraído a
+`_validar_cuentas_y_categoria`, reusado por ambas. (2) `alquiler_pagos` (la tabla que alimenta todo el motor)
+no tenía actor ni soft-delete — `eliminar_pago` hacía `DELETE` real, sin motivo; ahora tiene
+`created_by`/`anulado`/`anulado_por`/`anulado_at`/`anulado_motivo` (mismo patrón que `movimientos`),
+`DELETE→POST .../anular` con motivo obligatorio, y los 7 SELECT que suman `alquiler_pagos` (incluido el
+`SALDADO_CTE` de `reportes/liquidacion.py`, compartido por 3 consumidores) filtran `NOT anulado`. (3)
+`subir_comprobante` escribía SQL directo saltándose el motor (sin candado de mes cerrado, sin chequear
+`anulado`, sin actor) — exactamente el escenario que el propio `CLAUDE.md` del paquete advertía; ahora pasa por
+`commands.movimientos.actualizar_comprobante`.
+
+Robustez agregada: `pg_advisory_xact_lock` (mismo patrón que `services/facturacion/engine.py`/
+`routes/talleres.py`) entre `cerrar_mes`/`reabrir_mes` y crear/editar/anular movimiento del mismo mes —
+**verificado con un test de concurrencia real de dos conexiones** (no solo en teoría): sin el lock, un gasto
+podía colarse en un mes "recién cerrado" fuera de la foto; con el lock, B espera a que A commitee y después es
+rechazado correctamente. `desactivar_cuenta` toma `FOR UPDATE` (mismo método de verificación, B esperó los 5s
+reales del lock). Rate limiting (`ADMIN_WRITE_LIMIT`/`ADMIN_UPLOAD_LIMIT` en `rate_limit.py`) en los 13
+endpoints de escritura de `contabilidad.py`/`pagos.py` (ninguno lo tenía). Cotas `Field(...)` en los 8 modelos
+Pydantic — el `lt=2_147_483_647` en ids es lo que de verdad cierra la puerta a `NumericValueOutOfRange` crudo
+de Postgres — más el decorator `@map_pg_errors` (nuevo, en `routes/contabilidad.py`, reusado por `pagos.py`)
+que traduce `UniqueViolation`/`NumericValueOutOfRange` a 400 limpio en vez de filtrar el mensaje interno de
+Postgres vía el handler global. `idx_cuentas_socio` ahora único solo entre cuentas activas (simétrico con
+`cuentas_nombre_activa_uq` — antes dar de baja una cuenta de socio bloqueaba para siempre crear una nueva
+activa con ese socio). 8 tests nuevos candado (`editar_cuenta` no tenía ninguno pese a usarse en producción;
+`ajuste` con origen+destino; fallback de `saldo_de_cuenta`; anular un saldado de rendición ya registrado —
+documenta que `ya_transferido` excluye el anulado pero `_movimientos_rendicion` lo sigue mostrando, intencional).
+Ambigüedad documentada, no bloqueada: nada impide `retiro`/`aporte`/`gasto`/`ajuste` contra una cuenta
+CORRIENTE de socio (signo contraintuitivo) — bloquearlo mal rompería `saldar()`, que sí necesita tocar cuentas
+de socio; queda como docstring + test que fija el comportamiento actual. El supervisor marca: un `UPDATE`
+directo a `movimientos`/`alquiler_pagos` fuera de `commands/`, un endpoint de escritura de contabilidad/pagos
+sin `@limiter.limit`, o un `except Exception` nuevo en esos routes sin pasar por `map_pg_errors`. Rama aislada
+`fix/contabilidad-auditoria` (PR sin mergear, hoja de ruta), sobre `feature/contabilidad-cqrs`; tracking #1184.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
