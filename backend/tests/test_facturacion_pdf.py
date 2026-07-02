@@ -178,10 +178,10 @@ def test_si_falla_la_generacion_del_qr_propaga_el_error(layout, monkeypatch):
     """Hay payload pero segno/la generación de la imagen falla — tiene que
     propagar el error (el route lo convierte en 503), no devolver un HTML
     con un hueco donde debería ir el QR exigido por RG4892."""
-    def _boom(url):
+    def _boom(url, size):
         raise RuntimeError("segno no disponible")
 
-    monkeypatch.setattr("arca_fe.qr._build_qr_image_data_uri", _boom)
+    monkeypatch.setattr("arca_fe.qr._build_qr_svg", _boom)
     with pytest.raises(RuntimeError, match="segno no disponible"):
         factura_html(_factura(), _pedido(), layout=layout)
 

@@ -312,14 +312,13 @@ def _build_ctx(factura, pedido: dict) -> dict:
 
 
 def _qr_img(url: str, size: int) -> str:
-    """Nunca atrapa errores: si `segno` no puede generar la imagen, el caller
-    (`factura_html`) tiene que fallar fuerte, no entregar un comprobante con
-    un hueco donde debería ir el QR exigido por RG4892."""
-    from arca_fe.qr import _build_qr_image_data_uri
-    return (
-        f'<img src="{_build_qr_image_data_uri(url)}" width="{size}" height="{size}" '
-        f'alt="QR AFIP" style="display:block">'
-    )
+    """SVG inline (vectorial — sin resolución nativa fija, no se pixela en
+    ningún zoom). Nunca atrapa errores: si `segno` no puede generarlo, el
+    caller (`factura_html`) tiene que fallar fuerte, no entregar un
+    comprobante con un hueco donde debería ir el QR exigido por RG4892."""
+    from arca_fe.qr import _build_qr_svg
+    svg = _build_qr_svg(url, size)
+    return svg.replace("<svg ", '<svg style="display:block" ', 1)
 
 
 # ---------------------------------------------------------------------------
