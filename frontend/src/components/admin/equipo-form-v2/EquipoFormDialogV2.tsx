@@ -75,8 +75,7 @@ import { KitEditor } from "./KitEditor";
 import { ComboEditor } from "./ComboEditor";
 import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
-import { type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq } from "./spec-helpers";
-import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
+import { type Spec, newSpec, withIds, sameLabel, uniq } from "./spec-helpers";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 import {
   Field,
@@ -175,14 +174,29 @@ export function EquipoFormDialogV2({
   const [tags, setTags] = useState<string[]>([]);
 
   // ── Nombre público ─────────────────────────────────────────────────
-  // Input libre + toggle "generar automático desde categoría" (ver nombre-publico.ts).
-  // El toggle arranca ON: si la categoría tiene template, el form regenera el
-  // nombre desde los specs. El usuario puede toggle OFF para editar a mano,
-  // pero por design queda enganchado al template — si el dueño modifica el
-  // template en /admin/equipos/specs, la próxima vez que abra el equipo el
-  // nombre se actualiza automáticamente (#calidad-datos).
+  // Input libre + toggle "generar automático desde categoría". El toggle
+  // arranca ON: si la categoría de specs tiene un molde (nombre_publico_
+  // template, seteado desde /admin/equipos/specs), el nombre se arma solo
+  // desde los specs — es una fuente VIVA (services/nombre_service.py la lee
+  // en cada guardado, no una copia). El usuario puede toggle OFF para
+  // escribir a mano: eso se guarda como `nombre_publico_override`, que
+  // gana SIEMPRE sobre el molde de categoría (así cambiar el molde no pisa
+  // un nombre elegido a mano — ver services/nombre_builder.py, 2026-07).
   const [nombrePublico, setNombrePublico] = useState("");
   const [nombrePublicoAuto, setNombrePublicoAuto] = useState(true);
+  // Carga inicial / reset: el override (equipos.nombre_publico_override) es
+  // la ÚNICA fuente de "hay un nombre a mano" — separado del efecto de ficha
+  // de abajo porque vive en otra tabla (equipos, no equipo_fichas).
+  useEffect(() => {
+    const override = initial?.nombre_publico_override?.trim() || "";
+    if (override) {
+      setNombrePublico(override);
+      setNombrePublicoAuto(false);
+    } else {
+      setNombrePublico("");
+      setNombrePublicoAuto(true);
+    }
+  }, [initial?.id, initial?.nombre_publico_override]);
 
   // Specs traídos del HTML upload: se guardan en una lista separada para
   // que el usuario los apruebe uno por uno (vs los specs actuales).
@@ -255,19 +269,8 @@ export function EquipoFormDialogV2({
     if (f) {
       setDescripcion(f.descripcion ?? "");
       setNotas(f.notas ?? "");
-      // Si el nombre público guardado no tiene tokens, lo usamos como literal.
-      // Si tiene tokens ({...}), lo dejamos vacío — el usuario regenera con auto.
-      const tpl = (f.nombre_publico_template ?? "").trim();
-      const hasTokens = /\{[^}]+\}/.test(tpl);
-      setNombrePublico(hasTokens ? "" : tpl);
-      // Detectar override manual: si hay texto literal sin tokens, asumimos
-      // que el dueño puso un nombre a mano y no queremos que auto-gen lo
-      // pise al abrir (issue de auditoría). toggle OFF en ese caso.
-      if (tpl && !hasTokens) {
-        setNombrePublicoAuto(false);
-      } else {
-        setNombrePublicoAuto(true);
-      }
+      // nombrePublico/nombrePublicoAuto: cargados por el efecto de arriba
+      // desde `initial.nombre_publico_override` (equipos, no equipo_fichas).
 
       let kws: string[] = [];
       try {
@@ -296,7 +299,6 @@ export function EquipoFormDialogV2({
       setDescripcion("");
       setNotas("");
       setTags([]);
-      setNombrePublico("");
       setContenidoIncluido([]);
     }
   }, [fichaQ.data, initial]);
@@ -474,14 +476,26 @@ export function EquipoFormDialogV2({
   }, [templateItems, equipoSpecsQ.data]);
 
   // ── Auto-generación del nombre público ────────────────────────────
-  // Cuando el toggle está ON y la categoría tiene template, regenera al
-  // tocar cualquier campo relevante. Montura/Formato/Resolución se leen
-  // de los specs por label (ya no son inputs dedicados).
+  // Preview del molde de la categoría de specs (el mismo que lee el backend
+  // en vivo — services.nombre_service._categoria_template_de). Sin molde de
+  // categoría no hay auto-gen: ya no hay fallback hardcodeado por categoría
+  // (existía en nombre-publico.ts, retirado — era exactamente el patrón que
+  // el backend eliminó en #415 por dar nombres que "el back-end nunca iba a
+  // producir": la preview tiene que mostrar SOLO lo que se va a guardar).
   const watchedMarca = form.watch("marca");
   const watchedModelo = form.watch("modelo");
   useEffect(() => {
     if (!nombrePublicoAuto) return;
-    // Prioridad 1: template definido por el admin en la categoría (DB).
+    // Chequeo directo a `initial.nombre_publico_override` (no solo al estado
+    // derivado `nombrePublicoAuto`): cuando `initial` llega async, el efecto
+    // que carga el override y este pueden correr en el mismo commit — un
+    // `setNombrePublicoAuto(false)` recién encolado en el otro efecto no se
+    // refleja todavía en la clausura de ESTE efecto en el mismo pase (React
+    // no re-lee estado recién encolado entre efectos del mismo commit), así
+    // que sin este chequeo este efecto podía pisar el override recién
+    // cargado con "" — confirmado en vivo (equipo con override guardado
+    // abría con el campo vacío pese al toggle ya en OFF).
+    if (initial?.nombre_publico_override?.trim()) return;
     // Buscar el output_config de cada spec en el template (las definiciones
     // viven en templateItems con tipo + output_config; los valores en specs).
     const tmplByLabel = new Map(
@@ -503,19 +517,7 @@ export function EquipoFormDialogV2({
         };
       }),
     });
-    if (fromTemplate) {
-      setNombrePublico(fromTemplate);
-      return;
-    }
-    // Prioridad 2: template hardcoded (nombre-publico.ts) por categoría conocida.
-    const gen = generarNombrePublico(categoriaRoot, {
-      marca: watchedMarca ?? "",
-      modelo: watchedModelo ?? "",
-      montura: findSpecValue(specs, "Montura"),
-      formato: findSpecValue(specs, "Formato"),
-      resolucion: findSpecValue(specs, "Resolución"),
-    });
-    if (gen) setNombrePublico(gen);
+    setNombrePublico(fromTemplate ?? "");
   }, [
     nombrePublicoAuto,
     categoriaRoot,
@@ -524,11 +526,12 @@ export function EquipoFormDialogV2({
     watchedModelo,
     specs,
     initial?.nombre,
+    initial?.nombre_publico_override,
     templateItems,
   ]);
 
-  /** Hay alguna fuente de auto-gen disponible? Template DB o hardcoded. */
-  const autoGenDisponible = !!categoriaTemplate || categoriaSoportaAutoGen(categoriaRoot);
+  /** Hay auto-gen disponible? Solo si la categoría de specs tiene molde en DB. */
+  const autoGenDisponible = !!categoriaTemplate;
 
   // ════════════════════════════════════════════════════════════════════
   // Buscar fotos (solo foto, ~5s)
@@ -825,11 +828,11 @@ export function EquipoFormDialogV2({
           }
         }
 
-        // Ficha legacy: descripción + notas + keywords + nombre público.
-        // Las specs estructuradas ya NO van acá — viven en equipo_specs y
-        // se persisten vía putEquipoSpecs (más abajo).
-        const tieneFicha =
-          isEdit || !!descripcion || !!notas || tags.length > 0 || !!nombrePublico.trim();
+        // Ficha legacy: descripción + notas + keywords + contenido incluido.
+        // El nombre público ya NO va acá — vive en equipos.nombre_publico_override
+        // (ver más abajo). Las specs estructuradas tampoco — viven en equipo_specs
+        // y se persisten vía putEquipoSpecs (más abajo).
+        const tieneFicha = isEdit || !!descripcion || !!notas || tags.length > 0;
         if (tieneFicha) {
           try {
             const validos = contenidoIncluido.filter((ci) => ci.nombre.trim().length > 0);
@@ -837,15 +840,6 @@ export function EquipoFormDialogV2({
               descripcion: descripcion || null,
               notas: notas || null,
               keywords_json: tags.length ? JSON.stringify(tags) : null,
-              // Si el toggle "auto" está ON y tenemos un template de categoría,
-              // persistimos el TEMPLATE con tokens ("{marca} {modelo} ...").
-              // Al re-abrir el form, hasTokens detectará tokens → toggle queda ON.
-              // Cuando está OFF, guardamos el literal escrito por el dueño
-              // (override fijo, no se regenera).
-              nombre_publico_template:
-                nombrePublicoAuto && categoriaTemplate
-                  ? categoriaTemplate
-                  : nombrePublico.trim() || null,
               // B1 #635: contenido incluido — filtramos los ítems sin nombre
               // (el usuario puede tener una fila vacía sin completar; no la
               // enviamos para no fallar la validación del backend y perder
@@ -861,6 +855,35 @@ export function EquipoFormDialogV2({
             qc.setQueryData(["admin", "equipo-ficha", equipoId], fichaGuardada);
           } catch (e) {
             fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
+          }
+        }
+
+        // Nombre público: override manual vía el endpoint dedicado — gana
+        // SIEMPRE sobre el molde de categoría (ver services/nombre_builder.py).
+        // "Auto ON + hay molde de categoría" → el backend ya lo arma en vivo,
+        // no hay nada que guardar acá; si tenía un override viejo (volvió a
+        // auto), lo soltamos para que el molde tome el control de nuevo.
+        const usaMoldeDeCategoria = nombrePublicoAuto && !!categoriaTemplate;
+        const texto = usaMoldeDeCategoria ? "" : nombrePublico.trim();
+        const teniaOverride = !!initial?.nombre_publico_override?.trim();
+        // Solo llamamos al endpoint si hay algo que CAMBIAR — nunca en cada
+        // guardado sin condición. Si el campo está vacío y nunca hubo
+        // override, no tocamos nada: un equipo que nadie re-guardó desde
+        // antes del molde vivo puede tener un `nombre_publico` "fósil" de un
+        // mecanismo viejo (auto-build hardcodeado, retirado) — limpiar el
+        // override en ese caso dispara actualizar_nombres_de igual y lo
+        // pisaría a vacío sin que el usuario haya tocado el nombre.
+        if (texto) {
+          try {
+            await adminApi.aprobarNombre(equipoId, { override: texto, revisado: true });
+          } catch (e) {
+            fallidos.push(`nombre público (${e instanceof Error ? e.message : "error"})`);
+          }
+        } else if (teniaOverride) {
+          try {
+            await adminApi.aprobarNombre(equipoId, { override: null, revisado: false });
+          } catch (e) {
+            fallidos.push(`nombre público (${e instanceof Error ? e.message : "error"})`);
           }
         }
 
@@ -1157,30 +1180,34 @@ export function EquipoFormDialogV2({
                   onChange={(e) => setNombrePublico(e.target.value)}
                   placeholder={
                     autoGenDisponible
-                      ? "Generado automático según la categoría"
+                      ? "Generado automático según el molde de la categoría"
                       : "Ej: Cable HDMI 2.0 50cm"
                   }
                 />
                 {autoGenDisponible && (
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Switch checked={nombrePublicoAuto} onCheckedChange={setNombrePublicoAuto} />
-                    Generar automático desde {categoriaRoot?.toLowerCase()}
+                    Generar automático desde el molde de {categoriaRoot}
                     {!nombrePublicoAuto && (
-                      <span className="opacity-60">
-                        (off — el valor escrito se guarda como override fijo)
-                      </span>
+                      <span className="opacity-60">(off — se guarda como nombre fijo)</span>
                     )}
                   </label>
                 )}
                 {autoGenDisponible && nombrePublicoAuto && (
                   <p className="text-2xs text-muted-foreground italic">
-                    Tu edición se mantiene en esta sesión. Si cambia el template o los specs, el
-                    campo se regenera (toggle OFF para fijarlo).
+                    Molde vivo de la categoría — si el dueño lo cambia desde /admin/equipos/specs,
+                    este nombre se actualiza solo (toggle OFF para fijarlo a mano).
+                  </p>
+                )}
+                {!nombrePublicoAuto && (
+                  <p className="text-2xs text-muted-foreground italic">
+                    Nombre fijo: gana siempre, aunque cambie el molde de la categoría.
                   </p>
                 )}
                 {!autoGenDisponible && categoriaRoot && (
                   <p className="text-xs text-muted-foreground italic">
-                    Sin template auto para "{categoriaRoot}". Escribilo a mano.
+                    "{categoriaRoot}" todavía no tiene molde configurado. Escribilo a mano — se
+                    guarda como nombre fijo (o configurá el molde en /admin/equipos/specs).
                   </p>
                 )}
               </div>

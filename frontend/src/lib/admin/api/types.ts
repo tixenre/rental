@@ -145,6 +145,11 @@ export type Equipo = {
   nombre_publico?: string | null;
   /** Nombre público extendido (PDFs formales: albarán, contrato). */
   nombre_publico_largo?: string | null;
+  /** Override manual del nombre público — gana sobre el molde de categoría
+   *  siempre (ver services/nombre_builder.py). Se edita vía `aprobarNombre`. */
+  nombre_publico_override?: string | null;
+  /** true = nombre aprobado/editado a mano; false = pendiente de revisión. */
+  nombre_publico_revisado?: boolean;
   /** Relevancia manual (1=más destacado, 100=neutro). */
   relevancia_manual?: number;
   /** Score de popularidad (0..100, normalizado por categoría). */
