@@ -9,11 +9,12 @@ dos casos MUY distintos que antes se leían igual: (a) AFIP SÍ conoce el CUIT
 pero bloquea la constancia por una regla de negocio propia (ej. sin adhesión
 a Domicilio Fiscal Electrónico, RG 3990-E — ver manual "WS_SR_constancia_
 inscripcion" §5.3) y (b) no pudimos ni completar la consulta (WSAA no
-autoriza, relación no delegada, cert vencido, red). `resolver_persona`
-distingue las tres: None solo cuando AFIP genuinamente no tiene el CUIT (o no
-hay emisor para autenticar); RuntimeError con el motivo real para (a) y (b),
-que el route (admin-only) muestra tal cual. No participa del flujo de
-emisión de comprobantes (no toca `arca_fe.wsfe`/`engine.py`).
+autoriza, relación no delegada, cert vencido, red, o ningún emisor con
+certificado configurado). `resolver_persona` distingue las tres: None SOLO
+cuando la consulta se completó y AFIP respondió sin ningún dato ni motivo
+(silencio genuino); RuntimeError con el motivo real para (a) y (b), que el
+route (admin-only) muestra tal cual. No participa del flujo de emisión de
+comprobantes (no toca `arca_fe.wsfe`/`engine.py`).
 
 Cualquier emisor activo con cert cargado sirve para autenticar la consulta —
 el padrón responde por CUALQUIER CUIT consultado, no solo el que autentica.
@@ -31,15 +32,16 @@ _PADRON_PROD = "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5?w
 def resolver_persona(cuit_buscado: str, conn) -> Optional[PersonaArca]:
     """Consulta el padrón para `cuit_buscado`.
 
-    None: no hay ningún emisor con cert para autenticar, o AFIP respondió que
-    no tiene datos para ese CUIT (`arca_fe.padron.PadronClient.get_persona` ya
-    distingue esto de un fault real — ver sus tests).
+    None: la consulta se completó y AFIP respondió sin datos NI motivo para
+    ese CUIT (`arca_fe.padron.PadronClient.get_persona` ya distingue esto de
+    un fault real o un bloqueo de negocio — ver sus tests).
 
-    Levanta RuntimeError con el motivo real para cualquier OTRA falla (WSAA no
-    autoriza el servicio, relación no delegada, cert vencido, red, timeout) —
-    NO se swallowea: decirle al admin "ARCA no tiene datos" cuando en realidad
-    no pudimos ni completar la consulta es engañoso y no se puede diagnosticar
-    desde afuera. El caller (route, admin-only) decide qué mostrar."""
+    Levanta RuntimeError con el motivo real para cualquier OTRA falla: sin
+    emisor con cert para autenticar, WSAA no autoriza el servicio, relación
+    no delegada, cert vencido, red, timeout — NO se swallowea: decirle al
+    admin "ARCA no tiene datos" cuando en realidad no pudimos ni completar la
+    consulta es engañoso y no se puede diagnosticar desde afuera. El caller
+    (route, admin-only) decide qué mostrar."""
     from services.facturacion.config import credenciales
     from services.facturacion.wsaa_cache import get_ta
 
@@ -47,7 +49,10 @@ def resolver_persona(cuit_buscado: str, conn) -> Optional[PersonaArca]:
 
     emisor_autenticador = elegir_autenticador(conn)
     if emisor_autenticador is None:
-        return None
+        raise RuntimeError(
+            "No hay ningún emisor activo con certificado cargado para autenticar "
+            "la consulta al padrón."
+        )
 
     try:
         cred = credenciales(emisor_autenticador, conn)

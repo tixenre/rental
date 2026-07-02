@@ -26,12 +26,16 @@ def _emisor(nombre="pablo", activo=True, cert_cargado=True):
     )
 
 
-def test_sin_emisor_activo_con_cert_devuelve_none(monkeypatch):
+def test_sin_emisor_activo_con_cert_levanta_con_motivo(monkeypatch):
+    """Regresión: esto devolvía None en silencio, indistinguible de "ARCA no
+    tiene datos" — el admin nunca se enteraba de que la consulta ni siquiera
+    se había podido intentar."""
     monkeypatch.setattr(
         "services.facturacion.emisores_repo.list_emisores",
         lambda conn: [_emisor(activo=False), _emisor(cert_cargado=False)],
     )
-    assert resolver_persona("20301234567", conn=object()) is None
+    with pytest.raises(RuntimeError, match="ningún emisor activo con certificado"):
+        resolver_persona("20301234567", conn=object())
 
 
 def test_usa_el_primer_emisor_activo_con_cert(monkeypatch):
