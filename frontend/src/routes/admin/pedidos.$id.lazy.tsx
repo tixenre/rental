@@ -164,6 +164,10 @@ function PedidoEditorPage() {
     fechaHasta: draft.datos?.fecha_hasta || null,
     clienteId: p?.cliente_id ?? null,
     descuentoPct: draft.datos?.descuento_pct ?? null,
+    // Pedido ya existente: el total en vivo tiene que coincidir con lo que
+    // persiste el guardado (`_recalcular_total_pedido`, que usa el precio de
+    // línea congelado) — no con el precio de catálogo de hoy.
+    respetarPrecioItem: true,
   });
 
   // Modales
@@ -276,6 +280,11 @@ function PedidoEditorPage() {
   const total = totales.total;
   const pagadoMonto = p.monto_pagado ?? 0;
   const restante = Math.max(0, total - pagadoMonto);
+  // Cobrado por encima del total actual: pasa si se bajó el precio (ítem/desc)
+  // DESPUÉS de haber cobrado. No se oculta — se muestra para que el admin lo
+  // resuelva (crédito al cliente, devolución) en vez de descubrirlo recién en
+  // la reconciliación mensual.
+  const excedente = Math.max(0, pagadoMonto - total);
 
   // stockMap: { equipo_id → { cantidad: libres, reservado: 0 } }
   const stockMap: Record<string, { cantidad: number; reservado: number }> = Object.fromEntries(
@@ -735,21 +744,40 @@ function PedidoEditorPage() {
               <span
                 className={cn(
                   "font-mono text-xs font-semibold",
-                  pagadoMonto >= total && total > 0 ? "text-verde-ink" : "text-destructive",
+                  excedente > 0
+                    ? "text-destructive"
+                    : pagadoMonto >= total && total > 0
+                      ? "text-verde-ink"
+                      : "text-destructive",
                 )}
               >
-                {pagadoMonto >= total && total > 0 ? "pagado" : `resta ${fmtArs(restante)}`}
+                {excedente > 0
+                  ? `de más ${fmtArs(excedente)}`
+                  : pagadoMonto >= total && total > 0
+                    ? "pagado"
+                    : `resta ${fmtArs(restante)}`}
               </span>
             </div>
             <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
               <div
                 className={cn(
                   "h-full transition-colors",
-                  pagadoMonto >= total && total > 0 ? "bg-verde" : "bg-amber",
+                  excedente > 0
+                    ? "bg-destructive"
+                    : pagadoMonto >= total && total > 0
+                      ? "bg-verde"
+                      : "bg-amber",
                 )}
                 style={{ width: `${total ? Math.min(100, (pagadoMonto / total) * 100) : 0}%` }}
               />
             </div>
+            {excedente > 0 && (
+              <p className="mt-1 text-2xs text-destructive">
+                Se cobró {fmtArs(excedente)} de más — probablemente el pedido se editó
+                (ítem/descuento) después de cobrarlo. Resolvé con una devolución o dejalo como
+                crédito a favor del cliente.
+              </p>
+            )}
             {(p.pagos ?? []).map((pago) => (
               <PagoRow key={pago.id} pago={pago} pedidoId={p.id} />
             ))}
