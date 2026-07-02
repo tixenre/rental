@@ -298,3 +298,72 @@ def test_construir_comprobante_nc_usa_snapshot_no_pedido_en_vivo():
     assert req.importe_neto == Decimal(original.imp_neto), (
         "la NC tiene que cancelar el monto de la factura ORIGINAL, no el pedido en vivo"
     )
+
+
+# ── FchVtoPago nunca antes de la fecha del comprobante (ARCA rechaza: 10036) ─
+# Bug real en prod: se facturaba casi siempre DESPUÉS de que el pedido ya
+# terminó, así que `fecha_hasta` (fin del alquiler) quedaba en el pasado y
+# ARCA lo rechazaba con "El campo FchVtoPago no puede ser anterior a la
+# fecha del comprobante."
+
+
+def test_vto_pago_usa_fecha_hasta_si_todavia_no_paso():
+    """Si se factura ANTES de que termine el alquiler, el vencimiento sigue
+    siendo el fin del servicio (fecha_hasta) — comportamiento previo intacto."""
+    from services.facturacion.comprobante_pedido import construir_comprobante
+    from arca_fe import Emisor, CondicionIva
+
+    pedido = {**_fake_pedido(), "fecha_desde": "2026-07-05", "fecha_hasta": "2026-07-10"}
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+
+    req = construir_comprobante(
+        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 1),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 7, 10)
+
+
+def test_vto_pago_cae_a_fecha_del_comprobante_si_el_pedido_ya_termino():
+    """Caso real de prod: se factura DESPUÉS del alquiler (fecha_hasta en el
+    pasado) — el vencimiento no puede quedar antes que la fecha de emisión."""
+    from services.facturacion.comprobante_pedido import construir_comprobante
+    from arca_fe import Emisor, CondicionIva
+
+    pedido = {**_fake_pedido(), "fecha_desde": "2026-06-30", "fecha_hasta": "2026-07-01"}
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+
+    req = construir_comprobante(
+        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 7, 15)
+
+
+def test_vto_pago_sin_fecha_hasta_usa_fecha_del_comprobante():
+    from services.facturacion.comprobante_pedido import construir_comprobante
+    from arca_fe import Emisor, CondicionIva
+
+    pedido = {**_fake_pedido(), "fecha_hasta": None}
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+
+    req = construir_comprobante(
+        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 7, 15)
+
+
+def test_vto_pago_de_la_nc_tambien_respeta_la_fecha_del_comprobante():
+    from services.facturacion.comprobante_pedido import construir_comprobante_nc
+    from arca_fe import Emisor, CondicionIva, CbteAsoc, CbteTipo
+
+    original = _fake_original_factura()
+    pedido = {**_fake_pedido(), "fecha_hasta": "2026-07-01"}
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    cbte_asoc = CbteAsoc(tipo=CbteTipo.FACTURA_C, punto_venta=2, numero=1)
+
+    req = construir_comprobante_nc(
+        original, pedido, emisor_obj, fecha=date(2026, 8, 1), cbtes_asoc=(cbte_asoc,),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 8, 1)
