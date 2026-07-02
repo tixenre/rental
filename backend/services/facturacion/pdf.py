@@ -466,12 +466,9 @@ def _factura_mobile_html(f: dict) -> str:
     qr_block = _qr_img(f["qr"]["url"], 165)
 
     conceptos_html = "".join(f"""
-        <div style="padding:10px 0;border-top:1px solid #eef1f4;">
-          <div style="display:flex;justify-content:space-between;gap:16px;">
-            <span style="font-size:16px;font-weight:700;">{_e(c['desc'])}</span>
-            <span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;">{_e(c['importeStr'])}</span>
-          </div>
-          {f'<div style="font-size:12.5px;color:#8a97a3;margin-top:2px;">{_e(c["detalle"])}</div>' if c["detalle"] else ""}
+        <div style="padding:10px 0;border-top:1px solid #eef1f4;display:flex;justify-content:space-between;gap:16px;">
+          <span style="font-size:16px;font-weight:700;">{_e(c['desc'])}</span>
+          <span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;">{_e(c['importeStr'])}</span>
         </div>""" for c in f["conceptos"])
 
     iibb_line = (
@@ -508,8 +505,8 @@ def _factura_mobile_html(f: dict) -> str:
       </div>
     </div>
 
-    <div style="margin:18px 28px 0;background:#f7f8fa;border-radius:10px;text-align:center;font-size:14px;font-weight:600;padding:10px;">
-      CAE N° <span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span> · Vto. CAE <span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span>
+    <div style="margin:18px 28px 0;background:#f7f8fa;border-radius:10px;text-align:center;font-size:14px;padding:10px;">
+      CAE N° <span style="font-weight:700;font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span> · Vto. CAE <span style="font-weight:700;font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span>
     </div>
 
     <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 16px;">
