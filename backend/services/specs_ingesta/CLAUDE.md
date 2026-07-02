@@ -1,15 +1,18 @@
-# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F6 completas)
+# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F6 + F7a completas)
 
-> **Estado: F0-F6 completas.** Los 3 wrapper viejos (`services/{equipo,luces,generic}_html_extractor.py`)
-> **ya no existen** — se borraron en F6. `parse/` (primitivas HTML) + `parsers/` (los 4 parsers
-> grandes, movidos de `tools/`) + `queries/{resultado,bespoke,generic,detectar,extraer}.py` son la
-> fuente única, sin shims por delante — **cero `sys.path.insert()` hacks, cero lógica duplicada, cero
-> dispatcher fuera de `queries/extraer.py`**. `tools/*_parser.py` siguen como shims CLI-únicamente
-> (⏰ LEGACY-adyacente, no tocados por F6) para los `*_rebuild.sh` y 2 tests que importan por nombre.
+> **Estado: F0-F6 + F7a completas; falta F7b.** Los 3 wrapper viejos
+> (`services/{equipo,luces,generic}_html_extractor.py`) **ya no existen** — se borraron en F6. `parse/`
+> (primitivas HTML) + `parsers/` (los 4 parsers grandes, movidos de `tools/`) +
+> `queries/{resultado,bespoke,generic,detectar,extraer}.py` son la fuente única, sin shims por
+> delante — **cero `sys.path.insert()` hacks, cero lógica duplicada, cero dispatcher fuera de
+> `queries/extraer.py`**. `tools/*_parser.py` siguen como shims CLI-únicamente (⏰ LEGACY-adyacente, no
+> tocados por F6) para los `*_rebuild.sh` y 2 tests que importan por nombre.
 > `specs_ingesta.extract_from_html` (el barrel) importa DIRECTO de `queries/extraer.py`. `cli.py` es
 > el entry point offline — mismo `queries/extraer`, verificado byte-idéntico al del endpoint sobre el
-> mismo HTML. La capa `llm/` (suplemento offline-only) todavía no existe — eso es F7, la única fase
-> que falta.
+> mismo HTML. `commands/proponer.py::proponer_desde_unmatched` (F7a) es el único lado-escritura —
+> unmatched frecuente cruza el umbral → Canal C (`services.specs.encolar_propuesta`), verificado contra
+> data real + Postgres real. La capa `llm/` (suplemento offline-only) todavía no existe — eso es F7b,
+> la única pieza que falta.
 > Plan completo + fases → [`docs/PLAN_SPECS_INGESTA.md`](../../../docs/PLAN_SPECS_INGESTA.md) ·
 > tracking → issue [#1176](https://github.com/tixenre/rental/issues/1176) · rama aislada
 > `feature/specs-ingesta`, PR sin mergear hasta completar el módulo (convención "PR como hoja de ruta").
@@ -47,7 +50,7 @@ importa `specs_ingesta`. Tres canales (detalle en el plan):
 - **`llm/` SOLO lo importa `cli.py`.** Si algo en `queries/` o `parse/` importa de `llm/`, es un bug —
   rompe el split de runtime.
 
-## Estructura (F0-F6 completas; solo falta F7)
+## Estructura (F0-F6 + F7a completas; solo falta F7b)
 
 ```
 services/specs_ingesta/
@@ -68,7 +71,10 @@ services/specs_ingesta/
     generic.py    #   categorías sin parser — + filtro de ruido (package_weight, etc.)         ✓ F4
     detectar.py   #   detección de categoría, MAXIMIZADA contra el dataset real                ✓ F5
     extraer.py    #   entry point único (detecta + rutea) — usado por Railway Y cli.py          ✓ F5
-  commands/       # ESCRITURA — el embudo que aprende (propone-aprobás)         ✗ F7
+  commands/       # ESCRITURA — el embudo que aprende (propone-aprobás)
+    proponer.py   #   proponer_desde_unmatched — unmatched frecuente → Canal C ✓ F7a
+  llm/            # SUPLEMENTO OFFLINE-ONLY (solo cli.py importa de acá)        ✗ F7b
+    normalizador.py · buscador.py · validar.py
 ```
 
 **Invariante commands↔queries (igual que `specs`/`categorias`):** `commands/` puede importar de
@@ -163,3 +169,17 @@ services/specs_ingesta/
   citaba. Reescrito con el flujo real (§1 arriba). El resto de la staleness ya conocida de ese doc
   (§2/§5/§6, el workflow de seeders viejo) se dejó como estaba — está fuera del alcance de esta
   iniciativa y ya tiene su propio disclaimer.
+- **F7a — una tabla "huérfana" puede tener un CHECK constraint diseñado para OTRO productor.**
+  `spec_propuestas_pendientes` fue creada para el skill `gear-compatibility` (nunca le escribió) — su
+  `tipo` CHECK (`enum_option`/`spec_nueva`/`merge_specs`/`assign_spec`) no fue pensado para "unmatched
+  frecuente de una extracción HTML". Encajó igual: `spec_nueva` con un payload
+  `{categoria, label, label_normalizado, count, ejemplos}` alcanza (verificado, no supuesto — es
+  exactamente el ítem del ledger de reuso que el plan había dejado "pendiente probar en F7"). Si otro
+  productor futuro necesita un `tipo` que no esté en el CHECK, es un `ALTER TABLE...DROP/ADD CONSTRAINT`
+  aditivo (mismo patrón que F2.2 sobre `assign_spec`, ya en el schema) — no hace falta tabla nueva.
+- **F7a — el nivel de agregación importa: "unmatched" no es lo mismo por-HTML que por-batch.**
+  `proponer_desde_unmatched` recibe una LISTA de listas (`unmatched_por_html`), no una lista plana —
+  a propósito: contar por HTML-distinto (no por ocurrencia) es lo que evita que una sola página con una
+  tabla repetida (el mismo label 2 veces en el mismo documento) infle el conteo y dispare una propuesta
+  falsa. El test `test_mismo_label_repetido_en_un_html_cuenta_una_vez` es el caso testigo — sin la
+  dedup por HTML, 1 página con el label repetido 3 veces hubiera cruzado el umbral de 3 sola.

@@ -75,10 +75,10 @@ data.
 | Pieza candidata | Probe con data real | Estado |
 |---|---|---|
 | Parsers determinísticos B&H | Correr sobre las 54 páginas reales | **PROBADO ✓** (B0: 87% detección OK, 2 casos de ruido concretos, 0 errores) — se adopta **con** F4/F5, no tal cual |
-| `generic` como core canónico | Correr `extract_raw_pairs`/`resolve_pairs` sobre el dataset | pendiente — **probar en F1 antes de adoptar** |
-| `spec_render` como display único | Renderizar valores reales (lúmenes+unidad, rango, bool) **y un badge de provenance** | pendiente — **probar antes de delegar F2**; si no cubre provenance, extender |
+| `generic` como core canónico | Correr `extract_raw_pairs`/`resolve_pairs` sobre el dataset | **PROBADO ✓** (F1: adoptado como core de `parse/`+`queries/resolver.py`, verificado byte-a-byte) |
+| `spec_render` como display único | Renderizar valores reales (lúmenes+unidad, rango, bool) | **PROBADO ✓ parcial** (F2: display real verificado sobre las 54 páginas) — el **badge de provenance** sigue sin construir, es Iniciativa A4 |
 | `coerce_and_serialize` / `derive_lumens_from_lux` | Alimentar valores B&H reales + un lux/beam de datasheet conocido | pendiente — **probar en A4** |
-| Cola `spec_propuestas_pendientes` | Redactar un payload real (`enum_option`/`spec_nueva`) | pendiente — **probar en F7** |
+| Cola `spec_propuestas_pendientes` | Redactar un payload real (`spec_nueva`) desde unmatched real del dataset | **PROBADO ✓** (F7: `spec_nueva` con `{categoria, label, label_normalizado, count, ejemplos}` alcanza — verificado con el caso real de Modificadores, "interior color" 4x/"package weight" 6x, contra Postgres real) |
 | `value_funnel` (`mapear_valor`) | Confirmar que un enum real (FF→Full-frame) pasa end-to-end | tiene tests; **re-confirmar contra el dataset** |
 
 ## Decisión de arquitectura central: split por runtime
@@ -281,7 +281,21 @@ no importan ni uno ni otro. `llm/` solo lo importa `cli.py`.
   archivo borrado) y reescrita `docs/SISTEMA_SPECS.md` §1 (describía un flujo Firecrawl+LLM con
   endpoints que ya no existen — predata incluso el dispatcher viejo). Suite completa: 2481 passed / 20
   pre-existentes no relacionados.
-- **F7** — el embudo que aprende (`commands/proponer.py`) + capa LLM offline.
+- **F7a** ✅ — el embudo que aprende. Canal C cableado en `services/specs/` (`commands/propuestas.py`:
+  `encolar_propuesta`/`aplicar_propuesta`/`descartar_propuesta`, `queries/propuestas.py`:
+  `listar_propuestas_pendientes`) + `services/specs_ingesta/commands/proponer.py::proponer_desde_unmatched`
+  (agrupa `unmatched` de `resolve_pairs` por label normalizado a través de varios HTMLs, propone `spec_nueva`
+  cuando cruza un umbral de frecuencia — default 3 HTMLs distintos —, deduplicado contra lo ya pendiente).
+  Verificado contra data real (dataset de Modificadores_Luz: "interior color" 4x/"package weight" 6x se
+  proponen, "material of construction" 2x no cruza el umbral) + Postgres real (INSERT/UPDATE/CHECK
+  constraint/JSONB round-trip) + 7 tests permanentes (`test_specs_ingesta_proponer_db.py`, gate opt-in
+  `RESERVAS_DB_TEST=1`, mismo patrón que el resto de los `*_db.py`). **Regla dura: nunca muta el
+  registry** — `aplicar_propuesta` solo cierra el ítem de la cola después de que el humano ya editó el
+  registry a mano y re-sembró.
+- **F7b** (pendiente) — capa LLM offline (`llm/normalizador.py`/`buscador.py`/`validar.py`), cableada
+  solo en `cli.py`. Decisión de diseño abierta antes de escribir código: **cómo** invoca el LLM (API
+  directa con key propia vs. un modo semi-manual que arma el contexto para una sesión de Claude Code
+  interactiva) — ver discusión en la conversación con el dueño.
 
 Cada fase: verificar (pyflakes + suite + Postgres real vía clon local) antes de commit. Supervisor antes del PR
 `dev→main`.
