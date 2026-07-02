@@ -474,3 +474,35 @@ def test_crear_y_desactivar_cuenta_vacia(conn):
     c = crear_cuenta(conn, nombre="Caja Test Vacia ZZ", tipo="caja")
     desactivado = desactivar_cuenta(conn, c["id"])
     assert desactivado["activa"] is False
+
+
+def test_retiro_aporte_ajuste_extremo_a_extremo(conn):
+    # Gasto y transferencia ya se ejercen extremo-a-extremo (crear_movimiento)
+    # en otros tests de este archivo; retiro/aporte/ajuste NO tenían ningún test
+    # contra Postgres real (solo su validación estructural, pura, en
+    # test_contabilidad_movimientos.py) — auditoría 2026-07-02. Acá se prueba
+    # el camino de escritura real: validación + INSERT + derivación del saldo.
+    from contabilidad.commands.movimientos import crear_movimiento
+
+    efectivo = _cuenta_id(conn, "Efectivo")
+    banco = _cuenta_id(conn, "Banco")
+    base_efectivo = _saldo(conn, "Efectivo")
+    base_banco = _saldo(conn, "Banco")
+
+    # Retiro: un socio saca plata de una caja — sale del sistema, sin destino.
+    crear_movimiento(conn, tipo="retiro", monto=8000, cuenta_origen_id=efectivo, por="test")
+    assert _saldo(conn, "Efectivo") - base_efectivo == -8000
+
+    # Aporte: un socio mete plata — entra al sistema, sin origen.
+    crear_movimiento(conn, tipo="aporte", monto=15000, cuenta_destino_id=banco, por="test")
+    assert _saldo(conn, "Banco") - base_banco == 15000
+
+    # Ajuste: conciliación manual, puede ser de un solo lado (acá: solo origen,
+    # como una merma/pérdida en Efectivo — no exige el otro lado).
+    crear_movimiento(conn, tipo="ajuste", monto=500, cuenta_origen_id=efectivo,
+                     nota="Merma de caja", por="test")
+    assert _saldo(conn, "Efectivo") - base_efectivo == -8500  # retiro + ajuste acumulados
+
+    # Conservación: nada de esto tocó Banco más que el aporte, ni viceversa —
+    # las cajas no se contaminan entre sí sin un movimiento que las vincule.
+    assert _saldo(conn, "Banco") - base_banco == 15000
