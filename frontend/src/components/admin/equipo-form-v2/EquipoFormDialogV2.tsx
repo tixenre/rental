@@ -496,6 +496,16 @@ export function EquipoFormDialogV2({
     // cargado con "" — confirmado en vivo (equipo con override guardado
     // abría con el campo vacío pese al toggle ya en OFF).
     if (initial?.nombre_publico_override?.trim()) return;
+    // Sin molde de categoría no hay nada que auto-generar — bail ANTES de
+    // tocar el input. `nombrePublicoAuto` arranca en `true` por default y el
+    // toggle para apagarlo queda OCULTO cuando `autoGenDisponible` es falso
+    // (no hay molde), así que sin este chequeo el efecto seguía disparando en
+    // cada cambio de marca/modelo/specs y BORRABA silenciosamente el nombre
+    // que el usuario tipeó a mano — confirmado en vivo (modo creación: tipear
+    // el nombre público y después la marca lo vaciaba). No alcanza con que
+    // el toggle esté oculto: el efecto mismo tiene que respetar la ausencia
+    // de molde, no solo la UI.
+    if (!categoriaTemplate) return;
     // Buscar el output_config de cada spec en el template (las definiciones
     // viven en templateItems con tipo + output_config; los valores en specs).
     const tmplByLabel = new Map(
