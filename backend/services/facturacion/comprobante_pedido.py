@@ -6,7 +6,7 @@ este módulo solo la lee y transforma — NO recalcula (regla "el backend no rec
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -136,8 +136,15 @@ def _fecha_vto_pago(fecha_hasta: Optional[date], fecha_comprobante: date) -> dat
 
 
 def _parse_fecha(s) -> Optional[date]:
+    """`fecha_desde`/`fecha_hasta` vienen de columnas TIMESTAMP (`datetime.datetime`,
+    no `datetime.date`) — hay que chequear `datetime` ANTES que `date` porque
+    `datetime` es subclase de `date`: `isinstance(dt, date)` da True y devolvía
+    el datetime completo sin truncar. `_fecha_vto_pago` comparaba ese datetime
+    contra un `date` (`hoy`) y explotaba con TypeError en prod."""
     if not s:
         return None
+    if isinstance(s, datetime):
+        return s.date()
     if isinstance(s, date):
         return s
     s = str(s)[:10]
