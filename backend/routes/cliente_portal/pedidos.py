@@ -226,7 +226,7 @@ def cliente_pedidos(request: Request):
             pagos = conn.execute("""
                 SELECT monto, concepto, fecha
                 FROM alquiler_pagos
-                WHERE pedido_id = %s
+                WHERE pedido_id = %s AND NOT anulado
                 ORDER BY fecha
             """, (p["id"],)).fetchall()
             d["pagos"] = [row_to_dict(pg) for pg in pagos]
@@ -276,7 +276,7 @@ def cliente_pedido_detalle(id: int, request: Request):
 
         pagos = conn.execute("""
             SELECT monto, concepto, fecha FROM alquiler_pagos
-            WHERE pedido_id = %s ORDER BY fecha
+            WHERE pedido_id = %s AND NOT anulado ORDER BY fecha
         """, (id,)).fetchall()
         d["pagos"] = [row_to_dict(p) for p in pagos]
 

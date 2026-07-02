@@ -354,7 +354,14 @@ export function PagosSidebar({
   total: number;
   pagado: number;
   saldo: number;
-  pagos: { id: number; monto: number; concepto: string | null; fecha: string }[];
+  pagos: {
+    id: number;
+    monto: number;
+    concepto: string | null;
+    fecha: string;
+    anulado?: boolean;
+    anulado_motivo?: string | null;
+  }[];
 }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -375,9 +382,10 @@ export function PagosSidebar({
   });
 
   const delMut = useMutation({
-    mutationFn: (pagoId: number) => adminApi.deletePago(pedidoId, pagoId),
+    mutationFn: ({ pagoId, motivo }: { pagoId: number; motivo: string }) =>
+      adminApi.anularPago(pedidoId, pagoId, motivo),
     onSuccess: () => {
-      toast.success("Pago eliminado");
+      toast.success("Pago anulado");
       qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
     },
@@ -407,21 +415,43 @@ export function PagosSidebar({
       {pagos.length > 0 && (
         <div className="divide-y hairline rounded-md border hairline overflow-hidden">
           {pagos.map((pg) => (
-            <div key={pg.id} className="flex items-center justify-between px-3 py-2 text-xs">
+            <div
+              key={pg.id}
+              className={cn(
+                "flex items-center justify-between px-3 py-2 text-xs",
+                pg.anulado && "opacity-50",
+              )}
+            >
               <div>
-                <div className="tabular-nums font-medium text-ink">{fmtArs(pg.monto)}</div>
+                <div
+                  className={cn("tabular-nums font-medium text-ink", pg.anulado && "line-through")}
+                >
+                  {fmtArs(pg.monto)}
+                </div>
                 <div className="text-muted-foreground">
-                  {pg.fecha}
-                  {pg.concepto ? ` · ${pg.concepto}` : ""}
+                  <span className={cn(pg.anulado && "line-through")}>
+                    {pg.fecha}
+                    {pg.concepto ? ` · ${pg.concepto}` : ""}
+                  </span>
+                  {pg.anulado && pg.anulado_motivo && (
+                    <span className="text-destructive"> · Anulado: {pg.anulado_motivo}</span>
+                  )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => delMut.mutate(pg.id)}
-                className="rounded p-1 text-muted-foreground hover:text-destructive transition"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              {!pg.anulado && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const motivo = window.prompt("Motivo de la anulación del pago:");
+                    if (motivo && motivo.trim())
+                      delMut.mutate({ pagoId: pg.id, motivo: motivo.trim() });
+                  }}
+                  disabled={delMut.isPending}
+                  className="rounded p-1 text-muted-foreground hover:text-destructive transition"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           ))}
         </div>

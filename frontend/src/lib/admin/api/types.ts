@@ -559,6 +559,11 @@ export interface PagoLogRow {
   destinatario: string | null;
   metodo: string | null;
   fecha: string;
+  created_by: string | null;
+  anulado: boolean;
+  anulado_por: string | null;
+  anulado_at: string | null;
+  anulado_motivo: string | null;
   numero_pedido: number | null;
   cliente_nombre: string | null;
 }
@@ -1008,6 +1013,11 @@ export type PedidoPago = {
   concepto: string | null;
   fecha: string;
   created_at?: string;
+  created_by?: string | null;
+  anulado?: boolean;
+  anulado_por?: string | null;
+  anulado_at?: string | null;
+  anulado_motivo?: string | null;
 };
 
 export type Pedido = {

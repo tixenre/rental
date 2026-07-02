@@ -18,9 +18,33 @@ saldo de cada cuenta se deriva de estos movimientos + esos cobros
 `validar_estructura_movimiento` es pura (testeable sin DB). El resto toca la
 conexión. La plata nunca se borra: `anular_movimiento` hace soft-delete con motivo.
 Lectura → `queries/movimientos.py`.
+
+**TIPO de cuenta vs TIPO de movimiento (resuelto 2026-07-02, confirmado con el dueño):** la
+tabla de arriba dice contra qué CANTIDAD de cuentas es válido cada tipo; esto agrega qué TIPO
+de cuenta (`caja`/`banco`/`fondo` vs `socio`, cuenta corriente) puede tocar cada uno. Un socio
+humano (Pablo/Tincho) tiene su plata en un banco propio, fuera del sistema — su cuenta acá es
+**puro balance de deuda**, nunca plata real:
+
+- **`retiro`/`aporte` están BLOQUEADOS contra una cuenta `socio`** (`_validar_cuentas_y_categoria`):
+  representan plata física entrando/saliendo de una caja, y una cuenta corriente no tiene "caja"
+  que mover — no tienen sentido de negocio ahí.
+- **`transferencia`/`ajuste` siguen permitidos sin restricción**: `transferencia` DEBE poder tocar
+  una cuenta `socio` (así funciona `commands/rendicion.py::saldar`, que arma transferencias
+  Caja↔Fondo Rambla); un `ajuste` contra una cuenta `socio` puede ser una corrección legítima de
+  arranque de cuenta corriente.
+- **`gasto` está PERMITIDO a propósito contra una cuenta `socio`** (como origen — nunca tuvo
+  destino): es el caso "el socio pagó un gasto de Rambla con su propia plata". Ni
+  `gastos_por_categoria` ni `ganancia_neta` (`queries/pyl.py`) filtran por tipo de cuenta origen
+  — solo por moneda — así que un `gasto` con origen una cuenta de socio **cuenta en el P&L
+  categorizado** y a la vez **baja la deuda del socio** (`egresos` resta en la fórmula de cuenta
+  corriente de `queries/saldos.py`: Rambla ahora le debe eso). Un solo movimiento cubre el caso
+  completo, sin código extra más allá de dejarlo pasar la validación.
+
+Fijado por `test_retiro_aporte_bloqueados_contra_cuenta_socio` (bloqueo) y
+`test_gasto_contra_cuenta_socio_cuenta_en_pyl_y_baja_deuda` (permiso + efecto doble).
 """
 
-from contabilidad.constants import METODOS_MOVIMIENTO, TIPOS_MOVIMIENTO
+from contabilidad.constants import METODOS_MOVIMIENTO, SOCIOS_HUMANOS, TIPOS_MOVIMIENTO
 from contabilidad.queries.movimientos import listar_movimientos, obtener_movimiento
 
 # Campos que se pueden editar de un movimiento ya creado (el tipo no se cambia:
@@ -73,6 +97,45 @@ def _cuentas_validas(conn) -> set[int]:
     return {r["id"] for r in rows}
 
 
+def _validar_cuentas_y_categoria(conn, tipo, cuenta_origen_id, cuenta_destino_id, categoria_id) -> None:
+    """Existencia+actividad de las cuentas, misma moneda si hay origen y destino,
+    categoría existente+activa, y retiro/aporte bloqueados contra una cuenta de socio
+    (ver docstring del módulo). Toca DB (a diferencia de `validar_estructura_movimiento`,
+    que es pura). La usan `crear_movimiento` Y `editar_movimiento` — antes solo la
+    tenía crear, así que editar podía dejar un movimiento apuntando a una cuenta
+    inactiva/inexistente o mezclando monedas (auditoría 2026-07-02)."""
+    validas = _cuentas_validas(conn)
+    for cid in (cuenta_origen_id, cuenta_destino_id):
+        if cid and cid not in validas:
+            raise ValueError("La cuenta indicada no existe o está inactiva.")
+    ids = [cid for cid in (cuenta_origen_id, cuenta_destino_id) if cid]
+    info_por_id = {}
+    if ids:
+        ph = ", ".join("%s" for _ in ids)
+        rows = conn.execute(
+            f"SELECT id, moneda, socio FROM cuentas WHERE id IN ({ph})", tuple(ids)
+        ).fetchall()
+        info_por_id = {r["id"]: r for r in rows}
+    # Una transferencia/ajuste entre dos cuentas debe ser de la misma moneda
+    # (no hay conversión automática; los saldos no se mezclan).
+    if cuenta_origen_id and cuenta_destino_id:
+        if info_por_id[cuenta_origen_id]["moneda"] != info_por_id[cuenta_destino_id]["moneda"]:
+            raise ValueError("No se puede transferir entre cuentas de distinta moneda.")
+    if tipo in ("retiro", "aporte"):
+        for cid in (cuenta_origen_id, cuenta_destino_id):
+            if cid and info_por_id[cid]["socio"] in SOCIOS_HUMANOS:
+                raise ValueError(
+                    f"Un {tipo} no puede tocar la cuenta corriente de un socio (no representa "
+                    "plata real en una caja) — usá gasto, transferencia o ajuste."
+                )
+    if categoria_id:
+        ok = conn.execute(
+            "SELECT 1 FROM gasto_categorias WHERE id = %s AND activa = TRUE", (categoria_id,)
+        ).fetchone()
+        if not ok:
+            raise ValueError("La categoría indicada no existe o está inactiva.")
+
+
 def _mes_de_fecha(fecha) -> str:
     if not fecha:
         from services.fechas import mes_actual_ar
@@ -80,11 +143,35 @@ def _mes_de_fecha(fecha) -> str:
     return str(fecha)[:7]
 
 
+# Namespace del advisory lock para serializar cerrar_mes/reabrir_mes contra
+# crear/editar/anular movimiento (y actualizar_comprobante) del mismo mes
+# contable. Arbitrario y privado de este flujo — mismo patrón que
+# _ADVISORY_NS_PEDIDO (routes/alquileres/core.py, 5390412) y
+# _ADVISORY_NS_ESTUDIO (routes/estudio.py, 5390413); siguiente número libre.
+_ADVISORY_NS_CONTAB_MES = 5390420
+
+
+def _lock_mes(conn, mes: str) -> None:
+    """xact-scoped (se libera solo al commit/rollback de `conn`): sin esto, un
+    `cerrar_mes` puede leer los movimientos de un mes en T0 y commitear su foto
+    DESPUÉS de que otro request haya insertado un movimiento con fecha de ese
+    mismo mes (que pasó `_exigir_mes_abierto` porque el cierre todavía no había
+    commiteado) — el mes queda "cerrado" con una foto que no incluye ese
+    movimiento, que además ya no se puede tocar (auditoría 2026-07-02)."""
+    try:
+        anio, mo = mes.split("-")
+        key = int(anio) * 100 + int(mo)   # 'YYYY-MM' → YYYYMM, key natural
+    except (ValueError, AttributeError):
+        key = 0
+    conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", (_ADVISORY_NS_CONTAB_MES, key))
+
+
 def _exigir_mes_abierto(conn, fecha) -> None:
     """Traba tocar un movimiento cuyo mes contable está cerrado (#809 Fase 6)."""
     from contabilidad.queries.cierres import mes_cerrado
 
     mes = _mes_de_fecha(fecha)
+    _lock_mes(conn, mes)
     if mes_cerrado(conn, mes):
         raise ValueError(
             f"El mes {mes} está cerrado. Reabrilo desde Rendición para tocar movimientos de esa fecha."
@@ -102,27 +189,7 @@ def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino
     validar_estructura_movimiento(tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id)
     _validar_metodo(metodo)
     _exigir_mes_abierto(conn, fecha)
-
-    validas = _cuentas_validas(conn)
-    for cid in (cuenta_origen_id, cuenta_destino_id):
-        if cid and cid not in validas:
-            raise ValueError("La cuenta indicada no existe o está inactiva.")
-    # Una transferencia/ajuste entre dos cuentas debe ser de la misma moneda
-    # (no hay conversión automática; los saldos no se mezclan).
-    if cuenta_origen_id and cuenta_destino_id:
-        rows = conn.execute(
-            "SELECT id, moneda FROM cuentas WHERE id IN (%s, %s)",
-            (cuenta_origen_id, cuenta_destino_id),
-        ).fetchall()
-        mon = {r["id"]: r["moneda"] for r in rows}
-        if mon.get(cuenta_origen_id) != mon.get(cuenta_destino_id):
-            raise ValueError("No se puede transferir entre cuentas de distinta moneda.")
-    if categoria_id:
-        ok = conn.execute(
-            "SELECT 1 FROM gasto_categorias WHERE id = %s AND activa = TRUE", (categoria_id,)
-        ).fetchone()
-        if not ok:
-            raise ValueError("La categoría indicada no existe o está inactiva.")
+    _validar_cuentas_y_categoria(conn, tipo, cuenta_origen_id, cuenta_destino_id, categoria_id)
 
     beneficiario = (beneficiario or "").strip() or None
     cur = conn.execute(
@@ -164,6 +231,10 @@ def editar_movimiento(conn, mov_id: int, *, campos: dict, por=None) -> dict:
         propuesta.get("cuenta_destino_id"), propuesta.get("categoria_id"),
     )
     _validar_metodo(propuesta.get("metodo"))
+    _validar_cuentas_y_categoria(
+        conn, actual["tipo"], propuesta.get("cuenta_origen_id"),
+        propuesta.get("cuenta_destino_id"), propuesta.get("categoria_id"),
+    )
 
     sets, params = [], []
     for k in _CAMPOS_EDITABLES:
@@ -187,6 +258,25 @@ def editar_movimiento(conn, mov_id: int, *, campos: dict, por=None) -> dict:
     sets.append("updated_at = CURRENT_TIMESTAMP")
     params.append(mov_id)
     conn.execute(f"UPDATE movimientos SET {', '.join(sets)} WHERE id = %s", tuple(params))
+    return obtener_movimiento(conn, mov_id)
+
+
+def actualizar_comprobante(conn, mov_id: int, *, key: str, por=None) -> dict:
+    """Persiste la key del comprobante ya subido a storage (el upload en sí es
+    infra HTTP, se queda en el route). Pasa por el mismo candado que
+    crear/editar/anular — antes el route hacía un UPDATE directo, saltándose
+    `_exigir_mes_abierto` y el chequeo de `anulado` (auditoría 2026-07-02)."""
+    actual = obtener_movimiento(conn, mov_id)
+    if not actual:
+        raise ValueError("El movimiento no existe.")
+    if actual["anulado"]:
+        raise ValueError("No se puede adjuntar un comprobante a un movimiento anulado.")
+    _exigir_mes_abierto(conn, actual["fecha"])
+    conn.execute(
+        "UPDATE movimientos SET comprobante_url = NULL, comprobante_key = %s, "
+        "updated_by = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+        (key, por, mov_id),
+    )
     return obtener_movimiento(conn, mov_id)
 
 

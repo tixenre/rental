@@ -105,23 +105,20 @@ export const pedidosMethods = {
     metodo?: string;
     desde?: string;
     hasta?: string;
+    incluirAnulados?: boolean;
   }) => {
     const sp = new URLSearchParams();
     if (params?.destinatario) sp.set("destinatario", params.destinatario);
     if (params?.metodo) sp.set("metodo", params.metodo);
     if (params?.desde) sp.set("desde", params.desde);
     if (params?.hasta) sp.set("hasta", params.hasta);
+    if (params?.incluirAnulados) sp.set("incluir_anulados", "true");
     const qs = sp.toString();
     return authedJson<PagosLogResp>(`/api/admin/pagos${qs ? `?${qs}` : ""}`);
   },
-  deletePago: async (id: number, pagoId: number) => {
-    const res = await authedFetch(`/api/alquileres/${id}/pagos/${pagoId}`, { method: "DELETE" });
-    if (!res.ok) {
-      const detail = await res.json().catch(() => ({}));
-      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
-    }
-    return res.json();
-  },
+  /** Anula un pago (soft-delete con motivo) — reemplaza el viejo DELETE real. */
+  anularPago: (id: number, pagoId: number, motivo: string) =>
+    authedPostJson<Pedido>(`/api/alquileres/${id}/pagos/${pagoId}/anular`, { motivo }),
 
   // clientes
   listClientes: (params: { q?: string; per_page?: number } = {}) => {

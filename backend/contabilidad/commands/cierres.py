@@ -15,12 +15,14 @@ import json
 from reportes.cierres import rango_mes, validar_mes
 
 from contabilidad.queries.cierres import cierre_de, snapshot_de
+from contabilidad.commands.movimientos import _lock_mes
 
 
 def cerrar_mes(conn, mes: str, por: str | None) -> dict:
     """Congela la foto del mes (ganancia + rendición + gastos) y lo traba.
     Idempotente: re-cerrar recalcula la foto con los datos actuales."""
     validar_mes(mes)
+    _lock_mes(conn, mes)  # serializa contra crear/editar/anular movimiento del mes
     from contabilidad.queries.movimientos import gastos_por_categoria
     from contabilidad.queries.pyl import ganancia_neta
     from contabilidad.queries.rendicion import rendicion
@@ -48,6 +50,7 @@ def cerrar_mes(conn, mes: str, por: str | None) -> dict:
 def reabrir_mes(conn, mes: str) -> bool:
     """Borra el cierre → el mes vuelve a editarse y calcularse en vivo."""
     validar_mes(mes)
+    _lock_mes(conn, mes)
     existia = cierre_de(conn, mes) is not None
     if existia:
         conn.execute("DELETE FROM contabilidad_cierres WHERE mes = %s", (mes,))

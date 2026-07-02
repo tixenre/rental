@@ -61,6 +61,7 @@ def ingresos_derivados(conn, desde: str | None = None, hasta: str | None = None)
         FROM alquiler_pagos ap
         JOIN alquileres al ON al.id = ap.pedido_id
         WHERE ap.destinatario IS NOT NULL
+          AND NOT ap.anulado
           AND al.fecha_desde >= %s::date
     """
     params: list = [LIQUIDACION_INICIO]
@@ -187,7 +188,8 @@ def saldos(conn, as_of: str | None = None) -> dict:
     socios = [f for f in filas if f["es_cuenta_corriente"]]
     totales = _totales_por_moneda(cajas)  # el disponible es solo plata real del negocio
     return {
-        "cuentas": filas,   # todas (compat: saldo_de_cuenta, baja lógica)
+        "cuentas": filas,   # solo activas (_cuentas_activas filtra) — saldo_de_cuenta
+                            # tiene su propio fallback para inactivas/inexistentes
         "cajas": cajas,
         "socios": socios,
         "totales": totales,

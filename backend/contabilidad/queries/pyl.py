@@ -30,11 +30,6 @@ def _resumen_devengado(conn, mes: str) -> dict:
     return data["resumen"]
 
 
-def ingresos_devengados(conn, mes: str) -> int:
-    """Total facturado (devengado) del mes — bruto, antes del reparto (foto si está cerrado)."""
-    return int(_resumen_devengado(conn, mes)["total"])
-
-
 def ganancia_neta(conn, mes: str) -> dict:
     """Ganancia de Rambla del mes = **parte de Rambla − gastos**. Expone el desglose
     completo: facturado (devengado total), comisiones a dueños y gastos por categoría.
