@@ -18,12 +18,21 @@ import {
   Upload,
   Search,
   Fingerprint,
+  MoreHorizontal,
+  Power,
 } from "lucide-react";
 
 import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
 import { usePadronLookup } from "@/lib/admin/usePadronLookup";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/design-system/ui/dropdown-menu";
 
 export const Route = createLazyFileRoute("/admin/facturacion/emisores")({
   component: EmisoresPage,
@@ -202,44 +211,38 @@ function EmisorCard({
             <div className="text-xs text-muted-foreground mt-1 italic">{emisor.notas}</div>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {emisor.cert_cargado && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <button
               type="button"
-              onClick={() => certInfo.mutate()}
-              disabled={certInfo.isPending}
-              title="Ver Nº de serie del certificado — comparar contra el Computador Fiscal delegado en ARCA"
-              className="h-8 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5"
+              aria-label={`Acciones de ${emisor.nombre}`}
+              className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-ink hover:bg-muted shrink-0"
             >
-              <Fingerprint className="h-3.5 w-3.5" />
-              {certInfo.isPending ? "Leyendo…" : "Ver cert"}
+              <MoreHorizontal className="h-4 w-4" />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={onCert}
-            className="h-8 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5"
-          >
-            <KeyRound className="h-3.5 w-3.5" />
-            {emisor.cert_cargado ? "Renovar cert" : "Cargar cert"}
-          </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            className="h-8 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Editar
-          </button>
-          <button
-            type="button"
-            onClick={() => toggle.mutate()}
-            disabled={toggle.isPending}
-            className="h-8 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink"
-          >
-            {emisor.activo ? "Desactivar" : "Activar"}
-          </button>
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {emisor.cert_cargado && (
+              <DropdownMenuItem onClick={() => certInfo.mutate()} disabled={certInfo.isPending}>
+                <Fingerprint className="mr-2 h-4 w-4" />
+                {certInfo.isPending ? "Leyendo…" : "Ver cert"}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={onCert}>
+              <KeyRound className="mr-2 h-4 w-4" />
+              {emisor.cert_cargado ? "Renovar cert" : "Cargar cert"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => toggle.mutate()} disabled={toggle.isPending}>
+              <Power className="mr-2 h-4 w-4" />
+              {emisor.activo ? "Desactivar" : "Activar"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {certInfo.data && (
         <div className="rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs space-y-1 font-mono">
