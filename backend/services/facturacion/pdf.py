@@ -480,7 +480,7 @@ def _factura_mobile_html(f: dict) -> str:
         totales_iva = f"""
         <div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#5b6875;padding:2px 0;"><span>Neto gravado</span><span style="font-variant-numeric:tabular-nums;">{_e(f['tot']['netoStr'])}</span></div>
         <div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#5b6875;padding:2px 0;"><span>IVA {_e(f['tot']['ivaPct'])}</span><span style="font-variant-numeric:tabular-nums;">{_e(f['tot']['ivaStr'])}</span></div>
-        <div style="height:1px;background:#dfe4e8;margin:6px 0;"></div>"""
+        <div style="height:2px;background:#c9d0d6;margin:6px 0;"></div>"""
     else:
         totales_iva = ""
 
@@ -549,10 +549,10 @@ def _factura_mobile_html(f: dict) -> str:
     <div style="padding:20px 28px 24px;background:#f7f8fa;display:flex;gap:20px;align-items:flex-start;">
       <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:12px;padding:8px;">{qr_block}</div>
       <div style="flex:1;min-width:0;">{totales_iva}
-        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;">
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Total</span>
+          <span style="font-size:34px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
         </div>
-        <div style="font-size:34px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;text-align:right;margin-top:2px;">{_e(f['tot']['totalStr'])}</div>
       </div>
     </div>
 """
