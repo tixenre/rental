@@ -600,6 +600,91 @@ con CTA de WhatsApp en el carrito; **fail-open** (setting corrupto/ausente → 0
 validación de fecha/hora genérica recreada o duplicada fuera del módulo, o `date.today()` donde debería ir
 `now_ar()`. Cómo → el propio docstring de `services/fechas.py`; tracking #1126.
 
+### 2026-07-02 — El editor de pedidos admin cotiza con el precio de línea congelado, no con el de catálogo
+
+El editor de pedidos (`pedidos.$id.lazy.tsx`) mostraba el total "en vivo" recotizando contra `/api/cotizar`,
+que para ítems de catálogo siempre re-busca el precio **actual** de `equipos` — ignorando el `precio_jornada`
+ya persistido/editado del pedido. Eso podía divergir del `monto_total` que efectivamente se guarda
+(`_recalcular_total_pedido`, que sí usa el precio de línea congelado), mostrando "100% pagado" en la pantalla
+del pedido mientras la reconciliación mensual (que lee `monto_total`/`monto_pagado` directo de la base) lo
+marcaba como sobrepagado — dos totales del mismo pedido. `/api/cotizar` ahora acepta `respetar_precio_item`
+(solo lo honra una sesión admin): usa el precio de línea que manda el front en vez de recotizar contra
+`equipos`; el editor de pedidos lo activa siempre. La pantalla de Cobranza además deja de esconder un
+excedente cobrado (antes clampeaba a 0): si se cobró de más se muestra explícito, en vez de descubrirse
+recién en la reconciliación. El supervisor marca una pantalla que recotice un pedido YA EXISTENTE contra el
+precio de catálogo en vez del precio de línea persistido. PR #1181.
+
+### 2026-07-02 — `backend/contabilidad/` reorganizado CQRS-lite (`queries/`+`commands/`), espejo de `services/specs/`
+
+El motor de contabilidad (_2026-06-07_) se reorganizó en `queries/` (lectura, nunca muta) + `commands/` (única
+puerta de mutación) + `constants.py` (lo que ambos lados necesitan: cobradores, tipos de cuenta/movimiento,
+partes de la rendición) — mismo patrón CQRS-lite que `services/specs/`/`services/specs_ingesta/`. **Move
+verbatim, no rewrite**: cero cambio de lógica/SQL, confirmado por los 51 tests puros + 29 tests de integración
+(Postgres real) en verde byte-a-byte. Invariante dura: `commands/` puede importar de `queries/`; `queries/`
+**nunca** de `commands/` — confirmado al hacer el split que ningún query del paquete necesitaba nada de
+`commands/` (es un motor mayormente de lectura, 10 puntos de mutación reales). De paso se consolidó `PARTES`
+(estaba duplicada byte-idéntica en `rendicion.py` y `reporte_mensual.py`) en `constants.py` — una sola forma.
+El supervisor marca lógica de escritura nueva agregada a `queries/`, o un query importando de `commands/`.
+Estructura completa → `backend/contabilidad/CLAUDE.md`; tracking #1184.
+
+### 2026-07-02 — Auditoría de `backend/contabilidad/`: bordes reforzados (edición, locking, auditoría de pagos)
+
+A pedido del dueño tras el split CQRS-lite, 3 auditorías en paralelo (corrección/concurrencia, seguridad HTTP,
+duplicación/gaps de tests) sobre `backend/contabilidad/` completo: **el núcleo (fórmulas de saldo, derivación,
+soft-delete, multi-moneda en creación) estaba bien hecho y bien testeado — los problemas reales estaban en los
+bordes.** Se implementaron los 19 hallazgos. Los 3 bugs reales: (1) `editar_movimiento` no repetía las
+validaciones de `crear_movimiento` (existencia/actividad de cuenta, misma moneda, categoría activa) — se podía
+editar una transferencia para que apunte a una cuenta de OTRA moneda sin error, violando ARS≠USD; extraído a
+`_validar_cuentas_y_categoria`, reusado por ambas. (2) `alquiler_pagos` (la tabla que alimenta todo el motor)
+no tenía actor ni soft-delete — `eliminar_pago` hacía `DELETE` real, sin motivo; ahora tiene
+`created_by`/`anulado`/`anulado_por`/`anulado_at`/`anulado_motivo` (mismo patrón que `movimientos`),
+`DELETE→POST .../anular` con motivo obligatorio, y los 7 SELECT que suman `alquiler_pagos` (incluido el
+`SALDADO_CTE` de `reportes/liquidacion.py`, compartido por 3 consumidores) filtran `NOT anulado`. (3)
+`subir_comprobante` escribía SQL directo saltándose el motor (sin candado de mes cerrado, sin chequear
+`anulado`, sin actor) — exactamente el escenario que el propio `CLAUDE.md` del paquete advertía; ahora pasa por
+`commands.movimientos.actualizar_comprobante`.
+
+Robustez agregada: `pg_advisory_xact_lock` (mismo patrón que `services/facturacion/engine.py`/
+`routes/talleres.py`) entre `cerrar_mes`/`reabrir_mes` y crear/editar/anular movimiento del mismo mes —
+**verificado con un test de concurrencia real de dos conexiones** (no solo en teoría): sin el lock, un gasto
+podía colarse en un mes "recién cerrado" fuera de la foto; con el lock, B espera a que A commitee y después es
+rechazado correctamente. `desactivar_cuenta` toma `FOR UPDATE` (mismo método de verificación, B esperó los 5s
+reales del lock). Rate limiting (`ADMIN_WRITE_LIMIT`/`ADMIN_UPLOAD_LIMIT` en `rate_limit.py`) en los 13
+endpoints de escritura de `contabilidad.py`/`pagos.py` (ninguno lo tenía). Cotas `Field(...)` en los 8 modelos
+Pydantic — el `lt=2_147_483_647` en ids es lo que de verdad cierra la puerta a `NumericValueOutOfRange` crudo
+de Postgres — más el decorator `@map_pg_errors` (nuevo, en `routes/contabilidad.py`, reusado por `pagos.py`)
+que traduce `UniqueViolation`/`NumericValueOutOfRange` a 400 limpio en vez de filtrar el mensaje interno de
+Postgres vía el handler global. `idx_cuentas_socio` ahora único solo entre cuentas activas (simétrico con
+`cuentas_nombre_activa_uq` — antes dar de baja una cuenta de socio bloqueaba para siempre crear una nueva
+activa con ese socio). 8 tests nuevos candado (`editar_cuenta` no tenía ninguno pese a usarse en producción;
+`ajuste` con origen+destino; fallback de `saldo_de_cuenta`; anular un saldado de rendición ya registrado —
+documenta que `ya_transferido` excluye el anulado pero `_movimientos_rendicion` lo sigue mostrando, intencional).
+Ambigüedad dejada sin resolver a propósito en esta pasada (retiro/aporte/gasto/ajuste contra una cuenta
+CORRIENTE de socio) — **resuelta después, ver _2026-07-02 — Tipo de movimiento vs tipo de cuenta_ más abajo**.
+El supervisor marca: un `UPDATE`
+directo a `movimientos`/`alquiler_pagos` fuera de `commands/`, un endpoint de escritura de contabilidad/pagos
+sin `@limiter.limit`, o un `except Exception` nuevo en esos routes sin pasar por `map_pg_errors`. Rama aislada
+`fix/contabilidad-auditoria` (PR sin mergear, hoja de ruta), sobre `feature/contabilidad-cqrs`; tracking #1184.
+
+### 2026-07-02 — Tipo de movimiento vs tipo de cuenta: retiro/aporte bloqueados contra un socio, gasto permitido a propósito
+
+Resuelve la ambigüedad que la auditoría anterior dejó documentada-sin-bloquear. Confirmado con el dueño: un
+socio humano (Pablo/Tincho) tiene su plata real en un banco propio, **fuera del sistema** — su cuenta acá
+(`SOCIOS_HUMANOS`) es **puro balance de deuda**, nunca plata física. Con eso claro: **`retiro`/`aporte`
+quedan BLOQUEADOS contra una cuenta de socio** (`_validar_cuentas_y_categoria`, `commands/movimientos.py`) —
+representan plata física entrando/saliendo de una caja real, sin sentido contra un balance de deuda.
+**`transferencia`/`ajuste` siguen permitidos sin cambios** (`saldar()` necesita tocar cuentas de socio).
+**`gasto` queda PERMITIDO a propósito** contra una cuenta de socio como origen — es el caso real "el socio
+pagó un gasto de Rambla con su propia plata": ni `gastos_por_categoria` ni `ganancia_neta` filtran por tipo
+de cuenta origen (solo por moneda), así que un solo movimiento **cuenta en el P&L categorizado Y baja la
+deuda del socio** (`egresos` resta en la fórmula de cuenta corriente) — sin necesitar un tipo de movimiento
+nuevo. El caso inverso ("Rambla pagó algo de Pablo") ya se resolvía con 2 movimientos: `gasto` desde una caja
+real + `ajuste` con destino=socio (sin cambios). Mismo commit/rama que la auditoría de bordes
+(`fix/contabilidad-auditoria` → PR #1195, sin mergear); tests:
+`test_retiro_aporte_bloqueados_contra_cuenta_socio`, `test_gasto_contra_cuenta_socio_cuenta_en_pyl_y_baja_deuda`.
+El supervisor marca un `retiro`/`aporte` nuevo que se le vuelva a permitir a una cuenta de socio, o un tipo de
+movimiento nuevo inventado para el caso "el socio pagó un gasto de Rambla" en vez de reusar `gasto`.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

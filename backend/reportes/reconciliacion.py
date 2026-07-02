@@ -33,7 +33,7 @@ def reconciliar(conn) -> dict:
         FROM alquileres a
         LEFT JOIN (
             SELECT pedido_id, COALESCE(SUM(monto), 0) AS pagado
-            FROM alquiler_pagos GROUP BY pedido_id
+            FROM alquiler_pagos WHERE NOT anulado GROUP BY pedido_id
         ) p ON p.pedido_id = a.id
         WHERE a.estado <> 'cancelado'
           AND a.monto_total > 0
@@ -45,14 +45,17 @@ def reconciliar(conn) -> dict:
     ).fetchall()
 
     # 2. La columna monto_pagado no coincide con la suma del ledger (cache stale o
-    #    escritura por fuera del recálculo).
+    #    escritura por fuera del recálculo). NOT anulado: monto_pagado ya excluye
+    #    los pagos anulados (_recalcular_monto_pagado, #1184) — la comparación
+    #    tiene que usar la misma fuente o cada pago anulado marcaría un falso
+    #    divergente.
     divergentes = conn.execute(
         f"""
         SELECT a.id
         FROM alquileres a
         LEFT JOIN (
             SELECT pedido_id, COALESCE(SUM(monto), 0) AS pagado
-            FROM alquiler_pagos GROUP BY pedido_id
+            FROM alquiler_pagos WHERE NOT anulado GROUP BY pedido_id
         ) p ON p.pedido_id = a.id
         WHERE a.estado <> 'cancelado'
           AND a.monto_pagado <> COALESCE(p.pagado, 0)
@@ -95,7 +98,9 @@ def reconciliar(conn) -> dict:
             WHERE al.updated_at > c.cerrado_at
                OR EXISTS (
                    SELECT 1 FROM alquiler_pagos ap
-                   WHERE ap.pedido_id = al.id AND ap.created_at > c.cerrado_at
+                   WHERE ap.pedido_id = al.id
+                     AND (ap.created_at > c.cerrado_at
+                          OR ap.anulado_at > c.cerrado_at)
                )
             ORDER BY al.id
             """

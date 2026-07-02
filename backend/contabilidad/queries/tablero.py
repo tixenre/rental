@@ -1,4 +1,4 @@
-"""Tablero financiero (#809) — compone las miradas en una sola respuesta.
+"""Tablero financiero (#809) — compone las miradas en una sola respuesta. Nunca muta.
 
 1. **Disponible**: cuánta plata hay y dónde (saldos por caja). Plata percibida.
 2. **Ganancia del mes**: ingresos devengados − gastos. Resultado del negocio.
@@ -7,9 +7,11 @@ La rendición / quién le debe a quién vive en la cuenta corriente de socios
 (`saldos().socios`, que ya viaja en `disponible`).
 """
 
-from contabilidad.pyl import ganancia_neta
-from contabilidad.saldos import saldos
 from services.fechas import mes_actual_ar
+
+from contabilidad.queries.cierres import cierre_de
+from contabilidad.queries.pyl import ganancia_neta
+from contabilidad.queries.saldos import saldos
 
 
 def mes_actual() -> str:
@@ -17,8 +19,6 @@ def mes_actual() -> str:
 
 
 def tablero(conn, mes: str | None = None) -> dict:
-    from contabilidad.cierres import cierre_de
-
     mes = mes or mes_actual()
     disponible = saldos(conn)
     gan = ganancia_neta(conn, mes)

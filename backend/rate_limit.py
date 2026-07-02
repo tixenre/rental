@@ -24,3 +24,12 @@ limiter = Limiter(
     # solo se omiten los headers informativos X-RateLimit-*.
     headers_enabled=False,
 )
+
+# Límites para escrituras ADMIN (auditoría 2026-07-02, #1184): el patrón
+# @limiter.limit ya se usaba en endpoints públicos (cotizar, talleres,
+# búsqueda) pero no en contabilidad/pagos — una sesión admin comprometida o
+# un bug de front en loop podía golpear la DB/R2 sin ningún freno server-side.
+# Más holgado que los límites públicos (es tráfico humano autenticado, no
+# anónimo) pero no infinito.
+ADMIN_WRITE_LIMIT = "60/minute"
+ADMIN_UPLOAD_LIMIT = "20/minute"  # mismo valor que routes/talleres.py para uploads
