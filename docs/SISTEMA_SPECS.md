@@ -23,17 +23,35 @@
 
 ## 1. Autocompletar de specs (admin UI, por equipo)
 
-> **Cuándo se usa:** admin agrega un equipo nuevo individual en el form y pega la URL B&H. Equipo a
-> equipo, on-demand, vía UI. **NO confundir** con el seed bulk inicial (ver §2).
+> **Cuándo se usa:** admin agrega/edita un equipo individual y sube el HTML de su página B&H
+> guardada. Equipo a equipo, on-demand, vía UI. **NO confundir** con el seed bulk inicial (ver §2).
+>
+> ⏰ **Reescrito 2026-07 (rediseño `specs_ingesta`, issue #1176)** — reemplaza una versión vieja de
+> esta sección que describía un flujo Firecrawl+LLM (`POST /admin/equipos/autocompletar`,
+> `/batch-enriquecer`, `/autocompletar-from-html`) que **ya no existe**: esos endpoints se retiraron.
 
-- **URL única** en la autocompletar bar: bindeada al campo `bh_url` del form, con botones copy/abrir inline.
-- **Backend**: endpoint canónico `POST /admin/equipos/autocompletar` (alias deprecated `/enriquecer`). Scrape con Firecrawl + extract con LLM. Devuelve `AutocompletarResult` normalizado.
-- **Normalizer de specs**: backend traduce labels EN→ES (Weight→Peso, Lens Mount→Montura, etc.) y convierte unidades (lbs→kg, in→cm, °F→°C, ranges, dimensiones N×N×N).
-- **Cache del scrape**: el `AutocompletarResult` completo se guarda en `equipo_fichas.raw_json`. Habilita los botones de re-aplicar por sección en el form V2 sin volver a scrapear.
-- **Batch**: `POST /admin/equipos/batch-enriquecer` procesa hasta 3 equipos por request (cap defensivo, max 50 ids en body). Frontend re-batchea hasta terminar. Resultado se persiste en raw_json (cache). Sleep 1s entre scrapes para no rate-limitear B&H.
-- **Parser determinístico embebido (URL path)**: el endpoint URL existente ahora pide `rawHtml` a Firecrawl además del `json` extract. Si el rawHtml tiene JSON-LD estructurado (B&H lo siempre tiene), se corre `services/luces_html_extractor.py` (el MISMO pipeline del seed). Cuando el parser detecta ≥3 specs canónicos, OVERRIDE marca/modelo/specs/foto del LLM extract con la versión normalizada. Si no detecta nada (no es lighting, parser falla), se mantiene el flujo LLM intacto. → **Resultado: URL paste ahora también da calidad seed para luces sin tocar la UX**.
-- **HTML upload (fallback / cuando Firecrawl falla)**: `POST /admin/equipos/autocompletar-from-html` acepta un `.html` guardado manualmente (Cmd+S → Webpage Complete desde B&H/manufacturer) y corre el mismo pipeline directo sobre el HTML, sin Firecrawl. Sirve cuando B&H bloquea Firecrawl con bot-detection o cuando la URL no es accesible. UI: botón "Subir HTML guardado" en el diálogo de autocompletar.
-- **Paridad URL ↔ HTML upload**: ambos paths llaman a `luces_html_extractor.extract_from_html()` que reusa `tools/iluminacion_parser.py` + `iluminacion_normalizar.py`. Cualquier mejora al parser/normalizer mejora los TRES paths (seed bulk + URL autocompletar + HTML upload) automáticamente.
+- **Un solo endpoint**: `POST /admin/equipos/{id}/upload-html-source` — el admin sube un `.html`
+  guardado (Cmd+S → Webpage Complete desde B&H). **Sin LLM ni scraping en vivo**: Railway no puede
+  bajar la página de B&H (mismo bloqueo de bots que cualquier scraper) — solo parsea el HTML que le
+  suben. Guarda el blob en R2 (`equipos/{id}/source.html`, path determinístico — re-subir
+  sobreescribe) y devuelve `AutocompletarResult` con los specs extraídos; el front confirma antes de
+  persistir vía `PUT /admin/equipos/{id}/specs` (la extracción NUNCA persiste sola).
+- **Motor determinístico único**: `services.specs_ingesta.extract_from_html(html, categoria_hint)` —
+  fuente única para este endpoint Y para el CLI offline (`services/specs_ingesta/cli.py`, misma
+  compu del dueño), verificado byte-idéntico sobre el mismo HTML. Manual técnico completo (arquitectura,
+  split de runtime, gotchas) → [`backend/services/specs_ingesta/CLAUDE.md`](../backend/services/specs_ingesta/CLAUDE.md);
+  historia de la consolidación → [`docs/PLAN_SPECS_INGESTA.md`](PLAN_SPECS_INGESTA.md).
+- **Dispatcher por categoría**: detecta Cámaras / Lentes / Adaptadores / Filtros / Modificadores /
+  Iluminación por título + JSON-LD (o usa `categoria_hint` si el admin ya la eligió) y rutea al parser
+  bespoke de esa categoría (labels canónicos → `spec_key` del registry, ficha limpia). Sin categoría
+  reconocida → extractor genérico: extrae **todos** los pares label/value del HTML y los resuelve
+  contra el índice de aliases del registry — lo que no matchea se muestra "sin template" en vez de
+  descartarse en silencio.
+- **Asume estructura B&H** (JSON-LD `Product.additionalProperty` + atributos `data-selenium`). Un
+  HTML de otro sitio (eBay, la página del fabricante) da specs pobres o vacías con el motor
+  determinístico — no hay fallback a LLM en este endpoint. Suplir esos casos (y proponer specs/
+  aliases nuevos al registry) es la capa offline-only planeada en `specs_ingesta` (F7, todavía no
+  construida).
 
 ---
 
@@ -95,18 +113,21 @@
 
 | Acción | Sin Claude | Con Claude |
 |---|---|---|
-| Agregar 1 luz nueva — URL paste (Firecrawl OK) | Sí — calidad seed automática (parser embebido) | — |
-| Agregar 1 luz nueva — URL paste falla (Firecrawl rate-limit / bot-detection) | Sí — subir HTML guardado (Cmd+S → upload) | — |
-| Agregar equipo no-luz (cámara, lente, accesorio) — categoría existente | Sí — admin UI + autocompletar (LLM extract). Para calidad seed: bulk via Claude hasta wirear dispatcher HTML por categoría | — |
+| Agregar equipo nuevo (cualquier categoría con parser bespoke) — categoría existente | Sí — admin UI: guardar el HTML de B&H (Cmd+S) y subirlo (§1); calidad seed automática | — |
+| Agregar equipo de categoría sin parser bespoke, o de un sitio no-B&H | Sí — admin UI (extractor genérico, calidad menor: labels "sin template" a confirmar a mano) | Sí — CLI offline + capa LLM (F7, no construida todavía) para mejor calidad |
 | Editar precio / foto / nombre / spec value | Sí — admin UI | — |
 | Agregar spec key nueva al catálogo global | Sí — `/admin/equipos/specs` | — |
 | Importar bulk de una categoría NUEVA (ej. cámaras) — primera vez | — | Sí — curar HTMLs + parser específico + seed |
 | Refactor del schema (ej. partir `peso` en sub-campos) | — | Sí — plan + migration |
 
-**Limitaciones:**
-- El parser determinístico hoy solo cubre **luces** (`iluminacion_parser`) en el endpoint del admin. Cámaras/lentes/accesorios YA tienen parsers determinísticos propios (`tools/camaras_parser.py`, `tools/lentes_parser.py`) usados para el seed bulk, pero el endpoint `/admin/equipos/autocompletar-from-html` todavía hardcodea `luces_html_extractor`. Falta dispatcher por categoría (sniff por content o param explícito).
-- El parser asume estructura B&H. Otros sites (Adorama, manufacturer pages) caen al LLM extract.
-- Si Firecrawl no puede acceder al URL (bot-detection más agresivo de B&H, sitio caído), fallback a HTML upload.
+**Limitaciones (estado actual, post F5 de `specs_ingesta` — ver §1):**
+- El dispatcher por categoría ya existe y cubre Cámaras/Lentes/Adaptadores/Filtros/Modificadores/
+  Iluminación con parser bespoke; el resto cae al extractor genérico (sin descartes silenciosos, pero
+  con menos curación).
+- El parser asume estructura B&H (JSON-LD + `data-selenium`). Un HTML de otro sitio (eBay, la página
+  del fabricante) da specs pobres o vacías — no hay fallback a LLM en este endpoint (a diferencia de
+  una versión anterior de este flujo). Suplirlo es la capa offline-only planeada (F7, no construida).
+- No hay scraping en vivo por URL — el admin siempre sube el `.html` guardado a mano.
 
 El JSON del dataset NO se edita post-seed (es dev artifact). Para cambios puntuales: admin UI. Para reseed masivo (raro): editar JSON + re-correr seed (idempotente, no pisa campos manuales como `precio_jornada`).
 

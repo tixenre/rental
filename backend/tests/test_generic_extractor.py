@@ -25,7 +25,10 @@ def _load_fixture(name: str) -> str:
 
 
 def test_raw_pairs_desde_jsonld():
-    from services.generic_html_extractor import _extract_from_jsonld
+    from services.specs_ingesta.parse import jsonld as _jsonld_mod
+
+    def _extract_from_jsonld(html_content: str):
+        return _jsonld_mod.additional_properties_as_pairs(_jsonld_mod.jsonld_product(html_content))
 
     html = """
     <script type="application/ld+json">
@@ -43,7 +46,7 @@ def test_raw_pairs_desde_jsonld():
 
 
 def test_raw_pairs_desde_dom_table():
-    from services.generic_html_extractor import _extract_from_dom
+    from services.specs_ingesta.parse.dom import extract_dom_pairs as _extract_from_dom
 
     html = """
     <table>
@@ -58,7 +61,7 @@ def test_raw_pairs_desde_dom_table():
 
 
 def test_raw_pairs_desde_dl():
-    from services.generic_html_extractor import _extract_from_dom
+    from services.specs_ingesta.parse.dom import extract_dom_pairs as _extract_from_dom
 
     html = """
     <dl>
@@ -72,9 +75,68 @@ def test_raw_pairs_desde_dl():
     assert "Weight" in labels
 
 
+def test_raw_pairs_dom_captura_texto_anidado():
+    """F7b: markup por componentes (dt/dd con divs/spans envolviendo el texto,
+    patrón real de eBay) — antes solo capturaba hijos DIRECTOS de dt/dd,
+    daba 0 pares acá."""
+    from services.specs_ingesta.parse.dom import extract_dom_pairs as _extract_from_dom
+
+    html = """
+    <dl>
+      <dt><div class="label-wrap"><span>Mount</span></div></dt>
+      <dd><div class="value-wrap"><span>M42</span></div></dd>
+    </dl>
+    """
+    pairs = _extract_from_dom(html)
+    by_label = {p["label"]: p["value"] for p in pairs}
+    assert by_label.get("Mount") == "M42"
+
+
+def test_raw_pairs_dom_ignora_aria_hidden_y_botones():
+    """El contenido aria-hidden (versión duplicada/expandida para 'read more')
+    y el texto de <button> no son dato — se excluyen."""
+    from services.specs_ingesta.parse.dom import extract_dom_pairs as _extract_from_dom
+
+    html = """
+    <dl>
+      <dt>Condition</dt>
+      <dd>
+        <span>Used</span>
+        <button>Read more</button>
+        <span aria-hidden="true">Used - full duplicated description here</span>
+      </dd>
+    </dl>
+    """
+    pairs = _extract_from_dom(html)
+    by_label = {p["label"]: p["value"] for p in pairs}
+    assert by_label.get("Condition") == "Used"
+
+
+def test_raw_pairs_dom_void_elements_no_desalinean_la_pila():
+    """Bug real (F7b): un <img>/<br> sin cerrar DENTRO de una celda anidada
+    desalineaba la pila de tags abiertos — el primer endtag real que viniera
+    después "cerraba" el void element en vez del tag correcto, y el resto de
+    la extracción se perdía en silencio (0 pares, sin error). Verificado
+    contra una página eBay real del dataset: pasó de 0 a 15 pares con este fix."""
+    from services.specs_ingesta.parse.dom import extract_dom_pairs as _extract_from_dom
+
+    html = """
+    <dl>
+      <dt><span>Brand</span></dt>
+      <dd><img src="icon.png"><span>Carl Zeiss Jena</span></dd>
+      <dt><span>Mount</span></dt>
+      <dd><span>M42</span></dd>
+    </dl>
+    """
+    pairs = _extract_from_dom(html)
+    by_label = {p["label"]: p["value"] for p in pairs}
+    assert by_label.get("Brand") == "Carl Zeiss Jena"
+    assert by_label.get("Mount") == "M42", "el pair DESPUÉS del <img> no debe perderse"
+
+
 def test_raw_pairs_jsonld_tiene_prioridad_sobre_dom():
     """JSON-LD gana: si el mismo label está en JSON-LD y en tabla DOM, no se duplica."""
-    from services.generic_html_extractor import extract_raw_pairs
+    from services.specs_ingesta.parse.pares import extract_raw_pairs
 
     html = """
     <script type="application/ld+json">
@@ -93,7 +155,7 @@ def test_raw_pairs_jsonld_tiene_prioridad_sobre_dom():
 
 def test_garbage_values_se_filtran():
     """Valores basura (n/a, —, 1 x) se excluyen del resultado."""
-    from services.generic_html_extractor import resolve_pairs
+    from services.specs_ingesta.queries.resolver import resolve_pairs
 
     raw = [
         {"label": "Weight", "value": "n/a"},
@@ -111,7 +173,7 @@ def test_garbage_values_se_filtran():
 
 
 def test_resolve_alias_weight_a_peso_g():
-    from services.generic_html_extractor import resolve_pairs
+    from services.specs_ingesta.queries.resolver import resolve_pairs
 
     raw = [{"label": "Weight", "value": "1050 g"}]
     matched, unmatched = resolve_pairs(raw)
@@ -120,7 +182,7 @@ def test_resolve_alias_weight_a_peso_g():
 
 
 def test_resolve_alias_case_insensitive():
-    from services.generic_html_extractor import resolve_pairs
+    from services.specs_ingesta.queries.resolver import resolve_pairs
 
     raw = [{"label": "WEIGHT", "value": "800 g"}]
     matched, _ = resolve_pairs(raw)
@@ -128,7 +190,7 @@ def test_resolve_alias_case_insensitive():
 
 
 def test_resolve_alias_power_a_consumo_w():
-    from services.generic_html_extractor import resolve_pairs
+    from services.specs_ingesta.queries.resolver import resolve_pairs
 
     raw = [{"label": "Power", "value": "200 W"}]
     matched, _ = resolve_pairs(raw)
@@ -139,7 +201,7 @@ def test_resolve_alias_power_a_consumo_w():
 
 def test_resolve_valor_number_se_coerce():
     """'1050 g' → peso_g → valor coercionado a '1050' (solo número)."""
-    from services.generic_html_extractor import resolve_pairs
+    from services.specs_ingesta.queries.resolver import resolve_pairs
 
     raw = [{"label": "Weight", "value": "1050 g"}]
     matched, _ = resolve_pairs(raw)
@@ -150,7 +212,7 @@ def test_resolve_valor_number_se_coerce():
 
 
 def test_resolve_label_desconocido_va_a_unmatched():
-    from services.generic_html_extractor import resolve_pairs
+    from services.specs_ingesta.queries.resolver import resolve_pairs
 
     raw = [{"label": "Número de serie", "value": "ABC123"}]
     matched, unmatched = resolve_pairs(raw)
@@ -164,7 +226,7 @@ def test_sin_descartes_silenciosos():
     Los matched tienen el label canónico del registry (ej. "Weight" → label "Peso"),
     así que chequeamos por spec_key para ellos.
     """
-    from services.generic_html_extractor import resolve_pairs
+    from services.specs_ingesta.queries.resolver import resolve_pairs
 
     raw = [
         {"label": "Weight", "value": "1050 g"},
@@ -184,7 +246,7 @@ def test_sin_descartes_silenciosos():
 
 def test_extract_generic_fixture_modificador():
     """Fixture de Fresnel attachment → produce specs, no crashea."""
-    from services.generic_html_extractor import extract_from_html_generic
+    from services.specs_ingesta.queries.generic import extract_from_html_generic
 
     html = _load_fixture("modificador_minimal.html")
     r = extract_from_html_generic(html, categoria_hint="Modificadores")
@@ -195,7 +257,7 @@ def test_extract_generic_fixture_modificador():
 
 def test_extract_generic_todos_items_tienen_spec_key():
     """Invariante: ningún item de specs puede carecer de spec_key."""
-    from services.generic_html_extractor import extract_from_html_generic
+    from services.specs_ingesta.queries.generic import extract_from_html_generic
 
     html = _load_fixture("modificador_minimal.html")
     r = extract_from_html_generic(html)
@@ -207,7 +269,7 @@ def test_extract_generic_todos_items_tienen_spec_key():
 
 def test_extract_generic_matched_no_emite_keys_huerfanas():
     """Las spec_keys resueltas deben existir en el registry (no huérfanas)."""
-    from services.generic_html_extractor import extract_from_html_generic
+    from services.specs_ingesta.queries.generic import extract_from_html_generic
     from services.specs import REGISTRY
 
     all_registry_keys: set[str] = set()
@@ -230,7 +292,7 @@ def test_extract_generic_matched_no_emite_keys_huerfanas():
 
 def test_extract_generic_peso_g_resuelto_desde_fixture():
     """'Weight: 1050 g' en el fixture → spec_key 'peso_g' en el resultado."""
-    from services.generic_html_extractor import extract_from_html_generic
+    from services.specs_ingesta.queries.generic import extract_from_html_generic
 
     html = _load_fixture("modificador_minimal.html")
     r = extract_from_html_generic(html)
@@ -241,7 +303,7 @@ def test_extract_generic_peso_g_resuelto_desde_fixture():
 
 
 def test_extract_generic_categoria_sugerida_del_hint():
-    from services.generic_html_extractor import extract_from_html_generic
+    from services.specs_ingesta.queries.generic import extract_from_html_generic
 
     html = _load_fixture("modificador_minimal.html")
     r = extract_from_html_generic(html, categoria_hint="Modificadores")
@@ -254,7 +316,7 @@ def test_extract_generic_categoria_sugerida_del_hint():
 def test_dispatcher_modificador_usa_extractor_generico():
     """extract_from_html con HTML de softbox/fresnel attachment → no crashea
     y produce specs (vía extractor genérico, no parser de luces)."""
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
 
     html = _load_fixture("modificador_minimal.html")
     r = extract_from_html(html)
@@ -266,7 +328,7 @@ def test_dispatcher_modificador_usa_extractor_generico():
 
 def test_dispatcher_desconocido_usa_extractor_generico():
     """HTML sin categoría reconocible → extractor genérico (no resultado vacío)."""
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
 
     html = """
     <html><head><title>Some Unknown Widget</title>
@@ -293,7 +355,7 @@ def test_todas_las_keys_modificadores_son_emitibles():
     canónico. Complementa test_extract_generic_matched_no_emite_keys_huerfanas
     que solo verifica la dirección opuesta (emitidas ⊆ registry).
     """
-    from services.generic_html_extractor import extract_from_html_generic
+    from services.specs_ingesta.queries.generic import extract_from_html_generic
     from services.specs import REGISTRY
 
     cat_reg = REGISTRY.categorias.get("Modificadores")

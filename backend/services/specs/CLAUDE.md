@@ -24,6 +24,16 @@
 > refinamiento sobre lo que `search_source.py` ya cubre) sigue sin existir — no bloqueaba
 > tener algo real para probar.
 >
+> **Canal C aditivo desde `specs_ingesta` (2026-07, F7 de ese módulo, no una fase propia
+> de éste):** `commands/propuestas.py` + `queries/propuestas.py` cablean la cola
+> `spec_propuestas_pendientes` que existía huérfana en el schema (creada para el skill
+> `gear-compatibility`, que nunca le escribió). `specs_ingesta.commands.proponer` es el
+> primer productor real. Verificado contra Postgres real: INSERT+RETURNING, JSONB
+> auto-decodifica a dict al leer, `aplicar_propuesta`/`descartar_propuesta` sacan el ítem
+> de pendientes, el CHECK constraint de `tipo` rechaza valores inválidos. Regla dura:
+> **nunca muta el registry** — `aplicar_propuesta` solo cierra el ítem de la cola después
+> de que el humano ya editó el registry a mano (código = fuente única) y re-sembró.
+>
 > **`CategoriaRegistry` ya no declara navegación** (Fase 6, desenredo categorías↔specs):
 > solo `nombre` (ancla a una categoría real por nombre) + `specs`. `sub_categorias`/
 > `grupo_visual`/`prioridad` a nivel categoría se sacaron — eran parámetros que el
@@ -56,10 +66,12 @@ services/specs/
     persist.py     #   persistir_specs — LLAMA a mapear_valor para enum    ✓ Fase 3
     coerce.py      #   coerce_and_serialize — fallback si el embudo no matchea  ✓ Fase 1
     seed.py        #   seed_all_categorias — solo raíz + specs + templates ✓ Fase 1+2+6
-    value_aliases.py  # CRUD ad-hoc de spec_value_aliases (admin/cola IA) ✗ no existe, sin fase asignada
+    propuestas.py  #   Canal C: encolar/aplicar/descartar_propuesta (spec_propuestas_pendientes) ✓ aditivo 2026-07
+    value_aliases.py  # CRUD ad-hoc de spec_value_aliases (admin) ✗ no existe, sin fase asignada — NO confundir con propuestas.py (spec_value_aliases es la tabla de aliases YA curados; spec_propuestas_pendientes es la cola de candidatos sin revisar)
   queries/         # lectura — nunca mutan
     validation.py     # validate_dataset — SIN enchufar (sin conn, sin caller vivo)  ✓ Fase 1
     search_source.py  # specs_search_expr() — campo más de CAMPOS_EQUIPO           ✓ Fase 4
+    propuestas.py      # listar_propuestas_pendientes — Canal C                    ✓ aditivo 2026-07
     definitions.py     # ✗ no existe — mapear_valor hace su propia lectura de spec_definitions
     equipo_specs.py    # ✗ Fase futura, no existe
     aliases.py          # expansión de término (refinamiento; search_source.py ya cubre lo básico) ✗ no existe, sin fase asignada

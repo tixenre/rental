@@ -82,7 +82,7 @@ async def admin_upload_html_source(
             raise
 
     try:
-        from services.equipo_html_extractor import extract_from_html
+        from services.specs_ingesta import extract_from_html
         result = extract_from_html(html_content, categoria_hint=categoria_hint)
     except Exception:
         logger.exception("Error extrayendo specs del HTML (equipo %d)", id)
