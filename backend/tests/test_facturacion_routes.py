@@ -250,6 +250,14 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
         return b"%PDF-FAKE%"
 
     monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
+    monkeypatch.setattr(
+        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        lambda conn: (b"cert", b"key"),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.pdf_seguridad.asegurar_pdf",
+        lambda pdf_bytes, cert_pem, key_pem: pdf_bytes,
+    )
 
     resp = asyncio.run(facturacion_routes.descargar_pdf_factura(1, _fake_request()))
     assert resp.status_code == 200

@@ -378,6 +378,11 @@ async def descargar_pdf_factura(
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
+        if format == "html":
+            cert_pem = key_pem = None
+        else:
+            from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+            cert_pem, key_pem = get_or_create_signing_cert(conn)
 
     if format == "html":
         from fastapi.responses import HTMLResponse
@@ -385,8 +390,10 @@ async def descargar_pdf_factura(
 
     from pdf import _render_pdf
     from services.facturacion.pdf import factura_filename, page_size_for_layout
+    from services.facturacion.pdf_seguridad import asegurar_pdf
     try:
         pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
+        pdf_bytes = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF: {e}")
 
@@ -411,9 +418,11 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     require_admin(request)
 
     from services.email import send_raw_email, Attachment
+    from services.facturacion.pdf_seguridad import get_or_create_signing_cert
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn)
+        cert_pem, key_pem = get_or_create_signing_cert(conn)
 
         # Email del cliente: está en el pedido
         row = conn.execute(
@@ -434,8 +443,10 @@ async def enviar_mail_factura(factura_id: int, request: Request):
 
     from pdf import _render_pdf
     from services.facturacion.pdf import factura_filename
+    from services.facturacion.pdf_seguridad import asegurar_pdf
     try:
         pdf_bytes = await _render_pdf(html_str)
+        pdf_bytes = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF para el mail: {e}")
 

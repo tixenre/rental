@@ -49,6 +49,11 @@ zeep>=4.2.1
 # Generación de QR fiscal (RG4892) en el PDF de factura.
 segno>=1.5.0
 
+# Protección del PDF de la factura ya generado (permisos + firma de
+# integridad de archivo) — services/facturacion/pdf_seguridad.py.
+pymupdf==1.28.0
+pyhanko==0.35.1
+
 # Versiones PINEADAS (==) para builds reproducibles (#925). Estas son el set
 # resuelto y validado por CI al momento de pinear; antes el repo floteaba a la
 # última en cada build de Docker. Para subir una dep: cambiar el == acá, dejar
