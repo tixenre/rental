@@ -1,9 +1,10 @@
 # Plan — `specs_ingesta`: el motor-embudo de specs (2 iniciativas en paralelo + split de runtime)
 
-> Tracking: Iniciativa A → issue [#1175](https://github.com/tixenre/rental/issues/1175) · Iniciativa B →
+> Tracking: issue padre (plan completo) → [#1178](https://github.com/tixenre/rental/issues/1178). Iniciativa A →
+> issue [#1175](https://github.com/tixenre/rental/issues/1175) · Iniciativa B →
 > issue [#1176](https://github.com/tixenre/rental/issues/1176), PR-hoja-de-ruta [#1177](https://github.com/tixenre/rental/pull/1177)
-> (rama `feature/specs-ingesta`, sin mergear hasta completar el módulo). Manual técnico del módulo (una vez
-> exista código real) → `backend/services/specs_ingesta/CLAUDE.md`.
+> (rama `feature/specs-ingesta`, sin mergear hasta completar el módulo). Manual técnico del módulo →
+> `backend/services/specs_ingesta/CLAUDE.md`.
 
 ## Contexto (por qué)
 
