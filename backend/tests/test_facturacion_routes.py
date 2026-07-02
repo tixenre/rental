@@ -67,6 +67,7 @@ class _FakeConn:
         ("PUT", "/api/admin/emisores-arca/1"),
         ("DELETE", "/api/admin/emisores-arca/1"),
         ("POST", "/api/admin/emisores-arca/1/cert"),
+        ("GET", "/api/admin/arca/padron/20301234567"),
     ],
 )
 def test_rutas_facturacion_gatean_por_admin(method, path):
@@ -147,6 +148,28 @@ def test_descargar_pdf_400_si_no_emitida(monkeypatch):
     assert ei.value.status_code == 400
 
 
+def test_descargar_pdf_503_si_faltan_datos_de_arca(monkeypatch):
+    """factura_html falla fuerte (RuntimeError) si a una 'emitida' le faltan
+    datos de ARCA — el route lo convierte en 503, nunca en un 500 crudo."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_by_id", lambda factura_id, conn: _fake_factura()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+
+    def _raise(*a, **kw):
+        raise RuntimeError("Factura 1 está 'emitida' pero le faltan datos de ARCA (qr_payload)")
+
+    monkeypatch.setattr("services.facturacion.pdf.factura_html", _raise)
+
+    with pytest.raises(HTTPException) as ei:
+        asyncio.run(facturacion_routes.descargar_pdf_factura(1, _fake_request()))
+    assert ei.value.status_code == 503
+
+
 def test_descargar_pdf_format_html_devuelve_preview_sin_renderer(monkeypatch):
     """`format=html` no debe pasar por Playwright — devuelve el HTML tal cual."""
     monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
@@ -158,7 +181,7 @@ def test_descargar_pdf_format_html_devuelve_preview_sin_renderer(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido: "<html>FACTURA-X</html>"
+        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html>FACTURA-X</html>"
     )
 
     resp = asyncio.run(
@@ -178,10 +201,10 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
         "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf.factura_html", lambda factura, pedido: "<html></html>"
+        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
 
-    async def _fake_render_pdf(html):
+    async def _fake_render_pdf(html, **_):
         return b"%PDF-FAKE%"
 
     monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
@@ -191,3 +214,42 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
     assert resp.body == b"%PDF-FAKE%"
     assert "attachment" in resp.headers["content-disposition"]
     assert "Factura-C-00002-00000001.pdf" in resp.headers["content-disposition"]
+
+
+# ── consultar_padron: autocompletar CUIT — nunca rompe, {encontrado: false} ─
+
+
+def test_consultar_padron_encontrado(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+
+    class _Persona:
+        razon_social = "Empresa XYZ SRL"
+        domicilio = "Ruta 88 km 12"
+        condicion_iva = "responsable_inscripto"
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _Persona(),
+    )
+
+    result = facturacion_routes.consultar_padron("30712345678", _fake_request())
+    assert result == {
+        "encontrado": True,
+        "razon_social": "Empresa XYZ SRL",
+        "domicilio": "Ruta 88 km 12",
+        "condicion_iva": "responsable_inscripto",
+    }
+
+
+def test_consultar_padron_no_encontrado_no_es_error(monkeypatch):
+    """AFIP caído / sin datos / sin emisor autenticador — nunca un error, el
+    formulario sigue siendo editable a mano."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona", lambda cuit, conn: None
+    )
+
+    result = facturacion_routes.consultar_padron("30712345678", _fake_request())
+    assert result == {"encontrado": False}

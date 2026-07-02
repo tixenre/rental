@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { Lock } from "lucide-react";
+import { Lock, Search } from "lucide-react";
 
 import {
   Dialog,
@@ -25,6 +25,7 @@ import {
 } from "@/design-system/ui/select";
 
 import { adminApi, type Cliente, type ClienteInput } from "@/lib/admin/api";
+import { usePadronLookup } from "@/lib/admin/usePadronLookup";
 
 type Props = {
   open: boolean;
@@ -96,6 +97,15 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
   });
 
   const perfil = form.watch("perfil_impuestos");
+  const cuit = form.watch("cuit");
+
+  const padron = usePadronLookup((datos) => {
+    if (datos.razon_social && !form.getValues("nombre").trim()) {
+      form.setValue("nombre", datos.razon_social);
+    }
+    if (datos.domicilio) form.setValue("direccion", datos.domicilio);
+    if (datos.condicion_iva) form.setValue("perfil_impuestos", datos.condicion_iva);
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -128,7 +138,25 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
           </div>
           <div className="space-y-1">
             <Label>CUIT / DNI</Label>
-            <Input {...form.register("cuit")} />
+            <div className="flex gap-1.5">
+              <Input {...form.register("cuit")} />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={padron.buscando || (cuit ?? "").replace(/\D/g, "").length !== 11}
+                onClick={() => padron.buscar(cuit ?? "")}
+                title="Autocompletar nombre/dirección/perfil fiscal desde ARCA"
+                className="shrink-0"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </div>
+            {padron.noEncontrado && (
+              <p className="text-xs text-muted-foreground">
+                ARCA no tiene datos para este CUIT — cargá a mano.
+              </p>
+            )}
           </div>
           <div className="space-y-1">
             <Label>Descuento %</Label>

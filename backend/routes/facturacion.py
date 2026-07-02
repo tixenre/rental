@@ -42,6 +42,34 @@ def estado_facturacion(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# GET /admin/arca/padron/{cuit} — autocompletar razón social/domicilio/IVA
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/arca/padron/{cuit}")
+def consultar_padron(cuit: str, request: Request):
+    """Autocompleta razón social/domicilio/condición IVA desde el padrón de
+    ARCA (ws_sr_padron_a13) — mismo autocompletado que hace el facturador
+    oficial al tipear un CUIT. Best-effort: {encontrado: false} si AFIP no
+    responde o el CUIT no tiene datos, nunca un error — el formulario sigue
+    siendo editable a mano."""
+    require_admin(request)
+
+    from services.facturacion.padron import resolver_persona
+    with get_db() as conn:
+        persona = resolver_persona(cuit, conn)
+
+    if persona is None:
+        return {"encontrado": False}
+    return {
+        "encontrado": True,
+        "razon_social": persona.razon_social,
+        "domicilio": persona.domicilio,
+        "condicion_iva": persona.condicion_iva,
+    }
+
+
+# ---------------------------------------------------------------------------
 # CRUD emisores (Fase 7)
 # ---------------------------------------------------------------------------
 
@@ -64,6 +92,9 @@ def crear_emisor(request: Request, body: dict):
     pto_vta = body.get("pto_vta")
     condicion_iva = (body.get("condicion_iva") or "").strip()
     razon_social = (body.get("razon_social") or "").strip() or None
+    domicilio = (body.get("domicilio") or "").strip() or None
+    iibb = (body.get("iibb") or "").strip() or None
+    inicio_actividades = (body.get("inicio_actividades") or "").strip() or None
     notas = (body.get("notas") or "").strip() or None
 
     if not nombre or not cuit or not pto_vta or not condicion_iva:
@@ -84,6 +115,9 @@ def crear_emisor(request: Request, body: dict):
                 pto_vta=pto_vta_int,
                 condicion_iva=condicion_iva,
                 razon_social=razon_social,
+                domicilio=domicilio,
+                iibb=iibb,
+                inicio_actividades=inicio_actividades,
                 notas=notas,
             )
             from services.facturacion.emisores_repo import get_by_id
@@ -112,6 +146,9 @@ def actualizar_emisor(emisor_id: int, request: Request, body: dict):
                 condicion_iva=body.get("condicion_iva"),
                 activo=body.get("activo"),
                 razon_social=body.get("razon_social"),
+                domicilio=body.get("domicilio"),
+                iibb=body.get("iibb"),
+                inicio_actividades=body.get("inicio_actividades"),
                 notas=body.get("notas"),
             )
             emisor = get_by_id(emisor_id, conn)
@@ -284,16 +321,7 @@ def listar_facturas(
 _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
 
-def _factura_filename(factura) -> str:
-    cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
-        factura.cbte_tipo, "X"
-    )
-    es_nc = factura.cbte_tipo in (3, 8, 13)
-    prefijo = "NC" if es_nc else "Factura"
-    return f"{prefijo}-{cbte_tipo_letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}.pdf"
-
-
-def _factura_html_o_404(factura_id: int, conn):
+def _factura_html_o_404(factura_id: int, conn, layout: str = "clasica"):
     """Carga la factura + renderiza su HTML al vuelo. La factura no cambia una
     vez emitida, así que no hace falta guardar el PDF: regenerar da lo mismo."""
     from services.facturacion.repo import get_by_id
@@ -307,25 +335,37 @@ def _factura_html_o_404(factura_id: int, conn):
         raise HTTPException(400, "Solo se pueden ver/descargar/enviar facturas emitidas")
 
     pedido = _get_pedido(conn, factura.pedido_id)
-    return factura, factura_html(factura, pedido)
+    try:
+        html_str = factura_html(factura, pedido, layout=layout)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return factura, html_str
 
 
 @router.get("/facturas/{factura_id}/pdf")
-async def descargar_pdf_factura(factura_id: int, request: Request, format: str = "pdf"):
+async def descargar_pdf_factura(
+    factura_id: int, request: Request, format: str = "pdf", layout: str = "clasica"
+):
     """PDF de una factura, renderizado on-demand. `format=html` devuelve el preview
-    (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py)."""
+    (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py).
+    `layout`: 'clasica' (default, réplica oficial AFIP/ARCA) · 'celular' (compacta,
+    para compartir por WhatsApp) · 'formal' (A4, identidad de la celular)."""
     require_admin(request)
 
+    if layout not in ("clasica", "celular", "formal"):
+        layout = "clasica"
+
     with get_db() as conn:
-        factura, html_str = _factura_html_o_404(factura_id, conn)
+        factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
 
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
 
     from pdf import _render_pdf
+    from services.facturacion.pdf import factura_filename, page_size_for_layout
     try:
-        pdf_bytes = await _render_pdf(html_str)
+        pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF: {e}")
 
@@ -333,7 +373,7 @@ async def descargar_pdf_factura(factura_id: int, request: Request, format: str =
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="{_factura_filename(factura)}"',
+            "Content-Disposition": f'attachment; filename="{factura_filename(factura, layout=layout)}"',
             **_DOC_NO_CACHE,
         },
     )
@@ -372,6 +412,7 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     nombre_cliente = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip() or email_cliente
 
     from pdf import _render_pdf
+    from services.facturacion.pdf import factura_filename
     try:
         pdf_bytes = await _render_pdf(html_str)
     except Exception as e:
@@ -380,7 +421,7 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
         factura.cbte_tipo, "X"
     )
-    filename = _factura_filename(factura)
+    filename = factura_filename(factura)
 
     nro = f"{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}"
     subject = f"Tu factura {cbte_tipo_letra} Nº {nro} — Rambla Rental"
@@ -459,6 +500,9 @@ def _emisor_to_dict(e) -> dict:
         "cert_cargado": e.cert_cargado,
         "activo": e.activo,
         "razon_social": e.razon_social,
+        "domicilio": e.domicilio,
+        "iibb": e.iibb,
+        "inicio_actividades": e.inicio_actividades,
         "notas": e.notas,
         "created_at": e.created_at.isoformat() if e.created_at else None,
         "updated_at": e.updated_at.isoformat() if e.updated_at else None,

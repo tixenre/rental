@@ -29,6 +29,11 @@ _WSDL_PROD = "https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL"
 # Caché local de clientes SOAP (por endpoint, dentro del proceso)
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
 
+# Códigos de error de FECompConsultar que significan "no existe" (no un error
+# real): 10016 = hueco en una secuencia con historial; 602 = combinación
+# (pto_vta, cbte_tipo) sin NINGÚN historial todavía (ver comentario en `consultar`).
+_CODES_NO_EXISTE = (10016, 602)
+
 
 class _AfipSSLAdapter(HTTPAdapter):
     """Los servidores de prod de AFIP usan parámetros DH cortos (DH_KEY_TOO_SMALL).
@@ -129,17 +134,22 @@ class WsfeClient:
                 },
             )
         except zeep.exceptions.Fault as exc:
-            if "10016" in str(exc) or "El comprobante consultado no existe" in str(exc):
+            if any(str(c) in str(exc) for c in _CODES_NO_EXISTE) or "no existe" in str(exc).lower():
                 return None
             raise
 
         if resp is None:
             return None
 
-        # Chequear si hay error de "no existe"
+        # Chequear si hay error de "no existe". AFIP no es consistente: 10016 es
+        # el "no existe" de un hueco en una secuencia con historial; 602 ("No
+        # existen datos en nuestros registros para los parámetros ingresados")
+        # es lo que devuelve para una combinación (pto_vta, cbte_tipo) VIRGEN —
+        # p.ej. la primera Nota de Crédito que se emite para un punto de venta
+        # (bug encontrado en prod: bloqueaba la primera NC con un 503 espurio).
         if hasattr(resp, "Errors") and resp.Errors:
             for e in resp.Errors.Err:
-                if e.Code in (10016,):
+                if e.Code in _CODES_NO_EXISTE:
                     return None
             _raise_errors(resp.Errors.Err, "FECompConsultar")
 

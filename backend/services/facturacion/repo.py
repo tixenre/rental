@@ -97,6 +97,37 @@ def get_factura_vigente(pedido_id: int, conn) -> Optional[Factura]:
     return _row_to_factura(row) if row else None
 
 
+def get_factura_principal_emitida(pedido_id: int, conn) -> Optional[Factura]:
+    """La factura vigente del pedido (no NC), solo si ya está 'emitida' —
+    para el portal cliente: la factura aparece como documento recién ahí,
+    no antes (a diferencia de remito/contrato, que dependen del estado del
+    pedido, no de si el documento fiscal existe)."""
+    row = conn.execute(
+        """
+        SELECT * FROM facturas
+         WHERE pedido_id = %s AND estado = 'emitida' AND nota_credito_de IS NULL
+         LIMIT 1
+        """,
+        (pedido_id,),
+    ).fetchone()
+    return _row_to_factura(row) if row else None
+
+
+def pedidos_con_factura_emitida(pedido_ids: list[int], conn) -> set[int]:
+    """Subconjunto de `pedido_ids` que tienen una factura principal 'emitida'
+    (batch, para listados — evita N+1)."""
+    if not pedido_ids:
+        return set()
+    rows = conn.execute(
+        """
+        SELECT DISTINCT pedido_id FROM facturas
+         WHERE pedido_id = ANY(%s) AND estado = 'emitida' AND nota_credito_de IS NULL
+        """,
+        (pedido_ids,),
+    ).fetchall()
+    return {r["pedido_id"] for r in rows}
+
+
 def get_by_id(factura_id: int, conn) -> Optional[Factura]:
     row = conn.execute(
         "SELECT * FROM facturas WHERE id = %s",

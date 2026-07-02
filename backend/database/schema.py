@@ -2203,32 +2203,57 @@ def _init_db_schema(conn):
         CREATE TABLE IF NOT EXISTS afip_ta (
             ambiente   TEXT NOT NULL,
             emisor     TEXT NOT NULL,
+            servicio   TEXT NOT NULL DEFAULT 'wsfe',
             token      TEXT NOT NULL,
             sign       TEXT NOT NULL,
             expira_at  TIMESTAMPTZ NOT NULL,
-            PRIMARY KEY (ambiente, emisor)
+            PRIMARY KEY (ambiente, emisor, servicio)
         )
+    """)
+    conn.execute("""
+        ALTER TABLE afip_ta
+            ADD COLUMN IF NOT EXISTS servicio TEXT NOT NULL DEFAULT 'wsfe'
+    """)
+    conn.execute("ALTER TABLE afip_ta DROP CONSTRAINT IF EXISTS afip_ta_pkey")
+    conn.execute("""
+        ALTER TABLE afip_ta
+            ADD CONSTRAINT afip_ta_pkey PRIMARY KEY (ambiente, emisor, servicio)
     """)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS emisores_arca (
-            id              SERIAL PRIMARY KEY,
-            nombre          TEXT NOT NULL UNIQUE,
-            cuit            TEXT NOT NULL,
-            pto_vta         INTEGER NOT NULL,
-            condicion_iva   TEXT NOT NULL,
-            cert_enc        BYTEA,
-            key_enc         BYTEA,
-            activo          BOOLEAN NOT NULL DEFAULT true,
-            razon_social    TEXT,
-            notas           TEXT,
-            created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-            updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+            id                  SERIAL PRIMARY KEY,
+            nombre              TEXT NOT NULL UNIQUE,
+            cuit                TEXT NOT NULL,
+            pto_vta             INTEGER NOT NULL,
+            condicion_iva       TEXT NOT NULL,
+            cert_enc            BYTEA,
+            key_enc             BYTEA,
+            activo              BOOLEAN NOT NULL DEFAULT true,
+            razon_social        TEXT,
+            domicilio           TEXT,
+            iibb                TEXT,
+            inicio_actividades  TEXT,
+            notas               TEXT,
+            created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """)
     conn.execute("""
         ALTER TABLE emisores_arca
             ADD COLUMN IF NOT EXISTS razon_social TEXT
+    """)
+    conn.execute("""
+        ALTER TABLE emisores_arca
+            ADD COLUMN IF NOT EXISTS domicilio TEXT
+    """)
+    conn.execute("""
+        ALTER TABLE emisores_arca
+            ADD COLUMN IF NOT EXISTS iibb TEXT
+    """)
+    conn.execute("""
+        ALTER TABLE emisores_arca
+            ADD COLUMN IF NOT EXISTS inicio_actividades TEXT
     """)
 
     # Regenerar etiquetas auto (origen='auto') para todos los equipos.

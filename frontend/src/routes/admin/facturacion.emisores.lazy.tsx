@@ -8,9 +8,19 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, KeyRound, CheckCircle2, XCircle, Pencil, ChevronDown, Upload } from "lucide-react";
+import {
+  Plus,
+  KeyRound,
+  CheckCircle2,
+  XCircle,
+  Pencil,
+  ChevronDown,
+  Upload,
+  Search,
+} from "lucide-react";
 
 import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
+import { usePadronLookup } from "@/lib/admin/usePadronLookup";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
 
@@ -243,10 +253,19 @@ function EmisorFormModal({
   const [cuit, setCuit] = useState(emisor?.cuit ?? "");
   const [ptoVta, setPtoVta] = useState(String(emisor?.pto_vta ?? ""));
   const [condicion, setCondicion] = useState<string>(emisor?.condicion_iva ?? "monotributo");
+  const [domicilio, setDomicilio] = useState(emisor?.domicilio ?? "");
+  const [iibb, setIibb] = useState(emisor?.iibb ?? "");
+  const [inicioActividades, setInicioActividades] = useState(emisor?.inicio_actividades ?? "");
   const [notas, setNotas] = useState(emisor?.notas ?? "");
   // Cert opcional al crear
   const [cert, setCert] = useState("");
   const [key, setKey] = useState("");
+
+  const padron = usePadronLookup((datos) => {
+    if (datos.razon_social) setRazonSocial(datos.razon_social);
+    if (datos.domicilio) setDomicilio(datos.domicilio);
+    if (datos.condicion_iva) setCondicion(datos.condicion_iva);
+  });
 
   const certOk = cert.includes("BEGIN CERTIFICATE");
   const keyOk = key.includes("PRIVATE KEY");
@@ -261,6 +280,9 @@ function EmisorFormModal({
         cuit,
         pto_vta: parseInt(ptoVta, 10),
         condicion_iva: condicion as EmisorArca["condicion_iva"],
+        domicilio: domicilio || null,
+        iibb: iibb || null,
+        inicio_actividades: inicioActividades || null,
         notas: notas || null,
         activo: emisor?.activo ?? true,
       };
@@ -312,16 +334,33 @@ function EmisorFormModal({
             className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
           />
         </Field>
-        <Field label="CUIT">
-          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
-          <input
-            type="text"
-            inputMode="numeric"
-            value={cuit}
-            onChange={(e) => setCuit(formatCuit(e.target.value))}
-            placeholder="20-30000000-0"
-            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
-          />
+        <Field
+          label="CUIT"
+          hint={
+            padron.noEncontrado ? "ARCA no tiene datos para este CUIT — cargá a mano." : undefined
+          }
+        >
+          <div className="flex gap-1.5">
+            {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+            <input
+              type="text"
+              inputMode="numeric"
+              value={cuit}
+              onChange={(e) => setCuit(formatCuit(e.target.value))}
+              placeholder="20-30000000-0"
+              className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => padron.buscar(cuit)}
+              disabled={padron.buscando || cuit.replace(/\D/g, "").length !== 11}
+              title="Autocompletar razón social/domicilio/condición IVA desde ARCA"
+              className="shrink-0 h-9 px-3 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <Search className="h-3.5 w-3.5" />
+              {padron.buscando ? "Buscando…" : "Buscar"}
+            </button>
+          </div>
         </Field>
         <Field label="Punto de Venta">
           {/* eslint-disable-next-line no-restricted-syntax -- input nativo type="number"; DS Input no soporta este tipo */}
@@ -349,6 +388,42 @@ function EmisorFormModal({
             </select>
             <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
+        </Field>
+        <Field label="Domicilio comercial" hint="Aparece en el PDF de la factura">
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={domicilio}
+            onChange={(e) => setDomicilio(e.target.value)}
+            placeholder="Falucho 4625, Mar del Plata"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
+          />
+        </Field>
+        <Field
+          label="Ingresos Brutos (opcional)"
+          hint="Sin configurar, el renglón se omite del PDF (no es obligatorio para la validez fiscal)"
+        >
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={iibb}
+            onChange={(e) => setIibb(e.target.value)}
+            placeholder="901-123456-7"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+          />
+        </Field>
+        <Field
+          label="Fecha de Inicio de Actividades (opcional)"
+          hint="Sin configurar, el renglón se omite del PDF"
+        >
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={inicioActividades}
+            onChange={(e) => setInicioActividades(e.target.value)}
+            placeholder="01/03/2018"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+          />
         </Field>
         <Field label="Notas (opcional)">
           {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}

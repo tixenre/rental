@@ -174,6 +174,17 @@ cuelga, la llamada espera indefinidamente sosteniendo el advisory lock del engin
 el `FOR UPDATE` de `afip_ta` — bloquea TODA la facturación de ese emisor hasta que el
 proceso se reinicie. `arca_fe/wsfe.py::_afip_transport()` pasa `operation_timeout=30`.
 
+### FECompConsultar "no existe": el código de error de AFIP NO es consistente
+
+`10016` ("El comprobante consultado no existe") es el código documentado, pero AFIP
+devuelve **`602`** ("No existen datos en nuestros registros para los parámetros
+ingresados") cuando la combinación `(pto_vta, cbte_tipo)` no tiene **ningún**
+historial todavía — típicamente la primera Nota de Crédito que se emite para un
+punto de venta (la Factura y la NC son secuencias independientes). Sin contemplar
+602, `consultar()` trataba esa respuesta como un error real → `RuntimeError` → 503
+espurio, bloqueando la primera NC de cada punto de venta. `arca_fe/wsfe.py::consultar`
+trata ambos códigos (`_CODES_NO_EXISTE = (10016, 602)`) como "no existe".
+
 ---
 
 ## 4. Alta del certificado en AFIP (resumen)
