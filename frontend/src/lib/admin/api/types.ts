@@ -138,7 +138,6 @@ export type Equipo = {
   html_source_url?: string | null;
   /** Timestamp ISO si el equipo está soft-deleted. null = activo (#206). */
   eliminado_at?: string | null;
-  etiquetas?: string[];
   kit?: KitComponente[];
   categorias?: CategoriaRef[];
   ficha?: Ficha;
@@ -172,20 +171,8 @@ export type EquiposListResp = {
   items: Equipo[];
 };
 
-export type EquipoInput = Partial<
-  Omit<Equipo, "id" | "etiquetas" | "kit" | "categorias" | "ficha">
-> & {
+export type EquipoInput = Partial<Omit<Equipo, "id" | "kit" | "categorias" | "ficha">> & {
   nombre: string;
-};
-
-export type Etiqueta = { nombre: string; total?: number };
-
-export type EtiquetaAdmin = {
-  id: number;
-  nombre: string;
-  prioridad: number;
-  parent_id: number | null;
-  total: number;
 };
 
 // Categoría: vive en su propia taxonomía (tabla `categorias`).

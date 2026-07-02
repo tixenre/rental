@@ -98,7 +98,6 @@ export type BackendEquipo = {
   estado: string;
   visible_catalogo: number;
   relevancia_manual?: number;
-  etiquetas: string[];
   kit: Array<{
     componente_id: number;
     nombre: string;

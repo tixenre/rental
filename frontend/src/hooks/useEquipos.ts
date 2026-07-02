@@ -14,11 +14,11 @@ import {
 } from "@/data/equipment";
 import { format } from "date-fns";
 
-/* ─── Inferencia de categoría desde nombre/marca/etiquetas ────────────── */
+/* ─── Inferencia de categoría desde nombre/marca ───────────────────────── */
 //
-// El backend guarda las etiquetas vacías para la mayoría de los equipos,
-// así que inferimos la categoría a partir del nombre y la marca del equipo.
-// Las reglas se evalúan en orden: la primera que matchea gana.
+// Fallback cuando el equipo no tiene categorías asignadas (`e.categorias`):
+// inferimos la categoría a partir del nombre y la marca del equipo. Las
+// reglas se evalúan en orden: la primera que matchea gana.
 
 type Rule = { keywords: string[]; category: Category };
 
@@ -236,20 +236,6 @@ function inferCategory(nombre: string, marca: string): Category {
   return "Accesorios";
 }
 
-function resolveCategory(etiquetas: string[], nombre: string, marca: string): Category {
-  // 1. Si hay etiquetas explícitas, intentar mapearlas
-  for (const tag of etiquetas) {
-    const t = tag.toLowerCase().trim();
-    for (const rule of RULES) {
-      for (const kw of rule.keywords) {
-        if (t.includes(kw)) return rule.category;
-      }
-    }
-  }
-  // 2. Inferir desde nombre y marca
-  return inferCategory(nombre, marca);
-}
-
 /* ─── Nombre público derivado ──────────────────────────────────────── */
 //
 // Combina tipo (primera categoría asignada) + marca + modelo + montura +
@@ -440,7 +426,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
         .replace(/^-|-$/g, "") || `equipo-${e.id}`,
     name,
     brand: marca || "—",
-    category: e.categorias?.[0]?.nombre ?? resolveCategory(e.etiquetas ?? [], nombre, marca),
+    category: e.categorias?.[0]?.nombre ?? inferCategory(nombre, marca),
     categorias: e.categorias ?? [],
     pricePerDay: e.precio_jornada ?? 0,
     fotoUrl: e.foto_url ?? null,

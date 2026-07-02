@@ -7,7 +7,6 @@ Las funciones `_masivo` no lanzan si `equipo_ids` viene vacío: son no-op
 chequear `if ids:` antes de llamarlas."""
 import logging
 
-from database import regenerate_auto_tags, regenerate_auto_tags_batch
 from services.nombre_service import actualizar_nombres_de
 from ..queries.ancestry import expandir_a_ancestros
 from ..queries.validation import validar_existe
@@ -37,7 +36,7 @@ def _expandir_y_ordenar(conn, ids: list[int]) -> list[int]:
 
 def asignar_categorias(conn, equipo_id: int, categoria_ids: list[int]) -> None:
     """Reemplaza todas las categorías de un equipo. Expande ancestros.
-    Side effects: regenera auto-tags y nombres públicos (best-effort)."""
+    Side effect: regenera el nombre público (best-effort)."""
     ordered = _expandir_y_ordenar(conn, categoria_ids)
 
     conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = %s", (equipo_id,))
@@ -49,10 +48,6 @@ def asignar_categorias(conn, equipo_id: int, categoria_ids: list[int]) -> None:
             (equipo_id, cid_int, orden),
         )
 
-    try:
-        regenerate_auto_tags(conn, equipo_id)
-    except Exception:
-        logger.warning("regenerate_auto_tags falló para equipo %s", equipo_id, exc_info=True)
     try:
         actualizar_nombres_de(conn, equipo_id, commit=False)
     except Exception:
@@ -78,11 +73,6 @@ def set_categoria_masivo(conn, equipo_ids: list[int], categoria_id: int) -> None
         [(eid, cid_int, orden) for eid in equipo_ids for orden, cid_int in enumerate(ancestor_ids)],
     )
 
-    try:
-        regenerate_auto_tags_batch(conn, equipo_ids)
-    except Exception as e:
-        logger.warning("regenerate_auto_tags_batch falló en set_categoria_masivo: %s", e)
-
 
 def add_categoria_masivo(conn, equipo_ids: list[int], categoria_id: int) -> None:
     """Agrega categoria_id (expandida) a N equipos sin borrar las existentes.
@@ -99,11 +89,6 @@ def add_categoria_masivo(conn, equipo_ids: list[int], categoria_id: int) -> None
         [(eid, cid_int, orden) for eid in equipo_ids for orden, cid_int in enumerate(ancestor_ids)],
     )
 
-    try:
-        regenerate_auto_tags_batch(conn, equipo_ids)
-    except Exception as e:
-        logger.warning("regenerate_auto_tags_batch falló en add_categoria_masivo: %s", e)
-
 
 def remove_categoria_masivo(conn, equipo_ids: list[int], categoria_id: int) -> None:
     """Saca UNA categoría de N equipos sin tocar las otras categorías.
@@ -116,11 +101,6 @@ def remove_categoria_masivo(conn, equipo_ids: list[int], categoria_id: int) -> N
         f"DELETE FROM equipo_categorias WHERE categoria_id = %s AND equipo_id IN ({placeholders})",
         [categoria_id, *equipo_ids],
     )
-
-    try:
-        regenerate_auto_tags_batch(conn, equipo_ids)
-    except Exception as e:
-        logger.warning("regenerate_auto_tags_batch falló en remove_categoria_masivo: %s", e)
 
 
 def copiar_categorias(conn, source_id: int, target_id: int) -> None:

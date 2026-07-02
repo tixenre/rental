@@ -7,10 +7,9 @@ la DB.
 Política:
 - Upsert por clave natural. Insertar si no existe, actualizar si existe.
 - Campos del modelo siempre pisan (la fuente de verdad es el JSON).
-- M2M (`equipo_categorias`, `equipo_etiquetas`): siempre inserta del JSON
-  con `ON CONFLICT DO UPDATE` para mantener `orden`/`origen`. Si una fila
-  está en la DB pero no en el JSON, se preserva (es custom local).
-  El borrado de no-listadas se hace solo con `prune=True`.
+- M2M (`equipo_categorias`): `asignar_categorias` siempre reemplaza el set
+  completo del equipo por el del JSON (no es incremental, no preserva
+  asignaciones custom que no estén en el JSON).
 
 `dry-run` NO es responsabilidad de los importers — siempre escriben. El
 orchestrator (orchestrator.import_all) es quien envuelve el batch en un
@@ -114,35 +113,6 @@ def import_categorias(
                 f"que no existe (debe estar en el mismo JSON)"
             )
         asignar_padre_si_no_tiene(conn, c.nombre, parent_id)
-    return stats
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# etiquetas
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def import_etiquetas(
-    conn, rows: list[dict], resolver: KeyResolver
-) -> dict[str, int]:
-    items = _validate_rows(rows, schema.Etiqueta, "etiquetas")
-    stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    for e in items:
-        cur = conn.execute(
-            """
-            INSERT INTO etiquetas (nombre, prioridad)
-            VALUES (%s, %s)
-            ON CONFLICT (nombre) DO UPDATE SET prioridad = EXCLUDED.prioridad
-            RETURNING (xmax = 0) AS inserted
-            """,
-            (e.nombre, e.prioridad),
-        )
-        row = cur.fetchone()
-        if row and row["inserted"]:
-            stats["inserted"] += 1
-        else:
-            stats["updated"] += 1
-    resolver.refresh_etiquetas()
     return stats
 
 
@@ -337,7 +307,7 @@ def import_categoria_spec_templates(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# equipos (con M2M categorias/etiquetas)
+# equipos (con M2M categorias)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -345,14 +315,9 @@ def import_equipos(
     conn,
     rows: list[dict],
     resolver: KeyResolver,
-    prune_m2m: bool = False,
 ) -> dict[str, int]:
-    """Upsert de equipos por slug + sync de M2M categorias/etiquetas.
-
-    Args:
-        prune_m2m: si True, borra las relaciones M2M existentes que no
-            estén en el JSON. Default False (preserva custom).
-    """
+    """Upsert de equipos por slug + sync de M2M categorias (siempre
+    reemplaza — asignar_categorias no es incremental)."""
     items = _validate_rows(rows, schema.Equipo, "equipos")
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
 
@@ -434,40 +399,6 @@ def import_equipos(
                 )
             cat_ids.append(cat_id)
         asignar_categorias(conn, equipo_id, cat_ids)
-
-        # ── M2M: etiquetas ───────────────────────────────────────────────
-        if prune_m2m:
-            conn.execute(
-                "DELETE FROM equipo_etiquetas WHERE equipo_id = %s", (equipo_id,)
-            )
-        for et_ref in eq.etiquetas:
-            et_id = resolver.etiqueta_id(et_ref.nombre)
-            if et_id is None:
-                # Auto-crear etiqueta si no existe (más permisivo)
-                conn.execute(
-                    """
-                    INSERT INTO etiquetas (nombre, prioridad)
-                    VALUES (%s, 100)
-                    ON CONFLICT (nombre) DO NOTHING
-                    """,
-                    (et_ref.nombre,),
-                )
-                resolver.refresh_etiquetas()
-                et_id = resolver.etiqueta_id(et_ref.nombre)
-                if et_id is None:
-                    raise ImportError_(
-                        f"equipos[{eq.slug}].etiquetas: no se pudo crear '{et_ref.nombre}'"
-                    )
-            conn.execute(
-                """
-                INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, origen, orden)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (equipo_id, etiqueta_id) DO UPDATE SET
-                    origen = EXCLUDED.origen,
-                    orden = EXCLUDED.orden
-                """,
-                (equipo_id, et_id, et_ref.origen, et_ref.orden),
-            )
     return stats
 
 
@@ -950,7 +881,6 @@ def import_descuentos_jornada(
 IMPORTERS = {
     "marcas": import_marcas,
     "categorias": import_categorias,
-    "etiquetas": import_etiquetas,
     "spec_definitions": import_spec_definitions,
     "categoria_spec_templates": import_categoria_spec_templates,
     "equipos": import_equipos,

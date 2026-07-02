@@ -1,40 +1,10 @@
 """database/equipos.py — enriquecimiento de equipos (#501 Fase 5).
 
 Helpers `attach_*` que, dado un lote de equipos (list[dict]), les adjuntan en vivo
-sus tags, kit, categorías, ficha y specs (destacadas + estructuradas). Move-verbatim
+su kit, categorías, ficha y specs (destacadas + estructuradas). Move-verbatim
 desde `database.py`. `attach_kit` deriva el contenido de la puerta única
 `services.contenido` (fuente única del "qué incluye").
 """
-
-
-def attach_tags(conn, equipos: list[dict]) -> list[dict]:
-    """Agrega etiquetas a la lista de equipos (ordenadas por `orden`)."""
-    if not equipos:
-        return equipos
-
-    ids = [e["id"] for e in equipos]
-    placeholders = ",".join(["%s"] * len(ids))
-
-    cur = conn.cursor()
-    cur.execute(f"""
-        SELECT ee.equipo_id, et.nombre, et.prioridad
-        FROM equipo_etiquetas ee
-        JOIN etiquetas et ON et.id = ee.etiqueta_id
-        WHERE ee.equipo_id IN ({placeholders})
-        ORDER BY ee.equipo_id, ee.orden
-    """, ids)
-
-    rows = cur.fetchall()
-    tag_map: dict[int, list] = {e["id"]: [] for e in equipos}
-
-    for r in rows:
-        tag_map[r["equipo_id"]].append(r["nombre"])
-
-    for e in equipos:
-        e["etiquetas"] = tag_map[e["id"]]
-
-    cur.close()
-    return equipos
 
 
 def attach_kit(conn, equipos: list[dict]) -> list[dict]:

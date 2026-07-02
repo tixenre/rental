@@ -1,5 +1,5 @@
 """
-routes/equipos.py — CRUD de equipos, kits, etiquetas, categorías y fichas.
+routes/equipos.py — CRUD de equipos, kits, categorías y fichas.
 """
 
 import calendar as _cal
@@ -15,8 +15,7 @@ from fastapi import APIRouter, Query, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from database import (
-    get_db, row_to_dict, attach_tags,
-    regenerate_auto_tags,
+    get_db, row_to_dict,
     MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
 )
 from busqueda import construir
@@ -267,7 +266,6 @@ def list_equipos(
     request:       Request,
     response:      Response,
     q:                Optional[str]  = Query(None),
-    etiqueta:         Optional[str]  = Query(None),
     categoria:        Optional[str]  = Query(None),
     marca:            Optional[str]  = Query(None, description="Filtra por nombre exacto de marca"),
     solo_visibles:    Optional[bool] = Query(None),
@@ -383,16 +381,6 @@ def list_equipos(
                 base_sql += " AND 1=0"
         else:
             base_sql += " AND 1=0"
-    if etiqueta:
-        # Filtro plano por nombre de etiqueta (la bolsa ya no es jerárquica).
-        base_sql += """
-          AND e.id IN (
-            SELECT ee.equipo_id FROM equipo_etiquetas ee
-            JOIN etiquetas et ON et.id = ee.etiqueta_id
-            WHERE LOWER(et.nombre) = LOWER(%s)
-          )"""
-        params.append(etiqueta)
-
     if marca:
         # Filtro por marca exacta (case-insensitive) contra marcas.nombre (brand_id FK).
         base_sql += f" AND LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(%s)"
@@ -542,8 +530,7 @@ def create_equipo(data: EquipoCreate, request: Request):
             backfill_equipos_slug(conn)
             conn.commit()
             row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (new_id,)).fetchone()
-            equipo = attach_tags(conn, [row_to_dict(row)])[0]
-            return equipo
+            return row_to_dict(row)
         except Exception:
             conn.rollback()
             raise
@@ -612,9 +599,6 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
             set_clause += ", updated_at = CURRENT_TIMESTAMP"
             conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = %s",
                          list(updates.values()) + [id])
-            # Si cambió algo que alimenta auto-tags, regenerar.
-            if marca_cambio or any(k in updates for k in ("nombre", "modelo")):
-                regenerate_auto_tags(conn, id)
             # Hook: si cambió algo que afecta el nombre público, recalcular.
             # No falla el update si el recálculo rompe.
             if marca_cambio or any(k in updates for k in ("nombre", "modelo")):
@@ -624,8 +608,7 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
                     pass
             conn.commit()
             row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (id,)).fetchone()
-            equipo = attach_tags(conn, [row_to_dict(row)])[0]
-            return equipo
+            return row_to_dict(row)
         except Exception:
             conn.rollback()
             raise
@@ -679,20 +662,6 @@ def duplicate_equipo(id: int, request: Request):
 
             copiar_categorias(conn, id, new_id)
 
-            # Copiar etiquetas MANUALES (las auto se regeneran al setear marca/
-            # modelo/categorías). Sin esto, el duplicado pierde los tags que
-            # el admin tipeó a mano.
-            etqs = conn.execute(
-                "SELECT etiqueta_id, orden FROM equipo_etiquetas "
-                "WHERE equipo_id=%s AND origen='manual'",
-                (id,),
-            ).fetchall()
-            conn.executemany(
-                "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen) "
-                "VALUES (%s, %s, %s, 'manual')",
-                [(new_id, e["etiqueta_id"], e["orden"]) for e in etqs],
-            )
-
             # Copiar kit
             kit = conn.execute(
                 "SELECT componente_id, cantidad, orden FROM kit_componentes WHERE equipo_id=%s", (id,)
@@ -702,17 +671,9 @@ def duplicate_equipo(id: int, request: Request):
                 [(new_id, componente_id, cantidad, orden) for (componente_id, cantidad, orden) in kit],
             )
 
-            # Regenerar etiquetas auto (categoría/marca/modelo/nombre) sobre el
-            # duplicado. Las manuales ya las copiamos arriba; esto agrega las auto
-            # que normalmente se generan en setCategorias.
-            try:
-                regenerate_auto_tags(conn, new_id)
-            except Exception as e:
-                logger.warning("regenerate_auto_tags falló para duplicado %s: %s", new_id, e)
-
             conn.commit()
             row = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (new_id,)).fetchone()
-            return attach_tags(conn, [row_to_dict(row)])[0]
+            return row_to_dict(row)
         except Exception:
             conn.rollback()
             raise

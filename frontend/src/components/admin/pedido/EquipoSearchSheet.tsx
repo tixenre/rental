@@ -54,7 +54,7 @@ export function EquipoSearchSheet({
     const SIN = "Sin categoría";
     const map = new Map<string, Equipo[]>();
     for (const eq of lista) {
-      const cat = eq.etiquetas?.[0] ?? SIN;
+      const cat = eq.categorias?.[0]?.nombre ?? SIN;
       const arr = map.get(cat) ?? [];
       arr.push(eq);
       map.set(cat, arr);

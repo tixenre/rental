@@ -51,7 +51,7 @@ export type Equipment = {
    *  como "quick facts" en la fila del catálogo. Vacío → fallback a montura/
    *  formato/resolución hardcodeados. */
   specsDestacados?: { label: string; value: string }[];
-  /** Palabras clave editoriales (selling points) — distintas de las etiquetas de búsqueda. */
+  /** Palabras clave editoriales (selling points, `ficha.keywords_json`). */
   keywords?: string[];
   // Campos de Lovable
   isNew?: boolean;

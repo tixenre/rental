@@ -113,7 +113,7 @@ export function EquipoFormDialogV2({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial?: Equipo | null;
-  onSubmit: (data: EquipoInput, etiquetas: string[]) => Promise<Equipo>;
+  onSubmit: (data: EquipoInput) => Promise<Equipo>;
   saving?: boolean;
   /** "dialog" (modal, default) o "page" (editor de página completa con
    *  2 columnas + aside + save bar fija, como el mock del handoff). */
@@ -170,8 +170,7 @@ export function EquipoFormDialogV2({
   const [specs, setSpecs] = useState<Spec[]>([]);
   // B1 #635: contenido incluido (dim. 3)
   const [contenidoIncluido, setContenidoIncluido] = useState<ContenidoIncluidoItem[]>([]);
-  // Etiquetas unificadas: en V2 keywords y etiquetas son lo mismo. En save se
-  // envían a los dos backends (etiquetas vía onSubmit, keywords_json vía setFicha).
+  // Keywords editoriales (chips) — se guardan en ficha.keywords_json.
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
@@ -270,7 +269,6 @@ export function EquipoFormDialogV2({
         setNombrePublicoAuto(true);
       }
 
-      // Unificar keywords_json (ficha) + etiquetas (equipo top-level).
       let kws: string[] = [];
       try {
         const arr = f.keywords_json ? JSON.parse(f.keywords_json) : [];
@@ -278,7 +276,7 @@ export function EquipoFormDialogV2({
       } catch {
         kws = [];
       }
-      setTags(uniq([...(initial?.etiquetas ?? []), ...kws]));
+      setTags(uniq(kws));
 
       // Contenido incluido (B1 #635)
       try {
@@ -703,7 +701,7 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
-  // Tags (etiquetas + keywords unificadas)
+  // Tags (keywords editoriales)
   // ════════════════════════════════════════════════════════════════════
   const addTag = () => {
     const v = tagInput.trim().toLowerCase();
@@ -780,9 +778,6 @@ export function EquipoFormDialogV2({
         }
       }
 
-      // Tags unificadas (chip UI) → se envían a ambos backends: etiquetas (top-level
-      // equipo, para filtros/categorización) y keywords_json (ficha, para chips públicos).
-      const etiquetas = uniq(tags.map((t) => t.trim()).filter(Boolean));
       const { visible_catalogo, ficha_completa, tipo, ...rest } = values;
 
       const fotoUrlForm = rest.foto_url || null;
@@ -815,7 +810,7 @@ export function EquipoFormDialogV2({
       let equipoId: number | undefined;
 
       try {
-        const saved = await onSubmit(payload, etiquetas);
+        const saved = await onSubmit(payload);
         equipoId = saved?.id ?? initial?.id;
         if (!equipoId) {
           toast.error("No se pudo guardar el equipo");
@@ -1547,7 +1542,7 @@ export function EquipoFormDialogV2({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Se usan para búsqueda, filtros del catálogo y chips visibles en la ficha pública.
+                Se usan para búsqueda y como chips visibles en la ficha pública.
               </p>
             </div>
           </Field>

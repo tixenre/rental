@@ -16,11 +16,7 @@ function NuevoEquipoRoute() {
   const qc = useQueryClient();
 
   const saveMut = useMutation({
-    mutationFn: async ({ data, etiquetas }: { data: EquipoInput; etiquetas: string[] }) => {
-      const eq = await adminApi.createEquipo(data);
-      await adminApi.setEtiquetas(eq.id, etiquetas);
-      return eq;
-    },
+    mutationFn: (data: EquipoInput) => adminApi.createEquipo(data),
     onSettled: () => qc.invalidateQueries({ queryKey: ["admin", "equipos"] }),
   });
 
@@ -33,7 +29,7 @@ function NuevoEquipoRoute() {
       open
       initial={null}
       saving={saveMut.isPending}
-      onSubmit={(data, etiquetas) => saveMut.mutateAsync({ data, etiquetas })}
+      onSubmit={(data) => saveMut.mutateAsync(data)}
       onOpenChange={(v) => {
         if (!v) goBack();
       }}

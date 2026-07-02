@@ -11,7 +11,6 @@ import psycopg
 
 from busqueda.motor import CAMPO_PLANTILLA
 from database.core import DATABASE_URL, PGConnection
-from database.auto_tags import regenerate_auto_tags_all
 
 logger = logging.getLogger(__name__)
 
@@ -2191,16 +2190,6 @@ def _init_db_schema(conn):
         ALTER TABLE emisores_arca
             ADD COLUMN IF NOT EXISTS razon_social TEXT
     """)
-
-    # Regenerar etiquetas auto (origen='auto') para todos los equipos.
-    # Idempotente: solo borra y reinserta las auto, no toca las manuales.
-    # Se hace una vez por arranque para mantener la bolsa sincronizada
-    # con marca/modelo/nombre/categorías.
-    try:
-        n = regenerate_auto_tags_all(conn)
-        logger.info("%d equipos con etiquetas auto regeneradas", n)
-    except Exception as ex:
-        logger.warning("No se pudieron regenerar etiquetas auto: %s", ex)
 
     # ── Estudio: trabajos / producciones (galería "en acción") ───────────────
     conn.execute("""

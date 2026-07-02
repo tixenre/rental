@@ -5,7 +5,6 @@ ver `commands/assignment.py`. Todo lo de acá valida vía `queries/validation.py
 antes de tocar la fila (nombre único, profundidad ≤ 3 niveles, sin ciclos)."""
 import logging
 
-from database import regenerate_auto_tags_batch
 from services.nombre_service import actualizar_nombres_de
 from ..queries.ancestry import expandir_a_descendientes, buscar_id_por_nombre
 from ..errors import ErrorValidacion, CategoriaNoExiste
@@ -44,21 +43,11 @@ def crear(conn, nombre: str, prioridad: int = 100, parent_id: int | None = None)
     }
 
 
-def _side_effects(conn, cid: int, nuevo_nombre: str | None,
-                  nombre_publico_template: str | None) -> int:
-    """Side effects best-effort tras actualizar una categoría:
-    regenerar auto-tags si cambió el nombre, regenerar nombres públicos
-    si cambió el template. Nunca aborta la operación principal."""
+def _side_effects(conn, cid: int, nombre_publico_template: str | None) -> int:
+    """Side effect best-effort tras actualizar una categoría: regenerar
+    nombres públicos si cambió el template. Nunca aborta la operación
+    principal."""
     nombres_regen = 0
-    if nuevo_nombre is not None:
-        eq_rows = conn.execute(
-            "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = %s", (cid,)
-        ).fetchall()
-        try:
-            regenerate_auto_tags_batch(conn, [r["equipo_id"] for r in eq_rows])
-        except Exception:
-            logger.warning("regenerate_auto_tags_batch falló tras rename de cat %s", cid, exc_info=True)
-
     if nombre_publico_template is not None:
         sub_ids = expandir_a_descendientes(conn, cid)
         placeholders = ",".join(["%s"] * len(sub_ids))
@@ -84,8 +73,8 @@ def actualizar(conn, cid: int, *, nombre: str | None = None,
                nombre_publico_template: str | None = None) -> dict:
     """Actualiza los campos provistos (None = no tocar). `set_parent_null=True`
     desengancha la categoría a raíz (gana sobre `parent_id` si ambos vienen).
-    Rename/cambio de template disparan side effects best-effort — ver
-    `_side_effects`. Levanta ErrorValidacion si no se pasó ningún campo."""
+    Cambio de template dispara side effect best-effort — ver `_side_effects`.
+    Levanta ErrorValidacion si no se pasó ningún campo."""
     validar_existe(conn, cid)
 
     sets, vals = [], []
@@ -118,7 +107,7 @@ def actualizar(conn, cid: int, *, nombre: str | None = None,
 
     vals.append(cid)
     conn.execute(f"UPDATE categorias SET {', '.join(sets)} WHERE id = %s", tuple(vals))
-    nombres_regen = _side_effects(conn, cid, nuevo_nombre, nombre_publico_template)
+    nombres_regen = _side_effects(conn, cid, nombre_publico_template)
     return {"ok": True, "nombres_regenerados": nombres_regen}
 
 
@@ -136,12 +125,7 @@ def eliminar(conn, cid: int) -> None:
             "No se puede eliminar: tiene sub-categorías. "
             "Reasignalas a otro padre o eliminalas primero."
         )
-    eq_rows = conn.execute(
-        "SELECT equipo_id FROM equipo_categorias WHERE categoria_id = %s", (cid,)
-    ).fetchall()
-    affected = [r["equipo_id"] for r in eq_rows]
     conn.execute("DELETE FROM categorias WHERE id = %s", (cid,))
-    regenerate_auto_tags_batch(conn, affected)
 
 
 def reordenar(conn, ids: list[int]) -> int:

@@ -11,12 +11,10 @@ import type {
   EquipoInput,
   MantenimientoEvento,
   MantenimientoInput,
-  Etiqueta,
   KitComponente,
   Ficha,
   Categoria,
   CategoriaAdmin,
-  EtiquetaAdmin,
   MarcaAdmin,
 } from "./types";
 
@@ -29,7 +27,6 @@ export const equiposMethods = {
   listEquipos: (
     params: {
       q?: string;
-      etiqueta?: string;
       categoria?: string;
       marca?: string;
       per_page?: number;
@@ -41,7 +38,6 @@ export const equiposMethods = {
   ) => {
     const sp = new URLSearchParams();
     if (params.q) sp.set("q", params.q);
-    if (params.etiqueta) sp.set("etiqueta", params.etiqueta);
     if (params.categoria) sp.set("categoria", params.categoria);
     if (params.marca) sp.set("marca", params.marca);
     if (params.solo_incompletos) sp.set("solo_incompletos", "true");
@@ -160,12 +156,6 @@ export const equiposMethods = {
         ultimo_alquiler: string | null;
       };
     }>(`/api/equipos/${id}/historial`),
-  setEtiquetas: (id: number, etiquetas: string[]) =>
-    authedJson<{ ok: true }>(`/api/equipos/${id}/etiquetas`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ etiquetas }),
-    }),
   setCategorias: (id: number, categoria_ids: number[]) =>
     authedJson<{ ok: true }>(`/api/equipos/${id}/categorias`, {
       method: "PUT",
@@ -205,8 +195,6 @@ export const equiposMethods = {
   },
   reorderKit: (id: number, orden: number[]) =>
     authedPostJson<{ ok: boolean }>(`/api/admin/equipos/${id}/kit/reorder`, { orden }),
-  listEtiquetas: (incluirAuto = false) =>
-    authedJson<Etiqueta[]>(`/api/etiquetas${incluirAuto ? "?incluir_auto=1" : ""}`),
 
   // categorías (público — árbol con totales)
   listCategorias: () => authedJson<Categoria[]>("/api/categorias"),
@@ -240,34 +228,6 @@ export const equiposMethods = {
   },
   adminReorderCategorias: (ids: number[]) =>
     authedPostJson<{ ok: true; count: number }>("/api/admin/categorias/reorder", { ids }),
-
-  // etiquetas (admin) — bolsa libre
-  adminListEtiquetas: () => authedJson<EtiquetaAdmin[]>("/api/admin/etiquetas"),
-  adminCreateEtiqueta: (data: { nombre: string; prioridad?: number; parent_id?: number | null }) =>
-    authedPostJson<EtiquetaAdmin>("/api/admin/etiquetas", data),
-  adminUpdateEtiqueta: (
-    id: number,
-    patch: {
-      nombre?: string;
-      prioridad?: number;
-      parent_id?: number | null;
-      set_parent_null?: boolean;
-    },
-  ) =>
-    authedJson<{ ok: true }>(`/api/admin/etiquetas/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    }),
-  adminDeleteEtiqueta: async (id: number) => {
-    const res = await authedFetch(`/api/admin/etiquetas/${id}`, { method: "DELETE" });
-    if (!res.ok && res.status !== 204) {
-      const detail = await res.json().catch(() => ({}));
-      throw new Error(detail?.detail ?? `DELETE → ${res.status}`);
-    }
-  },
-  adminReorderEtiquetas: (ids: number[]) =>
-    authedPostJson<{ ok: true; count: number }>("/api/admin/etiquetas/reorder", { ids }),
 
   // marcas (admin)
   adminListMarcas: () => authedJson<{ items: MarcaAdmin[] }>("/api/admin/marcas"),

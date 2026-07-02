@@ -11,7 +11,7 @@ existen.
 | Stock / disponibilidad       | `reservas.calcular_disponibilidad`           |
 | Kit / contenido              | `services.contenido` (puerta única)          |
 | Precios combo                | `services.precios.precios_combo_batch`       |
-| Attach tags/categorías/specs | `database/equipos.py` (attach_*)             |
+| Attach categorías/specs      | `database/equipos.py` (attach_*)             |
 | Búsqueda / ranking           | `busqueda.construir` + `MARCA_SUBQUERY`      |
 
 ## Qué NO hace

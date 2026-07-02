@@ -6,8 +6,8 @@ Sirven tanto para validar al importar como para serializar al exportar.
 Reglas:
 - NUNCA incluir `id` SERIAL.
 - FKs siempre como claves naturales (nombre, slug, path).
-- M2M de equipos (categorías, etiquetas) embebidas dentro de `EquipoIn`
-  para que `equipos.json` sea autosuficiente.
+- M2M de equipos (categorías) embebida dentro de `EquipoIn` para que
+  `equipos.json` sea autosuficiente.
 - `equipo_specs` y `equipo_fichas` viven en archivos aparte porque tienen
   más volumen y se editan independientemente de los datos básicos del equipo.
 """
@@ -50,16 +50,6 @@ class Categoria(_Base):
     visible: bool = True
     grupo_visual: str | None = None
     nombre_publico_template: str | None = None
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# etiquetas.json
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-class Etiqueta(_Base):
-    nombre: str
-    prioridad: int = 100
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -120,14 +110,6 @@ class CategoriaSpecTemplate(_Base):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class EquipoEtiquetaRef(_Base):
-    """Ref a una etiqueta dentro de un equipo, con metadata de la relación."""
-
-    nombre: str
-    origen: Literal["auto", "manual"] = "manual"
-    orden: int = 0
-
-
 class EquipoCategoriaRef(_Base):
     """Ref a una categoría dentro de un equipo (M2M embebida)."""
 
@@ -169,7 +151,6 @@ class Equipo(_Base):
 
     # M2M embebida
     categorias: list[EquipoCategoriaRef] = Field(default_factory=list)
-    etiquetas: list[EquipoEtiquetaRef] = Field(default_factory=list)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -366,7 +347,6 @@ class DescuentoJornada(_Base):
 ENTITY_MODELS: dict[str, type[_Base]] = {
     "marcas": Marca,
     "categorias": Categoria,
-    "etiquetas": Etiqueta,
     "spec_definitions": SpecDefinition,
     "categoria_spec_templates": CategoriaSpecTemplate,
     "equipos": Equipo,
