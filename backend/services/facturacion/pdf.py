@@ -460,91 +460,117 @@ def _factura_clasica_html(f: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _factura_mobile_html(f: dict) -> str:
-    tipo_banner = "Nota de crédito electrónica · Original" if f["es_nc"] else "Factura electrónica · Original"
+_MOBILE_MAX_CONCEPTOS = 2
 
-    qr_block = _qr_img(f["qr"]["url"], 78)
+
+def _factura_mobile_html(f: dict) -> str:
+    tipo_txt = "Nota de crédito" if f["es_nc"] else "Factura"
+
+    qr_block = _qr_img(f["qr"]["url"], 165)
+
+    conceptos = f["conceptos"]
+    visibles = conceptos[:_MOBILE_MAX_CONCEPTOS]
+    restantes = len(conceptos) - len(visibles)
 
     conceptos_html = "".join(f"""
-        <div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-top:1px solid #f2f5f7;">
-          <div style="min-width:0;">
-            <div style="font-size:13.5px;font-weight:600;">{_e(c['desc'])}</div>
-            <div style="font-size:11.5px;color:#8a97a3;">{_e(c['detalle'])}</div>
+        <div style="padding:10px 0;border-top:1px solid #eef1f4;">
+          <div style="display:flex;justify-content:space-between;gap:16px;">
+            <span style="font-size:16px;font-weight:700;">{_e(c['desc'])}</span>
+            <span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;">{_e(c['importeStr'])}</span>
           </div>
-          <div style="font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;">{_e(c['importeStr'])}</div>
-        </div>""" for c in f["conceptos"])
+          {f'<div style="font-size:12.5px;color:#8a97a3;margin-top:2px;">{_e(c["detalle"])}</div>' if c["detalle"] else ""}
+        </div>""" for c in visibles)
+
+    mas_html = (
+        f'<div style="font-size:12.5px;font-style:italic;color:#8a97a3;padding-top:8px;">'
+        f'+ {restantes} concepto{"s" if restantes != 1 else ""} más — ver comprobante completo</div>'
+        if restantes > 0 else ""
+    )
+
+    iibb_line = (
+        f'<div style="font-size:12px;color:#5b6875;margin-top:2px;">IIBB {_e(f["emisor"]["iibb"])}</div>'
+        if f["emisor"]["iibb"] else ""
+    )
 
     if f["tot"]["discrimina"]:
         totales_iva = f"""
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:#5b6875;padding:1px 0;"><span>Neto gravado</span><span style="font-variant-numeric:tabular-nums;letter-spacing:0.04em;">{_e(f['tot']['netoStr'])}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:#5b6875;padding:1px 0;"><span>IVA {_e(f['tot']['ivaPct'])}</span><span style="font-variant-numeric:tabular-nums;letter-spacing:0.04em;">{_e(f['tot']['ivaStr'])}</span></div>
-        <div style="height:1px;background:#eef1f4;margin:4px 0;"></div>"""
+        <div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#5b6875;padding:2px 0;"><span>Neto gravado</span><span style="font-variant-numeric:tabular-nums;">{_e(f['tot']['netoStr'])}</span></div>
+        <div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#5b6875;padding:2px 0;"><span>IVA {_e(f['tot']['ivaPct'])}</span><span style="font-variant-numeric:tabular-nums;">{_e(f['tot']['ivaStr'])}</span></div>
+        <div style="height:1px;background:#dfe4e8;margin:6px 0;"></div>"""
     else:
         totales_iva = ""
 
+    inicio_cell = (
+        '<div><div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;letter-spacing:0.08em;'
+        'text-transform:uppercase;color:#98a3ae;line-height:1;">Inicio de actividades</div>'
+        f'<div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f["emisor"]["inicio"])}</div></div>'
+        if f["emisor"]["inicio"] else ""
+    )
+
     body = f"""
-    <div style="padding:6px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="min-width:0;display:flex;align-items:center;">
-        <div style="width:104px;color:#16202b;">{_arca_logo(104)}</div>
-      </div>
-      <div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:44px;height:48px;border:1.5px solid #16202b;border-radius:8px;">
-        <span style="font-size:24px;font-weight:800;line-height:1;">{_e(f['letra'])}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:7px;letter-spacing:0.08em;margin-top:2px;">COD {_e(f['cod'])}</span>
+    <div style="padding:24px 28px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+      <div style="width:170px;color:#16202b;padding-top:4px;">{_arca_logo(170)}</div>
+      <div style="flex:none;display:flex;align-items:center;gap:14px;">
+        <div style="text-align:right;">
+          <div style="font-size:20px;font-weight:800;letter-spacing:-0.01em;line-height:1.1;">{_e(tipo_txt.upper())}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;margin-top:2px;">Cód. {_e(f['cod'])}</div>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;justify-content:center;width:64px;height:64px;border:1.5px solid #16202b;border-radius:12px;">
+          <span style="font-size:34px;font-weight:800;line-height:1;">{_e(f['letra'])}</span>
+        </div>
       </div>
     </div>
 
-    <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:9.5px;letter-spacing:0.16em;text-transform:uppercase;padding:3px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">{_e(tipo_banner)}</div>
-
-    <div style="padding:5px 20px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 12px;">
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Punto de venta</div><div style="font-size:12px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['emisor']['ptoVta'])}</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Comp. Nro</div><div style="font-size:12px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['comp']['nro'])}</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Fecha de emisión</div><div style="font-size:12px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['comp']['fecha'])}</div></div>
-      <div style="grid-column:span 2;"><div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Período facturado</div><div style="font-size:12px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['periodo']['desde'])} → {_e(f['periodo']['hasta'])}</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Vto. de pago</div><div style="font-size:12px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums;">{_e(f['periodo']['vto'])}</div></div>
+    <div style="margin:18px 28px 0;background:#f7f8fa;border-radius:10px;text-align:center;font-size:14px;font-weight:600;padding:10px;">
+      CAE N° <span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span> · Vto. CAE <span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span>
     </div>
 
-    <div style="padding:6px 20px;border-bottom:1px solid #eef1f4;display:flex;flex-direction:column;gap:4px;">
-      <div style="display:flex;gap:8px;">
-        <div style="flex:none;width:38px;height:14px;display:flex;align-items:center;gap:5px;">
+    <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 16px;">
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Fecha de emisión</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['comp']['fecha'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Vto. de pago</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['periodo']['vto'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Período facturado</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['periodo']['desde'])} → {_e(f['periodo']['hasta'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Punto de venta</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['emisor']['ptoVta'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Comp. Nro</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['comp']['nro'])}</div></div>
+      {inicio_cell}
+    </div>
+
+    <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
           <span style="width:6px;height:6px;border-radius:999px;background:#1c5fb8;flex:none;"></span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.12em;text-transform:uppercase;color:#98a3ae;">De</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Emisor</span>
         </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:14px;font-weight:700;line-height:1.15;">{_e(f['emisor']['razonSocial'])}</div>
-          <div style="font-size:11.5px;color:#5b6875;font-variant-numeric:tabular-nums;">CUIT <span style="font-weight:600;color:#16202b;">{_e(f['emisor']['cuit'])}</span> · {_e(f['emisor']['cond'])}</div>
-        </div>
+        <div style="font-size:19px;font-weight:800;line-height:1.15;">{_e(f['emisor']['razonSocial'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:4px;">CUIT <span style="font-weight:600;color:#16202b;font-variant-numeric:tabular-nums;">{_e(f['emisor']['cuit'])}</span> · {_e(f['emisor']['cond'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:2px;">{_e(f['emisor']['dom'])}</div>
+        {iibb_line}
       </div>
-      <div style="display:flex;gap:8px;">
-        <div style="flex:none;width:38px;height:14px;display:flex;align-items:center;gap:5px;">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
           <span style="width:6px;height:6px;border-radius:999px;background:#16202b;flex:none;"></span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.12em;text-transform:uppercase;color:#98a3ae;">Para</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Receptor</span>
         </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:14px;font-weight:700;line-height:1.15;">{_e(f['receptor']['nombre'])}</div>
-          <div style="font-size:11.5px;color:#5b6875;font-variant-numeric:tabular-nums;">{_e(f['receptor']['docLabel'])} <span style="font-weight:600;color:#16202b;">{_e(f['receptor']['docNro'])}</span> · {_e(f['receptor']['cond'])}</div>
-        </div>
+        <div style="font-size:19px;font-weight:800;line-height:1.15;">{_e(f['receptor']['nombre'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:4px;">{_e(f['receptor']['docLabel'])} <span style="font-weight:600;color:#16202b;font-variant-numeric:tabular-nums;">{_e(f['receptor']['docNro'])}</span> · {_e(f['receptor']['cond'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:2px;">{_e(f['receptor']['dom'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:2px;">Cond. venta: {_e(f['receptor']['venta'])}</div>
       </div>
     </div>
 
-    <div style="padding:6px 20px;border-bottom:1px solid #eef1f4;">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.14em;text-transform:uppercase;color:#8a97a3;margin-bottom:2px;">Conceptos</div>{conceptos_html}
+    <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Conceptos · <span style="color:#16202b;">Servicios</span></div>
+      {conceptos_html}
+      {mas_html}
     </div>
 
-    <div style="padding:6px 20px 7px;border-bottom:1px solid #eef1f4;">{totales_iva}
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <span style="font-size:13px;font-weight:700;">Total</span>
-        <span style="font-size:20px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
+    <div style="padding:20px 28px 24px;background:#f7f8fa;display:flex;gap:20px;align-items:flex-end;">
+      <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:12px;padding:8px;">{qr_block}</div>
+      <div style="flex:1;min-width:0;">{totales_iva}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Total</span>
+        </div>
+        <div style="font-size:34px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;text-align:right;margin-top:2px;">{_e(f['tot']['totalStr'])}</div>
       </div>
-    </div>
-
-    <div style="padding:6px 16px 7px;background:#f5f7f9;display:flex;gap:10px;align-items:center;">
-      <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:8px;padding:5px;">{qr_block}</div>
-      <div style="flex:1;min-width:0;font-size:10.5px;color:#5b6875;line-height:1.25;">
-        <div style="font-weight:600;color:#16202b;margin-bottom:1px;">Comprobante autorizado</div>
-        <div>CAE N° <span style="color:#16202b;font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
-        <div>Vto. CAE <span style="color:#16202b;font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
-        <div style="margin-top:2px;">Escaneá el QR para validar en arca.gob.ar</div>
-              </div>
     </div>
 """
 
@@ -557,8 +583,8 @@ def _factura_mobile_html(f: dict) -> str:
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
   html,body {{ background:#fff; }}
-  body {{ width:392px; background:#fff; font-family:'TT Commons',ui-sans-serif,sans-serif;
-          color:#16202b; overflow:hidden; }}
+  body {{ width:{MOBILE_PAGE_WIDTH}px; background:#fff; font-family:'TT Commons',ui-sans-serif,sans-serif;
+          color:#16202b; }}
 </style>
 </head>
 <body>{body}
@@ -701,9 +727,9 @@ _LAYOUTS = {
 
 # Ancho fijo del comprobante "celular" (mismo valor que el `width` del body
 # en `_factura_mobile_html`). Alto = None → `pdf._render_pdf` mide el alto
-# real del contenido (el comprobante no es A4, es una tarjeta angosta que
-# tiene que terminar donde termina el contenido, no a media hoja).
-MOBILE_PAGE_WIDTH = 392
+# real del contenido (el comprobante no es A4, es una tarjeta que tiene que
+# terminar donde termina el contenido, no a media hoja).
+MOBILE_PAGE_WIDTH = 640
 
 
 def page_size_for_layout(layout: str) -> tuple[int, int | None] | None:

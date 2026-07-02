@@ -118,26 +118,33 @@ def test_layout_desconocido_cae_a_clasica():
 def test_page_size_solo_celular_tiene_ancho_propio():
     assert page_size_for_layout("clasica") is None
     assert page_size_for_layout("formal") is None
-    assert page_size_for_layout("celular") == (392, None)
+    assert page_size_for_layout("celular") == (640, None)
 
 
 # ── Regresión: NC en celular/formal tiene que decir "Nota de crédito" ───────
-# (estaba hardcodeado a "Factura electrónica" en los dos, sin importar es_nc)
+# (estaba hardcodeado a "Factura electrónica" en los dos, sin importar es_nc).
+# La celular (rediseño 2026-07-02) rotula "FACTURA"/"NOTA DE CRÉDITO" en vez de
+# "Factura electrónica · Original" — la formal conserva el rótulo viejo.
 
 
 @pytest.mark.parametrize("layout", ["celular", "formal"])
 def test_nc_en_celular_y_formal_dice_nota_de_credito(layout):
     nc = _factura(cbte_tipo=13, nota_credito_de=1)  # NOTA_CREDITO_C
-    html = factura_html(nc, _pedido(), layout=layout)
-    assert "Nota de crédito" in html
-    assert "Factura electrónica" not in html
+    html = factura_html(nc, _pedido(), layout=layout).lower()
+    assert "nota de crédito" in html
+    assert "factura electrónica" not in html
 
 
-@pytest.mark.parametrize("layout", ["celular", "formal"])
-def test_factura_en_celular_y_formal_dice_factura_electronica(layout):
-    html = factura_html(_factura(), _pedido(), layout=layout)
-    assert "Factura electrónica" in html
-    assert "Nota de crédito" not in html
+def test_factura_en_formal_dice_factura_electronica():
+    html = factura_html(_factura(), _pedido(), layout="formal").lower()
+    assert "factura electrónica" in html
+    assert "nota de crédito" not in html
+
+
+def test_factura_en_celular_dice_factura():
+    html = factura_html(_factura(), _pedido(), layout="celular").lower()
+    assert "factura" in html
+    assert "nota de crédito" not in html
 
 
 def test_clasica_ya_distinguia_nc_del_titulo():
