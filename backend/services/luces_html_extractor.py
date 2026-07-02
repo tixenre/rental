@@ -1,9 +1,8 @@
 """
 services/luces_html_extractor.py — Extrae specs normalizados de un HTML B&H.
 
-Usa el MISMO pipeline que el seed (tools/iluminacion_parser.py +
-tools/iluminacion_normalizar.py) para que la calidad sea idéntica a
-la del dataset curado.
+Usa el MISMO pipeline que el seed (services/specs_ingesta/parsers/iluminacion.py
++ normalizar.py) para que la calidad sea idéntica a la del dataset curado.
 
 Punto de entrada principal:
     extract_from_html(html_content: str) -> dict
@@ -18,34 +17,18 @@ El parser que usa lee:
 """
 
 import re
-import sys
-from pathlib import Path
 
 from services.specs_ingesta.parse import jsonld as _jsonld
 from services.specs_ingesta.parse.garbage import is_garbage as _is_garbage
 from services.specs_ingesta.parse.serialize import specs_dict_to_array
-
-# Importar el parser core desde tools/ (es código script-style ya probado).
-# El seed lo usa idéntico — esto garantiza paridad de calidad.
-# ⏰ LEGACY (F3 del rediseño de ingesta): este sys.path.insert se elimina cuando
-# los parsers se mudan a services/specs_ingesta/parsers/. Ver issue #1176.
-_TOOLS_DIR = Path(__file__).parent.parent.parent / "tools"
-sys.path.insert(0, str(_TOOLS_DIR))
-
-# Funciones del parser/normalizador que reusamos
-from iluminacion_parser import (  # noqa: E402  type: ignore
+from services.specs_ingesta.parsers.base import (
     BHSpecsParser,
     _clean_title,
     _extract_brand,
     _extract_modelo,
-    map_luz_specs,
-    map_luz_extras,
 )
-from iluminacion_normalizar import (  # noqa: E402  type: ignore
-    canon_brand,
-    canon_modelo,
-    clean_extras,
-)
+from services.specs_ingesta.parsers.iluminacion import map_luz_specs, map_luz_extras
+from services.specs_ingesta.parsers.normalizar import canon_brand, canon_modelo, clean_extras
 
 
 # ── Extractor principal ─────────────────────────────────────────────────────

@@ -19,25 +19,13 @@ Entrada principal:
 import json
 import logging
 import re
-import sys
-from pathlib import Path
 
+from services.nombre_builder import compute_keywords
 from services.specs_ingesta.parse import jsonld as _jsonld
 from services.specs_ingesta.parse.garbage import is_garbage
 from services.specs_ingesta.parse.serialize import specs_dict_to_array
 
 logger = logging.getLogger(__name__)
-
-# Importar parsers core desde tools/ (mismo código que el seed)
-_TOOLS_DIR = Path(__file__).parent.parent.parent / "tools"
-if str(_TOOLS_DIR) not in sys.path:
-    sys.path.insert(0, str(_TOOLS_DIR))
-
-# Importar compute_keywords del nombre_builder
-_BACKEND_DIR = Path(__file__).parent.parent
-if str(_BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(_BACKEND_DIR))
-from services.nombre_builder import compute_keywords  # noqa: E402  type: ignore
 
 
 # ── Detección de categoría ──────────────────────────────────────────────
@@ -140,13 +128,13 @@ def _extract_iluminacion(html_content: str) -> dict:
 
 
 def _extract_via_lentes_parser(html_content: str) -> dict:
-    """Usa tools/lentes_parser.py — clasifica lente/adaptador/filtro internamente.
-
-    El parser ya tiene `_classify()`, `map_lente_specs()`, `map_filtro_specs()`,
-    `map_adaptador_specs()`. Reusamos.
+    """Usa services/specs_ingesta/parsers/lentes.py — clasifica lente/adaptador/filtro
+    internamente. El parser ya tiene `_classify()`, `map_lente_specs()`,
+    `map_filtro_specs()`, `map_adaptador_specs()`. Reusamos.
     """
-    from lentes_parser import (  # type: ignore
-        BHSpecsParser, _clean_title, _extract_brand, _classify,
+    from services.specs_ingesta.parsers.base import BHSpecsParser, _clean_title, _extract_brand
+    from services.specs_ingesta.parsers.lentes import (
+        _classify,
         _build_lens_id, _build_filter_id,
         _build_adapter_id, _build_accesorio_model,
         map_lente_specs, map_filtro_specs, map_adaptador_specs,
@@ -208,11 +196,9 @@ def _extract_via_lentes_parser(html_content: str) -> dict:
 
 
 def _extract_via_modificadores_parser(html_content: str) -> dict:
-    """Usa tools/modificadores_parser.py — softbox / spotlight / fresnel / difusor."""
-    from modificadores_parser import map_modificador_specs  # type: ignore
-    from iluminacion_parser import (  # type: ignore
-        BHSpecsParser, _clean_title, _extract_brand, _extract_modelo,
-    )
+    """Usa services/specs_ingesta/parsers/modificadores.py — softbox / spotlight / fresnel / difusor."""
+    from services.specs_ingesta.parsers.base import BHSpecsParser, _clean_title, _extract_brand, _extract_modelo
+    from services.specs_ingesta.parsers.modificadores import map_modificador_specs
 
     parser = BHSpecsParser()
     parser.feed(html_content)
@@ -247,11 +233,9 @@ def _extract_via_modificadores_parser(html_content: str) -> dict:
 
 
 def _extract_via_camaras_parser(html_content: str) -> dict:
-    """Usa tools/camaras_parser.py — cámaras."""
-    from camaras_parser import (  # type: ignore
-        BHSpecsParser, _clean_title, _extract_brand, _extract_modelo,
-        map_camara_specs, map_camara_extras,
-    )
+    """Usa services/specs_ingesta/parsers/camaras.py — cámaras."""
+    from services.specs_ingesta.parsers.base import BHSpecsParser, _clean_title, _extract_brand, _extract_modelo
+    from services.specs_ingesta.parsers.camaras import map_camara_specs, map_camara_extras
 
     parser = BHSpecsParser()
     parser.feed(html_content)
