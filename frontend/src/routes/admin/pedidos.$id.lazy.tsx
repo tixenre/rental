@@ -762,15 +762,20 @@ function PedidoEditorPage() {
               <div
                 className={cn(
                   "h-full transition-colors",
-                  excedente > 0 ? "bg-destructive" : pagadoMonto >= total && total > 0 ? "bg-verde" : "bg-amber",
+                  excedente > 0
+                    ? "bg-destructive"
+                    : pagadoMonto >= total && total > 0
+                      ? "bg-verde"
+                      : "bg-amber",
                 )}
                 style={{ width: `${total ? Math.min(100, (pagadoMonto / total) * 100) : 0}%` }}
               />
             </div>
             {excedente > 0 && (
-              <p className="mt-1 text-[11px] text-destructive">
-                Se cobró {fmtArs(excedente)} de más — probablemente el pedido se editó (ítem/descuento) después de
-                cobrarlo. Resolvé con una devolución o dejalo como crédito a favor del cliente.
+              <p className="mt-1 text-2xs text-destructive">
+                Se cobró {fmtArs(excedente)} de más — probablemente el pedido se editó
+                (ítem/descuento) después de cobrarlo. Resolvé con una devolución o dejalo como
+                crédito a favor del cliente.
               </p>
             )}
             {(p.pagos ?? []).map((pago) => (
