@@ -681,22 +681,41 @@ def test_reabrir_mes_assert_retorno(conn):
     assert reabrir_mes(conn, MES) is False  # ya no hay nada → False de nuevo
 
 
-def test_movimiento_tipo_vs_tipo_cuenta_sin_restriccion(conn):
-    # Fija el comportamiento ACTUAL, a propósito no restringido (ver docstring
-    # de validar_estructura_movimiento, auditoría 2026-07-02): un retiro/aporte
-    # contra una cuenta CORRIENTE de socio (no una caja real) es válido hoy — el
-    # signo resulta contraintuitivo respecto del nombre del tipo (un "retiro"
-    # contra la cuenta de un socio en realidad BAJA su deuda, no la sube). Si
-    # algún día se agrega una validación dura, este test debe fallar y avisar
-    # que es un cambio deliberado, no una regresión.
+def test_retiro_aporte_bloqueados_contra_cuenta_socio(conn):
+    # Resuelto 2026-07-02 (confirmado con el dueño): la cuenta de un socio humano
+    # es puro balance de deuda (su plata real está en un banco aparte, fuera del
+    # sistema) — retiro/aporte representan plata física entrando/saliendo de una
+    # CAJA, así que no tienen sentido de negocio contra un balance de deuda.
     from contabilidad.commands.movimientos import crear_movimiento
-    from contabilidad.queries.saldos import saldos
 
     caja_pablo = _cuenta_id(conn, "Caja Pablo")
-    antes = next(f for f in saldos(conn)["socios"] if f["nombre"] == "Caja Pablo")["saldo"]
 
-    crear_movimiento(conn, tipo="retiro", monto=1000, cuenta_origen_id=caja_pablo, por="test")
+    with pytest.raises(ValueError, match="retiro"):
+        crear_movimiento(conn, tipo="retiro", monto=1000, cuenta_origen_id=caja_pablo, por="test")
+    with pytest.raises(ValueError, match="aporte"):
+        crear_movimiento(conn, tipo="aporte", monto=1000, cuenta_destino_id=caja_pablo, por="test")
+
+
+def test_gasto_contra_cuenta_socio_cuenta_en_pyl_y_baja_deuda(conn):
+    # Permitido a propósito: "el socio pagó un gasto de Rambla con su propia
+    # plata". Un solo movimiento hace las dos cosas — cuenta en el P&L
+    # categorizado (gastos_por_categoria no filtra por tipo de cuenta origen,
+    # solo por moneda) Y baja la deuda del socio (egresos resta en la fórmula de
+    # cuenta corriente) — Rambla ahora le debe eso.
+    from contabilidad.commands.movimientos import crear_movimiento
+    from contabilidad.queries.reporte_mensual import reporte_mensual
+    from contabilidad.queries.saldos import saldos
+
+    mes = "2026-08"
+    caja_pablo = _cuenta_id(conn, "Caja Pablo")
+    antes = next(f for f in saldos(conn)["socios"] if f["nombre"] == "Caja Pablo")["saldo"]
+    gastos_base = reporte_mensual(conn, mes)["gastos"]["total"]
+
+    crear_movimiento(
+        conn, tipo="gasto", monto=7000, cuenta_origen_id=caja_pablo,
+        categoria_id=_categoria_id(conn), fecha=f"{mes}-10", por="test",
+    )
 
     despues = next(f for f in saldos(conn)["socios"] if f["nombre"] == "Caja Pablo")["saldo"]
-    # egresos resta en la fórmula de cuenta corriente → la deuda BAJA, no sube.
-    assert despues == antes - 1000
+    assert despues == antes - 7000  # baja su deuda (o lo acerca a acreedor)
+    assert reporte_mensual(conn, mes)["gastos"]["total"] == gastos_base + 7000  # cuenta en el P&L

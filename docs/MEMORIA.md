@@ -659,12 +659,31 @@ Postgres vía el handler global. `idx_cuentas_socio` ahora único solo entre cue
 activa con ese socio). 8 tests nuevos candado (`editar_cuenta` no tenía ninguno pese a usarse en producción;
 `ajuste` con origen+destino; fallback de `saldo_de_cuenta`; anular un saldado de rendición ya registrado —
 documenta que `ya_transferido` excluye el anulado pero `_movimientos_rendicion` lo sigue mostrando, intencional).
-Ambigüedad documentada, no bloqueada: nada impide `retiro`/`aporte`/`gasto`/`ajuste` contra una cuenta
-CORRIENTE de socio (signo contraintuitivo) — bloquearlo mal rompería `saldar()`, que sí necesita tocar cuentas
-de socio; queda como docstring + test que fija el comportamiento actual. El supervisor marca: un `UPDATE`
+Ambigüedad dejada sin resolver a propósito en esta pasada (retiro/aporte/gasto/ajuste contra una cuenta
+CORRIENTE de socio) — **resuelta después, ver _2026-07-02 — Tipo de movimiento vs tipo de cuenta_ más abajo**.
+El supervisor marca: un `UPDATE`
 directo a `movimientos`/`alquiler_pagos` fuera de `commands/`, un endpoint de escritura de contabilidad/pagos
 sin `@limiter.limit`, o un `except Exception` nuevo en esos routes sin pasar por `map_pg_errors`. Rama aislada
 `fix/contabilidad-auditoria` (PR sin mergear, hoja de ruta), sobre `feature/contabilidad-cqrs`; tracking #1184.
+
+### 2026-07-02 — Tipo de movimiento vs tipo de cuenta: retiro/aporte bloqueados contra un socio, gasto permitido a propósito
+
+Resuelve la ambigüedad que la auditoría anterior dejó documentada-sin-bloquear. Confirmado con el dueño: un
+socio humano (Pablo/Tincho) tiene su plata real en un banco propio, **fuera del sistema** — su cuenta acá
+(`SOCIOS_HUMANOS`) es **puro balance de deuda**, nunca plata física. Con eso claro: **`retiro`/`aporte`
+quedan BLOQUEADOS contra una cuenta de socio** (`_validar_cuentas_y_categoria`, `commands/movimientos.py`) —
+representan plata física entrando/saliendo de una caja real, sin sentido contra un balance de deuda.
+**`transferencia`/`ajuste` siguen permitidos sin cambios** (`saldar()` necesita tocar cuentas de socio).
+**`gasto` queda PERMITIDO a propósito** contra una cuenta de socio como origen — es el caso real "el socio
+pagó un gasto de Rambla con su propia plata": ni `gastos_por_categoria` ni `ganancia_neta` filtran por tipo
+de cuenta origen (solo por moneda), así que un solo movimiento **cuenta en el P&L categorizado Y baja la
+deuda del socio** (`egresos` resta en la fórmula de cuenta corriente) — sin necesitar un tipo de movimiento
+nuevo. El caso inverso ("Rambla pagó algo de Pablo") ya se resolvía con 2 movimientos: `gasto` desde una caja
+real + `ajuste` con destino=socio (sin cambios). Mismo commit/rama que la auditoría de bordes
+(`fix/contabilidad-auditoria` → PR #1195, sin mergear); tests:
+`test_retiro_aporte_bloqueados_contra_cuenta_socio`, `test_gasto_contra_cuenta_socio_cuenta_en_pyl_y_baja_deuda`.
+El supervisor marca un `retiro`/`aporte` nuevo que se le vuelva a permitir a una cuenta de socio, o un tipo de
+movimiento nuevo inventado para el caso "el socio pagó un gasto de Rambla" en vez de reusar `gasto`.
 
 ---
 

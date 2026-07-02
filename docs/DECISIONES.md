@@ -2048,3 +2048,43 @@ cancel-in-progress` ya cancela corridas viejas.
   .../{pago_id}/anular` (body `{motivo}`) — sin otro consumidor confirmado por grep. Rama aislada
   `fix/contabilidad-auditoria` sobre `feature/contabilidad-cqrs` (convención "PR como hoja de ruta", PR sin
   mergear); tracking #1184.
+
+### 2026-07-02 — Tipo de movimiento vs tipo de cuenta: retiro/aporte bloqueados contra un socio, gasto permitido a propósito
+
+- **Contexto.** La auditoría de bordes (entrada anterior) dejó a propósito sin bloquear la ambigüedad de qué
+  TIPO de cuenta puede tocar cada TIPO de movimiento — la regla de negocio no estaba clara desde el código
+  solo. En la sesión siguiente, conversando con el dueño sobre casos reales ("Rambla pagó algo de Pablo",
+  "Pablo pagó algo de Rambla"), confirmó el modelo: los socios (Pablo/Tincho) tienen sus bancos propios,
+  **totalmente separados del sistema** — la cuenta que Rambla les lleva acá es **puro balance de deuda**
+  (quién le debe a quién), nunca plata física que el sistema administre.
+- **Decisión.**
+  - **`retiro`/`aporte` quedan BLOQUEADOS contra una cuenta de socio** (`_validar_cuentas_y_categoria`,
+    `commands/movimientos.py`, gana un parámetro `tipo`): representan plata física entrando/saliendo de una
+    caja real — no tienen sentido de negocio contra un balance de deuda que no es caja.
+  - **`transferencia`/`ajuste` siguen permitidos sin cambios** contra una cuenta de socio (`saldar()` los
+    necesita; un `ajuste` puede ser una corrección legítima de arranque).
+  - **`gasto` queda PERMITIDO a propósito** contra una cuenta de socio, como origen (nunca tuvo destino) —
+    resuelve el caso real "el socio pagó un gasto de Rambla con su propia plata". Verificado en el código
+    (`gastos_por_categoria` en `queries/movimientos.py`, `ganancia_neta` en `queries/pyl.py`): ninguno de los
+    dos filtra por TIPO de cuenta origen, solo por `moneda = 'ARS'` — así que un `gasto` con origen una
+    cuenta de socio **cuenta automáticamente en el P&L categorizado** Y **baja la deuda del socio en el mismo
+    movimiento** (`egresos` resta en la fórmula de cuenta corriente de `queries/saldos.py` — Rambla ahora le
+    debe eso). Un solo movimiento cubre el caso completo, sin inventar un tipo de movimiento nuevo.
+  - El caso inverso ("Rambla pagó algo de Pablo") ya se resolvía sin cambios con 2 movimientos: `gasto` desde
+    una caja real (categorizado, plata real que salió) + `ajuste` con destino=cuenta del socio (le sube la
+    deuda) — patrón que ya funcionaba con las reglas existentes, no necesitó tocarse.
+- **Why.** El check necesita leer `cuentas.socio` de la DB (`SOCIOS_HUMANOS`), así que no puede vivir en
+  `validar_estructura_movimiento` (PURA, sin DB) — va en `_validar_cuentas_y_categoria`, el mismo punto único
+  que ya cerró el bug de mayor impacto de la auditoría anterior (`editar_movimiento` sin revalidar). Se
+  descartó bloquear `gasto` junto con `retiro`/`aporte` (opción más simple/uniforme) porque hubiera cerrado
+  la única forma limpia de que un gasto pagado por un socio impacte el P&L sin necesitar un tipo de movimiento
+  nuevo — el análisis del código (`gastos_por_categoria` sin filtro de tipo de cuenta) mostró que la regla
+  "permitido" ya encajaba con la infraestructura existente, sin construir nada nuevo.
+- **Consecuencias.** `test_movimiento_tipo_vs_tipo_cuenta_sin_restriccion` (fijaba el comportamiento viejo, sin
+  restricción) reemplazado por `test_retiro_aporte_bloqueados_contra_cuenta_socio` (confirma el rechazo) +
+  `test_gasto_contra_cuenta_socio_cuenta_en_pyl_y_baja_deuda` (confirma el permiso y el efecto doble: P&L +
+  deuda). Docstring del módulo (`commands/movimientos.py`) reescrito de "ambigüedad sin resolver" a la regla
+  resuelta. Suite completa en verde (2693 tests). Mismo commit/rama que la auditoría de bordes
+  (`fix/contabilidad-auditoria` → PR #1195, sin mergear); tracking #1184. Frontend sin cambios — el gate es
+  100% backend, el formulario de movimientos no filtra cuentas por tipo hoy y no hacía falta agregarlo para
+  este alcance.
