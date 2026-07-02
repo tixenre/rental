@@ -40,6 +40,34 @@ _COND_IVA_LABEL: dict[int, str] = {
     6: "Responsable Monotributo",
 }
 
+# `Concepto` de AFIP (arca_fe.Concepto) — Rambla siempre factura Servicios
+# (alquiler), pero el campo SÍ es dinámico (viene de `factura.concepto`,
+# persistido en cada comprobante) para no asumir un único rubro: un futuro
+# tenant de este motor que venda productos tiene que ver "Productos" acá,
+# no un texto fijo.
+_CONCEPTO_LABEL: dict[int, str] = {
+    1: "Productos",
+    2: "Servicios",
+    3: "Productos y Servicios",
+}
+
+# Alícuotas de IVA vigentes en AFIP (`FEParamGetTiposIva`) — se usa para
+# redondear el % calculado al valor válido más cercano (evita mostrar
+# "21.02%" por el redondeo a entero de pesos de imp_neto/imp_iva).
+_ALICUOTAS_IVA = (0.0, 10.5, 21.0, 27.0)
+
+
+def _iva_pct_label(imp_neto, imp_iva) -> str:
+    """% de IVA a mostrar, DERIVADO de los importes reales de la factura (no
+    un valor fijo) — necesario para no asumir 21% en un motor que otro
+    negocio pueda usar con otra alícuota."""
+    if not imp_neto:
+        return "21%"
+    pct_crudo = float(imp_iva) / float(imp_neto) * 100
+    pct = min(_ALICUOTAS_IVA, key=lambda p: abs(p - pct_crudo))
+    texto = f"{pct:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{texto}%"
+
 # `condicion_iva` del EMISOR es un string propio de `emisores_arca`
 # (_CONDICIONES_VALIDAS en emisores_repo.py) — tabla distinta a la del
 # receptor (códigos numéricos de ARCA, `_COND_IVA_LABEL` arriba).
@@ -273,9 +301,10 @@ def _build_ctx(factura, pedido: dict) -> dict:
     vto_pago = fecha_desde
 
     mostrar_iva = letra in ("A", "B") and factura.imp_iva > 0
+    concepto_label = _CONCEPTO_LABEL.get(factura.concepto, "Servicios")
 
     return {
-        "letra": letra, "cod": cod, "es_nc": es_nc,
+        "letra": letra, "cod": cod, "es_nc": es_nc, "concepto": concepto_label,
         "titulo": ("NOTA DE CRÉDITO " if es_nc else "FACTURA ") + letra,
         "emisor": {
             "razonSocial": em_row["razon_social"] or "—",
@@ -304,7 +333,8 @@ def _build_ctx(factura, pedido: dict) -> dict:
             "discrimina": mostrar_iva,
             "netoStr": _money(factura.imp_neto), "ivaStr": _money(factura.imp_iva),
             "subStr": _money(factura.imp_neto), "otrosStr": _money(0),
-            "totalStr": _money(factura.imp_total), "ivaPct": "21%",
+            "totalStr": _money(factura.imp_total),
+            "ivaPct": _iva_pct_label(factura.imp_neto, factura.imp_iva),
         },
         "cae": {"nro": factura.cae, "vto": _fdate(factura.cae_vto)},
         "qr": {"url": factura.qr_payload},
@@ -542,7 +572,7 @@ def _factura_mobile_html(f: dict) -> str:
     </div>
 
     <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Conceptos · <span style="color:#16202b;">Servicios</span></div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Conceptos · <span style="color:#16202b;">{_e(f['concepto'])}</span></div>
       {conceptos_html}
     </div>
 

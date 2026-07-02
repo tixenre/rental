@@ -168,6 +168,42 @@ def test_factura_a_discrimina_iva_si_hay_monto():
     assert "IVA 21%" in html
 
 
+# ── % de IVA y rubro (Productos/Servicios) se DERIVAN de la factura real —
+# el motor no puede asumir "siempre 21%, siempre Servicios" (se va a reusar
+# para otros negocios con otras alícuotas/rubros) ──────────────────────────
+
+
+def test_iva_pct_se_calcula_no_se_hardcodea():
+    fa = _factura(
+        cbte_tipo=1, imp_neto=10000, imp_iva=1050, imp_total=11050, condicion_iva_receptor=1,
+    )
+    html = factura_html(fa, _pedido(), layout="clasica")
+    assert "IVA 10,5%" in html
+
+
+def test_iva_pct_27_tambien_se_reconoce():
+    from services.facturacion.pdf import _iva_pct_label
+    assert _iva_pct_label(1000, 270) == "27%"
+    assert _iva_pct_label(1000, 210) == "21%"
+    assert _iva_pct_label(1000, 105) == "10,5%"
+    assert _iva_pct_label(1000, 0) == "0%"
+
+
+def test_concepto_productos_no_queda_fijo_en_servicios():
+    """El rótulo de rubro sale de `factura.concepto` (persistido), no de un
+    texto fijo — Rambla siempre factura Servicios, pero el motor tiene que
+    poder mostrar "Productos" para otro negocio."""
+    f_productos = _factura(concepto=1)
+    html = factura_html(f_productos, _pedido(), layout="celular")
+    assert "Productos" in html
+    assert "Servicios" not in html
+
+
+def test_concepto_servicios_sigue_siendo_el_default_de_rambla():
+    html = factura_html(_factura(concepto=2), _pedido(), layout="celular")
+    assert "Servicios" in html
+
+
 # ── Datos de ARCA incompletos: fallar fuerte, nunca un comprobante a medias ──
 # (decisión explícita del dueño: mejor un 503 que una factura que "parece"
 # válida sin serlo — ni placeholder de QR ni "—" en el CAE)
