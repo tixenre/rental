@@ -18,32 +18,10 @@ from datetime import date
 from functools import lru_cache
 
 # ---------------------------------------------------------------------------
-# Datos de los emisores (env o defaults razonables para homologación).
-# domicilio/IIBB/inicio de actividades son datos legales fijos por emisor —
-# mismo patrón que ya regía para domicilio (env var, no hay tabla para esto).
-# ---------------------------------------------------------------------------
-
-_EMISORES_DATA: dict[str, dict] = {
-    "pablo": {
-        "cond_iva_label": "IVA Responsable Inscripto",
-        "domicilio": os.getenv("AFIP_PABLO_DOMICILIO", "Mar del Plata, Buenos Aires"),
-        # No son obligatorios para que la factura electrónica sea válida (la
-        # validez la da el CAE/QR de ARCA, no estos datos) — son la
-        # convención "clásica" del talonario impreso. Sin configurar → el
-        # renglón entero se omite (nunca se muestra un "—" vacío).
-        "iibb": os.getenv("AFIP_PABLO_IIBB", ""),
-        "inicio_actividades": os.getenv("AFIP_PABLO_INICIO_ACTIVIDADES", ""),
-    },
-    "santini": {
-        "cond_iva_label": "Responsable Monotributo",
-        "domicilio": os.getenv("AFIP_SANTINI_DOMICILIO", "Falucho 4625, Mar del Plata"),
-        "iibb": os.getenv("AFIP_SANTINI_IIBB", ""),
-        "inicio_actividades": os.getenv("AFIP_SANTINI_INICIO_ACTIVIDADES", ""),
-    },
-}
-
 # Letra + código de comprobante AFIP (`FEParamGetTiposCbte`) — el código de 2
 # dígitos que va en la "caja de letra" ES el cbte_tipo, ya cero-paddeado.
+# ---------------------------------------------------------------------------
+
 _CBTE_TIPO_LABEL: dict[int, str] = {
     1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C",
 }
@@ -60,6 +38,15 @@ _COND_IVA_LABEL: dict[int, str] = {
     4: "IVA Exento",
     5: "Consumidor Final",
     6: "Responsable Monotributo",
+}
+
+# `condicion_iva` del EMISOR es un string propio de `emisores_arca`
+# (_CONDICIONES_VALIDAS en emisores_repo.py) — tabla distinta a la del
+# receptor (códigos numéricos de ARCA, `_COND_IVA_LABEL` arriba).
+_EMISOR_COND_IVA_LABEL: dict[str, str] = {
+    "responsable_inscripto": "IVA Responsable Inscripto",
+    "monotributo": "Responsable Monotributo",
+    "exento": "IVA Exento",
 }
 
 
@@ -97,22 +84,29 @@ def _e(s) -> str:
     return _html.escape(str(s or ""))
 
 
+_EMISOR_ROW_CAMPOS = ("razon_social", "cuit", "condicion_iva", "domicilio", "iibb", "inicio_actividades")
+
+
 def _emisor_row(nombre: str) -> dict:
-    """Lee razon_social + cuit de emisores_arca. Fallback: vacío."""
+    """Lee los datos legales del emisor desde `emisores_arca` — administrables
+    desde el back-office, NUNCA hardcodeados por nombre (un emisor nuevo
+    heredaba en silencio los datos de "santini" antes de este fix)."""
     try:
         from database import get_db
         conn = get_db()
         try:
             row = conn.execute(
-                "SELECT razon_social, cuit FROM emisores_arca WHERE nombre = %s", (nombre,)
+                "SELECT razon_social, cuit, condicion_iva, domicilio, iibb, inicio_actividades "
+                "FROM emisores_arca WHERE nombre = %s",
+                (nombre,),
             ).fetchone()
         finally:
             conn.close()
         if row:
-            return {"razon_social": row["razon_social"] or "", "cuit": row["cuit"] or ""}
+            return {campo: row[campo] or "" for campo in _EMISOR_ROW_CAMPOS}
     except Exception:
         pass
-    return {"razon_social": "", "cuit": ""}
+    return {campo: "" for campo in _EMISOR_ROW_CAMPOS}
 
 
 # ---------------------------------------------------------------------------
@@ -255,9 +249,8 @@ def _validar_datos_arca(factura) -> None:
 def _build_ctx(factura, pedido: dict) -> dict:
     _validar_datos_arca(factura)
 
-    em_key = factura.emisor if factura.emisor in _EMISORES_DATA else "santini"
-    em_data = _EMISORES_DATA[em_key]
     em_row = _emisor_row(factura.emisor)
+    em_cond_label = _EMISOR_COND_IVA_LABEL.get(em_row["condicion_iva"], "—")
 
     letra = _CBTE_TIPO_LABEL.get(factura.cbte_tipo, "C")
     es_nc = _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False)
@@ -287,10 +280,10 @@ def _build_ctx(factura, pedido: dict) -> dict:
         "emisor": {
             "razonSocial": em_row["razon_social"] or "—",
             "cuit": em_row["cuit"] or "—",
-            "cond": em_data["cond_iva_label"],
-            "dom": em_data["domicilio"],
-            "iibb": em_data["iibb"],
-            "inicio": em_data["inicio_actividades"],
+            "cond": em_cond_label,
+            "dom": em_row["domicilio"] or "—",
+            "iibb": em_row["iibb"],
+            "inicio": em_row["inicio_actividades"],
             "ptoVta": f"{factura.pto_vta:05d}",
         },
         "comp": {

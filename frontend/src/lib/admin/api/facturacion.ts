@@ -12,6 +12,9 @@ export type EmisorArca = {
   cert_cargado: boolean;
   activo: boolean;
   razon_social: string | null;
+  domicilio: string | null;
+  iibb: string | null;
+  inicio_actividades: string | null;
   notas: string | null;
   created_at: string | null;
   updated_at: string | null;

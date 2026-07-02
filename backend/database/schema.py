@@ -2212,23 +2212,38 @@ def _init_db_schema(conn):
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS emisores_arca (
-            id              SERIAL PRIMARY KEY,
-            nombre          TEXT NOT NULL UNIQUE,
-            cuit            TEXT NOT NULL,
-            pto_vta         INTEGER NOT NULL,
-            condicion_iva   TEXT NOT NULL,
-            cert_enc        BYTEA,
-            key_enc         BYTEA,
-            activo          BOOLEAN NOT NULL DEFAULT true,
-            razon_social    TEXT,
-            notas           TEXT,
-            created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-            updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+            id                  SERIAL PRIMARY KEY,
+            nombre              TEXT NOT NULL UNIQUE,
+            cuit                TEXT NOT NULL,
+            pto_vta             INTEGER NOT NULL,
+            condicion_iva       TEXT NOT NULL,
+            cert_enc            BYTEA,
+            key_enc             BYTEA,
+            activo              BOOLEAN NOT NULL DEFAULT true,
+            razon_social        TEXT,
+            domicilio           TEXT,
+            iibb                TEXT,
+            inicio_actividades  TEXT,
+            notas               TEXT,
+            created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """)
     conn.execute("""
         ALTER TABLE emisores_arca
             ADD COLUMN IF NOT EXISTS razon_social TEXT
+    """)
+    conn.execute("""
+        ALTER TABLE emisores_arca
+            ADD COLUMN IF NOT EXISTS domicilio TEXT
+    """)
+    conn.execute("""
+        ALTER TABLE emisores_arca
+            ADD COLUMN IF NOT EXISTS iibb TEXT
+    """)
+    conn.execute("""
+        ALTER TABLE emisores_arca
+            ADD COLUMN IF NOT EXISTS inicio_actividades TEXT
     """)
 
     # Regenerar etiquetas auto (origen='auto') para todos los equipos.

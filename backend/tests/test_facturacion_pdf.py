@@ -44,6 +44,42 @@ def _pedido(**overrides) -> dict:
     return base
 
 
+# ── Datos legales del emisor: SIEMPRE de la DB, nunca hardcodeados por nombre
+# (bug real: un emisor nuevo que no fuera "pablo"/"santini" heredaba en
+# silencio la condición IVA / domicilio / IIBB de Santini) ──────────────────
+
+
+def test_emisor_desconocido_usa_sus_propios_datos_no_los_de_otro(monkeypatch):
+    monkeypatch.setattr(
+        "services.facturacion.pdf._emisor_row",
+        lambda nombre: {
+            "razon_social": "Empresa XYZ SRL",
+            "cuit": "30-71234567-8",
+            "condicion_iva": "exento",
+            "domicilio": "Ruta 88 km 12, Mar del Plata",
+            "iibb": "IIBB-XYZ-999",
+            "inicio_actividades": "01/01/2020",
+        },
+    )
+    f = _factura(emisor="empresa_xyz")
+    html = factura_html(f, _pedido(), layout="clasica")
+
+    assert "Empresa XYZ SRL" in html
+    assert "Ruta 88 km 12" in html
+    assert "IVA Exento" in html
+    assert "IIBB-XYZ-999" in html
+    # No se cuela ningún dato de otro emisor (el bug viejo hardcodeaba "santini").
+    assert "Falucho" not in html
+    assert "Monotributo" not in html
+
+
+def test_emisor_sin_domicilio_configurado_muestra_guion_no_hueco():
+    """`domicilio` siempre se muestra (a diferencia de iibb/inicio, que se
+    omiten) — sin configurar cae a "—", nunca a un renglón vacío."""
+    html = factura_html(_factura(emisor="sin_configurar"), _pedido(), layout="clasica")
+    assert "Domicilio Comercial:</span> —" in html
+
+
 # ── factura_filename ─────────────────────────────────────────────────────────
 
 

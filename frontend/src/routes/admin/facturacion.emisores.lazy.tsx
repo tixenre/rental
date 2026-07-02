@@ -243,6 +243,9 @@ function EmisorFormModal({
   const [cuit, setCuit] = useState(emisor?.cuit ?? "");
   const [ptoVta, setPtoVta] = useState(String(emisor?.pto_vta ?? ""));
   const [condicion, setCondicion] = useState<string>(emisor?.condicion_iva ?? "monotributo");
+  const [domicilio, setDomicilio] = useState(emisor?.domicilio ?? "");
+  const [iibb, setIibb] = useState(emisor?.iibb ?? "");
+  const [inicioActividades, setInicioActividades] = useState(emisor?.inicio_actividades ?? "");
   const [notas, setNotas] = useState(emisor?.notas ?? "");
   // Cert opcional al crear
   const [cert, setCert] = useState("");
@@ -261,6 +264,9 @@ function EmisorFormModal({
         cuit,
         pto_vta: parseInt(ptoVta, 10),
         condicion_iva: condicion as EmisorArca["condicion_iva"],
+        domicilio: domicilio || null,
+        iibb: iibb || null,
+        inicio_actividades: inicioActividades || null,
         notas: notas || null,
         activo: emisor?.activo ?? true,
       };
@@ -349,6 +355,42 @@ function EmisorFormModal({
             </select>
             <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
+        </Field>
+        <Field label="Domicilio comercial" hint="Aparece en el PDF de la factura">
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={domicilio}
+            onChange={(e) => setDomicilio(e.target.value)}
+            placeholder="Falucho 4625, Mar del Plata"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
+          />
+        </Field>
+        <Field
+          label="Ingresos Brutos (opcional)"
+          hint="Sin configurar, el renglón se omite del PDF (no es obligatorio para la validez fiscal)"
+        >
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={iibb}
+            onChange={(e) => setIibb(e.target.value)}
+            placeholder="901-123456-7"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+          />
+        </Field>
+        <Field
+          label="Fecha de Inicio de Actividades (opcional)"
+          hint="Sin configurar, el renglón se omite del PDF"
+        >
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={inicioActividades}
+            onChange={(e) => setInicioActividades(e.target.value)}
+            placeholder="01/03/2018"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+          />
         </Field>
         <Field label="Notas (opcional)">
           {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
