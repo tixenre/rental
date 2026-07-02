@@ -124,4 +124,5 @@ def extract_from_html_generic(
         "extras": {},
         "fuente": "html-upload",
         "raw_secciones": {},
+        "unmatched": unmatched,  # #1203: mismo unmatched que ya arma specs con key provisional
     }

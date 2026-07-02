@@ -15,11 +15,12 @@ interno del paquete.
 
 from .errors import ErrorIngesta, HtmlNoParseable
 from .queries.extraer import extract_from_html
-from .commands.proponer import proponer_desde_unmatched
+from .commands.proponer import proponer_desde_unmatched, proponer_desde_equipo
 
 __all__ = [
     "extract_from_html",
     "proponer_desde_unmatched",
+    "proponer_desde_equipo",
     "ErrorIngesta",
     "HtmlNoParseable",
 ]

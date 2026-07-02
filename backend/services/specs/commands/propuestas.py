@@ -24,14 +24,17 @@ def encolar_propuesta(
     payload: dict,
     origen: str | None = None,
     confianza: float | None = None,
+    equipo_id: int | None = None,
 ) -> int:
     """Encola una propuesta. `tipo` ∈ {enum_option, spec_nueva, merge_specs,
     assign_spec} (CHECK constraint de la tabla). Nunca se aplica sola — queda
-    pendiente hasta que el dueño la revise."""
+    pendiente hasta que el dueño la revise. `equipo_id` (#1203, opcional): qué
+    equipo la encontró — lo usa el productor "live" (upload en vivo, sin
+    umbral); el productor agregado del CLI offline (F7a) lo deja NULL."""
     return conn.insert_returning(
-        "INSERT INTO spec_propuestas_pendientes (tipo, payload, origen, confianza)"
-        " VALUES (%s, %s, %s, %s)",
-        (tipo, json.dumps(payload, ensure_ascii=False), origen, confianza),
+        "INSERT INTO spec_propuestas_pendientes (tipo, payload, origen, confianza, equipo_id)"
+        " VALUES (%s, %s, %s, %s, %s)",
+        (tipo, json.dumps(payload, ensure_ascii=False), origen, confianza, equipo_id),
     )
 
 

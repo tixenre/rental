@@ -60,3 +60,29 @@ def test_bucket_curado_gana_en_colision():
     )
     vals = {s["spec_key"]: s["value"] for s in r["specs"]}
     assert vals["video_io"] == "curado"
+
+
+# ── unmatched (#1203): panel admin de specs no reconocidas ───────────────────
+
+
+def test_unmatched_expone_labels_sin_match_del_registry():
+    """`secciones` (raw label→value del DOM) con un label que ningún spec_key/
+    alias de Cámaras reconoce → aparece en `unmatched`, explícito."""
+    r = build_result(
+        marca="Sony", modelo="FX6", specs={}, extras={},
+        image=None, url="http://x", title="Sony FX6",
+        secciones={"Weight": "1050 g", "Campo Inventado XYZ": "un valor"},
+        categoria_sugerida="Cámaras",
+    )
+    unmatched_labels = {p["label"] for p in r["unmatched"]}
+    assert "Campo Inventado XYZ" in unmatched_labels
+    assert "Weight" not in unmatched_labels, "Weight resuelve a peso_g — no es unmatched"
+
+
+def test_unmatched_vacio_si_secciones_vacio():
+    r = build_result(
+        marca="X", modelo="Y", specs={}, extras={},
+        image=None, url="http://x", title="X Y",
+        secciones={}, categoria_sugerida="Cámaras",
+    )
+    assert r["unmatched"] == []

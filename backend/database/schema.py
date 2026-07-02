@@ -970,6 +970,22 @@ def _init_db_schema(conn):
         "WHERE aplicado_at IS NULL AND descartado_at IS NULL"
     )
 
+    # Migration: atribución por equipo (#1203). El productor original (skill
+    # gear-compatibility) nunca llegó a escribir acá — el primer productor
+    # real fue specs_ingesta (F7, umbral ≥3 HTMLs, agregado sin equipo_id).
+    # Este campo habilita un segundo productor: el upload en vivo, que encola
+    # CADA par sin match (sin esperar repetición) atribuido al equipo que lo
+    # encontró — así el panel admin puede agrupar por label y mostrar qué
+    # equipos la tienen, en vez de perder todo lo que ocurre 1-2 veces.
+    conn.execute(
+        "ALTER TABLE spec_propuestas_pendientes ADD COLUMN IF NOT EXISTS "
+        "equipo_id INT REFERENCES equipos(id) ON DELETE CASCADE"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_propuestas_pendientes_equipo "
+        "ON spec_propuestas_pendientes(equipo_id) WHERE equipo_id IS NOT NULL"
+    )
+
     # ── Relevancia + ranking + nombre público calculado ────────────────
     # `relevancia_manual`: lo que el admin pone a mano (10=flagship, 100=default).
     # `popularidad_score`: calculado nightly desde historial de pedidos + ingreso.

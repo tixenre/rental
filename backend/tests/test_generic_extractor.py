@@ -310,6 +310,28 @@ def test_extract_generic_categoria_sugerida_del_hint():
     assert r["categoria_sugerida"] == "Modificadores"
 
 
+def test_extract_generic_expone_unmatched_explicito():
+    """#1203: además de mezclarlos en `specs` con key provisional (compat con
+    el form admin existente), `unmatched` los expone limpio — lo que consume
+    el panel de specs no reconocidas."""
+    from services.specs_ingesta.queries.generic import extract_from_html_generic
+
+    html = """
+    <html><head><title>Widget Desconocido</title>
+    <script type="application/ld+json">
+    {"@type":"Product","additionalProperty":[
+      {"@type":"PropertyValue","name":"Weight","value":"500 g"},
+      {"@type":"PropertyValue","name":"Campo Rarísimo","value":"un valor"}
+    ]}
+    </script>
+    </head><body></body></html>
+    """
+    r = extract_from_html_generic(html)
+    unmatched_labels = {p["label"] for p in r["unmatched"]}
+    assert "Campo Rarísimo" in unmatched_labels
+    assert "Weight" not in unmatched_labels, "Weight resuelve a peso_g"
+
+
 # ── Dispatcher: Modificadores → extractor genérico ───────────────────────────
 
 

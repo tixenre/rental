@@ -394,6 +394,19 @@ export type SpecTemplate = {
   rol_compatibilidad: RolCompatibilidad;
 };
 
+/** Grupo de specs sin match del panel admin (#1203) — un label sin
+ *  reconocer, agregado a través de todos los equipos que lo encontraron. */
+export type NoReconocidoGrupo = {
+  categoria: string;
+  label: string;
+  label_normalizado: string;
+  ejemplos: string[];
+  propuesta_ids: number[];
+  equipo_ids: number[];
+  equipo_nombres: string[];
+  ultima_vez: string;
+};
+
 /** Body para asignar una spec ya existente a una categoría. */
 export type SpecAssignmentInput = {
   spec_def_id: number;

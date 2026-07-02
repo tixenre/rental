@@ -204,6 +204,7 @@ export function EquipoFormDialogV2({
 
   // ── HTML source ────────────────────────────────────────────────────
   const [uploadingHtml, setUploadingHtml] = useState(false);
+  const [reExtracting, setReExtracting] = useState(false);
   const [htmlSourceUrl, setHtmlSourceUrl] = useState(initial?.html_source_url ?? null);
   useEffect(() => {
     setHtmlSourceUrl(initial?.html_source_url ?? null);
@@ -641,8 +642,67 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
-  // HTML source — sube el archivo, persiste en R2 y extrae specs
+  // HTML source — sube el archivo, persiste en R2 y extrae specs. También
+  // usado por re-extract (#1203): mismo resultado, sin volver a subir el
+  // archivo — comparten `_aplicarSpecsExtraidos` (aplica al template o
+  // manda a revisión), no hay 2 formas de procesar el mismo resultado.
   // ════════════════════════════════════════════════════════════════════
+  const _aplicarSpecsExtraidos = (
+    specsExtraidos: { label: string; value: string; spec_key?: string }[],
+    tituloSinSpecs: string,
+  ) => {
+    const propuestos: Spec[] = withIds(specsExtraidos ?? []);
+    if (propuestos.length === 0) {
+      toast.success(tituloSinSpecs, { description: "No se extrajeron specs del archivo" });
+      return;
+    }
+    const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+    const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+    for (const t of templateItems ?? []) {
+      if (t.spec_key) tmplByKey.set(t.spec_key, t);
+      if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
+    }
+    const findTmpl = (p: Spec) =>
+      (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
+      tmplByLabel.get(p.label.trim().toLowerCase());
+
+    const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
+    const requierenRevision = propuestos.filter((p) => !findTmpl(p));
+
+    if (autoAplicables.length > 0) {
+      setSpecs((prev) => {
+        const next = [...prev];
+        for (const p of autoAplicables) {
+          const tmpl = findTmpl(p)!;
+          const targetId = `spec-${tmpl.spec_def_id}`;
+          const idx = next.findIndex(
+            (x) =>
+              x.id === targetId ||
+              x.id === `tmpl-${tmpl.spec_def_id}` ||
+              sameLabel(x.label, tmpl.label),
+          );
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], value: p.value };
+          } else {
+            next.push({
+              id: targetId,
+              label: tmpl.label,
+              value: p.value,
+              spec_key: p.spec_key,
+            });
+          }
+        }
+        return next;
+      });
+    }
+    if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
+
+    const parts: string[] = [];
+    if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
+    if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
+    toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
+  };
+
   const handleHtmlUpload = async (file: File) => {
     if (!initial?.id) return;
     setUploadingHtml(true);
@@ -654,62 +714,24 @@ export function EquipoFormDialogV2({
         specs?: { label: string; value: string; spec_key?: string }[];
       }>(`/api/admin/equipos/${initial.id}/upload-html-source`, { method: "POST", body: fd });
       setHtmlSourceUrl(r.html_source_url);
-
-      const propuestos: Spec[] = withIds(r.specs ?? []);
-      if (propuestos.length > 0) {
-        const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        for (const t of templateItems ?? []) {
-          if (t.spec_key) tmplByKey.set(t.spec_key, t);
-          if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
-        }
-        const findTmpl = (p: Spec) =>
-          (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
-          tmplByLabel.get(p.label.trim().toLowerCase());
-
-        const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
-        const requierenRevision = propuestos.filter((p) => !findTmpl(p));
-
-        if (autoAplicables.length > 0) {
-          setSpecs((prev) => {
-            const next = [...prev];
-            for (const p of autoAplicables) {
-              const tmpl = findTmpl(p)!;
-              const targetId = `spec-${tmpl.spec_def_id}`;
-              const idx = next.findIndex(
-                (x) =>
-                  x.id === targetId ||
-                  x.id === `tmpl-${tmpl.spec_def_id}` ||
-                  sameLabel(x.label, tmpl.label),
-              );
-              if (idx >= 0) {
-                next[idx] = { ...next[idx], value: p.value };
-              } else {
-                next.push({
-                  id: targetId,
-                  label: tmpl.label,
-                  value: p.value,
-                  spec_key: p.spec_key,
-                });
-              }
-            }
-            return next;
-          });
-        }
-        if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
-
-        const parts: string[] = [];
-        if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
-        if (requierenRevision.length)
-          parts.push(`${requierenRevision.length} pendientes de revisar`);
-        toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
-      } else {
-        toast.success("HTML guardado", { description: "No se extrajeron specs del archivo" });
-      }
+      _aplicarSpecsExtraidos(r.specs ?? [], "HTML guardado");
     } catch (e) {
       toast.error(`Error al subir HTML: ${e instanceof Error ? e.message : ""}`);
     } finally {
       setUploadingHtml(false);
+    }
+  };
+
+  const handleReExtractSpecs = async () => {
+    if (!initial?.id) return;
+    setReExtracting(true);
+    try {
+      const r = await adminApi.reExtractSpecs(initial.id);
+      _aplicarSpecsExtraidos(r.specs ?? [], "HTML re-procesado");
+    } catch (e) {
+      toast.error(`Error al re-extraer specs: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setReExtracting(false);
     }
   };
 
@@ -1136,9 +1158,27 @@ export function EquipoFormDialogV2({
                 )}
               </Button>
               {htmlSourceUrl && (
-                <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
-                  <FileCode className="h-3 w-3" /> HTML guardado
-                </span>
+                <>
+                  <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
+                    <FileCode className="h-3 w-3" /> HTML guardado
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleReExtractSpecs()}
+                    disabled={reExtracting || uploadingHtml}
+                    title="Re-corre la extracción sobre el HTML ya guardado, sin resubirlo — útil después de agregar un spec nuevo al registry"
+                  >
+                    {reExtracting ? (
+                      <>
+                        <Spinner size="xs" className="mr-1" /> Buscando…
+                      </>
+                    ) : (
+                      "Buscar valores actualizados"
+                    )}
+                  </Button>
+                </>
               )}
             </>
           )}

@@ -54,6 +54,22 @@ def build_result(*, marca: str, modelo: str, specs: dict, extras: dict,
     specs_array = specs_dict_to_array(specs_para_persistir, categoria_sugerida)
     keywords = compute_keywords(specs)
 
+    # unmatched: pares crudos de `secciones` que no resuelven contra NINGÚN
+    # spec_key/alias del registry de esta categoría (#1203, panel admin de
+    # specs no reconocidos). Mismo resolver que ya usa `generic.py` — no un
+    # segundo mecanismo. Puede incluir labels que el mapper bespoke SÍ supo
+    # capturar a mano (hardcodeado en `map_*_specs`, sin ser alias formal del
+    # registry) — ruido aceptado: es señal de que ese label debería
+    # formalizarse como alias, no un bug.
+    unmatched: list[dict] = []
+    try:
+        from services.specs_ingesta.queries.resolver import resolve_pairs
+
+        raw_pairs = [{"label": k, "value": v} for k, v in (secciones or {}).items() if v]
+        _, unmatched = resolve_pairs(raw_pairs, categoria_sugerida)
+    except Exception as exc:
+        logger.warning("unmatched: no se pudo resolver pares de '%s': %s", categoria_sugerida, exc)
+
     # Campos derivados para AutocompletarResult (ficha extendida)
     peso_str: str | None = None
     if isinstance(specs.get("peso_g"), (int, float)):
@@ -90,6 +106,7 @@ def build_result(*, marca: str, modelo: str, specs: dict, extras: dict,
         "extras": extras,
         "fuente": "html-upload",
         "raw_secciones": secciones,
+        "unmatched": unmatched,
     }
 
 
@@ -119,4 +136,5 @@ def generic_fallback_result(title: str, marca: str, modelo: str, image: str | No
         "enriquecido_fuente": "html-upload (categoria desconocida)",
         "bh_url": url, "extras": {}, "fuente": "html-upload",
         "raw_secciones": {},
+        "unmatched": [],
     }

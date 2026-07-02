@@ -32,7 +32,7 @@ from .registry import (
     get_spec,
 )
 from .queries.validation import ValidationError, validate_dataset, validate_or_raise
-from .queries.propuestas import listar_propuestas_pendientes
+from .queries.propuestas import listar_propuestas_pendientes, listar_no_reconocidos_agrupados
 from .queries.equipo_specs import get_equipo_specs_rows, specs_en_nombre_de_equipo
 from .commands.coerce import coerce_and_serialize
 from .commands.persist import persistir_specs
@@ -52,7 +52,7 @@ __all__ = [
     "all_categorias", "get_categoria", "get_spec",
     # queries
     "ValidationError", "validate_dataset", "validate_or_raise",
-    "listar_propuestas_pendientes", "get_equipo_specs_rows",
+    "listar_propuestas_pendientes", "listar_no_reconocidos_agrupados", "get_equipo_specs_rows",
     "specs_en_nombre_de_equipo",
     # commands
     "coerce_and_serialize", "persistir_specs",
