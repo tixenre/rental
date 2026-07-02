@@ -1,5 +1,6 @@
 """services.facturacion.padron — autocompletar razón social/domicilio/condición
-IVA a partir de un CUIT, vía el padrón de ARCA (ws_sr_padron_a5).
+IVA a partir de un CUIT, vía el padrón de ARCA (WSDL personaServiceA5, servicio
+WSAA "ws_sr_constancia_inscripcion" — antes "ws_sr_padron_a5", deprecado).
 
 Es una comodidad de carga (lo mismo que hace el facturador oficial de ARCA al
 tipear un CUIT) — NUNCA crítico: si el padrón no responde, no está configurado,

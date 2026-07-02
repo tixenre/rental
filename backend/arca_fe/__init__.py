@@ -66,7 +66,7 @@ __all__ = [
     "login_con_cert",
     # cliente WSFEv1
     "WsfeClient",
-    # cliente de padrón (Constancia de Inscripción, ws_sr_padron_a5)
+    # cliente de padrón (Constancia de Inscripción, ws_sr_constancia_inscripcion)
     "PadronClient",
     "PersonaArca",
 ]
