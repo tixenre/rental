@@ -612,7 +612,7 @@ def _factura_mobile_html(f: dict) -> str:
       </div>
     </div>
 
-    <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;">
+    <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;flex:1;min-height:0;overflow:hidden;">
       <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Conceptos · <span style="color:#16202b;">{_e(f['concepto'])}</span></div>
       {conceptos_html}
     </div>
@@ -643,9 +643,10 @@ def _factura_mobile_html(f: dict) -> str:
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
   html,body {{ background:{_MOBILE_PAGE_BG}; }}
-  body {{ width:{MOBILE_PAGE_WIDTH}px; padding:{_MOBILE_CARD_MARGIN}px; font-family:'TT Commons',ui-sans-serif,sans-serif;
-          color:#16202b; }}
-  .card {{ width:{_MOBILE_CARD_WIDTH}px; background:#fff; border-radius:28px; border:1px solid #ecebe8;
+  body {{ width:{MOBILE_PAGE_WIDTH}px; height:{MOBILE_PAGE_HEIGHT}px; padding:{_MOBILE_CARD_MARGIN}px;
+          font-family:'TT Commons',ui-sans-serif,sans-serif; color:#16202b; }}
+  .card {{ width:{_MOBILE_CARD_WIDTH}px; height:{_MOBILE_CARD_HEIGHT}px; display:flex; flex-direction:column;
+           background:#fff; border-radius:28px; border:1px solid #ecebe8;
            box-shadow:0 1px 3px rgba(22,32,43,0.06); overflow:hidden; }}
 </style>
 </head>
@@ -800,19 +801,24 @@ _LAYOUTS = {
 
 # La celular es una TARJETA de esquinas redondeadas flotando sobre un fondo
 # (no un rectángulo a página completa) — el ancho de página incluye el
-# margen visible alrededor de la tarjeta en los 4 lados. Alto = None →
-# `pdf._render_pdf` mide el alto real del contenido, la página termina donde
-# termina la tarjeta, no a media hoja.
+# margen visible alrededor de la tarjeta en los 4 lados. Proporción 4:5 FIJA
+# (identidad visual): header/CAE/info/emisor-receptor arriba y QR/total/
+# leyendas abajo quedan anclados en su lugar; lo único que se ajusta con la
+# cantidad de conceptos es el espacio del medio (`flex:1` en la sección de
+# conceptos) — la tarjeta en sí nunca cambia de alto.
 _MOBILE_CARD_WIDTH = 640
 _MOBILE_CARD_MARGIN = 24
 _MOBILE_PAGE_BG = "#f4f2ef"
 MOBILE_PAGE_WIDTH = _MOBILE_CARD_WIDTH + 2 * _MOBILE_CARD_MARGIN
+MOBILE_PAGE_HEIGHT = round(MOBILE_PAGE_WIDTH * 5 / 4)  # ancho:alto = 4:5
+_MOBILE_CARD_HEIGHT = MOBILE_PAGE_HEIGHT - 2 * _MOBILE_CARD_MARGIN
 
 
 def page_size_for_layout(layout: str) -> tuple[int, int | None] | None:
     """Tamaño de página para `pdf._render_pdf(html, page_size=...)`.
-    None → A4 (default, clásica/formal). Un tuple → tamaño propio (celular)."""
-    return (MOBILE_PAGE_WIDTH, None) if layout == "celular" else None
+    None → A4 (default, clásica/formal). Un tuple → tamaño propio (celular,
+    4:5 fijo — ver `_MOBILE_CARD_HEIGHT`)."""
+    return (MOBILE_PAGE_WIDTH, MOBILE_PAGE_HEIGHT) if layout == "celular" else None
 
 
 def factura_html(factura, pedido: dict, layout: str = "clasica") -> str:

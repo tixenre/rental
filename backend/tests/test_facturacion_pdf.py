@@ -115,10 +115,12 @@ def test_layout_desconocido_cae_a_clasica():
     assert html == html_clasica
 
 
-def test_page_size_solo_celular_tiene_ancho_propio():
+def test_page_size_solo_celular_tiene_tamano_propio_4x5_fijo():
     assert page_size_for_layout("clasica") is None
     assert page_size_for_layout("formal") is None
-    assert page_size_for_layout("celular") == (688, None)  # 640 tarjeta + 24×2 margen
+    # 688 = 640 tarjeta + 24×2 margen; 860 = 688 × 5/4 (proporción 4:5 fija,
+    # identidad visual — no varía con la cantidad de conceptos).
+    assert page_size_for_layout("celular") == (688, 860)
 
 
 # ── Regresión: NC en celular/formal tiene que decir "Nota de crédito" ───────
