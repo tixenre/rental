@@ -967,6 +967,17 @@ export function EquipoFormDialogV2({
         return;
       }
 
+      // Invalidar las queries PÚBLICAS (catálogo + ficha de equipo) — el save
+      // arriba ya invalida lo admin (vía saveMut.onSettled del route padre),
+      // pero nombre público/specs/categorías se escriben acá con llamadas
+      // directas que ese onSettled no cubre. Sin esto, el catálogo público
+      // sigue mostrando el dato viejo hasta que su staleTime (30-60s) vence
+      // solo — "tarda en reproducirse" no era timing raro, era que nadie le
+      // avisaba. Prefix-match: no hace falta el slug/rango de fechas exacto.
+      void qc.invalidateQueries({ queryKey: ["equipos"] });
+      void qc.invalidateQueries({ queryKey: ["equipo"] });
+      void qc.invalidateQueries({ queryKey: ["categorias"] });
+
       if (fallidos.length > 0) {
         toast.warning(isEdit ? "Equipo actualizado con avisos" : "Equipo creado con avisos", {
           description: `Falló: ${fallidos.join(" · ")}`,
