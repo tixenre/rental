@@ -35,6 +35,7 @@ from .comprobante import tipo_comprobante, calcular_importes, armar_fecae
 from .qr import armar_qr
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert
 from .wsfe import WsfeClient
+from .padron import PadronClient, PersonaArca
 
 __all__ = [
     "__version__",
@@ -65,4 +66,7 @@ __all__ = [
     "login_con_cert",
     # cliente WSFEv1
     "WsfeClient",
+    # cliente de padrón (Constancia de Inscripción, ws_sr_padron_a5)
+    "PadronClient",
+    "PersonaArca",
 ]
