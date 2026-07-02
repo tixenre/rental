@@ -2203,11 +2203,21 @@ def _init_db_schema(conn):
         CREATE TABLE IF NOT EXISTS afip_ta (
             ambiente   TEXT NOT NULL,
             emisor     TEXT NOT NULL,
+            servicio   TEXT NOT NULL DEFAULT 'wsfe',
             token      TEXT NOT NULL,
             sign       TEXT NOT NULL,
             expira_at  TIMESTAMPTZ NOT NULL,
-            PRIMARY KEY (ambiente, emisor)
+            PRIMARY KEY (ambiente, emisor, servicio)
         )
+    """)
+    conn.execute("""
+        ALTER TABLE afip_ta
+            ADD COLUMN IF NOT EXISTS servicio TEXT NOT NULL DEFAULT 'wsfe'
+    """)
+    conn.execute("ALTER TABLE afip_ta DROP CONSTRAINT IF EXISTS afip_ta_pkey")
+    conn.execute("""
+        ALTER TABLE afip_ta
+            ADD CONSTRAINT afip_ta_pkey PRIMARY KEY (ambiente, emisor, servicio)
     """)
 
     conn.execute("""

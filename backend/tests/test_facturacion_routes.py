@@ -67,6 +67,7 @@ class _FakeConn:
         ("PUT", "/api/admin/emisores-arca/1"),
         ("DELETE", "/api/admin/emisores-arca/1"),
         ("POST", "/api/admin/emisores-arca/1/cert"),
+        ("GET", "/api/admin/arca/padron/20301234567"),
     ],
 )
 def test_rutas_facturacion_gatean_por_admin(method, path):
@@ -213,3 +214,42 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
     assert resp.body == b"%PDF-FAKE%"
     assert "attachment" in resp.headers["content-disposition"]
     assert "Factura-C-00002-00000001.pdf" in resp.headers["content-disposition"]
+
+
+# ── consultar_padron: autocompletar CUIT — nunca rompe, {encontrado: false} ─
+
+
+def test_consultar_padron_encontrado(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+
+    class _Persona:
+        razon_social = "Empresa XYZ SRL"
+        domicilio = "Ruta 88 km 12"
+        condicion_iva = "responsable_inscripto"
+
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona",
+        lambda cuit, conn: _Persona(),
+    )
+
+    result = facturacion_routes.consultar_padron("30712345678", _fake_request())
+    assert result == {
+        "encontrado": True,
+        "razon_social": "Empresa XYZ SRL",
+        "domicilio": "Ruta 88 km 12",
+        "condicion_iva": "responsable_inscripto",
+    }
+
+
+def test_consultar_padron_no_encontrado_no_es_error(monkeypatch):
+    """AFIP caído / sin datos / sin emisor autenticador — nunca un error, el
+    formulario sigue siendo editable a mano."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.padron.resolver_persona", lambda cuit, conn: None
+    )
+
+    result = facturacion_routes.consultar_padron("30712345678", _fake_request())
+    assert result == {"encontrado": False}

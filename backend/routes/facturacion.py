@@ -42,6 +42,34 @@ def estado_facturacion(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# GET /admin/arca/padron/{cuit} — autocompletar razón social/domicilio/IVA
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/arca/padron/{cuit}")
+def consultar_padron(cuit: str, request: Request):
+    """Autocompleta razón social/domicilio/condición IVA desde el padrón de
+    ARCA (ws_sr_padron_a13) — mismo autocompletado que hace el facturador
+    oficial al tipear un CUIT. Best-effort: {encontrado: false} si AFIP no
+    responde o el CUIT no tiene datos, nunca un error — el formulario sigue
+    siendo editable a mano."""
+    require_admin(request)
+
+    from services.facturacion.padron import resolver_persona
+    with get_db() as conn:
+        persona = resolver_persona(cuit, conn)
+
+    if persona is None:
+        return {"encontrado": False}
+    return {
+        "encontrado": True,
+        "razon_social": persona.razon_social,
+        "domicilio": persona.domicilio,
+        "condicion_iva": persona.condicion_iva,
+    }
+
+
+# ---------------------------------------------------------------------------
 # CRUD emisores (Fase 7)
 # ---------------------------------------------------------------------------
 

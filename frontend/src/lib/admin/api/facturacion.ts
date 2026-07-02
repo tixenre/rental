@@ -62,8 +62,16 @@ export type FacturasListResp = {
   count: number;
 };
 
+export type PadronResult =
+  | { encontrado: true; razon_social: string; domicilio: string; condicion_iva: string }
+  | { encontrado: false };
+
 export const facturacionApi = {
   getEstado: () => authedJson<EstadoFacturacion>("/api/admin/facturacion/estado"),
+
+  // Autocompletar razón social/domicilio/condición IVA desde el padrón ARCA.
+  consultarPadron: (cuit: string) =>
+    authedJson<PadronResult>(`/api/admin/arca/padron/${encodeURIComponent(cuit)}`),
 
   // Emisores
   listEmisores: () => authedJson<EmisorArca[]>("/api/admin/emisores-arca"),
