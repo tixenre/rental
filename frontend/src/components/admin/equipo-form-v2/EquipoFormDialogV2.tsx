@@ -193,10 +193,25 @@ export function EquipoFormDialogV2({
       setNombrePublico(override);
       setNombrePublicoAuto(false);
     } else {
-      setNombrePublico("");
+      // Sin override explícito: sembramos con el nombre EFECTIVO ya calculado
+      // (equipos.nombre_publico) en vez de dejar el campo vacío. Sin esto, un
+      // equipo cuyo nombre viene del ficha-template legado (texto YA
+      // renderizado, sin placeholders — una foto vieja, no un molde vivo)
+      // mostraba el campo en blanco mientras ese texto congelado seguía
+      // siendo lo que ve el catálogo público: el admin no tenía forma de
+      // verlo ni de saber que estaba ahí (bug real, encontrado en vivo —
+      // equipo con specs editadas cuyo nombre nunca reaccionaba).
+      // Si hay molde de categoría real, el efecto de auto-gen de abajo pisa
+      // esto enseguida con el valor recién calculado (sin flicker: corre
+      // antes de que el usuario interactúe). Si NO hay molde, este valor se
+      // queda — y el próximo Guardar lo persiste como override real
+      // (mismo criterio que "tipear apaga el auto-gen"), autocurando el
+      // dato congelado equipo por equipo con el uso normal, sin necesitar
+      // una migración aparte.
+      setNombrePublico(initial?.nombre_publico?.trim() || "");
       setNombrePublicoAuto(true);
     }
-  }, [initial?.id, initial?.nombre_publico_override]);
+  }, [initial?.id, initial?.nombre_publico_override, initial?.nombre_publico]);
 
   // Specs traídos del HTML upload: se guardan en una lista separada para
   // que el usuario los apruebe uno por uno (vs los specs actuales).
