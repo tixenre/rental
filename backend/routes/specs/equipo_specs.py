@@ -65,10 +65,18 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
             from services.categorias import buscar_id_por_nombre
             cat_id = buscar_id_por_nombre(conn, categoria_specs)
             if cat_id:
-                from services.categorias import root_of_categoria
-                if root_of_categoria(conn, cat_id) == cat_id:
-                    raiz_id = cat_id
-                    template_rows = conn.execute(
+                # `categoria_raiz_id` en spec_definitions es el id que el
+                # SEEDER resolvió para el nombre de la categoría de specs
+                # (`seed_categoria_from_registry` → `buscar_id_por_nombre`),
+                # NO necesariamente un nodo raíz del árbol de catálogo — ej.
+                # "Adaptadores"/"Filtros" son subcategorías de "Lentes" en el
+                # árbol (parent_id apunta a Lentes), pero sus specs se
+                # sembraron con categoria_raiz_id = su PROPIO id. Exigir acá
+                # que sea raíz del árbol (root_of_categoria(cat_id) == cat_id)
+                # dejaba el template SIEMPRE vacío para esas 2 categorías —
+                # bug real encontrado cargando specs de verdad (Iniciativa A).
+                raiz_id = cat_id
+                template_rows = conn.execute(
                     """
                     SELECT
                         sd.id AS spec_def_id,
