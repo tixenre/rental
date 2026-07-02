@@ -219,7 +219,7 @@ class WsfeClient:
         _check_errors(resp, "FEParamGetPtosVenta")
         if resp.ResultGet is None:
             return []
-        return zeep.helpers.serialize_object(resp.ResultGet.PtoVenta, list) or []
+        return zeep.helpers.serialize_object(resp.ResultGet.PtoVenta, dict) or []
 
     def param_tipos_cbte(self) -> list[dict]:
         """Devuelve los tipos de comprobante disponibles."""
@@ -228,7 +228,7 @@ class WsfeClient:
         _check_errors(resp, "FEParamGetTiposCbte")
         if resp.ResultGet is None:
             return []
-        return zeep.helpers.serialize_object(resp.ResultGet.CbteTipo, list) or []
+        return zeep.helpers.serialize_object(resp.ResultGet.CbteTipo, dict) or []
 
     def param_tipos_doc(self) -> list[dict]:
         """Tipos de documento del receptor (CUIT/CUIL/DNI/...) vigentes en ARCA."""
@@ -237,7 +237,7 @@ class WsfeClient:
         _check_errors(resp, "FEParamGetTiposDoc")
         if resp.ResultGet is None:
             return []
-        return zeep.helpers.serialize_object(resp.ResultGet.DocTipo, list) or []
+        return zeep.helpers.serialize_object(resp.ResultGet.DocTipo, dict) or []
 
     def param_tipos_concepto(self) -> list[dict]:
         """Tipos de concepto (Productos/Servicios/Ambos) vigentes en ARCA."""
@@ -246,7 +246,7 @@ class WsfeClient:
         _check_errors(resp, "FEParamGetTiposConcepto")
         if resp.ResultGet is None:
             return []
-        return zeep.helpers.serialize_object(resp.ResultGet.ConceptoTipo, list) or []
+        return zeep.helpers.serialize_object(resp.ResultGet.ConceptoTipo, dict) or []
 
     def param_condicion_iva_receptor(self, clase_cmp: str) -> list[dict]:
         """Condiciones de IVA del receptor válidas para una clase de
@@ -259,7 +259,7 @@ class WsfeClient:
         _check_errors(resp, "FEParamGetCondicionIvaReceptor")
         if resp.ResultGet is None:
             return []
-        return zeep.helpers.serialize_object(resp.ResultGet.CondicionIvaReceptor, list) or []
+        return zeep.helpers.serialize_object(resp.ResultGet.CondicionIvaReceptor, dict) or []
 
 
 # ---------------------------------------------------------------------------
