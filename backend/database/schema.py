@@ -1219,10 +1219,18 @@ def _init_db_schema(conn):
         "CREATE UNIQUE INDEX IF NOT EXISTS cuentas_nombre_activa_uq "
         "ON cuentas(nombre) WHERE activa"
     )
-    # Un socio = exactamente una caja (puente 1:1 con alquiler_pagos.destinatario).
+    # Un socio = exactamente una caja ACTIVA (puente 1:1 con
+    # alquiler_pagos.destinatario) — único solo entre activas, simétrico con
+    # cuentas_nombre_activa_uq: antes (sin `AND activa`) una cuenta de socio
+    # desactivada bloqueaba para siempre crear una nueva activa con el mismo
+    # socio (auditoría 2026-07-02, migración a4c5d6e7f8g9). El target-less
+    # `ON CONFLICT DO NOTHING` del seed de abajo (#932) sigue siendo necesario
+    # igual: cubre el caso de una cuenta ACTIVA renombrada que conserva su
+    # `socio`, sin depender de cuál de los dos índices la atrape.
+    conn.execute("DROP INDEX IF EXISTS idx_cuentas_socio")
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_cuentas_socio "
-        "ON cuentas(socio) WHERE socio IS NOT NULL"
+        "ON cuentas(socio) WHERE socio IS NOT NULL AND activa"
     )
     conn.execute("""
         INSERT INTO cuentas (nombre, tipo, socio, moneda, orden) VALUES
