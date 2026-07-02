@@ -7,6 +7,7 @@ incluso para una Nota de Crédito).
 """
 from __future__ import annotations
 
+import json
 from datetime import date
 
 import pytest
@@ -15,6 +16,51 @@ from services.facturacion.pdf import factura_filename, factura_html, page_size_f
 from services.facturacion.repo import Factura
 
 pytestmark = pytest.mark.unit
+
+
+# ── Catálogos ARCA (doc_tipo/concepto/condición IVA receptor): en tests se
+# simula que YA se corrió "Actualizar catálogos ARCA" (ver
+# services.facturacion.catalogos) con los valores reales vigentes — no se
+# vuelve a escribir la traducción a mano acá, es el mismo texto que devuelve
+# el catálogo real de ARCA, solo que servido desde un fake en vez de Postgres.
+_CATALOGOS_SEED = {
+    "arca_catalogo_doc_tipo": [
+        {"id": 80, "desc": "CUIT"}, {"id": 86, "desc": "CUIL"},
+        {"id": 96, "desc": "DNI"}, {"id": 99, "desc": "Documento"},
+    ],
+    "arca_catalogo_concepto": [
+        {"id": 1, "desc": "Productos"}, {"id": 2, "desc": "Servicios"},
+        {"id": 3, "desc": "Productos y Servicios"},
+    ],
+    "arca_catalogo_condicion_iva_receptor": [
+        {"id": 1, "desc": "IVA Responsable Inscripto"}, {"id": 4, "desc": "IVA Exento"},
+        {"id": 5, "desc": "Consumidor Final"}, {"id": 6, "desc": "Responsable Monotributo"},
+    ],
+}
+
+
+class _FakeCatalogConn:
+    """Fake de `database.get_db()` — solo entiende el SELECT de `app_settings`
+    que usan los catálogos (`_emisor_row` se mockea aparte, por test, cuando
+    hace falta)."""
+
+    def execute(self, sql, params=None):
+        key = params[0] if params else None
+        value = json.dumps(_CATALOGOS_SEED[key]) if key in _CATALOGOS_SEED else None
+
+        class _R:
+            def fetchone(self_inner):
+                return {"value": value} if value is not None else None
+
+        return _R()
+
+    def close(self):
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _fake_arca_catalogos(monkeypatch):
+    monkeypatch.setattr("database.get_db", lambda: _FakeCatalogConn())
 
 
 def _factura(**overrides) -> Factura:
@@ -299,3 +345,32 @@ def test_falta_cualquier_dato_de_arca_falla_fuerte(campo):
     incompleta = _factura(**{campo: None})
     with pytest.raises(RuntimeError, match=campo):
         factura_html(incompleta, _pedido())
+
+
+# ── Etiquetas de doc_tipo/concepto/condición IVA: salen del catálogo de ARCA
+# (cacheado), no de una traducción escrita a mano — ver services.facturacion.catalogos
+
+
+def test_doc_tipo_y_condicion_iva_salen_del_catalogo_no_de_un_diccionario_fijo():
+    html = factura_html(_factura(doc_tipo=96, condicion_iva_receptor=5), _pedido())
+    assert "DNI" in html
+    assert "Consumidor Final" in html
+
+
+def test_id_no_catalogado_muestra_el_codigo_crudo_no_inventa_un_texto():
+    """Un doc_tipo que el catálogo cacheado no tiene (quedó desactualizado)
+    muestra el número, no un texto adivinado."""
+    html = factura_html(_factura(doc_tipo=999), _pedido())
+    assert "999" in html
+
+
+def test_catalogo_nunca_refrescado_falla_fuerte_no_completa_con_texto_fijo():
+    """Si nadie corrió "Actualizar catálogos ARCA" todavía, el PDF tiene que
+    fallar (503) en vez de mostrar una traducción inventada."""
+    original = dict(_CATALOGOS_SEED)
+    _CATALOGOS_SEED.clear()
+    try:
+        with pytest.raises(RuntimeError, match="todavía no se consultó"):
+            factura_html(_factura(), _pedido())
+    finally:
+        _CATALOGOS_SEED.update(original)

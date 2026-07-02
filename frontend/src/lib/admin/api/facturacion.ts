@@ -23,6 +23,7 @@ export type EmisorArca = {
 export type EstadoFacturacion = {
   ambiente: "homologacion" | "produccion";
   emisores: EmisorArca[];
+  catalogos_actualizados_at: string | null;
 };
 
 export type FacturaEstado = "pendiente" | "emitida" | "error" | "anulada";
@@ -98,6 +99,16 @@ export const facturacionApi = {
   // Autocompletar razón social/domicilio/condición IVA desde el padrón ARCA.
   consultarPadron: (cuit: string) =>
     authedJson<PadronResult>(`/api/admin/arca/padron/${encodeURIComponent(cuit)}`),
+
+  // Actualiza los catálogos de ARCA (doc_tipo/concepto/condición IVA
+  // receptor) que se muestran en el PDF de la factura.
+  refrescarCatalogos: () =>
+    authedPostJson<{
+      ok: boolean;
+      doc_tipo: number;
+      concepto: number;
+      condicion_iva_receptor: number;
+    }>("/api/admin/arca/catalogos/refrescar", {}),
 
   // Emisores
   listEmisores: () => authedJson<EmisorArca[]>("/api/admin/emisores-arca"),

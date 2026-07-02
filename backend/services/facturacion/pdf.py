@@ -18,8 +18,14 @@ from datetime import date
 from functools import lru_cache
 
 # ---------------------------------------------------------------------------
-# Letra + código de comprobante AFIP (`FEParamGetTiposCbte`) — el código de 2
-# dígitos que va en la "caja de letra" ES el cbte_tipo, ya cero-paddeado.
+# Letra + "es nota de crédito" del comprobante — esto NO es una traducción de
+# ARCA que podamos pedirle mal (como pasaba con el padrón): es el ESQUEMA de
+# numeración de `FEParamGetTiposCbte`, fijo desde que existe WSFEv1 (1/3=A,
+# 6/8=B, 11/13=C — el mismo id que ya usa `arca_fe.modelos.CbteTipo` para
+# armar el pedido de CAE). Pedirle esto a ARCA en cada render sería consultar
+# un catálogo para reconstruir un esquema que el propio código ya necesita
+# saber de antemano para EMITIR el comprobante — al revés de doc_tipo/
+# concepto/condición IVA, que son prosa que sí podemos traer tal cual.
 # ---------------------------------------------------------------------------
 
 _CBTE_TIPO_LABEL: dict[int, str] = {
@@ -29,32 +35,31 @@ _CBTE_TIPO_NOTA: dict[int, bool] = {
     3: True, 8: True, 13: True,
 }
 
-_DOC_TIPO_LABEL: dict[int, str] = {
-    80: "CUIT", 86: "CUIL", 96: "DNI", 99: "Documento",
-}
+# Doc tipo / concepto / condición IVA receptor: las ETIQUETAS salen de ARCA
+# (`FEParamGetTiposDoc`/`FEParamGetTiposConcepto`/`FEParamGetCondicionIvaReceptor`,
+# cacheadas — ver `services.facturacion.catalogos`), no de una traducción
+# escrita a mano acá. Si el catálogo nunca se refrescó, `_catalogo` falla
+# fuerte (RuntimeError → 503) en vez de mostrar un texto inventado.
 
-_COND_IVA_LABEL: dict[int, str] = {
-    1: "IVA Responsable Inscripto",
-    4: "IVA Exento",
-    5: "Consumidor Final",
-    6: "Responsable Monotributo",
-}
 
-# `Concepto` de AFIP (arca_fe.Concepto) — Rambla siempre factura Servicios
-# (alquiler), pero el campo SÍ es dinámico (viene de `factura.concepto`,
-# persistido en cada comprobante) para no asumir un único rubro: un futuro
-# tenant de este motor que venda productos tiene que ver "Productos" acá,
-# no un texto fijo.
-_CONCEPTO_LABEL: dict[int, str] = {
-    1: "Productos",
-    2: "Servicios",
-    3: "Productos y Servicios",
-}
+def _catalogo(fn, id_) -> str:
+    from database import get_db
 
-# Alícuotas de IVA vigentes en AFIP (`FEParamGetTiposIva`) — se usa para
-# redondear el % calculado al valor válido más cercano (evita mostrar
-# "21.02%" por el redondeo a entero de pesos de imp_neto/imp_iva).
-_ALICUOTAS_IVA = (0.0, 10.5, 21.0, 27.0)
+    conn = get_db()
+    try:
+        return fn(id_, conn)
+    finally:
+        conn.close()
+
+
+# Alícuotas de IVA — MISMA fuente que la que arma el pedido de CAE
+# (`arca_fe.modelos.IVA_0/10_5/21/27`, id del WS FEParamGetTiposIva ya
+# verificado para la emisión real). Nunca un segundo listado separado: si se
+# agrega una alícuota nueva, se agrega ahí y acá lo hereda solo.
+def _alicuotas_iva_pct() -> tuple[float, ...]:
+    from arca_fe.modelos import IVA_0, IVA_10_5, IVA_21, IVA_27
+
+    return tuple(float(a.pct) for a in (IVA_0, IVA_10_5, IVA_21, IVA_27))
 
 
 def _iva_pct_label(imp_neto, imp_iva) -> str:
@@ -64,13 +69,14 @@ def _iva_pct_label(imp_neto, imp_iva) -> str:
     if not imp_neto:
         return "21%"
     pct_crudo = float(imp_iva) / float(imp_neto) * 100
-    pct = min(_ALICUOTAS_IVA, key=lambda p: abs(p - pct_crudo))
+    pct = min(_alicuotas_iva_pct(), key=lambda p: abs(p - pct_crudo))
     texto = f"{pct:.1f}".rstrip("0").rstrip(".").replace(".", ",")
     return f"{texto}%"
 
 # `condicion_iva` del EMISOR es un string propio de `emisores_arca`
-# (_CONDICIONES_VALIDAS en emisores_repo.py) — tabla distinta a la del
-# receptor (códigos numéricos de ARCA, `_COND_IVA_LABEL` arriba).
+# (_CONDICIONES_VALIDAS en emisores_repo.py) — vocabulario NUESTRO (no de
+# ARCA), tabla distinta a la del receptor (códigos numéricos de ARCA,
+# `label_condicion_iva_receptor` en `services.facturacion.catalogos`).
 _EMISOR_COND_IVA_LABEL: dict[str, str] = {
     "responsable_inscripto": "IVA Responsable Inscripto",
     "monotributo": "Responsable Monotributo",
@@ -259,6 +265,12 @@ def _validar_datos_arca(factura) -> None:
 
 
 def _build_ctx(factura, pedido: dict) -> dict:
+    from services.facturacion.catalogos import (
+        label_concepto,
+        label_condicion_iva_receptor,
+        label_doc_tipo,
+    )
+
     _validar_datos_arca(factura)
 
     em_row = _emisor_row(factura.emisor)
@@ -268,7 +280,7 @@ def _build_ctx(factura, pedido: dict) -> dict:
     es_nc = _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False)
     cod = f"{factura.cbte_tipo:02d}"
 
-    doc_label = _DOC_TIPO_LABEL.get(factura.doc_tipo, "Documento")
+    doc_label = _catalogo(label_doc_tipo, factura.doc_tipo)
     doc_nro = factura.cliente_cuit or factura.doc_nro or "—"
     # CUIT/CUIL con guiones si vienen en crudo (11 dígitos).
     if doc_nro and doc_nro.isdigit() and len(doc_nro) == 11:
@@ -285,7 +297,7 @@ def _build_ctx(factura, pedido: dict) -> dict:
     vto_pago = fecha_desde
 
     mostrar_iva = letra in ("A", "B") and factura.imp_iva > 0
-    concepto_label = _CONCEPTO_LABEL.get(factura.concepto, "Servicios")
+    concepto_label = _catalogo(label_concepto, factura.concepto)
     # Ley 27.743 / RG 5614: leyenda de Transparencia Fiscal al Consumidor,
     # obligatoria en toda venta/locación/prestación A CONSUMIDOR FINAL — en
     # este motor eso son las Facturas B/C (la A es RI-a-RI, no consumidor
@@ -313,7 +325,7 @@ def _build_ctx(factura, pedido: dict) -> dict:
             "nombre": factura.razon_social or pedido.get("cliente_nombre") or "—",
             "docLabel": doc_label,
             "docNro": doc_nro,
-            "cond": _COND_IVA_LABEL.get(factura.condicion_iva_receptor, "—"),
+            "cond": _catalogo(label_condicion_iva_receptor, factura.condicion_iva_receptor),
             "dom": pedido.get("cliente_domicilio_fiscal") or "—",
             "venta": venta,
         },

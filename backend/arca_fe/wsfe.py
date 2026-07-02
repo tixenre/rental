@@ -231,6 +231,37 @@ class WsfeClient:
             return []
         return zeep.helpers.serialize_object(resp.ResultGet.CbteTipo, list) or []
 
+    def param_tipos_doc(self) -> list[dict]:
+        """Tipos de documento del receptor (CUIT/CUIL/DNI/...) vigentes en ARCA."""
+        client = self._client()
+        resp = client.service.FEParamGetTiposDoc(Auth=self._auth())
+        _check_errors(resp, "FEParamGetTiposDoc")
+        if resp.ResultGet is None:
+            return []
+        return zeep.helpers.serialize_object(resp.ResultGet.DocTipo, list) or []
+
+    def param_tipos_concepto(self) -> list[dict]:
+        """Tipos de concepto (Productos/Servicios/Ambos) vigentes en ARCA."""
+        client = self._client()
+        resp = client.service.FEParamGetTiposConcepto(Auth=self._auth())
+        _check_errors(resp, "FEParamGetTiposConcepto")
+        if resp.ResultGet is None:
+            return []
+        return zeep.helpers.serialize_object(resp.ResultGet.ConceptoTipo, list) or []
+
+    def param_condicion_iva_receptor(self, clase_cmp: str) -> list[dict]:
+        """Condiciones de IVA del receptor válidas para una clase de
+        comprobante ("A", "B", "C", "M"). AFIP no tiene un valor "todas" —
+        hay que pedirlas por clase (verificado contra pyafipws)."""
+        client = self._client()
+        resp = client.service.FEParamGetCondicionIvaReceptor(
+            Auth=self._auth(), ClaseCmp=clase_cmp
+        )
+        _check_errors(resp, "FEParamGetCondicionIvaReceptor")
+        if resp.ResultGet is None:
+            return []
+        return zeep.helpers.serialize_object(resp.ResultGet.CondicionIvaReceptor, list) or []
+
 
 # ---------------------------------------------------------------------------
 # Helpers

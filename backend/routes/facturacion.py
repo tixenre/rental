@@ -25,19 +25,50 @@ router = APIRouter()
 
 @router.get("/admin/facturacion/estado")
 def estado_facturacion(request: Request):
-    """Estado de configuración: ambiente activo + lista de emisores (sin secretos)."""
+    """Estado de configuración: ambiente activo + lista de emisores (sin
+    secretos) + cuándo se actualizaron por última vez los catálogos de ARCA
+    (doc_tipo/concepto/condición IVA receptor — ver services.facturacion.catalogos)."""
     require_admin(request)
 
     from config import settings as app_settings
     ambiente = "produccion" if app_settings.is_production else "homologacion"
 
+    from services.facturacion.catalogos import ultimo_refresco
     from services.facturacion.emisores_repo import list_emisores
     with get_db() as conn:
         emisores = list_emisores(conn)
+        catalogos_actualizados_at = ultimo_refresco(conn)
 
     return {
         "ambiente": ambiente,
         "emisores": [_emisor_to_dict(e) for e in emisores],
+        "catalogos_actualizados_at": catalogos_actualizados_at,
+    }
+
+
+@router.post("/admin/arca/catalogos/refrescar")
+def refrescar_catalogos_arca(request: Request):
+    """Actualiza los catálogos de ARCA (doc_tipo/concepto/condición IVA
+    receptor) que se muestran en el PDF de la factura — las etiquetas salen
+    de acá, nunca de una traducción escrita a mano en el código."""
+    require_admin(request)
+
+    from services.facturacion.catalogos import refrescar_catalogos
+
+    with get_db() as conn:
+        try:
+            resultado = refrescar_catalogos(conn)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+        conn.commit()
+
+    return {
+        "ok": True,
+        "doc_tipo": len(resultado["doc_tipo"]),
+        "concepto": len(resultado["concepto"]),
+        "condicion_iva_receptor": len(resultado["condicion_iva_receptor"]),
     }
 
 

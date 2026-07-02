@@ -48,6 +48,9 @@ class _FakeConn:
     def __exit__(self, *a):
         pass
 
+    def commit(self):
+        pass
+
 
 # ── Guard de admin a nivel HTTP (rutea + gatea, sin DB) ─────────────────────
 
@@ -62,6 +65,7 @@ class _FakeConn:
         ("GET", "/api/alquileres/1/facturas"),
         ("GET", "/api/admin/facturas"),
         ("GET", "/api/admin/facturacion/estado"),
+        ("POST", "/api/admin/arca/catalogos/refrescar"),
         ("GET", "/api/admin/emisores-arca"),
         ("POST", "/api/admin/emisores-arca"),
         ("PUT", "/api/admin/emisores-arca/1"),
@@ -391,4 +395,51 @@ def test_consultar_puntos_venta_arca_caida_es_503_nunca_500(monkeypatch):
 
     with pytest.raises(HTTPException) as exc:
         facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert exc.value.status_code == 503
+
+
+# ── refrescar_catalogos_arca: actualiza las etiquetas del PDF desde ARCA ────
+
+
+def test_refrescar_catalogos_arca_devuelve_conteos(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.catalogos.refrescar_catalogos",
+        lambda conn: {
+            "doc_tipo": [{"id": 80, "desc": "CUIT"}],
+            "concepto": [{"id": 1, "desc": "Productos"}, {"id": 2, "desc": "Servicios"}],
+            "condicion_iva_receptor": [],
+        },
+    )
+
+    result = facturacion_routes.refrescar_catalogos_arca(_fake_request())
+    assert result == {"ok": True, "doc_tipo": 1, "concepto": 2, "condicion_iva_receptor": 0}
+
+
+def test_refrescar_catalogos_arca_sin_emisor_es_400(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+
+    def _boom(conn):
+        raise ValueError("No hay ningún emisor activo con certificado cargado")
+
+    monkeypatch.setattr("services.facturacion.catalogos.refrescar_catalogos", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.refrescar_catalogos_arca(_fake_request())
+    assert exc.value.status_code == 400
+
+
+def test_refrescar_catalogos_arca_caida_es_503(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+
+    def _boom(conn):
+        raise RuntimeError("FEParamGetTiposDoc error")
+
+    monkeypatch.setattr("services.facturacion.catalogos.refrescar_catalogos", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.refrescar_catalogos_arca(_fake_request())
     assert exc.value.status_code == 503
