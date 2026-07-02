@@ -19,7 +19,7 @@ def get_ta(emisor: str, conn, servicio: str = "wsfe") -> tuple[str, str]:
     """Devuelve (token, sign) vigentes para el emisor + servicio.
 
     Un TA autentica una relación (CUIT del cert ↔ SERVICIO) — el de "wsfe" no
-    sirve para otro servicio (ej. "ws_sr_padron_a13"), por eso el cache es por
+    sirve para otro servicio (ej. "ws_sr_padron_a5"), por eso el cache es por
     (ambiente, emisor, servicio), no solo por emisor.
 
     Si el TA está vencido (o no existe), llama al WSAA y persiste el nuevo.

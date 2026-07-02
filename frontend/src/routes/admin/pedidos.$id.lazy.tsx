@@ -976,11 +976,19 @@ function FacturacionRailSection({
     queryFn: () => facturacionApi.listFacturasPedido(pedidoId),
   });
 
+  const [showPreview, setShowPreview] = useState(false);
+
+  const preview = useMutation({
+    mutationFn: () => facturacionApi.previewFactura(pedidoId),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const facturar = useMutation({
     mutationFn: () => facturacionApi.facturarPedido(pedidoId),
     onSuccess: () => {
       toast.success("Factura emitida");
       qc.invalidateQueries({ queryKey: ["admin", "facturas", pedidoId] });
+      setShowPreview(false);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1127,18 +1135,128 @@ function FacturacionRailSection({
           variant="outline"
           size="sm"
           className="w-full"
-          disabled={!puedeFacturar || facturar.isPending}
+          disabled={!puedeFacturar || preview.isPending}
           title={
             !ESTADOS_FACTURABLES.includes(estadoPedido)
               ? "El pedido debe estar confirmado para facturar"
               : undefined
           }
-          onClick={() => facturar.mutate()}
+          onClick={() => {
+            setShowPreview(true);
+            preview.mutate();
+          }}
         >
           <Receipt className="h-3.5 w-3.5 mr-1" />
-          {facturar.isPending ? "Emitiendo…" : "Facturar"}
+          {preview.isPending ? "Calculando…" : "Facturar"}
         </Button>
       )}
+
+      <AlertDialog open={showPreview} onOpenChange={setShowPreview}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar factura</AlertDialogTitle>
+            <AlertDialogDescription>
+              Revisá los datos antes de emitir — una vez que ARCA da el CAE, solo se puede corregir
+              con una Nota de Crédito.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {preview.isPending && (
+            <div className="text-sm text-muted-foreground py-2">Calculando…</div>
+          )}
+          {preview.isError && (
+            <div className="text-sm text-destructive py-2">{(preview.error as Error).message}</div>
+          )}
+          {preview.data && (
+            <div className="rounded-lg border hairline p-3 space-y-2 text-sm">
+              {preview.data.ambiente === "homologacion" && (
+                // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica homologación (Tier 3), ya usada en esta pantalla
+                <div className="font-mono text-2xs text-amber-600 border border-amber-400/50 rounded px-1.5 py-0.5 inline-block">
+                  TEST · homologación
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Comprobante</span>
+                <span className="font-mono">
+                  Factura {preview.data.comprobante.letra}{" "}
+                  {String(preview.data.comprobante.pto_vta).padStart(5, "0")}-
+                  {String(preview.data.comprobante.numero_a_emitir).padStart(8, "0")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Emisor</span>
+                <span>{preview.data.emisor.nombre}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Receptor</span>
+                <span className="text-right">
+                  {preview.data.receptor.razon_social || "Consumidor final"}
+                  {preview.data.receptor.doc_tipo !== "CONSUMIDOR_FINAL" && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({preview.data.receptor.doc_tipo} {preview.data.receptor.doc_nro})
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t hairline pt-2">
+                <span className="text-muted-foreground">Neto</span>
+                <span className="font-mono">{formatARS(preview.data.importes.neto)}</span>
+              </div>
+              {preview.data.importes.iva > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">IVA</span>
+                  <span className="font-mono">{formatARS(preview.data.importes.iva)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between font-medium">
+                <span>Total</span>
+                <span className="font-mono">{formatARS(preview.data.importes.total)}</span>
+              </div>
+              {preview.data.fechas.vto_pago && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Vencimiento de pago</span>
+                  <span>{formatFechaCorta(preview.data.fechas.vto_pago)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {preview.data && (
+            <div className="space-y-1.5">
+              {preview.data.chequeos.map((c) => (
+                <div key={c.check} className="flex items-start gap-2 text-xs">
+                  {c.ok ? (
+                    <Check className="h-3.5 w-3.5 shrink-0 mt-0.5 text-verde-ink" />
+                  ) : c.bloqueante ? (
+                    <X className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
+                  ) : (
+                    // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica de advertencia (Tier 3), ya usada en esta pantalla
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
+                  )}
+                  <span
+                    className={cn(
+                      !c.ok && c.bloqueante ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {c.mensaje}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!preview.data?.listo || facturar.isPending}
+              onClick={() => facturar.mutate()}
+            >
+              {facturar.isPending ? "Emitiendo…" : "Confirmar y emitir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RailSection>
   );
 }

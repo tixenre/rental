@@ -65,7 +65,7 @@ def test_usa_el_primer_emisor_activo_con_cert(monkeypatch):
 
     assert result.razon_social == "Empresa XYZ"
     assert captured["emisor"] == "pablo"
-    assert captured["servicio"] == "ws_sr_padron_a13"
+    assert captured["servicio"] == "ws_sr_padron_a5"
 
 
 def test_cualquier_excepcion_degrada_a_none(monkeypatch):

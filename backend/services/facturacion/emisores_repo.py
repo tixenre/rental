@@ -84,6 +84,16 @@ def get_activo_para_condicion(condicion_iva: str, conn) -> Optional[EmisorArca]:
     return _row_to_emisor(row) if row else None
 
 
+def elegir_autenticador(conn) -> Optional[str]:
+    """El primer emisor activo con cert cargado — sirve para autenticar
+    consultas cuyo dato no depende de CUÁL CUIT autentica (padrón de
+    cualquier CUIT, catálogos globales de WSFE como FEParamGetTiposDoc)."""
+    for emisor in list_emisores(conn):
+        if emisor.activo and emisor.cert_cargado:
+            return emisor.nombre
+    return None
+
+
 def get_cert_pem(emisor_id: int, conn) -> tuple[bytes, bytes]:
     """Devuelve (cert_pem, key_pem) descifrados. Lanza ValueError si no hay cert."""
     row = conn.execute(

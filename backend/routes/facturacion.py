@@ -25,19 +25,50 @@ router = APIRouter()
 
 @router.get("/admin/facturacion/estado")
 def estado_facturacion(request: Request):
-    """Estado de configuración: ambiente activo + lista de emisores (sin secretos)."""
+    """Estado de configuración: ambiente activo + lista de emisores (sin
+    secretos) + cuándo se actualizaron por última vez los catálogos de ARCA
+    (doc_tipo/concepto/condición IVA receptor — ver services.facturacion.catalogos)."""
     require_admin(request)
 
     from config import settings as app_settings
     ambiente = "produccion" if app_settings.is_production else "homologacion"
 
+    from services.facturacion.catalogos import ultimo_refresco
     from services.facturacion.emisores_repo import list_emisores
     with get_db() as conn:
         emisores = list_emisores(conn)
+        catalogos_actualizados_at = ultimo_refresco(conn)
 
     return {
         "ambiente": ambiente,
         "emisores": [_emisor_to_dict(e) for e in emisores],
+        "catalogos_actualizados_at": catalogos_actualizados_at,
+    }
+
+
+@router.post("/admin/arca/catalogos/refrescar")
+def refrescar_catalogos_arca(request: Request):
+    """Actualiza los catálogos de ARCA (doc_tipo/concepto/condición IVA
+    receptor) que se muestran en el PDF de la factura — las etiquetas salen
+    de acá, nunca de una traducción escrita a mano en el código."""
+    require_admin(request)
+
+    from services.facturacion.catalogos import refrescar_catalogos
+
+    with get_db() as conn:
+        try:
+            resultado = refrescar_catalogos(conn)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+        conn.commit()
+
+    return {
+        "ok": True,
+        "doc_tipo": len(resultado["doc_tipo"]),
+        "concepto": len(resultado["concepto"]),
+        "condicion_iva_receptor": len(resultado["condicion_iva_receptor"]),
     }
 
 
@@ -49,7 +80,7 @@ def estado_facturacion(request: Request):
 @router.get("/admin/arca/padron/{cuit}")
 def consultar_padron(cuit: str, request: Request):
     """Autocompleta razón social/domicilio/condición IVA desde el padrón de
-    ARCA (ws_sr_padron_a13) — mismo autocompletado que hace el facturador
+    ARCA (ws_sr_padron_a5) — mismo autocompletado que hace el facturador
     oficial al tipear un CUIT. Best-effort: {encontrado: false} si AFIP no
     responde o el CUIT no tiene datos, nunca un error — el formulario sigue
     siendo editable a mano."""
@@ -64,8 +95,11 @@ def consultar_padron(cuit: str, request: Request):
     return {
         "encontrado": True,
         "razon_social": persona.razon_social,
+        "nombre": persona.nombre,
+        "apellido": persona.apellido,
         "domicilio": persona.domicilio,
         "condicion_iva": persona.condicion_iva,
+        "estado_clave": persona.estado_clave,
     }
 
 
@@ -199,6 +233,31 @@ def cargar_cert(emisor_id: int, request: Request, body: dict):
     return {"ok": True, "cert_cargado": emisor.cert_cargado}
 
 
+@router.get("/admin/emisores-arca/{emisor_id}/puntos-venta")
+def consultar_puntos_venta_emisor(emisor_id: int, request: Request):
+    """Consulta a ARCA (WSFE `FEParamGetPtosVenta`) los puntos de venta
+    habilitados de este emisor — para validar/elegir el número en vez de
+    cargarlo a mano y descubrir recién al pedir el primer CAE que estaba mal.
+    Requiere que el emisor ya tenga cert cargado."""
+    require_admin(request)
+
+    from services.facturacion.emisores_repo import get_by_id
+    from services.facturacion.puntos_venta import consultar_puntos_venta
+
+    with get_db() as conn:
+        emisor = get_by_id(emisor_id, conn)
+        if emisor is None:
+            raise HTTPException(404, "Emisor no encontrado")
+        try:
+            puntos = consultar_puntos_venta(emisor.nombre, conn)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+
+    return {"puntos_venta": puntos}
+
+
 @router.delete("/admin/emisores-arca/{emisor_id}", status_code=204)
 def desactivar_emisor(emisor_id: int, request: Request):
     """Marca el emisor como inactivo (soft-delete). Las facturas existentes no se tocan."""
@@ -207,6 +266,27 @@ def desactivar_emisor(emisor_id: int, request: Request):
     with get_db() as conn:
         delete_emisor(emisor_id, conn)
         conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# GET /alquileres/{id}/facturar/preview
+# ---------------------------------------------------------------------------
+
+
+@router.get("/alquileres/{pedido_id}/facturar/preview")
+def preview_factura(pedido_id: int, request: Request):
+    """Arma el comprobante y calcula sus importes SIN emitir — para que el
+    admin confirme los datos antes de pedir un CAE real (irreversible)."""
+    require_admin(request)
+
+    try:
+        from services.facturacion.engine import previsualizar_factura
+        with get_db() as conn:
+            return previsualizar_factura(pedido_id, conn)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -357,6 +437,11 @@ async def descargar_pdf_factura(
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
+        if format == "html":
+            cert_pem = key_pem = None
+        else:
+            from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+            cert_pem, key_pem = get_or_create_signing_cert(conn)
 
     if format == "html":
         from fastapi.responses import HTMLResponse
@@ -364,8 +449,10 @@ async def descargar_pdf_factura(
 
     from pdf import _render_pdf
     from services.facturacion.pdf import factura_filename, page_size_for_layout
+    from services.facturacion.pdf_seguridad import asegurar_pdf
     try:
         pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
+        pdf_bytes = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF: {e}")
 
@@ -390,9 +477,11 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     require_admin(request)
 
     from services.email import send_raw_email, Attachment
+    from services.facturacion.pdf_seguridad import get_or_create_signing_cert
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn)
+        cert_pem, key_pem = get_or_create_signing_cert(conn)
 
         # Email del cliente: está en el pedido
         row = conn.execute(
@@ -413,8 +502,10 @@ async def enviar_mail_factura(factura_id: int, request: Request):
 
     from pdf import _render_pdf
     from services.facturacion.pdf import factura_filename
+    from services.facturacion.pdf_seguridad import asegurar_pdf
     try:
         pdf_bytes = await _render_pdf(html_str)
+        pdf_bytes = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF para el mail: {e}")
 

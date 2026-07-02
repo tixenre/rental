@@ -100,8 +100,16 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
   const cuit = form.watch("cuit");
 
   const padron = usePadronLookup((datos) => {
-    if (datos.razon_social && !form.getValues("nombre").trim()) {
-      form.setValue("nombre", datos.razon_social);
+    // Persona física (AFIP da nombre/apellido separados) → cada campo el
+    // suyo; empresa (solo razón social) → todo a "nombre", sin inventar un
+    // apellido que no existe.
+    if (!form.getValues("nombre").trim()) {
+      if (datos.nombre || datos.apellido) {
+        if (datos.nombre) form.setValue("nombre", datos.nombre);
+        if (datos.apellido) form.setValue("apellido", datos.apellido);
+      } else if (datos.razon_social) {
+        form.setValue("nombre", datos.razon_social);
+      }
     }
     if (datos.domicilio) form.setValue("direccion", datos.domicilio);
     if (datos.condicion_iva) form.setValue("perfil_impuestos", datos.condicion_iva);
@@ -156,6 +164,9 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
               <p className="text-xs text-muted-foreground">
                 ARCA no tiene datos para este CUIT — cargá a mano.
               </p>
+            )}
+            {padron.inactivo && (
+              <p className="text-xs text-destructive">⚠️ Este CUIT figura inactivo en AFIP.</p>
             )}
           </div>
           <div className="space-y-1">

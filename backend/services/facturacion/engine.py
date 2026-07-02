@@ -27,6 +27,7 @@ from arca_fe import (
     CaeResult,
     CbteTipo,
     CondicionIva,
+    DocTipo,
     Emisor,
     armar_fecae,
     tipo_comprobante,
@@ -89,6 +90,180 @@ def _get_pedido(conn, pedido_id: int) -> dict:
     _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
     _enriquecer_pedido_con_cliente(conn, pedido)
     return pedido
+
+
+# ---------------------------------------------------------------------------
+# Preview — arma el comprobante sin tocar ARCA (para confirmar antes de emitir)
+# ---------------------------------------------------------------------------
+
+
+def _chequeos_previos(
+    req, perfil_receptor: str, importes: dict, ambiente: str, numero_a_emitir: int
+) -> list[dict]:
+    """Chequeos fail-not-fast (todos corren, ninguno frena a los demás — mismo
+    patrón que `services/checkout/validar.py`). Lo irreversible es "Confirmar
+    y emitir": acá se junta todo lo verificable de antemano para que ese paso
+    no tenga sorpresas."""
+    from identity.anchor import cuil_valido
+
+    chequeos = [
+        {
+            "check": "credenciales_arca",
+            "ok": True,
+            "bloqueante": False,
+            "mensaje": f"Conectado a ARCA ({ambiente}) — próximo comprobante N° {numero_a_emitir}",
+        },
+    ]
+
+    if req.receptor.doc_tipo == DocTipo.CUIT:
+        cuit_ok = cuil_valido(str(req.receptor.doc_nro))
+        chequeos.append({
+            "check": "cuit_receptor",
+            "ok": cuit_ok,
+            "bloqueante": True,
+            "mensaje": (
+                "CUIT del receptor con dígito verificador válido"
+                if cuit_ok
+                else f"CUIT del receptor ({req.receptor.doc_nro}) tiene el dígito verificador mal — ARCA lo va a rechazar"
+            ),
+        })
+
+    ri_degradado = (
+        perfil_receptor == "responsable_inscripto"
+        and req.receptor.condicion_iva != CondicionIva.RESPONSABLE_INSCRIPTO
+    )
+    chequeos.append({
+        "check": "perfil_fiscal_receptor",
+        "ok": not ri_degradado,
+        "bloqueante": False,
+        "mensaje": (
+            "El cliente es Responsable Inscripto pero no tiene un CUIT válido cargado — "
+            "se va a facturar como Consumidor Final en vez de Factura A"
+            if ri_degradado
+            else "Perfil fiscal del receptor consistente"
+        ),
+    })
+
+    # total == neto + iva (arca_fe.comprobante.calcular_importes) y el IVA nunca
+    # cambia el signo, así que chequear el total (la cifra que ve el admin) o
+    # el neto da lo mismo matemáticamente — se muestra el total para no meter
+    # jerga fiscal ("neto") en un chequeo pensado para el dueño, no para AFIP.
+    total_ok = importes["total"] > 0
+    chequeos.append({
+        "check": "importe_positivo",
+        "ok": total_ok,
+        "bloqueante": True,
+        "mensaje": "Importe total positivo" if total_ok else "El importe total es $0 o negativo",
+    })
+
+    fechas_ok = (
+        req.fecha_serv_desde is None
+        or req.fecha_serv_hasta is None
+        or req.fecha_serv_desde <= req.fecha_serv_hasta
+    )
+    chequeos.append({
+        "check": "fechas_servicio",
+        "ok": fechas_ok,
+        "bloqueante": True,
+        "mensaje": (
+            "Fechas de servicio coherentes"
+            if fechas_ok
+            else "La fecha de inicio del servicio es posterior a la de fin"
+        ),
+    })
+
+    return chequeos
+
+
+def previsualizar_factura(pedido_id: int, conn) -> dict:
+    """Arma el `ComprobanteRequest`, calcula sus importes, y consulta a ARCA
+    el próximo número de comprobante — SIN pedir CAE.
+
+    Corre los mismos pasos 1-3 de `emitir_factura` (validar estado, resolver
+    emisor/receptor, construir el comprobante) y agrega UNA llamada SOAP de
+    solo lectura (`FECompUltimoAutorizado`, la misma que ya usa el paso 7 de
+    la emisión real): no crea ni modifica nada en ARCA, pero sirve para dos
+    cosas — mostrar el número real que le va a tocar al comprobante, y
+    validar que el certificado/las credenciales funcionan ANTES de
+    comprometerse a pedir un CAE real (irreversible salvo Nota de Crédito).
+    Nada de advisory lock, nada de INSERT — eso sigue siendo exclusivo de
+    `emitir_factura`."""
+    pedido = _get_pedido(conn, pedido_id)
+
+    estado = (pedido.get("estado") or "").lower()
+    if estado not in ("confirmado", "retirado", "devuelto", "finalizado"):
+        raise ValueError(
+            f"El pedido {pedido_id} está en estado '{estado}'; "
+            "solo se puede facturar desde 'confirmado' o posterior"
+        )
+
+    perfil_receptor = (pedido.get("cliente_perfil_impuestos") or "").strip().lower()
+    nombre_emisor = emisor_para(perfil_receptor, conn)
+    cred = credenciales(nombre_emisor, conn)
+
+    emisor_obj = Emisor(
+        cuit=cred.cuit,
+        punto_venta=cred.punto_venta,
+        condicion_iva=(
+            CondicionIva.RESPONSABLE_INSCRIPTO
+            if cred.condicion_iva == "responsable_inscripto"
+            else CondicionIva.MONOTRIBUTO
+        ),
+    )
+
+    hoy = now_ar().date()
+    req = construir_comprobante(pedido, emisor_obj, emisor_obj.condicion_iva, fecha=hoy)
+    cbte_tipo = tipo_comprobante(req)
+    importes = calcular_importes(req)
+
+    # Único llamado a ARCA del preview: de solo lectura, no pide CAE. Si el
+    # cert está vencido o ARCA no responde, mejor enterarse acá (RuntimeError
+    # → 503) que después de que el admin ya confirmó.
+    token, sign = get_ta(nombre_emisor, conn)
+    wsfe = WsfeClient(
+        endpoint=cred.endpoint_wsfe, cuit=cred.cuit, token=token, sign=sign,
+    )
+    ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
+    numero_a_emitir = ultimo + 1
+
+    chequeos = _chequeos_previos(req, perfil_receptor, importes, cred.ambiente, numero_a_emitir)
+    listo = all(c["ok"] or not c["bloqueante"] for c in chequeos)
+
+    from services.facturacion.pdf import _CBTE_TIPO_LABEL
+
+    return {
+        "ambiente": cred.ambiente,
+        "emisor": {
+            "nombre": nombre_emisor,
+            "cuit": cred.cuit,
+            "condicion_iva": cred.condicion_iva,
+        },
+        "receptor": {
+            "doc_tipo": req.receptor.doc_tipo.name,
+            "doc_nro": str(req.receptor.doc_nro),
+            "condicion_iva": req.receptor.condicion_iva.name.lower(),
+            "razon_social": pedido.get("cliente_razon_social") or pedido.get("cliente_nombre") or "",
+        },
+        "comprobante": {
+            "letra": _CBTE_TIPO_LABEL.get(int(cbte_tipo), "?"),
+            "tipo_nro": int(cbte_tipo),
+            "numero_a_emitir": numero_a_emitir,
+            "pto_vta": emisor_obj.punto_venta,
+        },
+        "importes": {
+            "neto": float(importes["neto"]),
+            "iva": float(importes["iva"]),
+            "total": float(importes["total"]),
+        },
+        "fechas": {
+            "emision": hoy.isoformat(),
+            "servicio_desde": req.fecha_serv_desde.isoformat() if req.fecha_serv_desde else None,
+            "servicio_hasta": req.fecha_serv_hasta.isoformat() if req.fecha_serv_hasta else None,
+            "vto_pago": req.fecha_vto_pago.isoformat() if req.fecha_vto_pago else None,
+        },
+        "chequeos": chequeos,
+        "listo": listo,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 solo (ambiente, emisor).
 
 Hasta ahora `afip_ta` asumía implícitamente un único servicio ("wsfe"): la PK
-era (ambiente, emisor). El padrón de AFIP (ws_sr_padron_a13, para autocompletar
+era (ambiente, emisor). El padrón de AFIP (ws_sr_padron_a5, para autocompletar
 razón social/domicilio/condición IVA a partir de un CUIT — MEMORIA 2026-07-02)
 necesita su PROPIO TA por emisor (WSAA autentica una relación CUIT↔servicio; el
 TA de "wsfe" no sirve para consultar el padrón). Se agrega `servicio` a la PK

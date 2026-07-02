@@ -105,7 +105,7 @@ def construir_comprobante(
     # Concepto = SERVICIOS (2) → requiere FchServDesde/Hasta/VtoPago
     fecha_desde = _parse_fecha(pedido.get("fecha_desde"))
     fecha_hasta = _parse_fecha(pedido.get("fecha_hasta"))
-    fecha_vto_pago = fecha_hasta  # vencimiento = fin del servicio
+    fecha_vto_pago = _fecha_vto_pago(fecha_hasta, fecha)
 
     return ComprobanteRequest(
         emisor=emisor_obj,
@@ -120,6 +120,19 @@ def construir_comprobante(
         es_nota_credito=es_nota_credito,
         cbtes_asoc=cbtes_asoc,
     )
+
+
+def _fecha_vto_pago(fecha_hasta: Optional[date], fecha_comprobante: date) -> date:
+    """ARCA rechaza (10036) un FchVtoPago anterior a la fecha del comprobante.
+
+    `fecha_hasta` (fin del alquiler) es un vencimiento razonable cuando se
+    factura DURANTE el servicio, pero acá se factura casi siempre DESPUÉS de
+    que el pedido ya terminó — en ese caso queda en el pasado y ARCA lo
+    rechaza. El vencimiento nunca puede ser anterior a hoy (la fecha del
+    comprobante que se está emitiendo)."""
+    if fecha_hasta is None or fecha_hasta < fecha_comprobante:
+        return fecha_comprobante
+    return fecha_hasta
 
 
 def _parse_fecha(s) -> Optional[date]:
@@ -171,7 +184,7 @@ def construir_comprobante_nc(
         fecha=fecha,
         fecha_serv_desde=fecha_desde,
         fecha_serv_hasta=fecha_hasta,
-        fecha_vto_pago=fecha_hasta,
+        fecha_vto_pago=_fecha_vto_pago(fecha_hasta, fecha),
         es_nota_credito=True,
         cbtes_asoc=cbtes_asoc,
     )

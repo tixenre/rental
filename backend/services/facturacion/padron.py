@@ -1,5 +1,5 @@
 """services.facturacion.padron — autocompletar razón social/domicilio/condición
-IVA a partir de un CUIT, vía el padrón de ARCA (ws_sr_padron_a13).
+IVA a partir de un CUIT, vía el padrón de ARCA (ws_sr_padron_a5).
 
 Es una comodidad de carga (lo mismo que hace el facturador oficial de ARCA al
 tipear un CUIT) — NUNCA crítico: si el padrón no responde, no está configurado,
@@ -16,8 +16,8 @@ from typing import Optional
 
 from arca_fe.padron import PadronClient, PersonaArca, WSAA_SERVICIO
 
-_PADRON_HOMO = "awshomo.afip.gov.ar"
-_PADRON_PROD = "aws.afip.gov.ar"
+_PADRON_HOMO = "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
+_PADRON_PROD = "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
 
 
 def resolver_persona(cuit_buscado: str, conn) -> Optional[PersonaArca]:
@@ -26,7 +26,9 @@ def resolver_persona(cuit_buscado: str, conn) -> Optional[PersonaArca]:
     from services.facturacion.config import credenciales
     from services.facturacion.wsaa_cache import get_ta
 
-    emisor_autenticador = _elegir_autenticador(conn)
+    from services.facturacion.emisores_repo import elegir_autenticador
+
+    emisor_autenticador = elegir_autenticador(conn)
     if emisor_autenticador is None:
         return None
 
@@ -43,14 +45,3 @@ def resolver_persona(cuit_buscado: str, conn) -> Optional[PersonaArca]:
         # padrón no delegada, cert vencido) degrada a "no se pudo", no rompe
         # el formulario que está pidiendo el dato.
         return None
-
-
-def _elegir_autenticador(conn) -> Optional[str]:
-    """El primer emisor activo con cert cargado — cualquiera sirve para
-    autenticar la consulta de padrón (no tiene que ser el CUIT buscado)."""
-    from services.facturacion.emisores_repo import list_emisores
-
-    for emisor in list_emisores(conn):
-        if emisor.activo and emisor.cert_cargado:
-            return emisor.nombre
-    return None

@@ -48,6 +48,9 @@ class _FakeConn:
     def __exit__(self, *a):
         pass
 
+    def commit(self):
+        pass
+
 
 # ── Guard de admin a nivel HTTP (rutea + gatea, sin DB) ─────────────────────
 
@@ -62,12 +65,15 @@ class _FakeConn:
         ("GET", "/api/alquileres/1/facturas"),
         ("GET", "/api/admin/facturas"),
         ("GET", "/api/admin/facturacion/estado"),
+        ("POST", "/api/admin/arca/catalogos/refrescar"),
         ("GET", "/api/admin/emisores-arca"),
         ("POST", "/api/admin/emisores-arca"),
         ("PUT", "/api/admin/emisores-arca/1"),
         ("DELETE", "/api/admin/emisores-arca/1"),
         ("POST", "/api/admin/emisores-arca/1/cert"),
+        ("GET", "/api/admin/emisores-arca/1/puntos-venta"),
         ("GET", "/api/admin/arca/padron/20301234567"),
+        ("GET", "/api/alquileres/1/facturar/preview"),
     ],
 )
 def test_rutas_facturacion_gatean_por_admin(method, path):
@@ -98,6 +104,47 @@ def test_facturar_pedido_runtime_error_es_503_nunca_500(monkeypatch):
     )
     with pytest.raises(HTTPException) as ei:
         facturacion_routes.facturar_pedido(1, _fake_request())
+    assert ei.value.status_code == 503
+
+
+# ── preview_factura: arma sin emitir, ValueError → 400 ──────────────────────
+
+
+def test_preview_factura_devuelve_el_armado(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.engine.previsualizar_factura",
+        lambda pedido_id, conn: {"comprobante": {"letra": "C"}},
+    )
+
+    result = facturacion_routes.preview_factura(1, _fake_request())
+    assert result == {"comprobante": {"letra": "C"}}
+
+
+def test_preview_factura_value_error_es_400(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.engine.previsualizar_factura",
+        lambda pedido_id, conn: (_ for _ in ()).throw(ValueError("no confirmado")),
+    )
+    with pytest.raises(HTTPException) as ei:
+        facturacion_routes.preview_factura(1, _fake_request())
+    assert ei.value.status_code == 400
+
+
+def test_preview_factura_runtime_error_es_503_nunca_500(monkeypatch):
+    """El preview llama a ARCA (FECompUltimoAutorizado) — si ARCA está caída
+    o el cert venció, tiene que ser 503, no un 500 crudo."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.engine.previsualizar_factura",
+        lambda pedido_id, conn: (_ for _ in ()).throw(RuntimeError("ARCA caída")),
+    )
+    with pytest.raises(HTTPException) as ei:
+        facturacion_routes.preview_factura(1, _fake_request())
     assert ei.value.status_code == 503
 
 
@@ -208,6 +255,14 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
         return b"%PDF-FAKE%"
 
     monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
+    monkeypatch.setattr(
+        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        lambda conn: (b"cert", b"key"),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.pdf_seguridad.asegurar_pdf",
+        lambda pdf_bytes, cert_pem, key_pem: pdf_bytes,
+    )
 
     resp = asyncio.run(facturacion_routes.descargar_pdf_factura(1, _fake_request()))
     assert resp.status_code == 200
@@ -225,8 +280,11 @@ def test_consultar_padron_encontrado(monkeypatch):
 
     class _Persona:
         razon_social = "Empresa XYZ SRL"
+        nombre = ""
+        apellido = ""
         domicilio = "Ruta 88 km 12"
         condicion_iva = "responsable_inscripto"
+        estado_clave = "ACTIVO"
 
     monkeypatch.setattr(
         "services.facturacion.padron.resolver_persona",
@@ -237,8 +295,11 @@ def test_consultar_padron_encontrado(monkeypatch):
     assert result == {
         "encontrado": True,
         "razon_social": "Empresa XYZ SRL",
+        "nombre": "",
+        "apellido": "",
         "domicilio": "Ruta 88 km 12",
         "condicion_iva": "responsable_inscripto",
+        "estado_clave": "ACTIVO",
     }
 
 
@@ -253,3 +314,132 @@ def test_consultar_padron_no_encontrado_no_es_error(monkeypatch):
 
     result = facturacion_routes.consultar_padron("30712345678", _fake_request())
     assert result == {"encontrado": False}
+
+
+# ── consultar_puntos_venta_emisor: validar/elegir en vez de cargar a mano ───
+
+
+def _fake_emisor_arca(nombre="pablo"):
+    from datetime import datetime
+    from services.facturacion.emisores_repo import EmisorArca
+
+    return EmisorArca(
+        id=1, nombre=nombre, cuit="20300000000", pto_vta=2,
+        condicion_iva="responsable_inscripto", cert_cargado=True,
+        activo=True, razon_social=None, domicilio=None, iibb=None,
+        inicio_actividades=None, notas=None,
+        created_at=datetime(2026, 1, 1), updated_at=datetime(2026, 1, 1),
+    )
+
+
+def test_consultar_puntos_venta_devuelve_lista(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_by_id",
+        lambda emisor_id, conn: _fake_emisor_arca(),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.puntos_venta.consultar_puntos_venta",
+        lambda nombre_emisor, conn: [{"nro": 2}, {"nro": 5}],
+    )
+
+    result = facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert result == {"puntos_venta": [{"nro": 2}, {"nro": 5}]}
+
+
+def test_consultar_puntos_venta_emisor_no_encontrado_es_404(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_by_id", lambda emisor_id, conn: None
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert exc.value.status_code == 404
+
+
+def test_consultar_puntos_venta_sin_cert_es_400(monkeypatch):
+    """Emisor existe pero no tiene cert cargado — `credenciales()` (dentro
+    del service) levanta ValueError; la route lo mapea a 400, no a 500."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_by_id",
+        lambda emisor_id, conn: _fake_emisor_arca(),
+    )
+
+    def _boom(nombre_emisor, conn):
+        raise ValueError("Certificado no cargado")
+
+    monkeypatch.setattr("services.facturacion.puntos_venta.consultar_puntos_venta", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert exc.value.status_code == 400
+
+
+def test_consultar_puntos_venta_arca_caida_es_503_nunca_500(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_by_id",
+        lambda emisor_id, conn: _fake_emisor_arca(),
+    )
+
+    def _boom(nombre_emisor, conn):
+        raise RuntimeError("WSAA no respondió")
+
+    monkeypatch.setattr("services.facturacion.puntos_venta.consultar_puntos_venta", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert exc.value.status_code == 503
+
+
+# ── refrescar_catalogos_arca: actualiza las etiquetas del PDF desde ARCA ────
+
+
+def test_refrescar_catalogos_arca_devuelve_conteos(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.catalogos.refrescar_catalogos",
+        lambda conn: {
+            "doc_tipo": [{"id": 80, "desc": "CUIT"}],
+            "concepto": [{"id": 1, "desc": "Productos"}, {"id": 2, "desc": "Servicios"}],
+            "condicion_iva_receptor": [],
+        },
+    )
+
+    result = facturacion_routes.refrescar_catalogos_arca(_fake_request())
+    assert result == {"ok": True, "doc_tipo": 1, "concepto": 2, "condicion_iva_receptor": 0}
+
+
+def test_refrescar_catalogos_arca_sin_emisor_es_400(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+
+    def _boom(conn):
+        raise ValueError("No hay ningún emisor activo con certificado cargado")
+
+    monkeypatch.setattr("services.facturacion.catalogos.refrescar_catalogos", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.refrescar_catalogos_arca(_fake_request())
+    assert exc.value.status_code == 400
+
+
+def test_refrescar_catalogos_arca_caida_es_503(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+
+    def _boom(conn):
+        raise RuntimeError("FEParamGetTiposDoc error")
+
+    monkeypatch.setattr("services.facturacion.catalogos.refrescar_catalogos", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.refrescar_catalogos_arca(_fake_request())
+    assert exc.value.status_code == 503
