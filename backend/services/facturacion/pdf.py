@@ -641,15 +641,24 @@ def _factura_mobile_html(f: dict) -> str:
 {_fonts_css()}
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
-  html,body {{ background:{_MOBILE_PAGE_BG}; }}
-  body {{ width:{MOBILE_PAGE_WIDTH}px; height:{MOBILE_PAGE_HEIGHT}px; padding:{_MOBILE_CARD_MARGIN}px;
+  html,body {{ height:100%; background:{_MOBILE_PAGE_BG}; }}
+  body {{ min-height:100vh; display:flex; align-items:center; justify-content:center;
           font-family:'TT Commons',ui-sans-serif,sans-serif; color:#16202b; }}
+  /* `.page` conserva su tamaño NATURAL en px (Playwright renderiza el PDF a
+     una página de exactamente este tamaño — ahí 100vh/100vw igualan el
+     tamaño natural y el scale() da 1, sin cambiar el PDF) y el `transform:
+     scale()` la ajusta al viewport SOLO cuando se ve como preview
+     (`format=html`) en una ventana de otro tamaño — llena el alto/ancho
+     disponible sin perder la proporción 4:5. */
+  .page {{ flex:none; width:{MOBILE_PAGE_WIDTH}px; height:{MOBILE_PAGE_HEIGHT}px;
+           padding:{_MOBILE_CARD_MARGIN}px;
+           transform:scale(min(calc(100vh / {MOBILE_PAGE_HEIGHT}px), calc(100vw / {MOBILE_PAGE_WIDTH}px))); }}
   .card {{ width:{_MOBILE_CARD_WIDTH}px; height:{_MOBILE_CARD_HEIGHT}px; display:flex; flex-direction:column;
            background:#fff; border-radius:28px; border:1px solid #ecebe8;
            box-shadow:0 1px 3px rgba(22,32,43,0.06); overflow:hidden; }}
 </style>
 </head>
-<body><div class="card">{body}</div>
+<body><div class="page"><div class="card">{body}</div></div>
 </body>
 </html>"""
 
