@@ -165,6 +165,11 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
                 ARCA no tiene datos para este CUIT — cargá a mano.
               </p>
             )}
+            {padron.inactivo && (
+              <p className="text-xs text-destructive">
+                ⚠️ Este CUIT figura inactivo en AFIP.
+              </p>
+            )}
           </div>
           <div className="space-y-1">
             <Label>Descuento %</Label>

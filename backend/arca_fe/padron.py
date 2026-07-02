@@ -1,10 +1,20 @@
-"""arca_fe.padron — cliente del webservice de Padrón (ws_sr_padron_a13) de ARCA. PORTABLE.
+"""arca_fe.padron — cliente del webservice de Padrón — Constancia de
+Inscripción (ws_sr_padron_a5) de ARCA. PORTABLE.
 
 Dado un CUIT, devuelve razón social / nombre, domicilio fiscal y condición
 frente al IVA — lo mismo que autocompleta el facturador oficial de ARCA al
 tipear un CUIT. Reusa el mismo mecanismo de autenticación que WSFE (un TA de
-`arca_fe.wsaa`, pero pedido para el servicio "ws_sr_padron_a13" en vez de
+`arca_fe.wsaa`, pero pedido para el servicio "ws_sr_padron_a5" en vez de
 "wsfe" — son TAs distintos, no intercambiables).
+
+**Por qué A5 y no A13** (verificado contra el WSDL real de AFIP, homologación
+y producción — ambos idénticos): A13 (`personaServiceA13`) devuelve un
+`persona` PLANO, sin `datosGenerales`/`datosMonotributo`/`datosRegimenGeneral`
+— consultarlo y parsearlo como si tuviera esos campos anidados (lo que hacía
+este módulo antes) devuelve TODO vacío en producción real, aunque AFIP
+encuentre el CUIT. **A5** (`personaServiceA5`, "Constancia de Inscripción")
+sí tiene esa forma anidada — es el servicio correcto para razón social /
+domicilio / condición IVA.
 
 El WSAA autentica una relación (CUIT del cert ↔ servicio); una vez autenticado,
 se puede consultar el padrón de CUALQUIER CUIT — no hace falta que el CUIT
@@ -13,7 +23,7 @@ CUALQUIER emisor ya configurado para resolver el padrón de un CUIT nuevo
 (típicamente al dar de alta un emisor o un cliente).
 
 Requiere que el CUIT autenticador tenga la relación "Consulta de padrón"
-(ws_sr_padron_a13) delegada en AFIP con clave fiscal — es un paso administrativo
+(ws_sr_padron_a5) delegada en AFIP con clave fiscal — es un paso administrativo
 en el portal de AFIP, no algo que el código resuelva.
 
 Nunca crítico: si el padrón no responde o el CUIT no tiene datos, el caller
@@ -33,17 +43,22 @@ import zeep.helpers
 import zeep.transports
 from requests.adapters import HTTPAdapter
 
-WSAA_SERVICIO = "ws_sr_padron_a13"
+WSAA_SERVICIO = "ws_sr_padron_a5"
 
-_WSDL_HOMO = "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA13?wsdl"
-_WSDL_PROD = "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA13?wsdl"
+_WSDL_HOMO = "https://awshomo.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
+_WSDL_PROD = "https://aws.afip.gov.ar/sr-padron/webservices/personaServiceA5?wsdl"
 
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
 
 _TIMEOUT_SECONDS = 20.0
 
-# idImpuesto de IVA en datosRegimenGeneral.impuesto (padrón A13)
-_ID_IMPUESTO_IVA = 32
+# idImpuesto en datosRegimenGeneral.impuesto (padrón A5) — verificado contra
+# pyafipws (referencia de facto del ecosistema): 30 = IVA Responsable
+# Inscripto, 32 = IVA Exento. Ojo: el código viejo tenía esto AL REVÉS
+# (trataba 32 como "responsable_inscripto"), lo que hubiera detectado un
+# cliente EXENTO como RI — corregido acá.
+_ID_IMPUESTO_RI = 30
+_ID_IMPUESTO_EXENTO = 32
 
 
 class _AfipSSLAdapter(HTTPAdapter):
@@ -93,6 +108,9 @@ class PersonaArca:
     apellido: str
     domicilio: str
     condicion_iva: str  # 'responsable_inscripto' | 'monotributo' | 'exento' | ''
+    estado_clave: str  # 'ACTIVO' | 'INACTIVO' | '' — señal de calidad de dato,
+    # no bloqueante: un CUIT dado de baja en AFIP es motivo de aviso al
+    # usuario, no un error del autocompletado en sí.
 
 
 @dataclass
@@ -137,12 +155,15 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
     nombre = ""
     apellido = ""
     domicilio = ""
+    estado_clave = ""
     if dg is not None:
         razon_social = str(getattr(dg, "razonSocial", "") or "")
         if not razon_social:
             nombre = getattr(dg, "nombre", "") or ""
             apellido = getattr(dg, "apellido", "") or ""
             razon_social = f"{nombre} {apellido}".strip()
+
+        estado_clave = str(getattr(dg, "estadoClave", "") or "")
 
         dom = getattr(dg, "domicilioFiscal", None)
         if dom is not None:
@@ -153,19 +174,20 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
             ]
             domicilio = ", ".join(p for p in partes if p)
 
+    # Orden de chequeo — mismo criterio que pyafipws (referencia de facto):
+    # exento se chequea ANTES que RI (un mismo padrón podría traer ambos
+    # ids en teoría; exento es la condición más específica).
     condicion_iva = ""
     if getattr(persona, "datosMonotributo", None) is not None:
         condicion_iva = "monotributo"
     else:
         dr = getattr(persona, "datosRegimenGeneral", None)
         impuestos = getattr(dr, "impuesto", None) if dr is not None else None
-        if impuestos:
-            ids = {getattr(i, "idImpuesto", None) for i in impuestos}
-            if _ID_IMPUESTO_IVA in ids:
-                condicion_iva = "responsable_inscripto"
-        exento = getattr(persona, "datosExentos", None) if hasattr(persona, "datosExentos") else None
-        if exento is not None:
+        ids = {getattr(i, "idImpuesto", None) for i in impuestos} if impuestos else set()
+        if _ID_IMPUESTO_EXENTO in ids:
             condicion_iva = "exento"
+        elif _ID_IMPUESTO_RI in ids:
+            condicion_iva = "responsable_inscripto"
 
     return PersonaArca(
         cuit=cuit,
@@ -174,4 +196,5 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
         apellido=apellido,
         domicilio=domicilio,
         condicion_iva=condicion_iva,
+        estado_clave=estado_clave,
     )

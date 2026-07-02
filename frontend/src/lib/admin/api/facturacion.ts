@@ -70,6 +70,7 @@ export type PadronResult =
       apellido: string;
       domicilio: string;
       condicion_iva: string;
+      estado_clave: string;
     }
   | { encontrado: false };
 

@@ -279,6 +279,7 @@ def test_consultar_padron_encontrado(monkeypatch):
         apellido = ""
         domicilio = "Ruta 88 km 12"
         condicion_iva = "responsable_inscripto"
+        estado_clave = "ACTIVO"
 
     monkeypatch.setattr(
         "services.facturacion.padron.resolver_persona",
@@ -293,6 +294,7 @@ def test_consultar_padron_encontrado(monkeypatch):
         "apellido": "",
         "domicilio": "Ruta 88 km 12",
         "condicion_iva": "responsable_inscripto",
+        "estado_clave": "ACTIVO",
     }
 
 

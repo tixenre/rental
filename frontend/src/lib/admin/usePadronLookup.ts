@@ -24,12 +24,16 @@ export type PadronDatos = {
 export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
   const [buscando, setBuscando] = useState(false);
   const [noEncontrado, setNoEncontrado] = useState(false);
+  // CUIT encontrado pero dado de baja en AFIP — aviso, no bloquea nada
+  // (el dueño decide si igual quiere seguir).
+  const [inactivo, setInactivo] = useState(false);
 
   const buscar = async (cuit: string) => {
     const digits = cuit.replace(/\D/g, "");
     if (digits.length !== 11) return;
     setBuscando(true);
     setNoEncontrado(false);
+    setInactivo(false);
     try {
       const result = await facturacionApi.consultarPadron(digits);
       if (result.encontrado) {
@@ -40,6 +44,7 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
           domicilio: result.domicilio,
           condicion_iva: result.condicion_iva,
         });
+        setInactivo(!!result.estado_clave && result.estado_clave !== "ACTIVO");
       } else {
         setNoEncontrado(true);
       }
@@ -50,5 +55,5 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
     }
   };
 
-  return { buscar, buscando, noEncontrado };
+  return { buscar, buscando, noEncontrado, inactivo };
 }
