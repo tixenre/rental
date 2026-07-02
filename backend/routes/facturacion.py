@@ -83,10 +83,10 @@ def consultar_padron(cuit: str, request: Request):
     """Autocompleta razón social/domicilio/condición IVA desde el padrón de
     ARCA (ws_sr_constancia_inscripcion) — mismo autocompletado que hace el
     facturador oficial al tipear un CUIT. Best-effort: nunca un error HTTP —
-    el formulario sigue siendo editable a mano. `{encontrado: false}` sin
-    `motivo` = ARCA no tiene datos para ese CUIT; CON `motivo` = no pudimos
-    ni completar la consulta (WSAA/relación/cert/red) — se muestra tal cual,
-    es más útil para diagnosticar que un genérico "sin datos"."""
+    el formulario sigue siendo editable a mano. `resolver_persona` levanta
+    RuntimeError para cualquier cosa que no sea un CUIT encontrado (ya no
+    hay un "sin datos" silencioso) — se muestra tal cual, es más útil para
+    diagnosticar que un genérico "sin datos"."""
     require_admin(request)
 
     from services.facturacion.padron import resolver_persona
@@ -96,8 +96,6 @@ def consultar_padron(cuit: str, request: Request):
         except RuntimeError as e:
             return {"encontrado": False, "motivo": str(e)}
 
-    if persona is None:
-        return {"encontrado": False}
     return {
         "encontrado": True,
         "razon_social": persona.razon_social,
