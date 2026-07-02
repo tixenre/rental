@@ -345,13 +345,9 @@ function EmisorFormModal({
         <Field
           label="CUIT"
           hint={
-            padron.motivo
-              ? `⚠️ No se pudo consultar ARCA: ${padron.motivo}`
-              : padron.noEncontrado
-                ? "ARCA no tiene datos para este CUIT — cargá a mano."
-                : padron.inactivo
-                  ? "⚠️ Este CUIT figura inactivo en AFIP."
-                  : undefined
+            !padron.motivo && !padron.inactivo && padron.noEncontrado
+              ? "ARCA no tiene datos para este CUIT — cargá a mano."
+              : undefined
           }
         >
           <div className="flex gap-1.5">
@@ -375,13 +371,12 @@ function EmisorFormModal({
               {padron.buscando ? "Buscando…" : "Buscar"}
             </button>
           </div>
+          {padron.motivo && <ErrorBanner>{padron.motivo}</ErrorBanner>}
+          {!padron.motivo && padron.inactivo && (
+            <ErrorBanner>Este CUIT figura inactivo en AFIP.</ErrorBanner>
+          )}
         </Field>
-        <Field
-          label="Punto de Venta"
-          hint={
-            puntosVenta.isError ? "No se pudo consultar ARCA — cargá el número a mano." : undefined
-          }
-        >
+        <Field label="Punto de Venta">
           <div className="flex gap-1.5">
             {/* eslint-disable-next-line no-restricted-syntax -- input nativo type="number"; DS Input no soporta este tipo */}
             <input
@@ -405,6 +400,11 @@ function EmisorFormModal({
               </button>
             )}
           </div>
+          {puntosVenta.isError && (
+            <ErrorBanner>
+              No se pudo consultar ARCA: {(puntosVenta.error as Error).message}
+            </ErrorBanner>
+          )}
           {puntosVenta.data && (
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {puntosVenta.data.length === 0 ? (
@@ -658,6 +658,17 @@ function Field({
         {label}
       </div>
       {hint && <p className="text-xs text-muted-foreground/70 -mt-0.5">{hint}</p>}
+      {children}
+    </div>
+  );
+}
+
+// Mismo tratamiento que el error de Factura ARCA en el rail del pedido —
+// una sola forma de mostrar un error real de ARCA, con el texto tal cual
+// (nunca genérico) en vez de un simple hint gris.
+function ErrorBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-1.5 rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
       {children}
     </div>
   );

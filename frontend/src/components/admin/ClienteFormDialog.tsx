@@ -161,17 +161,19 @@ export function ClienteFormDialog({ open, onOpenChange, cliente, onSaved }: Prop
               </Button>
             </div>
             {padron.motivo && (
-              <p className="text-xs text-destructive">
-                ⚠️ No se pudo consultar ARCA: {padron.motivo}
-              </p>
+              <div className="mt-1 rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
+                {padron.motivo}
+              </div>
             )}
             {!padron.motivo && padron.noEncontrado && (
               <p className="text-xs text-muted-foreground">
                 ARCA no tiene datos para este CUIT — cargá a mano.
               </p>
             )}
-            {padron.inactivo && (
-              <p className="text-xs text-destructive">⚠️ Este CUIT figura inactivo en AFIP.</p>
+            {!padron.motivo && padron.inactivo && (
+              <div className="mt-1 rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
+                Este CUIT figura inactivo en AFIP.
+              </div>
             )}
           </div>
           <div className="space-y-1">
