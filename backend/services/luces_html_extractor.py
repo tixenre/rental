@@ -17,13 +17,13 @@ El parser que usa lee:
   - Title del <head> — para marca/modelo
 """
 
-import json
 import re
 import sys
 from pathlib import Path
 
 from services.specs_ingesta.parse import jsonld as _jsonld
 from services.specs_ingesta.parse.garbage import is_garbage as _is_garbage
+from services.specs_ingesta.parse.serialize import specs_dict_to_array
 
 # Importar el parser core desde tools/ (es código script-style ya probado).
 # El seed lo usa idéntico — esto garantiza paridad de calidad.
@@ -120,50 +120,11 @@ def extract_from_html(html_content: str) -> dict:
     specs_dict = map_luz_specs(secciones, title=modelo)
     extras_dict = clean_extras(map_luz_extras(secciones, title=modelo))
 
-    # 6) Formato AutocompletarResult: specs como array [{spec_key, label, value}]
-    # Label sale del registry (fuente única). Fallback: key.replace("_"," ").title().
-    registry_labels: dict[str, str] = {}
-    try:
-        from services.specs import REGISTRY  # import local: evita ciclos
-        cat_reg = REGISTRY.get("Iluminación")
-        if cat_reg:
-            registry_labels = {s.key: s.label for s in cat_reg.specs}
-    except Exception:
-        pass
-
-    specs_array = []
-    for key, value in specs_dict.items():
-        label = registry_labels.get(key) or key.replace("_", " ").title()
-        # Serializar valor: bools y listas → string compacto
-        if isinstance(value, bool):
-            val_str = "Sí" if value else "No"
-        elif isinstance(value, list):
-            val_str = ", ".join(str(v) for v in value)
-        elif isinstance(value, dict):
-            if "min" in value and "max" in value:
-                val_str = f"{value['min']}-{value['max']}K" if key == "temperatura_k" else f"{value['min']}-{value['max']}"
-            else:
-                val_str = json.dumps(value, ensure_ascii=False)
-        elif isinstance(value, (int, float)):
-            unit = ""
-            if key == "consumo_w": unit = " W"
-            elif "lumens" in key: unit = " lm"
-            elif "lux" in key: unit = " lux"
-            val_str = f"{value}{unit}"
-        else:
-            val_str = str(value)
-        specs_array.append({"spec_key": key, "label": label, "value": val_str})
-
-    # Peso lo agregamos como "390 g" (más legible) si está
-    if "peso" in specs_dict and isinstance(specs_dict["peso"], (int, float)):
-        val = specs_dict["peso"]
-        # Ya está agregado arriba como peso. Reemplazar para formatear.
-        for s in specs_array:
-            if s["label"] == "Peso":
-                if val >= 1000:
-                    s["value"] = f"{round(val/1000, 2)} kg"
-                else:
-                    s["value"] = f"{val} g"
+    # 6) Formato AutocompletarResult: specs como array [{spec_key, label, value}].
+    # Serialización delegada en specs_ingesta (fuente única de display, vía
+    # spec_render) — antes esta función tenía sus propios sufijos de unidad
+    # hardcodeados (K/lux) que no usaban el `unidad` que el registry declara.
+    specs_array = specs_dict_to_array(specs_dict, "Iluminación")
 
     # Ficha extendida: extraer campos compatibles con AutocompletarResult
     peso_raw = specs_dict.get("peso")

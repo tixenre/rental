@@ -24,6 +24,7 @@ from pathlib import Path
 
 from services.specs_ingesta.parse import jsonld as _jsonld
 from services.specs_ingesta.parse.garbage import is_garbage
+from services.specs_ingesta.parse.serialize import specs_dict_to_array
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +85,14 @@ def _detect_categoria(html_content: str, title: str = "") -> str:
 # ── Adapter común: convierte specs dict → array [{spec_key, label, value}] ──
 
 def _specs_dict_to_array(specs_dict: dict, registry_labels: dict | None = None) -> list[dict]:
-    """Convierte {spec_key: value} → [{spec_key, label, value}] para el form admin.
+    """⏰ LEGACY (F2 del rediseño de ingesta): `_build_result` ya NO llama a
+    esta función — usa `specs_ingesta.parse.serialize.specs_dict_to_array`
+    (delega en spec_render, aplica la unidad del registry). Esta queda solo
+    porque `tests/test_spec_key_normalization.py` la importa por nombre con
+    esta firma exacta (`registry_labels` simple, sin unidad/tipo) — se poda
+    en F6 junto con el resto de los shims. No usar en código nuevo.
 
+    Convierte {spec_key: value} → [{spec_key, label, value}] para el form admin.
     El label viene del registry (fuente única de verdad). Si la key no tiene
     entry en registry_labels, se usa la key limpia como fallback — nunca se
     descarta un item.
@@ -314,19 +321,22 @@ def _build_result(*, marca: str, modelo: str, specs: dict, extras: dict,
     # generan propuestas-basura por datos sin spec. El bucket curado gana en
     # caso de colisión de key.
     specs_para_persistir = dict(specs)
-    registry_labels: dict[str, str] = {}
     try:
         from services.specs import REGISTRY  # import local: evita ciclos al boot
         cat_reg = REGISTRY.get(categoria_sugerida)
         if cat_reg:
-            registry_labels = {s.key: s.label for s in cat_reg.specs}
-            registry_keys = set(registry_labels)
+            registry_keys = {s.key for s in cat_reg.specs}
             for k, v in (extras or {}).items():
                 if k in registry_keys and k not in specs_para_persistir:
                     specs_para_persistir[k] = v
     except Exception as exc:
         logger.warning("extras wiring: no se pudo promover extras para '%s': %s", categoria_sugerida, exc)
-    specs_array = _specs_dict_to_array(specs_para_persistir, registry_labels=registry_labels)
+    # Serialización delegada en specs_ingesta (fuente única de display, vía
+    # spec_render) — antes _specs_dict_to_array (todavía existe abajo, como
+    # shim ⏰ LEGACY para los tests que la importan por nombre) tenía sus
+    # propios sufijos de unidad hardcodeados (W/lm/g/fps) sin usar el
+    # `unidad` que el registry declara.
+    specs_array = specs_dict_to_array(specs_para_persistir, categoria_sugerida)
     keywords = compute_keywords(specs)
 
     # Campos derivados para AutocompletarResult (ficha extendida)

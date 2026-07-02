@@ -206,7 +206,14 @@ no importan ni uno ni otro. `llm/` solo lo importa `cli.py`.
 ## Comunicación entre `specs` y `specs_ingesta` — 3 canales
 
 - **Canal A** (lectura): `REGISTRY`/`get_categoria`, `coerce_and_serialize`, tipos. El embudo de valor
-  (`mapear_valor`) se expone en el `__all__` de `specs` (aditivo).
+  (`mapear_valor`) se expone en el `__all__` de `specs` (aditivo). **Corrección post-F2 (la afirmación
+  original "el endpoint tiene conn" era falsa, verificado leyendo `routes/equipos/fotos.py`):**
+  `extract_from_html` corre HOY fuera de cualquier `with get_db()`. Cablear el embudo con `conn` real
+  exige threading por 3 capas (route → dispatcher → serializer) + resolver `spec_def_id` por spec (riesgo
+  de N+1 en HTMLs con 40+ specs) — es plomería nueva, no una unificación. **Diferido a F7**, que de todos
+  modos necesita `conn` para la cola de propuestas (Canal C). La garantía de correctitud no se pierde: el
+  embudo YA corre en `persistir_specs` al guardar — F2 solo deja la vista previa sin value_funnel, no la
+  persistencia.
 - **Canal B** (emisión indirecta): emite `spec_key`, se detiene ahí. El front traduce a `spec_def_id`, el humano
   confirma, recién ahí `specs` persiste. Motor sagrado intacto.
 - **Canal C** (escritura): reusa `spec_propuestas_pendientes` (existe, huérfana). `specs` es dueño de la cola
@@ -216,8 +223,12 @@ no importan ni uno ni otro. `llm/` solo lo importa `cli.py`.
 
 - **B0** ✅ — diagnóstico read-only, completo.
 - **F0** ✅ — scaffold.
-- **F1** — `parse/` + `queries/resolver.py` adoptando `generic` como core (NO recrear).
-- **F2** — serialización delegando en `spec_render` + `queries/normalizar.py` (embudo de valor).
+- **F1** ✅ — `parse/` + `queries/resolver.py` adoptando `generic` como core. 54 páginas comparadas
+  byte-a-byte; 1 mejora real encontrada (garbage-filter de `equipo` no cazaba "not specified").
+- **F2** ✅ — `parse/serialize.py` delegando en `spec_render` (fuente única de display) — el embudo de
+  VALOR con `conn` se difiere a F7 (ver Canal A). 164 diffs encontrados y verificados contra el registry
+  (todas mejoras: unidad correcta donde antes faltaba, join `" · "` consistente, bool explícito Sí/No
+  — `spec_render` colapsa `false` a `""` por diseño, pero acá es información real; corregido).
 - **F3** (riesgo alto) — mover los 4 parsers verbatim, matar ambos `sys.path` hacks.
 - **F4** — unificar los 4 builders del resultado + maximizar el genérico (los 2 casos de ruido de B0).
 - **F5** (riesgo alto) — entry point único + maximizar detección + `cli.py` + call-site.
