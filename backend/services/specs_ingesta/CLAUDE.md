@@ -1,15 +1,16 @@
-# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F4 completas)
+# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F5 completas)
 
-> **Estado: F0-F4 completas.** `parse/` (primitivas HTML) + `parsers/` (los 4 parsers grandes,
-> movidos de `tools/`) + `queries/{resultado,bespoke,generic}.py` (los builders unificados) ya son la
-> fuente única — `equipo_html_extractor.py`/`luces_html_extractor.py`/`generic_html_extractor.py` son
-> shims ⏰ LEGACY delgados que delegan acá, **cero `sys.path.insert()` hacks, cero lógica duplicada**.
-> `tools/*_parser.py` quedan como shims CLI-únicamente (⏰ LEGACY-adyacente) para los `*_rebuild.sh` y
-> 2 tests que importan por nombre.
-> `queries/extraer.py` (el entry point único que reemplaza el dispatcher de `equipo_html_extractor.py`)
-> todavía no existe — eso es F5, junto con maximizar `_detect_categoria` y el `cli.py` offline. Hasta
-> entonces `specs_ingesta.extract_from_html` (el barrel) sigue siendo un re-export lazy (`__getattr__`,
-> PEP 562) de `equipo_html_extractor.extract_from_html` — que ya delega internamente en `queries/`.
+> **Estado: F0-F5 completas.** `parse/` (primitivas HTML) + `parsers/` (los 4 parsers grandes,
+> movidos de `tools/`) + `queries/{resultado,bespoke,generic,detectar,extraer}.py` ya son la fuente
+> única — `equipo_html_extractor.py`/`luces_html_extractor.py`/`generic_html_extractor.py` son shims
+> ⏰ LEGACY delgados que delegan acá, **cero `sys.path.insert()` hacks, cero lógica duplicada, cero
+> dispatcher fuera de `queries/extraer.py`**. `tools/*_parser.py` quedan como shims CLI-únicamente
+> (⏰ LEGACY-adyacente) para los `*_rebuild.sh` y 2 tests que importan por nombre.
+> `specs_ingesta.extract_from_html` (el barrel) importa DIRECTO de `queries/extraer.py` — el
+> `__getattr__` lazy de F1 ya no hace falta (el ciclo que lo motivaba desapareció junto con el
+> dispatcher viejo). `cli.py` es el entry point offline — mismo `queries/extraer`, verificado
+> byte-idéntico al del endpoint sobre el mismo HTML. La capa `llm/` (suplemento offline-only) todavía
+> no existe — eso es F7.
 > Plan completo + fases → [`docs/PLAN_SPECS_INGESTA.md`](../../../docs/PLAN_SPECS_INGESTA.md) ·
 > tracking → issue [#1176](https://github.com/tixenre/rental/issues/1176) · rama aislada
 > `feature/specs-ingesta`, PR sin mergear hasta completar el módulo (convención "PR como hoja de ruta").
@@ -41,31 +42,33 @@ importa `specs_ingesta`. Tres canales (detalle en el plan):
 - **Railway (en vivo, el endpoint admin):** solo `queries/` + `parse/` + `parsers/` — determinístico,
   sin LLM, sin API key. Railway **no baja HTML** (mismo bloqueo de bots que el scraping) — solo parsea
   lo que el form le sube.
-- **La compu (offline, `cli.py`):** el mismo `queries/extraer` + la capa `llm/` como suplemento —
-  resuelve lo que el determinístico no puede (eBay, fuentes de fabricante, misdetección, unmatched).
+- **La compu (offline, `cli.py`):** el mismo `queries/extraer` + la capa `llm/` como suplemento (F7,
+  todavía no existe) — resuelve lo que el determinístico no puede (eBay, fuentes de fabricante,
+  misdetección, unmatched).
 - **`llm/` SOLO lo importa `cli.py`.** Si algo en `queries/` o `parse/` importa de `llm/`, es un bug —
   rompe el split de runtime.
 
-## Estructura (F0-F4 completas; se sigue poblando fase a fase)
+## Estructura (F0-F5 completas; se sigue poblando fase a fase)
 
 ```
 services/specs_ingesta/
   __init__.py     # barrel. __all__ es el contrato real.                         ✓ F0
   errors.py       # ErrorIngesta (400), HtmlNoParseable (422)                    ✓ F0
   CLAUDE.md        # este doc                                                    ✓ F0
+  cli.py          # entry point offline — mismo queries/extraer, sin LLM todavía ✓ F5
   parse/          # DOMINIO — primitivas puras de lectura de HTML (Railway-safe) ✓ F1
     jsonld.py · dom.py · garbage.py · pares.py · serialize.py                    ✓ F1/F2
     fuentes/      #   adaptadores de fuente pluggable (bh.py, ebay.py, futuros)  ✗ F7
   parsers/        # DOMINIO — verbatim ex-tools/ (los 4 parsers grandes)         ✓ F3
     base.py       #   BHSpecsParser + helpers compartidos (antes en iluminacion_parser)
     camaras.py · lentes.py · iluminacion.py · modificadores.py · normalizar.py
-  queries/        # LECTURA — lo que corre en Railway, nunca muta                ✓ F4 (falta F5)
+  queries/        # LECTURA — lo que corre en Railway, nunca muta                ✓ F5
     resolver.py   #   resolve_pairs, el matcheo label→spec_key                   ✓ F1
     resultado.py  #   build_result/generic_fallback_result — fuente única AutocompletarResult ✓ F4
     bespoke.py    #   4 categorías con parser (cámaras/lentes/modificadores/iluminación)       ✓ F4
     generic.py    #   categorías sin parser — + filtro de ruido (package_weight, etc.)         ✓ F4
-    extraer.py    #   entry point único (reemplaza el dispatcher de equipo_html_extractor.py)  ✗ F5
-    detectar.py   #   detección de categoría maximizada (hoy vive en equipo_html_extractor.py) ✗ F5
+    detectar.py   #   detección de categoría, MAXIMIZADA contra el dataset real                ✓ F5
+    extraer.py    #   entry point único (detecta + rutea) — usado por Railway Y cli.py          ✓ F5
   commands/       # ESCRITURA — el embudo que aprende (propone-aprobás)         ✗ F7
 ```
 
@@ -96,10 +99,9 @@ services/specs_ingesta/
   (RED KOMODO Production Pack, Canon Mount Adapter 0.71x), 6 casos "0 specs" todos explicados por
   fuente no-B&H (3 eBay + 3 fabricante directo — confirma la necesidad de `parse/fuentes/` pluggable).
   Detalle → comentario en issue #1176. **F4 resolvió el filtro de ruido genérico** (`package_weight`/
-  `box_dimensions` — Canon Mount Adapter queda 100% limpio) **pero NO el caso RED KOMODO** — ese tiene
-  ~30 specs de ruido MÁS ALLÁ de shipping (son specs de los accesorios del bundle, mezclados en el
-  mismo JSON-LD/DOM); la causa real es que el título no matchea el regex de detección de cámaras y cae
-  al genérico en vez del parser de cámaras (que solo extrae specs conocidos) — se ataca en F5.
+  `box_dimensions` — Canon Mount Adapter queda 100% limpio); **F5 resolvió RED KOMODO** — la causa real
+  era que el título no matcheaba el regex de detección de cámaras (caía al genérico, 70 specs de ruido
+  de los accesorios del bundle) — con detección arreglada rutea al parser de cámaras, 33 specs curados.
 - **F3 no movió `camaras_normalizar.py`/`lentes_normalizar.py`/`*_patches.py`** — confirmado que
   ningún código en vivo los importa (solo el pipeline offline de `_rebuild.sh`, que F3 no tocó).
   Quedan en `tools/` sin shim; se revisan si/cuando F5 cablea `cli.py`.
@@ -119,3 +121,25 @@ services/specs_ingesta/
   el mapper real emite `"peso_g"`; `keywords` SIEMPRE daba `[]` porque estaba hardcodeado en vez de llamar
   `compute_keywords()` (sin ninguna razón category-specific — la función es genérica). Ambos se
   corrigieron gratis al pasar luces por el mismo `build_result` que ya usaban las otras 3 categorías.
+- **F5 — "maximizar detección" es barrido sistemático, no parchear el caso ya conocido.** B0 solo había
+  encontrado el caso RED KOMODO. Correr `detect_categoria` contra las 47 páginas B&H reales del dataset
+  (filtrando los assets `_files/` del guardado y las páginas de fabricante que no son B&H) encontró 3
+  fallas MÁS que nadie había visto: 2 casos donde el título decía "lens" para un accesorio óptico de luz
+  (no un lente fotográfico) y caía al parser EQUIVOCADO — peor que caer a "Desconocido", porque produce
+  un resultado con apariencia válida pero basura (1 spec). La lección: un fix puntual sobre el caso que
+  se conoce deja plata en la mesa — correr el diagnóstico contra TODO el dataset (mismo método de B0) es
+  lo que separa "arreglé el caso que vi" de "maximicé la detección".
+- **F5 — un bug de parseo puede esconderse en un campo que nunca se compara.** Ninguna verificación
+  previa (F1-F4) había puesto el ojo en `modelo`/`nombre_normalizado` porque los diffs se enfocaban en
+  `specs` (lo que importa para persistir) — pero `BHSpecsParser.title` tenía un bug real y grande (52/277
+  páginas con "Accessibility" pegado al título, sin espacio: un `<title>` de un ícono SVG de accesibilidad
+  se sumaba al título de la página porque el parser no distingue `<title>` de `<head>` de `<title>` de
+  `<svg>`) que solo salió a la luz al mirar TODOS los campos del diff, no solo los que uno espera que
+  cambien. Moraleja: al verificar "no cambió nada inesperado", diffear el resultado completo — no solo
+  el campo que la fase que estás haciendo se supone que toca.
+- **F5 — un valor "roto" puede ser basura genuina de la fuente, no un bug propio.** Un `extras['video_io']
+  = '</b<'` en RED KOMODO resultó ser exactamente ese string, literal, en el JSON-LD del HTML de B&H
+  (`grep` lo confirmó en el HTML crudo) — no algo que nuestro parser corrompe. Antes de "arreglar" un
+  valor sospechoso, confirmar si el HTML fuente ya lo trae roto; en ese caso no hay fix razonable del
+  lado del parser (headers/JSON-LD malformados de terceros son la realidad de scrapear/parsear la web) y
+  el bucket `extras` (cola larga, no curada) ya tolera esto por diseño — no se promueve a `specs`.

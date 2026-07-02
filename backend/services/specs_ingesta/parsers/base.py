@@ -30,6 +30,7 @@ class BHSpecsParser(HTMLParser):
         self._in_value = False
         self._pending_label: str | None = None
         self._in_title = False
+        self._title_done = False  # ver handle_starttag: HTMLParser no distingue <title> de <head> vs <svg><title> (accesibilidad)
         self._seen_pairs: set[str] = set()  # dedup (el DOM se repite)
 
     def handle_comment(self, data: str):
@@ -40,7 +41,7 @@ class BHSpecsParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs):
         attrs_d = dict(attrs)
         sel = attrs_d.get("data-selenium", "")
-        if tag == "title":
+        if tag == "title" and not self._title_done:
             self._in_title = True
         elif sel == "specsItemGroupName":
             self._in_label = True
@@ -57,8 +58,9 @@ class BHSpecsParser(HTMLParser):
             self._in_value = True
 
     def handle_endtag(self, tag: str):
-        if tag == "title":
+        if tag == "title" and self._in_title:
             self._in_title = False
+            self._title_done = True  # el <title> del <head> siempre es el primero; ignorar cualquier otro (ej. <svg><title>Accessibility</title></svg>)
 
     def handle_data(self, data: str):
         text = data.strip()

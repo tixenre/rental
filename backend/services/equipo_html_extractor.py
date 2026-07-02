@@ -1,73 +1,21 @@
-"""
-services/equipo_html_extractor.py — Dispatcher de extractores HTML por categoría.
+"""services/equipo_html_extractor.py — ⏰ LEGACY (F5 del rediseño de ingesta).
 
-Reemplaza al LLM-based autocompletar para equipos: cuando el admin sube un
-HTML B&H (o se obtiene rawHtml de Firecrawl), este módulo:
-
-  1. Detecta la categoría del HTML (Cámaras / Lentes / Adaptadores / Filtros /
-     Iluminación) por título + JSON-LD.
-  2. Delega al parser determinístico correspondiente, vía
-     `services.specs_ingesta.queries` (mismo código que usa el CLI offline).
-  3. Devuelve estructura `AutocompletarResult` con specs canónicos + keywords.
-
-Calidad idéntica al dataset del seed. Sin LLM (ver split de runtime en
-services/specs_ingesta/CLAUDE.md — Railway nunca corre LLM).
-
-Entrada principal:
-    extract_from_html(html_content, categoria_hint=None) -> dict
+El dispatcher (detección + ruteo) se movió a
+`services/specs_ingesta/queries/extraer.py` + `queries/detectar.py`. Este
+archivo queda como shim de compatibilidad — re-exporta `extract_from_html`
+(varios tests lo importan por nombre) y 2 shims ⏰ LEGACY más viejos
+(`_build_result`, `_specs_dict_to_array`) que otros tests siguen usando
+directo. Se poda en F6 junto con el resto de los shims. Ver
+docs/PLAN_SPECS_INGESTA.md e issue #1176.
 """
 
 import json
-import re
 
-from services.specs_ingesta.queries import bespoke, generic
+from services.specs_ingesta.queries.extraer import extract_from_html
 from services.specs_ingesta.queries.resultado import build_result as _build_result
 
 __all__ = ["extract_from_html", "_build_result", "_specs_dict_to_array"]
 
-
-# ── Detección de categoría ──────────────────────────────────────────────
-
-def _detect_categoria(html_content: str, title: str = "") -> str:
-    """Detecta la categoría del HTML basado en título + JSON-LD + heurística.
-
-    Devuelve: "Cámaras" | "Lentes" | "Adaptadores" | "Filtros" | "Iluminación"
-              | "Desconocido"
-    """
-    t = (title or "").lower()
-    body_excerpt = html_content[:50_000].lower()  # primeros 50KB
-
-    # Adaptadores: mention explícita
-    if re.search(r"\b(lens\s+mount\s+adapter|mount\s+converter|speedbooster|lens\s+adapter)\b", t):
-        return "Adaptadores"
-    if "lens mount adapter" in body_excerpt[:5000]:
-        return "Adaptadores"
-
-    # Filtros
-    if re.search(r"\b(filter|polariz|pro-?mist|nd\s+filter|variable\s+nd)\b", t):
-        return "Filtros"
-
-    # Cámaras (incluye action cams)
-    if re.search(r"\b(cinema\s+camera|mirrorless|dslr|action\s+camera|action\s+cam\b|camera\s+body|camcorder|gopro|insta360)\b", t):
-        return "Cámaras"
-
-    # Lentes (después de adaptadores/filtros para evitar falsos positivos)
-    if re.search(r"\b(lens|lente)\b", t) and not re.search(r"\b(adapter|filter|hood|cap)\b", t):
-        return "Lentes"
-
-    # Modificadores: accesorios que se acoplan a una luz (antes que Iluminación
-    # para evitar que "fresnel attachment" / "softbox" caigan en el parser de luces)
-    if re.search(r"\b(fresnel\s+attachment|softbox|octobox|diffusion\s+frame|beauty\s+dish|reflector\s+dish|parabolic)\b", t):
-        return "Modificadores"
-
-    # Iluminación: amplio (LED, light, monolight, flash, tube, panel, fresnel)
-    if re.search(r"\b(led|light|monolight|spotlight|flash|tube\s+light|fresnel|panel)\b", t):
-        return "Iluminación"
-
-    return "Desconocido"
-
-
-# ── Adapter común: convierte specs dict → array [{spec_key, label, value}] ──
 
 def _specs_dict_to_array(specs_dict: dict, registry_labels: dict | None = None) -> list[dict]:
     """⏰ LEGACY (F2 del rediseño de ingesta): `_build_result` ya NO llama a
@@ -114,39 +62,3 @@ def _specs_dict_to_array(specs_dict: dict, registry_labels: dict | None = None) 
             val_str = str(value)
         out.append({"spec_key": key, "label": label, "value": val_str})
     return out
-
-
-# ── Entrada principal ──────────────────────────────────────────────────
-
-def extract_from_html(html_content: str, categoria_hint: str | None = None) -> dict:
-    """Extrae specs canónicos de un HTML B&H.
-
-    Dispatcher: detecta categoría (o usa hint) y delega al parser específico
-    de `services.specs_ingesta.queries` — mismo motor que usa el CLI offline
-    (F5), garantiza online == offline sobre el mismo HTML.
-
-    Args:
-        html_content: HTML completo (Cmd+S de B&H o rawHtml de Firecrawl).
-        categoria_hint: si el frontend ya sabe la categoría (ej. usuario eligió
-                        en un dropdown), evita la detección automática.
-    """
-    # Title del <head>
-    title_m = re.search(r"<title[^>]*>(.*?)</title>", html_content, re.IGNORECASE | re.DOTALL)
-    title = title_m.group(1).strip() if title_m else ""
-
-    categoria = (categoria_hint or _detect_categoria(html_content, title)).strip()
-
-    if categoria == "Iluminación":
-        return bespoke.extract_iluminacion(html_content)
-    if categoria == "Cámaras":
-        return bespoke.extract_via_camaras_parser(html_content)
-    if categoria in ("Lentes", "Adaptadores", "Filtros"):
-        return bespoke.extract_via_lentes_parser(html_content)
-    if categoria == "Modificadores":
-        return bespoke.extract_via_modificadores_parser(html_content)
-
-    # Categorías sin parser bespoke (Desconocido, futuras) →
-    # extractor genérico: saca TODOS los pares crudos y resuelve por aliases.
-    # Cero descartes silenciosos: lo que no resuelve queda visible como "sin
-    # template" (salvo ruido conocido de shipping/packaging, ver F4).
-    return generic.extract_from_html_generic(html_content, categoria_hint=categoria if categoria != "Desconocido" else None)

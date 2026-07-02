@@ -248,7 +248,23 @@ no importan ni uno ni otro. `llm/` solo lo importa `cli.py`.
   dataset completo, todo diff es una mejora ya explicada. Wireado a los 3 archivos viejos
   (`equipo_html_extractor.py`/`luces_html_extractor.py`/`generic_html_extractor.py`, ahora shims ⏰ LEGACY
   delgados). Suite completa: 2481 passed / 20 pre-existentes no relacionados (mismo baseline que F1-F3).
-- **F5** (riesgo alto) — entry point único + maximizar detección + `cli.py` + call-site.
+- **F5** ✅ (riesgo alto) — `queries/detectar.py` (detección MAXIMIZADA: barrido sistemático de las 47
+  páginas B&H reales del dataset, no solo el caso ya conocido, encontró 5 fallas — RED KOMODO Production
+  Pack, 2× Aputure Quick Dome, y 2 casos NUEVOS mal-rutead os a Lentes en vez de Desconocido: "Nanlite
+  Fresnel Lens for Forza" y "amaran Spotlight SE Lens Kit" — ambos accesorios ópticos de luz, no lentes
+  fotográficos). Los 5 fixes se probaron contra el dataset completo antes de sumarse: 0 falsos positivos.
+  RED KOMODO pasó de 70 specs de ruido (genérico) a 33 curados (parser de cámaras); los 2 lens-kit
+  pasaron de 1 spec basura (parser de lentes equivocado) a 4-6 specs curados (parser de modificadores).
+  **Bug adicional encontrado y arreglado en el camino** (no estaba en el alcance original, pero la
+  verificación de F5 lo destapó): `BHSpecsParser.title` concatenaba CUALQUIER `<title>` del documento,
+  incluyendo un `<svg><title>Accessibility</title></svg>` de un ícono — 52/277 páginas del dataset tenían
+  el sufijo "Accessibility" pegado al modelo/nombre_normalizado sin espacio. Arreglado: dejar de acumular
+  después del primer `</title>` que cierra. `queries/extraer.py` (entry point único, reemplaza el
+  dispatcher que vivía en `equipo_html_extractor.py`) + `cli.py` (offline, mismo `queries.extraer`) +
+  call-site cambiado (`routes/equipos/fotos.py` ahora importa de `services.specs_ingesta`, no del shim
+  viejo). **Verificado el invariante "online == offline"**: `cli.py` y el endpoint dan resultado
+  byte-idéntico sobre el mismo HTML. `specs_ingesta/__init__.py` ya no necesita el `__getattr__` lazy
+  (F1) — import directo, sin ciclo. Suite completa: 2481 passed / 20 pre-existentes no relacionados.
 - **F6** — podar shims LEGACY.
 - **F7** — el embudo que aprende (`commands/proponer.py`) + capa LLM offline.
 
