@@ -109,7 +109,7 @@ def _agrupar_items_por_categoria(conn, items: list[dict]) -> list[dict]:
     if eq_ids:
         ph = ",".join("%s" for _ in eq_ids)
         first_cats = conn.execute(f"""
-            SELECT ec.equipo_id, ec.categoria_id FROM (
+            SELECT t.equipo_id, t.categoria_id FROM (
                 SELECT ec.equipo_id, ec.categoria_id,
                        ROW_NUMBER() OVER (
                            PARTITION BY ec.equipo_id
