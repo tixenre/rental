@@ -10,10 +10,12 @@ import logging
 from typing import Optional
 
 from fastapi import Request, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import get_db, row_to_dict, now_ar
 from auth.guards import require_admin
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
+from routes.contabilidad import map_pg_errors
 from routes.alquileres.core import (
     router,
     _maybe_finalizar,
@@ -36,15 +38,15 @@ METODO_PAGO_DEFAULT = "transferencia"
 
 
 class PagoCreate(BaseModel):
-    monto:        int
-    concepto:     Optional[str] = None
-    fecha:        Optional[str] = None   # YYYY-MM-DD; si no viene usa hoy
-    destinatario: Optional[str] = None   # Tincho|Pablo (default Tincho)
-    metodo:       Optional[str] = None   # transferencia|efectivo (default transferencia)
+    monto:        int = Field(gt=0, le=2_000_000_000)
+    concepto:     Optional[str] = Field(default=None, max_length=500)
+    fecha:        Optional[str] = Field(default=None, max_length=10)   # YYYY-MM-DD; si no viene usa hoy
+    destinatario: Optional[str] = Field(default=None, max_length=20)   # Tincho|Pablo (default Tincho)
+    metodo:       Optional[str] = Field(default=None, max_length=20)   # transferencia|efectivo (default transferencia)
 
 
 class AnularPagoBody(BaseModel):
-    motivo: str
+    motivo: str = Field(max_length=500)
 
 
 def _resolver_destino_metodo(
@@ -109,11 +111,11 @@ def list_pagos(id: int, request: Request):
 
 
 @router.post("/alquileres/{id}/pagos", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def agregar_pago(id: int, data: PagoCreate, request: Request):
     """Agrega una entrada de pago y recalcula monto_pagado."""
     admin = require_admin(request)
-    if data.monto <= 0:
-        raise HTTPException(400, "El monto debe ser mayor a 0")
     destinatario, metodo = _resolver_destino_metodo(data.destinatario, data.metodo)
     with get_db() as conn:
         try:
@@ -142,6 +144,8 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
 
 
 @router.post("/alquileres/{id}/pagos/{pago_id}/anular", status_code=200)
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def anular_pago(id: int, pago_id: int, data: AnularPagoBody, request: Request):
     """Anula una entrada de pago (soft-delete con motivo) y recalcula monto_pagado.
 
