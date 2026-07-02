@@ -214,11 +214,14 @@ def _arca_logo(width: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-def factura_filename(factura, *, layout: str = "clasica") -> str:
-    """Nombre de archivo canónico del PDF de una factura/NC (admin + portal cliente)."""
+def factura_filename(factura, *, layout: str = "celular") -> str:
+    """Nombre de archivo canónico del PDF de una factura/NC (admin + portal cliente).
+
+    Sin sufijo para el layout DEFAULT de Rambla (celular, 4:5); los demás
+    layouts (pedidos explícitamente) llevan su nombre como sufijo."""
     letra = _CBTE_TIPO_LABEL.get(factura.cbte_tipo, "X")
     prefijo = "NC" if _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False) else "Factura"
-    sufijo = "" if layout == "clasica" else f"-{layout}"
+    sufijo = "" if layout == "celular" else f"-{layout}"
     return f"{prefijo}-{letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}{sufijo}.pdf"
 
 
@@ -567,7 +570,7 @@ def _factura_mobile_html(f: dict) -> str:
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;margin-top:2px;">Cód. {_e(f['cod'])}</div>
         </div>
         <div style="flex:none;display:flex;align-items:center;justify-content:center;width:64px;height:64px;border:1.5px solid #16202b;border-radius:10px;overflow:hidden;">
-          <span style="font-size:72px;font-weight:800;line-height:1;position:relative;top:8px;">{_e(f['letra'])}</span>
+          <span style="font-size:44px;font-weight:800;line-height:1;">{_e(f['letra'])}</span>
         </div>
       </div>
     </div>
@@ -817,15 +820,15 @@ def page_size_for_layout(layout: str) -> tuple[int, int | None] | None:
     return (MOBILE_PAGE_WIDTH, MOBILE_PAGE_HEIGHT) if layout == "celular" else None
 
 
-def factura_html(factura, pedido: dict, layout: str = "clasica") -> str:
+def factura_html(factura, pedido: dict, layout: str = "celular") -> str:
     """Genera el HTML completo de la factura (Factura A/B/C o Nota de Crédito).
 
     `factura` es una instancia de `services.facturacion.repo.Factura`.
     `pedido` viene de `services.facturacion.engine._get_pedido` (items + cliente
-    enriquecidos). `layout`: 'clasica' (default, réplica oficial AFIP/ARCA) ·
-    'celular' (compacta, para compartir por WhatsApp) · 'formal' (A4, identidad
-    de la celular).
+    enriquecidos). `layout`: 'celular' (default de Rambla, compacta 4:5) ·
+    'clasica' (réplica oficial AFIP/ARCA, A4) · 'formal' (A4, identidad de la
+    celular).
     """
-    builder = _LAYOUTS.get(layout, _factura_clasica_html)
+    builder = _LAYOUTS.get(layout, _factura_mobile_html)
     ctx = _build_ctx(factura, pedido)
     return builder(ctx)

@@ -164,15 +164,16 @@ async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf")
 @router.get("/api/cliente/pedidos/{id}/factura.pdf")
 @router.get("/api/cliente/pedidos/{id}/factura")
 async def cliente_pedido_factura(
-    id: int, request: Request, format: str = "pdf", layout: str = "clasica"
+    id: int, request: Request, format: str = "pdf", layout: str = "celular"
 ):
     """Factura ARCA del pedido. A diferencia de remito/contrato/albarán, no
     depende del estado del pedido sino de si la factura ya fue emitida —
     aparece como documento recién ahí, no antes (y desaparece si se anula).
-    `layout`: 'clasica' (default) · 'celular' (para compartir por WhatsApp) · 'formal'."""
+    `layout`: 'celular' (default de Rambla, compacta 4:5) · 'clasica' (réplica
+    oficial AFIP/ARCA, A4) · 'formal'."""
     session = require_cliente(request)
     if layout not in ("clasica", "celular", "formal"):
-        layout = "clasica"
+        layout = "celular"
     with get_db() as conn:
         row = conn.execute(
             "SELECT id FROM alquileres WHERE id = %s AND cliente_id = %s",

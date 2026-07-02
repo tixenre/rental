@@ -129,14 +129,15 @@ def test_emisor_sin_domicilio_configurado_muestra_guion_no_hueco():
 # ── factura_filename ─────────────────────────────────────────────────────────
 
 
-def test_filename_clasica_sin_sufijo():
+def test_filename_celular_es_el_default_de_rambla_sin_sufijo():
     f = _factura()
     assert factura_filename(f) == "Factura-C-00002-00000001.pdf"
+    assert factura_filename(f, layout="celular") == "Factura-C-00002-00000001.pdf"
 
 
-def test_filename_celular_con_sufijo():
+def test_filename_clasica_explicita_lleva_sufijo():
     f = _factura()
-    assert factura_filename(f, layout="celular") == "Factura-C-00002-00000001-celular.pdf"
+    assert factura_filename(f, layout="clasica") == "Factura-C-00002-00000001-clasica.pdf"
 
 
 def test_filename_nc_usa_prefijo_nc():
@@ -155,10 +156,10 @@ def test_factura_html_genera_documento_valido(layout):
     assert "5.700,00" in html  # total formateado es-AR
 
 
-def test_layout_desconocido_cae_a_clasica():
+def test_layout_desconocido_cae_al_default_de_rambla_celular():
     html = factura_html(_factura(), _pedido(), layout="no-existe")
-    html_clasica = factura_html(_factura(), _pedido(), layout="clasica")
-    assert html == html_clasica
+    html_celular = factura_html(_factura(), _pedido(), layout="celular")
+    assert html == html_celular
 
 
 def test_page_size_solo_celular_tiene_tamano_propio_4x5_fijo():
