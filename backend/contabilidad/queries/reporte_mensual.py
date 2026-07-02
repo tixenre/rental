@@ -1,5 +1,5 @@
 """Reporte mensual de Rambla (#809) — compone las miradas del mes en una sola
-respuesta, derivando TODO del motor (no recalcula ni doble-cuenta).
+respuesta, derivando TODO del motor (no recalcula ni doble-cuenta). Nunca muta.
 
 Cada capa sale de UNA sola fuente del paquete:
 - **Devengado** (lo que se ganó): la liquidación del mes (`reportes/`).
@@ -20,9 +20,9 @@ Devengado y percibido van por separado y rotulados — NUNCA se suman entre sí.
 from reportes.cierres import rango_mes, snapshot_de, validar_mes
 from reportes.liquidacion import liquidar
 
-from contabilidad.cuentas import SOCIOS_HUMANOS
-
-PARTES = ("Pablo", "Tincho", "Rambla")
+from contabilidad.constants import PARTES, SOCIOS_HUMANOS
+from contabilidad.queries.pyl import ganancia_neta
+from contabilidad.queries.saldos import ingresos_derivados, saldos
 
 
 def _movimientos_socios_mes(conn, desde: str, hasta: str) -> dict:
@@ -67,9 +67,6 @@ def reporte_mensual(conn, mes: str) -> dict:
     """El reporte completo del mes de Rambla. Compone liquidación + cobros + gastos
     + ganancia + cargos de socios + cuenta corriente. Si el mes está cerrado, el
     devengado sale de la foto congelada."""
-    from contabilidad.pyl import ganancia_neta
-    from contabilidad.saldos import ingresos_derivados, saldos
-
     validar_mes(mes)
     desde, hasta = rango_mes(mes)
 

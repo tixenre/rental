@@ -6,11 +6,11 @@ Chequeos de integridad que verifican que la plata del módulo cuadre. Devuelve
 
 from reportes.liquidacion import LIQUIDACION_INICIO
 
-from contabilidad.cuentas import COBRADORES
+from contabilidad.constants import COBRADORES
 
 
 def reconciliar(conn) -> dict:
-    from contabilidad.saldos import saldos
+    from contabilidad.queries.saldos import saldos
 
     out: dict = {}
 

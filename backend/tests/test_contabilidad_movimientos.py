@@ -6,8 +6,9 @@ La parte SQL (alta/anulación/saldos) se ejerce en `test_contabilidad_db.py`.
 
 import pytest
 
-from contabilidad.movimientos import TIPOS_MOVIMIENTO, validar_estructura_movimiento
-from contabilidad.categorias import validar_categoria
+from contabilidad.constants import TIPOS_MOVIMIENTO
+from contabilidad.commands.movimientos import validar_estructura_movimiento
+from contabilidad.commands.categorias import validar_categoria
 
 
 class TestValidarEstructura:

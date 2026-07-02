@@ -1877,3 +1877,71 @@ cancel-in-progress` ya cancela corridas viejas.
   única sana, y el buffer del motor de reservas es regla de overlap (no genérica). **Pendiente menor** (no es de
   fechas): `cuentas.py` hardcodea `'2026-06-01'` en vez de `LIQUIDACION_INICIO` (drift latente del clean-start). PR
   #1136; tracking #1126.
+
+### 2026-07-02 — El editor de pedidos admin cotiza con el precio de línea congelado, no con el de catálogo
+
+- **Contexto.** El dueño reportó el pedido #405 marcado como "sobrepagado" en la reconciliación mensual pese a
+  que la pantalla del pedido mostraba "Cobranza $163.860 de $163.860 · pagado". Investigado: la reconciliación
+  (`reportes/reconciliacion.py`, chequeo 3) compara `alquileres.monto_pagado` contra `alquileres.monto_total`
+  — dos columnas persistidas de la base. La pantalla del pedido (`pedidos.$id.lazy.tsx`) NO lee esa columna: arma
+  su propio total llamando en vivo a `POST /api/cotizar`, que para ítems de catálogo **siempre** recotiza contra
+  el precio **actual** de `equipos` (`cotizacion.py`, comentario: "no se confía en lo que mande el front") — no
+  contra el `precio_jornada` que ya está persistido/editado en `alquiler_items` del pedido. Dos cálculos
+  independientes del mismo "total" para el mismo pedido, que pueden divergir en cualquier momento en que el
+  precio de catálogo de algún ítem cambie desde que el pedido se armó.
+- **Decisión.** `POST /api/cotizar` acepta un flag nuevo `respetar_precio_item` (solo lo honra una sesión
+  admin, mismo patrón que `cliente_id`/`descuento_pct`): si viene en `true`, usa el `precio_jornada` que manda
+  cada ítem de catálogo en vez de re-buscarlo en `equipos`. El editor de pedidos (`useCotizacion` con
+  `respetarPrecioItem: true`) lo activa siempre — así el total que ve el admin mientras edita es el MISMO que
+  persiste `_recalcular_total_pedido` al guardar, que es el mismo que lee la reconciliación. Además, la pantalla
+  de Cobranza dejaba de mostrar un excedente cobrado (`restante = Math.max(0, total - pagadoMonto)` clampeaba a
+  0 cualquier sobrepago): ahora un `excedente = Math.max(0, pagadoMonto - total)` se muestra explícito en rojo
+  ("de más $X") con una nota sugiriendo devolución/crédito, en vez de esconderse detrás de un "pagado" falso.
+- **Why.** Se evaluaron dos caminos: (a) bloquear la edición de precio/descuento en pedidos ya
+  confirmados/cobrados (snapshot-lock estricto, matching la letra de la decisión 2026-06-06 "Datos del pedido:
+  plata congelada"), o (b) mantener la edición permitida (uso real del dueño: dar un descuento retroactivo tras
+  cobrar) pero eliminar la fuente de verdad duplicada. El dueño explícitamente pidió (b): "quiero poder editar
+  las cosas y que estén todas bien, no sincronizadas" — la solución no es restringir el flujo de trabajo, es que
+  no haya DOS cálculos del mismo número. El caso #405 en sí (dinero ya cobrado por encima del total actual tras
+  un descuento retroactivo) sigue siendo una situación real de negocio que el dueño resuelve a mano (crédito o
+  devolución) — no es un bug de datos, es información que antes estaba oculta.
+- **Consecuencias.** Ningún cambio de contrato público: `respetar_precio_item` default `False` (el carrito
+  público/`CartDrawer`/`CatalogoMovil` siguen cotizando contra catálogo, sin tocar). Regresión: verificado
+  manualmente que `es_admin` se resuelve antes del loop de ítems (antes solo se calculaba dentro del bloque
+  `if tiene_fechas:`, se hoisteó). PR #1181, sin tests nuevos (cambio de UI + flag de query ya cubierto por el
+  test de contrato de `/api/cotizar`); plan de prueba manual en el PR.
+
+### 2026-07-02 — `backend/contabilidad/` reorganizado CQRS-lite (`queries/`+`commands/`), espejo de `services/specs/`
+
+- **Contexto.** A raíz de investigar el caso #405 (ver decisión anterior), el dueño pidió explícitamente aplicarle
+  a `backend/contabilidad/` "el CQRS liviano que estamos implementando en el repo" (ya usado en
+  `services/specs/` y `services/specs_ingesta/`) y auditar el módulo para que este tipo de bug no vuelva a pasar.
+  El módulo (10 archivos, ~1400 líneas, `#809`) era plano: cada archivo mezclaba lectura y escritura sin
+  frontera física.
+- **Decisión.** Split **move-verbatim** (cero cambio de lógica/SQL) en `queries/` (lectura, nunca muta) +
+  `commands/` (única puerta de mutación) + `constants.py` (top-level: `TIPOS_CUENTA`, `COBRADORES`,
+  `SOCIOS_HUMANOS`, `MONEDAS`, `TIPOS_MOVIMIENTO`, `METODOS_MOVIMIENTO`, `PARTES` — viven fuera de `queries/`/
+  `commands/` porque `queries/` los necesita y no puede importarlos del lado de escritura). Mapeo: de los 10
+  archivos viejos salieron 10 `queries/*.py` + 5 `commands/*.py` (categorías, cuentas, movimientos, cierres,
+  rendición). `PARTES` estaba duplicada byte-idéntica en `rendicion.py` y `reporte_mensual.py` — consolidada
+  en `constants.py` (una sola forma). Actualizados los 2 callers (`routes/contabilidad.py`,
+  `routes/alquileres/pagos.py`) y los 4 archivos de test que importaban rutas viejas.
+- **Why.** El motor resultó ser mayormente de lectura: de ~35 funciones públicas, solo 10 mutan de verdad
+  (`crear_categoria`, `crear_cuenta`/`editar_cuenta`/`desactivar_cuenta`, `crear_movimiento`/`editar_movimiento`/
+  `anular_movimiento`, `cerrar_mes`/`reabrir_mes`, `saldar`). Confirmado al hacer el split: **ningún** query del
+  paquete necesitaba nada de `commands/` — la invariante "`commands/` importa de `queries/`; `queries/` nunca de
+  `commands/`" se cumple sin fricción, igual que en `specs`/`specs_ingesta`. Separar físicamente lectura de
+  escritura hace más fácil auditar visualmente "¿esto puede mutar plata?" con solo mirar en qué carpeta vive —
+  reduce la clase de bug de #405 (que fue un bug del LADO CLIENTE del total, no de este módulo, pero la misma
+  disciplina de "una sola fuente, nunca dos caminos" es la que lo hubiera prevenido si hubiera vivido acá).
+- **Consecuencias.** Candado: 51 tests puros (sin DB) + 29 tests de integración (Postgres real, todo el árbol
+  `test_contabilidad_db.py`/`test_reportes_cierres_db.py`/`test_init_db_cuentas_seed_db.py`) pasan en verde
+  byte-a-byte contra el comportamiento pre-split — confirma que fue mecánico, no una reescritura. `pyflakes`
+  limpio sobre el paquete completo (sin imports muertos ni nombres indefinidos). Suite completa del backend:
+  2684 passed (los 3 failed + 3 error de `test_catalogo_motor_shape.py` son preexistentes, no tocan
+  `contabilidad` — sin datos de catálogo sembrados en la DB de prueba local). **Auditoría del patrón "dos
+  cálculos del mismo número"** (lo que causó #405) sobre el módulo: no se encontró una segunda instancia dentro
+  de `contabilidad/` — el propio `queries/reconciliacion.py::reconciliar` ya es el semáforo que cazaría ese
+  patrón (hereda `reportes/reconciliacion.py`, que tiene 3 chequeos: pagados-sin-ledger, `monto_pagado`
+  divergente del ledger real, y sobrepagados). Rama aislada `feature/contabilidad-cqrs`, PR sin mergear
+  (convención "PR como hoja de ruta"); tracking #1184.

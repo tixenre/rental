@@ -1,4 +1,4 @@
-"""Libro de movimientos (#809) — el registro único de la plata que se mueve.
+"""Escritura del libro de movimientos (#809) — única puerta de mutación.
 
 Cada fila mueve plata entre cuentas (o desde/hacia afuera). El **tipo** define qué
 cuentas se usan:
@@ -12,14 +12,16 @@ cuentas se usan:
 | ajuste        | ✓ o —  | ✓ o —   | —         | conciliación manual (con nota)           |
 
 Los ingresos por alquiler NO viven acá: derivan de `alquiler_pagos` (Fase 1). El
-saldo de cada cuenta se deriva de estos movimientos + esos cobros (`saldos.py`).
+saldo de cada cuenta se deriva de estos movimientos + esos cobros
+(`queries/saldos.py`).
 
 `validar_estructura_movimiento` es pura (testeable sin DB). El resto toca la
 conexión. La plata nunca se borra: `anular_movimiento` hace soft-delete con motivo.
+Lectura → `queries/movimientos.py`.
 """
 
-TIPOS_MOVIMIENTO = ("gasto", "transferencia", "retiro", "aporte", "ajuste")
-METODOS_MOVIMIENTO = ("transferencia", "efectivo")
+from contabilidad.constants import METODOS_MOVIMIENTO, TIPOS_MOVIMIENTO
+from contabilidad.queries.movimientos import listar_movimientos, obtener_movimiento
 
 # Campos que se pueden editar de un movimiento ya creado (el tipo no se cambia:
 # cambiar de gasto a transferencia es otro movimiento, se anula y se rehace).
@@ -80,7 +82,7 @@ def _mes_de_fecha(fecha) -> str:
 
 def _exigir_mes_abierto(conn, fecha) -> None:
     """Traba tocar un movimiento cuyo mes contable está cerrado (#809 Fase 6)."""
-    from contabilidad.cierres import mes_cerrado
+    from contabilidad.queries.cierres import mes_cerrado
 
     mes = _mes_de_fecha(fecha)
     if mes_cerrado(conn, mes):
@@ -89,73 +91,13 @@ def _exigir_mes_abierto(conn, fecha) -> None:
         )
 
 
-def listar_movimientos(conn, *, tipo=None, cuenta_id=None, categoria_id=None,
-                       desde=None, hasta=None, beneficiario=None,
-                       incluir_anulados=False, limit=500) -> list[dict]:
-    """Movimientos con nombres de cuenta/categoría resueltos, filtrables. Más
-    nuevos primero. Por defecto excluye los anulados."""
-    from database import row_to_dict
-
-    sql = """
-        SELECT m.id, m.tipo, m.monto, m.cuenta_origen_id, m.cuenta_destino_id,
-               m.categoria_id, m.metodo, m.fecha, m.nota, m.beneficiario,
-               m.comprobante_url, m.es_rendicion, m.rendicion_mes,
-               m.anulado, m.anulado_motivo, m.created_by, m.created_at,
-               co.nombre AS cuenta_origen_nombre,
-               cd.nombre AS cuenta_destino_nombre,
-               COALESCE(co.moneda, cd.moneda) AS moneda,
-               gc.nombre AS categoria_nombre
-        FROM movimientos m
-        LEFT JOIN cuentas co ON co.id = m.cuenta_origen_id
-        LEFT JOIN cuentas cd ON cd.id = m.cuenta_destino_id
-        LEFT JOIN gasto_categorias gc ON gc.id = m.categoria_id
-        WHERE 1=1
-    """
-    params: list = []
-    if not incluir_anulados:
-        sql += " AND m.anulado = FALSE"
-    if tipo:
-        sql += " AND m.tipo = %s"
-        params.append(tipo)
-    if cuenta_id:
-        sql += " AND (m.cuenta_origen_id = %s OR m.cuenta_destino_id = %s)"
-        params.extend([cuenta_id, cuenta_id])
-    if categoria_id:
-        sql += " AND m.categoria_id = %s"
-        params.append(categoria_id)
-    if beneficiario:
-        sql += " AND m.beneficiario = %s"
-        params.append(beneficiario)
-    if desde:
-        sql += " AND m.fecha >= %s::date"
-        params.append(desde)
-    if hasta:
-        sql += " AND m.fecha <= %s::date"
-        params.append(hasta)
-    sql += " ORDER BY m.fecha DESC, m.id DESC LIMIT %s"
-    params.append(min(int(limit or 500), 2000))
-    return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
-
-
-def obtener_movimiento(conn, mov_id: int) -> dict | None:
-    from database import row_to_dict
-    row = conn.execute(
-        """SELECT id, tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id,
-                  metodo, fecha, nota, beneficiario, comprobante_url, comprobante_key, es_rendicion,
-                  rendicion_mes, anulado, anulado_motivo, created_by, created_at
-           FROM movimientos WHERE id = %s""",
-        (mov_id,),
-    ).fetchone()
-    return row_to_dict(row) if row else None
-
-
 def crear_movimiento(conn, *, tipo, monto, cuenta_origen_id=None, cuenta_destino_id=None,
                      categoria_id=None, metodo=None, fecha=None, nota=None, beneficiario=None,
                      por=None, es_rendicion=False, rendicion_mes=None) -> dict:
     """Crea un movimiento (valida estructura + existencia de cuentas/categoría).
     `fecha` None → hoy. `es_rendicion`/`rendicion_mes` marcan un saldado de
-    rendición entre socios (lo usa `rendicion.saldar`, no la UI general).
-    Devuelve el movimiento con nombres resueltos."""
+    rendición entre socios (lo usa `commands/rendicion.py::saldar`, no la UI
+    general). Devuelve el movimiento con nombres resueltos."""
     monto = int(monto or 0)
     validar_estructura_movimiento(tipo, monto, cuenta_origen_id, cuenta_destino_id, categoria_id)
     _validar_metodo(metodo)
@@ -267,71 +209,3 @@ def anular_movimiento(conn, mov_id: int, *, motivo, por=None) -> dict:
         (por, motivo, mov_id),
     )
     return obtener_movimiento(conn, mov_id)
-
-
-def gastos_por_categoria(conn, desde=None, hasta=None) -> list[dict]:
-    """Σ de gastos en PESOS (no anulados) agrupados por categoría, en la ventana.
-    Para el tablero / P&L (que es en ARS). Filtra por la moneda de la caja de
-    origen: un gasto pagado desde una caja USD NO se suma al P&L en pesos (no se
-    mezclan monedas). Más gastado primero."""
-    from database import row_to_dict
-    sql = """
-        SELECT gc.nombre AS categoria, COALESCE(SUM(m.monto), 0) AS monto
-        FROM movimientos m
-        JOIN gasto_categorias gc ON gc.id = m.categoria_id
-        JOIN cuentas co ON co.id = m.cuenta_origen_id
-        WHERE m.tipo = 'gasto' AND m.anulado = FALSE AND co.moneda = 'ARS'
-    """
-    params: list = []
-    if desde:
-        sql += " AND m.fecha >= %s::date"
-        params.append(desde)
-    if hasta:
-        sql += " AND m.fecha <= %s::date"
-        params.append(hasta)
-    sql += " GROUP BY gc.nombre ORDER BY monto DESC"
-    return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
-
-
-def cobros_mensuales(conn, desde=None, hasta=None, cobrador=None) -> list[dict]:
-    """Cobros de pedidos (de `alquiler_pagos`) agregados por mes — una línea por
-    mes con el total cobrado. Es la cara READ-ONLY de los cobros dentro de la vista
-    unificada de movimientos: la plata entra, pero se carga desde el pedido (Pagos),
-    no se edita acá. Mismo recorte que los saldos (clean start por fecha del alquiler
-    `fecha_desde >= LIQUIDACION_INICIO`, destinatario asignado). Si `cobrador` se pasa,
-    solo los de ese cobrador. Devuelve filas {mes:'YYYY-MM', monto, cantidad} más
-    nuevas primero."""
-    from database import row_to_dict
-    from reportes.liquidacion import LIQUIDACION_INICIO
-
-    sql = """
-        SELECT to_char(ap.fecha, 'YYYY-MM') AS mes,
-               COALESCE(SUM(ap.monto), 0) AS monto,
-               COUNT(*) AS cantidad
-        FROM alquiler_pagos ap
-        JOIN alquileres al ON al.id = ap.pedido_id
-        WHERE ap.destinatario IS NOT NULL AND al.fecha_desde >= %s::date
-    """
-    params: list = [LIQUIDACION_INICIO]
-    if cobrador:
-        sql += " AND ap.destinatario = %s"
-        params.append(cobrador)
-    if desde:
-        sql += " AND ap.fecha::date >= %s::date"
-        params.append(desde)
-    if hasta:
-        sql += " AND ap.fecha::date <= %s::date"
-        params.append(hasta)
-    sql += " GROUP BY 1 ORDER BY 1 DESC"
-    return [row_to_dict(r) for r in conn.execute(sql, tuple(params)).fetchall()]
-
-
-def beneficiarios_usados(conn) -> list[str]:
-    """Beneficiarios ya usados (distintos, no anulados), para el autocompletado del
-    formulario — así "Jimena" se elige en vez de reescribirse."""
-    rows = conn.execute(
-        """SELECT DISTINCT beneficiario FROM movimientos
-           WHERE beneficiario IS NOT NULL AND beneficiario <> '' AND NOT anulado
-           ORDER BY beneficiario"""
-    ).fetchall()
-    return [r["beneficiario"] for r in rows]

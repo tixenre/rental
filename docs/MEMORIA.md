@@ -600,6 +600,33 @@ con CTA de WhatsApp en el carrito; **fail-open** (setting corrupto/ausente → 0
 validación de fecha/hora genérica recreada o duplicada fuera del módulo, o `date.today()` donde debería ir
 `now_ar()`. Cómo → el propio docstring de `services/fechas.py`; tracking #1126.
 
+### 2026-07-02 — El editor de pedidos admin cotiza con el precio de línea congelado, no con el de catálogo
+
+El editor de pedidos (`pedidos.$id.lazy.tsx`) mostraba el total "en vivo" recotizando contra `/api/cotizar`,
+que para ítems de catálogo siempre re-busca el precio **actual** de `equipos` — ignorando el `precio_jornada`
+ya persistido/editado del pedido. Eso podía divergir del `monto_total` que efectivamente se guarda
+(`_recalcular_total_pedido`, que sí usa el precio de línea congelado), mostrando "100% pagado" en la pantalla
+del pedido mientras la reconciliación mensual (que lee `monto_total`/`monto_pagado` directo de la base) lo
+marcaba como sobrepagado — dos totales del mismo pedido. `/api/cotizar` ahora acepta `respetar_precio_item`
+(solo lo honra una sesión admin): usa el precio de línea que manda el front en vez de recotizar contra
+`equipos`; el editor de pedidos lo activa siempre. La pantalla de Cobranza además deja de esconder un
+excedente cobrado (antes clampeaba a 0): si se cobró de más se muestra explícito, en vez de descubrirse
+recién en la reconciliación. El supervisor marca una pantalla que recotice un pedido YA EXISTENTE contra el
+precio de catálogo en vez del precio de línea persistido. PR #1181.
+
+### 2026-07-02 — `backend/contabilidad/` reorganizado CQRS-lite (`queries/`+`commands/`), espejo de `services/specs/`
+
+El motor de contabilidad (_2026-06-07_) se reorganizó en `queries/` (lectura, nunca muta) + `commands/` (única
+puerta de mutación) + `constants.py` (lo que ambos lados necesitan: cobradores, tipos de cuenta/movimiento,
+partes de la rendición) — mismo patrón CQRS-lite que `services/specs/`/`services/specs_ingesta/`. **Move
+verbatim, no rewrite**: cero cambio de lógica/SQL, confirmado por los 51 tests puros + 29 tests de integración
+(Postgres real) en verde byte-a-byte. Invariante dura: `commands/` puede importar de `queries/`; `queries/`
+**nunca** de `commands/` — confirmado al hacer el split que ningún query del paquete necesitaba nada de
+`commands/` (es un motor mayormente de lectura, 10 puntos de mutación reales). De paso se consolidó `PARTES`
+(estaba duplicada byte-idéntica en `rendicion.py` y `reporte_mensual.py`) en `constants.py` — una sola forma.
+El supervisor marca lógica de escritura nueva agregada a `queries/`, o un query importando de `commands/`.
+Estructura completa → `backend/contabilidad/CLAUDE.md`; tracking #1184.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

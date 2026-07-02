@@ -5,7 +5,8 @@ El cruce real con `alquiler_pagos` y el saldado se ejercen en
 """
 
 
-from contabilidad.rendicion import PARTES, _netting
+from contabilidad.constants import PARTES
+from contabilidad.queries.rendicion import _netting
 
 
 def _by(personas):

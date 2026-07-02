@@ -1,4 +1,5 @@
 """Rendición de cuentas mensual (#809) — quién le debe a quién entre los socios.
+Nunca muta — ver `commands/rendicion.py` para `saldar`.
 
 Cruza, para un mes, lo que **le corresponde** a cada parte (del reporte de
 liquidación: `reportes/liquidacion`) contra lo que **cobró** físicamente (del
@@ -9,17 +10,16 @@ rendición cierra en cero.
 Las partes son tres: **Pablo**, **Tincho** y **Rambla** — los tres pueden cobrar
 (Rambla es el cobrador por defecto y su plata cae en la caja Fondo Rambla). El
 netting calcula quién le debe a quién para que cada parte termine con lo que le
-corresponde; la parte de Rambla NO se reparte entre Pablo y Tincho. Al registrar un
-saldado (`saldar`) se crea como `transferencia` en el libro de movimientos con
-`es_rendicion=True` — NO es un sistema paralelo.
+corresponde; la parte de Rambla NO se reparte entre Pablo y Tincho.
 
 El núcleo (`_netting`) es puro y testeable sin DB.
 """
 
 from reportes.liquidacion import SALDADO_CTE, liquidar
-from reportes.cierres import rango_mes, snapshot_de, validar_mes
+from reportes.cierres import rango_mes, snapshot_de as _snapshot_liquidacion, validar_mes
 
-PARTES = ("Pablo", "Tincho", "Rambla")
+from contabilidad.constants import PARTES
+from contabilidad.queries.cierres import mes_cerrado
 
 
 def _netting(corresponde: dict, cobrado: dict, ya_transferido: dict) -> dict:
@@ -165,7 +165,7 @@ def rendicion(conn, mes: str) -> dict:
     validar_mes(mes)
     desde, hasta = rango_mes(mes)
 
-    snap = snapshot_de(conn, mes)
+    snap = _snapshot_liquidacion(conn, mes)
     data = snap if snap is not None else liquidar(conn, desde, hasta)
     por_benef = data["resumen"]["por_beneficiario"]
     corresponde = {p: int(por_benef.get(p, 0)) for p in PARTES}
@@ -177,7 +177,6 @@ def rendicion(conn, mes: str) -> dict:
 
     net = _netting(corresponde, cobrado, ya)
 
-    from contabilidad.cierres import mes_cerrado
     cierre_contable = mes_cerrado(conn, mes)
 
     advertencias = []
@@ -211,32 +210,3 @@ def rendicion(conn, mes: str) -> dict:
         "advertencias": advertencias,
         "movimientos": _movimientos_rendicion(conn, mes),
     }
-
-
-def saldar(conn, mes: str, *, de: str, a: str, monto: int,
-           metodo=None, fecha=None, nota=None, por=None) -> dict:
-    """Registra un saldado de rendición: una transferencia entre las cajas de las
-    partes, marcada `es_rendicion`. Reusa el libro de movimientos (no duplica)."""
-    validar_mes(mes)
-    if de not in PARTES or a not in PARTES:
-        raise ValueError("Las partes de la rendición son Pablo, Tincho o Rambla.")
-    if de == a:
-        raise ValueError("El que paga y el que recibe no pueden ser la misma parte.")
-    monto = int(monto or 0)
-    if monto <= 0:
-        raise ValueError("El monto debe ser mayor a cero.")
-
-    origen = cuenta_de_parte(conn, de)
-    destino = cuenta_de_parte(conn, a)
-    if not origen or not destino:
-        raise ValueError("Falta la caja de alguna de las partes (Caja del socio o Fondo Rambla).")
-
-    from contabilidad.movimientos import crear_movimiento
-
-    return crear_movimiento(
-        conn, tipo="transferencia", monto=monto,
-        cuenta_origen_id=origen, cuenta_destino_id=destino,
-        metodo=metodo, fecha=fecha,
-        nota=nota or f"Rendición {mes}: {de} → {a}", por=por,
-        es_rendicion=True, rendicion_mes=mes,
-    )

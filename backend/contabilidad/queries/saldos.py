@@ -1,4 +1,4 @@
-"""Saldos por cuenta (#809) — el corazón del cálculo.
+"""Saldos por cuenta (#809) — el corazón del cálculo. Nunca muta.
 
 Hay DOS tipos de cuenta, que se calculan distinto:
 
@@ -38,7 +38,7 @@ from datetime import date
 
 from reportes.liquidacion import LIQUIDACION_INICIO
 
-from .cuentas import SOCIOS_HUMANOS
+from contabilidad.constants import SOCIOS_HUMANOS
 
 
 def partes_socios(conn) -> dict[str, int]:
@@ -202,7 +202,7 @@ def saldo_de_cuenta(conn, cuenta_id: int) -> int:
         if f["id"] == cuenta_id:
             return int(f["saldo"])
     # Cuenta inactiva o inexistente: recalcular incluyéndola explícitamente.
-    from .cuentas import obtener_cuenta
+    from contabilidad.queries.cuentas import obtener_cuenta
     cuenta = obtener_cuenta(conn, cuenta_id)
     if not cuenta:
         return 0
@@ -213,5 +213,5 @@ def saldo_de_cuenta(conn, cuenta_id: int) -> int:
 
 
 def _cuentas_activas(conn) -> list[dict]:
-    from .cuentas import listar_cuentas
+    from contabilidad.queries.cuentas import listar_cuentas
     return listar_cuentas(conn, incluir_inactivas=False)

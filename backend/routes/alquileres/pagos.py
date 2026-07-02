@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Cualquiera de los tres puede cobrar; el default es Rambla (en transferencia).
 # Cada destinatario mapea a una caja en Contabilidad (Pablo/Tincho → su caja de
 # socio; Rambla → Fondo Rambla), donde la plata cobrada se atribuye sola.
-from contabilidad.cuentas import COBRADORES as DESTINATARIOS_PAGO  # fuente única
+from contabilidad.constants import COBRADORES as DESTINATARIOS_PAGO  # fuente única
 METODOS_PAGO = ("transferencia", "efectivo")
 DESTINATARIO_PAGO_DEFAULT = "Rambla"
 METODO_PAGO_DEFAULT = "transferencia"

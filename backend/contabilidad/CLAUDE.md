@@ -1,10 +1,47 @@
 # `backend/contabilidad/` — motor único de la plata "de adentro"
 
-> Invariantes locales. El _por qué_ completo: `docs/DECISIONES.md` _2026-06-07 — `backend/contabilidad/`_.
+> Invariantes locales. El _por qué_ completo: `docs/DECISIONES.md` _2026-06-07 — `backend/contabilidad/`_
+> y _2026-07-02 — CQRS-lite en `contabilidad/`_.
 
 **Toda la plata interna del negocio vive acá** (cajas/cuentas, libro de movimientos, saldos,
 rendición entre socios, ganancia/P&L, cierre contable, reconciliación); los routes son solo
 transporte HTTP. No re-implementar plata interna ad-hoc en un route.
+
+## Estructura (CQRS-lite, espeja `services/specs/` y `services/specs_ingesta/`)
+
+```
+contabilidad/
+  __init__.py       # barrel (docstring, sin __all__ — no hay re-exports públicos)
+  constants.py       # TIPOS_CUENTA, COBRADORES, SOCIOS_HUMANOS, MONEDAS,
+                      # TIPOS_MOVIMIENTO, METODOS_MOVIMIENTO, PARTES — las usan
+                      # AMBOS lados (por eso no viven en commands/)
+  queries/            # LECTURA — nunca mutan
+    categorias.py       # listar_categorias
+    cuentas.py            # listar_cuentas, obtener_cuenta
+    movimientos.py          # listar_movimientos, obtener_movimiento,
+                             # gastos_por_categoria, cobros_mensuales, beneficiarios_usados
+    cierres.py                # cierre_de, mes_cerrado, snapshot_de
+    saldos.py                   # partes_socios, ingresos_derivados, movimientos_planos,
+                                 # calcular_saldos (PURA), saldos, saldo_de_cuenta
+    rendicion.py                  # _netting (PURA), cobrado_por_socio, ya_transferido,
+                                   # cuenta_de_parte, rendicion
+    pyl.py                         # ingresos_devengados, ganancia_neta
+    reconciliacion.py                # reconciliar
+    reporte_mensual.py                 # reporte_mensual
+    tablero.py                           # tablero, mes_actual
+  commands/           # ESCRITURA — única puerta de mutación
+    categorias.py       # validar_categoria (PURA), crear_categoria
+    cuentas.py            # validar_cuenta (PURA), crear_cuenta, editar_cuenta, desactivar_cuenta
+    movimientos.py          # validar_estructura_movimiento (PURA), crear_movimiento,
+                             # editar_movimiento, anular_movimiento, _exigir_mes_abierto (guard)
+    cierres.py                # cerrar_mes, reabrir_mes
+    rendicion.py                 # saldar
+```
+
+**Invariante commands↔queries (igual que `specs`/`specs_ingesta`):** `commands/` puede
+importar de `queries/`; `queries/` **nunca** de `commands/`. Ningún query del paquete
+necesita nada de `commands/` — confirmado al hacer el split (2026-07-02): es un motor
+mayormente de lectura, con 10 puntos de mutación reales.
 
 Reglas que NO se rompen:
 

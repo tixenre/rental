@@ -13,29 +13,25 @@ from pydantic import BaseModel
 
 from database import get_db
 from auth.guards import require_admin
-from contabilidad.cuentas import (
-    crear_cuenta,
-    desactivar_cuenta,
-    editar_cuenta,
-    listar_cuentas,
-)
-from contabilidad.saldos import saldos as _saldos
-from contabilidad.categorias import crear_categoria, listar_categorias
-from contabilidad.movimientos import (
-    anular_movimiento,
+from contabilidad.commands.cuentas import crear_cuenta, desactivar_cuenta, editar_cuenta
+from contabilidad.queries.cuentas import listar_cuentas
+from contabilidad.queries.saldos import saldos as _saldos
+from contabilidad.commands.categorias import crear_categoria
+from contabilidad.queries.categorias import listar_categorias
+from contabilidad.commands.movimientos import anular_movimiento, crear_movimiento, editar_movimiento
+from contabilidad.queries.movimientos import (
     beneficiarios_usados,
     cobros_mensuales,
-    crear_movimiento,
-    editar_movimiento,
     gastos_por_categoria,
     listar_movimientos,
     obtener_movimiento,
 )
-from contabilidad.tablero import tablero as _tablero
-from contabilidad.pyl import ganancia_neta
-from contabilidad.rendicion import rendicion as _rendicion, saldar as _saldar
-from contabilidad.cierres import cerrar_mes as _cerrar_mes, reabrir_mes as _reabrir_mes
-from contabilidad.reconciliacion import reconciliar as _reconciliar
+from contabilidad.queries.tablero import tablero as _tablero
+from contabilidad.queries.pyl import ganancia_neta
+from contabilidad.queries.rendicion import rendicion as _rendicion
+from contabilidad.commands.rendicion import saldar as _saldar
+from contabilidad.commands.cierres import cerrar_mes as _cerrar_mes, reabrir_mes as _reabrir_mes
+from contabilidad.queries.reconciliacion import reconciliar as _reconciliar
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -394,7 +390,7 @@ def get_reporte_mensual(request: Request, mes: str):
     """Reporte mensual completo de Rambla: devengado + percibido + gastos +
     ganancia + cargos de socios + cuenta corriente, derivado del motor."""
     require_admin(request)
-    from contabilidad.reporte_mensual import reporte_mensual
+    from contabilidad.queries.reporte_mensual import reporte_mensual
 
     with get_db() as conn:
         try:
