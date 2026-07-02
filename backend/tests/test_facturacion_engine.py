@@ -353,6 +353,33 @@ def test_vto_pago_sin_fecha_hasta_usa_fecha_del_comprobante():
     assert req.fecha_vto_pago == date(2026, 7, 15)
 
 
+def test_vto_pago_con_fecha_hasta_como_datetime_no_string():
+    """Regresión de prod: `fecha_desde`/`fecha_hasta` son columnas TIMESTAMP —
+    psycopg3 las devuelve como `datetime.datetime`, no como string ISO (que es
+    todo lo que probaban los tests de arriba). `datetime` es subclase de
+    `date`, así que `_parse_fecha` los dejaba pasar SIN truncar a `.date()`,
+    y comparar ese datetime contra un `date` en `_fecha_vto_pago` explotaba
+    con "TypeError: can't compare datetime.datetime to datetime.date" —
+    reproducido en vivo en el preview de una factura real (pedido #418)."""
+    from services.facturacion.comprobante_pedido import construir_comprobante
+    from arca_fe import Emisor, CondicionIva
+
+    pedido = {
+        **_fake_pedido(),
+        "fecha_desde": datetime(2026, 6, 30, 9, 0),
+        "fecha_hasta": datetime(2026, 7, 1, 18, 0),
+    }
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+
+    req = construir_comprobante(
+        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 7, 15)
+    assert req.fecha_serv_desde == date(2026, 6, 30)
+    assert req.fecha_serv_hasta == date(2026, 7, 1)
+
+
 def test_vto_pago_de_la_nc_tambien_respeta_la_fecha_del_comprobante():
     from services.facturacion.comprobante_pedido import construir_comprobante_nc
     from arca_fe import Emisor, CondicionIva, CbteAsoc, CbteTipo
