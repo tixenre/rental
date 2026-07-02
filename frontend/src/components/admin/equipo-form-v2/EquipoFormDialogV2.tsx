@@ -1187,7 +1187,16 @@ export function EquipoFormDialogV2({
               <div className="space-y-1.5">
                 <Input
                   value={nombrePublico}
-                  onChange={(e) => setNombrePublico(e.target.value)}
+                  onChange={(e) => {
+                    // Tipear a mano es la señal de "esto es mío" — apaga el
+                    // auto-gen. Sin esto, `nombrePublicoAuto` (default true)
+                    // queda armado en silencio mientras no hay molde (el
+                    // toggle para verlo/apagarlo está oculto), y el texto
+                    // tipeado se borra apenas se elige una categoría de specs
+                    // que sí tiene molde — confirmado en vivo (Angulo 5).
+                    setNombrePublico(e.target.value);
+                    setNombrePublicoAuto(false);
+                  }}
                   placeholder={
                     autoGenDisponible
                       ? "Generado automático según el molde de la categoría"
