@@ -54,10 +54,15 @@ def armar_qr(
 
 
 def _build_qr_image_data_uri(url: str) -> str:
-    """Genera un QR code PNG como data-URI a partir de la URL fiscal AFIP."""
+    """Genera un QR code PNG como data-URI a partir de la URL fiscal AFIP.
+
+    Resolución nativa fija e independiente del tamaño de display — la misma
+    imagen se reusa achicada en las 3 facturas (78px celular, 112px clásica,
+    150px formal). scale=10 da ~600px nativos: aguanta zoom/compresión de
+    WhatsApp sin pixelarse (scale=4 daba ~240px, visiblemente borroso)."""
     import segno
     qr = segno.make(url, error="M")
     buf = io.BytesIO()
-    qr.save(buf, kind="png", scale=4, border=2)
+    qr.save(buf, kind="png", scale=10, border=2)
     png_b64 = base64.b64encode(buf.getvalue()).decode()
     return f"data:image/png;base64,{png_b64}"

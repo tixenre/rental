@@ -97,3 +97,25 @@ def test_importe_dos_decimales():
     assert p["importe"] == pytest.approx(333.33)
 
 
+# ── Resolución de la imagen: aguanta zoom/compresión de WhatsApp ────────────
+# (bug real: scale=4 daba ~240px nativos, se veía pixelado al hacer zoom o
+# al pasar por la compresión de WhatsApp — la misma imagen se reusa achicada
+# en las 3 facturas, la más chica (celular) la muestra a 78px)
+
+
+def test_qr_image_resolucion_minima_para_no_pixelarse():
+    from arca_fe.qr import _build_qr_image_data_uri
+    import base64
+    import io
+    from PIL import Image
+
+    data_uri = _build_qr_image_data_uri(
+        "https://www.afip.gob.ar/fe/qr/?p=" + "x" * 180
+    )
+    assert data_uri.startswith("data:image/png;base64,")
+    png_bytes = base64.b64decode(data_uri.split(",", 1)[1])
+    img = Image.open(io.BytesIO(png_bytes))
+    # 4x el mayor tamaño de display (150px, la formal) — margen para zoom.
+    assert img.size[0] >= 600
+
+
