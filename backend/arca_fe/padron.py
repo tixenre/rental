@@ -79,10 +79,18 @@ class PersonaArca:
     """Datos resueltos del padrón para autocompletar un formulario.
 
     Cualquier campo puede venir vacío — el padrón no garantiza completitud
-    (ej: un monotributista puede no tener domicilio fiscal cargado)."""
+    (ej: un monotributista puede no tener domicilio fiscal cargado).
+
+    `nombre`/`apellido` solo vienen poblados para una PERSONA FÍSICA sin
+    razón social propia registrada (AFIP los da separados) — un formulario
+    con campos Nombre/Apellido separados (cliente) los usa así; uno con un
+    solo campo "razón social" (emisor, siempre una identidad de negocio)
+    usa `razon_social`, que ya viene combinado como fallback."""
 
     cuit: str
     razon_social: str
+    nombre: str
+    apellido: str
     domicilio: str
     condicion_iva: str  # 'responsable_inscripto' | 'monotributo' | 'exento' | ''
 
@@ -126,6 +134,8 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
     dg = getattr(persona, "datosGenerales", None)
 
     razon_social = ""
+    nombre = ""
+    apellido = ""
     domicilio = ""
     if dg is not None:
         razon_social = str(getattr(dg, "razonSocial", "") or "")
@@ -160,6 +170,8 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
     return PersonaArca(
         cuit=cuit,
         razon_social=razon_social,
+        nombre=nombre,
+        apellido=apellido,
         domicilio=domicilio,
         condicion_iva=condicion_iva,
     )

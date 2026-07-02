@@ -63,7 +63,14 @@ export type FacturasListResp = {
 };
 
 export type PadronResult =
-  | { encontrado: true; razon_social: string; domicilio: string; condicion_iva: string }
+  | {
+      encontrado: true;
+      razon_social: string;
+      nombre: string;
+      apellido: string;
+      domicilio: string;
+      condicion_iva: string;
+    }
   | { encontrado: false };
 
 export type ChequeoPreview = { check: string; ok: boolean; bloqueante: boolean; mensaje: string };

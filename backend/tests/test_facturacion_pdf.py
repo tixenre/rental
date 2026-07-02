@@ -240,6 +240,40 @@ def test_leyenda_transparencia_fiscal_usa_el_iva_real_no_hardcodeado():
     assert "IVA Contenido: $ 2.100,00" in html
 
 
+# ── Concepto: default de Rambla = una sola línea "Rambla #N", sin desglose ──
+
+
+def test_concepto_es_marca_mas_numero_de_pedido_sin_desglose():
+    html = factura_html(_factura(), _pedido(numero_pedido="231"), layout="celular")
+    assert "Rambla #231" in html
+
+
+def test_concepto_ignora_el_desglose_por_equipo_del_pedido():
+    """Aunque el pedido tenga varios ítems, la factura muestra una sola línea
+    (decisión de negocio de Rambla — no un límite de ARCA)."""
+    pedido = _pedido(numero_pedido="231", items=[
+        {"nombre": "Cámara Sony FX3", "cantidad": 1, "subtotal": 3000},
+        {"nombre": "Trípode Manfrotto", "cantidad": 1, "subtotal": 2700},
+    ])
+    html = factura_html(_factura(), pedido, layout="celular")
+    assert "Rambla #231" in html
+    assert "Cámara Sony FX3" not in html
+    assert "Trípode Manfrotto" not in html
+
+
+def test_concepto_marca_es_configurable(monkeypatch):
+    monkeypatch.setenv("FACTURACION_CONCEPTO_MARCA", "Otro Negocio")
+    import importlib
+    import services.facturacion.pdf as pdf_mod
+    importlib.reload(pdf_mod)
+    try:
+        html = pdf_mod.factura_html(_factura(), _pedido(numero_pedido="9"), layout="celular")
+        assert "Otro Negocio #9" in html
+    finally:
+        monkeypatch.delenv("FACTURACION_CONCEPTO_MARCA", raising=False)
+        importlib.reload(pdf_mod)
+
+
 @pytest.mark.parametrize("layout", ["clasica", "celular", "formal"])
 def test_sin_qr_payload_falla_fuerte(layout):
     sin_qr = _factura(qr_payload=None)

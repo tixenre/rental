@@ -85,6 +85,47 @@ def test_get_persona_fisica_monotributo_arma_nombre_completo():
     assert result.domicilio == ""
 
 
+def test_get_persona_fisica_expone_nombre_y_apellido_por_separado():
+    """Un formulario con campos Nombre/Apellido separados (cliente) no tiene
+    que quedarse solo con el combinado — AFIP los da separados, no hay que
+    tirarlos."""
+    from arca_fe.padron import PadronClient
+
+    client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
+    resp = MagicMock()
+    resp.persona = _persona_fisica_monotributo(nombre="Juan", apellido="Pérez")
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.getPersona.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        result = client.get_persona("20301234567")
+
+    assert result.nombre == "Juan"
+    assert result.apellido == "Pérez"
+
+
+def test_get_persona_juridica_no_tiene_nombre_ni_apellido_separado():
+    """Una empresa solo tiene razón social — no hay Nombre/Apellido que
+    inventar."""
+    from arca_fe.padron import PadronClient
+
+    client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
+    resp = MagicMock()
+    resp.persona = _persona_juridica()
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.getPersona.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        result = client.get_persona("30-71234567-8")
+
+    assert result.nombre == ""
+    assert result.apellido == ""
+
+
 def test_get_persona_sin_datos_devuelve_none():
     from arca_fe.padron import PadronClient
 

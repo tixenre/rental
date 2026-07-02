@@ -64,6 +64,8 @@ def consultar_padron(cuit: str, request: Request):
     return {
         "encontrado": True,
         "razon_social": persona.razon_social,
+        "nombre": persona.nombre,
+        "apellido": persona.apellido,
         "domicilio": persona.domicilio,
         "condicion_iva": persona.condicion_iva,
     }

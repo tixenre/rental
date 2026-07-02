@@ -216,42 +216,26 @@ def factura_filename(factura, *, layout: str = "clasica") -> str:
     return f"{prefijo}-{letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}{sufijo}.pdf"
 
 
-def _conceptos(pedido: dict, factura) -> list[dict]:
-    """Ítems del comprobante ← `pedido.items`. Si no hay líneas (pedidos
-    viejos o ítems personalizados sin persistir), cae a una sola línea con
-    el neto total de la factura — nunca inventa un desglose que no existe."""
-    items = pedido.get("items") or []
-    if not items:
-        desc = (
-            pedido.get("descripcion")
-            or f"Alquiler de equipos — Pedido #{pedido.get('numero_pedido') or pedido.get('id', '')}"
-        )
-        return [{
-            "codigo": "001", "desc": desc, "detalle": "",
-            "cant": "1,00", "uMedida": "unidad", "bonif": "0,00",
-            "precioUnitFmt": _plain(factura.imp_neto), "subtotalFmt": _plain(factura.imp_neto),
-            "importeStr": _money(factura.imp_neto),
-        }]
+# Default de Rambla: el concepto facturado es una sola línea "Rambla #N" (el
+# número del pedido), sin desglose por equipo ni texto adicional — decisión
+# de negocio, no un requisito de ARCA (WSFE solo pide los importes agregados;
+# el desglose por ítem es puramente de presentación). El nombre es
+# configurable (`FACTURACION_CONCEPTO_MARCA`) para que otro negocio que reuse
+# este motor pueda poner el suyo en vez de "Rambla".
+CONCEPTO_MARCA = os.getenv("FACTURACION_CONCEPTO_MARCA", "Rambla")
 
-    jornadas = pedido.get("cantidad_jornadas") or 1
-    out = []
-    for i, it in enumerate(items):
-        cobro_fijo = (it.get("cobro_modo") or "jornada") == "fijo"
-        detalle = "Cargo único" if cobro_fijo else f"{jornadas} jornada{'s' if jornadas != 1 else ''}"
-        subtotal = it.get("subtotal") or 0
-        cantidad = it.get("cantidad") or 1
-        out.append({
-            "codigo": f"{i + 1:03d}",
-            "desc": it.get("nombre") or it.get("nombre_libre") or "Ítem",
-            "detalle": detalle,
-            "cant": _plain(cantidad),
-            "uMedida": "unidad",
-            "bonif": "0,00",
-            "precioUnitFmt": _plain(it.get("precio_jornada") or 0),
-            "subtotalFmt": _plain(subtotal),
-            "importeStr": _money(subtotal),
-        })
-    return out
+
+def _conceptos(pedido: dict, factura) -> list[dict]:
+    """Ítem único del comprobante: `"{CONCEPTO_MARCA} #{numero_pedido}"`, sin
+    desglose por equipo — ver `CONCEPTO_MARCA`."""
+    numero = pedido.get("numero_pedido") or pedido.get("id", "")
+    desc = f"{CONCEPTO_MARCA} #{numero}"
+    return [{
+        "codigo": "001", "desc": desc, "detalle": "",
+        "cant": "1,00", "uMedida": "unidad", "bonif": "0,00",
+        "precioUnitFmt": _plain(factura.imp_neto), "subtotalFmt": _plain(factura.imp_neto),
+        "importeStr": _money(factura.imp_neto),
+    }]
 
 
 def _validar_datos_arca(factura) -> None:

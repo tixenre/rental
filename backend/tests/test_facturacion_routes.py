@@ -275,6 +275,8 @@ def test_consultar_padron_encontrado(monkeypatch):
 
     class _Persona:
         razon_social = "Empresa XYZ SRL"
+        nombre = ""
+        apellido = ""
         domicilio = "Ruta 88 km 12"
         condicion_iva = "responsable_inscripto"
 
@@ -287,6 +289,8 @@ def test_consultar_padron_encontrado(monkeypatch):
     assert result == {
         "encontrado": True,
         "razon_social": "Empresa XYZ SRL",
+        "nombre": "",
+        "apellido": "",
         "domicilio": "Ruta 88 km 12",
         "condicion_iva": "responsable_inscripto",
     }
