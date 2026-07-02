@@ -1222,10 +1222,34 @@ function FacturacionRailSection({
             </div>
           )}
 
+          {preview.data && (
+            <div className="space-y-1.5">
+              {preview.data.chequeos.map((c) => (
+                <div key={c.check} className="flex items-start gap-2 text-xs">
+                  {c.ok ? (
+                    <Check className="h-3.5 w-3.5 shrink-0 mt-0.5 text-verde-ink" />
+                  ) : c.bloqueante ? (
+                    <X className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
+                  ) : (
+                    // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica de advertencia (Tier 3), ya usada en esta pantalla
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
+                  )}
+                  <span
+                    className={cn(
+                      !c.ok && c.bloqueante ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {c.mensaje}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={!preview.data || facturar.isPending}
+              disabled={!preview.data?.listo || facturar.isPending}
               onClick={() => facturar.mutate()}
             >
               {facturar.isPending ? "Emitiendo…" : "Confirmar y emitir"}

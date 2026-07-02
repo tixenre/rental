@@ -27,6 +27,7 @@ from arca_fe import (
     CaeResult,
     CbteTipo,
     CondicionIva,
+    DocTipo,
     Emisor,
     armar_fecae,
     tipo_comprobante,
@@ -96,6 +97,80 @@ def _get_pedido(conn, pedido_id: int) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def _chequeos_previos(
+    req, perfil_receptor: str, importes: dict, ambiente: str, numero_a_emitir: int
+) -> list[dict]:
+    """Chequeos fail-not-fast (todos corren, ninguno frena a los demás — mismo
+    patrón que `services/checkout/validar.py`). Lo irreversible es "Confirmar
+    y emitir": acá se junta todo lo verificable de antemano para que ese paso
+    no tenga sorpresas."""
+    from identity.anchor import cuil_valido
+
+    chequeos = [
+        {
+            "check": "credenciales_arca",
+            "ok": True,
+            "bloqueante": False,
+            "mensaje": f"Conectado a ARCA ({ambiente}) — próximo comprobante N° {numero_a_emitir}",
+        },
+    ]
+
+    if req.receptor.doc_tipo == DocTipo.CUIT:
+        cuit_ok = cuil_valido(str(req.receptor.doc_nro))
+        chequeos.append({
+            "check": "cuit_receptor",
+            "ok": cuit_ok,
+            "bloqueante": True,
+            "mensaje": (
+                "CUIT del receptor con dígito verificador válido"
+                if cuit_ok
+                else f"CUIT del receptor ({req.receptor.doc_nro}) tiene el dígito verificador mal — ARCA lo va a rechazar"
+            ),
+        })
+
+    ri_degradado = (
+        perfil_receptor == "responsable_inscripto"
+        and req.receptor.condicion_iva != CondicionIva.RESPONSABLE_INSCRIPTO
+    )
+    chequeos.append({
+        "check": "perfil_fiscal_receptor",
+        "ok": not ri_degradado,
+        "bloqueante": False,
+        "mensaje": (
+            "El cliente es Responsable Inscripto pero no tiene un CUIT válido cargado — "
+            "se va a facturar como Consumidor Final en vez de Factura A"
+            if ri_degradado
+            else "Perfil fiscal del receptor consistente"
+        ),
+    })
+
+    neto_ok = importes["neto"] > 0
+    chequeos.append({
+        "check": "importe_positivo",
+        "ok": neto_ok,
+        "bloqueante": True,
+        "mensaje": "Importe neto positivo" if neto_ok else "El importe neto es $0 o negativo",
+    })
+
+    fechas_ok = (
+        req.fecha_serv_desde is None
+        or req.fecha_serv_hasta is None
+        or req.fecha_serv_desde <= req.fecha_serv_hasta
+    )
+    chequeos.append({
+        "check": "fechas_servicio",
+        "ok": fechas_ok,
+        "bloqueante": True,
+        "mensaje": (
+            "Fechas de servicio coherentes"
+            if fechas_ok
+            else "La fecha de inicio del servicio es posterior a la de fin"
+        ),
+    })
+
+    return chequeos
+
+
 def previsualizar_factura(pedido_id: int, conn) -> dict:
     """Arma el `ComprobanteRequest`, calcula sus importes, y consulta a ARCA
     el próximo número de comprobante — SIN pedir CAE.
@@ -147,6 +222,9 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
     numero_a_emitir = ultimo + 1
 
+    chequeos = _chequeos_previos(req, perfil_receptor, importes, cred.ambiente, numero_a_emitir)
+    listo = all(c["ok"] or not c["bloqueante"] for c in chequeos)
+
     from services.facturacion.pdf import _CBTE_TIPO_LABEL
 
     return {
@@ -179,6 +257,8 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
             "servicio_hasta": req.fecha_serv_hasta.isoformat() if req.fecha_serv_hasta else None,
             "vto_pago": req.fecha_vto_pago.isoformat() if req.fecha_vto_pago else None,
         },
+        "chequeos": chequeos,
+        "listo": listo,
     }
 
 

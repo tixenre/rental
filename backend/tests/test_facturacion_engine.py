@@ -401,6 +401,71 @@ def test_preview_consulta_ultimo_autorizado_pero_nunca_pide_cae(monkeypatch):
     assert wsfe.consultar_calls == [], "consultar() es de la idempotencia de emitir_factura, no del preview"
 
 
+def test_preview_chequeos_ok_caso_normal(monkeypatch):
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    _patch_preview_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "now_ar", lambda: datetime(2026, 7, 15))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["listo"] is True
+    assert all(c["ok"] for c in result["chequeos"])
+
+
+def test_preview_chequeo_cuit_invalido_bloquea(monkeypatch):
+    """Un CUIT con el dígito verificador mal formado bloquea — ARCA lo
+    rechazaría de entrada, mejor que el admin lo sepa antes de confirmar."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": "20301234560",  # dígito verificador incorrecto (a propósito)
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    cuit_check = next(c for c in result["chequeos"] if c["check"] == "cuit_receptor")
+    assert cuit_check["ok"] is False
+    assert result["listo"] is False
+
+
+def test_preview_chequeo_ri_sin_cuit_valido_avisa_pero_no_bloquea(monkeypatch):
+    """RI sin CUIT cae a Consumidor Final (comportamiento ya existente) — el
+    preview lo muestra como advertencia, no como bloqueo (igual se puede
+    emitir, solo que como C/B en vez de A)."""
+    pedido_ri_sin_cuit = {**_fake_pedido(), "cliente_perfil_impuestos": "responsable_inscripto"}
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri_sin_cuit)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    perfil_check = next(c for c in result["chequeos"] if c["check"] == "perfil_fiscal_receptor")
+    assert perfil_check["ok"] is False
+    assert result["listo"] is True, "es una advertencia, no un bloqueo"
+
+
+def test_preview_chequeo_importe_cero_bloquea(monkeypatch):
+    pedido_gratis = {**_fake_pedido(), "monto_total": 0, "iva_monto": 0}
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_gratis)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    importe_check = next(c for c in result["chequeos"] if c["check"] == "importe_positivo")
+    assert importe_check["ok"] is False
+    assert result["listo"] is False
+
+
 def test_preview_pedido_no_confirmado_levanta_value_error(monkeypatch):
     monkeypatch.setattr(
         engine, "_get_pedido", lambda conn, pedido_id: {**_fake_pedido(), "estado": "presupuesto"}
