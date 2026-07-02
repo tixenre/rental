@@ -75,6 +75,65 @@ def test_raw_pairs_desde_dl():
     assert "Weight" in labels
 
 
+def test_raw_pairs_dom_captura_texto_anidado():
+    """F7b: markup por componentes (dt/dd con divs/spans envolviendo el texto,
+    patrón real de eBay) — antes solo capturaba hijos DIRECTOS de dt/dd,
+    daba 0 pares acá."""
+    from services.specs_ingesta.parse.dom import extract_dom_pairs as _extract_from_dom
+
+    html = """
+    <dl>
+      <dt><div class="label-wrap"><span>Mount</span></div></dt>
+      <dd><div class="value-wrap"><span>M42</span></div></dd>
+    </dl>
+    """
+    pairs = _extract_from_dom(html)
+    by_label = {p["label"]: p["value"] for p in pairs}
+    assert by_label.get("Mount") == "M42"
+
+
+def test_raw_pairs_dom_ignora_aria_hidden_y_botones():
+    """El contenido aria-hidden (versión duplicada/expandida para 'read more')
+    y el texto de <button> no son dato — se excluyen."""
+    from services.specs_ingesta.parse.dom import extract_dom_pairs as _extract_from_dom
+
+    html = """
+    <dl>
+      <dt>Condition</dt>
+      <dd>
+        <span>Used</span>
+        <button>Read more</button>
+        <span aria-hidden="true">Used - full duplicated description here</span>
+      </dd>
+    </dl>
+    """
+    pairs = _extract_from_dom(html)
+    by_label = {p["label"]: p["value"] for p in pairs}
+    assert by_label.get("Condition") == "Used"
+
+
+def test_raw_pairs_dom_void_elements_no_desalinean_la_pila():
+    """Bug real (F7b): un <img>/<br> sin cerrar DENTRO de una celda anidada
+    desalineaba la pila de tags abiertos — el primer endtag real que viniera
+    después "cerraba" el void element en vez del tag correcto, y el resto de
+    la extracción se perdía en silencio (0 pares, sin error). Verificado
+    contra una página eBay real del dataset: pasó de 0 a 15 pares con este fix."""
+    from services.specs_ingesta.parse.dom import extract_dom_pairs as _extract_from_dom
+
+    html = """
+    <dl>
+      <dt><span>Brand</span></dt>
+      <dd><img src="icon.png"><span>Carl Zeiss Jena</span></dd>
+      <dt><span>Mount</span></dt>
+      <dd><span>M42</span></dd>
+    </dl>
+    """
+    pairs = _extract_from_dom(html)
+    by_label = {p["label"]: p["value"] for p in pairs}
+    assert by_label.get("Brand") == "Carl Zeiss Jena"
+    assert by_label.get("Mount") == "M42", "el pair DESPUÉS del <img> no debe perderse"
+
+
 def test_raw_pairs_jsonld_tiene_prioridad_sobre_dom():
     """JSON-LD gana: si el mismo label está en JSON-LD y en tabla DOM, no se duplica."""
     from services.specs_ingesta.parse.pares import extract_raw_pairs

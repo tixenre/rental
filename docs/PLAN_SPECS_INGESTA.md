@@ -292,10 +292,22 @@ no importan ni uno ni otro. `llm/` solo lo importa `cli.py`.
   `RESERVAS_DB_TEST=1`, mismo patrón que el resto de los `*_db.py`). **Regla dura: nunca muta el
   registry** — `aplicar_propuesta` solo cierra el ítem de la cola después de que el humano ya editó el
   registry a mano y re-sembró.
-- **F7b** (pendiente) — capa LLM offline (`llm/normalizador.py`/`buscador.py`/`validar.py`), cableada
-  solo en `cli.py`. Decisión de diseño abierta antes de escribir código: **cómo** invoca el LLM (API
-  directa con key propia vs. un modo semi-manual que arma el contexto para una sesión de Claude Code
-  interactiva) — ver discusión en la conversación con el dueño.
+- **F7b** ✅ — **Decisión del dueño: modo semi-manual, no API propia.** Se evaluaron 2 caminos — API
+  directa (Anthropic SDK + key nueva, cli.py 100% autónomo, pero suma secreto + costo por llamada +
+  parseo/validación de la respuesta como ingeniería real) vs. semi-manual (armar el contexto para que
+  una sesión de Claude Code interactiva lo razone — "hay Claude a mano", la frase original del plan) —
+  se eligió semi-manual: cero infraestructura nueva, mismo gate de revisión humana que ya exige el
+  principio rector. `llm/contexto.py::armar_contexto` (HTML → `{título, marca_jsonld, categoría
+  detectada, raw_pairs, schema_categoria, instrucciones}`) + `cli.py context` (nuevo subcomando). Quien
+  razone el bundle llama DIRECTO a `services.specs.encolar_propuesta` — no hace falta un mecanismo de
+  "aplicar" nuevo. **Bug real encontrado en el camino** (no en el alcance original): `parse/dom.py` solo
+  capturaba texto HIJO DIRECTO de `th/td/dt/dd` — sitios con markup por componentes (eBay) daban 0
+  pares. Ampliado a capturar texto anidado (con guardas `aria-hidden`/`<button>` para no sumar ruido de
+  "read more"/duplicados) — destapó un bug de pila (elementos `void` como `<img>` sin cierre
+  desalineaban el tag-stack, silencio total, 0 pares). Verificado: 0 diffs en las 277 páginas vía
+  `extract_from_html` (B&H no dispara el bug — su markup no anida así) + 2 páginas eBay reales pasan de
+  0 a 15/11 pares limpios (Maximum Aperture, Mount, Focal Length, Power, Light Color...) + 8 tests
+  permanentes. Suite completa: 2489 passed / 20 pre-existentes no relacionados.
 
 Cada fase: verificar (pyflakes + suite + Postgres real vía clon local) antes de commit. Supervisor antes del PR
 `dev→main`.

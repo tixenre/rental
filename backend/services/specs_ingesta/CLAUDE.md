@@ -1,6 +1,6 @@
-# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F6 + F7a completas)
+# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F7 completo)
 
-> **Estado: F0-F6 + F7a completas; falta F7b.** Los 3 wrapper viejos
+> **Estado: MÓDULO COMPLETO, F0-F7.** Los 3 wrapper viejos
 > (`services/{equipo,luces,generic}_html_extractor.py`) **ya no existen** — se borraron en F6. `parse/`
 > (primitivas HTML) + `parsers/` (los 4 parsers grandes, movidos de `tools/`) +
 > `queries/{resultado,bespoke,generic,detectar,extraer}.py` son la fuente única, sin shims por
@@ -11,8 +11,10 @@
 > el entry point offline — mismo `queries/extraer`, verificado byte-idéntico al del endpoint sobre el
 > mismo HTML. `commands/proponer.py::proponer_desde_unmatched` (F7a) es el único lado-escritura —
 > unmatched frecuente cruza el umbral → Canal C (`services.specs.encolar_propuesta`), verificado contra
-> data real + Postgres real. La capa `llm/` (suplemento offline-only) todavía no existe — eso es F7b,
-> la única pieza que falta.
+> data real + Postgres real. `llm/contexto.py::armar_contexto` (F7b, **decisión del dueño: modo
+> semi-manual, sin API key propia** — ver docstring del módulo) + `cli.py context` completan el
+> suplemento offline. **Todas las fases del plan original están hechas.** Lo que sigue es Iniciativa A
+> (cargar specs reales, todavía sin arrancar) — no más fases de refactor/infraestructura de este módulo.
 > Plan completo + fases → [`docs/PLAN_SPECS_INGESTA.md`](../../../docs/PLAN_SPECS_INGESTA.md) ·
 > tracking → issue [#1176](https://github.com/tixenre/rental/issues/1176) · rama aislada
 > `feature/specs-ingesta`, PR sin mergear hasta completar el módulo (convención "PR como hoja de ruta").
@@ -44,23 +46,24 @@ importa `specs_ingesta`. Tres canales (detalle en el plan):
 - **Railway (en vivo, el endpoint admin):** solo `queries/` + `parse/` + `parsers/` — determinístico,
   sin LLM, sin API key. Railway **no baja HTML** (mismo bloqueo de bots que el scraping) — solo parsea
   lo que el form le sube.
-- **La compu (offline, `cli.py`):** el mismo `queries/extraer` + la capa `llm/` como suplemento (F7,
-  todavía no existe) — resuelve lo que el determinístico no puede (eBay, fuentes de fabricante,
-  misdetección, unmatched).
+- **La compu (offline, `cli.py`):** el mismo `queries/extraer` + `llm/contexto.py` como suplemento
+  (F7b) — arma el bundle para el caso que el determinístico no puede (eBay, fuentes de fabricante,
+  misdetección, unmatched); **no** llama a un LLM por API — lo razona una sesión de Claude Code
+  interactiva (decisión del dueño, ver docstring de `llm/contexto.py`).
 - **`llm/` SOLO lo importa `cli.py`.** Si algo en `queries/` o `parse/` importa de `llm/`, es un bug —
   rompe el split de runtime.
 
-## Estructura (F0-F6 + F7a completas; solo falta F7b)
+## Estructura (F0-F7 completas — el plan original entero)
 
 ```
 services/specs_ingesta/
   __init__.py     # barrel. __all__ es el contrato real.                         ✓ F0
   errors.py       # ErrorIngesta (400), HtmlNoParseable (422)                    ✓ F0
   CLAUDE.md        # este doc                                                    ✓ F0
-  cli.py          # entry point offline — mismo queries/extraer, sin LLM todavía ✓ F5
+  cli.py          # entry point offline — extract (determinístico) + context (F7b) ✓ F5/F7b
   parse/          # DOMINIO — primitivas puras de lectura de HTML (Railway-safe) ✓ F1
-    jsonld.py · dom.py · garbage.py · pares.py · serialize.py                    ✓ F1/F2
-    fuentes/      #   adaptadores de fuente pluggable (bh.py, ebay.py, futuros)  ✗ F7
+    jsonld.py · dom.py · garbage.py · pares.py · serialize.py                    ✓ F1/F2/F7b
+    fuentes/      #   adaptadores de fuente pluggable — NO construido, no bloqueaba nada ✗ sin fase
   parsers/        # DOMINIO — verbatim ex-tools/ (los 4 parsers grandes)         ✓ F3
     base.py       #   BHSpecsParser + helpers compartidos (antes en iluminacion_parser)
     camaras.py · lentes.py · iluminacion.py · modificadores.py · normalizar.py
@@ -73,9 +76,14 @@ services/specs_ingesta/
     extraer.py    #   entry point único (detecta + rutea) — usado por Railway Y cli.py          ✓ F5
   commands/       # ESCRITURA — el embudo que aprende (propone-aprobás)
     proponer.py   #   proponer_desde_unmatched — unmatched frecuente → Canal C ✓ F7a
-  llm/            # SUPLEMENTO OFFLINE-ONLY (solo cli.py importa de acá)        ✗ F7b
-    normalizador.py · buscador.py · validar.py
+  llm/            # SUPLEMENTO OFFLINE-ONLY (solo cli.py importa de acá)        ✓ F7b
+    contexto.py   #   armar_contexto — bundle para razonar a mano/con Claude Code interactivo
 ```
+
+`parse/fuentes/` (adaptadores de fuente pluggable por sitio) quedó sin construir — el diagnóstico (B0)
+mostró que era una idea razonable, pero **`parse/dom.py` genérico + `llm/contexto.py` (F7b) ya resuelven
+el caso real** (eBay, fabricante) sin necesitar una abstracción de "fuente" separada. Se revisita si/
+cuando el volumen de fuentes no-B&H lo justifique — no se construye por adelantado.
 
 **Invariante commands↔queries (igual que `specs`/`categorias`):** `commands/` puede importar de
 `queries/`; `queries/` **nunca** de `commands/`. `parse/` y `parsers/` no importan ni uno ni otro.
@@ -183,3 +191,27 @@ services/specs_ingesta/
   tabla repetida (el mismo label 2 veces en el mismo documento) infle el conteo y dispare una propuesta
   falsa. El test `test_mismo_label_repetido_en_un_html_cuenta_una_vez` es el caso testigo — sin la
   dedup por HTML, 1 página con el label repetido 3 veces hubiera cruzado el umbral de 3 sola.
+- **F7b — "no automatizar el LLM" es una decisión de costo/complejidad, no de principio.** Se evaluó
+  API directa (Anthropic SDK) contra semi-manual (Claude Code interactivo) — la elegida fue semi-manual
+  **porque para el volumen actual (todavía Iniciativa A no arrancó) el costo de la infraestructura nueva
+  no se justifica**, no porque llamar a un LLM por API sea incorrecto en sí. Si el volumen de casos
+  duros crece (muchos eBay/misdetects por batch), re-evaluar API directa es razonable — no es una
+  decisión "para siempre", es la proporcional a HOY. No reintroducir sin medir que el semi-manual quedó
+  chico.
+- **F7b — un bundle "vacío" puede ocultar un bug del extractor, no falta de datos.** El primer intento
+  de `armar_contexto` sobre una página eBay real dio `raw_pairs: []` — la conclusión fácil hubiera sido
+  "eBay no tiene specs estructurados acá". Falsa: la página SÍ tenía una sección "Item specifics" con
+  15 pares reales (Maximum Aperture, Mount, Focal Length...); el bug estaba en `parse/dom.py`
+  (`_TableParser` solo capturaba texto HIJO DIRECTO de `th/td/dt/dd` — el markup por componentes de
+  eBay envuelve el texto en `<div><span>` anidados, invisibles para esa lógica). Antes de aceptar "no
+  hay data acá" de un extractor, mirar el HTML crudo — la ausencia de resultado y la ausencia de dato
+  son cosas distintas.
+- **F7b — un elemento HTML sin cierre desalinea CUALQUIER parser basado en pila de tags, en silencio.**
+  Al arreglar la captura anidada de arriba, la primera versión daba 0 pares (peor que antes). Causa:
+  `<img>`/`<br>` y otros elementos `void` (sin `</tag>` de cierre) se empujaban a la pila de tags
+  abiertos igual que cualquier otro — el primer `handle_endtag` real que llegara después "cerraba" ese
+  elemento fantasma en vez del que correspondía, y desde ahí la pila quedaba permanentemente
+  desalineada (sin excepción, sin log — el resultado es simplemente vacío/incorrecto). Fix: la lista
+  estándar de void elements de HTML5 nunca se empuja a la pila. Cualquier parser HTML hecho a mano
+  (no una librería como BeautifulSoup) que trackee tags abiertos tiene este riesgo — verificar contra
+  HTML real con markup "sucio" (íconos, imágenes inline), no solo fixtures de test prolijos.
