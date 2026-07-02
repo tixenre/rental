@@ -43,6 +43,14 @@ class CotizarRequest(BaseModel):
     #    en vivo en el builder; gana sobre el `clientes.descuento` guardado).
     cliente_id: Optional[int] = None
     descuento_pct: Optional[float] = None
+    # Solo lo honra una sesión admin: respeta el `precio_jornada` que manda cada
+    # ítem de catálogo (el snapshot congelado del pedido que se está editando)
+    # en vez de re-buscarlo en `equipos`. Sin esto, el editor de pedidos admin
+    # mostraba un total "en vivo" con el precio de HOY del catálogo — distinto
+    # al que persiste `_recalcular_total_pedido` al guardar (que sí respeta el
+    # precio de línea) → dos totales del mismo pedido que podían no coincidir.
+    # Ver MEMORIA 2026-06-06 "Datos del pedido: plata congelada".
+    respetar_precio_item: Optional[bool] = False
 
 
 @router.post("/cotizar")
@@ -74,6 +82,10 @@ def cotizar(data: CotizarRequest, request: Request):
         jornadas = jornadas_periodo(d0, d1)
         tiene_fechas = bool(d0 and d1)
 
+        session = get_session(request)
+        es_admin = bool(session and is_admin_email(session.get("email")))
+        respetar_precio_item = es_admin and bool(data.respetar_precio_item)
+
         # Precios desde el backend. Equipos inexistentes/eliminados se ignoran
         # (cotización best-effort: el carrito puede tener algo que ya no está).
         # Fetch por-ítem (lookup por PK indexada): se revirtió el batch `IN (...)`
@@ -93,11 +105,19 @@ def cotizar(data: CotizarRequest, request: Request):
                     "cobro_modo": it.cobro_modo or "jornada",
                 })
                 continue
-            # Precio efectivo por jornada (combo → derivado de componentes C3 #635;
-            # kit/simple → su precio propio), resuelto en la fuente única.
-            precio = precio_jornada_efectivo(conn, it.equipo_id)
-            if precio is None:
-                continue
+            # Admin editando un pedido existente (`respetar_precio_item`): usa el
+            # precio de línea que manda el front (el snapshot congelado del
+            # pedido, editable por el admin) en vez de recotizar contra el
+            # catálogo — así el total "en vivo" del editor coincide siempre con
+            # el que persiste `_recalcular_total_pedido` al guardar.
+            if respetar_precio_item and it.precio_jornada is not None:
+                precio = int(it.precio_jornada)
+            else:
+                # Precio efectivo por jornada (combo → derivado de componentes
+                # C3 #635; kit/simple → su precio propio), fuente única.
+                precio = precio_jornada_efectivo(conn, it.equipo_id)
+                if precio is None:
+                    continue
             items_para_total.append({
                 "equipo_id": it.equipo_id,
                 "cantidad": it.cantidad,
@@ -116,8 +136,6 @@ def cotizar(data: CotizarRequest, request: Request):
         if tiene_fechas:
             # ¿Qué cliente? El logueado (sesión cliente) o, si es admin, el
             # `cliente_id` pedido (el builder admin cotiza para terceros).
-            session = get_session(request)
-            es_admin = bool(session and is_admin_email(session.get("email")))
             target_cliente_id = None
             if session:
                 if session.get("role") == "cliente" and session.get("cliente_id"):

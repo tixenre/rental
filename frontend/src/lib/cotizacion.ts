@@ -150,9 +150,26 @@ export function useCotizacion(args: {
   clienteId?: number | null;
   /** Solo admin: override del descuento del cliente (el builder lo edita en vivo). */
   descuentoPct?: number | null;
+  /**
+   * Solo admin, para el editor de un pedido YA EXISTENTE: respeta el
+   * `precioJornada` de cada ítem (el snapshot congelado del pedido, editable
+   * por el admin) en vez de recotizar contra el precio de catálogo de HOY.
+   * Sin esto, el total "en vivo" del editor podía no coincidir con el que
+   * persiste el guardado — dos totales del mismo pedido. Ver MEMORIA
+   * 2026-06-06 "Datos del pedido: plata congelada".
+   */
+  respetarPrecioItem?: boolean;
   enabled?: boolean;
 }): { data: Cotizacion; isFetching: boolean } {
-  const { items, fechaDesde, fechaHasta, clienteId, descuentoPct, enabled = true } = args;
+  const {
+    items,
+    fechaDesde,
+    fechaHasta,
+    clienteId,
+    descuentoPct,
+    respetarPrecioItem = false,
+    enabled = true,
+  } = args;
 
   const body = {
     items: items
@@ -160,9 +177,11 @@ export function useCotizacion(args: {
       .map((i) => ({
         equipo_id: i.equipoId,
         cantidad: i.cantidad,
-        // Solo relevantes para líneas personalizadas (equipoId null); el backend
-        // ignora estos campos en ítems de catálogo (toma el precio de la DB).
-        ...(i.equipoId == null
+        // Personalizadas (equipoId null): siempre mandan precio/modo propios.
+        // Catálogo con `respetarPrecioItem`: el backend solo lo honra si la
+        // sesión es admin; en el resto de los usos (carrito público) el
+        // backend ignora estos campos y toma el precio de `equipos`.
+        ...(i.equipoId == null || respetarPrecioItem
           ? { precio_jornada: i.precioJornada ?? 0, cobro_modo: i.cobroModo ?? "jornada" }
           : {}),
       })),
@@ -170,6 +189,7 @@ export function useCotizacion(args: {
     fecha_hasta: fechaHasta ?? null,
     cliente_id: clienteId ?? null,
     descuento_pct: descuentoPct ?? null,
+    respetar_precio_item: respetarPrecioItem,
   };
 
   const hayItems = body.items.length > 0;
