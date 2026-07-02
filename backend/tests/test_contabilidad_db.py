@@ -42,15 +42,37 @@ pytestmark = [
 PED = 9_400_001
 
 
+def _ensure_cuenta(conn, nombre: str, **kwargs) -> None:
+    """Crea la cuenta de ejemplo si todavía no existe. Idempotente A PROPÓSITO:
+    `cerrar_mes`/`reabrir_mes` (`contabilidad/cierres.py`) comitean de verdad
+    (son acciones durables reales, no solo del request) — si un test anterior
+    los llamó, esta cuenta puede haber sobrevivido al rollback de SU propio
+    `conn` fixture. Sin el chequeo, el segundo test que la crea pisa el único
+    parcial `cuentas_nombre_activa_uq` con UniqueViolation."""
+    from contabilidad.cuentas import crear_cuenta
+
+    if _cuenta_id(conn, nombre) is None:
+        crear_cuenta(conn, nombre=nombre, por="test-seed", **kwargs)
+
+
 @pytest.fixture
 def conn():
     """Conexión transaccional: lo que inserta el test se DESCARTA con rollback al
-    terminar, así no quedan datos sucios (no hace falta limpieza manual)."""
+    terminar, así no quedan datos sucios (no hace falta limpieza manual).
+
+    Efectivo/Banco/Dólares ya NO están en el seed de `init_db()` (#quitadas en
+    44ede548 — resucitaban en cada boot si el dueño las daba de baja, por el
+    `ON CONFLICT DO NOTHING` sin agarrar `socio=NULL` bajo el índice parcial
+    `activa`). Este archivo las sigue necesitando como cajas de ejemplo para
+    varios tests → se crean acá (idempotente, ver `_ensure_cuenta`)."""
     from database import get_db, init_db
 
-    init_db()  # garantiza el esquema + el seed de cuentas (su propia conexión/commit)
+    init_db()  # garantiza el esquema (su propia conexión/commit)
     c = get_db()
     try:
+        _ensure_cuenta(c, "Efectivo", tipo="caja")
+        _ensure_cuenta(c, "Banco", tipo="caja")
+        _ensure_cuenta(c, "Dólares", tipo="caja", moneda="USD")
         yield c
     finally:
         c.rollback()
