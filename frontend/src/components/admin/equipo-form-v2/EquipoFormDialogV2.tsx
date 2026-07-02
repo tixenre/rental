@@ -122,8 +122,8 @@ export function EquipoFormDialogV2({
   const isEdit = !!initial;
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const { rate: usdRate } = useUsdRate();
-  const roiDefault = useRoiPctDefault();
+  const { rate: usdRate } = useUsdRate({ staleTime: 0 });
+  const roiDefault = useRoiPctDefault({ staleTime: 0 });
 
   // "Aplicar" (guardar sin cerrar) vs "Guardar" (cerrar al terminar). El
   // botón Aplicar setea este ref a false antes de disparar el submit; en el

@@ -22,7 +22,7 @@ export function LeadTimeSection() {
   const settingQ = useQuery({
     queryKey: ["settings", "antelacion_minima_horas"],
     queryFn: () => adminApi.getSetting("antelacion_minima_horas"),
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   useEffect(() => {

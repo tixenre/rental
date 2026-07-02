@@ -13,8 +13,9 @@ const SETTINGS_STALE_MS = 5 * 60_000; // 5 min — el USD lo cambia el admin man
 const SETTINGS_CACHE_MS = 30 * 60_000; // 30 min retain
 
 /** Tipo de cambio ARS por 1 USD. Default 1000 si falla la red.
- *  El componente que lo use puede mostrar un fallback hasta que cargue. */
-export function useUsdRate(): {
+ *  El componente que lo use puede mostrar un fallback hasta que cargue.
+ *  `opts.staleTime`: override para call-sites admin (ver useEquipos()). */
+export function useUsdRate(opts?: { staleTime?: number }): {
   rate: number;
   isLoading: boolean;
   updatedAt: string | null;
@@ -23,7 +24,7 @@ export function useUsdRate(): {
   const q = useQuery({
     queryKey: ["settings", "usd_rate"],
     queryFn: () => adminApi.getSetting("usd_rate"),
-    staleTime: SETTINGS_STALE_MS,
+    staleTime: opts?.staleTime ?? SETTINGS_STALE_MS,
     gcTime: SETTINGS_CACHE_MS,
     retry: 1,
   });
@@ -37,11 +38,11 @@ export function useUsdRate(): {
 }
 
 /** ROI % default para nuevos equipos. Default 3. */
-export function useRoiPctDefault(): number {
+export function useRoiPctDefault(opts?: { staleTime?: number }): number {
   const q = useQuery({
     queryKey: ["settings", "roi_pct_default"],
     queryFn: () => adminApi.getSetting("roi_pct_default").catch(() => null),
-    staleTime: SETTINGS_STALE_MS,
+    staleTime: opts?.staleTime ?? SETTINGS_STALE_MS,
     retry: 0,
   });
   const parsed = Number(q.data?.value);
@@ -52,11 +53,11 @@ export function useRoiPctDefault(): number {
  *  (#1126). Default 0 = apagado. El admin lo configura desde /admin/settings.
  *  El backend es la fuente de verdad (lo enforza el portero + el backstop de
  *  creación); el front lo lee solo para avisar antes de tiempo (disclaimer). */
-export function useAntelacionMinimaHoras(): number {
+export function useAntelacionMinimaHoras(opts?: { staleTime?: number }): number {
   const q = useQuery({
     queryKey: ["settings", "antelacion_minima_horas"],
     queryFn: () => adminApi.getSetting("antelacion_minima_horas").catch(() => null),
-    staleTime: SETTINGS_STALE_MS,
+    staleTime: opts?.staleTime ?? SETTINGS_STALE_MS,
     retry: 0,
   });
   const parsed = Number(q.data?.value);
