@@ -29,8 +29,11 @@ _CATALOGOS = {
 _SETTING_FETCHED_AT = "arca_catalogos_fetched_at"
 
 # FEParamGetCondicionIvaReceptor no tiene un valor "todas las clases" — hay
-# que pedirlas una por una y unificar (verificado contra pyafipws).
-_CLASES_CMP = ("A", "B", "C", "M")
+# que pedirlas una por una y unificar. "M" NO es una clase válida acá (bug de
+# prod: ARCA devuelve 10244 "El valor ingresado para la clase de comprobante
+# no es valido... solo puede ser 'A', 'B', 'C', 'ALEY' o '49'") — son las 5
+# únicas clases que este webservice puntual acepta.
+_CLASES_CMP = ("A", "B", "C", "ALEY", "49")
 
 
 def refrescar_catalogos(conn) -> dict[str, list[dict]]:
