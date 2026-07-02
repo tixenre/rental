@@ -41,76 +41,17 @@ def _categorias_de(conn, equipo_id: int) -> tuple[Optional[str], Optional[str]]:
 
 
 def _specs_en_nombre_de(conn, equipo_id: int) -> list[dict]:
-    """Devuelve los specs del equipo marcados `en_nombre=true` en el registry,
-    con sus valores actuales del equipo + metadata para el render.
-
-    Lee directo de `spec_definitions` (single source of truth) + LEFT JOIN
-    con `equipo_specs` para traer el valor. No depende de
-    `categoria_spec_templates` (que puede estar incompleto tras migraciones
-    del registry — mismo bug que resolvimos en PR #410 para listar templates).
-
-    Cada item: `{label, spec_key, value, tipo, unidad, tabla_columnas,
-    output_config}`. Ordenados por `sd.prioridad`.
-
-    El builder los usa en `_render_template`: cada placeholder `{spec:Label}`
-    busca por label y aplica `render_spec_placeholder` (que respeta
-    `output_config.name_format` y formatea tipos no-string).
-    """
-    import json as _json
-    rows = conn.execute(
-        """
-        SELECT
-          sd.label, sd.spec_key, sd.tipo, sd.unidad,
-          sd.tabla_columnas, sd.output_config,
-          COALESCE(es.value, '') AS value,
-          COALESCE(sd.prioridad, 100) AS prioridad
-        FROM spec_definitions sd
-        JOIN equipo_categorias ec ON ec.equipo_id = %s
-        JOIN categorias c ON c.id = ec.categoria_id
-        LEFT JOIN equipo_specs es
-          ON es.equipo_id = ec.equipo_id AND es.spec_def_id = sd.id
-        WHERE COALESCE(sd.en_nombre, FALSE) = TRUE
-          AND sd.categoria_raiz_id IS NOT NULL
-          AND (sd.categoria_raiz_id = c.id OR sd.categoria_raiz_id = c.parent_id)
-        ORDER BY COALESCE(sd.prioridad, 100), sd.label
-        """,
-        (equipo_id,),
-    ).fetchall()
-    out: list[dict] = []
-    seen_labels: set[str] = set()
-    for r in rows:
-        label = r["label"]
-        # Dedupe por label (un equipo puede estar en varias cats de la misma raíz)
-        key = (label or "").lower().strip()
-        if key in seen_labels:
-            continue
-        seen_labels.add(key)
-        cols = r["tabla_columnas"]
-        if isinstance(cols, str):
-            try:
-                cols = _json.loads(cols)
-            except Exception:
-                cols = None
-        oc = r["output_config"]
-        if isinstance(oc, str):
-            try:
-                oc = _json.loads(oc)
-            except Exception:
-                oc = None
-        out.append({
-            "label": label,
-            "spec_key": r["spec_key"],
-            "value": r["value"] or "",
-            "tipo": r["tipo"],
-            "unidad": r["unidad"],
-            "tabla_columnas": cols,
-            "output_config": oc,
-        })
-    return out
+    """Specs `en_nombre=true` del equipo para el render del nombre. Puerta única:
+    `services.specs.specs_en_nombre_de_equipo` (resuelve por `categoria_specs`,
+    no por el árbol de catálogo — arregla nombres vacíos por mal-tageo). El
+    builder los usa en `_render_template`: cada `{spec:Label}` busca por label."""
+    from services.specs import specs_en_nombre_de_equipo
+    return specs_en_nombre_de_equipo(conn, equipo_id)
 
 
 def _ficha_template_de(conn, equipo_id: int) -> Optional[str]:
-    """Lee el `nombre_publico_template` de la ficha (si existe)."""
+    """Lee el `nombre_publico_template` de la ficha (si existe) — template
+    por-equipo, fallback cuando la categoría no tiene molde."""
     row = conn.execute(
         "SELECT nombre_publico_template FROM equipo_fichas WHERE equipo_id = %s",
         (equipo_id,),
@@ -118,6 +59,29 @@ def _ficha_template_de(conn, equipo_id: int) -> Optional[str]:
     if not row:
         return None
     return row["nombre_publico_template"]
+
+
+def _categoria_template_de(conn, equipo_id: int) -> Optional[str]:
+    """Lee el molde de nombre de la CATEGORÍA DE SPECS del equipo
+    (`categorias.nombre_publico_template` de la categoría cuyo nombre ==
+    `equipos.categoria_specs`). Es la fuente VIVA del nombre: se define una vez
+    por categoría y aplica a todos sus equipos (a diferencia del template por-
+    ficha, que es una excepción por-equipo). None si el equipo no tiene
+    `categoria_specs`, si su nombre no resuelve, o si la categoría no tiene molde."""
+    cs_row = conn.execute(
+        "SELECT categoria_specs FROM equipos WHERE id = %s", (equipo_id,)
+    ).fetchone()
+    categoria_specs = cs_row["categoria_specs"] if cs_row else None
+    if not categoria_specs:
+        return None
+    from services.categorias import buscar_id_por_nombre
+    cat_id = buscar_id_por_nombre(conn, categoria_specs)
+    if not cat_id:
+        return None
+    row = conn.execute(
+        "SELECT nombre_publico_template FROM categorias WHERE id = %s", (cat_id,)
+    ).fetchone()
+    return row["nombre_publico_template"] if row else None
 
 
 def calcular_nombres_para(conn, equipo_id: int) -> tuple[str, str]:
@@ -150,6 +114,7 @@ def calcular_nombres_para(conn, equipo_id: int) -> tuple[str, str]:
         categoria_raiz=raiz,
         categoria_sub=sub,
         specs_en_nombre=_specs_en_nombre_de(conn, equipo_id),
+        categoria_template=_categoria_template_de(conn, equipo_id),
         template_override=_ficha_template_de(conn, equipo_id),
         nombre_publico_override=override,
     )

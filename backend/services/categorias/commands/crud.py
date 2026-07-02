@@ -6,7 +6,7 @@ antes de tocar la fila (nombre único, profundidad ≤ 3 niveles, sin ciclos).""
 import logging
 
 from services.nombre_service import actualizar_nombres_de
-from ..queries.ancestry import expandir_a_descendientes, buscar_id_por_nombre
+from ..queries.ancestry import buscar_id_por_nombre
 from ..errors import ErrorValidacion, CategoriaNoExiste
 from ..queries.validation import (
     validar_profundidad, detectar_ciclo, validar_nombre_unico, validar_existe,
@@ -44,26 +44,36 @@ def crear(conn, nombre: str, prioridad: int = 100, parent_id: int | None = None)
 
 
 def _side_effects(conn, cid: int, nombre_publico_template: str | None) -> int:
-    """Side effect best-effort tras actualizar una categoría: regenerar
-    nombres públicos si cambió el template. Nunca aborta la operación
-    principal."""
+    """Side effect best-effort tras actualizar una categoría: si cambió el molde
+    de nombre, regenerar los nombres públicos de sus equipos. Nunca aborta la
+    operación principal.
+
+    El nombre público resuelve el molde por **`equipos.categoria_specs`** (el
+    nombre de la categoría de specs), NO por el árbol de catálogo — así que
+    regeneramos los equipos cuya `categoria_specs` es ESTA categoría, no los del
+    subárbol de `equipo_categorias`. El molde de categoría "manda": cambiarlo
+    re-nombra a todos sus equipos (salvo los que tengan override manual fijo,
+    que el builder respeta)."""
+    if nombre_publico_template is None:
+        return 0
+    cat = conn.execute(
+        "SELECT nombre FROM categorias WHERE id = %s", (cid,)
+    ).fetchone()
+    if not cat:
+        return 0
+    eq_rows = conn.execute(
+        "SELECT id FROM equipos WHERE categoria_specs = %s", (cat["nombre"],)
+    ).fetchall()
     nombres_regen = 0
-    if nombre_publico_template is not None:
-        sub_ids = expandir_a_descendientes(conn, cid)
-        placeholders = ",".join(["%s"] * len(sub_ids))
-        eq_rows = conn.execute(
-            f"SELECT DISTINCT ec.equipo_id FROM equipo_categorias ec WHERE ec.categoria_id IN ({placeholders})",
-            sub_ids,
-        ).fetchall()
-        for r in eq_rows:
-            try:
-                actualizar_nombres_de(conn, r["equipo_id"], commit=False)
-                nombres_regen += 1
-            except Exception:
-                logger.warning(
-                    "actualizar_nombres_de falló para equipo %s tras cambio de template cat %s",
-                    r["equipo_id"], cid, exc_info=True,
-                )
+    for r in eq_rows:
+        try:
+            actualizar_nombres_de(conn, r["id"], commit=False)
+            nombres_regen += 1
+        except Exception:
+            logger.warning(
+                "actualizar_nombres_de falló para equipo %s tras cambio de molde de cat %s",
+                r["id"], cid, exc_info=True,
+            )
     return nombres_regen
 
 

@@ -19,6 +19,93 @@ tenía que estar duplicado era el QUERY en sí.
 
 from __future__ import annotations
 
+import json as _json
+
+
+def specs_en_nombre_de_equipo(conn, equipo_id: int) -> list[dict]:
+    """Specs marcadas `en_nombre=true` del equipo, para armar el nombre público.
+
+    Resuelve la categoría por **`equipos.categoria_specs`** (la taxonomía de
+    specs — Cámaras/Lentes/Filtros/…), NO por `equipo_categorias` (el árbol de
+    catálogo): son fuentes distintas y el equipo puede estar bien clasificado en
+    specs pero mal-tageado en el árbol (o al revés). Antes esto se leía por el
+    árbol de catálogo (JOIN equipo_categorias con `categoria_raiz_id = c.id OR
+    c.parent_id`), lo que dejaba el nombre público **vacío** para equipos con
+    specs cargadas pero sin el tag de catálogo correcto (bug real: un filtro
+    tageado solo en "Lentes" en vez de "Filtros"). Mismo criterio de resolución
+    que usa el editor de specs del admin (`routes/specs/equipo_specs.py`).
+
+    LEFT JOIN a `equipo_specs`: incluye specs SIN valor (el placeholder del
+    template rinde vacío y el builder lo colapsa) para que el molde sea
+    estable — el conjunto de placeholders lo define la categoría, no qué specs
+    tenga cargadas este equipo puntual.
+
+    Devuelve [{label, spec_key, value, tipo, unidad, tabla_columnas,
+    output_config}] ordenado por prioridad, deduplicado por label. `[]` si el
+    equipo no tiene `categoria_specs` o su nombre no resuelve a una categoría.
+    """
+    cs_row = conn.execute(
+        "SELECT categoria_specs FROM equipos WHERE id = %s", (equipo_id,)
+    ).fetchone()
+    categoria_specs = dict(cs_row).get("categoria_specs") if cs_row else None
+    if not categoria_specs:
+        return []
+
+    # Import lazy: evita el ciclo services.specs ↔ services.categorias al cargar
+    # el módulo (mismo patrón que routes/specs/equipo_specs.py).
+    from services.categorias import buscar_id_por_nombre
+    raiz_id = buscar_id_por_nombre(conn, categoria_specs)
+    if not raiz_id:
+        return []
+
+    rows = conn.execute(
+        """
+        SELECT sd.label, sd.spec_key, sd.tipo, sd.unidad,
+               sd.tabla_columnas, sd.output_config,
+               COALESCE(es.value, '') AS value,
+               COALESCE(sd.prioridad, 100) AS prioridad
+        FROM spec_definitions sd
+        LEFT JOIN equipo_specs es
+               ON es.equipo_id = %s AND es.spec_def_id = sd.id
+        WHERE COALESCE(sd.en_nombre, FALSE) = TRUE
+          AND sd.categoria_raiz_id = %s
+        ORDER BY COALESCE(sd.prioridad, 100), sd.label
+        """,
+        (equipo_id, raiz_id),
+    ).fetchall()
+
+    out: list[dict] = []
+    seen_labels: set[str] = set()
+    for r in rows:
+        d = dict(r)
+        label = d["label"]
+        key = (label or "").lower().strip()
+        if key in seen_labels:
+            continue
+        seen_labels.add(key)
+        cols = d["tabla_columnas"]
+        if isinstance(cols, str):
+            try:
+                cols = _json.loads(cols)
+            except Exception:
+                cols = None
+        oc = d["output_config"]
+        if isinstance(oc, str):
+            try:
+                oc = _json.loads(oc)
+            except Exception:
+                oc = None
+        out.append({
+            "label": label,
+            "spec_key": d["spec_key"],
+            "value": d["value"] or "",
+            "tipo": d["tipo"],
+            "unidad": d["unidad"],
+            "tabla_columnas": cols,
+            "output_config": oc,
+        })
+    return out
+
 
 def get_equipo_specs_rows(conn, equipo_ids: list[int]) -> dict[int, list[dict]]:
     """{equipo_id: [{spec_def_id, spec_key, label, tipo, unidad, value,

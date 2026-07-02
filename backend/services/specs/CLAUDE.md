@@ -84,7 +84,7 @@ services/specs/
     search_source.py  # specs_search_expr() — campo más de CAMPOS_EQUIPO           ✓ Fase 4
     propuestas.py      # listar_propuestas_pendientes — Canal C                    ✓ aditivo 2026-07
     definitions.py     # ✗ no existe — mapear_valor hace su propia lectura de spec_definitions
-    equipo_specs.py    # get_equipo_specs_rows — specs YA PERSISTIDAS de un lote de equipos ✓ aditivo 2026-07
+    equipo_specs.py    # get_equipo_specs_rows (specs persistidas de un lote) + specs_en_nombre_de_equipo (specs en_nombre para el nombre público, vía categoria_specs) ✓ aditivo 2026-07
     aliases.py          # expansión de término (refinamiento; search_source.py ya cubre lo básico) ✗ no existe, sin fase asignada
   normalize/
     value_funnel.py    # mapear_valor(conn, spec_def_id, raw) — EXISTE, llamado desde persist.py  ✓ Fase 2+3
