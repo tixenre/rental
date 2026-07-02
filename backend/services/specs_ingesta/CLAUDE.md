@@ -215,3 +215,20 @@ cuando el volumen de fuentes no-B&H lo justifique — no se construye por adelan
   estándar de void elements de HTML5 nunca se empuja a la pila. Cualquier parser HTML hecho a mano
   (no una librería como BeautifulSoup) que trackee tags abiertos tiene este riesgo — verificar contra
   HTML real con markup "sucio" (íconos, imágenes inline), no solo fixtures de test prolijos.
+- **Iniciativa A (primer uso real) — el genérico con categoría "Desconocido" resuelve alias CONTRA
+  TODAS las categorías, no solo la que correspondería.** Encontrado al cargar de verdad un equipo real
+  ("Canon Mount Adapter EF-EOS R 0.71x" — un adaptador, título sin "lens" antes de "mount adapter", no
+  matcheaba el regex de Adaptadores): cayó a Desconocido → `extract_from_html_generic(html,
+  categoria_hint=None)` → `resolve_pairs` sin categoría matcheó `modificador_subtipo` (un spec_key de
+  **Modificadores**, otra categoría) contra un label del adaptador, y encima con un valor sin sentido
+  (`lens_mount_out='E'`, un Sony E-mount, en un adaptador Canon EF↔RF). Ampliar el regex de Adaptadores
+  para cubrir "mount adapter" a secas (sin exigir "lens" antes) lo arregla — y es **gratis en riesgo**:
+  el parser bespoke de lentes/adaptadores clasifica lente/filtro/adaptador con su propio `_classify()`
+  interno, no con este regex, así que ensanchar el regex de detección no cambia el resultado de ningún
+  archivo que ya rendía bien (verificado: de las 47 páginas B&H reales, solo 2 tienen "mount adapter"
+  en el título, la otra ya iba a Filtros → mismo parser bespoke, mismo resultado). Después del fix:
+  `categoria_sugerida='Adaptadores'`, specs correctos (`lens_mount='RF'`, `adaptador_subtipo=
+  'Speedbooster'`) y hasta el `modelo` se arma bien ("Speedbooster 0.71x EF → RF" en vez del título
+  crudo con "B&H Photo Video" pegado). Lección: F5 barrió el dataset buscando fallas de detección, pero
+  "Mount Adapter" (sin "Lens") no estaba en los 5 casos que encontró — **el barrido más exhaustivo es
+  usar el sistema para su propósito real**, no solo correr el diagnóstico contra el dataset offline.

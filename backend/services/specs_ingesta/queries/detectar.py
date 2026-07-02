@@ -45,8 +45,18 @@ def detect_categoria(html_content: str, title: str = "") -> str:
     t = (title or "").lower()
     body_excerpt = html_content[:50_000].lower()  # primeros 50KB
 
-    # Adaptadores: mención explícita
-    if re.search(r"\b(lens\s+mount\s+adapter|mount\s+converter|speedbooster|lens\s+adapter)\b", t):
+    # Adaptadores: mención explícita. "mount adapter" a secas (sin "lens"
+    # antes) también cuenta — caso real: "Canon Mount Adapter EF-EOS R
+    # 0.71x" caía a Desconocido → genérico con categoria_hint=None, que
+    # resuelve alias CONTRA TODAS las categorías (sin acotar) y matcheaba
+    # "modificador_subtipo" (de Modificadores) para un adaptador. Ampliar
+    # acá rutea al parser bespoke de lentes/adaptadores — que clasifica
+    # lente/filtro/adaptador con su propio `_classify()`, no con este
+    # regex, así que ensanchar esto no cambia el resultado de un archivo
+    # que ya rendía bien (ej. "Drop-In Filter Mount Adapter", ya iba a
+    # Filtros → mismo parser bespoke). Verificado: de las 47 páginas B&H
+    # reales del dataset, solo 2 tienen "mount adapter" en el título.
+    if re.search(r"\b(lens\s+mount\s+adapter|mount\s+adapter|mount\s+converter|speedbooster|lens\s+adapter)\b", t):
         return "Adaptadores"
     if "lens mount adapter" in body_excerpt[:5000]:
         return "Adaptadores"
