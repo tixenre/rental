@@ -137,15 +137,22 @@ class PadronClient:
         return _get_client(self.endpoint)
 
     def get_persona(self, cuit_buscado: str) -> Optional[PersonaArca]:
-        """Consulta el padrón para `cuit_buscado`. None si AFIP genuinamente no
-        tiene el CUIT. Levanta RuntimeError si AFIP SÍ conoce el CUIT pero
-        bloquea la constancia por una regla de negocio (ej. CUIT sin adhesión
-        a Domicilio Fiscal Electrónico, RG 3990-E) — verificado contra el
-        manual oficial "WS_SR_constancia_inscripcion" v3.7 §5.3: en ese caso
-        `persona` viene SIN `datosGenerales` pero CON `errorConstancia`/
-        `errorRegimenGeneral`/`errorMonotributo` poblado con el motivo real.
-        Sin esto, un CUIT real y activo pero bloqueado por esa regla se leía
-        como "ARCA no tiene datos" — indistinguible de un CUIT que no existe."""
+        """Consulta el padrón para `cuit_buscado`. None solo cuando AFIP no
+        devolvió NINGÚN dato ni motivo (silencio limpio — respuesta vacía sin
+        `persona`, o `persona` sin `datosGenerales` y sin ningún error*
+        poblado). Levanta RuntimeError con el texto de AFIP tal cual para
+        cualquier otra cosa: un Fault SOAP, o un bloqueo de negocio (ej. CUIT
+        sin adhesión a Domicilio Fiscal Electrónico, RG 3990-E — `persona`
+        viene sin `datosGenerales` pero con `errorConstancia`/
+        `errorRegimenGeneral`/`errorMonotributo` poblado, ver manual oficial
+        "WS_SR_constancia_inscripcion" v3.7 §5.3).
+
+        Antes se filtraban los Fault que mencionaban "no se encuentran datos"/
+        "sin resultados" tratándolos como silencio limpio — esa heurística
+        escondía motivos reales (bloqueo de negocio, relación no delegada,
+        cert vencido) detrás de un genérico "sin datos" indistinguible de un
+        CUIT que de verdad no existe. Mostrar el texto de AFIP tal cual es más
+        honesto que adivinar cuáles vale la pena mostrar."""
         client = self._client()
         try:
             resp = client.service.getPersona(
@@ -155,9 +162,7 @@ class PadronClient:
                 idPersona=int(_solo_digitos(cuit_buscado)),
             )
         except zeep.exceptions.Fault as exc:
-            if "no se encuentran datos" in str(exc).lower() or "sin resultados" in str(exc).lower():
-                return None
-            raise
+            raise RuntimeError(str(exc)) from exc
 
         persona = getattr(resp, "persona", None) if resp is not None else None
         if persona is None:
