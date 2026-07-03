@@ -2201,6 +2201,100 @@ cancel-in-progress` ya cancela corridas viejas.
   `subtotal * (1 - descuento_pct/100)` (o cualquier variante que recalcule el descuento) en vez de leer
   `alquileres.monto_total` directo o prorrateado.
 
+### 2026-07-03 — La vista multi-mes/anual de reportes ahora respeta los meses cerrados (`liquidar_rango`)
+
+- **Contexto.** Otro hallazgo de severidad media de la auditoría cruzada de plata (2026-07-02, tracking
+  #1209): `backend/reportes/cierres.py` ya implementaba correctamente "cerrar un mes" = congelar una foto
+  inmutable del reporte de liquidación (`liquidacion_cierres`, `snapshot_de`), y `_data_liquidacion`
+  (`routes/reportes.py`) ya la usaba bien para la vista de UN mes puntual (`mes_de_rango` detecta el rango
+  exacto → `snapshot_de` directo). Pero cuando el rango pedido cubre VARIOS meses o un año completo (la
+  vista "Mes a mes · {año}" y el total anual del front, `LiquidacionReporte.tsx`), el código llamaba a
+  `liquidar()` en vivo sobre TODO el rango, sin chequear si alguno de esos meses individuales estaba
+  cerrado — ignoraba la foto congelada para esos meses dentro del rango largo. Escenario de falla
+  concreto: se cierra junio con el modelo de comisiones Pablo{50/45/5} (la foto congela ese reparto);
+  después se edita `comisiones_modelo` a Pablo{60/40} (o se edita/anula un pago de un pedido de junio ya
+  cerrado); al abrir el reporte anual, la TARJETA de junio (que sí usa `snapshot_de`) mostraba el reparto
+  viejo, pero la FILA de junio dentro de "Mes a mes · 2026" y el total anual (ambos calculados en vivo
+  sobre el rango largo) mostraban el reparto nuevo — misma plata, misma pantalla, dos cifras de payout
+  distintas para Pablo/Rambla/Tincho. El semáforo de reconciliación no lo detectaba (solo mira actividad
+  de pedidos/pagos, no cambios al modelo de comisiones).
+- **Decisión.** `reportes/liquidacion.py` gana una función pura nueva, `combinar_meses(meses_data)`: junta
+  N reportes por-mes (cada uno con la forma completa de `liquidar`) en un solo reporte multi-mes, sumando
+  resumen/por_mes/por_dia/por_dueno — seguro porque un pedido se atribuye a un ÚNICO mes de saldado, nunca
+  se solapan entre los reportes de entrada, así que sumar no duplica nada. `reportes/cierres.py` gana
+  `liquidar_rango(conn, desde, hasta)`: parte el rango en los meses calendario que cubre
+  (`_meses_en_rango`), y para cada mes que el rango cubre COMPLETO usa `snapshot_de` si está cerrado o
+  `liquidar()` en vivo si no —nunca mezcla las dos fuentes para el mismo mes—, y combina todo con
+  `combinar_meses`. Los fragmentos de mes en los bordes (el rango no arranca/termina en un límite de mes
+  calendario) siguen en vivo, como antes — no hay foto posible para un pedazo de mes.
+  `routes/reportes.py::_data_liquidacion` (la fuente única usada por JSON/CSV/PDF/mail) delega en
+  `liquidar_rango` cuando el rango NO es un único mes calendario exacto; el camino de un mes puntual no
+  cambió una línea.
+- **Why.** Se evaluó reimplementar el chequeo de "está cerrado" inline en el route, pero eso hubiera
+  duplicado la lógica que `cierres.py` ya tiene bien hecha ("una sola forma de cada cosa" — la memoria ya
+  marca a `reportes/` como motor único). Extraer `combinar_meses` como función pura (en vez de mezclarla
+  con el pipeline SQL→filas→`agregar` de `liquidacion.py`) preserva el contrato "pipeline testeable sin
+  DB" del `CLAUDE.md` local del paquete: a `combinar_meses` no le importa si un mes vino de una foto o de
+  un cálculo en vivo, solo suma dicts con la misma forma — eso es lo que permite mezclar fuentes sin
+  condicionales especiales por mes. Nota de precisión: los totales/reparto por-beneficiario de nivel
+  "resumen" ahora se arman sumando los enteros YA REDONDEADOS de cada mes (en vez de redondear una sola
+  vez al final sobre floats de todo el rango) — coincide con cómo `agregar()` ya redondeaba `por_mes` en
+  el código viejo, así que puede diferir del cálculo anterior por, a lo sumo, unos pocos pesos por mes
+  involucrado (redondeo ARS enteros); es una mejora, no una regresión, porque ahora la suma de las filas
+  de "Mes a mes" cuadra exacto con el total mostrado.
+- **Consecuencias.** Sin cambio de contrato público (mismo shape de respuesta JSON). Tests: pure
+  (`TestCombinarMeses`, `TestCierresPuros::test_meses_en_rango` en `test_reportes_liquidacion.py`) +
+  integración con Postgres real (`test_liquidar_rango_multimes_respeta_mes_cerrado` en
+  `test_reportes_cierres_db.py`) que reproduce el escenario exacto: cierra junio, agrega un pedido en
+  julio (abierto), cambia el modelo, y verifica que la tarjeta de junio, la fila de junio dentro del año,
+  el resumen anual y el detalle por dueño coincidan — junio con la foto vieja, julio con el modelo nuevo,
+  el total la suma correcta de ambos (no 140k recalculado enteros con el modelo nuevo, que hubiera sido
+  el bug). El supervisor marca un cálculo de reporte multi-mes que recalcule en vivo sin chequear
+  `cierre_de`/`snapshot_de` por mes, o lógica de "está cerrado" reimplementada fuera de
+  `reportes/cierres.py`. PR sin mergear (rama `fix/reportes-anual-usa-foto-cerrada`), tracking #1209.
+
+### 2026-07-03 — dataio export/import perdía `anulado` de `alquiler_pagos`: un pago anulado revivía activo tras backup/restore
+
+- **Contexto.** La auditoría de bordes de `contabilidad/` (2026-07-02) le agregó soft-delete a
+  `alquiler_pagos` (`anulado`/`anulado_por`/`anulado_at`/`anulado_motivo`) y actualizó las 7 queries
+  "vivas" del sistema para filtrar `NOT anulado`. Quedó afuera de esa pasada `backend/dataio/` — el
+  exportador/importador de backup/restore/clonado (distinto del `pg_dump` que se usa normalmente para
+  clonar staging), que sigue siendo el camino que usa el dueño para bajar un backup completo o migrar
+  datos entre ambientes. Encontrado por auditoría dirigida sobre `dataio/exporters.py` (#1209), no por
+  la auditoría cruzada de plata del 2026-07-02 (que no llegó a cubrir `dataio`).
+- **Bug.** `export_alquileres` (`dataio/exporters.py`) exportaba el pago embebido con solo
+  `monto`/`concepto`/`fecha` — sin `anulado` ni sus columnas de auditoría. `import_alquileres`
+  (`dataio/importers.py`) sigue la política REPLACE para pagos (`DELETE FROM alquiler_pagos WHERE
+  pedido_id = %s` + re-`INSERT` de lo que traiga el JSON) — con el `INSERT` sin esas columnas, Postgres
+  aplicaba el **default de la columna**, `anulado=FALSE`. Escenario de falla concreto: un pago de
+  $100.000 cargado por error se anula (con motivo, actor y timestamp); se corre `dataio export`
+  (backup) y después `dataio import` (restore, o clonado a otro ambiente); el pago **vuelve a la vida
+  como activo** — `monto_pagado` del pedido sube $100.000 de la nada, la caja del socio destinatario
+  sube, la liquidación lo cuenta como saldado. La anulación desaparece sin dejar rastro y sin que nadie
+  lo pida.
+- **Fix.** `AlquilerPagoRef` (`dataio/schema.py`) suma `anulado: bool = False` +
+  `anulado_por`/`anulado_at`/`anulado_motivo` (opcionales, default `False`/`None` — no rompe JSONs viejos
+  ya exportados sin esas claves; `extra="forbid"` de `_Base` no afecta porque son campos nuevos CON
+  default, no extra). El `SELECT` de `export_alquileres` suma las 4 columnas (`COALESCE(anulado, FALSE)`
+  por si alguna fila legacy quedó con `NULL`); el `INSERT` de `import_alquileres` las reinserta tal cual,
+  sin defaultear. Deliberadamente **no** se tocó ninguna otra columna del pago (`destinatario`/`metodo`/
+  `created_by` siguen sin exportar) — fuera del alcance de este fix, que es específicamente sobre las
+  columnas de soft-delete. Se revisó si el mismo patrón (tabla con soft-delete tocada incompleta por
+  `dataio`) aparecía en otro lado: `movimientos` (contabilidad, también tiene `anulado`) **no está en
+  `EXPORTERS`/`IMPORTERS`** — `dataio` no exporta contabilidad hoy, así que no había nada más que
+  arreglar en este alcance.
+- **Consecuencias.** `test_dataio_pagos_anulado_roundtrip_db.py` (Postgres real, opt-in vía
+  `RESERVAS_DB_TEST=1`) cubre: (1) el export incluye `anulado`+auditoría del pago; (2) round-trip
+  completo export→(se borra el pago, simulando un ambiente fresco donde el backup se restaura)→import→
+  el pago vuelve anulado, no activo. Verificado **empíricamente** que el test caza el bug: revertidos
+  temporalmente los 3 archivos del fix (`git stash`), corridos los 2 tests nuevos → ambos fallan con el
+  síntoma exacto (`KeyError: 'anulado'` en el export; `assert False is True` en el roundtrip); restaurado
+  el fix → ambos pasan. Suite completa (2548 tests) + los otros `*_db.py` de dataio existentes
+  (`test_dataio_roundtrip_db.py`, `test_dataio_export_readonly_db.py`) siguen en verde — no se rompió
+  ningún round-trip existente. `pyflakes` limpio en los 3 archivos tocados + el test nuevo. El
+  supervisor marca una entidad nueva de `dataio` que toque una tabla con soft-delete
+  (`anulado`/`eliminado_at`) sin exportar/importar esas columnas.
+
 ### 2026-07-03 — El pipeline de carritos activos (dashboard admin) incluye el precio derivado de un combo
 
 - **Contexto.** Uno de los 14 hallazgos priorizados de la auditoría cruzada de plata (issue #1209, severidad
