@@ -297,7 +297,7 @@ def update_cliente(id: int, data: ClienteUpdate, request: Request):
             updates = data.model_dump(exclude_unset=True)
             if not updates:
                 raise HTTPException(400, "Nada para actualizar")
-            set_clause = ", ".join(f"{k}=?" for k in updates) + ", updated_at=CURRENT_TIMESTAMP"
+            set_clause = ", ".join(f"{k}=%s" for k in updates) + ", updated_at=CURRENT_TIMESTAMP"
             conn.execute(f"UPDATE clientes SET {set_clause} WHERE id=%s", list(updates.values()) + [id])
             # Si cambió el descuento del cliente, propagarlo a sus presupuestos
             # (pedidos NO confirmados). Los confirmados/cerrados quedan congelados
