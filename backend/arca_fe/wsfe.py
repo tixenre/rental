@@ -181,8 +181,10 @@ class WsfeClient:
         return zeep.helpers.serialize_object(resp.ResultGet, dict)
 
     # ------------------------------------------------------------------
-    # FECAESolicitar — solicitar CAE
+    # COMMANDS (efecto en AFIP — emite un comprobante legal)
     # ------------------------------------------------------------------
+
+    # FECAESolicitar — solicitar CAE
 
     def solicitar_cae(self, fecae: dict) -> CaeResult:
         """Envía FECAESolicitar y parsea la respuesta en un CaeResult.
@@ -192,12 +194,33 @@ class WsfeClient:
         from .modelos import CaeResult  # import local para evitar circulares
 
         client = self._client()
-        resp = client.service.FECAESolicitar(
+        resp = self._soap(
+            "FECAESolicitar",
+            client.service.FECAESolicitar,
             Auth=self._auth(),
             FeCAEReq=fecae,
         )
 
-        result_obj = resp.FeDetResp.FECAEDetResponse[0]
+        # Chequear el detalle ANTES de indexarlo: si AFIP rechazó el pedido
+        # completo (ej. Auth inválido), FeDetResp puede venir ausente —
+        # `resp.FeDetResp.FECAEDetResponse[0]` a ciegas explotaría con un
+        # AttributeError/IndexError críptico en vez de mostrar el motivo real.
+        det_resp = getattr(resp, "FeDetResp", None)
+        detalles = (
+            getattr(det_resp, "FECAEDetResponse", None) if det_resp is not None else None
+        )
+        if not detalles:
+            # Sin detalle: surfaceamos el motivo. Si hay Errors de cabecera,
+            # `_check_errors` levanta ArcaBusinessError con los códigos; si no
+            # hay ni detalle ni Errors, es una respuesta que no entendemos.
+            _check_errors(resp, "FECAESolicitar")
+            raise ArcaResponseError(
+                "FECAESolicitar: AFIP no devolvió FeDetResp/FECAEDetResponse ni "
+                "Errors — respuesta inesperada, no se puede determinar el resultado.",
+                raw=str(resp),
+            )
+
+        result_obj = detalles[0]
         resultado = result_obj.Resultado  # 'A' | 'R' | 'P'
 
         cae: Optional[str] = None
