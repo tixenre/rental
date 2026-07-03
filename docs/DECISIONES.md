@@ -2153,6 +2153,66 @@ cancel-in-progress` ya cancela corridas viejas.
   plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
   reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.
 
+### 2026-07-02 — `backend/services/finanzas_flujo/` = módulo orquestador de plata (Fase 1: desglose de pedido)
+
+- **Contexto.** Tras ver los 14 hallazgos + el descubrimiento de #1181, el dueño pidió una hoja de ruta
+  en fases y, explícitamente, que "el proceso de la plata" fuera **una implementación real y
+  reproducible** — no un documento que describa cómo se hace, sino un **módulo orquestador en el
+  backend** que sea el único punto de entrada para "preguntar algo de plata", para que un consumidor
+  nuevo no tenga que saber a cuál de los 6 motores llamar ("que no sean un montón de referencias
+  cruzadas"). Se diseñó como facade de solo lectura, mismo patrón que `services/carrito/` (que ya
+  orquesta lectura sobre reservas/precios/contenido). Nombre elegido con el dueño tras descartar
+  "plata" (se quedaba corto — no capta que abarca liquidación/facturación) y "tesorería" (suena a solo
+  caja): **`finanzas_flujo`**. El manual `docs/SISTEMA_PLATA.md` se renombró a
+  `docs/SISTEMA_FINANZAS_FLUJO.md` (git mv, preserva historia) para mantener el patrón 1:1 manual↔módulo
+  ya establecido (`SISTEMA_CARRITO.md`↔`services/carrito/`, `SISTEMA_CONTENIDO.md`↔`services/contenido/`).
+- **Decisión — diseño del facade.** `backend/services/finanzas_flujo/` **nunca escribe** — las
+  mutaciones siguen pasando por cada motor directo (`create_pedido_retry`, `contabilidad.commands.*`,
+  rutas de `alquiler_pagos`), porque cada uno tiene su propia validación/candado/lock que no debe
+  saltearse. Cada función del facade delega 1:1 al motor dueño (comentario explícito "OWNA: nada,
+  delega en X" en cada una) — nunca reimplementa. Migración gradual: los consumidores existentes se
+  migran de a uno, en el mismo PR en que ya se estaba tocando ese archivo por otra razón — no se abre
+  un PR aparte solo para "migrar imports" sin otro motivo (sería refactor sin necesidad real).
+- **Decisión — Fase 1 (primera pieza implementada, no solo diseñada).**
+  `finanzas_flujo/pedido.py::desglose_de_pedido(conn, pedido)` es la nueva fuente única del desglose de
+  plata de un pedido (bruto/descuento/neto/IVA por línea) — arregla el bug de `cobro_modo` encontrado en
+  la auditoría: `_enriquecer_pedido_con_total` (`routes/alquileres/core.py`) armaba los ítems para
+  `calcular_total` SIN pasarle `cobro_modo`, así que una línea personalizada `cobro_modo='fijo'` (ej.
+  flete, #805) se multiplicaba igual por jornadas al mostrar/facturar (aunque `bruto_linea`, la función
+  que `calcular_total` llama por ítem, ya sabía manejarlo bien — el bug era de "quién arma el input", no
+  de la fórmula). El fix corrige de un solo punto los 6 call-sites reales: `_get_alquiler_detail`
+  (detalle admin), `routes/alquileres/documentos.py` (PDF/mail), `routes/cliente_portal/documentos.py` +
+  `pedidos.py` (portal cliente), y **`services/facturacion/engine.py`** (el motor de facturación real —
+  el de mayor impacto, corrige lo que efectivamente se factura). `_enriquecer_pedido_con_total` se dejó
+  como wrapper de compatibilidad (delega en la fachada) para no tocar los 6 call-sites en este PR —
+  código nuevo debería importar `desglose_de_pedido` directo. De paso, `services/facturacion/engine.py`
+  (un `service`) dejó de importar de `routes.alquileres` (un `route`) — dependencia arquitectónicamente
+  invertida que ya no hace falta.
+- **Fix espejo en el PDF.** `pdf_templates.py::_pedido_html`/`_sum_bruto` reimplementaban la
+  multiplicación `precio_jornada × cantidad × jornadas` desde cero (sin `cobro_modo`) — no pasaban por
+  `_enriquecer_pedido_con_total` para el detalle de línea. Nuevo helper `_bruto_item_pdf(it, j)` (espeja
+  `bruto_linea` sin importar `services.precios` completo — el PDF agrega distinto por componente de
+  combo, que `bruto_linea` no contempla tal cual) usado en ambos puntos.
+- **Fix espejo en el front admin.** `PedidoPageCards.tsx` (ignoraba `cobro_modo`) y
+  `PedidoPageHelpers.tsx` (correcto, comentario decía "espeja bruto_linea del backend") ya habían
+  divergido sobre el mismo tipo `DraftItem`. Extraído `subtotalDraftItem(it, jornadas)` a
+  `usePedidoDraft.ts` (hogar del tipo) — ambos componentes importan la misma función; no pueden volver a
+  divergir porque ya no tienen cada uno su propia fórmula.
+- **Fuera de esta fase, a propósito.** `CartDrawerView.tsx`/`CartMiniBarView.tsx` (carrito público)
+  también recalculan localmente (`pricePerDay` cacheado) en vez de leer `lineaPorEquipo()` — pero el
+  carrito público hoy NO tiene líneas `cobro_modo='fijo'` (feature exclusiva del builder admin, #805), y
+  migrarlo requiere threadear el objeto `Cotizacion` completo por 3 call-sites (cambio de mayor alcance).
+  Queda documentado como fase futura opcional en `SISTEMA_FINANZAS_FLUJO.md`, no en esta hoja de ruta.
+- **Candados.** `test_finanzas_flujo_pedido.py` (unit, 5 casos: línea jornada, línea fija, mezcla,
+  default sin `cobro_modo`, mutación in-place) + `test_finanzas_flujo_source_scan.py` (verifica que
+  `pdf_templates.py` usa `_bruto_item_pdf` y que `services/facturacion/engine.py` importa la fachada, no
+  `routes.alquileres`) + `test_pdf_helpers.py::TestBrutoItemPdf` (4 casos). No se agregó test de
+  componente en frontend (sin infraestructura de Vitest en el repo hoy) — la garantía ahí es estructural
+  por construcción (misma función compartida, no puede divergir).
+- **Consecuencias.** Suite completa en verde (2717 tests, +26 nuevos). `pyflakes`/`eslint`/`tsc --noEmit`
+  limpios en los archivos tocados. Rama aislada `feature/finanzas-flujo-fase1` (PR sin mergear, hoja de
+  ruta); tracking #1184 (Fase 3, continúa tras la auditoría cruzada de plata).
+
 ### 2026-07-03 — `routes/estadisticas.py`: las agregaciones leen `monto_total`, no reconstruyen el descuento (#1209)
 
 - **Contexto.** Uno de los 14 hallazgos de la auditoría cruzada de plata (2026-07-02, severidad media):
