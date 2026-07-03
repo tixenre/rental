@@ -11,6 +11,7 @@ Deps: zeep (SOAP), ya en requirements.txt.
 
 from __future__ import annotations
 
+import logging
 import re
 import urllib3
 from dataclasses import dataclass
@@ -28,6 +29,8 @@ from requests.adapters import HTTPAdapter
 
 from ._ssl_afip import afip_ssl_context
 from .errores import ArcaBusinessError, ArcaResponseError
+
+_logger = logging.getLogger(__name__)
 
 # Caché local de clientes SOAP (por endpoint, dentro del proceso)
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
@@ -335,12 +338,17 @@ class WsfeClient:
 def _parse_fecha(s: Any) -> Optional[date]:
     if s is None:
         return None
-    s = str(s).strip()
-    if len(s) == 8:
-        return date(int(s[:4]), int(s[4:6]), int(s[6:8]))
+    raw = str(s).strip()
+    if not raw:
+        return None  # ausente/vacío es legítimo (no una fecha malformada)
     try:
-        return date.fromisoformat(s[:10])
+        if len(raw) == 8 and raw.isdigit():
+            return date(int(raw[:4]), int(raw[4:6]), int(raw[6:8]))
+        return date.fromisoformat(raw[:10])
     except ValueError:
+        # No se pierde en silencio: una fecha de AFIP (ej. CAEFchVto) con
+        # formato inesperado es señal de que algo cambió del otro lado.
+        _logger.warning("WSFE: fecha con formato inesperado (%r) — se ignora.", s)
         return None
 
 
