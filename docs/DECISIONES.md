@@ -2213,6 +2213,49 @@ cancel-in-progress` ya cancela corridas viejas.
   limpios en los archivos tocados. Rama aislada `feature/finanzas-flujo-fase1` (PR sin mergear, hoja de
   ruta); tracking #1184 (Fase 3, continúa tras la auditoría cruzada de plata).
 
+### 2026-07-03 — `routes/facturacion.py`: rate limit + mapeo de errores en las escrituras (gap de la auditoría de #1184, #1209)
+
+- **Contexto.** Hallazgo de severidad baja detectado por la auditoría cruzada de plata (2026-07-02,
+  #1184): esa pasada blindó `contabilidad.py`/`pagos.py`/`reportes.py` con `@limiter.limit(ADMIN_WRITE_LIMIT)`
+  + `@map_pg_errors` en sus 13 endpoints de escritura, pero **no tocó** `backend/routes/facturacion.py` —
+  que también escribe plata/estado (facturas, emisores ARCA) y además pega a un webservice externo (ARCA)
+  por cada llamada. Sin rate limit, una sesión admin comprometida o un bug de front en loop podía golpear
+  ARCA/Postgres sin ningún freno server-side (riesgo de gatillar límites del lado de ARCA). Sin
+  `map_pg_errors`, un `UniqueViolation` no anticipado (ej. crear un emisor con un `nombre` duplicado —
+  la columna es `UNIQUE` en `emisores_arca`) subía crudo como 500 con el mensaje interno de Postgres, en
+  vez de un 400 limpio.
+- **Decisión.** Se identificaron los 7 endpoints de escritura reales del módulo (`crear_emisor`,
+  `actualizar_emisor`, `cargar_cert`, `desactivar_emisor`, `facturar_pedido`, `nota_credito`,
+  `enviar_mail_factura`) y se les agregó el mismo patrón, **reusado tal cual** de `routes/contabilidad.py`
+  (`from routes.contabilidad import map_pg_errors`, `from rate_limit import limiter, ADMIN_WRITE_LIMIT`) —
+  ninguna reimplementación nueva. `ADMIN_WRITE_LIMIT` (60/minute) en los 7; `@map_pg_errors` en los 6
+  sync (compone alrededor del `except ValueError`/`except RuntimeError` que cada handler ya tenía, sin
+  reemplazarlos). El único endpoint async, `enviar_mail_factura`, lleva solo el rate limit — **no**
+  `@map_pg_errors`, porque el decorator hace `return fn(*args, **kwargs)` sin `await`: para una corrutina
+  eso solo captura el objeto coroutine (nunca ejecutado en ese punto), así que el `try/except` nunca vería
+  la excepción real — mismo motivo por el que `subir_comprobante` (también async) en `contabilidad.py`
+  tampoco lo lleva. No se identificaron endpoints de "subida de archivo" reales en el módulo (`cargar_cert`
+  recibe el PEM como texto en el body JSON, no como `UploadFile` multipart) — así que ninguno usa
+  `ADMIN_UPLOAD_LIMIT`, a diferencia de `subir_comprobante` en contabilidad.
+- **Why.** "Una sola forma de cada cosa": el patrón de rate-limit + mapeo de errores para escrituras admin
+  ya existe y está probado en `contabilidad.py`/`pagos.py` — inventar una variante nueva para facturación
+  hubiera sido drift. Componer alrededor de los `except ValueError`/`except RuntimeError` existentes (en
+  vez de tocarlos) preserva el contrato HTTP ya testeado (`ValueError`→400, `RuntimeError`→503) mientras
+  cierra el hueco real: un `UniqueViolation` no es ni `ValueError` ni `RuntimeError`, así que antes escapaba
+  ambos catches.
+- **Consecuencias.** `tests/test_facturacion_routes.py`: el helper `_fake_request()` pasó de un
+  `SimpleNamespace` a un `starlette.requests.Request` real y mínimo (scope manual, sin transporte ASGI) —
+  necesario porque `slowapi` exige `isinstance(request, Request)` en el wrapper de `@limiter.limit`, y los
+  4 tests existentes que llamaban a `facturar_pedido`/`nota_credito` directo (sin pasar por FastAPI/ASGI)
+  lo necesitaban para no romperse. 2 tests nuevos: (1) un loop de 65 requests contra
+  `POST /admin/emisores-arca` con una IP dedicada (`TestClient(..., client=("203.0.113.9", ...))`, distinta
+  de la IP default `"testclient"` que usan los demás tests del archivo) confirma que el request #61+ corta
+  con 429 — la IP dedicada evita compartir el bucket del limiter (en memoria, singleton de proceso) con el
+  test del gate de admin o el de nombre duplicado, sin depender del orden de ejecución; (2) un `UniqueViolation`
+  simulado sobre `create_emisor` confirma que `crear_emisor` devuelve 400 con el mensaje genérico
+  ("Ya existe un registro con ese valor.") en vez de 500. Suite completa (2550 tests, sin DB) + pyflakes en
+  verde. Rama `fix/facturacion-rate-limit-errores` (PR sin mergear); tracking #1209.
+
 ### 2026-07-03 — La vista multi-mes/anual de reportes ahora respeta los meses cerrados (`liquidar_rango`)
 
 - **Contexto.** Otro hallazgo de severidad media de la auditoría cruzada de plata (2026-07-02, tracking
