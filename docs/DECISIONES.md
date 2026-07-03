@@ -2152,3 +2152,43 @@ cancel-in-progress` ya cancela corridas viejas.
   de `contabilidad/`: primero el mapa completo, después la rama de fixes). El supervisor marca un motor de
   plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
   reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.
+
+### 2026-07-03 — El pipeline de carritos activos (dashboard admin) incluye el precio derivado de un combo
+
+- **Contexto.** Uno de los 14 hallazgos priorizados de la auditoría cruzada de plata (issue #1209, severidad
+  BAJA): `_enrich_items` (`backend/services/carrito/activos.py`), la función que arma el `monto_estimado` de
+  cada carrito y el `pipeline_ars` total que ve el dueño en `/admin/carritos`, leía la columna
+  `equipos.precio_jornada` **cruda** por ítem (`SELECT e.nombre, e.precio_jornada FROM equipos e WHERE e.id
+  = %s`). Para un equipo `tipo='combo'` esa columna es **NULL a propósito** — el precio de un combo se
+  DERIVA en vivo de sus componentes vía `services.precios.precio_combo`/`precio_jornada_efectivo` (C3
+  #635), no vive en esa columna. `int(row["precio_jornada"] or 0)` coercía el NULL a `0`, y el filtro
+  `if precio > 0:` que decide si el ítem entra a `items_precio` (los que `calcular_total` suma) descartaba
+  el combo por completo. Resultado: un carrito activo con un combo aportaba **$0** al estimado — el dueño
+  veía menos plata "en camino" de la real en el dashboard de funnel.
+- **Alcance del bug.** Solo la **métrica interna** del dashboard admin (`stats.pipeline_ars` +
+  `carritos[].monto_estimado`). No afecta `cotizado == cobrado`: el carrito NO crea la reserva (eso lo hace
+  `create_pedido_retry`, que sigue el camino de `readiness.precios_catalogo_para_reserva` →
+  `precio_jornada_efectivo`, ya correcto desde #635/#1110), y el cliente nunca ve este número — es puramente
+  informativo para el dueño.
+- **Decisión.** `_enrich_items` ahora resuelve el precio de cada ítem con la fuente única
+  `services.precios.precio_jornada_efectivo(conn, equipo_id)` (la misma que usa `readiness.py` para el
+  camino de creación real) en vez de leer `precio_jornada` crudo. La query de nombre se separó
+  (`SELECT e.nombre FROM equipos e WHERE e.id = %s`) del precio, que ahora delega en el resolutor.
+- **Por qué fetch por-ítem y no un batch.** El módulo `services/carrito/` ya tiene un batch seguro
+  (`precios.precios_combo_batch`), pero se usa en el **catálogo** (`services/catalogo/proyeccion.py`) para
+  resolver de una sola vez el precio de TODOS los combos listados — un contexto distinto (sin fechas, sin
+  descuentos, batch homogéneo de un solo tipo). Acá el precedente directo es el opuesto: `/api/cotizar`
+  **revirtió** su propio batch `IN (...)` de precios (#643) porque devolvió el mapa vacío en prod → total
+  $0 en producción — literalmente el mismo síntoma que este bug, por la razón opuesta (un batch roto en vez
+  de un batch ausente). `readiness.py` (mismo paquete, camino de creación real) ya resuelve **por-ítem** con
+  este mismo resolutor. Con ese precedente + el tamaño acotado del carrito de un heartbeat (unos pocos
+  ítems, no cientos), no vale el riesgo de escribir una query batch nueva para un endpoint de dashboard
+  (no hot-path de cliente): se mantiene el patrón per-item ya usado en `readiness.py`.
+- **Consecuencias.** `int` extra de queries por ítem (1 para nombre + 1-2 dentro del resolutor si es
+  combo) en cada heartbeat — irrelevante dado el tamaño típico de un carrito. Test nuevo
+  `test_carritos_activos_precio_combo.py` (unit, `FakeConn` que resuelve las 3 queries encadenadas
+  nombre→`precio_jornada_efectivo`→`precio_combo`, sin mockear el resolutor en sí) fija el escenario: un
+  carrito con un combo aporta su precio derivado real al estimado, no $0. El supervisor marca un ítem de
+  carrito/dashboard cuyo precio salga de `equipos.precio_jornada` crudo en vez de
+  `precio_jornada_efectivo`, o una query batch nueva de precios sin evaluar el precedente de #643. Issue
+  #1209.
