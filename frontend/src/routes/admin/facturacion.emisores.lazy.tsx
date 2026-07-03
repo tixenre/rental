@@ -5,7 +5,7 @@
  * emisores (CUITs habilitados ante ARCA) sin tocar Railway.
  */
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -320,6 +320,11 @@ function EmisorFormModal({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Si se crea el emisor CON cert, ya se puede detectar el punto de venta en
+  // ARCA — se muestra el resolver antes de cerrar en vez de que el usuario lo
+  // tipeé a mano (mismo patrón que CertFormModal).
+  const [creadoConCert, setCreadoConCert] = useState<EmisorArca | null>(null);
+
   const qc = useQueryClient();
   const save = useMutation({
     mutationFn: async () => {
@@ -340,7 +345,7 @@ function EmisorFormModal({
       if (certOk && keyOk) await facturacionApi.cargarCert(created.id, cert, key);
       return created;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       const msg = emisor
         ? "Emisor actualizado"
         : certOk && keyOk
@@ -349,10 +354,48 @@ function EmisorFormModal({
       toast.success(msg);
       qc.invalidateQueries({ queryKey: ["admin", "emisores-arca"] });
       onSaved();
+      if (!emisor && certOk && keyOk) {
+        setCreadoConCert(result);
+      } else {
+        onClose();
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const asignarPtoVta = useMutation({
+    mutationFn: (nro: number) =>
+      facturacionApi.updateEmisor(creadoConCert!.id, { pto_vta: nro }),
+    onSuccess: (_data, nro) => {
+      toast.success(`Punto de venta ${String(nro).padStart(5, "0")} detectado y asignado`);
+      qc.invalidateQueries({ queryKey: ["admin", "emisores-arca"] });
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  if (creadoConCert) {
+    return (
+      <Overlay onClose={onClose}>
+        <h2 className="font-display text-xl text-ink mb-1">{creadoConCert.nombre}</h2>
+        <p className="text-sm text-verde-ink mb-4">Emisor creado con certificado ✓</p>
+        <PuntoVentaResolver
+          emisorId={creadoConCert.id}
+          onResolved={(nro) => asignarPtoVta.mutate(nro)}
+        />
+        <div className="flex justify-end gap-2 mt-5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={asignarPtoVta.isPending}
+            className="h-9 px-4 rounded-md bg-ink text-background text-sm font-medium disabled:opacity-50"
+          >
+            Listo
+          </button>
+        </div>
+      </Overlay>
+    );
+  }
 
   return (
     <Overlay onClose={onClose}>
@@ -598,6 +641,77 @@ function EmisorFormModal({
   );
 }
 
+// ── Punto de venta: auto-detección tras cargar un certificado ──────────────────
+//
+// Ni bien hay cert cargado, ya se puede consultar ARCA (WSFE `FEParamGetPtosVenta`)
+// sin que el usuario tenga que tipear el número a mano y descubrir recién al pedir
+// el primer CAE que estaba mal. Un solo punto de venta válido → se asigna solo;
+// varios → se deja la lista para elegir (mismo patrón de botones que ya usaba
+// "Consultar en ARCA" en el campo Punto de Venta).
+
+function PuntoVentaResolver({
+  emisorId,
+  onResolved,
+}: {
+  emisorId: number;
+  onResolved: (ptoVta: number) => void;
+}) {
+  const q = useQuery({
+    queryKey: ["admin", "puntos-venta-autodetect", emisorId],
+    queryFn: async () => (await facturacionApi.consultarPuntosVenta(emisorId)).puntos_venta,
+  });
+  const yaResuelto = useRef(false);
+
+  useEffect(() => {
+    if (q.data && q.data.length === 1 && !yaResuelto.current) {
+      yaResuelto.current = true;
+      onResolved(q.data[0].nro);
+    }
+  }, [q.data, onResolved]);
+
+  if (q.isLoading) {
+    return <p className="text-xs text-muted-foreground">Detectando punto de venta en ARCA…</p>;
+  }
+  if (q.isError) {
+    return (
+      <ErrorBanner>
+        No se pudo detectar el punto de venta automáticamente:{" "}
+        {(q.error as Error).message} — cargalo a mano.
+      </ErrorBanner>
+    );
+  }
+  if (!q.data || q.data.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        ARCA no tiene puntos de venta electrónicos habilitados para este CUIT — cargalo a mano.
+      </p>
+    );
+  }
+  if (q.data.length === 1) {
+    // Se resuelve solo (useEffect de arriba) — nada que mostrar acá.
+    return null;
+  }
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs text-muted-foreground">
+        ARCA tiene varios puntos de venta habilitados — elegí uno:
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {q.data.map((p) => (
+          <button
+            key={p.nro}
+            type="button"
+            onClick={() => onResolved(p.nro)}
+            className="h-7 px-2.5 rounded-md border hairline text-xs font-mono bg-surface-elevated text-muted-foreground hover:text-ink"
+          >
+            {String(p.nro).padStart(5, "0")}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Modal cargar cert ──────────────────────────────────────────────────────────
 
 function CertFormModal({
@@ -611,21 +725,58 @@ function CertFormModal({
 }) {
   const [cert, setCert] = useState("");
   const [key, setKey] = useState("");
+  const [certGuardado, setCertGuardado] = useState(false);
   const qc = useQueryClient();
+
+  const finalizar = () => {
+    onSaved();
+    onClose();
+  };
 
   const save = useMutation({
     mutationFn: () => facturacionApi.cargarCert(emisor.id, cert, key),
     onSuccess: () => {
       toast.success("Certificado cargado y cifrado");
       qc.invalidateQueries({ queryKey: ["admin", "emisores-arca"] });
-      onSaved();
-      onClose();
+      // No cierra todavía: ahora que hay cert, ya se puede detectar el punto
+      // de venta en ARCA sin que el usuario lo tenga que tipear a mano.
+      setCertGuardado(true);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const asignarPtoVta = useMutation({
+    mutationFn: (nro: number) => facturacionApi.updateEmisor(emisor.id, { pto_vta: nro }),
+    onSuccess: (_data, nro) => {
+      toast.success(`Punto de venta ${String(nro).padStart(5, "0")} detectado y asignado`);
+      qc.invalidateQueries({ queryKey: ["admin", "emisores-arca"] });
+      finalizar();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const certOk = cert.includes("BEGIN CERTIFICATE");
   const keyOk = key.includes("PRIVATE KEY");
+
+  if (certGuardado) {
+    return (
+      <Overlay onClose={finalizar}>
+        <h2 className="font-display text-xl text-ink mb-1">Cert · {emisor.nombre}</h2>
+        <p className="text-sm text-verde-ink mb-4">Certificado cargado y cifrado ✓</p>
+        <PuntoVentaResolver emisorId={emisor.id} onResolved={(nro) => asignarPtoVta.mutate(nro)} />
+        <div className="flex justify-end gap-2 mt-5">
+          <button
+            type="button"
+            onClick={finalizar}
+            disabled={asignarPtoVta.isPending}
+            className="h-9 px-4 rounded-md bg-ink text-background text-sm font-medium disabled:opacity-50"
+          >
+            Listo
+          </button>
+        </div>
+      </Overlay>
+    );
+  }
 
   return (
     <Overlay onClose={onClose}>
