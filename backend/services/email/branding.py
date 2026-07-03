@@ -106,6 +106,22 @@ def item_row(nombre_html: str, cantidad_html: str, subtotal_html: str | None) ->
     )
 
 
+def discount_row(label_html: str, monto_html: str) -> str:
+    """Fila de descuento/bonificación dentro de la tabla de ítems del mail —
+    entre las líneas (bruto, sin descuento) y el `Total` (neto, con descuento
+    ya aplicado) para que la resta quede visible. Mismo criterio
+    bruto→descuento→neto que ya usa el Presupuesto
+    (`pdf_templates._pedido_html`): sin esta fila el ítem mostraba el bruto y
+    el Total el neto, sin ningún renglón que explicara la diferencia.
+    `label_html`/`monto_html` ya vienen escapados desde el caller."""
+    return (
+        f'<tr style="border-bottom:1px solid {HAIRLINE};">'
+        f'<td colspan="2" style="padding:8px 8px 8px 0;color:{MUTED};">{label_html}</td>'
+        f'<td style="padding:8px 0;text-align:right;white-space:nowrap;'
+        f'color:{MUTED};font-variant-numeric:tabular-nums;">{monto_html}</td></tr>'
+    )
+
+
 def items_table(rows_html: str) -> str:
     """Envuelve filas (de `item_row`) en la tabla de ítems. Devuelve '' si no hay
     filas (el body lo inyecta con `|safe`)."""

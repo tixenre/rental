@@ -718,6 +718,33 @@ cualquier equipo, como en `PUT /alquileres/{id}/items`). El supervisor marca un 
 de catálogo del lado cliente que no llame a `equipo_visible_catalogo`. Hallazgo de la auditoría cruzada de
 plata (#1209).
 
+### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
+
+Con descuento (el caso común: cualquier alquiler de varios días tiene descuento automático por jornadas),
+la **Factura** (`services/facturacion/pdf.py::_conceptos`) mostraba el BRUTO por línea con un `% Bonif.`
+hardcodeado en `0,00`, y el **mail de "pedido creado"** (`routes/alquileres/core.py::_pedido_email_context`)
+mostraba el bruto por ítem sin ningún renglón que explicara la diferencia con el "Total" (ya neto) — el
+comprobante/mail no cerraba consigo mismo. Mismo criterio bruto→descuento→neto que ya usaba el
+**Presupuesto** (`pdf_templates._pedido_html`, decisión 2026-06-06 sobre el IVA aparte — **no se toca**).
+La Factura reparte la bonificación proporcionalmente entre las líneas (remanente de redondeo en la
+última) contra el bruto de las LÍNEAS vs. el `imp_neto` YA DECLARADO/congelado en la factura — no el
+pedido en vivo — para que también cierre en una Nota de Crédito. El mail suma una fila de "Descuento"
+visible en la tabla de ítems vía el helper único `services/email/branding.py::discount_row`. El
+supervisor marca una línea de factura o de mail que muestre el bruto sin reconciliar contra el total
+declarado, o un `bonif`/`% Bonif.` hardcodeado reintroducido. Iniciativa: #1209 (2 de 9 hallazgos).
+
+### 2026-07-03 — `routes/facturacion.py`: rate limit + mapeo de errores en las escrituras (gap de la auditoría de #1184, #1209)
+
+Las escrituras de `backend/routes/facturacion.py` (facturar pedido, nota de crédito, enviar mail, CRUD de
+emisores ARCA) ahora llevan `@limiter.limit(ADMIN_WRITE_LIMIT)` + `@map_pg_errors` — **reusados tal cual**
+de `routes/contabilidad.py` (mismo import, mismo patrón), no reimplementados. Cierra el hueco que dejó la
+auditoría de plata 2026-07-02 (#1184): esa pasada blindó contabilidad/pagos/reportes pero no tocó
+facturación, pese a que también pega a ARCA y a Postgres sin freno. Única excepción: el endpoint async
+`enviar_mail_factura` NO lleva `@map_pg_errors` (el decorator hace `fn(*args, **kwargs)` sin `await`, no
+detecta excepciones de una corrutina — mismo motivo por el que `subir_comprobante`, también async, en
+`contabilidad.py` tampoco lo lleva). El supervisor marca un endpoint de escritura de facturación nuevo sin
+`@limiter.limit`, o un `except Exception` ad-hoc en esos routes en vez de `map_pg_errors`.
+
 ### 2026-07-03 — La vista multi-mes/anual de reportes ahora respeta los meses cerrados (`liquidar_rango`)
 
 Uno de los 14 hallazgos de la auditoría cruzada de plata (severidad media): la vista "Mes a mes"/el total
