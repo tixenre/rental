@@ -448,6 +448,11 @@ class PedidoDatos(BaseModel):
             return v
         if v < 0:
             raise ValueError("descuento_manual_monto no puede ser negativo")
+        # `alquileres.descuento_manual_monto` es INTEGER — sin este tope, un
+        # valor fuera de rango llega crudo a Postgres como `NumericValueOutOfRange`
+        # (mismo gap que cerró la auditoría de contabilidad, 2026-07-02).
+        if v >= 2_147_483_647:
+            raise ValueError("descuento_manual_monto demasiado alto")
         return v
 
 

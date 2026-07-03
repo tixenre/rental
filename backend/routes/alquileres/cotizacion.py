@@ -89,6 +89,10 @@ class CotizarRequest(BaseModel):
             return v
         if v < 0:
             raise ValueError("descuento_manual_monto no puede ser negativo")
+        # Mismo tope que `PedidoDatos` (routes/alquileres/core.py) — preview y
+        # guardado no deberían divergir en qué rechazan.
+        if v >= 2_147_483_647:
+            raise ValueError("descuento_manual_monto demasiado alto")
         return v
 
 

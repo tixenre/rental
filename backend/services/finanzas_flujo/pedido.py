@@ -37,6 +37,17 @@ def desglose_de_pedido(conn, pedido: dict) -> dict:
     ("pct"/"monto") + `pedido["descuento_manual_monto"]` son columnas directas
     del pedido (no un snapshot aparte — el override ES el valor persistido,
     igual que `descuento_pct`), leídas tal cual están en la fila.
+
+    Combos no acumulables (Fase C-3, #1219): `es_combo` por línea sale de
+    `equipo_tipo` EN VIVO (join con `equipos.tipo` al armar `pedido["items"]`,
+    ver `_get_alquiler_items`/`_batch_get_alquiler_items`), NO de un snapshot
+    por línea. Limitación aceptada (hallazgo del supervisor, PR #1220): si un
+    equipo se reclasifica de `combo` a `simple` (o viceversa) DESPUÉS de que
+    un pedido confirmado lo usó, el desglose de ESE pedido puede moverse. Muy
+    baja probabilidad (reclasificar el tipo de un equipo es una acción manual
+    rara del catálogo, no un flujo de uso normal) — se acepta sin snapshot
+    dedicado; si algún día se materializa, agregar `es_combo` congelado a
+    `alquiler_items` sería la solución, mismo patrón que `descuento_cliente_pct`.
     """
     perfil = pedido.get("cliente_perfil_impuestos")
     if perfil is None and pedido.get("cliente_id"):

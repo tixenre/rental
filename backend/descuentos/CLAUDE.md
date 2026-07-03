@@ -13,9 +13,12 @@ ni en `services/precios.py`.
 descuentos/
   __init__.py       # barrel (docstring, sin __all__ — no hay re-exports públicos)
   queries/            # LECTURA — nunca mutan
-    decision.py         # calcular_descuento_aplicable (PURA), calcular_descuento_origen (PURA)
+    decision.py         # calcular_descuento_aplicable (PURA), calcular_descuento_origen (PURA),
+                         # resolver_descuento_pedido/resolver_origen_pedido (jerarquía C-1, PURA),
+                         # resolver_descuento_monto_pedido/resolver_origen_pedido_monto (C-2, PURA)
     jornadas.py           # interpolar_descuento_jornadas (PURA), obtener_descuento_jornadas,
                            # listar_descuentos_jornada, obtener_descuento_jornada_por_jornadas
+    cliente.py             # obtener_descuento_cliente (descuento fijo del cliente, en vivo)
   commands/           # ESCRITURA — única puerta de mutación
     jornadas.py          # validar_descuento_jornada (PURA), crear_descuento_jornada,
                           # eliminar_descuento_jornada
@@ -48,18 +51,29 @@ descuentos/
   dirección de dependencia (`descuentos/` importando de un módulo de rutas) sin ganar nada — este paquete
   las consume solo indirectamente, vía `obtener_descuento_jornadas`.
 - **`services/precios.py::calcular_total` no se mueve acá.** Es el motor de TOTALES (subtotal/IVA/neto,
-  también combos) — consume `calcular_descuento_aplicable` para la porción de descuento, pero el resto de
-  su trabajo no es de este dominio.
-
-## Roadmap (documentado, no implementado — ver `docs/DECISIONES.md` para el detalle completo)
-
-- **Jerarquía manual > cliente/jornadas:** un override manual del pedido (≠0) va a ganar *outright* (sin
-  competir por tamaño); si es 0, cae al 2-way de siempre entre cliente y jornadas. Se compone SOBRE
-  `calcular_descuento_aplicable` (no la reemplaza) con una función nueva, `resolver_descuento_pedido`.
-- **Descuento manual en % o en $ fijo**, en el mismo campo del builder de pedidos.
-- **Combos no acumulables con el descuento global** — decisión de *composición de precio por línea*, vive en
-  `services/precios.py::calcular_total`/`bruto_linea`, no en este paquete.
+  también combos) — consume las funciones de `descuentos/queries/decision.py` para la porción de descuento,
+  pero el resto de su trabajo no es de este dominio.
+- **Jerarquía de 3 niveles (Fase C-1, #1219):** un override manual del pedido (≠0) gana *outright* (sin
+  competir por tamaño) sobre cliente/jornadas; si es 0, cae al 2-way de siempre. `resolver_descuento_pedido`/
+  `resolver_origen_pedido` se COMPONEN sobre `calcular_descuento_aplicable`/`calcular_descuento_origen` (no
+  las reemplazan). Requirió un snapshot nuevo, `alquileres.descuento_cliente_pct` (mismo patrón que
+  `descuento_jornadas_pct`) — sin él, el desglose de un pedido confirmado divergiría de `monto_total` si el
+  cliente cambia de descuento después (clase de bug #405). Migración de backfill
+  (`v9w0x1y2z3a4`) mueve todo `descuento_pct` histórico ≠0 a `descuento_cliente_pct` y resetea el manual a 0
+  — preserva el % mostrado de los pedidos preexistentes (identidad algebraica, ver el docstring de la
+  migración; hallazgo del supervisor en PR #1220, no tenerlo hubiera roto pedidos viejos con descuento).
+- **Descuento manual en % o en $ fijo (Fase C-2, #1219):** mismo campo del builder de pedidos, un selector al
+  lado (`alquileres.descuento_manual_tipo`/`descuento_manual_monto`). `resolver_descuento_monto_pedido`
+  resuelve el monto en pesos (capeado al bruto DESCONTABLE, no al bruto total — ver C-3) y deriva el %
+  efectivo para mostrar; con tipo="pct" es byte-idéntico al cálculo de C-1.
+- **Combos no acumulables con el descuento global (Fase C-3, #1219)** — decisión de *composición de precio
+  por línea*, vive en `services/precios.py::calcular_total`/`bruto_linea` (no en este paquete): las líneas
+  `es_combo=True` quedan afuera del bruto que alimenta la jerarquía de arriba. `tipos_equipo_batch`
+  (`services/precios.py`) resuelve qué líneas son combo, batch, sin N+1. Limitación aceptada: `es_combo` se
+  resuelve EN VIVO del `tipo` actual del equipo (no hay snapshot por línea) — si un equipo se reclasifica de
+  combo↔simple después de que un pedido confirmado lo usó, ese desglose puede moverse (muy baja probabilidad).
 
 El supervisor marca: lógica de decisión de descuento reimplementada fuera de `descuentos/queries/decision.py`,
-un `commands/` importado desde `queries/`, o `_recalcular_total_pedido`/`propagar_descuento_a_presupuestos`
-movidas acá sin una razón nueva que invalide la nota de arriba.
+un `commands/` importado desde `queries/`, `_recalcular_total_pedido`/`propagar_descuento_a_presupuestos`
+movidas acá sin una razón nueva que invalide la nota de arriba, un descuento global aplicado a una línea de
+combo, o una competencia por tamaño reintroducida entre el override manual y cliente/jornadas.
