@@ -520,12 +520,23 @@ def _jornadas(pedido):
 # ═══════════════════════════════════════════════════════════════════════════
 #  PRESUPUESTO   (reemplaza _pedido_html)
 # ═══════════════════════════════════════════════════════════════════════════
+def _bruto_item_pdf(it, j):
+    """Bruto de UN ítem, respetando `cobro_modo` (espeja
+    `services.precios.bruto_linea` — no se importa el módulo entero acá
+    porque el PDF agrega distinto por componente de combo). Una línea
+    personalizada `cobro_modo='fijo'` (ej. flete, #805) NO se multiplica por
+    jornadas. Fix de la auditoría cruzada de plata (2026-07-02): antes esta
+    fila y `_sum_bruto` multiplicaban siempre por `j`, sin excepción."""
+    mult = 1 if (it.get("cobro_modo") or "jornada") == "fijo" else max(1, int(j or 1))
+    return (it.get("precio_jornada") or 0) * it.get("cantidad", 1) * mult
+
+
 def _pedido_html(pedido):
     j = _jornadas(pedido)
     items = pedido.get("items", [])
     rows = []
     for it in items:
-        sub = (it.get("precio_jornada") or 0) * it.get("cantidad", 1) * j
+        sub = _bruto_item_pdf(it, j)
         rows.append(
             f'<tr><td style="width:58px">{_thumb(it)}</td>'
             f'<td>{_nombre_con_incluye(it)}</td>'
@@ -596,7 +607,7 @@ def _pedido_html(pedido):
 def _sum_bruto(items, j):
     total = 0
     for it in items:
-        total += (it.get("precio_jornada") or 0) * it.get("cantidad", 1) * j
+        total += _bruto_item_pdf(it, j)
         for c in it.get("componentes", []):
             total += (c.get("precio_jornada") or 0) * c.get("cantidad", 1) * it.get("cantidad", 1) * j
     return total
