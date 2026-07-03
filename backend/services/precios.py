@@ -62,7 +62,8 @@ class ItemPrecio(TypedDict, total=False):
 
 
 class TotalDesglose(TypedDict):
-    bruto: int               # Σ(precio_jornada × cantidad × jornadas)
+    bruto: int               # Σ(precio_jornada × cantidad × jornadas), TODAS las líneas
+    bruto_descontable: int   # bruto SIN las líneas es_combo — el tope real del descuento manual en $ (C-3, #1219)
     descuento_pct: float     # % efectivo aplicado (el ganador de la jerarquía: manual > max(cliente, jornadas))
     descuento_monto: int     # bruto - neto
     neto: int                # bruto - descuento_monto — lo que se PERSISTE en monto_total
@@ -258,6 +259,7 @@ def calcular_total(
     iva_monto = int(round(neto * IVA_PCT / 100)) if con_iva else 0
     return {
         "bruto": int(bruto),
+        "bruto_descontable": int(bruto_descontable),
         "descuento_pct": pct,
         "descuento_monto": descuento_monto,
         "neto": neto,

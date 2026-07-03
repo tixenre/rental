@@ -636,6 +636,7 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
           {/* Totales */}
           <TotalesCard
             bruto={bruto}
+            brutoDescontable={totales.subtotalDescontable}
             totalNeto={totalNeto}
             total={total}
             conIva={conIva}

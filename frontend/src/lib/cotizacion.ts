@@ -51,6 +51,10 @@ export type Cotizacion = {
   jornadas: number;
   /** Bruto del período: subtotalPorJornada × jornadas (antes de descuentos). */
   subtotal: number;
+  /** Bruto SIN las líneas de combo (C-3, #1219) — el tope real de un
+   *  descuento manual en $: no se le puede descontar más a un pedido que a
+   *  su parte descontable (los combos ya vienen con su propio descuento). */
+  subtotalDescontable: number;
   descuentoPct: number;
   descuentoOrigen: DescuentoOrigen;
   descuentoMonto: number;
@@ -81,6 +85,7 @@ type CotizarResp = {
   subtotal_por_jornada: number;
   descuento_origen: DescuentoOrigen;
   bruto: number;
+  bruto_descontable: number;
   descuento_pct: number;
   descuento_monto: number;
   neto: number;
@@ -95,6 +100,7 @@ export const COTIZACION_VACIA: Cotizacion = {
   subtotalPorJornada: 0,
   jornadas: 1,
   subtotal: 0,
+  subtotalDescontable: 0,
   descuentoPct: 0,
   descuentoOrigen: "ninguno",
   descuentoMonto: 0,
@@ -110,6 +116,7 @@ function adaptar(r: CotizarResp): Cotizacion {
     subtotalPorJornada: r.subtotal_por_jornada,
     jornadas: r.jornadas,
     subtotal: r.bruto,
+    subtotalDescontable: r.bruto_descontable,
     descuentoPct: r.descuento_pct,
     descuentoOrigen: r.descuento_origen,
     descuentoMonto: r.descuento_monto,

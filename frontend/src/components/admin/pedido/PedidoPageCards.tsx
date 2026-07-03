@@ -252,6 +252,7 @@ export function ItemsCard({
 
 export function TotalesCard({
   bruto,
+  brutoDescontable,
   totalNeto,
   total,
   conIva,
@@ -272,6 +273,10 @@ export function TotalesCard({
   mode = "admin",
 }: {
   bruto: number;
+  /** Bruto SIN las líneas de combo (C-3, #1219) — tope real del input $ del
+   *  override manual: no se le puede descontar más a un pedido que a su
+   *  parte descontable. */
+  brutoDescontable: number;
   totalNeto: number;
   total: number;
   conIva: boolean;
@@ -329,6 +334,7 @@ export function TotalesCard({
               {descuentoManualTipo === "monto" ? (
                 <DraftNumberInput
                   min={0}
+                  max={brutoDescontable}
                   step="100"
                   value={descuentoManualMonto}
                   onCommit={setDescuentoManualMonto}

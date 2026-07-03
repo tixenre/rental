@@ -179,6 +179,9 @@ def test_cotizar_endpoint_no_aplica_descuento_global_al_combo(setup):
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["bruto"] == 19000
+    # bruto_descontable excluye el combo (#1219): tope real de un override
+    # manual en $ — el front lo usa como `max` del input.
+    assert data["bruto_descontable"] == 10000
     assert data["descuento_monto"] == 2000  # 20% de 10.000 (solo el simple)
     assert data["neto"] == 17000
 

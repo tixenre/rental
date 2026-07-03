@@ -748,6 +748,7 @@ function PedidoEditorPage() {
                   <Input
                     type="number"
                     min={0}
+                    max={totales.subtotalDescontable}
                     step={100}
                     value={datos.descuento_manual_monto}
                     className="max-w-[140px]"
@@ -756,7 +757,10 @@ function PedidoEditorPage() {
                         (d) =>
                           d && {
                             ...d,
-                            descuento_manual_monto: Math.max(0, Number(e.target.value) || 0),
+                            descuento_manual_monto: Math.max(
+                              0,
+                              Math.min(totales.subtotalDescontable, Number(e.target.value) || 0),
+                            ),
                           },
                       )
                     }
