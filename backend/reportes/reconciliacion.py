@@ -19,6 +19,42 @@ _SAMPLE = 25
 _CLEAN_START = f"AND a.fecha_desde >= '{LIQUIDACION_INICIO}'"
 
 
+def _pedidos_para_desglose(conn) -> list[dict]:
+    """Pedidos activos (no cancelados, `monto_total > 0`) dentro del clean start,
+    con sus ítems — la forma que espera `finanzas_flujo.pedido.desglose_de_pedido`.
+    Un solo `IN` para los ítems (no N+1 por pedido)."""
+    from database import row_to_dict
+
+    rows = conn.execute(
+        f"""
+        SELECT a.id, a.fecha_desde, a.fecha_hasta, a.monto_total,
+               a.descuento_pct, a.descuento_jornadas_pct, a.cliente_id
+        FROM alquileres a
+        WHERE a.estado <> 'cancelado'
+          AND a.monto_total > 0
+          {_CLEAN_START}
+        ORDER BY a.id
+        """
+    ).fetchall()
+    pedidos = [row_to_dict(r) for r in rows]
+    if not pedidos:
+        return []
+    ids = tuple(p["id"] for p in pedidos)
+    placeholders = ", ".join("%s" for _ in ids)
+    items_rows = conn.execute(
+        f"""SELECT pedido_id, equipo_id, cantidad, precio_jornada, cobro_modo
+            FROM alquiler_items WHERE pedido_id IN ({placeholders})""",
+        ids,
+    ).fetchall()
+    items_por_pedido: dict[int, list[dict]] = {}
+    for r in items_rows:
+        d = row_to_dict(r)
+        items_por_pedido.setdefault(d["pedido_id"], []).append(d)
+    for p in pedidos:
+        p["items"] = items_por_pedido.get(p["id"], [])
+    return pedidos
+
+
 def reconciliar(conn) -> dict:
     """Corre los chequeos de integridad. Devuelve `ok` global + detalle por chequeo
     (cantidad + ids de muestra)."""
@@ -133,6 +169,27 @@ def reconciliar(conn) -> dict:
         row_to_dict(d)["dueno"] for d in duenos if row_to_dict(d)["dueno"] not in canonicos
     )
 
+    # 5. Desglose recalculado del pedido (vía la fachada `finanzas_flujo`, con el
+    #    precio de LÍNEA persistido de cada ítem — no el de catálogo, mismo
+    #    criterio que el fix de #1181) debe coincidir con `monto_total`.
+    #    Generaliza el patrón del bug #405: si el módulo de pedidos vuelve a
+    #    desincronizarse por cualquier motivo futuro, este chequeo lo caza solo,
+    #    sin depender de que el dueño note un reporte puntual (#1184 Fase 2).
+    desglose_divergentes: list[int] = []
+    try:
+        from services.finanzas_flujo.pedido import desglose_de_pedido
+
+        for p in _pedidos_para_desglose(conn):
+            d = desglose_de_pedido(conn, p)
+            if int(round(d["monto_neto"])) != int(p["monto_total"]):
+                desglose_divergentes.append(p["id"])
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        desglose_divergentes = []
+
     def chk(rows):
         ids = [row_to_dict(r)["id"] for r in rows]
         return {"cantidad": len(ids), "ids": ids[:_SAMPLE]}
@@ -145,6 +202,10 @@ def reconciliar(conn) -> dict:
         "ids": mes_cerrado_pedidos[:_SAMPLE],
         "meses": meses_afectados,
     }
+    desglose_stale = {
+        "cantidad": len(desglose_divergentes),
+        "ids": desglose_divergentes[:_SAMPLE],
+    }
 
     ok = (
         pagados_sin_ledger["cantidad"] == 0
@@ -152,6 +213,7 @@ def reconciliar(conn) -> dict:
         and sobrepagados_chk["cantidad"] == 0
         and mes_cerrado_stale["cantidad"] == 0
         and len(no_canonicos) == 0
+        and desglose_stale["cantidad"] == 0
     )
 
     return {
@@ -161,4 +223,5 @@ def reconciliar(conn) -> dict:
         "sobrepagados": sobrepagados_chk,
         "mes_cerrado_desactualizado": mes_cerrado_stale,
         "duenos_no_canonicos": no_canonicos,
+        "desglose_divergente": desglose_stale,
     }

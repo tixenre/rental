@@ -77,18 +77,25 @@ debe depender de un route).
   Deriva de `monto_total`/`iva_monto` ya persistidos; la Nota de Crédito usa el snapshot de la
   factura ORIGINAL (no el pedido en vivo), para no quedar descuadrada ante ARCA si el precio cambió.
 
-## El semáforo de reconciliación (dos capas, ambas 100% manuales)
+## El semáforo de reconciliación (dos capas + alerta proactiva)
 
 - `reportes/reconciliacion.py::reconciliar` — `GET /admin/reportes/reconciliacion` (pagados-sin-
-  ledger, `monto_pagado` divergente, sobrepagados).
+  ledger, `monto_pagado` divergente, sobrepagados, mes cerrado desactualizado, dueños no canónicos,
+  **desglose de pedido divergente** — Fase 2, ver abajo).
 - `contabilidad/queries/reconciliacion.py::reconciliar` — `GET /admin/contabilidad/reconciliacion`
   (saldos negativos, movimientos a cuenta inactiva, pagos sin cobrador válido) — **hereda** el de
   arriba, no lo duplica.
-
-**Ninguno de los dos corre solo.** `backend/jobs/scheduler.py` (el único scheduler in-process del
-repo) solo corre `enviar_recordatorios_retiro` y `purgar_cuentas_livianas_stale` — nada de
-reconciliación. No hay badge/contador en el dashboard admin. Es la pieza de gobernanza que hoy
-**falta** — ver Hallazgos.
+- **`services/finanzas_flujo/reconciliacion.py::estado`** (Fase 2, #1184) — la fachada que une los
+  dos en un solo `ok`. Primer consumidor: **`jobs/reconciliacion.py::chequear_reconciliacion_y_alertar`**,
+  corrido 1×/día desde `jobs/scheduler.py` (mismo thread in-process que ya corre
+  `enviar_recordatorios_retiro`/`purgar_cuentas_livianas_stale`) — si `ok=False`, manda un mail resumen
+  a `settings.admin_emails`. **Ya no es 100% manual**: el dueño se entera sin tener que abrir el
+  dashboard. El job solo avisa, no repara nada.
+- **Chequeo nuevo (Fase 2):** `desglose_divergente` en `reportes/reconciliacion.py` — compara
+  `alquileres.monto_total` persistido contra el desglose recalculado con el precio de línea YA
+  PERSISTIDO de cada ítem (vía `finanzas_flujo.pedido.desglose_de_pedido`, NO el de catálogo). Es la
+  red genérica que hubiera cazado el patrón del bug #405 sin depender de que el dueño notara un
+  reporte puntual.
 
 ## Candados (tests que fijan la garantía)
 
@@ -99,6 +106,13 @@ reconciliación. No hay badge/contador en el dashboard admin. Es la pieza de gob
 - `backend/tests/test_reportes_cierres_db.py` — cierre de la liquidación.
 - `backend/tests/test_finanzas_flujo_pedido.py` — desglose de pedido, cobro_modo-aware (Fase 1).
 - `backend/tests/test_finanzas_flujo_source_scan.py` — PDF y facturación pasan por la fachada.
+- `backend/tests/test_finanzas_flujo_reconciliacion.py` — el semáforo unificado (`estado`) delega bien
+  en los dos `reconciliar()` (Fase 2).
+- `backend/tests/test_jobs_reconciliacion.py` — el job de alerta manda mail solo cuando `ok=False`, a
+  cada admin, y nunca propaga un fallo de envío (Fase 2).
+- `backend/tests/test_reportes_liquidacion_db.py::test_reconciliacion_caza_desglose_divergente_del_pedido`
+  — el chequeo `desglose_divergente` caza un `monto_total` que no coincide con el desglose recalculado
+  del precio de línea persistido (Fase 2).
 - Facturación: candados propios en `docs/SISTEMA_FACTURACION.md`.
 
 ## Hallazgos de la auditoría cruzada (2026-07-02) — estado: por priorizar con el dueño
@@ -180,8 +194,11 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
    Candado: `test_reportes_cierres_db.py::test_lock_serializa_cerrar_mes_concurrente` (Postgres real,
    dos conexiones + `threading.Event` — confirma que una segunda conexión que intenta `cerrar_mes` del
    mismo mes queda bloqueada hasta que la primera libera el lock, no corren en paralelo).
-9. **Reconciliación 100% manual** (ver arriba) — el riesgo de gobernanza más directo: nada avisa
-   proactivamente si algo se desincroniza.
+9. ✅ **RESUELTO (Fase 2, #1184).** Reconciliación 100% manual — el riesgo de gobernanza más directo:
+   nada avisaba proactivamente si algo se desincronizaba. Fix: `services/finanzas_flujo/reconciliacion.py::estado`
+   (une los dos `reconciliar()`) + `jobs/reconciliacion.py::chequear_reconciliacion_y_alertar` corrido
+   1×/día desde el scheduler in-process — manda mail a `settings.admin_emails` si `ok=False`. Suma
+   además el chequeo `desglose_divergente` (ver arriba) — la red genérica que hubiera cazado #405 sola.
 
 ### Seguridad / limpieza (bajo impacto, documentado para no perderlo)
 10. ✅ **RESUELTO (Fase 6, #1184).** `routes/reportes.py` — sin `@limiter.limit` en los endpoints de

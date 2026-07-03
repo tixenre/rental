@@ -2359,6 +2359,55 @@ cancel-in-progress` ya cancela corridas viejas.
   limpios en los archivos tocados. Rama aislada `feature/finanzas-flujo-fase1` (PR sin mergear, hoja de
   ruta); tracking #1184 (Fase 3, continúa tras la auditoría cruzada de plata).
 
+### 2026-07-02 — Fase 2 (última): reconciliación proactiva — mail al dueño + chequeo `desglose_divergente`
+
+- **Contexto.** Última fase de la hoja de ruta de plata (#1184). El semáforo de reconciliación era
+  **100% manual**: `reportes/reconciliacion.py::reconciliar` y
+  `contabilidad/queries/reconciliacion.py::reconciliar` solo se consultaban si alguien abría
+  `/admin/reportes`/`/admin/contabilidad` a mirar — el gap de gobernanza más directo detrás del miedo
+  original del dueño ("no sé desde dónde se gobierna cómo funciona la plata"). Antes de esta fase, la
+  pregunta "¿un pedido confirmado puede desincronizarse de su propio desglose?" (el patrón general del
+  bug #405) no tenía ningún chequeo automático — dependía de que alguien notara un reporte puntual raro.
+- **Decisión — semáforo unificado.** `services/finanzas_flujo/reconciliacion.py::estado(conn)` (nuevo
+  submódulo de la fachada, tercero tras `pedido.py`) une los dos `reconciliar()` existentes en un solo
+  `{ok, reporte, contabilidad}` — `ok` es el AND de ambos. **No reimplementa ningún chequeo**: cada
+  función delega 1:1, mismo patrón que `pedido.py` (Fase 1).
+- **Decisión — job de alerta proactiva.** `jobs/reconciliacion.py::chequear_reconciliacion_y_alertar()`
+  corre 1×/día desde el mismo thread in-process del scheduler (`jobs/scheduler.py`, junto a
+  `enviar_recordatorios_retiro`/`purgar_cuentas_livianas_stale` — mismo mecanismo de "última fecha
+  corrida" que ya acota a 1×/día, sin necesitar un rate-limit aparte): si `estado(conn)["ok"]` es
+  `False`, arma un resumen legible del detalle y manda un mail a cada `settings.admin_emails` vía
+  `send_raw_email` (mail transaccional one-off, mismo mecanismo que ya usa
+  `routes/reportes.py::enviar_reporte_mail`). El job **solo avisa, nunca repara** — la corrección sigue
+  siendo manual, vía el dashboard admin. Nunca propaga: un error en `estado()` o en el envío no debe
+  tumbar el scheduler (mismo contrato que los otros dos jobs del thread).
+- **Decisión — nuevo chequeo `desglose_divergente`.** Se agrega a `reportes/reconciliacion.py::reconciliar`
+  (no a la fachada — vive donde viven los otros 4 chequeos del reporte). Para cada pedido activo (no
+  cancelado, `monto_total > 0`, dentro del clean start), recalcula el desglose con el precio de línea
+  YA PERSISTIDO de cada ítem (vía `finanzas_flujo.pedido.desglose_de_pedido` — NO el precio de catálogo,
+  mismo criterio que el fix de #1181) y lo compara contra `monto_total`. Si divergen, el pedido se
+  lista. **Se descartaron** los dos chequeos que el dueño propuso inicialmente en la conversación de
+  diseño ("facturado == cobrado" y "ganancia del mes == suma recalculada"): el primero viola
+  devengado≠percibido a propósito (`contabilidad/CLAUDE.md`); el segundo se calcula al vuelo sin
+  persistirse dos veces, así que no tiene riesgo de drift por construcción — agregar un chequeo ahí
+  sería ruido sin cazar nada real. El único chequeo con valor real era éste: es la red genérica que
+  hubiera cazado el patrón de #405 sin depender de que el dueño notara un reporte puntual.
+- **Why.** Un job que solo lee y notifica es de bajo riesgo (no toca ningún camino de escritura de
+  plata) — la corrección la sigue haciendo un humano informado, no el sistema solo. El chequeo nuevo usa
+  la MISMA fuente que ya usan los 6 consumidores reales del desglose (Fase 1), así que no puede
+  divergir de lo que el dueño ve en pantalla.
+- **Consecuencias.** `test_finanzas_flujo_reconciliacion.py` (3 tests: la fachada une bien los dos
+  semáforos, cualquiera de los dos en `False` tumba el `ok` global). `test_jobs_reconciliacion.py`
+  (5 tests: no manda mail si `ok=True`; manda uno a cada admin si `ok=False`; un envío fallido no
+  propaga; el resumen HTML incluye los chequeos con cantidad positiva y no rompe sin ítems).
+  `test_reportes_liquidacion_db.py::test_reconciliacion_caza_desglose_divergente_del_pedido` (Postgres
+  real: un pedido con `monto_total` deliberadamente desincronizado de su desglose recalculado aparece
+  en `desglose_divergente`). Suite completa 2565 passed / 177 skipped (sin regresiones). El supervisor
+  marca: un chequeo de reconciliación nuevo fuera de la fachada `finanzas_flujo`, un job de este tipo
+  que repare en vez de solo avisar, o un mail de alerta que no pase por `send_raw_email`. Rama
+  `feature/finanzas-flujo-fase2-reconciliacion` (sobre `feature/finanzas-flujo-fase1`, que sigue sin
+  mergear — PR scoped, sin mergear, hoja de ruta); tracking #1184 — **última fase de la iniciativa**.
+
 ### 2026-07-03 — `routes/estadisticas.py`: las agregaciones leen `monto_total`, no reconstruyen el descuento (#1209)
 
 - **Contexto.** Uno de los 14 hallazgos de la auditoría cruzada de plata (2026-07-02, severidad media):
