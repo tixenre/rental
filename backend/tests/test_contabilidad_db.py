@@ -42,15 +42,37 @@ pytestmark = [
 PED = 9_400_001
 
 
+def _ensure_cuenta(conn, nombre: str, **kwargs) -> None:
+    """Crea la cuenta de ejemplo si todavía no existe. Idempotente A PROPÓSITO:
+    `cerrar_mes`/`reabrir_mes` (`contabilidad/cierres.py`) comitean de verdad
+    (son acciones durables reales, no solo del request) — si un test anterior
+    los llamó, esta cuenta puede haber sobrevivido al rollback de SU propio
+    `conn` fixture. Sin el chequeo, el segundo test que la crea pisa el único
+    parcial `cuentas_nombre_activa_uq` con UniqueViolation."""
+    from contabilidad.commands.cuentas import crear_cuenta
+
+    if _cuenta_id(conn, nombre) is None:
+        crear_cuenta(conn, nombre=nombre, por="test-seed", **kwargs)
+
+
 @pytest.fixture
 def conn():
     """Conexión transaccional: lo que inserta el test se DESCARTA con rollback al
-    terminar, así no quedan datos sucios (no hace falta limpieza manual)."""
+    terminar, así no quedan datos sucios (no hace falta limpieza manual).
+
+    Efectivo/Banco/Dólares ya NO están en el seed de `init_db()` (#quitadas en
+    44ede548 — resucitaban en cada boot si el dueño las daba de baja, por el
+    `ON CONFLICT DO NOTHING` sin agarrar `socio=NULL` bajo el índice parcial
+    `activa`). Este archivo las sigue necesitando como cajas de ejemplo para
+    varios tests → se crean acá (idempotente, ver `_ensure_cuenta`)."""
     from database import get_db, init_db
 
-    init_db()  # garantiza el esquema + el seed de cuentas (su propia conexión/commit)
+    init_db()  # garantiza el esquema (su propia conexión/commit)
     c = get_db()
     try:
+        _ensure_cuenta(c, "Efectivo", tipo="caja")
+        _ensure_cuenta(c, "Banco", tipo="caja")
+        _ensure_cuenta(c, "Dólares", tipo="caja", moneda="USD")
         yield c
     finally:
         c.rollback()
@@ -58,7 +80,7 @@ def conn():
 
 
 def _saldo(conn, nombre: str):
-    from contabilidad.saldos import saldos
+    from contabilidad.queries.saldos import saldos
     for f in saldos(conn)["cuentas"]:
         if f["nombre"] == nombre:
             return f["saldo"]
@@ -117,7 +139,7 @@ def test_cobro_de_rambla_alimenta_el_fondo_rambla(conn):
 
 
 def test_ingresos_derivados_agrupan_por_destinatario(conn):
-    from contabilidad.saldos import ingresos_derivados
+    from contabilidad.queries.saldos import ingresos_derivados
 
     base = ingresos_derivados(conn).get("Tincho", 0)
     _pedido_y_pago(conn, 150000, "Tincho")
@@ -128,8 +150,8 @@ def test_alquiler_previo_al_clean_start_no_entra_a_finanzas(conn):
     # Clean start por FECHA DEL ALQUILER (no de pago): un pedido cuyo alquiler fue
     # antes de junio, aunque se cobre en junio, NO suma al saldo de la caja del socio
     # ni a los cobros mensuales. Queda "cobrado y listo" en el pedido, fuera de Finanzas.
-    from contabilidad.saldos import ingresos_derivados
-    from contabilidad.movimientos import cobros_mensuales
+    from contabilidad.queries.saldos import ingresos_derivados
+    from contabilidad.queries.movimientos import cobros_mensuales
 
     base_caja = _saldo(conn, "Caja Tincho")
     base_ing = ingresos_derivados(conn).get("Tincho", 0)
@@ -148,7 +170,7 @@ def test_nombre_se_libera_al_dar_de_baja(conn):
     # El nombre es único solo entre activas: dar de baja una cuenta libera su
     # nombre, así se puede reusar (caso real: renombrar a un nombre que tenía una
     # cuenta vieja de baja).
-    from contabilidad.cuentas import crear_cuenta, desactivar_cuenta
+    from contabilidad.commands.cuentas import crear_cuenta, desactivar_cuenta
 
     nombre = "Reuso Test 9400"
     c1 = crear_cuenta(conn, nombre=nombre, tipo="caja", por="test")
@@ -176,7 +198,7 @@ def test_transferencia_mueve_plata_entre_cuentas(conn):
 def test_saldo_iguala_la_derivacion(conn):
     # Invariante: el saldo de una caja de socio (sin movimientos que la toquen)
     # == sus ingresos derivados (+ su saldo inicial, que es 0 en el seed).
-    from contabilidad.saldos import ingresos_derivados
+    from contabilidad.queries.saldos import ingresos_derivados
     _pedido_y_pago(conn, 90000, "Pablo")
     assert _saldo(conn, "Caja Pablo") == ingresos_derivados(conn).get("Pablo", 0)
 
@@ -185,14 +207,14 @@ def test_socios_coinciden_con_destinatarios_de_pago(conn):
     # Anti-drift: los socios del módulo contable son exactamente los destinatarios
     # posibles de un cobro (si alguien agrega un tercero, este test obliga a tocar
     # los dos lados).
-    from contabilidad.cuentas import COBRADORES
+    from contabilidad.constants import COBRADORES
     from routes.alquileres import DESTINATARIOS_PAGO
 
     assert set(COBRADORES) == set(DESTINATARIOS_PAGO)
 
 
 def test_desactivar_falla_si_la_cuenta_tiene_saldo(conn):
-    from contabilidad.cuentas import crear_cuenta, desactivar_cuenta
+    from contabilidad.commands.cuentas import crear_cuenta, desactivar_cuenta
 
     c = crear_cuenta(conn, nombre="Caja Test ZZ", tipo="caja", saldo_inicial=50000)
     with pytest.raises(ValueError):
@@ -207,7 +229,7 @@ def _categoria_id(conn, nombre="Otros"):
 def test_crear_gasto_baja_caja_y_anular_lo_restaura(conn):
     # El engine (no SQL crudo): un gasto baja la caja; anularlo la restaura, porque
     # los movimientos anulados no cuentan para el saldo.
-    from contabilidad.movimientos import anular_movimiento, crear_movimiento
+    from contabilidad.commands.movimientos import anular_movimiento, crear_movimiento
 
     base = _saldo(conn, "Efectivo")
     mov = crear_movimiento(
@@ -222,8 +244,8 @@ def test_crear_gasto_baja_caja_y_anular_lo_restaura(conn):
 def test_reporte_mensual_cargo_a_socio_no_toca_ganancia(conn):
     # Núcleo del reporte: un CARGO a un socio (Rambla le compró algo) es una
     # transferencia, NO un gasto → aparece en socios_mes pero NO baja la ganancia.
-    from contabilidad.movimientos import crear_movimiento
-    from contabilidad.reporte_mensual import reporte_mensual
+    from contabilidad.commands.movimientos import crear_movimiento
+    from contabilidad.queries.reporte_mensual import reporte_mensual
 
     mes = "2026-06"
     base = reporte_mensual(conn, mes)
@@ -243,8 +265,8 @@ def test_reporte_mensual_cargo_a_socio_no_toca_ganancia(conn):
 
 def test_reporte_mensual_gasto_si_baja_ganancia(conn):
     # Contraste: un gasto real SÍ baja la ganancia neta.
-    from contabilidad.movimientos import crear_movimiento
-    from contabilidad.reporte_mensual import reporte_mensual
+    from contabilidad.commands.movimientos import crear_movimiento
+    from contabilidad.queries.reporte_mensual import reporte_mensual
 
     mes = "2026-06"
     gan_base = reporte_mensual(conn, mes)["ganancia_neta"]
@@ -260,7 +282,7 @@ def test_reporte_ganancia_descuenta_comision_de_duenos(conn):
     # reparto, a Rambla le tocan $45k (45%); Pablo+Tincho se llevan $55k. La
     # ganancia parte de los $45k de Rambla, NO de los $100k facturados — la comisión
     # de los dueños es un COSTO, no ganancia de Rambla.
-    from contabilidad.reporte_mensual import reporte_mensual
+    from contabilidad.queries.reporte_mensual import reporte_mensual
 
     EQ, PEDX = 9_400_700, 9_400_701
     conn.execute(
@@ -296,7 +318,8 @@ def test_reporte_ganancia_descuenta_comision_de_duenos(conn):
 
 
 def test_listar_movimientos_resuelve_nombres(conn):
-    from contabilidad.movimientos import crear_movimiento, listar_movimientos
+    from contabilidad.commands.movimientos import crear_movimiento
+    from contabilidad.queries.movimientos import listar_movimientos
 
     crear_movimiento(
         conn, tipo="transferencia", monto=5000,
@@ -311,7 +334,7 @@ def test_listar_movimientos_resuelve_nombres(conn):
 
 
 def test_gasto_necesita_categoria(conn):
-    from contabilidad.movimientos import crear_movimiento
+    from contabilidad.commands.movimientos import crear_movimiento
 
     with pytest.raises(ValueError):
         crear_movimiento(conn, tipo="gasto", monto=1000,
@@ -322,7 +345,8 @@ def test_rendicion_cierra_en_cero_y_saldar(conn):
     # El invariante de oro: la rendición está atada al universo del reporte, así
     # que lo cobrado == el total del reporte. Y registrar los sugeridos deja todo
     # saldado. Mes futuro aislado para no chocar con datos de otros tests.
-    from contabilidad.rendicion import rendicion, saldar
+    from contabilidad.queries.rendicion import rendicion
+    from contabilidad.commands.rendicion import saldar
 
     MES = "2026-09"
     EQ, PED2 = 9_400_900, 9_400_901
@@ -366,8 +390,9 @@ def test_rendicion_cierra_en_cero_y_saldar(conn):
 
 
 def test_cierre_traba_la_edicion_del_mes(conn):
-    from contabilidad.cierres import cerrar_mes, mes_cerrado, reabrir_mes
-    from contabilidad.movimientos import crear_movimiento
+    from contabilidad.commands.cierres import cerrar_mes, reabrir_mes
+    from contabilidad.queries.cierres import mes_cerrado
+    from contabilidad.commands.movimientos import crear_movimiento
 
     MES = "2026-08"
     reabrir_mes(conn, MES)  # idempotente: limpia un cierre colgado de una corrida previa
@@ -393,7 +418,7 @@ def test_cierre_traba_la_edicion_del_mes(conn):
 
 
 def test_reconciliar_corre(conn):
-    from contabilidad.reconciliacion import reconciliar
+    from contabilidad.queries.reconciliacion import reconciliar
 
     r = reconciliar(conn)
     assert "ok" in r
@@ -401,7 +426,8 @@ def test_reconciliar_corre(conn):
 
 
 def test_beneficiario_se_guarda_y_autocompleta(conn):
-    from contabilidad.movimientos import beneficiarios_usados, crear_movimiento, listar_movimientos
+    from contabilidad.commands.movimientos import crear_movimiento
+    from contabilidad.queries.movimientos import beneficiarios_usados, listar_movimientos
 
     crear_movimiento(
         conn, tipo="gasto", monto=125000, cuenta_origen_id=_cuenta_id(conn, "Efectivo"),
@@ -414,7 +440,7 @@ def test_beneficiario_se_guarda_y_autocompleta(conn):
 
 
 def test_cobros_mensuales_agrega_por_mes(conn):
-    from contabilidad.movimientos import cobros_mensuales
+    from contabilidad.queries.movimientos import cobros_mensuales
 
     _pedido_y_pago(conn, 120000, "Tincho", fecha="2026-06-15T10:00:00")
     junio = [r for r in cobros_mensuales(conn, cobrador="Tincho") if r["mes"] == "2026-06"]
@@ -422,7 +448,7 @@ def test_cobros_mensuales_agrega_por_mes(conn):
 
 
 def test_caja_usd_existe_y_totales_por_moneda(conn):
-    from contabilidad.saldos import saldos
+    from contabilidad.queries.saldos import saldos
 
     s = saldos(conn)
     by = {c["nombre"]: c for c in s["cuentas"]}
@@ -431,7 +457,7 @@ def test_caja_usd_existe_y_totales_por_moneda(conn):
 
 
 def test_transferencia_entre_monedas_distintas_falla(conn):
-    from contabilidad.movimientos import crear_movimiento
+    from contabilidad.commands.movimientos import crear_movimiento
 
     with pytest.raises(ValueError):
         crear_movimiento(
@@ -443,8 +469,273 @@ def test_transferencia_entre_monedas_distintas_falla(conn):
 
 
 def test_crear_y_desactivar_cuenta_vacia(conn):
-    from contabilidad.cuentas import crear_cuenta, desactivar_cuenta
+    from contabilidad.commands.cuentas import crear_cuenta, desactivar_cuenta
 
     c = crear_cuenta(conn, nombre="Caja Test Vacia ZZ", tipo="caja")
     desactivado = desactivar_cuenta(conn, c["id"])
     assert desactivado["activa"] is False
+
+
+def test_retiro_aporte_ajuste_extremo_a_extremo(conn):
+    # Gasto y transferencia ya se ejercen extremo-a-extremo (crear_movimiento)
+    # en otros tests de este archivo; retiro/aporte/ajuste NO tenían ningún test
+    # contra Postgres real (solo su validación estructural, pura, en
+    # test_contabilidad_movimientos.py) — auditoría 2026-07-02. Acá se prueba
+    # el camino de escritura real: validación + INSERT + derivación del saldo.
+    from contabilidad.commands.movimientos import crear_movimiento
+
+    efectivo = _cuenta_id(conn, "Efectivo")
+    banco = _cuenta_id(conn, "Banco")
+    base_efectivo = _saldo(conn, "Efectivo")
+    base_banco = _saldo(conn, "Banco")
+
+    # Retiro: un socio saca plata de una caja — sale del sistema, sin destino.
+    crear_movimiento(conn, tipo="retiro", monto=8000, cuenta_origen_id=efectivo, por="test")
+    assert _saldo(conn, "Efectivo") - base_efectivo == -8000
+
+    # Aporte: un socio mete plata — entra al sistema, sin origen.
+    crear_movimiento(conn, tipo="aporte", monto=15000, cuenta_destino_id=banco, por="test")
+    assert _saldo(conn, "Banco") - base_banco == 15000
+
+    # Ajuste: conciliación manual, puede ser de un solo lado (acá: solo origen,
+    # como una merma/pérdida en Efectivo — no exige el otro lado).
+    crear_movimiento(conn, tipo="ajuste", monto=500, cuenta_origen_id=efectivo,
+                     nota="Merma de caja", por="test")
+    assert _saldo(conn, "Efectivo") - base_efectivo == -8500  # retiro + ajuste acumulados
+
+    # Conservación: nada de esto tocó Banco más que el aporte, ni viceversa —
+    # las cajas no se contaminan entre sí sin un movimiento que las vincule.
+    assert _saldo(conn, "Banco") - base_banco == 15000
+
+
+def test_ajuste_con_origen_y_destino_mueve_ambos_saldos(conn):
+    # Único hueco combinatorio real entre los 5 tipos de movimiento: un ajuste
+    # con AMBOS lados a la vez (conciliación entre dos cajas, sin ser
+    # "transferencia" en el sentido operativo) — auditoría 2026-07-02.
+    from contabilidad.commands.movimientos import crear_movimiento
+
+    efectivo = _cuenta_id(conn, "Efectivo")
+    banco = _cuenta_id(conn, "Banco")
+    base_efectivo = _saldo(conn, "Efectivo")
+    base_banco = _saldo(conn, "Banco")
+
+    crear_movimiento(conn, tipo="ajuste", monto=3000, cuenta_origen_id=efectivo,
+                     cuenta_destino_id=banco, nota="Corrección de conteo", por="test")
+    assert _saldo(conn, "Efectivo") - base_efectivo == -3000
+    assert _saldo(conn, "Banco") - base_banco == 3000
+
+
+def test_editar_cuenta_end_to_end(conn):
+    # editar_cuenta no tenía NINGÚN test — auditoría 2026-07-02. Es la función
+    # de escritura de mayor riesgo real (se usa hoy en producción para editar
+    # el saldo_inicial de arranque de un socio).
+    from contabilidad.commands.cuentas import crear_cuenta, editar_cuenta
+
+    c = crear_cuenta(conn, nombre="Caja Editar ZZ", tipo="caja", saldo_inicial=1000)
+
+    editado = editar_cuenta(conn, c["id"], campos={"saldo_inicial": 5000}, por="test")
+    assert editado["saldo_inicial"] == 5000
+
+    editado = editar_cuenta(conn, c["id"], campos={"nombre": "Caja Editar ZZ Renombrada"}, por="test")
+    assert editado["nombre"] == "Caja Editar ZZ Renombrada"
+
+    # tipo/socio NO están en _CAMPOS_EDITABLES → se ignoran en silencio, no se tocan.
+    editado = editar_cuenta(conn, c["id"], campos={"tipo": "banco", "socio": "Pablo"}, por="test")
+    assert editado["tipo"] == "caja"
+    assert editado["socio"] is None
+
+    # El nombre viejo queda libre (índice parcial WHERE activa) — otra cuenta
+    # nueva puede reusarlo sin chocar.
+    c2 = crear_cuenta(conn, nombre="Caja Editar ZZ", tipo="caja")
+    assert c2["id"] != c["id"]
+
+
+def test_editar_movimiento_revalida_cuentas_y_categoria(conn):
+    # editar_movimiento no repetía las validaciones de crear_movimiento — bug
+    # real: se podía cambiar cuenta_destino_id a una cuenta de OTRA moneda sin
+    # ningún error, violando la invariante ARS≠USD (auditoría 2026-07-02, fix
+    # en _validar_cuentas_y_categoria). Este test confirma el fix.
+    from contabilidad.commands.movimientos import crear_movimiento, editar_movimiento
+
+    efectivo = _cuenta_id(conn, "Efectivo")
+    banco = _cuenta_id(conn, "Banco")
+    dolares = _cuenta_id(conn, "Dólares")
+
+    mov = crear_movimiento(conn, tipo="transferencia", monto=10000,
+                           cuenta_origen_id=efectivo, cuenta_destino_id=banco, por="test")
+
+    # Editar a una cuenta de OTRA moneda: debe fallar (antes del fix, pasaba).
+    with pytest.raises(ValueError):
+        editar_movimiento(conn, mov["id"], campos={"cuenta_destino_id": dolares}, por="test")
+
+    # Editar a una cuenta inexistente: debe fallar.
+    with pytest.raises(ValueError):
+        editar_movimiento(conn, mov["id"], campos={"cuenta_origen_id": 999_999_999}, por="test")
+
+    # Editar la categoría de un gasto a una inexistente: debe fallar.
+    gasto = crear_movimiento(conn, tipo="gasto", monto=2000, cuenta_origen_id=efectivo,
+                             categoria_id=_categoria_id(conn), por="test")
+    with pytest.raises(ValueError):
+        editar_movimiento(conn, gasto["id"], campos={"categoria_id": 999_999_999}, por="test")
+
+    # El camino sano (misma moneda, cuenta activa) sigue andando.
+    editado = editar_movimiento(conn, mov["id"], campos={"monto": 12000}, por="test")
+    assert editado["monto"] == 12000
+
+
+def test_saldo_de_cuenta_fallback_inactiva_e_inexistente(conn):
+    # El fallback de saldo_de_cuenta (cuenta que no aparece en saldos() porque
+    # está desactivada, o no existe) nunca corría bajo test — auditoría 2026-07-02.
+    from contabilidad.commands.cuentas import crear_cuenta, desactivar_cuenta
+    from contabilidad.commands.movimientos import crear_movimiento
+    from contabilidad.queries.saldos import saldo_de_cuenta
+
+    c = crear_cuenta(conn, nombre="Caja Fallback ZZ", tipo="caja")
+    efectivo = _cuenta_id(conn, "Efectivo")
+    # Llevarla a saldo 0 (entra y sale lo mismo) para poder desactivarla.
+    crear_movimiento(conn, tipo="transferencia", monto=4000,
+                     cuenta_origen_id=efectivo, cuenta_destino_id=c["id"], por="test")
+    crear_movimiento(conn, tipo="transferencia", monto=4000,
+                     cuenta_origen_id=c["id"], cuenta_destino_id=efectivo, por="test")
+    assert saldo_de_cuenta(conn, c["id"]) == 0
+
+    desactivar_cuenta(conn, c["id"])
+    # Ya no aparece en saldos()["cuentas"] (solo activas) — el fallback recalcula.
+    assert saldo_de_cuenta(conn, c["id"]) == 0
+
+    assert saldo_de_cuenta(conn, 999_999_999) == 0  # inexistente
+
+
+def test_anular_movimiento_es_rendicion_ya_saldado(conn):
+    # anular_movimiento no distingue si el movimiento es parte de una rendición
+    # ya saldada — auditoría 2026-07-02. Este test documenta el comportamiento
+    # (correcto, no un bug): ya_transferido() excluye el anulado ("la plata no
+    # se borra" reflejado en la rendición: el saldado deja de contar y el
+    # pendiente reaparece), pero _movimientos_rendicion (el log de auditoría)
+    # lo sigue mostrando — es intencional, no una divergencia accidental.
+    from contabilidad.queries.rendicion import rendicion, ya_transferido
+    from contabilidad.commands.rendicion import saldar
+    from contabilidad.commands.movimientos import anular_movimiento
+
+    MES = "2026-10"
+    EQ, PED = 9_400_910, 9_400_911
+    # Dueño Pablo pero cobrado por Tincho (mismo patrón que
+    # test_rendicion_cierra_en_cero_y_saldar): genera un sugerido real de
+    # Tincho→Pablo, no ambiguo como cuando cobra el mismo que corresponde.
+    conn.execute(
+        "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
+        (EQ, "Equipo Anular Rend", 2, "Pablo"),
+    )
+    conn.execute(
+        """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
+                                   monto_total, monto_pagado)
+           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+        (PED, "Cli anular rend", "finalizado", "2026-10-05T08:00:00", "2026-10-06T20:00:00",
+         50000, 50000),
+    )
+    conn.execute(
+        "INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, subtotal) VALUES (%s,%s,%s,%s)",
+        (PED, EQ, 1, 50000),
+    )
+    conn.execute(
+        """INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
+           VALUES (%s,%s,%s,%s,%s,%s)""",
+        (PED, 50000, "pago", "Tincho", "transferencia", "2026-10-15T10:00:00"),
+    )
+
+    r = rendicion(conn, MES)
+    assert r["cuadra"] is True
+    sugeridos = r["sugeridos"]
+    assert sugeridos, "esperaba al menos un sugerido para saldar"
+    s = sugeridos[0]
+    mov = saldar(conn, MES, de=s["de"], a=s["a"], monto=s["monto"], por="test")
+
+    ya = ya_transferido(conn, MES)
+    assert ya[s["a"]] > 0  # ya recibió, vía el saldado
+
+    anular_movimiento(conn, mov["id"], motivo="carga duplicada", por="test")
+
+    # Al anular, ya_transferido() ya NO lo cuenta — el pendiente reaparece.
+    ya2 = ya_transferido(conn, MES)
+    assert ya2[s["a"]] == 0
+
+    # Pero el log de auditoría (_movimientos_rendicion, vía rendicion()) SÍ lo
+    # sigue mostrando — no desaparece, queda trazable.
+    r2 = rendicion(conn, MES)
+    ids_en_log = [m["id"] for m in r2["movimientos"]]
+    assert mov["id"] in ids_en_log
+
+
+def test_reabrir_mes_assert_retorno(conn):
+    # reabrir_mes se ejecutaba en otros tests (como limpieza) pero nunca se
+    # asserteaba su valor de retorno True/False — auditoría 2026-07-02. El
+    # equivalente en reportes/cierres.py sí lo testea en ambos casos.
+    from contabilidad.commands.cierres import cerrar_mes, reabrir_mes
+
+    MES = "2026-11"
+    assert reabrir_mes(conn, MES) is False  # no había cierre → nada que reabrir
+
+    cerrar_mes(conn, MES, "test")
+    assert reabrir_mes(conn, MES) is True  # había cierre → lo borró
+
+    assert reabrir_mes(conn, MES) is False  # ya no hay nada → False de nuevo
+
+
+def test_retiro_aporte_bloqueados_contra_cuenta_socio(conn):
+    # Resuelto 2026-07-02 (confirmado con el dueño): la cuenta de un socio humano
+    # es puro balance de deuda (su plata real está en un banco aparte, fuera del
+    # sistema) — retiro/aporte representan plata física entrando/saliendo de una
+    # CAJA, así que no tienen sentido de negocio contra un balance de deuda.
+    from contabilidad.commands.movimientos import crear_movimiento
+
+    caja_pablo = _cuenta_id(conn, "Caja Pablo")
+
+    with pytest.raises(ValueError, match="retiro"):
+        crear_movimiento(conn, tipo="retiro", monto=1000, cuenta_origen_id=caja_pablo, por="test")
+    with pytest.raises(ValueError, match="aporte"):
+        crear_movimiento(conn, tipo="aporte", monto=1000, cuenta_destino_id=caja_pablo, por="test")
+
+
+def test_gasto_contra_cuenta_socio_cuenta_en_pyl_y_baja_deuda(conn):
+    # Permitido a propósito: "el socio pagó un gasto de Rambla con su propia
+    # plata". Un solo movimiento hace las dos cosas — cuenta en el P&L
+    # categorizado (gastos_por_categoria no filtra por tipo de cuenta origen,
+    # solo por moneda) Y baja la deuda del socio (egresos resta en la fórmula de
+    # cuenta corriente) — Rambla ahora le debe eso.
+    from contabilidad.commands.movimientos import crear_movimiento
+    from contabilidad.queries.reporte_mensual import reporte_mensual
+    from contabilidad.queries.saldos import saldos
+
+    mes = "2026-08"
+    caja_pablo = _cuenta_id(conn, "Caja Pablo")
+    antes = next(f for f in saldos(conn)["socios"] if f["nombre"] == "Caja Pablo")["saldo"]
+    gastos_base = reporte_mensual(conn, mes)["gastos"]["total"]
+
+    crear_movimiento(
+        conn, tipo="gasto", monto=7000, cuenta_origen_id=caja_pablo,
+        categoria_id=_categoria_id(conn), fecha=f"{mes}-10", por="test",
+    )
+
+    despues = next(f for f in saldos(conn)["socios"] if f["nombre"] == "Caja Pablo")["saldo"]
+    assert despues == antes - 7000  # baja su deuda (o lo acerca a acreedor)
+    assert reporte_mensual(conn, mes)["gastos"]["total"] == gastos_base + 7000  # cuenta en el P&L
+
+
+def test_editar_movimiento_no_puede_reapuntar_retiro_a_cuenta_socio(conn):
+    # El bloqueo de retiro/aporte contra una cuenta de socio vive en
+    # _validar_cuentas_y_categoria, compartida por crear_movimiento Y
+    # editar_movimiento — pero solo estaba probado por el camino de creación.
+    # Mismo patrón de gap que el bug original de editar_movimiento (auditoría
+    # 2026-07-02): no alcanza con que "debería andar igual", hay que confirmarlo.
+    from contabilidad.commands.movimientos import crear_movimiento, editar_movimiento
+
+    efectivo = _cuenta_id(conn, "Efectivo")
+    caja_pablo = _cuenta_id(conn, "Caja Pablo")
+
+    retiro = crear_movimiento(conn, tipo="retiro", monto=1000, cuenta_origen_id=efectivo, por="test")
+    with pytest.raises(ValueError, match="retiro"):
+        editar_movimiento(conn, retiro["id"], campos={"cuenta_origen_id": caja_pablo}, por="test")
+
+    aporte = crear_movimiento(conn, tipo="aporte", monto=1000, cuenta_destino_id=efectivo, por="test")
+    with pytest.raises(ValueError, match="aporte"):
+        editar_movimiento(conn, aporte["id"], campos={"cuenta_destino_id": caja_pablo}, por="test")

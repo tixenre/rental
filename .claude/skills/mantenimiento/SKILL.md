@@ -160,7 +160,8 @@ positivos típicos (**NO borrar**):
 
 > **Respetar la MEMORIA.** Antes de borrar, chequear que no contradiga una decisión registrada.
 > **Nunca** se borra: el barrel documentado `equipment/index.ts` (*2026-05-29*), los motores únicos
-> `backend/{reservas,reportes,busqueda,services/branding}/` ni el sistema de analytics (*2026-06-02*).
+> `backend/{reservas,reportes,busqueda,services/branding,contabilidad,services/contenido}/` ni el
+> sistema de analytics (*2026-06-02*).
 > Si algo "parece muerto" pero está documentado como vivo → se **deja y se reporta** (baranda de
 > "mirar el target antes de borrar").
 
@@ -293,6 +294,18 @@ y clasificá por riesgo (tabla de la fase 4). Reglas:
   de explosión → **iniciativa propia con plan + supervisor**, jamás en un barrido.
 - **Honestidad > actividad.** Si tras el análisis el código ya está bien modularizado (motores únicos
   presentes, clones ≤0.5%), la respuesta correcta es **decirlo**, no fabricar churn de bajo valor.
+- **Decidir qué consolidar en un módulo fuente-única (no a ojo).** Cuando el candidato es "una regla
+  o helper repetido en varios motores" (ej. lógica de fechas dispersa en reservas/precios/reportes),
+  no lo cortes por intuición: despachá un **workflow de lectores paralelos** (uno por motor
+  consumidor) que clasifique cada uso en una de 4 categorías — **PRIMITIVA-DAL** (ya vive en el DAL,
+  no se toca), **DOMINIO-MOTOR** (lógica propia del motor, se queda ahí aunque "parezca" el mismo
+  tema), **DISPLAY-FORMATO** (solo formatea para mostrar, no decide), **CANDIDATO-CONSOLIDAR** (la
+  misma decisión repetida sin dueño claro). Solo se mueven los `CANDIDATO-CONSOLIDAR`. Caso testigo
+  (#1136, `services/fechas.py`): 4 lectores sobre reservas/precios/alquileres/portal/jobs/
+  reportes/contabilidad/auth/ical/pdf cazaron los candidatos reales (ventana de modificación,
+  horarios) y **descartaron con fundamento** los falsos (buffer → se queda en `reservas`, jornadas →
+  se queda en `precios`) — evitó mover lógica de dominio por "parece la misma fecha". La
+  clasificación hace el corte objetivo en vez de a ojo; repetible para cualquier consolidación grande.
 
 ---
 
@@ -353,6 +366,14 @@ es un refactor aparte, después).
   cuando `database.py` pasa a ser el paquete `database/` → leer el paquete entero (`rglob("*.py")`).
 - **Import huérfano post-extracción:** mover un concern suele dejar imports sin uso en el spine
   (ej. `from pdf import …` cuando los PDFs salieron) → ruff F401, podarlos.
+- **`tsc` con cache incremental puede dar OK falso al cambiar el contrato de props de un componente
+  compartido:** no rechequea todo tras un merge → corré fresco (`rm tsconfig.tsbuildinfo` o
+  `tsc -b --force`) antes de cantar verde. Además, **el CI de un PR mergea con el `dev` actual**, que
+  puede tener **call-sites nuevos** del componente aparecidos después de tu último merge local → antes
+  de cerrar, re-mergeá `dev` y re-verificá (no confíes en el último `tsc` local si pasó tiempo).
+  Pasó dos veces en la misma sesión (#1136: un 3er call-site de `CartDrawerView` llegó de `dev` después
+  del merge, `tsc` local pasó por cache pero el CI del PR falló, costó 2 vueltas). Mismo gotcha aplica
+  en `pulido-frontend` cuando se toca un componente compartido, no solo en splits de Frente E.
 
 ### Promoción
 

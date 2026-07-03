@@ -2,18 +2,48 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { authedFetch } from "./authedFetch";
 
-export type EstadoCuenta = "no-logueado" | "no-verificado" | "logueado-verificado" | "error";
+export type EstadoCuenta =
+  | "no-logueado"
+  | "no-verificado"
+  | "en-revision"
+  | "rechazado"
+  | "logueado-verificado"
+  | "error";
 
-/** Lee /api/cliente/me (que ya devuelve dni_validado_at) y clasifica la cuenta.
- *  Fuente única del pre-check de checkout (reemplaza el `me.ok` suelto de las bocas). */
-export async function chequearEstadoCuenta(): Promise<EstadoCuenta> {
+export interface EstadoVerificacion {
+  estado: EstadoCuenta;
+  motivo?: string | null;
+}
+
+/** Lee /api/cliente/me y clasifica la cuenta por `dni_verificacion_estado`
+ *  (no solo por `dni_validado_at`) — así "en revisión" y "rechazado" (con motivo)
+ *  se distinguen de "todavía no verificó nada". Fuente única del pre-check de
+ *  checkout (reemplaza el `me.ok` suelto de las bocas). */
+export async function chequearEstadoVerificacion(): Promise<EstadoVerificacion> {
   try {
     const r = await authedFetch("/api/cliente/me");
-    if (!r.ok) return r.status === 401 ? "no-logueado" : "error";
+    if (!r.ok) return { estado: r.status === 401 ? "no-logueado" : "error" };
     const me = await r.json();
-    return me?.dni_validado_at ? "logueado-verificado" : "no-verificado";
+    if (me?.dni_validado_at) return { estado: "logueado-verificado" };
+    if (me?.dni_verificacion_estado === "en_revision") return { estado: "en-revision" };
+    if (me?.dni_verificacion_estado === "rechazado") {
+      return { estado: "rechazado", motivo: me?.dni_verificacion_motivo ?? null };
+    }
+    return { estado: "no-verificado" };
   } catch {
-    return "error";
+    return { estado: "error" };
+  }
+}
+
+/** Re-chequea contra Didit el estado ACTUAL de la propia verificación (self-recheck
+ *  del cliente) — cubre el webhook que puede no haber llegado todavía cuando el
+ *  cliente vuelve del flujo de Didit. Silencioso: si falla, el estado se sigue
+ *  leyendo de /api/cliente/me tal cual esté (no bloquea al usuario). */
+export async function recheckVerificacionIdentidad(): Promise<void> {
+  try {
+    await authedFetch("/api/cliente/verificacion/recheck", { method: "POST" });
+  } catch {
+    /* best-effort — el estado real se refleja en /api/cliente/me igual */
   }
 }
 

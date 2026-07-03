@@ -14,11 +14,11 @@ import {
 } from "@/data/equipment";
 import { format } from "date-fns";
 
-/* ─── Inferencia de categoría desde nombre/marca/etiquetas ────────────── */
+/* ─── Inferencia de categoría desde nombre/marca ───────────────────────── */
 //
-// El backend guarda las etiquetas vacías para la mayoría de los equipos,
-// así que inferimos la categoría a partir del nombre y la marca del equipo.
-// Las reglas se evalúan en orden: la primera que matchea gana.
+// Fallback cuando el equipo no tiene categorías asignadas (`e.categorias`):
+// inferimos la categoría a partir del nombre y la marca del equipo. Las
+// reglas se evalúan en orden: la primera que matchea gana.
 
 type Rule = { keywords: string[]; category: Category };
 
@@ -236,20 +236,6 @@ function inferCategory(nombre: string, marca: string): Category {
   return "Accesorios";
 }
 
-function resolveCategory(etiquetas: string[], nombre: string, marca: string): Category {
-  // 1. Si hay etiquetas explícitas, intentar mapearlas
-  for (const tag of etiquetas) {
-    const t = tag.toLowerCase().trim();
-    for (const rule of RULES) {
-      for (const kw of rule.keywords) {
-        if (t.includes(kw)) return rule.category;
-      }
-    }
-  }
-  // 2. Inferir desde nombre y marca
-  return inferCategory(nombre, marca);
-}
-
 /* ─── Nombre público derivado ──────────────────────────────────────── */
 //
 // Combina tipo (primera categoría asignada) + marca + modelo + montura +
@@ -440,7 +426,7 @@ export function backendToEquipment(e: BackendEquipo): Equipment {
         .replace(/^-|-$/g, "") || `equipo-${e.id}`,
     name,
     brand: marca || "—",
-    category: e.categorias?.[0]?.nombre ?? resolveCategory(e.etiquetas ?? [], nombre, marca),
+    category: e.categorias?.[0]?.nombre ?? inferCategory(nombre, marca),
     categorias: e.categorias ?? [],
     pricePerDay: e.precio_jornada ?? 0,
     fotoUrl: e.foto_url ?? null,
@@ -540,7 +526,7 @@ export function discoverFilterableSpecs(equipos: Equipment[]): SpecFilterDef[] {
 
 type EquiposQueryResult = { items: Equipment[]; usingFallback: boolean };
 
-export function useEquipos(startDate?: Date, endDate?: Date) {
+export function useEquipos(startDate?: Date, endDate?: Date, opts?: { staleTime?: number }) {
   const desde = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
   const hasta = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
 
@@ -554,7 +540,11 @@ export function useEquipos(startDate?: Date, endDate?: Date) {
     // staleTime corto (30s) para que los cambios desde back-office se reflejen
     // rápido en el catálogo público. Sin esto, el cliente podía ver datos
     // viejos hasta 5min después de un cambio del admin.
-    staleTime: 30_000,
+    // `opts.staleTime` (ej. 0): override explícito para call-sites DENTRO del
+    // back-office — comparten esta misma query key con el catálogo público
+    // (misma cache), pero cada observer decide su propia frescura, así que
+    // el admin puede pedir "siempre al día" sin bajarle el cache al público.
+    staleTime: opts?.staleTime ?? 30_000,
     retry: 1,
   });
 
@@ -565,19 +555,19 @@ export function useEquipos(startDate?: Date, endDate?: Date) {
   };
 }
 
-export function useCategorias() {
+export function useCategorias(opts?: { staleTime?: number }) {
   return useQuery({
     queryKey: ["categorias"],
     queryFn: apiGetCategorias,
-    staleTime: 60_000,
+    staleTime: opts?.staleTime ?? 60_000,
   });
 }
 
-export function useMarcas() {
+export function useMarcas(opts?: { staleTime?: number }) {
   return useQuery<{ items: BackendMarca[] }>({
     queryKey: ["marcas"],
     queryFn: apiGetMarcs,
-    staleTime: 60_000,
+    staleTime: opts?.staleTime ?? 60_000,
     retry: 1,
   });
 }

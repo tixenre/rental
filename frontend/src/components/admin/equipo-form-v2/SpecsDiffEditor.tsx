@@ -49,7 +49,7 @@ import {
 } from "@/design-system/ui/select";
 import type { SpecTemplate } from "@/lib/admin/api";
 
-import { type Spec, sameLabel, extractNumericPart } from "./spec-helpers";
+import { type Spec, extractNumericPart } from "./spec-helpers";
 import { TablaValueInput } from "./TablaValueInput";
 
 const lower = (s: string) => s.trim().toLowerCase();
@@ -97,13 +97,31 @@ export function SpecsDiffEditor({
   // primera vez, updateSpec lo materializa en specs[]. Esto asegura que
   // el form siempre muestre todos los specs disponibles del template,
   // independiente de timing/sincronización.
-  const specByLabel = new Map<string, Spec>();
-  for (const s of specs) specByLabel.set(lower(s.label), s);
+  //
+  // El match es por spec_def_id (extraído de `spec-N`/`tmpl-N`), NO por
+  // label — bug real encontrado en vivo: el label de una spec guardada
+  // arranca como fallback ("spec 3") hasta que un efecto aparte en
+  // EquipoFormDialogV2 lo re-etiqueta contra el template ya cargado. Si
+  // ese re-etiquetado corre DESPUÉS de este render (carrera real, no solo
+  // teórica — timing de queries en paralelo), el match por label fallaba
+  // en silencio y la spec aparecía duplicada en "Custom" con su label sin
+  // resolver, mientras el template-bound mostraba un ghost vacío para el
+  // mismo spec_def_id. Matchear por id es inmune a esa carrera — no
+  // depende de que el re-etiquetado ya haya corrido.
+  const specDefId = (id: string): number | null => {
+    const m = /^(?:spec|tmpl)-(\d+)$/.exec(id);
+    return m ? Number(m[1]) : null;
+  };
+  const specByDefId = new Map<number, Spec>();
+  for (const s of specs) {
+    const defId = specDefId(s.id);
+    if (defId != null) specByDefId.set(defId, s);
+  }
 
   const templateBound: Array<{ spec: Spec; tmpl: SpecTemplate; ghost: boolean }> = [];
   for (const t of templateItems ?? []) {
     if (!t.label?.trim()) continue;
-    const existing = specByLabel.get(lower(t.label));
+    const existing = specByDefId.get(t.spec_def_id);
     if (existing) {
       templateBound.push({ spec: existing, tmpl: t, ghost: false });
     } else {
@@ -145,8 +163,12 @@ export function SpecsDiffEditor({
     // Reconstruir el array global preservando los template-bound en su lugar
     // (el lookup por label en render no depende del orden del array, pero
     // mantenemos un array consistente: primero los template-bound en orden
-    // del template, después los custom reordenados).
-    const next = [...templateBound.map((x) => x.spec), ...reorderedCustom];
+    // del template, después los custom reordenados). Filtra los ghosts
+    // (specs del template todavía sin valor, `spec.value === ""`) — mismo
+    // filtro que `templateBoundIds` ya aplica arriba; sin él, reordenar
+    // CUALQUIER spec custom materializaba de golpe todos los placeholders
+    // vacíos del template como si el admin los hubiera tocado.
+    const next = [...templateBound.filter((x) => !x.ghost).map((x) => x.spec), ...reorderedCustom];
     onChange(next);
   };
 

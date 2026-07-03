@@ -1,5 +1,5 @@
 """
-routes/equipos.py — CRUD de equipos, kits, etiquetas, categorías y fichas.
+routes/equipos.py — CRUD de equipos, kits, categorías y fichas.
 """
 
 import calendar as _cal
@@ -15,8 +15,7 @@ from fastapi import APIRouter, Query, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from database import (
-    get_db, row_to_dict, attach_tags,
-    regenerate_auto_tags, regenerate_auto_tags_batch,
+    get_db, row_to_dict,
     MARCA_SUBQUERY, MARCA_NOMBRE_EXPR,
 )
 from busqueda import construir
@@ -29,6 +28,18 @@ from auth.session import get_session
 from auth.guards import require_admin
 from services.nombre_service import actualizar_nombres_de
 from services.catalogo import proyectar_lista, proyectar_uno
+from services.categorias import (
+    set_categoria_masivo,
+    add_categoria_masivo,
+    remove_categoria_masivo,
+    copiar_categorias,
+    expandir_a_descendientes,
+    sql_filtro_categoria,
+    sql_filtro_equipos_por_categoria,
+    buscar_id_por_nombre,
+)
+from services.specs.queries.search_source import specs_search_expr
+from services.categorias.errors import CategoriaNoExiste
 # `delete_equipo` limpia el blob HTML scrapeado en R2 al borrar un equipo; los
 # endpoints de fotos viven en `routes.equipos.fotos` (importan estos mismos
 # helpers de `services.media.storage` por su cuenta). Lo testea
@@ -39,14 +50,19 @@ router = APIRouter()
 
 
 # Campos buscables del equipo (motor único backend/busqueda). Incluye la marca
-# (subquery por brand_id) y los textos de la ficha (descripción + keywords) para
-# que la barra siga siendo un "find anything" — buscás "log3" o "iso 25600" y
-# aparece aunque la palabra viva en un spec, no en el nombre.
+# (subquery por brand_id), los textos de la ficha (descripción + keywords), y
+# las specs estructuradas (#1163 F4: value+label+aliases de cada spec, vía el
+# embudo de alias de valor) — la barra es un "find anything": buscás "log3",
+# "iso 25600" o "FF" y aparece aunque la palabra viva en un spec, no en el
+# nombre ni en la ficha.
 _FICHA_EXPR = (
     "(SELECT string_agg(coalesce(ef.descripcion, '') || ' ' || coalesce(ef.keywords_json, ''), ' ') "
     "FROM equipo_fichas ef WHERE ef.equipo_id = e.id)"
 )
-CAMPOS_EQUIPO = ["e.nombre", MARCA_NOMBRE_EXPR, "e.modelo", "e.serie", _FICHA_EXPR]
+CAMPOS_EQUIPO = [
+    "e.nombre", MARCA_NOMBRE_EXPR, "e.modelo", "e.serie", _FICHA_EXPR,
+    specs_search_expr(),
+]
 
 
 # ── Modelos ──────────────────────────────────────────────────────────────────
@@ -55,7 +71,7 @@ def _validar_categoria_specs(v: Optional[str]) -> Optional[str]:
     """Valida que la categoría de specs sea una del registry (o None)."""
     if v is None or v == "":
         return None
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     if v not in REGISTRY.categorias:
         validas = ", ".join(REGISTRY.categorias)
         raise ValueError(f"categoria_specs inválida: '{v}'. Opciones: {validas}")
@@ -250,7 +266,6 @@ def list_equipos(
     request:       Request,
     response:      Response,
     q:                Optional[str]  = Query(None),
-    etiqueta:         Optional[str]  = Query(None),
     categoria:        Optional[str]  = Query(None),
     marca:            Optional[str]  = Query(None, description="Filtra por nombre exacto de marca"),
     solo_visibles:    Optional[bool] = Query(None),
@@ -305,10 +320,7 @@ def list_equipos(
                 " WHERE f.equipo_id = e.id"
                 " AND NULLIF(TRIM(COALESCE(f.descripcion, '')), '') IS NOT NULL)"
             ),
-            "categoria": (
-                " AND NOT EXISTS ("
-                " SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id)"
-            ),
+            "categoria": sql_filtro_categoria(),
         }
         if falta in FALTA_SQL:
             base_sql += FALTA_SQL[falta]
@@ -353,47 +365,22 @@ def list_equipos(
         base_sql += f" AND ({pred.where})"
         params += pred.where_params
     if categoria:
-        # Filtro recursivo: si es padre, incluye descendientes (árbol de `categorias`).
-        # Acepta id numérico o nombre.
         try:
-            cat_id_int = int(categoria)
-            base_sql += """
-              AND e.id IN (
-                SELECT ec.equipo_id FROM equipo_categorias ec
-                WHERE ec.categoria_id IN (
-                    WITH RECURSIVE sub AS (
-                        SELECT id FROM categorias WHERE id = %s
-                        UNION ALL
-                        SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
-                    )
-                    SELECT id FROM sub
-                )
-              )"""
-            params.append(cat_id_int)
-        except (TypeError, ValueError):
-            base_sql += """
-              AND e.id IN (
-                SELECT ec.equipo_id FROM equipo_categorias ec
-                WHERE ec.categoria_id IN (
-                    WITH RECURSIVE sub AS (
-                        SELECT id FROM categorias WHERE nombre = %s
-                        UNION ALL
-                        SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
-                    )
-                    SELECT id FROM sub
-                )
-              )"""
-            params.append(categoria)
-    if etiqueta:
-        # Filtro plano por nombre de etiqueta (la bolsa ya no es jerárquica).
-        base_sql += """
-          AND e.id IN (
-            SELECT ee.equipo_id FROM equipo_etiquetas ee
-            JOIN etiquetas et ON et.id = ee.etiqueta_id
-            WHERE LOWER(et.nombre) = LOWER(%s)
-          )"""
-        params.append(etiqueta)
-
+            cat_id = int(categoria)
+        except ValueError:
+            with get_db() as conn0:
+                cat_id = buscar_id_por_nombre(conn0, categoria)
+        if cat_id is not None:
+            with get_db() as conn0:
+                sub_ids = expandir_a_descendientes(conn0, cat_id)
+            if sub_ids:
+                fragment, _ = sql_filtro_equipos_por_categoria("e", sub_ids)
+                base_sql += fragment
+                params += sub_ids
+            else:
+                base_sql += " AND 1=0"
+        else:
+            base_sql += " AND 1=0"
     if marca:
         # Filtro por marca exacta (case-insensitive) contra marcas.nombre (brand_id FK).
         base_sql += f" AND LOWER(COALESCE({MARCA_NOMBRE_EXPR}, '')) = LOWER(%s)"
@@ -543,8 +530,7 @@ def create_equipo(data: EquipoCreate, request: Request):
             backfill_equipos_slug(conn)
             conn.commit()
             row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (new_id,)).fetchone()
-            equipo = attach_tags(conn, [row_to_dict(row)])[0]
-            return equipo
+            return row_to_dict(row)
         except Exception:
             conn.rollback()
             raise
@@ -613,9 +599,6 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
             set_clause += ", updated_at = CURRENT_TIMESTAMP"
             conn.execute(f"UPDATE equipos SET {set_clause} WHERE id = %s",
                          list(updates.values()) + [id])
-            # Si cambió algo que alimenta auto-tags, regenerar.
-            if marca_cambio or any(k in updates for k in ("nombre", "modelo")):
-                regenerate_auto_tags(conn, id)
             # Hook: si cambió algo que afecta el nombre público, recalcular.
             # No falla el update si el recálculo rompe.
             if marca_cambio or any(k in updates for k in ("nombre", "modelo")):
@@ -625,8 +608,7 @@ def update_equipo(id: int, data: EquipoUpdate, request: Request):
                     pass
             conn.commit()
             row    = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (id,)).fetchone()
-            equipo = attach_tags(conn, [row_to_dict(row)])[0]
-            return equipo
+            return row_to_dict(row)
         except Exception:
             conn.rollback()
             raise
@@ -678,28 +660,7 @@ def duplicate_equipo(id: int, request: Request):
                     [new_id] + [f.get(c) for c in cols],
                 )
 
-            # Copiar categorías (con orden manual preservado)
-            cats = conn.execute(
-                "SELECT categoria_id, orden FROM equipo_categorias WHERE equipo_id=%s", (id,)
-            ).fetchall()
-            conn.executemany(
-                "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (%s, %s, %s)",
-                [(new_id, cat["categoria_id"], cat["orden"]) for cat in cats],
-            )
-
-            # Copiar etiquetas MANUALES (las auto se regeneran al setear marca/
-            # modelo/categorías). Sin esto, el duplicado pierde los tags que
-            # el admin tipeó a mano.
-            etqs = conn.execute(
-                "SELECT etiqueta_id, orden FROM equipo_etiquetas "
-                "WHERE equipo_id=%s AND origen='manual'",
-                (id,),
-            ).fetchall()
-            conn.executemany(
-                "INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, orden, origen) "
-                "VALUES (%s, %s, %s, 'manual')",
-                [(new_id, e["etiqueta_id"], e["orden"]) for e in etqs],
-            )
+            copiar_categorias(conn, id, new_id)
 
             # Copiar kit
             kit = conn.execute(
@@ -710,17 +671,9 @@ def duplicate_equipo(id: int, request: Request):
                 [(new_id, componente_id, cantidad, orden) for (componente_id, cantidad, orden) in kit],
             )
 
-            # Regenerar etiquetas auto (categoría/marca/modelo/nombre) sobre el
-            # duplicado. Las manuales ya las copiamos arriba; esto agrega las auto
-            # que normalmente se generan en setCategorias.
-            try:
-                regenerate_auto_tags(conn, new_id)
-            except Exception as e:
-                logger.warning("regenerate_auto_tags falló para duplicado %s: %s", new_id, e)
-
             conn.commit()
             row = conn.execute(f"SELECT *, {MARCA_SUBQUERY} FROM equipos e WHERE id=%s", (new_id,)).fetchone()
-            return attach_tags(conn, [row_to_dict(row)])[0]
+            return row_to_dict(row)
         except Exception:
             conn.rollback()
             raise
@@ -796,73 +749,23 @@ def bulk_action(payload: BulkActionInput, request: Request):
             elif payload.action == "set_categoria":
                 if not payload.categoria_id:
                     raise HTTPException(400, "set_categoria requiere categoria_id: int")
-                cat_exists = conn.execute(
-                    "SELECT id FROM categorias WHERE id = %s", (payload.categoria_id,)
-                ).fetchone()
-                if not cat_exists:
-                    raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
-                # Expandir a ancestros una sola vez (mismo set para todos los equipos
-                # del bulk): si "Montura E" (hija) se asigna, también va "Lente" (madre).
-                ancestor_ids = _expand_to_ancestors(conn, [payload.categoria_id])
-                # Reemplaza las categorías existentes con el set expandido
-                conn.execute(
-                    f"DELETE FROM equipo_categorias WHERE equipo_id IN ({placeholders})",
-                    ids,
-                )
-                conn.executemany(
-                    "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) VALUES (%s, %s, %s)",
-                    [(eid, cid_int, orden) for eid in ids for orden, cid_int in enumerate(ancestor_ids)],
-                )
-                # Regeneración batch (1 pasada para los N equipos, no N+1).
                 try:
-                    regenerate_auto_tags_batch(conn, ids)
-                except Exception as e:
-                    logger.warning("regenerate_auto_tags_batch falló en bulk set_categoria: %s", e)
+                    set_categoria_masivo(conn, ids, payload.categoria_id)
+                except CategoriaNoExiste as e:
+                    raise HTTPException(404, str(e))
 
             elif payload.action == "add_categoria":
-                # Igual que set_categoria pero NO borra las existentes — sólo
-                # AGREGA. Útil para asignar masivamente una categoría desde
-                # la vista de categorías sin perder las otras categorías que
-                # cada equipo ya tenía.
                 if not payload.categoria_id:
                     raise HTTPException(400, "add_categoria requiere categoria_id: int")
-                cat_exists = conn.execute(
-                    "SELECT id FROM categorias WHERE id = %s", (payload.categoria_id,)
-                ).fetchone()
-                if not cat_exists:
-                    raise HTTPException(404, f"Categoría {payload.categoria_id} no existe")
-                # Expandimos a ancestros una sola vez para todos los equipos.
-                ancestor_ids = _expand_to_ancestors(conn, [payload.categoria_id])
-                conn.executemany(
-                    """
-                    INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (equipo_id, categoria_id) DO NOTHING
-                    """,
-                    [(eid, cid_int, orden) for eid in ids for orden, cid_int in enumerate(ancestor_ids)],
-                )
-                # Regeneración batch (1 pasada para los N equipos, no N+1).
                 try:
-                    regenerate_auto_tags_batch(conn, ids)
-                except Exception as e:
-                    logger.warning("regenerate_auto_tags_batch falló en bulk add_categoria: %s", e)
+                    add_categoria_masivo(conn, ids, payload.categoria_id)
+                except CategoriaNoExiste as e:
+                    raise HTTPException(404, str(e))
 
             elif payload.action == "remove_categoria":
-                # Saca UNA categoría de cada equipo sin tocar las otras. Si la
-                # categoría es padre/abuela y los equipos tienen hijas suyas,
-                # NO borramos esas hijas — solo la categoría exacta indicada.
                 if not payload.categoria_id:
                     raise HTTPException(400, "remove_categoria requiere categoria_id: int")
-                placeholders_ids = ",".join("%s" * len(ids))
-                conn.execute(
-                    f"DELETE FROM equipo_categorias WHERE categoria_id = %s AND equipo_id IN ({placeholders_ids})",
-                    [payload.categoria_id, *ids],
-                )
-                # Regeneración batch (1 pasada para los N equipos, no N+1).
-                try:
-                    regenerate_auto_tags_batch(conn, ids)
-                except Exception as e:
-                    logger.warning("regenerate_auto_tags_batch falló en bulk remove_categoria: %s", e)
+                remove_categoria_masivo(conn, ids, payload.categoria_id)
 
             elif payload.action == "delete":
                 # Soft delete: consistente con el endpoint single DELETE (#206).
@@ -1016,52 +919,6 @@ def get_precio_historial(id: int):
         """, (id,)).fetchall()
         return [row_to_dict(r) for r in rows]
 
-
-# ── Categorías por equipo ────────────────────────────────────────────────────
-
-def _expand_to_ancestors(conn, ids) -> list[int]:
-    """
-    Expande una lista de categoria_ids agregando todos los ancestros
-    (padres, abuelos, …) hasta la raíz.
-
-    Hoy las categorías tienen máximo 2 niveles (raíz / hija), pero la
-    implementación es recursiva por si más adelante se permite mayor
-    profundidad.
-
-    Ejemplo: si "Montura E" (id=42, parent_id=10) está en `ids` y "Lente"
-    (id=10, parent_id=None) no, devuelve [42, 10].
-
-    Issue: implementación de la regla "asigno hija → se asigna madre" del
-    sistema de categorías sugeridas (rule of the project).
-    """
-    if not ids:
-        return []
-    out: set[int] = set()
-    pending: list[int] = []
-    for raw in ids:
-        try:
-            iv = int(raw)
-        except (TypeError, ValueError):
-            continue
-        if iv not in out:
-            out.add(iv)
-            pending.append(iv)
-
-    while pending:
-        placeholders = ",".join(["%s"] * len(pending))
-        rows = conn.execute(
-            f"SELECT id, parent_id FROM categorias WHERE id IN ({placeholders})",
-            pending,
-        ).fetchall()
-        next_pending: list[int] = []
-        for row in rows:
-            pid = row["parent_id"]
-            if pid is not None and int(pid) not in out:
-                out.add(int(pid))
-                next_pending.append(int(pid))
-        pending = next_pending
-
-    return list(out)
 
 
 @router.get("/equipos/{id}/calendario")

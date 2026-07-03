@@ -13,6 +13,8 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict
+from services.categorias import root_of_categoria, validar_existe
+from services.categorias.errors import CategoriaNoExiste
 from routes.specs.core import router, _require_admin
 
 logger = logging.getLogger(__name__)
@@ -79,19 +81,7 @@ def listar_templates(categoria_id: int, request: Request):
     _require_admin(request)
     with get_db() as conn:
         # Subir a la raíz si recibimos una sub-cat.
-        raiz_row = conn.execute(
-            """
-            WITH RECURSIVE up AS (
-                SELECT id, parent_id FROM categorias WHERE id = %s
-                UNION
-                SELECT c.id, c.parent_id
-                FROM categorias c JOIN up ON up.parent_id = c.id
-            )
-            SELECT id FROM up WHERE parent_id IS NULL LIMIT 1
-            """,
-            (categoria_id,),
-        ).fetchone()
-        raiz_id = row_to_dict(raiz_row)["id"] if raiz_row else categoria_id
+        raiz_id = root_of_categoria(conn, categoria_id) or categoria_id
 
         rows = conn.execute(
             """
@@ -189,11 +179,10 @@ def asignar_spec_a_categoria(categoria_id: int, payload: SpecAssignmentInput, re
     y después asignar acá."""
     _require_admin(request)
     with get_db() as conn:
-        cat = conn.execute(
-            "SELECT id FROM categorias WHERE id = %s", (categoria_id,)
-        ).fetchone()
-        if not cat:
-            raise HTTPException(404, f"Categoría {categoria_id} no existe")
+        try:
+            validar_existe(conn, categoria_id)
+        except CategoriaNoExiste as e:
+            raise HTTPException(404, str(e))
         sd = conn.execute(
             "SELECT id, label FROM spec_definitions WHERE id = %s", (payload.spec_def_id,)
         ).fetchone()

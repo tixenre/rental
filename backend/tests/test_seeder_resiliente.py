@@ -6,6 +6,13 @@ Cubre:
 2. purge_stale_specs efectivamente elimina specs cuya key ya no está en el
    registry (complementa test_shutter_split_purge — acá enfocado en la purga
    como parte del flujo de seeding completo).
+
+Los `patch(...)` de `seed_categoria_from_registry` apuntan a
+`services.specs.commands.seed` (donde vive de verdad, Fase 1 del rediseño,
+#1163): mock.patch reemplaza el atributo en el módulo indicado, y
+`seed_all_categorias` llama a `seed_categoria_from_registry` como global de
+SU PROPIO módulo — patchear un re-export en otro módulo no intercepta esa
+llamada interna (gotcha documentado en services/specs/CLAUDE.md).
 """
 
 from unittest.mock import MagicMock, patch
@@ -53,13 +60,13 @@ def test_seed_all_categorias_usa_savepoints():
     conn = _make_conn_tracking()
 
     # Parchamos seed_categoria_from_registry para que no toque la DB real.
-    with patch("seeds.registry_seeder.seed_categoria_from_registry") as mock_seed:
+    with patch("services.specs.commands.seed.seed_categoria_from_registry") as mock_seed:
         mock_seed.return_value = {
-            "raiz_id": 1, "subcat_ids": {}, "spec_def_ids": {},
+            "raiz_id": 1, "spec_def_ids": {},
             "stats": {"specs_creadas": 0, "specs_purgadas": 0},
             "purge": {},
         }
-        from seeds.registry_seeder import seed_all_categorias, REGISTRY
+        from services.specs import seed_all_categorias, REGISTRY
         result = seed_all_categorias(conn, dry_run=False)
 
     savepoints = [q for q in conn._executed if "SAVEPOINT" in q.upper()]
@@ -72,7 +79,7 @@ def test_seed_all_categorias_usa_savepoints():
 
 def test_seed_all_categorias_continua_si_una_falla():
     """Si una categoría lanza excepción, las demás igualmente se procesan."""
-    from seeds.registry_seeder import seed_all_categorias, REGISTRY
+    from services.specs import seed_all_categorias, REGISTRY
 
     nombres = list(REGISTRY.categorias.keys())
     assert len(nombres) >= 2, "Necesitamos al menos 2 categorías para este test"
@@ -86,13 +93,13 @@ def test_seed_all_categorias_continua_si_una_falla():
         if nombre == nombre_rota:
             raise RuntimeError("categoría rota simulada")
         return {
-            "raiz_id": 1, "subcat_ids": {}, "spec_def_ids": {},
+            "raiz_id": 1, "spec_def_ids": {},
             "stats": {"specs_creadas": 3, "specs_purgadas": 0},
             "purge": {},
         }
 
     conn = _make_conn_tracking()
-    with patch("seeds.registry_seeder.seed_categoria_from_registry", side_effect=fake_seed):
+    with patch("services.specs.commands.seed.seed_categoria_from_registry", side_effect=fake_seed):
         result = seed_all_categorias(conn, dry_run=False)
 
     # La categoría rota no aparece en el resultado pero las demás sí.
@@ -109,13 +116,13 @@ def test_seed_all_categorias_continua_si_una_falla():
 def test_seed_all_categorias_dry_run_no_savepoints():
     """En dry_run no se emiten SAVEPOINTs (no hay transacción real)."""
     conn = _make_conn_tracking()
-    with patch("seeds.registry_seeder.seed_categoria_from_registry") as mock_seed:
+    with patch("services.specs.commands.seed.seed_categoria_from_registry") as mock_seed:
         mock_seed.return_value = {
-            "raiz_id": None, "subcat_ids": {}, "spec_def_ids": {},
+            "raiz_id": None, "spec_def_ids": {},
             "stats": {"specs_creadas": 0, "specs_purgadas": 0},
             "purge": {},
         }
-        from seeds.registry_seeder import seed_all_categorias
+        from services.specs import seed_all_categorias
         seed_all_categorias(conn, dry_run=True)
 
     savepoints = [q for q in conn._executed if "SAVEPOINT" in q.upper()]
@@ -146,7 +153,7 @@ def _make_purge_conn(spec_rows, categoria_id=1):
 
 def test_purge_elimina_spec_stale_en_modificadores():
     """purge_stale_specs borra una spec que existía en DB pero ya no en el registry."""
-    from seeds.registry_seeder import purge_stale_specs
+    from services.specs import purge_stale_specs
 
     spec_rows = [
         {"id": 10, "spec_key": "modificador_subtipo"},  # en registry

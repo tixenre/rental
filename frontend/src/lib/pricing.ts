@@ -1,16 +1,11 @@
 /**
- * Cálculo de precios de alquiler.
- *
- * Hoy: simple multiplicación pricePerDay × jornadas.
- *
- * Mañana (issue #73): aplicar descuentos por cantidad de jornadas
- * (tramos configurables) y descuento del cliente preestablecido. Cuando se
- * implemente, este helper devuelve `total` aplicando el descuento; el
- * `effectivePerDay` muestra el valor por jornada real (post-descuento) — que
- * será distinto al `perDay` base.
- *
- * Mantener TODO el cálculo de precios pasando por acá para que el día que se
- * agreguen descuentos no haya que tocar todos los componentes.
+ * Precio de REFERENCIA de un equipo — simple multiplicación pricePerDay × jornadas,
+ * SIN descuentos. Alcance acotado a propósito (no es un TODO pendiente): los
+ * descuentos (cliente/jornadas/manual, `backend/descuentos/`) ya están implementados
+ * hace tiempo, pero solo se resuelven en el backend vía `/api/cotizar` — "el front no
+ * calcula plata" (MEMORIA 2026-06-29). Este helper se usa donde todavía no hay fechas
+ * elegidas (`PreviewPane`, `PriceBlock`) para mostrar un precio de referencia rápido,
+ * sin pegarle al backend — nunca para el total real de una reserva.
  */
 
 export type PriceBreakdown = {
@@ -40,8 +35,7 @@ export function priceBreakdown(
 ): PriceBreakdown {
   const j = Math.max(1, jornadas);
   const q = Math.max(1, qty);
-  // TODO #73: aplicar descuentos por jornadas + descuento del cliente.
-  // Por ahora es lineal — pricePerDay × jornadas × qty.
+  // Lineal a propósito, sin descuento — ver docstring del módulo.
   const total = pricePerDay * j * q;
   return {
     perDay: pricePerDay,

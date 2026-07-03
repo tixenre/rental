@@ -21,7 +21,10 @@ import { IncludesLine } from "./equipment/shared/IncludesLine";
 import { KitSection } from "./KitSection";
 import { EmptyState } from "@/design-system/composites/EmptyState";
 import { EmptyImage } from "./EmptyImage";
-import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
+import {
+  VerificacionRequeridaPanel,
+  type VerificacionPanelEstado,
+} from "@/components/rental/VerificacionRequeridaPanel";
 import { GuardarComoListaButton } from "./GuardarComoListaButton";
 import { CompartirComposicionButton } from "./CompartirComposicionButton";
 import { RentalDateModal } from "./RentalDateModal";
@@ -90,7 +93,8 @@ export function CartDrawerView({
   needsLogin,
   onLogin,
   onRegister,
-  needsVerif,
+  verifEstado,
+  verifMotivo,
   iniciandoVerif,
   onVerificar,
   // sesión / acciones
@@ -141,7 +145,8 @@ export function CartDrawerView({
   needsLogin: boolean;
   onLogin: () => void;
   onRegister: () => void;
-  needsVerif: boolean;
+  verifEstado: VerificacionPanelEstado | null;
+  verifMotivo?: string | null;
   iniciandoVerif: boolean;
   onVerificar: () => void;
   clienteSession: ClienteSessionLike;
@@ -586,8 +591,10 @@ export function CartDrawerView({
                 )}
 
                 {/* Verificación de identidad requerida (logueado sin DNI validado) */}
-                {needsVerif && (
+                {verifEstado && (
                   <VerificacionRequeridaPanel
+                    estado={verifEstado}
+                    motivo={verifMotivo}
                     iniciando={iniciandoVerif}
                     onVerificar={onVerificar}
                   />

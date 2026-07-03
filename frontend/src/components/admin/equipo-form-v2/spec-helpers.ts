@@ -18,10 +18,6 @@ export const withIds = (raw: Array<{ label: string; value: string; spec_key?: st
 export const sameLabel = (a: string, b: string) =>
   a.trim().toLowerCase() === b.trim().toLowerCase();
 
-/** Devuelve el valor de un spec por label, o "". */
-export const findSpecValue = (specs: Spec[], label: string): string =>
-  specs.find((s) => sameLabel(s.label, label))?.value ?? "";
-
 export const uniq = <T>(arr: T[]): T[] => Array.from(new Set(arr));
 
 /**

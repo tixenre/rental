@@ -64,6 +64,41 @@ class TestContextoFormato:
         assert ctx["items_html"] == ""
         assert ctx["items_text"] == ""
 
+    def test_items_html_muestra_fila_de_descuento_si_hay_bonificacion(self):
+        # Bug (#1209, L1): el ítem mostraba el bruto por línea ($30.000, el
+        # ejemplo real: 1 cámara a $10.000/día × 3 jornadas) y el "Total" del
+        # mail el neto con el 10% de descuento por jornadas ya aplicado
+        # ($27.000), sin ningún renglón que explicara la diferencia. Mismo
+        # criterio bruto→descuento→neto que el Presupuesto
+        # (`pdf_templates._pedido_html`): ahora la tabla de ítems trae una
+        # fila de "Descuento" visible entre el bruto y el total.
+        ctx = _pedido_email_context(
+            {
+                "id": 1,
+                "items": [{"nombre": "Cámara", "cantidad": 1, "subtotal": 30000}],
+                "descuento_monto": 3000,
+                # `descuento_efectivo_pct` (el % GANADOR, lo que expone
+                # `desglose_de_pedido` desde la Fase C-1, #1219) — no
+                # `descuento_pct` crudo, que es solo el override manual.
+                "descuento_efectivo_pct": 10,
+            }
+        )
+        html = ctx["items_html"]
+        assert "Descuento" in html
+        assert "(10%)" in html
+        assert "− $ 3.000" in html  # mismo signo "−" (U+2212) que el Presupuesto
+
+    def test_items_html_sin_descuento_no_muestra_fila(self):
+        # Regresión: un pedido sin descuento no debe ganar una fila espuria.
+        ctx = _pedido_email_context(
+            {
+                "id": 1,
+                "items": [{"nombre": "Cámara", "cantidad": 1, "subtotal": 30000}],
+                "descuento_monto": 0,
+            }
+        )
+        assert "Descuento" not in ctx["items_html"]
+
 
 # ── info "estilo pasaje": jornadas + estado de pago ─────────────────────────
 

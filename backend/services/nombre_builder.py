@@ -342,25 +342,29 @@ def construir_nombre_publico(
     categoria_raiz: Optional[str],
     categoria_sub: Optional[str] = None,
     specs_en_nombre: list[dict],
+    categoria_template: Optional[str] = None,
     template_override: Optional[str] = None,
     nombre_publico_override: Optional[str] = None,
 ) -> tuple[str, str]:
     """Devuelve (nombre_publico, nombre_publico_largo).
 
-    Jerarquía (decidido en refactor 2026-05-22):
-    1. Si hay `nombre_publico_override` (escape hatch manual del admin) →
-       gana sobre todo.
-    2. Si hay `template_override` (template de categoría o ficha) →
-       `_render_template` con specs y vars del equipo.
-    3. Si NO hay template → devolver `("", "")`. La UI debe usar
-       `nombre_interno` como fallback.
+    Jerarquía (2026-07 — molde vivo por categoría; refina 2026-05-22):
+    1. `nombre_publico_override` (escape hatch manual del admin) → gana sobre todo.
+    2. `categoria_template` — el MOLDE de la categoría de specs. Fuente viva:
+       se define una vez por categoría y "manda" sobre todos sus equipos.
+    3. `template_override` — template por-FICHA (excepción por-equipo), fallback
+       cuando la categoría no tiene molde.
+    4. Sin ningún template que rinda → `("", "")`. La UI usa `nombre_interno`.
 
-    Antes había un auto-build con formatters por categoría (`_fmt_luz`,
-    `_fmt_camara`, etc.) que tomaba decisiones hardcoded y miraba specs
-    legacy. Se eliminó porque generaba inconsistencias con el template.
+    Se prueba cada molde en orden; el PRIMERO que rinde no-vacío gana (si el
+    molde de categoría rinde vacío por specs faltantes, cae al de ficha en vez
+    de dejar el nombre en blanco). Antes había un auto-build con formatters por
+    categoría (`_fmt_luz`, `_fmt_camara`, …) que tomaba decisiones hardcoded y
+    miraba specs legacy; se eliminó (PR #415) porque daba 3 nombres distintos
+    del mismo equipo.
 
-    `categoria_raiz` y `categoria_sub` quedan en la firma por compat con
-    callers existentes, pero ya no se usan internamente.
+    `categoria_raiz` y `categoria_sub` quedan en la firma por compat con callers
+    existentes, pero ya no se usan internamente.
 
     Args:
         nombre_interno: el `equipos.nombre` (no se usa salvo override).
@@ -368,11 +372,12 @@ def construir_nombre_publico(
         categoria_raiz: ej. "Iluminación". Compat — no se usa.
         categoria_sub: ej. "LED Bicolor". Compat — no se usa.
         specs_en_nombre: lista de dicts {label, value, tipo, unidad,
-            tabla_columnas, output_config} desde `equipo_specs` JOIN
-            `spec_definitions`.
-        template_override: template con placeholders `{marca}` `{modelo}`
-            `{nombre}` y `{spec:Label}`. Hoy viene de
-            `categorias.nombre_publico_template`.
+            tabla_columnas, output_config} de la categoría de specs.
+        categoria_template: molde de `categorias.nombre_publico_template` (vía
+            `equipos.categoria_specs`). Placeholders `{marca}` `{modelo}`
+            `{nombre}` `{spec:Label}`.
+        template_override: molde por-ficha (`equipo_fichas.nombre_publico_template`).
+            Excepción por-equipo; solo se usa si la categoría no tiene molde.
         nombre_publico_override: override manual del admin. Gana siempre.
 
     Returns:
@@ -388,23 +393,19 @@ def construir_nombre_publico(
         v = nombre_publico_override.strip()
         return v, v
 
-    # 2. Template del registry (categoría)
-    if template_override and template_override.strip():
-        vars_dict = {
-            "marca": marca_s,
-            "modelo": modelo_s,
-            "nombre": nombre_s,
-        }
-        rendered = _render_template(template_override, vars_dict, specs=specs_en_nombre)
-        if rendered:
-            # Cap suave a 120 chars — los nombres del template suelen ser
-            # más descriptivos que el auto-build legacy.
-            rendered = _cap_largo(rendered, 120)
-            return rendered, rendered
-        # Template existe pero rindió vacío (todos los placeholders sin valor).
-        # Igual devolvemos vacío para que la UI use nombre interno.
+    # 2/3. Molde de categoría (manda) → molde de ficha (fallback). El primero
+    # que rinde no-vacío gana; un molde presente que rinde vacío no bloquea al
+    # siguiente (no dejamos el nombre en blanco si hay otro molde utilizable).
+    vars_dict = {"marca": marca_s, "modelo": modelo_s, "nombre": nombre_s}
+    for tpl in (categoria_template, template_override):
+        if tpl and tpl.strip():
+            rendered = _render_template(tpl, vars_dict, specs=specs_en_nombre)
+            if rendered:
+                # Cap suave a 120 chars — los nombres del template suelen ser
+                # más descriptivos que el auto-build legacy.
+                return _cap_largo(rendered, 120), _cap_largo(rendered, 120)
 
-    # 3. Sin template → vacío. La UI usa `equipos.nombre` como fallback.
+    # 4. Ningún molde rindió → vacío. La UI usa `equipos.nombre` como fallback.
     return "", ""
 
 

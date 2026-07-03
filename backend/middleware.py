@@ -30,7 +30,6 @@ PUBLIC_PREFIXES = (
 PUBLIC_API_READONLY = (
     "/api/equipos",
     "/api/categorias",
-    "/api/etiquetas",
     "/api/disponibilidad",
 )
 

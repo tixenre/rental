@@ -1,4 +1,4 @@
-"""Tests para `backend/specs/` — registry como single source of truth.
+"""Tests para `services/specs/registry/` — registry como single source of truth.
 
 Reemplaza al viejo test_seed_split_tipo.py que validaba el split en una
 arquitectura intermedia (8 cats viejas). Ahora el contrato es:
@@ -21,7 +21,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-from specs import (
+from services.specs import (
     FORMATO_ENUM,
     LENS_MOUNT_ENUM,
     REGISTRY,

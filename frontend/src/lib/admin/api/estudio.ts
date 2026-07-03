@@ -166,4 +166,13 @@ export const descuentosJornadaApi = {
   create: (data: { jornadas: number; pct: number }) =>
     authedPostJson<DescuentoJornada>("/api/admin/descuentos-jornada", data),
   delete: (id: number) => authedFetch(`/api/admin/descuentos-jornada/${id}`, { method: "DELETE" }),
+  /** % interpolado para cada cantidad de jornadas pedida — la fuente ÚNICA
+   *  (misma que /api/cotizar). El front NO reimplementa la interpolación
+   *  (#1219: la preview local podía redondear distinto al backend). */
+  interpolar: (jornadasList: number[]) => {
+    const qs = jornadasList.map((j) => `jornadas=${j}`).join("&");
+    return authedJson<{ jornadas: number; pct: number }[]>(
+      `/api/descuentos-jornada/interpolar?${qs}`,
+    );
+  },
 };

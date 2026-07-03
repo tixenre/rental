@@ -9,6 +9,9 @@ Exports públicos:
   extraer_datos_renaper  — parsea el `decision` v3 → DatosRenaper (identidad, puro)
   extraer_contactos      — parsea el `decision` v3 → ContactosVerificados (mail/tel, puro)
   verify_webhook         — verifica firma HMAC-SHA256 + freshness de un webhook
+  recheck_cliente        — re-consulta el estado ACTUAL a Didit y lo aplica (admin,
+                           self-service del cliente y el barrido de abandonadas)
+  ClienteSinVerificacionError — el cliente no tiene ninguna sesión Didit conocida
   DatosRenaper           — datos del documento confirmados por RENAPER
   ContactoVerificado / ContactosVerificados — mail/tel verificados por Didit
   DiditNotConfiguredError — API key / secret no seteada
@@ -28,6 +31,7 @@ from services.didit.decision import (
     extraer_contactos,
     extraer_datos_renaper,
 )
+from services.didit.recheck import ClienteSinVerificacionError, recheck_cliente
 from services.didit.webhook import DiditSignatureError, verify_webhook
 
 __all__ = [
@@ -36,6 +40,8 @@ __all__ = [
     "extraer_datos_renaper",
     "extraer_contactos",
     "verify_webhook",
+    "recheck_cliente",
+    "ClienteSinVerificacionError",
     "DatosRenaper",
     "ContactoVerificado",
     "ContactosVerificados",

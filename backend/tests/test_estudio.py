@@ -501,10 +501,6 @@ class TestCentinelaNoLeak:
         from routes.equipos import admin_equipos_sin_serie
         assert "es_recurso_interno = FALSE" in self._src(admin_equipos_sin_serie)
 
-    def test_clasificar_excluye_centinela(self):
-        from routes.equipos import admin_clasificar
-        assert "es_recurso_interno = FALSE" in self._src(admin_clasificar)
-
 
 # ── E3: pack dinámico (Grip / Iluminación / Modificadores) ────────────────────
 #

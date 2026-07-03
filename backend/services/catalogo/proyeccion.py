@@ -14,7 +14,7 @@ DEPENDENCIAS CANÓNICAS (fuente única de cada motor):
     - stock/disponibilidad → reservas.calcular_disponibilidad (GLOBAL FIXED COST)
     - kit/contenido        → services.contenido
     - precios combo        → services.precios.precios_combo_batch / precio_combo
-    - attach_*             → database/equipos.py (tags, kit, categorías, ficha, specs)
+    - attach_*             → database/equipos.py (kit, categorías, ficha, specs)
     - busqueda/ranking     → pred.score / MARCA_SUBQUERY
 
 NO TOCA: reservas/ (solo lee), kit_componentes directamente,
@@ -22,7 +22,6 @@ NO TOCA: reservas/ (solo lee), kit_componentes directamente,
 """
 from database import (
     row_to_dict,
-    attach_tags,
     attach_kit,
     attach_categorias,
     attach_ficha,
@@ -34,6 +33,7 @@ from reservas import calcular_disponibilidad
 from reservas.disponibilidad import _derivar_compuestos
 from reservas.semantics import componentes_de
 from services.contenido import contenido_de
+from services.categorias import listar_categorias_flat
 
 
 # ── Constantes de ordenamiento (espejo de routes/equipos/core.py) ─────────────
@@ -175,7 +175,6 @@ def proyectar_lista(
         bid = equipo.get("brand_id")
         equipo["brand"] = brands_map.get(bid) if bid else None
 
-    equipos = attach_tags(conn, equipos)
     equipos = attach_kit(conn, equipos)
     equipos = attach_categorias(conn, equipos)
     equipos = attach_ficha(conn, equipos)
@@ -225,8 +224,7 @@ def proyectar_uno(conn, equipo_id: int) -> dict | None:
     if not row:
         return None
 
-    equipo = attach_tags(conn, [row_to_dict(row)])[0]
-    equipo = attach_ficha(conn, [equipo])[0]
+    equipo = attach_ficha(conn, [row_to_dict(row)])[0]
     equipo = attach_categorias(conn, [equipo])[0]
     equipo = attach_specs_estructuradas(conn, [equipo])[0]
 
@@ -266,7 +264,7 @@ def proyectar_seed(conn) -> dict:
 
     Subconjunto de proyectar_lista sin attach_*, suficiente para el primer
     render de las cards sin round-trip. El front (backendToEquipment) tolera
-    campos ausentes (etiquetas/kit/specs → arrays vacíos o None).
+    campos ausentes (kit/specs → arrays vacíos o None).
 
     Emite los mismos campos que _get_initial_catalog de main.py (move-verbatim).
     """
@@ -291,14 +289,10 @@ def proyectar_seed(conn) -> dict:
     items = []
     for row in rows:
         item = dict(row)
-        item.setdefault("etiquetas", [])
         item.setdefault("kit", [])
         items.append(item)
 
-    cats = conn.execute(
-        "SELECT id, nombre, COALESCE(total, 0) AS total, prioridad, parent_id "
-        "FROM categorias ORDER BY COALESCE(prioridad, 999), nombre"
-    ).fetchall()
+    cats = listar_categorias_flat(conn)
 
     estudio_fotos = conn.execute(
         "SELECT url, url_sm, url_avif, url_sm_avif, es_principal, orden "

@@ -71,7 +71,6 @@ class TestEquipo:
         assert e.visible_catalogo == 1
         assert e.estado == "operativo"
         assert e.categorias == []
-        assert e.etiquetas == []
 
     def test_con_m2m(self):
         e = schema.Equipo(
@@ -82,19 +81,17 @@ class TestEquipo:
                 {"nombre": "Cinema Cameras", "orden": 1},
                 {"nombre": "Montura E", "orden": 2},
             ],
-            etiquetas=[
-                {"nombre": "destacado", "origen": "manual", "orden": 0},
-            ],
         )
         assert len(e.categorias) == 2
         assert e.categorias[0].nombre == "Cinema Cameras"
-        assert e.etiquetas[0].origen == "manual"
 
-    def test_origen_etiqueta_invalido(self):
+    def test_rechaza_campos_extra(self):
+        # El sistema de etiquetas (tags libres) se eliminó (#1163 F5) — un
+        # JSON viejo que aún traiga la clave debe rechazarse, no ignorarse.
         with pytest.raises(ValidationError):
             schema.Equipo(
                 slug="sony-fx3", nombre="Sony FX3",
-                etiquetas=[{"nombre": "x", "origen": "wat"}],
+                etiquetas=[{"nombre": "x", "origen": "manual"}],
             )
 
 

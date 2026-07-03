@@ -29,7 +29,6 @@ class KeyResolver:
         self.conn = conn
         self._marcas: dict[str, int] | None = None
         self._categorias: dict[str, int] | None = None
-        self._etiquetas: dict[str, int] | None = None
         self._spec_defs: dict[tuple[str | None, str], int] | None = None
         self._equipos: dict[str, int] | None = None
         self._clientes: dict[str, int] | None = None
@@ -41,7 +40,6 @@ class KeyResolver:
         """Limpia el cache. Llamar después de un batch de inserts."""
         self._marcas = None
         self._categorias = None
-        self._etiquetas = None
         self._spec_defs = None
         self._equipos = None
         self._clientes = None
@@ -54,9 +52,6 @@ class KeyResolver:
         self._categorias = None
         # spec_defs depende de categorias para resolver categoria_raiz_id
         self._spec_defs = None
-
-    def refresh_etiquetas(self) -> None:
-        self._etiquetas = None
 
     def refresh_spec_defs(self) -> None:
         self._spec_defs = None
@@ -86,8 +81,9 @@ class KeyResolver:
     # ── categorias ───────────────────────────────────────────────────────────
 
     def _load_categorias(self) -> dict[str, int]:
-        rows = self.conn.execute("SELECT id, nombre FROM categorias").fetchall()
-        return {r["nombre"]: r["id"] for r in rows}
+        from services.categorias import listar_categorias_flat
+        cats = listar_categorias_flat(self.conn)
+        return {c["nombre"]: c["id"] for c in cats}
 
     def categoria_id(self, nombre: str | None) -> int | None:
         if not nombre:
@@ -95,19 +91,6 @@ class KeyResolver:
         if self._categorias is None:
             self._categorias = self._load_categorias()
         return self._categorias.get(nombre)
-
-    # ── etiquetas ────────────────────────────────────────────────────────────
-
-    def _load_etiquetas(self) -> dict[str, int]:
-        rows = self.conn.execute("SELECT id, nombre FROM etiquetas").fetchall()
-        return {r["nombre"]: r["id"] for r in rows}
-
-    def etiqueta_id(self, nombre: str | None) -> int | None:
-        if not nombre:
-            return None
-        if self._etiquetas is None:
-            self._etiquetas = self._load_etiquetas()
-        return self._etiquetas.get(nombre)
 
     # ── spec_definitions (composite key) ────────────────────────────────────
 

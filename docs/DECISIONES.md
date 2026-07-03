@@ -1877,3 +1877,935 @@ cancel-in-progress` ya cancela corridas viejas.
   única sana, y el buffer del motor de reservas es regla de overlap (no genérica). **Pendiente menor** (no es de
   fechas): `cuentas.py` hardcodea `'2026-06-01'` en vez de `LIQUIDACION_INICIO` (drift latente del clean-start). PR
   #1136; tracking #1126.
+
+### 2026-07-02 — El editor de pedidos admin cotiza con el precio de línea congelado, no con el de catálogo
+
+- **Contexto.** El dueño reportó el pedido #405 marcado como "sobrepagado" en la reconciliación mensual pese a
+  que la pantalla del pedido mostraba "Cobranza $163.860 de $163.860 · pagado". Investigado: la reconciliación
+  (`reportes/reconciliacion.py`, chequeo 3) compara `alquileres.monto_pagado` contra `alquileres.monto_total`
+  — dos columnas persistidas de la base. La pantalla del pedido (`pedidos.$id.lazy.tsx`) NO lee esa columna: arma
+  su propio total llamando en vivo a `POST /api/cotizar`, que para ítems de catálogo **siempre** recotiza contra
+  el precio **actual** de `equipos` (`cotizacion.py`, comentario: "no se confía en lo que mande el front") — no
+  contra el `precio_jornada` que ya está persistido/editado en `alquiler_items` del pedido. Dos cálculos
+  independientes del mismo "total" para el mismo pedido, que pueden divergir en cualquier momento en que el
+  precio de catálogo de algún ítem cambie desde que el pedido se armó.
+- **Decisión.** `POST /api/cotizar` acepta un flag nuevo `respetar_precio_item` (solo lo honra una sesión
+  admin, mismo patrón que `cliente_id`/`descuento_pct`): si viene en `true`, usa el `precio_jornada` que manda
+  cada ítem de catálogo en vez de re-buscarlo en `equipos`. El editor de pedidos (`useCotizacion` con
+  `respetarPrecioItem: true`) lo activa siempre — así el total que ve el admin mientras edita es el MISMO que
+  persiste `_recalcular_total_pedido` al guardar, que es el mismo que lee la reconciliación. Además, la pantalla
+  de Cobranza dejaba de mostrar un excedente cobrado (`restante = Math.max(0, total - pagadoMonto)` clampeaba a
+  0 cualquier sobrepago): ahora un `excedente = Math.max(0, pagadoMonto - total)` se muestra explícito en rojo
+  ("de más $X") con una nota sugiriendo devolución/crédito, en vez de esconderse detrás de un "pagado" falso.
+- **Why.** Se evaluaron dos caminos: (a) bloquear la edición de precio/descuento en pedidos ya
+  confirmados/cobrados (snapshot-lock estricto, matching la letra de la decisión 2026-06-06 "Datos del pedido:
+  plata congelada"), o (b) mantener la edición permitida (uso real del dueño: dar un descuento retroactivo tras
+  cobrar) pero eliminar la fuente de verdad duplicada. El dueño explícitamente pidió (b): "quiero poder editar
+  las cosas y que estén todas bien, no sincronizadas" — la solución no es restringir el flujo de trabajo, es que
+  no haya DOS cálculos del mismo número. El caso #405 en sí (dinero ya cobrado por encima del total actual tras
+  un descuento retroactivo) sigue siendo una situación real de negocio que el dueño resuelve a mano (crédito o
+  devolución) — no es un bug de datos, es información que antes estaba oculta.
+- **Consecuencias.** Ningún cambio de contrato público: `respetar_precio_item` default `False` (el carrito
+  público/`CartDrawer`/`CatalogoMovil` siguen cotizando contra catálogo, sin tocar). Regresión: verificado
+  manualmente que `es_admin` se resuelve antes del loop de ítems (antes solo se calculaba dentro del bloque
+  `if tiene_fechas:`, se hoisteó). PR #1181, sin tests nuevos (cambio de UI + flag de query ya cubierto por el
+  test de contrato de `/api/cotizar`); plan de prueba manual en el PR.
+
+### 2026-07-02 — `backend/contabilidad/` reorganizado CQRS-lite (`queries/`+`commands/`), espejo de `services/specs/`
+
+- **Contexto.** A raíz de investigar el caso #405 (ver decisión anterior), el dueño pidió explícitamente aplicarle
+  a `backend/contabilidad/` "el CQRS liviano que estamos implementando en el repo" (ya usado en
+  `services/specs/` y `services/specs_ingesta/`) y auditar el módulo para que este tipo de bug no vuelva a pasar.
+  El módulo (10 archivos, ~1400 líneas, `#809`) era plano: cada archivo mezclaba lectura y escritura sin
+  frontera física.
+- **Decisión.** Split **move-verbatim** (cero cambio de lógica/SQL) en `queries/` (lectura, nunca muta) +
+  `commands/` (única puerta de mutación) + `constants.py` (top-level: `TIPOS_CUENTA`, `COBRADORES`,
+  `SOCIOS_HUMANOS`, `MONEDAS`, `TIPOS_MOVIMIENTO`, `METODOS_MOVIMIENTO`, `PARTES` — viven fuera de `queries/`/
+  `commands/` porque `queries/` los necesita y no puede importarlos del lado de escritura). Mapeo: de los 10
+  archivos viejos salieron 10 `queries/*.py` + 5 `commands/*.py` (categorías, cuentas, movimientos, cierres,
+  rendición). `PARTES` estaba duplicada byte-idéntica en `rendicion.py` y `reporte_mensual.py` — consolidada
+  en `constants.py` (una sola forma). Actualizados los 2 callers (`routes/contabilidad.py`,
+  `routes/alquileres/pagos.py`) y los 4 archivos de test que importaban rutas viejas.
+- **Why.** El motor resultó ser mayormente de lectura: de ~35 funciones públicas, solo 10 mutan de verdad
+  (`crear_categoria`, `crear_cuenta`/`editar_cuenta`/`desactivar_cuenta`, `crear_movimiento`/`editar_movimiento`/
+  `anular_movimiento`, `cerrar_mes`/`reabrir_mes`, `saldar`). Confirmado al hacer el split: **ningún** query del
+  paquete necesitaba nada de `commands/` — la invariante "`commands/` importa de `queries/`; `queries/` nunca de
+  `commands/`" se cumple sin fricción, igual que en `specs`/`specs_ingesta`. Separar físicamente lectura de
+  escritura hace más fácil auditar visualmente "¿esto puede mutar plata?" con solo mirar en qué carpeta vive —
+  reduce la clase de bug de #405 (que fue un bug del LADO CLIENTE del total, no de este módulo, pero la misma
+  disciplina de "una sola fuente, nunca dos caminos" es la que lo hubiera prevenido si hubiera vivido acá).
+- **Consecuencias.** Candado: 51 tests puros (sin DB) + 29 tests de integración (Postgres real, todo el árbol
+  `test_contabilidad_db.py`/`test_reportes_cierres_db.py`/`test_init_db_cuentas_seed_db.py`) pasan en verde
+  byte-a-byte contra el comportamiento pre-split — confirma que fue mecánico, no una reescritura. `pyflakes`
+  limpio sobre el paquete completo (sin imports muertos ni nombres indefinidos). Suite completa del backend:
+  2684 passed (los 3 failed + 3 error de `test_catalogo_motor_shape.py` son preexistentes, no tocan
+  `contabilidad` — sin datos de catálogo sembrados en la DB de prueba local). **Auditoría del patrón "dos
+  cálculos del mismo número"** (lo que causó #405) sobre el módulo: no se encontró una segunda instancia dentro
+  de `contabilidad/` — el propio `queries/reconciliacion.py::reconciliar` ya es el semáforo que cazaría ese
+  patrón (hereda `reportes/reconciliacion.py`, que tiene 3 chequeos: pagados-sin-ledger, `monto_pagado`
+  divergente del ledger real, y sobrepagados). Rama aislada `feature/contabilidad-cqrs`, PR sin mergear
+  (convención "PR como hoja de ruta"); tracking #1184.
+
+### 2026-07-02 — Auditoría de `backend/contabilidad/`: bordes reforzados (edición, locking, auditoría de pagos)
+
+- **Contexto.** Tras cerrar el split CQRS-lite, el dueño pidió una segunda pasada: "¿qué está mal, flojo, poco
+  seguro, bien, qué falta, qué sobra?". Se lanzaron 3 auditorías en paralelo (agentes `Explore` independientes,
+  sin compartir contexto entre sí para evitar sesgo de confirmación): corrección contable/concurrencia,
+  seguridad de la capa HTTP (`routes/contabilidad.py` + `routes/alquileres/pagos.py`), y duplicación/gaps de
+  cobertura de tests. Encontraron 19 hallazgos, priorizados en 4 tiers. El dueño, tras ver el diagnóstico
+  completo, pidió implementar los 19 en una rama aislada.
+- **Decisión — Tier 1 (3 bugs reales):**
+  1. `editar_movimiento` (`commands/movimientos.py`) no repetía las validaciones de `crear_movimiento`
+     (existencia+actividad de cuenta, misma moneda entre origen/destino, categoría existente+activa) — extraídas
+     a `_validar_cuentas_y_categoria(conn, origen, destino, categoria_id)`, llamada por ambas funciones. Antes,
+     `PATCH .../movimientos/{id}` con `cuenta_destino_id` de otra moneda pasaba sin error — violación directa de
+     "ARS y USD no se mezclan". Verificado: `grep` confirmó cero call-sites de `updateMovimiento` en el
+     frontend hoy — el fix es de riesgo cero para flujos en producción, cierra un hueco de la API.
+  2. `alquiler_pagos` (la tabla que alimenta `ingresos_derivados`/`saldos`/`rendicion`/`reporte_mensual`/
+     liquidación) no tenía columna de actor y `eliminar_pago` hacía `DELETE` real sin motivo — contradecía "la
+     plata no se borra" que `movimientos` sí respeta. Fix: migración `a3b4c5d6e7f8` agrega `created_by` +
+     `anulado`/`anulado_por`/`anulado_at`/`anulado_motivo` (mismo patrón que `movimientos`, espejado en
+     `schema.py`). `agregar_pago` captura `admin.get("email")`. `DELETE /pagos/{id}` → `POST .../{id}/anular`
+     con `motivo` obligatorio (soft-delete). **7 queries** que sumaban `alquiler_pagos` sin filtrar ahora llevan
+     `AND NOT anulado`: `ingresos_derivados`, `cobros_mensuales`, el chequeo `pagos_sin_socio` de
+     `contabilidad/queries/reconciliacion.py`, `cobrado_por_socio` (rendición — hallazgo adicional, no estaba en
+     la lista original de la auditoría, encontrado al mapear el fix), el `SALDADO_CTE` de
+     `reportes/liquidacion.py` (compartido por 3 consumidores — el filtro va UNA vez ahí, no repetido), los 2
+     chequeos de `reportes/reconciliacion.py` (`sin_ledger`/`divergentes`, que además ahora comparan contra la
+     MISMA fuente que `monto_pagado` — sin esto, cada pago anulado marcaría un falso divergente), y los 2
+     listados de pagos del portal cliente. De regalo: el chequeo "mes cerrado desactualizado" ahora también
+     detecta un pago anulado DESPUÉS del cierre (`ap.anulado_at > c.cerrado_at`) — antes imposible de distinguir
+     porque el hard-delete no dejaba rastro temporal. Frontend: `deletePago`→`anularPago` (pide motivo vía
+     `window.prompt`, mismo patrón que `AnularMovimiento`); los pagos anulados quedan visibles tachados
+     (`line-through`+`opacity-50`) en vez de desaparecer — mismo lenguaje visual que ya usa la pantalla de
+     movimientos. `test_routes_contract.py` actualizado al nuevo contrato (sumado a `_VALIDA_ANTES_DEL_GUARD`,
+     mismo patrón que los demás POST con body requerido).
+  3. `subir_comprobante` (`routes/contabilidad.py`) escribía `UPDATE movimientos` directo, saltándose el motor
+     — exactamente el escenario que el propio `contabilidad/CLAUDE.md` advertía textualmente ("un endpoint que
+     escriba `movimientos` por fuera se saltearía el candado"). No llamaba `_exigir_mes_abierto`, no chequeaba
+     `anulado`, no capturaba actor. Fix: nueva `commands.movimientos.actualizar_comprobante(conn, mov_id, *,
+     key, por)` que sí pasa por las 3 validaciones; el route la llama en vez del `UPDATE` inline.
+- **Decisión — Tier 2 (robustez, concurrencia):**
+  - `pg_advisory_xact_lock` (mismo patrón exacto que `services/facturacion/engine.py` y `routes/talleres.py`/
+    `routes/alquileres/core.py` ya usan) entre `cerrar_mes`/`reabrir_mes` y `crear_movimiento`/
+    `editar_movimiento`/`anular_movimiento` (vía `_exigir_mes_abierto`) del mismo mes. Namespace
+    `_ADVISORY_NS_CONTAB_MES = 5390420` (siguiente libre después de `_ADVISORY_NS_PEDIDO`/`_ADVISORY_NS_ESTUDIO`),
+    key = `'YYYY-MM'` convertido a entero natural (`YYYYMM`). **Verificado con un test de concurrencia real de
+    dos conexiones psycopg + threading** (no solo en teoría, siguiendo "los hallazgos de una auditoría son
+    hipótesis hasta confirmarlos" — 2026-06-22): con un monkeypatch que demora `gastos_por_categoria` dentro de
+    `cerrar_mes` para exponer la ventana entre tomar el lock y el commit interno, un `crear_movimiento`
+    concurrente del mismo mes BLOQUEÓ 4 segundos reales (esperando el lock) y, al desbloquear, fue rechazado
+    correctamente por "mes cerrado" — confirmando que la carrera (un gasto colándose en la foto de un cierre en
+    curso) queda cerrada.
+  - `desactivar_cuenta` (`commands/cuentas.py`) toma `SELECT ... FOR UPDATE` antes de leer el saldo — un
+    `crear_movimiento` concurrente contra la misma cuenta toma un lock `FOR KEY SHARE` implícito por la FK, que
+    conflictúa. **También verificado con dos conexiones reales**: el `crear_movimiento` concurrente esperó los
+    5 segundos completos que la transacción de A mantuvo el lock abierto.
+  - Rate limiting: `ADMIN_WRITE_LIMIT = "60/minute"` / `ADMIN_UPLOAD_LIMIT = "20/minute"` (nuevas constantes en
+    `rate_limit.py`) aplicadas a los **13 endpoints de escritura reales** (10 en `contabilidad.py` + `pagos.py`
+    tenía 2, más `subir_comprobante` con el límite de upload) — el patrón `@limiter.limit` ya existía en el
+    repo mas solo para endpoints públicos.
+  - Cotas `Field(...)` en los 8 modelos Pydantic de ambos routes: topes de longitud en texto libre, y
+    `lt=2_147_483_647` en todo id de cuenta/categoría (el techo real de `INTEGER`/int4 de Postgres — sin esto,
+    un id gigante pasaba Pydantic y reventaba en el bind de psycopg con `NumericValueOutOfRange`, no
+    `ValueError`). El chequeo manual `monto<=0` de `agregar_pago` se eliminó (redundante con `Field(gt=0)`).
+    Decorator nuevo `@map_pg_errors` (`routes/contabilidad.py`, reusado por `pagos.py` — sin ciclo de imports,
+    verificado) que envuelve cada endpoint y traduce `psycopg.errors.UniqueViolation`/`NumericValueOutOfRange`
+    a 400 limpio — antes, lo que las cotas de arriba no llegaban a prevenir subía crudo al handler global
+    (`main.py`), que expone `f"{type(exc).__name__}: {exc}"` (mensaje interno de Postgres) al cliente.
+- **Decisión — Tier 3 (limpieza barata, un commit):** `idx_cuentas_socio` pasa a único **solo entre activas**
+  (migración `b4c5d6e7f8g9`, simétrica con `cuentas_nombre_activa_uq`) — antes dar de baja una cuenta de socio
+  bloqueaba para siempre crear una nueva ACTIVA con ese mismo socio (verificado que el target-less
+  `ON CONFLICT DO NOTHING` del seed, fix histórico de #932, sigue funcionando igual con el nuevo predicado).
+  Comentario incorrecto corregido en `queries/saldos.py`. `ingresos_devengados` (0 usos confirmados) borrada.
+  `SELECT socio FROM cuentas` crudo en el route reemplazado por `obtener_cuenta`. Ambigüedad tipo-cuenta-vs-
+  tipo-movimiento (¿puede un `retiro`/`aporte`/`gasto`/`ajuste` tocar una cuenta CORRIENTE de socio, no una caja
+  real?) **documentada en el docstring de `validar_estructura_movimiento`, NO bloqueada**: una validación dura
+  ahí rompería `commands/rendicion.py::saldar`, que necesita crear `transferencia`s contra cuentas de socio por
+  diseño — la regla de negocio no es obvia (un `ajuste` contra una cuenta de socio puede ser una corrección
+  legítima), así que se fija el comportamiento actual con un test en vez de adivinar la regla correcta.
+- **Decisión — Tier 4 (8 tests candado):** `editar_cuenta` (cero tests pese a usarse en producción para editar
+  `saldo_inicial` de socios), `editar_movimiento` con cambio de moneda (el candado directo del bug #1), `ajuste`
+  con origen y destino simultáneos (puro + DB — único hueco combinatorio real entre los 5 tipos), fallback de
+  `saldo_de_cuenta` (cuenta inactiva/inexistente), anular un saldado de rendición ya registrado (documenta que
+  `ya_transferido()` excluye el anulado —el pendiente reaparece, correcto— pero `_movimientos_rendicion` —el log
+  de auditoría— lo sigue mostrando, intencional, no una divergencia accidental), `reabrir_mes` con assert
+  explícito del retorno en sus 3 casos, y el test de la ambigüedad tipo-cuenta documentada arriba.
+- **Why.** El patrón que emergió de las 3 auditorías independientes: **el núcleo (fórmulas, derivación,
+  soft-delete, multi-moneda en creación) está sano y bien testeado — los problemas reales viven en los BORDES**
+  (el camino de edición no repite las validaciones del camino de creación, un endpoint se salteaba el motor,
+  faltaba locking donde el resto del repo ya lo usa, y una tabla vecina no respetaba el invariante de auditoría
+  que el propio motor sí respeta). Dos hallazgos (`editar_movimiento` sin revalidar, `alquiler_pagos` sin
+  actor/soft-delete) los marcaron DOS agentes de forma independiente sin verse entre sí — señal fuerte de que no
+  eran ruido. Ningún hallazgo implica pérdida de plata YA OCURRIDA — son gaps que dejarían un descuadre si se
+  daban las condiciones (una carrera real, o alguien editando vía API cruda en vez de la UI). Se prefirió
+  verificar los dos locks con concurrencia REAL (dos conexiones, no solo leer el código y confiar) siguiendo el
+  principio de que un hallazgo de auditoría es hipótesis hasta confirmarlo en vivo.
+- **Consecuencias.** 2689 tests en verde (2681 + 8 nuevos), suite completa, sin regresiones. Dos migraciones
+  Alembic nuevas (`a3b4c5d6e7f8`, `b4c5d6e7f8g9`), ambas con `upgrade`/`downgrade` verificados limpios contra
+  Postgres real. `pyflakes` limpio en los ~18 archivos backend tocados; `eslint`/`tsc` limpios en los 4 archivos
+  frontend tocados. Cambio de contrato HTTP: `DELETE /alquileres/{id}/pagos/{pago_id}` → `POST
+  .../{pago_id}/anular` (body `{motivo}`) — sin otro consumidor confirmado por grep. Rama aislada
+  `fix/contabilidad-auditoria` sobre `feature/contabilidad-cqrs` (convención "PR como hoja de ruta", PR sin
+  mergear); tracking #1184.
+
+### 2026-07-02 — Tipo de movimiento vs tipo de cuenta: retiro/aporte bloqueados contra un socio, gasto permitido a propósito
+
+- **Contexto.** La auditoría de bordes (entrada anterior) dejó a propósito sin bloquear la ambigüedad de qué
+  TIPO de cuenta puede tocar cada TIPO de movimiento — la regla de negocio no estaba clara desde el código
+  solo. En la sesión siguiente, conversando con el dueño sobre casos reales ("Rambla pagó algo de Pablo",
+  "Pablo pagó algo de Rambla"), confirmó el modelo: los socios (Pablo/Tincho) tienen sus bancos propios,
+  **totalmente separados del sistema** — la cuenta que Rambla les lleva acá es **puro balance de deuda**
+  (quién le debe a quién), nunca plata física que el sistema administre.
+- **Decisión.**
+  - **`retiro`/`aporte` quedan BLOQUEADOS contra una cuenta de socio** (`_validar_cuentas_y_categoria`,
+    `commands/movimientos.py`, gana un parámetro `tipo`): representan plata física entrando/saliendo de una
+    caja real — no tienen sentido de negocio contra un balance de deuda que no es caja.
+  - **`transferencia`/`ajuste` siguen permitidos sin cambios** contra una cuenta de socio (`saldar()` los
+    necesita; un `ajuste` puede ser una corrección legítima de arranque).
+  - **`gasto` queda PERMITIDO a propósito** contra una cuenta de socio, como origen (nunca tuvo destino) —
+    resuelve el caso real "el socio pagó un gasto de Rambla con su propia plata". Verificado en el código
+    (`gastos_por_categoria` en `queries/movimientos.py`, `ganancia_neta` en `queries/pyl.py`): ninguno de los
+    dos filtra por TIPO de cuenta origen, solo por `moneda = 'ARS'` — así que un `gasto` con origen una
+    cuenta de socio **cuenta automáticamente en el P&L categorizado** Y **baja la deuda del socio en el mismo
+    movimiento** (`egresos` resta en la fórmula de cuenta corriente de `queries/saldos.py` — Rambla ahora le
+    debe eso). Un solo movimiento cubre el caso completo, sin inventar un tipo de movimiento nuevo.
+  - El caso inverso ("Rambla pagó algo de Pablo") ya se resolvía sin cambios con 2 movimientos: `gasto` desde
+    una caja real (categorizado, plata real que salió) + `ajuste` con destino=cuenta del socio (le sube la
+    deuda) — patrón que ya funcionaba con las reglas existentes, no necesitó tocarse.
+- **Why.** El check necesita leer `cuentas.socio` de la DB (`SOCIOS_HUMANOS`), así que no puede vivir en
+  `validar_estructura_movimiento` (PURA, sin DB) — va en `_validar_cuentas_y_categoria`, el mismo punto único
+  que ya cerró el bug de mayor impacto de la auditoría anterior (`editar_movimiento` sin revalidar). Se
+  descartó bloquear `gasto` junto con `retiro`/`aporte` (opción más simple/uniforme) porque hubiera cerrado
+  la única forma limpia de que un gasto pagado por un socio impacte el P&L sin necesitar un tipo de movimiento
+  nuevo — el análisis del código (`gastos_por_categoria` sin filtro de tipo de cuenta) mostró que la regla
+  "permitido" ya encajaba con la infraestructura existente, sin construir nada nuevo.
+- **Consecuencias.** `test_movimiento_tipo_vs_tipo_cuenta_sin_restriccion` (fijaba el comportamiento viejo, sin
+  restricción) reemplazado por `test_retiro_aporte_bloqueados_contra_cuenta_socio` (confirma el rechazo) +
+  `test_gasto_contra_cuenta_socio_cuenta_en_pyl_y_baja_deuda` (confirma el permiso y el efecto doble: P&L +
+  deuda). Docstring del módulo (`commands/movimientos.py`) reescrito de "ambigüedad sin resolver" a la regla
+  resuelta. Suite completa en verde (2693 tests). Mismo commit/rama que la auditoría de bordes
+  (`fix/contabilidad-auditoria` → PR #1195, sin mergear); tracking #1184. Frontend sin cambios — el gate es
+  100% backend, el formulario de movimientos no filtra cuentas por tipo hoy y no hacía falta agregarlo para
+  este alcance.
+
+### 2026-07-02 — Auditoría cruzada de plata: `docs/SISTEMA_PLATA.md` + el fix de #405 (#1181) nunca se mergeó
+
+- **Contexto.** Tras cerrar la auditoría de `contabilidad/` + el fix de socios, el dueño expresó un miedo
+  concreto: "son muchos lugares donde se toca la plata, y no estoy tan seguro desde donde se gobierna cómo
+  funciona". Pidió (1) un manual que mapee todos los motores de plata y (2) que no fuera solo un mapa de
+  conexiones sino una verificación real de que cada uno funciona correcto — más seguridad/optimización.
+- **Método.** 6 agentes de exploración en paralelo (sin compartir contexto entre sí), cada uno auditando un
+  motor no cubierto por la auditoría de `contabilidad/`: `services/precios` (2 corridas independientes —
+  la primera no delegó bien la tarea y devolvió un resumen genérico en vez del reporte, se reenganchó con
+  una instrucción explícita de "no delegues, hacé el trabajo vos"), `reportes/` completo (liquidación +
+  comisiones + cierres + reconciliación), `services/facturacion`, el camino de congelamiento de precio en
+  la creación/edición de pedidos, y un trace end-to-end de un pedido + estado del semáforo de
+  reconciliación. Se verificó cada hallazgo contra el código real antes de documentarlo (grep directo,
+  no solo confiar en el reporte del agente) — así se descubrió el hallazgo crítico de abajo.
+- **Descubrimiento crítico (de proceso, no de código nuevo).** El **PR #1181** — el fix ORIGINAL del bug
+  #405 (el editor de pedidos admin recotizaba contra el precio de catálogo de hoy en vez del precio de
+  línea ya persistido/congelado, mostrando "100% pagado" mientras la reconciliación mensual marcaba
+  "sobrepagado") — **nunca se mergeó a `dev` ni a `main`**. Sigue abierto (`state: open, merged: false`,
+  `mergeable_state: clean`). Confirmado con `git grep respetar_precio_item` sobre `origin/dev`/`origin/main`
+  y el checkout actual: cero resultados en todos — el símbolo solo existe en la rama del PR sin mergear
+  (`claude/payment-registration-issue-3mi8fk`). La entrada de `MEMORIA.md`/`DECISIONES.md` de la sesión
+  anterior lo registraba como ya shippeado ("PR #1181 (merged branch history...)") — era un error de
+  registro, no un revert; probablemente una confusión entre "el commit existe en una rama" y "esa rama está
+  mergeada". **Consecuencia: el bug #405 está potencialmente activo en producción hoy.** Prioridad
+  recomendada: mergear #1181 antes que cualquier otro hallazgo de esta auditoría.
+- **Decisión — nuevo manual `docs/SISTEMA_PLATA.md`.** Cruza los ~6 motores de plata (precios, reservas,
+  `alquiler_pagos`, `reportes/liquidacion`, `contabilidad`, `facturacion`) con una tabla "fuente única de
+  cada número" + el estado del semáforo de reconciliación. **No repite** los invariantes de cada
+  `CLAUDE.md`/`SISTEMA_*.md` local (`backend/contabilidad/CLAUDE.md`, `backend/reservas/CLAUDE.md`,
+  `docs/SISTEMA_FACTURACION.md`, `docs/SISTEMA_CARRITO.md`) — los referencia. Indexado en `MANIFIESTO.md`
+  §8. Responde directamente al miedo del dueño: antes no había un solo lugar para mirar "¿esto de dónde
+  sale?", ahora sí.
+- **Hallazgos priorizados (14 ítems, documentados con detalle en `SISTEMA_PLATA.md` — no duplicados acá):**
+  el más severo es que `_enriquecer_pedido_con_total` (`routes/alquileres/core.py`) ignora `cobro_modo` en
+  6 call-sites reales incluido el motor de facturación real (`services/facturacion/engine.py`) — una línea
+  personalizada "fijo" (ej. flete) se multiplica igual por jornadas en el desglose mostrado/facturado,
+  aunque `monto_total` persistido (lo que se cobra) sigue siendo correcto. Le siguen: mismo bug en el PDF
+  de presupuesto; un `UndefinedColumn` real en `enviar_mail_factura` (`c.owner_email` no existe en
+  `clientes`, debería ser `c.email`) que rompe siempre que se usa esa función; una división por cero en
+  `reportes/liquidacion.py::filas_atribucion` que puede perder plata en silencio del reporte si todos los
+  ítems de un pedido tienen subtotal 0; 3 lugares en el front que reimplementan cálculo de línea en vez de
+  leer lo que ya devolvió el backend (2 de ellos ya divergidos entre sí); un bug dormido en el editor de
+  pedido del portal cliente (mismo patrón que #405, inalcanzable hoy por un feature flag apagado); falta de
+  lock de concurrencia en `reportes/cierres.py::cerrar_mes` (mismo patrón ya cerrado en `contabilidad`); y
+  la **reconciliación confirmada 100% manual** — ni `reportes/reconciliacion.py` ni
+  `contabilidad/queries/reconciliacion.py::reconciliar` corren en `jobs/scheduler.py` (el único scheduler
+  in-process del repo, que solo corre recordatorios de retiro + cleanup de cuentas livianas), y no hay
+  ningún badge/alerta en el dashboard admin — si nadie abre esa pantalla puntual, un desbalance puede
+  persistir indefinidamente sin que nadie se entere. Es el gap de gobernanza más directo detrás del miedo
+  original del dueño.
+- **Lo que está confirmado BIEN hecho** (no solo ausencia de bug, para el panorama completo): comisiones
+  con `validar_modelo` que fuerza sumar 100% con fallback seguro; `SALDADO_CTE` ya filtra pagos anulados;
+  IVA en `Decimal` con `assert total==neto+iva`, calculado sobre el neto post-descuento; sin secretos
+  hardcodeados en facturación; sin IDOR en la factura del cliente; `create_pedido_retry` persiste la plata
+  de forma atómica; el cliente nunca decide su propio precio (2 caminos reales verificados); cotas de
+  cantidad/descuento en múltiples capas espejadas; y `test_carrito_precio_efectivo.py` hace un source-scan
+  real (no solo unit test) que blinda mecánicamente contra el drift de combos histórico (#635).
+- **Consecuencias / próximos pasos.** Mergear #1181 con prioridad. El resto de los 14 hallazgos quedan
+  priorizados en `SISTEMA_PLATA.md` a la espera de que el dueño decida el orden de implementación (no se
+  arregló nada todavía en esta pasada — fue diagnóstico + manual, siguiendo el mismo patrón de la auditoría
+  de `contabilidad/`: primero el mapa completo, después la rama de fixes). El supervisor marca un motor de
+  plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
+  reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.
+
+### 2026-07-03 — `facturas.imp_neto/imp_iva/imp_total`: INTEGER → NUMERIC(12,2), dejan de truncar al centavo (#1209)
+
+- **Contexto.** Bug de severidad media encontrado al auditar `services/facturacion` (línea de la auditoría
+  cruzada de plata, decisión anterior). `services/facturacion/engine.py` calcula el neto/IVA/total EXACTOS
+  al centavo en `Decimal` vía `arca_fe.comprobante.calcular_importes` (`neto = req.importe_neto.quantize(...)`;
+  `iva = (neto * alicuota.pct / 100).quantize(...)`; `assert total == neto + iva`) — y esos son los valores
+  que se le mandan a ARCA en `armar_fecae` (`emitir_factura`/`emitir_nota_credito`, ambas llaman
+  `wsfe.solicitar_cae(fecae_payload)` con `_fmt(neto)`/`_fmt(iva)`/`_fmt(total)`, string con 2 decimales) y
+  se codifican en el QR fiscal vía `armar_qr(..., importe_total=importes["total"], ...)` (RG4892) para
+  obtener el CAE. Pero al armar el dict que se persiste en `facturas` (`imp_neto=neto_int, imp_iva=iva_int,
+  imp_total=total_int`, con `neto_int = int(round(float(importes["neto"])))` y análogos), esos Decimal
+  exactos se truncaban a peso entero — la tabla `facturas` seguía, por error, la convención de "enteros ARS"
+  de `backend/contabilidad/` (2026-06-07), que es la convención correcta para la plata **interna** pero NO
+  para un documento fiscal cuyo importe legal ya quedó fijado al centavo en ARCA.
+- **Escenario de falla concreto (verificado con un test, no solo teórico).** Un pedido Factura A (RI) con
+  `monto_total` (neto) = $1001 — un entero de pesos, pero NO múltiplo de 100. IVA 21% de 1001 = 210,21 (con
+  centavos, aunque el neto no los tenga). ARCA autoriza y el QR codifica: neto 1001.00, IVA 210.21, TOTAL
+  1211.21. La fila en `facturas` guardaba `imp_iva=210`, `imp_total=1211` (truncados) y el PDF impreso decía
+  "IVA 21%: $210,00" / "Importe Total: $1.211,00" — **$0,21 por debajo** de lo que el CAE/QR realmente
+  autorizaron. Pasa en cualquier factura cuyo neto no sea múltiplo de 100 (común con descuentos o precios no
+  redondos) — no es un caso de borde raro.
+- **Efecto secundario descubierto al leer `comprobante_pedido.py`.** `construir_comprobante_nc` (usada para
+  anular con Nota de Crédito) reconstruye el importe de la NC leyendo el SNAPSHOT ya persistido de la factura
+  original (`importe_neto = Decimal(original.imp_neto)`) — a propósito, para que la NC cancele exactamente lo
+  facturado y no lo que el pedido diga "en vivo" (decisión 2026-06-29, test
+  `test_construir_comprobante_nc_usa_snapshot_no_pedido_en_vivo`). Con `imp_neto` truncado, ese snapshot
+  YA VENÍA MAL — la NC hubiera heredado el mismo redondeo. El fix de la columna corrige este camino gratis,
+  sin tocar `comprobante_pedido.py`.
+- **Decisión — fix mínimo, sin tocar el core de ARCA.** (1) `facturas.imp_neto`/`imp_iva`/`imp_total` pasan
+  de INTEGER a NUMERIC(12,2) — en `database/schema.py::init_db()` (`CREATE TABLE` con el tipo nuevo para
+  instalaciones frescas + un bloque `DO $$ ... ALTER COLUMN ... TYPE NUMERIC(12,2) USING ...::NUMERIC(12,2)`
+  idempotente, guardado tras chequear `information_schema.columns.data_type = 'integer'`, para DBs
+  existentes que corran `init_db()` sin pasar por Alembic) y en la migración nueva `h3i4j5k6l7m8` (mismo
+  `ALTER COLUMN ... TYPE` sin guard — Alembic ya trackea si se aplicó; `downgrade()` sí usa `ROUND(...)` antes
+  de volver a INTEGER, por si para entonces hay filas con centavos reales que perderían precisión al bajar).
+  (2) `engine.py` deja de truncar: `neto_dec/iva_dec/total_dec = importes["neto"|"iva"|"total"]` directo,
+  sin `int(round(float(...)))`, en los 2 call-sites (`emitir_factura` e `emitir_nota_credito`). (3) `repo.py`:
+  el dataclass `Factura` y la firma de `insert_factura` cambian el type hint de `int` a `Decimal` en los tres
+  campos (cosmético para type-checking; en runtime Python no lo exige, pero documenta el contrato real).
+  (4) `pdf.py` **NO necesitó ningún cambio** — `_money`/`_plain` ya formatean con `f"{float(n):,.2f}"`, así
+  que ya mostraban 2 decimales; solo mostraban "00" de centavos porque el valor guardado venía sin ellos.
+  Verificado manualmente (`factura_html` con `imp_iva=Decimal("210.21")` → el HTML contiene literalmente
+  "210,21", no "210,00") antes de descartar tocar ese archivo.
+- **Por qué NUMERIC(12,2) y no cambiar el `int(round(...))` por otra cosa.** Se consideró dejar la columna
+  INTEGER y solo redondear "mejor" en algún otro punto — descartado: el problema no es CÓMO se redondea, es
+  QUE se redondea un documento fiscal cuyo importe legal ya es fraccionario por diseño (IVA discriminado).
+  NUMERIC(12,2) (no NUMERIC sin precisión, no FLOAT — mismo criterio que `g1a2b3c4d5e6` para `descuento_pct`:
+  FLOAT introduce error de punto flotante en plata) replica exactamente la precisión de 2 decimales que ARCA
+  exige en `ImpNeto`/`ImpIVA`/`ImpTotal`. El `USING ...::NUMERIC(12,2)` (sin `ROUND`) en el `upgrade()` es
+  seguro porque el valor de origen es INTEGER — no hay parte fraccionaria que perder al ampliar precisión (a
+  diferencia de la migración inversa `g1a2b3c4d5e6`, que sí necesitaba `ROUND` porque iba de más a menos
+  precisión). Precedente seguido para el patrón de dos capas: `g1a2b3c4d5e6_descuentos_float_a_numeric.py`
+  (mismo tipo de bug — plata perdiendo precisión por el tipo de columna equivocado).
+- **Verificación.** Test nuevo `tests/test_facturacion_centavos.py`: (a)
+  `test_emitir_factura_persiste_centavos_exactos_no_trunca` arma un pedido RI con neto=$1001, mockea
+  WSFE/DB (mismo patrón que `test_facturacion_engine.py`, sin red ni Postgres real), y verifica que lo
+  persistido en `insert_factura` (`imp_neto`/`imp_iva`/`imp_total`) coincide EXACTO —
+  `Decimal("1001.00")`/`Decimal("210.21")`/`Decimal("1211.21")`— con lo que el mismo test capturó en el
+  payload `FECAESolicitar` mandado a ARCA (`det["ImpIVA"] == "210.21"`); (b)
+  `test_pdf_muestra_centavos_no_redondea_a_peso_entero` renderiza `factura_html` con esos mismos valores y
+  confirma que el HTML contiene "210,21"/"1.211,21" y NO contiene "210,00"/"1.211,00". Suite completa
+  (2550 unit + 2457 con Postgres real vía `RESERVAS_DB_TEST=1`, excluyendo `test_catalogo_motor_shape.py`
+  que ya falla igual en `origin/dev` sin este cambio — verificado clonando el repo limpio) y
+  `test_alembic_upgrade_db.py` (`ALEMBIC_DB_TEST=1`, que corre `init_db()+upgrade head` contra una BD
+  descartable) en verde; confirmado además a mano que re-correr `init_db()` sobre una tabla `facturas` ya
+  existente con columnas INTEGER (simulando una BD vieja no migrada) las deja en NUMERIC(12,2) — el guard
+  `DO $$` idempotente funciona. pyflakes limpio en los 5 archivos tocados.
+- **Consecuencias.** Sin cambios de contrato público más allá de más precisión (el JSON de
+  `/api/admin/facturas` y `/facturas/{id}/pdf` sigue devolviendo los mismos campos, ahora con centavos
+  reales en vez de siempre ".00"). No afecta `backend/contabilidad/` ni ningún reporte que sume plata
+  interna — `facturas` no es consumida fuera del paquete `services/facturacion/` + su route (verificado con
+  `grep -rl facturas backend/`). El supervisor marca un `int(round(...))` reintroducido sobre
+  `imp_neto`/`imp_iva`/`imp_total`, o un cambio de esta tabla que la vuelva a alinear con "enteros ARS" sin
+  entender que es la excepción fiscal. PR sin mergear (rama `fix/factura-centavos-arca` → `dev`); issue #1209.
+
+### 2026-07-02 — `reportes/liquidacion.py::filas_atribucion` perdía plata en silencio con `suma_items = 0`
+
+- **Contexto.** Fase 5 de la hoja de ruta de plata (#1184; hallazgo #4 de la auditoría cruzada,
+  `docs/SISTEMA_PLATA.md`). El prorrateo del `monto_total` entre los equipos de un pedido se hacía
+  `al.monto_total * pi.subtotal::numeric / NULLIF(t.suma_items, 0)`. Si **todos** los ítems de un pedido
+  tenían `subtotal = 0` (ej. un descuento del 100% aplicado a nivel ítem, no al pedido completo) —
+  `suma_items` daba 0, `NULLIF` lo convertía en `NULL`, y el `monto` resultante era `NULL` para cada
+  ítem. En `agregar()` (la función pura que suma todo), `float(f["monto"] or 0)` trata `NULL` como 0 →
+  esos pesos **desaparecían del reporte sin ningún error ni warning**. Ningún chequeo de reconciliación
+  existente (ni `reportes/reconciliacion.py` ni `contabilidad/queries/reconciliacion.py`) lo detectaba,
+  porque ambos comparan cosas distintas (pagado vs. total del pedido, no el reporte de liquidación
+  agregado vs. la suma de `monto_total` de los pedidos incluidos).
+- **Decisión — fallback de reparto parejo.** `tot` CTE suma también `COUNT(*) AS cant_items`. La query
+  pasa a un `CASE`: si `suma_items = 0`, el monto de cada ítem es `monto_total / cant_items` (reparto
+  **en partes iguales** entre los ítems del pedido); si no, sigue el prorrateo proporcional de siempre.
+  Se descartó "atribuir todo a Rambla por default" (mencionado como opción en el plan original) porque
+  no hay ninguna base real para decidir que la plata "sin subtotal" le pertenece a Rambla en vez de a
+  los dueños de los equipos involucrados — repartir parejo entre los ítems reales del pedido es el
+  fallback más neutral y defendible cuando no hay proporción real que usar.
+- **Why.** La regla dura del sistema de plata es que ningún número puede desaparecer en silencio — un
+  `NULLIF` que colapsa a 0 sin un camino alternativo viola eso. El fix es puramente técnico (garantizar
+  que la suma siempre cuadre); no cambia el reparto en el caso común (`suma_items > 0`), que sigue
+  siendo byte-idéntico.
+- **Consecuencias.** `test_reportes_liquidacion_db.py::test_suma_items_cero_no_pierde_plata` (Postgres
+  real, aislado de la fixture `setup` compartida para no alterar sus totales/aserciones existentes):
+  un pedido con 2 ítems `subtotal=0` y `monto_total=30000` confirma que el reporte de junio sigue
+  incluyendo esos 30000 (total agregado + suma de `por_beneficiario`). Suite completa 2548 passed / 183
+  skipped (sin regresiones); `test_reportes_liquidacion.py` (28 tests puros/DB) también en verde. El
+  supervisor marca cualquier prorrateo de plata con `NULLIF`/división que pueda colapsar a `NULL`/0 sin
+  un fallback explícito que garantice que el total nunca se pierda. Rama `fix/liquidacion-division-cero`
+  → PR scoped (sin mergear, hoja de ruta); tracking #1184.
+
+### 2026-07-02 — Fase 3+6: lock de concurrencia en `reportes/cierres.py` + rate limit en `routes/reportes.py`
+
+- **Contexto.** Últimas dos fases pendientes de la hoja de ruta de plata (#1184; hallazgos #8 y #10 de
+  la auditoría cruzada en `docs/SISTEMA_PLATA.md`). `reportes/cierres.py::cerrar_mes`/`reabrir_mes` no
+  tenían ningún candado de concurrencia — el mismo tipo de carrera que se cerró en `contabilidad`
+  (2026-07-02, `_exigir_mes_abierto`/`_lock_mes`) seguía sin mitigar acá: un `cerrar_mes` podía leer el
+  reporte de un mes en T0 y commitear su foto DESPUÉS de que un pago (`alquiler_pagos`) de ese mismo mes
+  se insertara en otra transacción, dejando una foto que no incluye ese pago. Y `routes/reportes.py`
+  tenía sus 3 endpoints de escritura (enviar mail, cerrar/reabrir mes) sin `@limiter.limit` — mismo gap
+  ya cerrado en `contabilidad.py`/`pagos.py`.
+- **Decisión — lock de concurrencia (Fase 3).** `reportes/cierres.py` gana `_lock_mes(conn, mes)`
+  (`pg_advisory_xact_lock`, mismo parseo `'YYYY-MM'`→`YYYYMM` que
+  `contabilidad/commands/movimientos.py::_lock_mes`), llamada al inicio de `cerrar_mes` y `reabrir_mes`.
+  **Namespace nuevo y separado** — `_ADVISORY_NS_REPORTES_MES = 5390421` — NO reusa
+  `_ADVISORY_NS_CONTAB_MES` (5390420): el cierre de liquidación (reparto/comisiones entre dueños) y el
+  cierre contable (cajas/movimientos) son operaciones independientes sobre invariantes distintos;
+  compartir namespace bloquearía sin necesidad un cierre por el otro (ej. cerrar el mes contable no
+  debería esperar a que termine de cerrarse la liquidación de ese mismo mes).
+- **Decisión — rate limit (Fase 6).** `routes/reportes.py` importa `limiter`/`ADMIN_WRITE_LIMIT` de
+  `rate_limit.py` (ya existente) y agrega `@limiter.limit(ADMIN_WRITE_LIMIT)` a los 3 endpoints de
+  escritura: `enviar_reporte_mail` (POST enviar-mail), `cerrar_mes_liquidacion` (POST cierres/{mes}),
+  `reabrir_mes_liquidacion` (DELETE cierres/{mes}).
+- **Why.** El lock de `reportes/cierres.py` no reemplaza el candado preventivo de `contabilidad` (ese
+  protege movimientos internos; este protege el reporte de liquidación) — son dominios distintos que
+  necesitan su propio candado, mismo patrón, sin compartir key space. El rate limit cierra el mismo gap
+  de superficie de ataque que ya se había cerrado en el resto de los routes de escritura de plata.
+- **Consecuencias.** Nuevo test de concurrencia real con Postgres (no solo en teoría, mismo criterio
+  que la auditoría de `contabilidad`): `test_reportes_cierres_db.py::test_lock_serializa_cerrar_mes_concurrente`
+  — dos conexiones reales + `threading.Event`, una toma el lock del mes y lo retiene, la otra intenta
+  `cerrar_mes` del mismo mes y debe quedar bloqueada hasta que la primera libere (commit); se verifica
+  el orden real de eventos, no solo ausencia de errores. Suite completa 2548 passed / 184 skipped (sin
+  regresiones); `test_reportes_cierres_db.py` completo (4 tests) en verde. El supervisor marca: (1)
+  cualquier escritura nueva en `reportes/cierres.py` que no pase por `_lock_mes`; (2) reusar
+  `_ADVISORY_NS_CONTAB_MES` en vez de un namespace propio para un candado de otro dominio de plata; (3)
+  un endpoint de escritura nuevo en `routes/reportes.py` sin `@limiter.limit`. Rama
+  `fix/reportes-lock-rate-limit` → PR scoped (sin mergear, hoja de ruta); tracking #1184.
+
+### 2026-07-02 — `enviar_mail_factura` roto por 2 bugs encadenados (columna inexistente + kwarg inexistente)
+
+- **Contexto.** Fase 4 de la hoja de ruta de plata (`services/finanzas_flujo/`, ver entradas anteriores de
+  esta misma fecha). El hallazgo #3 de la auditoría cruzada (`docs/SISTEMA_PLATA.md`) marcaba
+  `routes/facturacion.py::enviar_mail_factura` con un `UndefinedColumn`: la query consultaba `c.owner_email`,
+  columna que no existe en `clientes` (vive en otras tablas — `passkey_credentials`/`auth_sessions` tienen
+  su propio `owner_email` para otro propósito). La función rompía **siempre** que se invocaba.
+- **Decisión.** Fix directo: `SELECT c.owner_email, ...` → `SELECT c.email, ...` (+ las referencias
+  derivadas de esa fila, `row["owner_email"]` → `row["email"]`).
+- **Segundo bug encontrado al escribir el test de regresión.** Al ejercitar la función completa por primera
+  vez (el test viejo de `test_facturacion_routes.py` nunca cubría este endpoint — gap de test real, no solo
+  de código), apareció un **segundo bug** nunca antes ejecutado, escondido detrás del primero: la construcción
+  del adjunto usaba `Attachment(filename=filename, content=pdf_bytes, content_type="application/pdf")`, pero
+  el dataclass real (`services/email/base.py::Attachment`) tiene el campo `mimetype`, no `content_type` — un
+  `TypeError` en cuanto se corregía el primer bug. Confirmado contra los otros 3 usos reales de `Attachment`
+  en el repo (`routes/reportes.py`, `routes/alquileres/documentos.py`, `routes/alquileres/core.py`), los tres
+  usan `mimetype`. Fix: `content_type=` → `mimetype=`.
+- **Why.** Sin arreglar los dos, la función seguía completamente rota — el primer fix por sí solo no era
+  suficiente para dejarla funcionando, solo movía el punto de falla más adelante. Refuerza con un corolario
+  concreto la decisión _2026-06-22 — Los hallazgos de una auditoría son hipótesis_: confirmar un fix no es
+  solo confirmar que la línea señalada compila, es ejecutar la función **completa** hasta el final — un bug
+  puede estar tapado por otro que se ejecuta primero.
+- **Consecuencias.** `test_facturacion_routes.py` suma `_FakeRow`/`_FakeConnConEmail` (fake de conexión con
+  `execute().fetchone()` para simular la fila de `clientes`) + `test_enviar_mail_factura_no_rompe_con_undefined_column`
+  (ejercita la función completa: SELECT → PDF → mail, confirma que no rompe y que el destinatario es el email
+  real) + `test_enviar_mail_factura_400_si_sin_email` (cliente sin email → 400, no un crash). 22/22 tests de
+  `test_facturacion_routes.py` en verde; suite completa 2720 (mismos 6 fallos preexistentes no relacionados
+  de `test_catalogo_motor_shape.py`). El supervisor marca un fix de columna/kwarg que no ejercite el código
+  que queda DESPUÉS de esa línea — un segundo bug latente puede estar escondido detrás del primero. Rama
+  `fix/facturacion-owner-email` → PR scoped (sin mergear, hoja de ruta); tracking #1184.
+
+### 2026-07-03 — El endpoint de modificación de pedido del cliente aplica el mismo gate de catálogo que la creación (M6, #1209)
+
+- **Contexto.** Hallazgo M6 de la auditoría cruzada de plata (#1209, 52 agentes: 9 finders + verificación
+  adversarial en 2 pasadas): `cliente_crear_pedido` (creación) resuelve el precio de cada ítem vía la
+  puerta del carrito `services/carrito/readiness.py::precios_catalogo_para_reserva`, que además de
+  resolver plata aplica un gate de seguridad — solo equipos `visible_catalogo=1` con precio definido.
+  `cliente_modificar_pedido` (`routes/cliente_portal/solicitudes.py`, el endpoint de modificación de un
+  pedido ya existente) resolvía el precio de un ítem nuevo con `_equipo_precio_catalogo` — que SOLO
+  resuelve plata (`precio_jornada_efectivo`), sin ningún chequeo de visibilidad — así que un cliente podía,
+  vía `POST /api/cliente/pedidos/{id}/modificacion` sobre un pedido en `presupuesto` o `confirmado`,
+  agregar un equipo con `visible_catalogo=0` (oculto del catálogo público) o el recurso interno del Estudio
+  (`es_recurso_interno=TRUE`, el "centinela" que modela el espacio físico — ver _El Estudio (2026-05-27)_)
+  — reservando stock de un recurso que el negocio nunca ofreció públicamente. En `confirmado` el hueco era
+  peor: la propuesta quedaba pendiente para que un admin la apruebe a ciegas, sin ver que el equipo nunca
+  debió ofrecerse.
+- **Decisión.** Se extrajo el gate a una función única, `services/carrito/readiness.py::equipo_visible_catalogo(conn,
+  equipo_id)`, que valida: vivo (`eliminado_at IS NULL`), `visible_catalogo=1`, NO `es_recurso_interno`, y
+  precio definido — lanza `HTTPException(404)` si falla cualquiera. `precios_catalogo_para_reserva`
+  (creación) ahora llama a esta función en vez de tener su propio SELECT inline; `cliente_modificar_pedido`
+  la llama ANTES de resolver el precio, pero SOLO para ítems que no estaban ya en el pedido
+  (`it.equipo_id not in precios`) — un ítem ya reservado (frozen) no se re-gatea aunque se haya ocultado
+  después, para no invalidar algo ya confirmado. El chequeo corre ANTES del branch `presupuesto`/
+  `confirmado`, así que en `confirmado` rechaza la propuesta de una vez en vez de dejarla pendiente. El
+  path admin (`admin_responder_solicitud`, que también llama `_equipo_precio_catalogo`) NO se tocó a
+  propósito: el admin puede legítimamente agregar cualquier equipo — visible o no — igual que
+  `PUT /alquileres/{id}/items`; documentado explícitamente en el docstring para que no se "arregle" por
+  error en el futuro.
+- **Why.** Extraer a una función única (en vez de solo copiar el chequeo dentro de `solicitudes.py`) sigue
+  el patrón motor-único del repo (_`backend/services/carrito/` (2026-06-29)_): un solo lugar decide "qué es
+  un producto real del catálogo", consumido por los dos caminos que persisten plata de cliente (crear +
+  modificar). De paso se sumó `eliminado_at IS NULL` al gate — el SELECT viejo de la creación solo
+  chequeaba `visible_catalogo=1 AND precio_jornada IS NOT NULL`, y el soft-delete de un equipo
+  (`DELETE /equipos/{id}`) NO baja `visible_catalogo` a la vez (confirmado en `routes/equipos/core.py`) —
+  así que un equipo soft-deleted con `visible_catalogo` sin bajar colaba en AMBOS caminos antes de este
+  fix (no solo en la modificación). `es_recurso_interno=FALSE` es defensa en profundidad (hoy redundante
+  en la práctica — el centinela nace con `visible_catalogo=0` — pero no depende de que ese dato nunca
+  cambie).
+- **Consecuencias.** Ningún cambio de contrato público para el uso legítimo (agregar un equipo visible
+  nuevo al pedido sigue funcionando igual; un ítem ya frozen tampoco se ve afectado si se oculta después).
+  Regresión contra Postgres real (`tests/test_cliente_modificar_pedido_gate_db.py`, 4 tests): rechaza un
+  equipo oculto nuevo, rechaza el recurso interno, acepta un equipo visible nuevo (control), y no re-gatea
+  un ítem ya frozen aunque se oculte después — confirmado manualmente que los 2 tests de rechazo fallan
+  (200 en vez de 404) contra el código viejo (revertido temporalmente con `git stash` para verificar) antes
+  de aplicar el fix. Hallazgo de la auditoría cruzada de plata (#1209); el resto de los hallazgos (M1-M5,
+  L1-L3) quedan en ramas propias, sin mergear, mismo criterio "PR como hoja de ruta".
+
+### 2026-07-02 — `backend/services/finanzas_flujo/` = módulo orquestador de plata (Fase 1: desglose de pedido)
+
+- **Contexto.** Tras ver los 14 hallazgos + el descubrimiento de #1181, el dueño pidió una hoja de ruta
+  en fases y, explícitamente, que "el proceso de la plata" fuera **una implementación real y
+  reproducible** — no un documento que describa cómo se hace, sino un **módulo orquestador en el
+  backend** que sea el único punto de entrada para "preguntar algo de plata", para que un consumidor
+  nuevo no tenga que saber a cuál de los 6 motores llamar ("que no sean un montón de referencias
+  cruzadas"). Se diseñó como facade de solo lectura, mismo patrón que `services/carrito/` (que ya
+  orquesta lectura sobre reservas/precios/contenido). Nombre elegido con el dueño tras descartar
+  "plata" (se quedaba corto — no capta que abarca liquidación/facturación) y "tesorería" (suena a solo
+  caja): **`finanzas_flujo`**. El manual `docs/SISTEMA_PLATA.md` se renombró a
+  `docs/SISTEMA_FINANZAS_FLUJO.md` (git mv, preserva historia) para mantener el patrón 1:1 manual↔módulo
+  ya establecido (`SISTEMA_CARRITO.md`↔`services/carrito/`, `SISTEMA_CONTENIDO.md`↔`services/contenido/`).
+- **Decisión — diseño del facade.** `backend/services/finanzas_flujo/` **nunca escribe** — las
+  mutaciones siguen pasando por cada motor directo (`create_pedido_retry`, `contabilidad.commands.*`,
+  rutas de `alquiler_pagos`), porque cada uno tiene su propia validación/candado/lock que no debe
+  saltearse. Cada función del facade delega 1:1 al motor dueño (comentario explícito "OWNA: nada,
+  delega en X" en cada una) — nunca reimplementa. Migración gradual: los consumidores existentes se
+  migran de a uno, en el mismo PR en que ya se estaba tocando ese archivo por otra razón — no se abre
+  un PR aparte solo para "migrar imports" sin otro motivo (sería refactor sin necesidad real).
+- **Decisión — Fase 1 (primera pieza implementada, no solo diseñada).**
+  `finanzas_flujo/pedido.py::desglose_de_pedido(conn, pedido)` es la nueva fuente única del desglose de
+  plata de un pedido (bruto/descuento/neto/IVA por línea) — arregla el bug de `cobro_modo` encontrado en
+  la auditoría: `_enriquecer_pedido_con_total` (`routes/alquileres/core.py`) armaba los ítems para
+  `calcular_total` SIN pasarle `cobro_modo`, así que una línea personalizada `cobro_modo='fijo'` (ej.
+  flete, #805) se multiplicaba igual por jornadas al mostrar/facturar (aunque `bruto_linea`, la función
+  que `calcular_total` llama por ítem, ya sabía manejarlo bien — el bug era de "quién arma el input", no
+  de la fórmula). El fix corrige de un solo punto los 6 call-sites reales: `_get_alquiler_detail`
+  (detalle admin), `routes/alquileres/documentos.py` (PDF/mail), `routes/cliente_portal/documentos.py` +
+  `pedidos.py` (portal cliente), y **`services/facturacion/engine.py`** (el motor de facturación real —
+  el de mayor impacto, corrige lo que efectivamente se factura). `_enriquecer_pedido_con_total` se dejó
+  como wrapper de compatibilidad (delega en la fachada) para no tocar los 6 call-sites en este PR —
+  código nuevo debería importar `desglose_de_pedido` directo. De paso, `services/facturacion/engine.py`
+  (un `service`) dejó de importar de `routes.alquileres` (un `route`) — dependencia arquitectónicamente
+  invertida que ya no hace falta.
+- **Fix espejo en el PDF.** `pdf_templates.py::_pedido_html`/`_sum_bruto` reimplementaban la
+  multiplicación `precio_jornada × cantidad × jornadas` desde cero (sin `cobro_modo`) — no pasaban por
+  `_enriquecer_pedido_con_total` para el detalle de línea. Nuevo helper `_bruto_item_pdf(it, j)` (espeja
+  `bruto_linea` sin importar `services.precios` completo — el PDF agrega distinto por componente de
+  combo, que `bruto_linea` no contempla tal cual) usado en ambos puntos.
+- **Fix espejo en el front admin.** `PedidoPageCards.tsx` (ignoraba `cobro_modo`) y
+  `PedidoPageHelpers.tsx` (correcto, comentario decía "espeja bruto_linea del backend") ya habían
+  divergido sobre el mismo tipo `DraftItem`. Extraído `subtotalDraftItem(it, jornadas)` a
+  `usePedidoDraft.ts` (hogar del tipo) — ambos componentes importan la misma función; no pueden volver a
+  divergir porque ya no tienen cada uno su propia fórmula.
+- **Fuera de esta fase, a propósito.** `CartDrawerView.tsx`/`CartMiniBarView.tsx` (carrito público)
+  también recalculan localmente (`pricePerDay` cacheado) en vez de leer `lineaPorEquipo()` — pero el
+  carrito público hoy NO tiene líneas `cobro_modo='fijo'` (feature exclusiva del builder admin, #805), y
+  migrarlo requiere threadear el objeto `Cotizacion` completo por 3 call-sites (cambio de mayor alcance).
+  Queda documentado como fase futura opcional en `SISTEMA_FINANZAS_FLUJO.md`, no en esta hoja de ruta.
+- **Candados.** `test_finanzas_flujo_pedido.py` (unit, 5 casos: línea jornada, línea fija, mezcla,
+  default sin `cobro_modo`, mutación in-place) + `test_finanzas_flujo_source_scan.py` (verifica que
+  `pdf_templates.py` usa `_bruto_item_pdf` y que `services/facturacion/engine.py` importa la fachada, no
+  `routes.alquileres`) + `test_pdf_helpers.py::TestBrutoItemPdf` (4 casos). No se agregó test de
+  componente en frontend (sin infraestructura de Vitest en el repo hoy) — la garantía ahí es estructural
+  por construcción (misma función compartida, no puede divergir).
+- **Consecuencias.** Suite completa en verde (2717 tests, +26 nuevos). `pyflakes`/`eslint`/`tsc --noEmit`
+  limpios en los archivos tocados. Rama aislada `feature/finanzas-flujo-fase1` (PR sin mergear, hoja de
+  ruta); tracking #1184 (Fase 3, continúa tras la auditoría cruzada de plata).
+
+### 2026-07-02 — Fase 2 (última): reconciliación proactiva — mail al dueño + chequeo `desglose_divergente`
+
+- **Contexto.** Última fase de la hoja de ruta de plata (#1184). El semáforo de reconciliación era
+  **100% manual**: `reportes/reconciliacion.py::reconciliar` y
+  `contabilidad/queries/reconciliacion.py::reconciliar` solo se consultaban si alguien abría
+  `/admin/reportes`/`/admin/contabilidad` a mirar — el gap de gobernanza más directo detrás del miedo
+  original del dueño ("no sé desde dónde se gobierna cómo funciona la plata"). Antes de esta fase, la
+  pregunta "¿un pedido confirmado puede desincronizarse de su propio desglose?" (el patrón general del
+  bug #405) no tenía ningún chequeo automático — dependía de que alguien notara un reporte puntual raro.
+- **Decisión — semáforo unificado.** `services/finanzas_flujo/reconciliacion.py::estado(conn)` (nuevo
+  submódulo de la fachada, tercero tras `pedido.py`) une los dos `reconciliar()` existentes en un solo
+  `{ok, reporte, contabilidad}` — `ok` es el AND de ambos. **No reimplementa ningún chequeo**: cada
+  función delega 1:1, mismo patrón que `pedido.py` (Fase 1).
+- **Decisión — job de alerta proactiva.** `jobs/reconciliacion.py::chequear_reconciliacion_y_alertar()`
+  corre 1×/día desde el mismo thread in-process del scheduler (`jobs/scheduler.py`, junto a
+  `enviar_recordatorios_retiro`/`purgar_cuentas_livianas_stale` — mismo mecanismo de "última fecha
+  corrida" que ya acota a 1×/día, sin necesitar un rate-limit aparte): si `estado(conn)["ok"]` es
+  `False`, arma un resumen legible del detalle y manda un mail a cada `settings.admin_emails` vía
+  `send_raw_email` (mail transaccional one-off, mismo mecanismo que ya usa
+  `routes/reportes.py::enviar_reporte_mail`). El job **solo avisa, nunca repara** — la corrección sigue
+  siendo manual, vía el dashboard admin. Nunca propaga: un error en `estado()` o en el envío no debe
+  tumbar el scheduler (mismo contrato que los otros dos jobs del thread).
+- **Decisión — nuevo chequeo `desglose_divergente`.** Se agrega a `reportes/reconciliacion.py::reconciliar`
+  (no a la fachada — vive donde viven los otros 4 chequeos del reporte). Para cada pedido activo (no
+  cancelado, `monto_total > 0`, dentro del clean start), recalcula el desglose con el precio de línea
+  YA PERSISTIDO de cada ítem (vía `finanzas_flujo.pedido.desglose_de_pedido` — NO el precio de catálogo,
+  mismo criterio que el fix de #1181) y lo compara contra `monto_total`. Si divergen, el pedido se
+  lista. **Se descartaron** los dos chequeos que el dueño propuso inicialmente en la conversación de
+  diseño ("facturado == cobrado" y "ganancia del mes == suma recalculada"): el primero viola
+  devengado≠percibido a propósito (`contabilidad/CLAUDE.md`); el segundo se calcula al vuelo sin
+  persistirse dos veces, así que no tiene riesgo de drift por construcción — agregar un chequeo ahí
+  sería ruido sin cazar nada real. El único chequeo con valor real era éste: es la red genérica que
+  hubiera cazado el patrón de #405 sin depender de que el dueño notara un reporte puntual.
+- **Why.** Un job que solo lee y notifica es de bajo riesgo (no toca ningún camino de escritura de
+  plata) — la corrección la sigue haciendo un humano informado, no el sistema solo. El chequeo nuevo usa
+  la MISMA fuente que ya usan los 6 consumidores reales del desglose (Fase 1), así que no puede
+  divergir de lo que el dueño ve en pantalla.
+- **Consecuencias.** `test_finanzas_flujo_reconciliacion.py` (3 tests: la fachada une bien los dos
+  semáforos, cualquiera de los dos en `False` tumba el `ok` global). `test_jobs_reconciliacion.py`
+  (5 tests: no manda mail si `ok=True`; manda uno a cada admin si `ok=False`; un envío fallido no
+  propaga; el resumen HTML incluye los chequeos con cantidad positiva y no rompe sin ítems).
+  `test_reportes_liquidacion_db.py::test_reconciliacion_caza_desglose_divergente_del_pedido` (Postgres
+  real: un pedido con `monto_total` deliberadamente desincronizado de su desglose recalculado aparece
+  en `desglose_divergente`). Suite completa 2565 passed / 177 skipped (sin regresiones). El supervisor
+  marca: un chequeo de reconciliación nuevo fuera de la fachada `finanzas_flujo`, un job de este tipo
+  que repare en vez de solo avisar, o un mail de alerta que no pase por `send_raw_email`. Rama
+  `feature/finanzas-flujo-fase2-reconciliacion` (sobre `feature/finanzas-flujo-fase1`, que sigue sin
+  mergear — PR scoped, sin mergear, hoja de ruta); tracking #1184 — **última fase de la iniciativa**.
+
+### 2026-07-03 — `routes/estadisticas.py`: las agregaciones leen `monto_total`, no reconstruyen el descuento (#1209)
+
+- **Contexto.** Uno de los 14 hallazgos de la auditoría cruzada de plata (2026-07-02, severidad media):
+  `routes/estadisticas.py` tenía ~6 queries que, en vez de leer `alquileres.monto_total` (el neto ya
+  correcto, persistido por `_recalcular_total_pedido` con el descuento GANADOR aplicado), reconstruían el
+  ingreso a mano con `subtotal * (1 - COALESCE(descuento_pct, 0) / 100.0)`. `descuento_pct` en la tabla
+  `alquileres` **solo guarda el descuento de CLIENTE** — nunca el de JORNADAS, aunque este último haya sido
+  el ganador (`services/precios.descuento_aplicable = max(descuento_cliente_pct, descuento_jornadas_pct)`,
+  no la suma). En un alquiler de varios días con 0% de descuento de cliente pero un % por jornadas (el caso
+  común), la reconstrucción devolvía el BRUTO en vez del NETO realmente cobrado.
+- **Escenario de falla concreto** (el que motivó el fix): 1 equipo a $10.000/día × 7 jornadas, cliente 0%
+  propio + 10% por jornadas (ganador) → se cobra $63.000 real (en `monto_total`), pero
+  `70.000 × (1 - 0/100) = $70.000` — **$7.000 de más**, que escala con cada alquiler multi-día del
+  histórico. Y en la MISMA pantalla, "Top clientes"/"Clientes recurrentes" ya usaban `p.monto_total`
+  directo (correcto) — dos números del mismo pedido no cuadraban entre sí.
+- **Por qué no alcanza con leer `monto_total` en todos lados por igual.** Es una columna a nivel PEDIDO,
+  no por ítem. Las agregaciones a nivel pedido (`totales`, `por_mes`, `mejor_peor_mes`) pueden leerlo
+  directo — pero había que sacar el `JOIN alquiler_items` que tenían (si no, `monto_total` se multiplica
+  por cada línea del pedido). Las agregaciones a nivel ÍTEM (`top_equipos`, agrupado por equipo; `por_dueno`,
+  agrupado por `equipos.dueno`) necesitan saber "cuánto aportó cada línea" de un pedido con potencialmente
+  varios equipos de dueños distintos — ahí no alcanza con el número del pedido entero. Solución: **prorratear**
+  `monto_total` según la participación de cada línea en el `subtotal` (bruto) del pedido — el MISMO patrón ya
+  usado y confiable en `reportes/liquidacion.py::filas_atribucion` (`SALDADO_CTE` + prorrateo por subtotal),
+  ahora factorizado en un fragmento SQL compartido `_PRORRATEO_CTE` (misma técnica de composición por
+  f-string que `SALDADO_CTE`) para no repetir la CTE en `top_equipos` y `por_dueno`.
+- **`mejor_peor_mes` de paso simplificado.** Las 4 subqueries (mejor mes/total, peor mes/total) repetían la
+  misma fórmula rota 4 veces; se consolidaron en una única CTE `por_mes_full` (con `monto_total`, sin join a
+  ítems) referenciada 4 veces — menos código Y arregla el bug de una sola vez. Mismo universo que antes
+  (todo el histórico, sin el `LIMIT 24` que sí tiene `por_mes`).
+- **Universo de pedidos preservado.** Al sacar el `JOIN alquiler_items` de `totales`/`por_mes`/`mejor_peor`
+  no cambia qué pedidos cuentan: todo pedido en estado `confirmado`/`finalizado`/`retirado` tiene ≥1 ítem
+  por invariante de creación (`if not data.items and data.estado != "borrador"` en
+  `routes/alquileres/core.py`), así que el join solo estaba ahí por la fórmula rota, no como filtro real.
+- **NO se reconstruye el descuento en ningún camino** — ni con `descuento_pct` solo (el bug), ni con
+  `GREATEST(descuento_pct, descuento_jornadas_pct)` (tentador pero redundante: `monto_total` YA tiene el
+  número correcto, calcularlo de nuevo es la misma clase de bug con otra fórmula). `monto_total` es la
+  fuente única del neto, se lee o se prorratea, nunca se recalcula.
+  Consecuencia: cambio SQL-only en `backend/routes/estadisticas.py`, sin tocar el motor de precios ni el
+  esquema.
+- **Regresión:** `backend/tests/test_estadisticas_db.py` (Postgres real, opt-in `RESERVAS_DB_TEST=1`) —
+  reproduce el escenario (descuento por jornadas ganador + descuento de cliente en 0%) y verifica que
+  `totales`/`por_mes`/`top_equipos`/`por_dueno` devuelven el NETO (`monto_total`), no el bruto reconstruido;
+  se confirmó que el test FALLA contra la fórmula vieja (revertido temporalmente) antes de mergear el fix.
+  No había tests previos de `estadisticas.py` que asumieran la fórmula rota.
+- El supervisor marca cualquier query nueva de estadísticas/reportes que reconstruya
+  `subtotal * (1 - descuento_pct/100)` (o cualquier variante que recalcule el descuento) en vez de leer
+  `alquileres.monto_total` directo o prorrateado.
+
+### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
+
+- **Contexto.** Issue #1209 ("Iniciativa: 9 hallazgos de la auditoría del régimen de plata") — auditoría
+  multi-agente (52 agentes: 9 finders + verificación adversarial en 2 pasadas) sobre `dev` + los 5 PRs de
+  fixes ya aplicados (#1203-1207), a pedido del dueño ("que no calcule mal, que sea seguro... no haber
+  dobles sumas ni nada"). Veredicto general de esa auditoría: el núcleo (precio → cotización →
+  `monto_total` congelado → pagos → liquidación → contabilidad) está bien construido —
+  `cotizado == cobrado` blindado por construcción—; los 9 hallazgos están en superficies de
+  **display/derivación** que recalculan en vez de leer la fuente única. Esta entrada cierra 2 de los 9
+  (M5 + L1, agrupados porque comparten exactamente el mismo criterio de fix — "Convención" del issue: M5+L1
+  van en un solo PR).
+- **M5 (medio) — Factura.** `services/facturacion/pdf.py::_conceptos` mostraba, para cada línea, el
+  BRUTO (`it["subtotal"]`, sin descuento) y un campo `bonif` (`% Bonif.` en la grilla clásica AFIP/ARCA)
+  **hardcodeado en `"0,00"`**. El "Importe Neto Gravado"/"Importe Total" declarado (`factura.imp_neto`)
+  sí tenía el descuento aplicado (viene de `pedido["monto_total"]`, neto persistido). Con 2 ítems de $500
+  (=$1.000 bruto) + 10% de descuento → `imp_neto`=$900: la Factura mostraba dos líneas de $500 (suman
+  $1.000) y un total de $900, sin ninguna línea de -$100 que explicara la diferencia — el comprobante no
+  cerraba consigo mismo. Como el descuento por jornadas es automático en cualquier alquiler de varios
+  días, esto afectaba al caso común, no a un edge case.
+- **Investigación previa al fix — ¿el `%Bonif.` es un campo real de AFIP/ARCA?** Se revisó `arca_fe/`
+  (el módulo que arma el `ComprobanteRequest` y llama al WSFE real): no hay ningún concepto de
+  bonificación por línea en la llamada SOAP — `construir_comprobante` manda un `importe_neto` plano para
+  todo el comprobante, sin desglose por ítem. La columna "% Bonif." es puramente del LAYOUT del PDF (una
+  réplica visual del formato clásico impreso AFIP/ARCA, que sí trae esa columna en su grilla de 7
+  columnas: Código · Producto · Cantidad · U. Medida · Precio Unit. · **% Bonif.** · Subtotal) — no
+  restringe nada del lado fiscal real. Conclusión: repartir el descuento por línea (llenando esa columna
+  ya presente en el layout, en vez de agregar una fila global aparte) es la opción MÁS fiel al formato
+  real, porque el layout ya tiene el lugar pensado para eso — no una improvisación.
+- **Fix.** `_conceptos` reparte el descuento total proporcionalmente al bruto de cada línea, con el
+  remanente de redondeo absorbido en la ÚLTIMA línea (evita que la suma quede a centavos de distancia del
+  total declarado por acumulación de redondeos independientes por línea). El total a repartir se calcula
+  como `bruto_de_las_líneas − factura.imp_neto` (no `pedido["bruto"] − pedido["descuento_monto"]`, que son
+  campos en VIVO) — así el desglose cierra también al mostrar una Nota de Crédito, cuyos importes vienen
+  frozen del comprobante original y pueden no coincidir con el pedido si este cambió después de facturar
+  (mismo principio que ya usa `construir_comprobante_nc`, que tampoco recalcula del pedido en vivo). Cada
+  línea ahora expone: `bonif` = "% Bonif." real de esa línea, `subtotalFmt`/`importeStr` = el NETO
+  post-bonif (antes era el bruto). Las 3 piezas de layout (clásica, celular, formal) comparten
+  `_conceptos` → las 3 quedan arregladas con un solo cambio. El Presupuesto (que ya reconciliaba bien, y
+  cuya decisión de IVA-aparte es intencional, 2026-06-06) **no se toca**.
+- **L1 (bajo) — Mail de "pedido creado".** Mismo problema en
+  `routes/alquileres/core.py::_pedido_email_context`: las filas de la tabla de ítems del mail (helper
+  `services/email/branding.py::item_row`) mostraban `it["subtotal"]` (bruto), y el `{{ total }}` del
+  template (`services/email/default_templates.py`) es `pedido["monto_total"]` (neto) — sin ningún
+  renglón intermedio. Ejemplo real: 1 cámara a $10.000/día × 3 jornadas = $30.000 en la línea del ítem,
+  "Total: $27.000" (10% de descuento) abajo, sin aclaración.
+- **Fix.** Se agregó el helper único `discount_row()` a `services/email/branding.py` (mismo patrón visual
+  que `item_row`/`items_table`, ya existentes — reusa `HAIRLINE`/`MUTED`, no inventa estilos nuevos).
+  `_pedido_email_context` arma la fila con `pedido["descuento_monto"]`/`pedido["descuento_pct"]` (ya
+  enriquecidos por `_enriquecer_pedido_con_total` antes de que se llame esta función, confirmado en
+  `create_pedido`/`_get_alquiler_detail`) y la inserta en `items_html`, entre las líneas y donde el
+  template imprime el `Total` — **sin tocar los 7 templates de mail sembrados en la DB** (el fix vive
+  100% en el builder de contexto, ninguna migración de copy necesaria). Mismo signo "−" (U+2212, no un
+  guion ASCII) que ya usa `pdf_templates._pedido_html` para el Presupuesto, por consistencia visual.
+- **Tests.** `tests/test_facturacion_pdf.py` (nuevo): reconciliación exacta bruto→bonif→neto con el
+  ejemplo de 2 ítems de $500 + 10%, el ejemplo real de la cámara del mail, un caso de 3 líneas con brutos
+  que no dividen limpio (verifica que el remanente de redondeo cierra exacto, no una aproximación), y 2
+  regresiones (sin descuento no cambia nada; el fallback sin ítems persistidos sigue igual).
+  `tests/test_pedido_email_context.py`: 2 casos nuevos (con descuento aparece la fila con el % y el monto
+  correctos; sin descuento no aparece ninguna fila espuria).
+- **Consecuencias.** Quedan 7 de los 9 hallazgos de #1209 sin tocar en esta pasada (M1-M4, M6, L2, L3) —
+  cada uno es su propia rama + PR scoped, por diseño del issue ("PR como hoja de ruta", 2026-06-27); no se
+  cierra el tracking #1209 (issue madre, sigue con 7 pendientes). El supervisor marca una línea de factura
+  o de mail que vuelva a mostrar el bruto sin reconciliar contra el total declarado, o un
+  `bonif`/`% Bonif.` hardcodeado reintroducido.
+
+### 2026-07-03 — `routes/facturacion.py`: rate limit + mapeo de errores en las escrituras (gap de la auditoría de #1184, #1209)
+
+- **Contexto.** Hallazgo de severidad baja detectado por la auditoría cruzada de plata (2026-07-02,
+  #1184): esa pasada blindó `contabilidad.py`/`pagos.py`/`reportes.py` con `@limiter.limit(ADMIN_WRITE_LIMIT)`
+  + `@map_pg_errors` en sus 13 endpoints de escritura, pero **no tocó** `backend/routes/facturacion.py` —
+  que también escribe plata/estado (facturas, emisores ARCA) y además pega a un webservice externo (ARCA)
+  por cada llamada. Sin rate limit, una sesión admin comprometida o un bug de front en loop podía golpear
+  ARCA/Postgres sin ningún freno server-side (riesgo de gatillar límites del lado de ARCA). Sin
+  `map_pg_errors`, un `UniqueViolation` no anticipado (ej. crear un emisor con un `nombre` duplicado —
+  la columna es `UNIQUE` en `emisores_arca`) subía crudo como 500 con el mensaje interno de Postgres, en
+  vez de un 400 limpio.
+- **Decisión.** Se identificaron los 7 endpoints de escritura reales del módulo (`crear_emisor`,
+  `actualizar_emisor`, `cargar_cert`, `desactivar_emisor`, `facturar_pedido`, `nota_credito`,
+  `enviar_mail_factura`) y se les agregó el mismo patrón, **reusado tal cual** de `routes/contabilidad.py`
+  (`from routes.contabilidad import map_pg_errors`, `from rate_limit import limiter, ADMIN_WRITE_LIMIT`) —
+  ninguna reimplementación nueva. `ADMIN_WRITE_LIMIT` (60/minute) en los 7; `@map_pg_errors` en los 6
+  sync (compone alrededor del `except ValueError`/`except RuntimeError` que cada handler ya tenía, sin
+  reemplazarlos). El único endpoint async, `enviar_mail_factura`, lleva solo el rate limit — **no**
+  `@map_pg_errors`, porque el decorator hace `return fn(*args, **kwargs)` sin `await`: para una corrutina
+  eso solo captura el objeto coroutine (nunca ejecutado en ese punto), así que el `try/except` nunca vería
+  la excepción real — mismo motivo por el que `subir_comprobante` (también async) en `contabilidad.py`
+  tampoco lo lleva. No se identificaron endpoints de "subida de archivo" reales en el módulo (`cargar_cert`
+  recibe el PEM como texto en el body JSON, no como `UploadFile` multipart) — así que ninguno usa
+  `ADMIN_UPLOAD_LIMIT`, a diferencia de `subir_comprobante` en contabilidad.
+- **Why.** "Una sola forma de cada cosa": el patrón de rate-limit + mapeo de errores para escrituras admin
+  ya existe y está probado en `contabilidad.py`/`pagos.py` — inventar una variante nueva para facturación
+  hubiera sido drift. Componer alrededor de los `except ValueError`/`except RuntimeError` existentes (en
+  vez de tocarlos) preserva el contrato HTTP ya testeado (`ValueError`→400, `RuntimeError`→503) mientras
+  cierra el hueco real: un `UniqueViolation` no es ni `ValueError` ni `RuntimeError`, así que antes escapaba
+  ambos catches.
+- **Consecuencias.** `tests/test_facturacion_routes.py`: el helper `_fake_request()` pasó de un
+  `SimpleNamespace` a un `starlette.requests.Request` real y mínimo (scope manual, sin transporte ASGI) —
+  necesario porque `slowapi` exige `isinstance(request, Request)` en el wrapper de `@limiter.limit`, y los
+  4 tests existentes que llamaban a `facturar_pedido`/`nota_credito` directo (sin pasar por FastAPI/ASGI)
+  lo necesitaban para no romperse. 2 tests nuevos: (1) un loop de 65 requests contra
+  `POST /admin/emisores-arca` con una IP dedicada (`TestClient(..., client=("203.0.113.9", ...))`, distinta
+  de la IP default `"testclient"` que usan los demás tests del archivo) confirma que el request #61+ corta
+  con 429 — la IP dedicada evita compartir el bucket del limiter (en memoria, singleton de proceso) con el
+  test del gate de admin o el de nombre duplicado, sin depender del orden de ejecución; (2) un `UniqueViolation`
+  simulado sobre `create_emisor` confirma que `crear_emisor` devuelve 400 con el mensaje genérico
+  ("Ya existe un registro con ese valor.") en vez de 500. Suite completa (2550 tests, sin DB) + pyflakes en
+  verde. Rama `fix/facturacion-rate-limit-errores` (PR sin mergear); tracking #1209.
+
+### 2026-07-03 — La vista multi-mes/anual de reportes ahora respeta los meses cerrados (`liquidar_rango`)
+
+- **Contexto.** Otro hallazgo de severidad media de la auditoría cruzada de plata (2026-07-02, tracking
+  #1209): `backend/reportes/cierres.py` ya implementaba correctamente "cerrar un mes" = congelar una foto
+  inmutable del reporte de liquidación (`liquidacion_cierres`, `snapshot_de`), y `_data_liquidacion`
+  (`routes/reportes.py`) ya la usaba bien para la vista de UN mes puntual (`mes_de_rango` detecta el rango
+  exacto → `snapshot_de` directo). Pero cuando el rango pedido cubre VARIOS meses o un año completo (la
+  vista "Mes a mes · {año}" y el total anual del front, `LiquidacionReporte.tsx`), el código llamaba a
+  `liquidar()` en vivo sobre TODO el rango, sin chequear si alguno de esos meses individuales estaba
+  cerrado — ignoraba la foto congelada para esos meses dentro del rango largo. Escenario de falla
+  concreto: se cierra junio con el modelo de comisiones Pablo{50/45/5} (la foto congela ese reparto);
+  después se edita `comisiones_modelo` a Pablo{60/40} (o se edita/anula un pago de un pedido de junio ya
+  cerrado); al abrir el reporte anual, la TARJETA de junio (que sí usa `snapshot_de`) mostraba el reparto
+  viejo, pero la FILA de junio dentro de "Mes a mes · 2026" y el total anual (ambos calculados en vivo
+  sobre el rango largo) mostraban el reparto nuevo — misma plata, misma pantalla, dos cifras de payout
+  distintas para Pablo/Rambla/Tincho. El semáforo de reconciliación no lo detectaba (solo mira actividad
+  de pedidos/pagos, no cambios al modelo de comisiones).
+- **Decisión.** `reportes/liquidacion.py` gana una función pura nueva, `combinar_meses(meses_data)`: junta
+  N reportes por-mes (cada uno con la forma completa de `liquidar`) en un solo reporte multi-mes, sumando
+  resumen/por_mes/por_dia/por_dueno — seguro porque un pedido se atribuye a un ÚNICO mes de saldado, nunca
+  se solapan entre los reportes de entrada, así que sumar no duplica nada. `reportes/cierres.py` gana
+  `liquidar_rango(conn, desde, hasta)`: parte el rango en los meses calendario que cubre
+  (`_meses_en_rango`), y para cada mes que el rango cubre COMPLETO usa `snapshot_de` si está cerrado o
+  `liquidar()` en vivo si no —nunca mezcla las dos fuentes para el mismo mes—, y combina todo con
+  `combinar_meses`. Los fragmentos de mes en los bordes (el rango no arranca/termina en un límite de mes
+  calendario) siguen en vivo, como antes — no hay foto posible para un pedazo de mes.
+  `routes/reportes.py::_data_liquidacion` (la fuente única usada por JSON/CSV/PDF/mail) delega en
+  `liquidar_rango` cuando el rango NO es un único mes calendario exacto; el camino de un mes puntual no
+  cambió una línea.
+- **Why.** Se evaluó reimplementar el chequeo de "está cerrado" inline en el route, pero eso hubiera
+  duplicado la lógica que `cierres.py` ya tiene bien hecha ("una sola forma de cada cosa" — la memoria ya
+  marca a `reportes/` como motor único). Extraer `combinar_meses` como función pura (en vez de mezclarla
+  con el pipeline SQL→filas→`agregar` de `liquidacion.py`) preserva el contrato "pipeline testeable sin
+  DB" del `CLAUDE.md` local del paquete: a `combinar_meses` no le importa si un mes vino de una foto o de
+  un cálculo en vivo, solo suma dicts con la misma forma — eso es lo que permite mezclar fuentes sin
+  condicionales especiales por mes. Nota de precisión: los totales/reparto por-beneficiario de nivel
+  "resumen" ahora se arman sumando los enteros YA REDONDEADOS de cada mes (en vez de redondear una sola
+  vez al final sobre floats de todo el rango) — coincide con cómo `agregar()` ya redondeaba `por_mes` en
+  el código viejo, así que puede diferir del cálculo anterior por, a lo sumo, unos pocos pesos por mes
+  involucrado (redondeo ARS enteros); es una mejora, no una regresión, porque ahora la suma de las filas
+  de "Mes a mes" cuadra exacto con el total mostrado.
+- **Consecuencias.** Sin cambio de contrato público (mismo shape de respuesta JSON). Tests: pure
+  (`TestCombinarMeses`, `TestCierresPuros::test_meses_en_rango` en `test_reportes_liquidacion.py`) +
+  integración con Postgres real (`test_liquidar_rango_multimes_respeta_mes_cerrado` en
+  `test_reportes_cierres_db.py`) que reproduce el escenario exacto: cierra junio, agrega un pedido en
+  julio (abierto), cambia el modelo, y verifica que la tarjeta de junio, la fila de junio dentro del año,
+  el resumen anual y el detalle por dueño coincidan — junio con la foto vieja, julio con el modelo nuevo,
+  el total la suma correcta de ambos (no 140k recalculado enteros con el modelo nuevo, que hubiera sido
+  el bug). El supervisor marca un cálculo de reporte multi-mes que recalcule en vivo sin chequear
+  `cierre_de`/`snapshot_de` por mes, o lógica de "está cerrado" reimplementada fuera de
+  `reportes/cierres.py`. PR sin mergear (rama `fix/reportes-anual-usa-foto-cerrada`), tracking #1209.
+
+### 2026-07-03 — dataio export/import perdía `anulado` de `alquiler_pagos`: un pago anulado revivía activo tras backup/restore
+
+- **Contexto.** La auditoría de bordes de `contabilidad/` (2026-07-02) le agregó soft-delete a
+  `alquiler_pagos` (`anulado`/`anulado_por`/`anulado_at`/`anulado_motivo`) y actualizó las 7 queries
+  "vivas" del sistema para filtrar `NOT anulado`. Quedó afuera de esa pasada `backend/dataio/` — el
+  exportador/importador de backup/restore/clonado (distinto del `pg_dump` que se usa normalmente para
+  clonar staging), que sigue siendo el camino que usa el dueño para bajar un backup completo o migrar
+  datos entre ambientes. Encontrado por auditoría dirigida sobre `dataio/exporters.py` (#1209), no por
+  la auditoría cruzada de plata del 2026-07-02 (que no llegó a cubrir `dataio`).
+- **Bug.** `export_alquileres` (`dataio/exporters.py`) exportaba el pago embebido con solo
+  `monto`/`concepto`/`fecha` — sin `anulado` ni sus columnas de auditoría. `import_alquileres`
+  (`dataio/importers.py`) sigue la política REPLACE para pagos (`DELETE FROM alquiler_pagos WHERE
+  pedido_id = %s` + re-`INSERT` de lo que traiga el JSON) — con el `INSERT` sin esas columnas, Postgres
+  aplicaba el **default de la columna**, `anulado=FALSE`. Escenario de falla concreto: un pago de
+  $100.000 cargado por error se anula (con motivo, actor y timestamp); se corre `dataio export`
+  (backup) y después `dataio import` (restore, o clonado a otro ambiente); el pago **vuelve a la vida
+  como activo** — `monto_pagado` del pedido sube $100.000 de la nada, la caja del socio destinatario
+  sube, la liquidación lo cuenta como saldado. La anulación desaparece sin dejar rastro y sin que nadie
+  lo pida.
+- **Fix.** `AlquilerPagoRef` (`dataio/schema.py`) suma `anulado: bool = False` +
+  `anulado_por`/`anulado_at`/`anulado_motivo` (opcionales, default `False`/`None` — no rompe JSONs viejos
+  ya exportados sin esas claves; `extra="forbid"` de `_Base` no afecta porque son campos nuevos CON
+  default, no extra). El `SELECT` de `export_alquileres` suma las 4 columnas (`COALESCE(anulado, FALSE)`
+  por si alguna fila legacy quedó con `NULL`); el `INSERT` de `import_alquileres` las reinserta tal cual,
+  sin defaultear. Deliberadamente **no** se tocó ninguna otra columna del pago (`destinatario`/`metodo`/
+  `created_by` siguen sin exportar) — fuera del alcance de este fix, que es específicamente sobre las
+  columnas de soft-delete. Se revisó si el mismo patrón (tabla con soft-delete tocada incompleta por
+  `dataio`) aparecía en otro lado: `movimientos` (contabilidad, también tiene `anulado`) **no está en
+  `EXPORTERS`/`IMPORTERS`** — `dataio` no exporta contabilidad hoy, así que no había nada más que
+  arreglar en este alcance.
+- **Consecuencias.** `test_dataio_pagos_anulado_roundtrip_db.py` (Postgres real, opt-in vía
+  `RESERVAS_DB_TEST=1`) cubre: (1) el export incluye `anulado`+auditoría del pago; (2) round-trip
+  completo export→(se borra el pago, simulando un ambiente fresco donde el backup se restaura)→import→
+  el pago vuelve anulado, no activo. Verificado **empíricamente** que el test caza el bug: revertidos
+  temporalmente los 3 archivos del fix (`git stash`), corridos los 2 tests nuevos → ambos fallan con el
+  síntoma exacto (`KeyError: 'anulado'` en el export; `assert False is True` en el roundtrip); restaurado
+  el fix → ambos pasan. Suite completa (2548 tests) + los otros `*_db.py` de dataio existentes
+  (`test_dataio_roundtrip_db.py`, `test_dataio_export_readonly_db.py`) siguen en verde — no se rompió
+  ningún round-trip existente. `pyflakes` limpio en los 3 archivos tocados + el test nuevo. El
+  supervisor marca una entidad nueva de `dataio` que toque una tabla con soft-delete
+  (`anulado`/`eliminado_at`) sin exportar/importar esas columnas.
+
+### 2026-07-03 — El pipeline de carritos activos (dashboard admin) incluye el precio derivado de un combo
+
+- **Contexto.** Uno de los 14 hallazgos priorizados de la auditoría cruzada de plata (issue #1209, severidad
+  BAJA): `_enrich_items` (`backend/services/carrito/activos.py`), la función que arma el `monto_estimado` de
+  cada carrito y el `pipeline_ars` total que ve el dueño en `/admin/carritos`, leía la columna
+  `equipos.precio_jornada` **cruda** por ítem (`SELECT e.nombre, e.precio_jornada FROM equipos e WHERE e.id
+  = %s`). Para un equipo `tipo='combo'` esa columna es **NULL a propósito** — el precio de un combo se
+  DERIVA en vivo de sus componentes vía `services.precios.precio_combo`/`precio_jornada_efectivo` (C3
+  #635), no vive en esa columna. `int(row["precio_jornada"] or 0)` coercía el NULL a `0`, y el filtro
+  `if precio > 0:` que decide si el ítem entra a `items_precio` (los que `calcular_total` suma) descartaba
+  el combo por completo. Resultado: un carrito activo con un combo aportaba **$0** al estimado — el dueño
+  veía menos plata "en camino" de la real en el dashboard de funnel.
+- **Alcance del bug.** Solo la **métrica interna** del dashboard admin (`stats.pipeline_ars` +
+  `carritos[].monto_estimado`). No afecta `cotizado == cobrado`: el carrito NO crea la reserva (eso lo hace
+  `create_pedido_retry`, que sigue el camino de `readiness.precios_catalogo_para_reserva` →
+  `precio_jornada_efectivo`, ya correcto desde #635/#1110), y el cliente nunca ve este número — es puramente
+  informativo para el dueño.
+- **Decisión.** `_enrich_items` ahora resuelve el precio de cada ítem con la fuente única
+  `services.precios.precio_jornada_efectivo(conn, equipo_id)` (la misma que usa `readiness.py` para el
+  camino de creación real) en vez de leer `precio_jornada` crudo. La query de nombre se separó
+  (`SELECT e.nombre FROM equipos e WHERE e.id = %s`) del precio, que ahora delega en el resolutor.
+- **Por qué fetch por-ítem y no un batch.** El módulo `services/carrito/` ya tiene un batch seguro
+  (`precios.precios_combo_batch`), pero se usa en el **catálogo** (`services/catalogo/proyeccion.py`) para
+  resolver de una sola vez el precio de TODOS los combos listados — un contexto distinto (sin fechas, sin
+  descuentos, batch homogéneo de un solo tipo). Acá el precedente directo es el opuesto: `/api/cotizar`
+  **revirtió** su propio batch `IN (...)` de precios (#643) porque devolvió el mapa vacío en prod → total
+  $0 en producción — literalmente el mismo síntoma que este bug, por la razón opuesta (un batch roto en vez
+  de un batch ausente). `readiness.py` (mismo paquete, camino de creación real) ya resuelve **por-ítem** con
+  este mismo resolutor. Con ese precedente + el tamaño acotado del carrito de un heartbeat (unos pocos
+  ítems, no cientos), no vale el riesgo de escribir una query batch nueva para un endpoint de dashboard
+  (no hot-path de cliente): se mantiene el patrón per-item ya usado en `readiness.py`.
+- **Consecuencias.** `int` extra de queries por ítem (1 para nombre + 1-2 dentro del resolutor si es
+  combo) en cada heartbeat — irrelevante dado el tamaño típico de un carrito. Test nuevo
+  `test_carritos_activos_precio_combo.py` (unit, `FakeConn` que resuelve las 3 queries encadenadas
+  nombre→`precio_jornada_efectivo`→`precio_combo`, sin mockear el resolutor en sí) fija el escenario: un
+  carrito con un combo aporta su precio derivado real al estimado, no $0. El supervisor marca un ítem de
+  carrito/dashboard cuyo precio salga de `equipos.precio_jornada` crudo en vez de
+  `precio_jornada_efectivo`, o una query batch nueva de precios sin evaluar el precedente de #643. Issue
+  #1209.
+
+### 2026-07-03 — `backend/descuentos/` reorganizado CQRS-lite (`queries/`+`commands/`), espejo de `contabilidad/`/`services/specs/`
+
+- **Contexto.** El dueño reportó no poder aplicar un descuento manual en el back-office — investigado y
+  resuelto (bug de auth en `/api/cotizar`, no respetaba `dev_bypass_enabled()`, ya en `dev`). En la misma
+  conversación, el dueño adelantó mecanismos de descuento nuevos para más adelante (jerarquía manual>cliente/
+  jornadas, descuento en $ fijo, combos no acumulables — ver Fase C en la issue #1219) y pidió organizar la
+  lógica actual en un módulo propio ANTES de sumarlos, mismo "CQRS liviano" que ya usa `contabilidad/`/
+  `services/specs/`.
+- **Decisión.** Split **move-verbatim** (cero cambio de lógica/SQL) de `services/precios.py::
+  descuento_aplicable`, la reimplementación duplicada de `descuento_origen` en `cotizacion.py`, y
+  `routes/alquileres/core.py::_get_descuento_jornadas` + el CRUD de `descuentos_jornada` hacia
+  `backend/descuentos/` (`queries/decision.py`, `queries/jornadas.py`, `commands/jornadas.py`). Cambio
+  deliberado de firma: `calcular_descuento_aplicable` toma un dict de fuentes con nombre
+  (`{"cliente": pct, "jornadas": pct}`) en vez de 2 floats posicionales — mismo resultado numérico hoy, pero
+  sumar una fuente nueva (ej. Fase C) es agregar una key, no rediseñar la función ni sus callers. Fold-in
+  trivial: `CotizarRequest.descuento_pct` no tenía validador de rango 0-100 (a diferencia de
+  `PedidoDatos.descuento_pct`) — sumado en el mismo archivo que ya se tocaba.
+- **Why.** `_recalcular_total_pedido`/`propagar_descuento_a_presupuestos` (`core.py`) se evaluaron para
+  mover también, pero se descartó: son orquestación de PEDIDOS (se disparan también por cambios de fecha/
+  ítems, no solo de descuento) — moverlas invertiría la dirección de dependencia (`descuentos/` importando
+  de un módulo de rutas), algo que ningún paquete CQRS-lite del repo hace hoy. `services/precios.py::
+  calcular_total` tampoco se mueve — es el motor de TOTALES (IVA, combos), no de descuento; solo pasa a
+  importar la decisión desde el paquete nuevo.
+- **Consecuencias.** Cero cambio de contrato HTTP (`test_routes_contract.py` sin tocar, verde). Candado: 19
+  tests puros nuevos (`test_descuentos_decision.py`) + 5 de integración Postgres real
+  (`test_descuentos_jornada_db.py` — cierra un gap real: ningún test ejercitaba la interpolación de la
+  escala contra un `Decimal` real de psycopg, pese a un fix histórico de `Decimal × float → TypeError` en
+  esa función). Suite completa 2717 passed; integración (contabilidad/alembic/gate de reservas/descuentos)
+  verde contra Postgres real, confirmado que las fallas de un barrido `-m integration` completo son
+  preexistentes (reproducidas idénticas en `dev` sin tocar — contaminación de estado entre tests de DB de
+  dominios no relacionados). Rama aislada `feature/descuentos-cqrs`, PR #1220 sin mergear (convención "PR
+  como hoja de ruta"), issue de tracking #1219 con Fase B (hardening, 5 hallazgos colaterales) y Fase C
+  (features nuevas) sin comprometer. De paso, aparte de esta iniciativa: se encontró y arregló un bug real
+  en `routes/clientes.py::update_cliente` (placeholders `?` de sqlite3 nunca migrados a `%s`, cualquier
+  edición de cliente fallaba en runtime) — pusheado directo a `dev` (commit `5eb5e18`), con test de
+  regresión.

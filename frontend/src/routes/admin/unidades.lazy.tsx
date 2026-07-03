@@ -48,7 +48,7 @@ function UnidadesPage() {
   const listQ = useQuery({
     queryKey: ["admin", "unidades"],
     queryFn: () => adminApi.listUnidades(),
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   const delMut = useMutation({

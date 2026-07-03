@@ -125,7 +125,6 @@ class TestGetInitialCatalog:
         assert "estudio" in result
         assert result["equipos"]["total"] == 1
         assert result["equipos"]["items"][0]["nombre"] == "Canon R5"
-        assert result["equipos"]["items"][0]["etiquetas"] == []
         assert result["estudio"]["fotos"][0]["url"] == "https://r2.dev/foto.webp"
         assert result["equipos"]["items"][0]["kit"] == []
         assert result["categorias"][0]["nombre"] == "Cámaras"

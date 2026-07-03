@@ -81,7 +81,6 @@ const GROUPS = [
 const CATALOG_ENTITIES = [
   { key: "marcas", label: "Marcas" },
   { key: "categorias", label: "Categorías" },
-  { key: "etiquetas", label: "Etiquetas" },
   { key: "spec_definitions", label: "Specs (definiciones)" },
   { key: "categoria_spec_templates", label: "Specs (asignaciones)" },
   { key: "equipos", label: "Equipos" },

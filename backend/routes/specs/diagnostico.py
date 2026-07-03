@@ -9,6 +9,7 @@ sus rutas en el router compartido del paquete `routes.specs`. `_require_admin`
 from fastapi import HTTPException, Request
 
 from database import get_db, row_to_dict
+from services.categorias import root_of_categoria, categoria_por_id
 from routes.specs.core import router, _require_admin
 
 
@@ -186,19 +187,7 @@ def template_debug(categoria_id: int, request: Request):
     _require_admin(request)
     with get_db() as conn:
         # 1) Calcular raíz desde la categoría dada
-        raiz_row = conn.execute(
-            """
-            WITH RECURSIVE up AS (
-                SELECT id, parent_id, 0 AS depth FROM categorias WHERE id = %s
-                UNION
-                SELECT c.id, c.parent_id, up.depth + 1
-                FROM categorias c JOIN up ON up.parent_id = c.id
-            )
-            SELECT id FROM up WHERE parent_id IS NULL LIMIT 1
-            """,
-            (categoria_id,),
-        ).fetchone()
-        raiz_id = row_to_dict(raiz_row)["id"] if raiz_row else categoria_id
+        raiz_id = root_of_categoria(conn, categoria_id) or categoria_id
 
         # 2) Conteo de specs en spec_definitions con esa raíz
         sd_row = conn.execute(
@@ -238,11 +227,7 @@ def template_debug(categoria_id: int, request: Request):
         fallback_keys = [row_to_dict(r)["spec_key"] for r in fallback_rows]
 
         # 5) Categoria info para el response
-        cat_row = conn.execute(
-            "SELECT id, nombre, parent_id FROM categorias WHERE id = %s",
-            (categoria_id,),
-        ).fetchone()
-        cat_info = row_to_dict(cat_row) if cat_row else None
+        cat_info = categoria_por_id(conn, categoria_id)
 
         return {
             "input": {"categoria_id": categoria_id},

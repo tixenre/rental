@@ -734,15 +734,10 @@ def equipo_page(id_or_slug: str):
                 (equipo_id,),
             ).fetchone()
             # Primera categoría del equipo (para BreadcrumbList).
-            cat_row = conn.execute(
-                """
-                SELECT c.nombre FROM categorias c
-                JOIN equipo_categorias ec ON ec.categoria_id = c.id
-                WHERE ec.equipo_id = %s
-                ORDER BY ec.id LIMIT 1
-                """,
-                (equipo_id,),
-            ).fetchone()
+            from services.categorias import categorias_de_equipos
+            cat_map = categorias_de_equipos(conn, [equipo_id])
+            cat_list = cat_map.get(equipo_id, [])
+            cat_row = {"nombre": cat_list[0]["nombre"]} if cat_list else None
         finally:
             conn.close()
         if not row:
@@ -1130,7 +1125,7 @@ def _run_alembic_migrations() -> None:
 
 
 def _seed_registry() -> None:
-    """Persiste el registry de specs (código `backend/specs/`) a la DB.
+    """Persiste el registry de specs (código `services/specs/registry/`) a la DB.
 
     Idempotente: solo crea/actualiza `spec_definitions` y
     `categoria_spec_templates` con base en lo declarado en el código.
@@ -1143,7 +1138,7 @@ def _seed_registry() -> None:
     """
     from database import get_db
     try:
-        from seeds.registry_seeder import seed_all_categorias
+        from services.specs import seed_all_categorias
         conn = get_db()
         try:
             result = seed_all_categorias(conn)
@@ -1188,8 +1183,8 @@ def init_db_bg():
 
     # Registry de specs → DB (idempotente, siempre corre en boot).
     # Persiste spec_definitions + categoria_spec_templates desde el
-    # código del registry (`backend/specs/categorias/*.py`). Sin esto,
-    # las tablas de specs quedarían vacías.
+    # código del registry (`backend/services/specs/registry/catalogo/*.py`).
+    # Sin esto, las tablas de specs quedarían vacías.
     try:
         _seed_registry()
     except Exception as e:

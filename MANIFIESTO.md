@@ -290,6 +290,7 @@ Histórico: `docs/archive/` conserva auditorías viejas (`BUGS.md`, `MEJORAS.md`
 | [`docs/SISTEMA_CARRITO.md`](docs/SISTEMA_CARRITO.md) | **Manual técnico del carrito: módulo único de la lógica (`services/carrito`) — selección / activos / readiness; carrito = intención, gate = verdad** |
 | [`docs/SISTEMA_AUTH.md`](docs/SISTEMA_AUTH.md) | **Manual técnico de la autenticación: motor `auth/` (sesión + jti/revocación), métodos (Google/passkey/staging), guards, middleware, seguridad** |
 | [`docs/SISTEMA_IDENTITY.md`](docs/SISTEMA_IDENTITY.md) | **Manual técnico de la identidad: motor `identity/` (ancla CUIL, KYC sobre Didit, contactos verificados, lector único `get_validated_identity`, dedup/merge)** |
+| [`docs/SISTEMA_FINANZAS_FLUJO.md`](docs/SISTEMA_FINANZAS_FLUJO.md) | **Manual cruzado de plata + módulo orquestador `services/finanzas_flujo/`: fuente única de cada número entre precios/reservas/pagos/liquidación/contabilidad/facturación + el semáforo de reconciliación** |
 | [`docs/FLUJO_PEDIDOS.md`](docs/FLUJO_PEDIDOS.md) | Recorrido del pedido: estados, confirmación visible, mails, `id` vs `numero_pedido` |
 | [`docs/MOBILE.md`](docs/MOBILE.md) | Componentes y patrones mobile |
 | [`docs/MOBILE_AUDIT.md`](docs/MOBILE_AUDIT.md) | Criterio mobile + checklist + status por ruta |

@@ -13,10 +13,20 @@
  *    pase (arma pedidos para terceros). Anónimo / sin cliente → consumidor final.
  */
 
+import { useEffect, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { authedPostJson } from "@/lib/authedFetch";
 
-export type DescuentoOrigen = "cliente" | "jornadas" | "ninguno";
+/** Debounce del recálculo en vivo. Sin esto, `useCotizacion` le pega a
+ * `/api/cotizar` en CADA tecla (tipear un %, arrastrar una fecha, cambiar una
+ * cantidad) → editando activamente se supera el rate-limit del endpoint
+ * (30/min) → 429 → el desglose se queda mostrando el último valor bueno en
+ * silencio (bug "el descuento no se aplica"). Coalescemos los cambios rápidos
+ * en UN solo request. El primer cálculo NO se debouncea (estado inicial
+ * inmediato). */
+const COTIZAR_DEBOUNCE_MS = 300;
+
+export type DescuentoOrigen = "manual" | "cliente" | "jornadas" | "ninguno";
 
 /** Detalle por equipo que el front MUESTRA (no calcula): el backend lo resuelve
  *  en `/api/cotizar` con el precio efectivo (combo-aware). Ver FASE 3 / #1110. */
@@ -41,6 +51,10 @@ export type Cotizacion = {
   jornadas: number;
   /** Bruto del período: subtotalPorJornada × jornadas (antes de descuentos). */
   subtotal: number;
+  /** Bruto SIN las líneas de combo (C-3, #1219) — el tope real de un
+   *  descuento manual en $: no se le puede descontar más a un pedido que a
+   *  su parte descontable (los combos ya vienen con su propio descuento). */
+  subtotalDescontable: number;
   descuentoPct: number;
   descuentoOrigen: DescuentoOrigen;
   descuentoMonto: number;
@@ -71,6 +85,7 @@ type CotizarResp = {
   subtotal_por_jornada: number;
   descuento_origen: DescuentoOrigen;
   bruto: number;
+  bruto_descontable: number;
   descuento_pct: number;
   descuento_monto: number;
   neto: number;
@@ -85,6 +100,7 @@ export const COTIZACION_VACIA: Cotizacion = {
   subtotalPorJornada: 0,
   jornadas: 1,
   subtotal: 0,
+  subtotalDescontable: 0,
   descuentoPct: 0,
   descuentoOrigen: "ninguno",
   descuentoMonto: 0,
@@ -100,6 +116,7 @@ function adaptar(r: CotizarResp): Cotizacion {
     subtotalPorJornada: r.subtotal_por_jornada,
     jornadas: r.jornadas,
     subtotal: r.bruto,
+    subtotalDescontable: r.bruto_descontable,
     descuentoPct: r.descuento_pct,
     descuentoOrigen: r.descuento_origen,
     descuentoMonto: r.descuento_monto,
@@ -148,11 +165,36 @@ export function useCotizacion(args: {
   fechaHasta?: string | null;
   /** Solo admin: cotizar para el cliente del pedido. */
   clienteId?: number | null;
-  /** Solo admin: override del descuento del cliente (el builder lo edita en vivo). */
+  /** Solo admin: override manual del pedido en % (el builder lo edita en vivo). */
   descuentoPct?: number | null;
+  /** Solo admin, Fase C-2 (#1219): tipo del override manual — "pct" (default)
+   *  o "monto" ($ fijo). Mismo campo de la UI, un selector al lado. */
+  descuentoTipo?: "pct" | "monto" | null;
+  /** Solo admin, Fase C-2: override manual del pedido en $ fijo, usado cuando
+   *  `descuentoTipo === "monto"`. */
+  descuentoMonto?: number | null;
+  /**
+   * Solo admin, para el editor de un pedido YA EXISTENTE: respeta el
+   * `precioJornada` de cada ítem (el snapshot congelado del pedido, editable
+   * por el admin) en vez de recotizar contra el precio de catálogo de HOY.
+   * Sin esto, el total "en vivo" del editor podía no coincidir con el que
+   * persiste el guardado — dos totales del mismo pedido. Ver MEMORIA
+   * 2026-06-06 "Datos del pedido: plata congelada".
+   */
+  respetarPrecioItem?: boolean;
   enabled?: boolean;
-}): { data: Cotizacion; isFetching: boolean } {
-  const { items, fechaDesde, fechaHasta, clienteId, descuentoPct, enabled = true } = args;
+}): { data: Cotizacion; isFetching: boolean; isError: boolean } {
+  const {
+    items,
+    fechaDesde,
+    fechaHasta,
+    clienteId,
+    descuentoPct,
+    descuentoTipo,
+    descuentoMonto,
+    respetarPrecioItem = false,
+    enabled = true,
+  } = args;
 
   const body = {
     items: items
@@ -160,9 +202,11 @@ export function useCotizacion(args: {
       .map((i) => ({
         equipo_id: i.equipoId,
         cantidad: i.cantidad,
-        // Solo relevantes para líneas personalizadas (equipoId null); el backend
-        // ignora estos campos en ítems de catálogo (toma el precio de la DB).
-        ...(i.equipoId == null
+        // Personalizadas (equipoId null): siempre mandan precio/modo propios.
+        // Catálogo con `respetarPrecioItem`: el backend solo lo honra si la
+        // sesión es admin; en el resto de los usos (carrito público) el
+        // backend ignora estos campos y toma el precio de `equipos`.
+        ...(i.equipoId == null || respetarPrecioItem
           ? { precio_jornada: i.precioJornada ?? 0, cobro_modo: i.cobroModo ?? "jornada" }
           : {}),
       })),
@@ -170,32 +214,60 @@ export function useCotizacion(args: {
     fecha_hasta: fechaHasta ?? null,
     cliente_id: clienteId ?? null,
     descuento_pct: descuentoPct ?? null,
+    descuento_manual_tipo: descuentoTipo ?? null,
+    descuento_manual_monto: descuentoMonto ?? null,
+    respetar_precio_item: respetarPrecioItem,
   };
 
-  const hayItems = body.items.length > 0;
+  // Debounce: la query usa el body DEBOUNCEADO. Al tipear rápido, `bodyKey`
+  // cambia por tecla pero solo el último (tras COTIZAR_DEBOUNCE_MS de quietud)
+  // dispara un fetch → un request por edición, no por tecla. El estado inicial
+  // es inmediato (`useState(body)`).
+  const bodyKey = JSON.stringify(body);
+  const [debounced, setDebounced] = useState({ key: bodyKey, body });
+  useEffect(() => {
+    if (bodyKey === debounced.key) return;
+    const t = setTimeout(() => setDebounced({ key: bodyKey, body }), COTIZAR_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce: dispara por el hash del body; `body` se captura fresco cuando cambia el hash
+  }, [bodyKey, debounced.key]);
+
+  const hayItems = debounced.body.items.length > 0;
   const q = useQuery({
-    queryKey: ["cotizar", body],
-    queryFn: () => authedPostJson<CotizarResp>("/api/cotizar", body),
+    queryKey: ["cotizar", debounced.body],
+    queryFn: () => authedPostJson<CotizarResp>("/api/cotizar", debounced.body),
     enabled: enabled && hayItems,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 
+  // `isFetching` cubre TAMBIÉN el intervalo de debounce (hay una edición
+  // pendiente de recalcular) → el consumidor puede mostrar "recalculando…" y
+  // no presentar el número viejo como definitivo. `isError` surfacea un fallo
+  // del recálculo (ej. 429) en vez de quedarse mudo con el valor stale.
+  const pendingDebounce = bodyKey !== debounced.key;
+
   // Carrito vacío → cero, sin arrastrar el último valor cacheado por
   // `keepPreviousData` (si no, al vaciar el carrito quedaría el total viejo).
   return {
     data: hayItems && q.data ? adaptar(q.data) : COTIZACION_VACIA,
-    isFetching: q.isFetching,
+    isFetching: q.isFetching || pendingDebounce,
+    isError: q.isError,
   };
 }
 
 /** Etiqueta de la fila de descuento. Cuando gana el del cliente se personaliza
- *  con su nombre ("Descuento para Tincho") — atención manual del dueño. */
+ *  con su nombre ("Descuento para Tincho") — atención manual del dueño.
+ *  "manual" (jerarquía, #1219): el admin lo seteó a mano para ESE pedido —
+ *  gana outright, no compite con cliente/jornadas. */
 export function descuentoLabel(
   origen: DescuentoOrigen,
   jornadas: number,
   nombreCliente?: string | null,
 ): string {
+  if (origen === "manual") {
+    return "Descuento manual";
+  }
   if (origen === "jornadas") {
     return `Descuento jornadas (${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"})`;
   }

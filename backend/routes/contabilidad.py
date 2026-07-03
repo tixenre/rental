@@ -6,56 +6,80 @@ mínimo. Acceso = cualquier admin (`require_admin`); el actor de auditoría sale
 `admin.get("email")`.
 """
 
+import functools
 import logging
 
+import psycopg.errors
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import get_db
 from auth.guards import require_admin
-from contabilidad.cuentas import (
-    crear_cuenta,
-    desactivar_cuenta,
-    editar_cuenta,
-    listar_cuentas,
-)
-from contabilidad.saldos import saldos as _saldos
-from contabilidad.categorias import crear_categoria, listar_categorias
-from contabilidad.movimientos import (
+from rate_limit import limiter, ADMIN_UPLOAD_LIMIT, ADMIN_WRITE_LIMIT
+from contabilidad.commands.cuentas import crear_cuenta, desactivar_cuenta, editar_cuenta
+from contabilidad.queries.cuentas import listar_cuentas, obtener_cuenta
+from contabilidad.queries.saldos import saldos as _saldos
+from contabilidad.commands.categorias import crear_categoria
+from contabilidad.queries.categorias import listar_categorias
+from contabilidad.commands.movimientos import (
+    actualizar_comprobante,
     anular_movimiento,
-    beneficiarios_usados,
-    cobros_mensuales,
     crear_movimiento,
     editar_movimiento,
+)
+from contabilidad.queries.movimientos import (
+    beneficiarios_usados,
+    cobros_mensuales,
     gastos_por_categoria,
     listar_movimientos,
     obtener_movimiento,
 )
-from contabilidad.tablero import tablero as _tablero
-from contabilidad.pyl import ganancia_neta
-from contabilidad.rendicion import rendicion as _rendicion, saldar as _saldar
-from contabilidad.cierres import cerrar_mes as _cerrar_mes, reabrir_mes as _reabrir_mes
-from contabilidad.reconciliacion import reconciliar as _reconciliar
+from contabilidad.queries.tablero import tablero as _tablero
+from contabilidad.queries.pyl import ganancia_neta
+from contabilidad.queries.rendicion import rendicion as _rendicion
+from contabilidad.commands.rendicion import saldar as _saldar
+from contabilidad.commands.cierres import cerrar_mes as _cerrar_mes, reabrir_mes as _reabrir_mes
+from contabilidad.queries.reconciliacion import reconciliar as _reconciliar
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def map_pg_errors(fn):
+    """Traduce a un 400 limpio los errores de Postgres que se cuelan más allá de
+    las cotas de `Field(...)` del body (auditoría 2026-07-02) — sin esto, un
+    `NumericValueOutOfRange`/`UniqueViolation` no anticipado por el motor (que
+    ya devuelve `ValueError`→400 para lo que sí anticipa) sube crudo al handler
+    global (`main.py`), que expone `f"{type(exc).__name__}: {exc}"` — nombre de
+    constraint/columna de Postgres — al cliente. No reemplaza `except ValueError`
+    (ya lo maneja cada endpoint); compone alrededor de él. Reusado en
+    `routes/alquileres/pagos.py`."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except psycopg.errors.UniqueViolation:
+            raise HTTPException(400, "Ya existe un registro con ese valor.")
+        except psycopg.errors.NumericValueOutOfRange:
+            raise HTTPException(400, "Un valor numérico es demasiado grande.")
+    return wrapper
+
+
 class CuentaCreate(BaseModel):
-    nombre: str
-    tipo: str
-    socio: str | None = None
-    moneda: str = "ARS"
-    saldo_inicial: int = 0
-    fecha_apertura: str | None = None
-    orden: int = 0
+    nombre: str = Field(max_length=120)
+    tipo: str = Field(max_length=20)
+    socio: str | None = Field(default=None, max_length=40)
+    moneda: str = Field(default="ARS", max_length=3)
+    saldo_inicial: int = Field(default=0, ge=-2_000_000_000, le=2_000_000_000)
+    fecha_apertura: str | None = Field(default=None, max_length=10)
+    orden: int = Field(default=0, ge=0, le=10_000)
 
 
 class CuentaUpdate(BaseModel):
-    nombre: str | None = None
-    saldo_inicial: int | None = None
-    fecha_apertura: str | None = None
-    orden: int | None = None
+    nombre: str | None = Field(default=None, max_length=120)
+    saldo_inicial: int | None = Field(default=None, ge=-2_000_000_000, le=2_000_000_000)
+    fecha_apertura: str | None = Field(default=None, max_length=10)
+    orden: int | None = Field(default=None, ge=0, le=10_000)
     activa: bool | None = None
 
 
@@ -90,6 +114,8 @@ def get_cuentas(request: Request, incluir_inactivas: bool = False):
 
 
 @router.post("/admin/contabilidad/cuentas")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def post_cuenta(request: Request, body: CuentaCreate):
     """Crea una cuenta/caja nueva."""
     admin = require_admin(request)
@@ -117,6 +143,8 @@ def post_cuenta(request: Request, body: CuentaCreate):
 
 
 @router.patch("/admin/contabilidad/cuentas/{cuenta_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def patch_cuenta(request: Request, cuenta_id: int, body: CuentaUpdate):
     """Edita una cuenta. No se puede cambiar tipo ni socio."""
     admin = require_admin(request)
@@ -136,6 +164,8 @@ def patch_cuenta(request: Request, cuenta_id: int, body: CuentaUpdate):
 
 
 @router.delete("/admin/contabilidad/cuentas/{cuenta_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def delete_cuenta(request: Request, cuenta_id: int):
     """Baja lógica de una cuenta (falla si tiene saldo distinto de cero)."""
     admin = require_admin(request)
@@ -155,7 +185,7 @@ def delete_cuenta(request: Request, cuenta_id: int):
 # ── Categorías de gasto ─────────────────────────────────────────────────────
 
 class CategoriaCreate(BaseModel):
-    nombre: str
+    nombre: str = Field(max_length=80)
 
 
 @router.get("/admin/contabilidad/categorias")
@@ -174,6 +204,8 @@ def get_beneficiarios(request: Request):
 
 
 @router.post("/admin/contabilidad/categorias")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def post_categoria(request: Request, body: CategoriaCreate):
     require_admin(request)
     with get_db() as conn:
@@ -192,30 +224,30 @@ def post_categoria(request: Request, body: CategoriaCreate):
 # ── Movimientos (gasto / transferencia / retiro / aporte / ajuste) ──────────
 
 class MovimientoCreate(BaseModel):
-    tipo: str
-    monto: int
-    cuenta_origen_id: int | None = None
-    cuenta_destino_id: int | None = None
-    categoria_id: int | None = None
-    metodo: str | None = None
-    fecha: str | None = None
-    nota: str | None = None
-    beneficiario: str | None = None
+    tipo: str = Field(max_length=20)
+    monto: int = Field(gt=0, le=2_000_000_000)
+    cuenta_origen_id: int | None = Field(default=None, gt=0, lt=2_147_483_647)
+    cuenta_destino_id: int | None = Field(default=None, gt=0, lt=2_147_483_647)
+    categoria_id: int | None = Field(default=None, gt=0, lt=2_147_483_647)
+    metodo: str | None = Field(default=None, max_length=20)
+    fecha: str | None = Field(default=None, max_length=10)
+    nota: str | None = Field(default=None, max_length=500)
+    beneficiario: str | None = Field(default=None, max_length=120)
 
 
 class MovimientoUpdate(BaseModel):
-    monto: int | None = None
-    cuenta_origen_id: int | None = None
-    cuenta_destino_id: int | None = None
-    categoria_id: int | None = None
-    metodo: str | None = None
-    fecha: str | None = None
-    nota: str | None = None
-    beneficiario: str | None = None
+    monto: int | None = Field(default=None, gt=0, le=2_000_000_000)
+    cuenta_origen_id: int | None = Field(default=None, gt=0, lt=2_147_483_647)
+    cuenta_destino_id: int | None = Field(default=None, gt=0, lt=2_147_483_647)
+    categoria_id: int | None = Field(default=None, gt=0, lt=2_147_483_647)
+    metodo: str | None = Field(default=None, max_length=20)
+    fecha: str | None = Field(default=None, max_length=10)
+    nota: str | None = Field(default=None, max_length=500)
+    beneficiario: str | None = Field(default=None, max_length=120)
 
 
 class AnularBody(BaseModel):
-    motivo: str
+    motivo: str = Field(max_length=500)
 
 
 @router.get("/admin/contabilidad/movimientos")
@@ -249,8 +281,8 @@ def get_movimientos(
         if tipo in (None, "", "cobro") and not categoria_id and not beneficiario:
             cobrador = None
             if cuenta_id:
-                row = conn.execute("SELECT socio FROM cuentas WHERE id = %s", (cuenta_id,)).fetchone()
-                cobrador = row["socio"] if row else None
+                cta = obtener_cuenta(conn, cuenta_id)
+                cobrador = cta["socio"] if cta else None
                 # Caja sin cobrador (Efectivo/Banco/Dólares) → no recibe cobros.
                 if not cobrador:
                     cobros = []
@@ -260,6 +292,8 @@ def get_movimientos(
 
 
 @router.post("/admin/contabilidad/movimientos")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def post_movimiento(request: Request, body: MovimientoCreate):
     """Registra un movimiento (gasto/transferencia/retiro/aporte/ajuste)."""
     admin = require_admin(request)
@@ -284,6 +318,8 @@ def post_movimiento(request: Request, body: MovimientoCreate):
 
 
 @router.patch("/admin/contabilidad/movimientos/{mov_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def patch_movimiento(request: Request, mov_id: int, body: MovimientoUpdate):
     admin = require_admin(request)
     campos = body.model_dump(exclude_unset=True)
@@ -301,6 +337,8 @@ def patch_movimiento(request: Request, mov_id: int, body: MovimientoUpdate):
 
 
 @router.post("/admin/contabilidad/movimientos/{mov_id}/anular")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def anular_mov(request: Request, mov_id: int, body: AnularBody):
     """Soft-delete con motivo: la plata nunca se borra, queda anulada y trazable."""
     admin = require_admin(request)
@@ -322,10 +360,11 @@ _COMPROBANTE_TIPOS = ("application/pdf", "image/jpeg", "image/png", "image/webp"
 
 
 @router.post("/admin/contabilidad/movimientos/{mov_id}/comprobante")
+@limiter.limit(ADMIN_UPLOAD_LIMIT)
 async def subir_comprobante(request: Request, mov_id: int, file: UploadFile = File(...)):
     """Adjunta un comprobante (PDF o imagen) a un movimiento. Sube a R2 reusando
     la infra de media (`services/media/storage`)."""
-    require_admin(request)
+    admin = require_admin(request)
     content = await file.read()
     if len(content) > _COMPROBANTE_MAX:
         raise HTTPException(400, "El comprobante supera los 5 MB.")
@@ -353,16 +392,15 @@ async def subir_comprobante(request: Request, mov_id: int, file: UploadFile = Fi
                 content_type=ctype,
                 presign_expires=3600,
             )
-            conn.execute(
-                "UPDATE movimientos SET comprobante_url = NULL, comprobante_key = %s, "
-                "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-                (key, mov_id),
-            )
+            actualizar_comprobante(conn, mov_id, key=key, por=admin.get("email"))
             conn.commit()
             return {"comprobante_url": presigned, "comprobante_key": key}
         except HTTPException:
             conn.rollback()
             raise
+        except ValueError as e:
+            conn.rollback()
+            raise HTTPException(400, str(e))
         except Exception:
             conn.rollback()
             logger.exception("No se pudo subir el comprobante")
@@ -394,7 +432,7 @@ def get_reporte_mensual(request: Request, mes: str):
     """Reporte mensual completo de Rambla: devengado + percibido + gastos +
     ganancia + cargos de socios + cuenta corriente, derivado del motor."""
     require_admin(request)
-    from contabilidad.reporte_mensual import reporte_mensual
+    from contabilidad.queries.reporte_mensual import reporte_mensual
 
     with get_db() as conn:
         try:
@@ -406,12 +444,12 @@ def get_reporte_mensual(request: Request, mes: str):
 # ── Rendición de cuentas mensual entre socios ───────────────────────────────
 
 class SaldarBody(BaseModel):
-    de: str
-    a: str
-    monto: int
-    metodo: str | None = None
-    fecha: str | None = None
-    nota: str | None = None
+    de: str = Field(max_length=20)
+    a: str = Field(max_length=20)
+    monto: int = Field(gt=0, le=2_000_000_000)
+    metodo: str | None = Field(default=None, max_length=20)
+    fecha: str | None = Field(default=None, max_length=10)
+    nota: str | None = Field(default=None, max_length=500)
 
 
 @router.get("/admin/contabilidad/rendicion/{mes}")
@@ -427,6 +465,8 @@ def get_rendicion(request: Request, mes: str):
 
 
 @router.post("/admin/contabilidad/rendicion/{mes}/saldar")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def post_saldar(request: Request, mes: str, body: SaldarBody):
     """Registra un saldado real de rendición (transferencia entre las cajas de las
     partes, marcada como rendición en el libro)."""
@@ -459,6 +499,8 @@ def get_reconciliacion(request: Request):
 
 
 @router.post("/admin/contabilidad/cierres/{mes}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def post_cierre(request: Request, mes: str):
     """Cierra un mes contable: congela la foto y traba la edición de sus
     movimientos. Idempotente."""
@@ -472,6 +514,8 @@ def post_cierre(request: Request, mes: str):
 
 
 @router.delete("/admin/contabilidad/cierres/{mes}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def delete_cierre(request: Request, mes: str):
     """Reabre un mes contable cerrado."""
     require_admin(request)

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from database import get_db, row_to_dict
 from services.nombre_service import actualizar_nombres_de
-from services.spec_persist import persistir_specs
+from services.specs import persistir_specs
 from routes.specs.core import router, _require_admin
 
 
@@ -62,12 +62,20 @@ def obtener_specs_equipo(equipo_id: int, request: Request):
 
         template: list[dict] = []
         if categoria_specs:
-            cat_row = conn.execute(
-                "SELECT id FROM categorias WHERE nombre = %s AND parent_id IS NULL",
-                (categoria_specs,),
-            ).fetchone()
-            if cat_row:
-                raiz_id = row_to_dict(cat_row)["id"]
+            from services.categorias import buscar_id_por_nombre
+            cat_id = buscar_id_por_nombre(conn, categoria_specs)
+            if cat_id:
+                # `categoria_raiz_id` en spec_definitions es el id que el
+                # SEEDER resolvió para el nombre de la categoría de specs
+                # (`seed_categoria_from_registry` → `buscar_id_por_nombre`),
+                # NO necesariamente un nodo raíz del árbol de catálogo — ej.
+                # "Adaptadores"/"Filtros" son subcategorías de "Lentes" en el
+                # árbol (parent_id apunta a Lentes), pero sus specs se
+                # sembraron con categoria_raiz_id = su PROPIO id. Exigir acá
+                # que sea raíz del árbol (root_of_categoria(cat_id) == cat_id)
+                # dejaba el template SIEMPRE vacío para esas 2 categorías —
+                # bug real encontrado cargando specs de verdad (Iniciativa A).
+                raiz_id = cat_id
                 template_rows = conn.execute(
                     """
                     SELECT

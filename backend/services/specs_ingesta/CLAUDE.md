@@ -1,0 +1,234 @@
+# `services/specs_ingesta/` — motor de ingesta y normalización de specs (F0-F7 completo)
+
+> **Estado: MÓDULO COMPLETO, F0-F7.** Los 3 wrapper viejos
+> (`services/{equipo,luces,generic}_html_extractor.py`) **ya no existen** — se borraron en F6. `parse/`
+> (primitivas HTML) + `parsers/` (los 4 parsers grandes, movidos de `tools/`) +
+> `queries/{resultado,bespoke,generic,detectar,extraer}.py` son la fuente única, sin shims por
+> delante — **cero `sys.path.insert()` hacks, cero lógica duplicada, cero dispatcher fuera de
+> `queries/extraer.py`**. `tools/*_parser.py` siguen como shims CLI-únicamente (⏰ LEGACY-adyacente, no
+> tocados por F6) para los `*_rebuild.sh` y 2 tests que importan por nombre.
+> `specs_ingesta.extract_from_html` (el barrel) importa DIRECTO de `queries/extraer.py`. `cli.py` es
+> el entry point offline — mismo `queries/extraer`, verificado byte-idéntico al del endpoint sobre el
+> mismo HTML. `commands/proponer.py::proponer_desde_unmatched` (F7a) es el único lado-escritura —
+> unmatched frecuente cruza el umbral → Canal C (`services.specs.encolar_propuesta`), verificado contra
+> data real + Postgres real. `llm/contexto.py::armar_contexto` (F7b, **decisión del dueño: modo
+> semi-manual, sin API key propia** — ver docstring del módulo) + `cli.py context` completan el
+> suplemento offline. **Todas las fases del plan original están hechas.** Lo que sigue es Iniciativa A
+> (cargar specs reales, todavía sin arrancar) — no más fases de refactor/infraestructura de este módulo.
+> Plan completo + fases → [`docs/PLAN_SPECS_INGESTA.md`](../../../docs/PLAN_SPECS_INGESTA.md) ·
+> tracking → issue [#1176](https://github.com/tixenre/rental/issues/1176) · rama aislada
+> `feature/specs-ingesta`, PR sin mergear hasta completar el módulo (convención "PR como hoja de ruta").
+
+## Por qué existe
+
+Hoy la extracción HTML→specs vive partida en dos capas mal empalmadas: una capa "wrapper" en
+`services/{generic,luces,equipo}_html_extractor.py` (~1200 líneas, con duplicación real — parseo
+JSON-LD triplicado, garbage-filter con constantes distintas entre `generic` y `luces`) que reachea
+hacia `tools/*_parser.py` (~6400 líneas más, en la raíz del repo) vía un hack de `sys.path.insert()`.
+
+Este módulo consolida ambas capas en un motor único, CQRS-lite (espeja `services/specs/` y
+`services/categorias/`), y **maximiza el parser determinístico** (issue #1072 subsumido acá) — no
+solo reordena código.
+
+## La frontera con `services/specs/` — dependencia UN SOLO sentido
+
+`specs_ingesta` **lee** de `services/specs` (su barrel público, nunca internals). `specs` **nunca**
+importa `specs_ingesta`. Tres canales (detalle en el plan):
+- **Canal A** (lectura): `REGISTRY`/`get_categoria`, `coerce_and_serialize`, el embudo de valor.
+- **Canal B** (emisión indirecta): este módulo emite `spec_key` y se **detiene ahí** — nunca resuelve
+  `spec_def_id` ni llama `persistir_specs`. El front traduce, el humano confirma, recién ahí `specs`
+  persiste. El motor de persistencia sagrado no se toca.
+- **Canal C** (escritura, vía `commands/`): propone specs/aliases nuevos a la cola
+  `spec_propuestas_pendientes` (ya existe en `specs`, hoy huérfana) — nunca escribe el registry directo.
+
+## Split de runtime (invariante dura)
+
+- **Railway (en vivo, el endpoint admin):** solo `queries/` + `parse/` + `parsers/` — determinístico,
+  sin LLM, sin API key. Railway **no baja HTML** (mismo bloqueo de bots que el scraping) — solo parsea
+  lo que el form le sube.
+- **La compu (offline, `cli.py`):** el mismo `queries/extraer` + `llm/contexto.py` como suplemento
+  (F7b) — arma el bundle para el caso que el determinístico no puede (eBay, fuentes de fabricante,
+  misdetección, unmatched); **no** llama a un LLM por API — lo razona una sesión de Claude Code
+  interactiva (decisión del dueño, ver docstring de `llm/contexto.py`).
+- **`llm/` SOLO lo importa `cli.py`.** Si algo en `queries/` o `parse/` importa de `llm/`, es un bug —
+  rompe el split de runtime.
+
+## Estructura (F0-F7 completas — el plan original entero)
+
+```
+services/specs_ingesta/
+  __init__.py     # barrel. __all__ es el contrato real.                         ✓ F0
+  errors.py       # ErrorIngesta (400), HtmlNoParseable (422)                    ✓ F0
+  CLAUDE.md        # este doc                                                    ✓ F0
+  cli.py          # entry point offline — extract (determinístico) + context (F7b) ✓ F5/F7b
+  parse/          # DOMINIO — primitivas puras de lectura de HTML (Railway-safe) ✓ F1
+    jsonld.py · dom.py · garbage.py · pares.py · serialize.py                    ✓ F1/F2/F7b
+    fuentes/      #   adaptadores de fuente pluggable — NO construido, no bloqueaba nada ✗ sin fase
+  parsers/        # DOMINIO — verbatim ex-tools/ (los 4 parsers grandes)         ✓ F3
+    base.py       #   BHSpecsParser + helpers compartidos (antes en iluminacion_parser)
+    camaras.py · lentes.py · iluminacion.py · modificadores.py · normalizar.py
+  queries/        # LECTURA — lo que corre en Railway, nunca muta                ✓ F5
+    resolver.py   #   resolve_pairs, el matcheo label→spec_key                   ✓ F1
+    resultado.py  #   build_result/generic_fallback_result — fuente única AutocompletarResult ✓ F4
+    bespoke.py    #   4 categorías con parser (cámaras/lentes/modificadores/iluminación)       ✓ F4
+    generic.py    #   categorías sin parser — + filtro de ruido (package_weight, etc.)         ✓ F4
+    detectar.py   #   detección de categoría, MAXIMIZADA contra el dataset real                ✓ F5
+    extraer.py    #   entry point único (detecta + rutea) — usado por Railway Y cli.py          ✓ F5
+  commands/       # ESCRITURA — el embudo que aprende (propone-aprobás)
+    proponer.py   #   proponer_desde_unmatched — unmatched frecuente → Canal C ✓ F7a
+  llm/            # SUPLEMENTO OFFLINE-ONLY (solo cli.py importa de acá)        ✓ F7b
+    contexto.py   #   armar_contexto — bundle para razonar a mano/con Claude Code interactivo
+```
+
+`parse/fuentes/` (adaptadores de fuente pluggable por sitio) quedó sin construir — el diagnóstico (B0)
+mostró que era una idea razonable, pero **`parse/dom.py` genérico + `llm/contexto.py` (F7b) ya resuelven
+el caso real** (eBay, fabricante) sin necesitar una abstracción de "fuente" separada. Se revisita si/
+cuando el volumen de fuentes no-B&H lo justifique — no se construye por adelantado.
+
+**Invariante commands↔queries (igual que `specs`/`categorias`):** `commands/` puede importar de
+`queries/`; `queries/` **nunca** de `commands/`. `parse/` y `parsers/` no importan ni uno ni otro.
+
+## Gotchas (se van sumando fase a fase)
+
+- **`generic_html_extractor.py` YA era el core canónico** (F1 lo adoptó, no lo recreó) — tenía
+  `extract_raw_pairs`/`resolve_pairs`/un solo `_GARBAGE_VALUES`. Los duplicados vivos estaban en
+  `equipo` (merge JSON-LD triplicado inline) y `luces` (garbage-set propio con `":"` — drift real,
+  fix confirmado: la Sony FX3A dejaba pasar "Signal-to-Noise Ratio: Not Specified by Manufacturer"
+  como spec fantasma).
+- **Reuso bajo prueba, no a ciegas:** cada pieza que se mueve/reusa de las capas viejas se prueba
+  contra HTML real (dataset de 54 páginas en `/Users/tincho/Desktop/Paginas`, gitignored) antes de
+  adoptarla tal cual — no basta con pyflakes limpio. Encontró 2 bugs reales en F2 (bool `false`→"Sí"
+  por alimentar un string crudo a un serializador que esperaba Python bool tipado) y un gap real de
+  extracción por línea en F3 (una constante a nivel módulo, `_TIPO_KEYWORDS`, quedó fuera del rango
+  al hacer un slice manual por número de línea — **usar AST (`ast.parse` + `node.lineno`/
+  `node.end_lineno`), no grep, para partir un archivo**: un grep-based slice asume que todo lo que
+  hay entre dos `def` pertenece a la primera función, y no es así — puede haber constantes/alias de
+  compat sueltos en el medio). Ledger completo en el plan.
+- **Un test que importa por nombre desde el módulo viejo no siempre aparece en el primer grep** — el
+  patrón `from X import (\n    nombre,\n)` multilínea, o un import indentado dentro de una función
+  de test, no matchea un grep ingenuo de `^from`. Verificar con `grep -oP` exhaustivo antes de armar
+  el `__all__` de un shim, y correr los tests afectados — no asumir que "no apareció" = "no se usa".
+- **B0 (diagnóstico) corrió** sobre las 54 páginas reales: 87% detección OK, 2 casos de ruido real
+  (RED KOMODO Production Pack, Canon Mount Adapter 0.71x), 6 casos "0 specs" todos explicados por
+  fuente no-B&H (3 eBay + 3 fabricante directo — confirma la necesidad de `parse/fuentes/` pluggable).
+  Detalle → comentario en issue #1176. **F4 resolvió el filtro de ruido genérico** (`package_weight`/
+  `box_dimensions` — Canon Mount Adapter queda 100% limpio); **F5 resolvió RED KOMODO** — la causa real
+  era que el título no matcheaba el regex de detección de cámaras (caía al genérico, 70 specs de ruido
+  de los accesorios del bundle) — con detección arreglada rutea al parser de cámaras, 33 specs curados.
+- **F3 no movió `camaras_normalizar.py`/`lentes_normalizar.py`/`*_patches.py`** — confirmado que
+  ningún código en vivo los importa (solo el pipeline offline de `_rebuild.sh`, que F3 no tocó).
+  Quedan en `tools/` sin shim; se revisan si/cuando F5 cablea `cli.py`.
+- **F4 — el "criterio más seguro" no lo era: probarlo contra data real lo refutó.** El merge JSON-LD
+  tenía 2 criterios distintos en el código viejo — `equipo` anteponía JSON-LD siempre primero, `luces`
+  hacía dedupe (solo agregaba si el label no estaba ya en el DOM). La primera versión de
+  `parse/secciones.py` adoptó el de luces asumiendo que "no pisar nada" era más conservador — **al
+  probarlo contra las 103 páginas reales de Luces perdía datos en 111 casos**: JSON-LD trae el valor
+  RICO (ej. multi-línea con las 4 combinaciones de ángulo×CCT), el DOM uno resumido para el mismo
+  label, y el dedupe se quedaba con el resumido por haber llegado "primero". Se revirtió al criterio de
+  `equipo` (más simple, además de correcto). Lección: cuando dos implementaciones viejas discrepan y hay
+  que elegir una, "la que parece más cautelosa" es una hipótesis igual que cualquier otra — se prueba
+  contra data real, no se elige por intuición aunque suene razonable.
+- **F4 — unificar destapó 2 bugs reales que llevaban tiempo silenciosos en `luces_html_extractor.py`**
+  (nunca se habrían visto sin el diff empírico completo, no alcanzaba con leer el código): `peso` SIEMPRE
+  daba `None` en la ficha de una luz porque el código buscaba la key `"peso"` en el dict de specs, pero
+  el mapper real emite `"peso_g"`; `keywords` SIEMPRE daba `[]` porque estaba hardcodeado en vez de llamar
+  `compute_keywords()` (sin ninguna razón category-specific — la función es genérica). Ambos se
+  corrigieron gratis al pasar luces por el mismo `build_result` que ya usaban las otras 3 categorías.
+- **F5 — "maximizar detección" es barrido sistemático, no parchear el caso ya conocido.** B0 solo había
+  encontrado el caso RED KOMODO. Correr `detect_categoria` contra las 47 páginas B&H reales del dataset
+  (filtrando los assets `_files/` del guardado y las páginas de fabricante que no son B&H) encontró 3
+  fallas MÁS que nadie había visto: 2 casos donde el título decía "lens" para un accesorio óptico de luz
+  (no un lente fotográfico) y caía al parser EQUIVOCADO — peor que caer a "Desconocido", porque produce
+  un resultado con apariencia válida pero basura (1 spec). La lección: un fix puntual sobre el caso que
+  se conoce deja plata en la mesa — correr el diagnóstico contra TODO el dataset (mismo método de B0) es
+  lo que separa "arreglé el caso que vi" de "maximicé la detección".
+- **F5 — un bug de parseo puede esconderse en un campo que nunca se compara.** Ninguna verificación
+  previa (F1-F4) había puesto el ojo en `modelo`/`nombre_normalizado` porque los diffs se enfocaban en
+  `specs` (lo que importa para persistir) — pero `BHSpecsParser.title` tenía un bug real y grande (52/277
+  páginas con "Accessibility" pegado al título, sin espacio: un `<title>` de un ícono SVG de accesibilidad
+  se sumaba al título de la página porque el parser no distingue `<title>` de `<head>` de `<title>` de
+  `<svg>`) que solo salió a la luz al mirar TODOS los campos del diff, no solo los que uno espera que
+  cambien. Moraleja: al verificar "no cambió nada inesperado", diffear el resultado completo — no solo
+  el campo que la fase que estás haciendo se supone que toca.
+- **F5 — un valor "roto" puede ser basura genuina de la fuente, no un bug propio.** Un `extras['video_io']
+  = '</b<'` en RED KOMODO resultó ser exactamente ese string, literal, en el JSON-LD del HTML de B&H
+  (`grep` lo confirmó en el HTML crudo) — no algo que nuestro parser corrompe. Antes de "arreglar" un
+  valor sospechoso, confirmar si el HTML fuente ya lo trae roto; en ese caso no hay fix razonable del
+  lado del parser (headers/JSON-LD malformados de terceros son la realidad de scrapear/parsear la web) y
+  el bucket `extras` (cola larga, no curada) ya tolera esto por diseño — no se promueve a `specs`.
+- **F6 — podar un shim de test puede ser la oportunidad de testear lo REAL, no solo mudar el import.**
+  `_specs_dict_to_array` (el shim ⏰ LEGACY de F2) no tenía equivalente exacto en el módulo nuevo — su
+  firma simplificada (`registry_labels` dict a mano) nunca fue lo que corre en producción, solo un
+  stand-in de cuando el test se escribió. En vez de preservarla artificialmente, los 5 tests que la
+  usaban se reescribieron contra `parse/serialize.py::specs_dict_to_array` (la función real, con
+  `categoria` en vez de un dict a mano) — mismas invariantes, pero ahora ejercitando el código que
+  efectivamente corre. Regla: podar un shim de test no es "encontrar dónde pegar el import nuevo" —
+  es la oportunidad de preguntarse si el test debería ejercitar la función real en primer lugar.
+- **F6 — un `sys.path` hack puede sobrevivir escondido DENTRO de un test**, no solo en código de
+  producción. F1/F3 habían limpiado los hacks de `services/`/`tools/`, pero
+  `test_spec_key_normalization.py::test_parser_luz_no_emite_keys_huerfanas` tenía su propio
+  `sys.path.insert()` apuntando a `tools/iluminacion_parser` — invisible a un grep que solo mira
+  `services/`. Verificar `tests/` con la misma exhaustividad que el código de producción, no asumir
+  que los hacks solo viven del lado no-test.
+- **F6 — borrar un archivo puede exponer que un doc lo describía mal desde antes.** `docs/SISTEMA_SPECS.md`
+  §1 describía un flujo Firecrawl+LLM (`/admin/equipos/autocompletar`, `/batch-enriquecer`) que ya no
+  existía — ni siquiera era el dispatcher pre-`specs_ingesta`, era una capa MÁS vieja todavía. Nadie lo
+  había notado porque nadie leyó ese doc buscando algo relacionado hasta que F6 borró el archivo que
+  citaba. Reescrito con el flujo real (§1 arriba). El resto de la staleness ya conocida de ese doc
+  (§2/§5/§6, el workflow de seeders viejo) se dejó como estaba — está fuera del alcance de esta
+  iniciativa y ya tiene su propio disclaimer.
+- **F7a — una tabla "huérfana" puede tener un CHECK constraint diseñado para OTRO productor.**
+  `spec_propuestas_pendientes` fue creada para el skill `gear-compatibility` (nunca le escribió) — su
+  `tipo` CHECK (`enum_option`/`spec_nueva`/`merge_specs`/`assign_spec`) no fue pensado para "unmatched
+  frecuente de una extracción HTML". Encajó igual: `spec_nueva` con un payload
+  `{categoria, label, label_normalizado, count, ejemplos}` alcanza (verificado, no supuesto — es
+  exactamente el ítem del ledger de reuso que el plan había dejado "pendiente probar en F7"). Si otro
+  productor futuro necesita un `tipo` que no esté en el CHECK, es un `ALTER TABLE...DROP/ADD CONSTRAINT`
+  aditivo (mismo patrón que F2.2 sobre `assign_spec`, ya en el schema) — no hace falta tabla nueva.
+- **F7a — el nivel de agregación importa: "unmatched" no es lo mismo por-HTML que por-batch.**
+  `proponer_desde_unmatched` recibe una LISTA de listas (`unmatched_por_html`), no una lista plana —
+  a propósito: contar por HTML-distinto (no por ocurrencia) es lo que evita que una sola página con una
+  tabla repetida (el mismo label 2 veces en el mismo documento) infle el conteo y dispare una propuesta
+  falsa. El test `test_mismo_label_repetido_en_un_html_cuenta_una_vez` es el caso testigo — sin la
+  dedup por HTML, 1 página con el label repetido 3 veces hubiera cruzado el umbral de 3 sola.
+- **F7b — "no automatizar el LLM" es una decisión de costo/complejidad, no de principio.** Se evaluó
+  API directa (Anthropic SDK) contra semi-manual (Claude Code interactivo) — la elegida fue semi-manual
+  **porque para el volumen actual (todavía Iniciativa A no arrancó) el costo de la infraestructura nueva
+  no se justifica**, no porque llamar a un LLM por API sea incorrecto en sí. Si el volumen de casos
+  duros crece (muchos eBay/misdetects por batch), re-evaluar API directa es razonable — no es una
+  decisión "para siempre", es la proporcional a HOY. No reintroducir sin medir que el semi-manual quedó
+  chico.
+- **F7b — un bundle "vacío" puede ocultar un bug del extractor, no falta de datos.** El primer intento
+  de `armar_contexto` sobre una página eBay real dio `raw_pairs: []` — la conclusión fácil hubiera sido
+  "eBay no tiene specs estructurados acá". Falsa: la página SÍ tenía una sección "Item specifics" con
+  15 pares reales (Maximum Aperture, Mount, Focal Length...); el bug estaba en `parse/dom.py`
+  (`_TableParser` solo capturaba texto HIJO DIRECTO de `th/td/dt/dd` — el markup por componentes de
+  eBay envuelve el texto en `<div><span>` anidados, invisibles para esa lógica). Antes de aceptar "no
+  hay data acá" de un extractor, mirar el HTML crudo — la ausencia de resultado y la ausencia de dato
+  son cosas distintas.
+- **F7b — un elemento HTML sin cierre desalinea CUALQUIER parser basado en pila de tags, en silencio.**
+  Al arreglar la captura anidada de arriba, la primera versión daba 0 pares (peor que antes). Causa:
+  `<img>`/`<br>` y otros elementos `void` (sin `</tag>` de cierre) se empujaban a la pila de tags
+  abiertos igual que cualquier otro — el primer `handle_endtag` real que llegara después "cerraba" ese
+  elemento fantasma en vez del que correspondía, y desde ahí la pila quedaba permanentemente
+  desalineada (sin excepción, sin log — el resultado es simplemente vacío/incorrecto). Fix: la lista
+  estándar de void elements de HTML5 nunca se empuja a la pila. Cualquier parser HTML hecho a mano
+  (no una librería como BeautifulSoup) que trackee tags abiertos tiene este riesgo — verificar contra
+  HTML real con markup "sucio" (íconos, imágenes inline), no solo fixtures de test prolijos.
+- **Iniciativa A (primer uso real) — el genérico con categoría "Desconocido" resuelve alias CONTRA
+  TODAS las categorías, no solo la que correspondería.** Encontrado al cargar de verdad un equipo real
+  ("Canon Mount Adapter EF-EOS R 0.71x" — un adaptador, título sin "lens" antes de "mount adapter", no
+  matcheaba el regex de Adaptadores): cayó a Desconocido → `extract_from_html_generic(html,
+  categoria_hint=None)` → `resolve_pairs` sin categoría matcheó `modificador_subtipo` (un spec_key de
+  **Modificadores**, otra categoría) contra un label del adaptador, y encima con un valor sin sentido
+  (`lens_mount_out='E'`, un Sony E-mount, en un adaptador Canon EF↔RF). Ampliar el regex de Adaptadores
+  para cubrir "mount adapter" a secas (sin exigir "lens" antes) lo arregla — y es **gratis en riesgo**:
+  el parser bespoke de lentes/adaptadores clasifica lente/filtro/adaptador con su propio `_classify()`
+  interno, no con este regex, así que ensanchar el regex de detección no cambia el resultado de ningún
+  archivo que ya rendía bien (verificado: de las 47 páginas B&H reales, solo 2 tienen "mount adapter"
+  en el título, la otra ya iba a Filtros → mismo parser bespoke, mismo resultado). Después del fix:
+  `categoria_sugerida='Adaptadores'`, specs correctos (`lens_mount='RF'`, `adaptador_subtipo=
+  'Speedbooster'`) y hasta el `modelo` se arma bien ("Speedbooster 0.71x EF → RF" en vez del título
+  crudo con "B&H Photo Video" pegado). Lección: F5 barrió el dataset buscando fallas de detección, pero
+  "Mount Adapter" (sin "Lens") no estaba en los 5 casos que encontró — **el barrido más exhaustivo es
+  usar el sistema para su propósito real**, no solo correr el diagnóstico contra el dataset offline.

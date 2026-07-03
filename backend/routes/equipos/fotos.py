@@ -82,13 +82,79 @@ async def admin_upload_html_source(
             raise
 
     try:
-        from services.equipo_html_extractor import extract_from_html
+        from services.specs_ingesta import extract_from_html
         result = extract_from_html(html_content, categoria_hint=categoria_hint)
     except Exception:
         logger.exception("Error extrayendo specs del HTML (equipo %d)", id)
         raise HTTPException(500, "No se pudo procesar el HTML")
 
+    _proponer_no_reconocidos(id, result)
+
     return {"html_source_url": html_source_url, **result}
+
+
+@router.post("/admin/equipos/{id}/re-extract-specs")
+def admin_re_extract_specs(id: int, request: Request, categoria_hint: Optional[str] = None) -> dict:
+    """Re-corre la extracción sobre el HTML YA guardado del equipo, sin
+    resubir el archivo (#1203) — típicamente después de agregar un spec
+    nuevo al registry: los equipos con HTML guardado pueden traer su valor
+    de un plumazo en vez de perseguir el archivo original de nuevo.
+
+    Mismo motor (`extract_from_html`) que el upload — resultado idéntico al
+    de resubir el mismo archivo. 404 si el equipo no tiene HTML guardado.
+
+    Returns: mismo shape que upload-html-source (AutocompletarResult).
+    """
+    require_admin(request)
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT html_source_url FROM equipos WHERE id=%s", (id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Equipo no encontrado")
+        html_source_url = dict(row).get("html_source_url")
+        if not html_source_url:
+            raise HTTPException(404, "Este equipo no tiene HTML fuente guardado")
+
+    path = f"equipos/{id}/source.html"
+    with media_http():
+        content = _get_r2(path)
+
+    try:
+        html_content = content.decode("utf-8", errors="replace")
+    except Exception:
+        raise HTTPException(400, "HTML guardado inválido (no es UTF-8)")
+
+    try:
+        from services.specs_ingesta import extract_from_html
+        result = extract_from_html(html_content, categoria_hint=categoria_hint)
+    except Exception:
+        logger.exception("Error re-extrayendo specs del HTML guardado (equipo %d)", id)
+        raise HTTPException(500, "No se pudo procesar el HTML guardado")
+
+    _proponer_no_reconocidos(id, result)
+
+    return {"html_source_url": html_source_url, **result}
+
+
+def _proponer_no_reconocidos(equipo_id: int, result: dict) -> None:
+    """Encola en la cola de aprendizaje (#1203) los pares sin match de esta
+    extracción, atribuidos al equipo. Best-effort: un fallo acá NO debe
+    tirar abajo la subida del HTML (ya persistida) ni ocultar las specs
+    reconocidas al frontend — solo se pierde la señal de aprendizaje de
+    ESTA subida, recuperable resubiendo o con re-extract-specs."""
+    unmatched = result.get("unmatched") or []
+    if not unmatched:
+        return
+    try:
+        from services.specs_ingesta import proponer_desde_equipo
+
+        with get_db() as conn:
+            proponer_desde_equipo(conn, equipo_id, result.get("categoria_sugerida"), unmatched)
+            conn.commit()
+    except Exception:
+        logger.exception("No se pudo encolar specs no reconocidas (equipo %d)", equipo_id)
 
 
 
@@ -456,7 +522,7 @@ def admin_buscar_fotos(payload: BuscarFotosInput, request: Request):
 
 
 from services.media.security import _download_image_bytes, _validate_external_image_url
-from services.media.storage import delete_object as _delete_from_r2, put as _put_r2
+from services.media.storage import delete_object as _delete_from_r2, put as _put_r2, get as _get_r2
 from services.media import (
     EQUIPO_DERIVE_SPECS,
     collect_asset_keys,

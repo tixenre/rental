@@ -6,8 +6,8 @@ Sirven tanto para validar al importar como para serializar al exportar.
 Reglas:
 - NUNCA incluir `id` SERIAL.
 - FKs siempre como claves naturales (nombre, slug, path).
-- M2M de equipos (categorías, etiquetas) embebidas dentro de `EquipoIn`
-  para que `equipos.json` sea autosuficiente.
+- M2M de equipos (categorías) embebida dentro de `EquipoIn` para que
+  `equipos.json` sea autosuficiente.
 - `equipo_specs` y `equipo_fichas` viven en archivos aparte porque tienen
   más volumen y se editan independientemente de los datos básicos del equipo.
 """
@@ -50,16 +50,6 @@ class Categoria(_Base):
     visible: bool = True
     grupo_visual: str | None = None
     nombre_publico_template: str | None = None
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# etiquetas.json
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-class Etiqueta(_Base):
-    nombre: str
-    prioridad: int = 100
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -120,14 +110,6 @@ class CategoriaSpecTemplate(_Base):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class EquipoEtiquetaRef(_Base):
-    """Ref a una etiqueta dentro de un equipo, con metadata de la relación."""
-
-    nombre: str
-    origen: Literal["auto", "manual"] = "manual"
-    orden: int = 0
-
-
 class EquipoCategoriaRef(_Base):
     """Ref a una categoría dentro de un equipo (M2M embebida)."""
 
@@ -169,7 +151,6 @@ class Equipo(_Base):
 
     # M2M embebida
     categorias: list[EquipoCategoriaRef] = Field(default_factory=list)
-    etiquetas: list[EquipoEtiquetaRef] = Field(default_factory=list)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -249,10 +230,19 @@ class AlquilerPagoRef(_Base):
     """Pago embebido dentro de un Alquiler. No tiene clave natural propia
     — la combinación (numero_pedido + fecha + monto + concepto) se trata
     como identidad para evitar duplicarlos en re-imports.
+
+    `anulado` + sus columnas de auditoría viajan tal cual (#1184/#1209): un
+    pago anulado es soft-delete y NO debe "revivir" activo tras un
+    export→import — antes se perdían en el viaje y el import los reinsertaba
+    con el default de la columna (`anulado=FALSE`).
     """
     monto: int
     concepto: str | None = None
     fecha: str  # ISO date string
+    anulado: bool = False
+    anulado_por: str | None = None
+    anulado_at: str | None = None  # ISO datetime string
+    anulado_motivo: str | None = None
 
 
 class Alquiler(_Base):
@@ -366,7 +356,6 @@ class DescuentoJornada(_Base):
 ENTITY_MODELS: dict[str, type[_Base]] = {
     "marcas": Marca,
     "categorias": Categoria,
-    "etiquetas": Etiqueta,
     "spec_definitions": SpecDefinition,
     "categoria_spec_templates": CategoriaSpecTemplate,
     "equipos": Equipo,

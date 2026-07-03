@@ -11,7 +11,6 @@ import psycopg
 
 from busqueda.motor import CAMPO_PLANTILLA
 from database.core import DATABASE_URL, PGConnection
-from database.auto_tags import regenerate_auto_tags_all
 
 logger = logging.getLogger(__name__)
 
@@ -670,74 +669,7 @@ def _init_db_schema(conn):
         CREATE INDEX IF NOT EXISTS idx_eq_cat_categoria ON equipo_categorias(categoria_id)
     """)
 
-    # Seed del árbol de categorías (en la tabla `categorias`, no en etiquetas).
-    # Sólo se ejecuta cuando la tabla está vacía — un install fresco arranca
-    # con el árbol sugerido, pero una DB con categorías existentes queda
-    # intacta. Antes corría en cada startup como "idempotente con ON CONFLICT",
-    # pero pisaba parent_id y resucitaba categorías borradas por el admin.
-    existing_cat_count = 0
-    try:
-        row = conn.execute("SELECT COUNT(*) AS n FROM categorias").fetchone()
-        existing_cat_count = int(row["n"] if isinstance(row, dict) else row[0])
-    except Exception:
-        existing_cat_count = 0
-    SEED_TREE = [] if existing_cat_count > 0 else [
-        # (prioridad, nombre_padre, [hijos…])
-        (10,  "Cámaras",              ["Video", "Foto", "Acción"]),
-        (20,  "Lentes",               ["Zoom", "Fijo", "Vintage", "Especiales"]),
-        (25,  "Adaptadores",          []),  # sub-cats por montura (E/RF/EF/M42) on-the-fly
-        (27,  "Filtros",              []),  # sub-cats por diámetro (82mm/77mm) on-the-fly
-        (30,  "Iluminación",          ["LED daylight/bicolor", "LED RGB", "Tungsteno",
-                                       "Fluorescente", "On-camera / Flash", "Práctica / efecto"]),
-        (40,  "Modificadores",        ["Softbox", "Difusión / Frame", "Reflectores", "Banderas"]),
-        (50,  "Soportes",             ["Trípodes video", "Trípodes foto", "C-Stands",
-                                       "Estabilización", "Slider / Dolly / Riel", "Car Mount"]),
-        (60,  "Grip",                 ["Brazos", "Clamps", "Wall plates / pins",
-                                       "Pinzas", "Líneas de seguridad", "Sopapa", "Lastre"]),
-        (70,  "Sonido",               ["Inalámbricos / Lavalier", "Shotgun / Boom",
-                                       "On-camera (sonido)", "Estudio / Podcast", "Intercom"]),
-        (80,  "Monitores y Video",    ["Monitores", "Grabadores",
-                                       "Transmisión inalámbrica", "Follow Focus / Matebox"]),
-        (90,  "Energía",              ["V-Mount", "NP / LP-E6", "Distribución eléctrica"]),
-        (100, "Media y Datos",        ["Tarjetas SD", "Tarjetas CFexpress", "Lectores"]),
-        (110, "Estudio y Producción", ["Set / Backdrops", "Paquetes"]),
-    ]
 
-    # Set de todos los nombres del árbol — se usa abajo para migrar etiquetas
-    # legacy (las que actualmente viven en `etiquetas` como nodos del árbol)
-    # hacia `categorias`.
-    SEED_NAMES: set[str] = set()
-    for pri, parent_name, children in SEED_TREE:
-        SEED_NAMES.add(parent_name)
-        SEED_NAMES.update(children)
-
-    for pri, parent_name, children in SEED_TREE:
-        conn.execute("""
-            INSERT INTO categorias (nombre, prioridad, parent_id)
-            VALUES (%s, %s, NULL)
-            ON CONFLICT (nombre) DO UPDATE
-                SET prioridad = CASE
-                        WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad
-                        ELSE categorias.prioridad
-                    END,
-                    parent_id = NULL
-        """, (parent_name, pri))
-        prow = conn.execute(
-            "SELECT id FROM categorias WHERE nombre = %s", (parent_name,)
-        ).fetchone()
-        parent_cat_id = prow["id"]
-        for idx, child_name in enumerate(children, start=1):
-            child_pri = idx * 10
-            conn.execute("""
-                INSERT INTO categorias (nombre, prioridad, parent_id)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (nombre) DO UPDATE
-                    SET parent_id = EXCLUDED.parent_id,
-                        prioridad = CASE
-                            WHEN categorias.prioridad = 100 THEN EXCLUDED.prioridad
-                            ELSE categorias.prioridad
-                        END
-            """, (child_name, child_pri, parent_cat_id))
 
     # ── Migración: mover nodos del árbol que viven en `etiquetas` → `categorias` ──
     # Esta migración corre una sola vez por el ciclo de vida de cada nombre:
@@ -750,7 +682,8 @@ def _init_db_schema(conn):
         JOIN categorias c ON c.nombre = et.nombre
     """).fetchall()
     for r in legacy_rows:
-        # Copiar asignaciones: equipo_etiquetas → equipo_categorias.
+        # LEGACY MIGRATION — ver AUD-001: refactorizar a asignar_categorias()
+        # del módulo gobernanza_categorias, o borrar si ya no corre.
         conn.execute("""
             INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
             SELECT equipo_id, %s, orden
@@ -773,7 +706,7 @@ def _init_db_schema(conn):
     #    raíz es dueña de sus filas; los keys "shared" (lens_mount, formato,
     #    diametro_filtro, peso_g) están duplicados por cat. El motor de
     #    compat matchea por string-equality del spec_key + value.
-    #    Single source of truth: `backend/specs/registry.py`.
+    #    Single source of truth: `backend/services/specs/registry/`.
     #
     # 2) `categoria_spec_templates` — asigna spec_def a una sub-categoría
     #    con flags overriding (prioridad, destacado, en_card/filtros/nombre).
@@ -922,6 +855,30 @@ def _init_db_schema(conn):
         "ON equipo_specs(equipo_id)"
     )
 
+    # Embudo de alias de valor (rediseño de specs, #1163, Fase 2). Sinónimos
+    # que apuntan a un value canónico de un spec enum/multi_enum (ej. "FF" →
+    # "Full-frame"). Sirve cuádruple: normaliza al persistir, valida
+    # mapeando, alimenta la búsqueda, y de paso arregla la compatibilidad
+    # (el motor matchea por igualdad exacta de value — con el embudo, dos
+    # equipos que dijeron "FF" y "Full-frame" terminan guardando lo mismo).
+    # Tabla (no columna JSONB en spec_definitions): se consulta en las dos
+    # direcciones (alias→canónico al persistir, canónico→[alias] al
+    # buscar). Todavía sin consumidor (Fase 2, el embudo está apagado) —
+    # services/specs/normalize/value_funnel.py la lee, pero coerce/validation
+    # no lo llaman hasta la Fase 3. Ver docs/PLAN_SPECS_REDISENO.md.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS spec_value_aliases (
+            spec_def_id    INTEGER NOT NULL REFERENCES spec_definitions(id) ON DELETE CASCADE,
+            alias          TEXT NOT NULL,
+            valor_canonico TEXT NOT NULL,
+            PRIMARY KEY (spec_def_id, alias)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_value_alias_canon "
+        "ON spec_value_aliases(spec_def_id, valor_canonico)"
+    )
+
     # ── Mantenimiento log por equipo ─────────────────────────────────────
     # Una fila por evento de mantenimiento (revisión, reparación, limpieza,
     # etc.). proxima_revision opcional para recordatorios.
@@ -1011,6 +968,22 @@ def _init_db_schema(conn):
         "CREATE INDEX IF NOT EXISTS idx_propuestas_pendientes "
         "ON spec_propuestas_pendientes(created_at DESC) "
         "WHERE aplicado_at IS NULL AND descartado_at IS NULL"
+    )
+
+    # Migration: atribución por equipo (#1203). El productor original (skill
+    # gear-compatibility) nunca llegó a escribir acá — el primer productor
+    # real fue specs_ingesta (F7, umbral ≥3 HTMLs, agregado sin equipo_id).
+    # Este campo habilita un segundo productor: el upload en vivo, que encola
+    # CADA par sin match (sin esperar repetición) atribuido al equipo que lo
+    # encontró — así el panel admin puede agrupar por label y mostrar qué
+    # equipos la tienen, en vez de perder todo lo que ocurre 1-2 veces.
+    conn.execute(
+        "ALTER TABLE spec_propuestas_pendientes ADD COLUMN IF NOT EXISTS "
+        "equipo_id INT REFERENCES equipos(id) ON DELETE CASCADE"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_propuestas_pendientes_equipo "
+        "ON spec_propuestas_pendientes(equipo_id) WHERE equipo_id IS NOT NULL"
     )
 
     # ── Relevancia + ranking + nombre público calculado ────────────────
@@ -1106,6 +1079,16 @@ def _init_db_schema(conn):
     # 2026 son import del sistema anterior y quedan sin especificar ("—").
     conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS destinatario TEXT")
     conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS metodo TEXT")
+
+    # Actor + soft-delete con motivo — mismo patrón que `movimientos` (#809),
+    # esquema en dos capas (también en la migración a3b4c5d6e7f8). Auditoría
+    # 2026-07-02 (#1184): la tabla que alimenta todo el motor contable no
+    # respetaba "la plata no se borra" que el resto del motor sí respeta.
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS created_by TEXT")
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS anulado BOOLEAN NOT NULL DEFAULT FALSE")
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS anulado_por TEXT")
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS anulado_at TIMESTAMP")
+    conn.execute("ALTER TABLE alquiler_pagos ADD COLUMN IF NOT EXISTS anulado_motivo TEXT")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS solicitudes_modificacion (
@@ -1252,10 +1235,18 @@ def _init_db_schema(conn):
         "CREATE UNIQUE INDEX IF NOT EXISTS cuentas_nombre_activa_uq "
         "ON cuentas(nombre) WHERE activa"
     )
-    # Un socio = exactamente una caja (puente 1:1 con alquiler_pagos.destinatario).
+    # Un socio = exactamente una caja ACTIVA (puente 1:1 con
+    # alquiler_pagos.destinatario) — único solo entre activas, simétrico con
+    # cuentas_nombre_activa_uq: antes (sin `AND activa`) una cuenta de socio
+    # desactivada bloqueaba para siempre crear una nueva activa con el mismo
+    # socio (auditoría 2026-07-02, migración a4c5d6e7f8g9). El target-less
+    # `ON CONFLICT DO NOTHING` del seed de abajo (#932) sigue siendo necesario
+    # igual: cubre el caso de una cuenta ACTIVA renombrada que conserva su
+    # `socio`, sin depender de cuál de los dos índices la atrape.
+    conn.execute("DROP INDEX IF EXISTS idx_cuentas_socio")
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_cuentas_socio "
-        "ON cuentas(socio) WHERE socio IS NOT NULL"
+        "ON cuentas(socio) WHERE socio IS NOT NULL AND activa"
     )
     conn.execute("""
         INSERT INTO cuentas (nombre, tipo, socio, moneda, orden) VALUES
@@ -1357,7 +1348,44 @@ def _init_db_schema(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_jornadas_pct FLOAT DEFAULT 0")
+    # NUMERIC(5,2), no FLOAT — mismo tipo que la migración g1a2b3c4d5e6 le dio a las
+    # otras 3 columnas de descuento (drift detectado en la Fase B de #1219: un bootstrap
+    # 100% vía init_db(), sin Alembic, quedaba con esta columna en un tipo distinto).
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_jornadas_pct NUMERIC(5,2) DEFAULT 0")
+    # Snapshot del descuento del CLIENTE al momento del último recálculo (Fase
+    # C-1, #1219) — mismo patrón que descuento_jornadas_pct de arriba: sin esto,
+    # `desglose_de_pedido` tendría que leer `clientes.descuento` EN VIVO para
+    # mostrar el desglose de un pedido ya confirmado, y si el cliente cambia su
+    # descuento después de confirmar, el desglose (bruto/neto mostrados)
+    # divergiría de `monto_total` ya persistido — la clase de bug "dos cálculos
+    # del mismo número" (#405). `alquileres.descuento_pct` es el override MANUAL
+    # (0 = sin override); esta columna es la contribución del cliente, congelada
+    # igual que jornadas — se refresca en cada recálculo real (edición del admin,
+    # o el presupuesto siguiendo al cliente en vivo).
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_cliente_pct NUMERIC(5,2) DEFAULT 0")
+    # Override manual en % o en $ fijo (Fase C-2, #1219): `descuento_manual_tipo`
+    # decide cómo se interpreta el override de ESTE pedido — 'pct' (de siempre,
+    # usa `descuento_pct`) o 'monto' (usa `descuento_manual_monto`, pesos fijos,
+    # capeado a `bruto` en `descuentos.queries.decision.resolver_descuento_monto_pedido`
+    # para que el neto nunca sea negativo). Mismo campo de la UI, un selector al
+    # lado. Default 'pct' + monto=0 → comportamiento IDÉNTICO a antes de C-2.
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_tipo VARCHAR(10) DEFAULT 'pct'")
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_monto INTEGER DEFAULT 0")
+    # descuento_pct NUMERIC(5,2) → NUMERIC(7,4): el toggle %/$ del builder
+    # convierte el override manual al equivalente de la otra unidad — con solo
+    # 2 decimales, la ida y vuelta %→$→% perdía unos pesos en el redondeo
+    # intermedio (#1219). Idempotente (no-op si ya está migrado); también en
+    # migración w1x2y3z4a5b6.
+    conn.execute("""
+        DO $$
+        BEGIN
+            IF (SELECT numeric_scale FROM information_schema.columns
+                WHERE table_name = 'alquileres' AND column_name = 'descuento_pct') = 2 THEN
+                ALTER TABLE alquileres ALTER COLUMN descuento_pct TYPE NUMERIC(7,4)
+                    USING descuento_pct::NUMERIC(7,4);
+            END IF;
+        END $$;
+    """)
 
     # email infra (migración a4e8c2b9d710)
     conn.execute("""
@@ -1452,26 +1480,29 @@ def _init_db_schema(conn):
     # que equipo_specs y categoria_spec_templates quedan intactos (FK por id, no por key).
     # Guard NOT EXISTS: evita violar UNIQUE(categoria_raiz_id, spec_key) si la canónica
     # ya existiera (un merge real se resolvería en migración, no acá).
+    from services.categorias.queries.ancestry import buscar_id_por_nombre
+    camaras_id = buscar_id_por_nombre(conn, 'Cámaras')
+    lentes_id = buscar_id_por_nombre(conn, 'Lentes')
     conn.execute("""
         UPDATE spec_definitions sd
            SET spec_key = 'consumo_w', label = 'Consumo eléctrico', updated_at = NOW()
          WHERE sd.spec_key = 'power_consumption_w'
-           AND sd.categoria_raiz_id = (SELECT id FROM categorias WHERE nombre = 'Cámaras')
+           AND sd.categoria_raiz_id = %s
            AND NOT EXISTS (
                SELECT 1 FROM spec_definitions x
                 WHERE x.categoria_raiz_id = sd.categoria_raiz_id AND x.spec_key = 'consumo_w'
            )
-    """)
+    """, (camaras_id,))
     conn.execute("""
         UPDATE spec_definitions sd
            SET spec_key = 'distancia_minima_cm', updated_at = NOW()
          WHERE sd.spec_key = 'distancia_minima_m'
-           AND sd.categoria_raiz_id = (SELECT id FROM categorias WHERE nombre = 'Lentes')
+           AND sd.categoria_raiz_id = %s
            AND NOT EXISTS (
                SELECT 1 FROM spec_definitions x
                 WHERE x.categoria_raiz_id = sd.categoria_raiz_id AND x.spec_key = 'distancia_minima_cm'
            )
-    """)
+    """, (lentes_id,))
 
     # Fechas TEXT → tipo nativo (migración e2c6f4a8b1d7). Las fechas se
     # guardaban como strings ISO; ahora son TIMESTAMP/DATE. Idempotente: solo
@@ -2173,9 +2204,9 @@ def _init_db_schema(conn):
             doc_nro                 TEXT NOT NULL,
             condicion_iva_receptor  INTEGER NOT NULL,
             concepto                INTEGER NOT NULL,
-            imp_neto                INTEGER NOT NULL,
-            imp_iva                 INTEGER NOT NULL DEFAULT 0,
-            imp_total               INTEGER NOT NULL,
+            imp_neto                NUMERIC(12,2) NOT NULL,
+            imp_iva                 NUMERIC(12,2) NOT NULL DEFAULT 0,
+            imp_total               NUMERIC(12,2) NOT NULL,
             moneda                  TEXT NOT NULL DEFAULT 'PES',
             cliente_cuit            TEXT,
             razon_social            TEXT,
@@ -2197,6 +2228,24 @@ def _init_db_schema(conn):
     """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_facturas_pedido ON facturas (pedido_id)
+    """)
+    # imp_neto/imp_iva/imp_total INTEGER → NUMERIC(12,2) (bug #1209): el CAE/QR de
+    # ARCA autorizan el importe EXACTO al centavo; truncarlo a entero acá dejaba el
+    # PDF impreso por debajo de lo que el comprobante fiscal autorizó. Idempotente
+    # (no-op si ya está migrado); también en migración h3i4j5k6l7m8.
+    conn.execute("""
+        DO $$
+        BEGIN
+            IF (SELECT data_type FROM information_schema.columns
+                WHERE table_name = 'facturas' AND column_name = 'imp_neto') = 'integer' THEN
+                ALTER TABLE facturas ALTER COLUMN imp_neto TYPE NUMERIC(12,2)
+                    USING imp_neto::NUMERIC(12,2);
+                ALTER TABLE facturas ALTER COLUMN imp_iva TYPE NUMERIC(12,2)
+                    USING imp_iva::NUMERIC(12,2);
+                ALTER TABLE facturas ALTER COLUMN imp_total TYPE NUMERIC(12,2)
+                    USING imp_total::NUMERIC(12,2);
+            END IF;
+        END $$;
     """)
 
     conn.execute("""
@@ -2255,16 +2304,6 @@ def _init_db_schema(conn):
         ALTER TABLE emisores_arca
             ADD COLUMN IF NOT EXISTS inicio_actividades TEXT
     """)
-
-    # Regenerar etiquetas auto (origen='auto') para todos los equipos.
-    # Idempotente: solo borra y reinserta las auto, no toca las manuales.
-    # Se hace una vez por arranque para mantener la bolsa sincronizada
-    # con marca/modelo/nombre/categorías.
-    try:
-        n = regenerate_auto_tags_all(conn)
-        logger.info("%d equipos con etiquetas auto regeneradas", n)
-    except Exception as ex:
-        logger.warning("No se pudieron regenerar etiquetas auto: %s", ex)
 
     # ── Estudio: trabajos / producciones (galería "en acción") ───────────────
     conn.execute("""

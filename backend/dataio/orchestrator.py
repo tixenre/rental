@@ -2,7 +2,7 @@
 
 Funciones principales:
     export_all(conn, out_dir)
-    import_all(conn, in_dir, dry_run=False, prune_m2m=False, only=None)
+    import_all(conn, in_dir, dry_run=False, only=None)
     diff_all(conn, baseline_dir) → dict de cambios por entidad
 
 Los archivos JSON se escriben con indent=2, sort_keys=False (el orden ya
@@ -93,7 +93,6 @@ def import_all(
     conn,
     in_dir: Path | None = None,
     dry_run: bool = False,
-    prune_m2m: bool = False,
     only: list[str] | None = None,
 ) -> dict[str, dict[str, int]]:
     """Importa todas las entidades en orden FK desde `in_dir`.
@@ -104,7 +103,6 @@ def import_all(
     Args:
         in_dir: directorio con los JSONs. Default DATA_DIR.
         dry_run: simula sin commitear.
-        prune_m2m: borra M2M existentes antes de re-insertar (peligroso).
         only: lista de entidades a procesar (default todas en orden).
 
     Returns:
@@ -138,11 +136,7 @@ def import_all(
                 logger.info("Import %s: archivo vacío o ausente (%s)", entity, path)
                 continue
 
-            kwargs: dict[str, Any] = {}
-            if entity == "equipos":
-                kwargs["prune_m2m"] = prune_m2m
-
-            entity_stats = IMPORTERS[entity](conn, rows, resolver, **kwargs)
+            entity_stats = IMPORTERS[entity](conn, rows, resolver)
             stats[entity] = entity_stats
             logger.info(
                 "Import %s: +%d ins, ~%d upd, %d skip (%s)",
@@ -197,8 +191,6 @@ def diff_all(
                 return f"marca:{row['nombre']}"
             if entity == "categorias":
                 return f"cat:{row['nombre']}"
-            if entity == "etiquetas":
-                return f"et:{row['nombre']}"
             if entity == "spec_definitions":
                 cat = row.get("categoria_raiz_nombre") or ""
                 return f"sd:{cat}::{row['spec_key']}"
@@ -341,7 +333,6 @@ def import_from_zip_bytes(
     zip_bytes: bytes,
     only: list[str],
     dry_run: bool = False,
-    prune_m2m: bool = False,
 ) -> dict[str, dict[str, int]]:
     """Importa desde un ZIP en memoria. Útil para endpoints HTTP.
 
@@ -371,7 +362,6 @@ def import_from_zip_bytes(
                     conn,
                     in_dir=tmp_path,
                     dry_run=dry_run,
-                    prune_m2m=prune_m2m,
                     only=only,
                 )
     except zipfile.BadZipFile as e:

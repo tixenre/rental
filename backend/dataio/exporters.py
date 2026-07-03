@@ -81,26 +81,6 @@ def export_categorias(conn) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# etiquetas
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def export_etiquetas(conn) -> list[dict]:
-    rows = conn.execute("""
-        SELECT nombre, prioridad
-        FROM etiquetas
-        ORDER BY nombre
-    """).fetchall()
-    return [
-        schema.Etiqueta(
-            nombre=r["nombre"],
-            prioridad=int(r["prioridad"]),
-        ).model_dump()
-        for r in rows
-    ]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # spec_definitions
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -179,7 +159,7 @@ def export_categoria_spec_templates(conn) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# equipos (con M2M categorias/etiquetas embebidas)
+# equipos (con M2M categorias embebidas)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -248,28 +228,6 @@ def export_equipos(conn) -> list[dict]:
             schema.EquipoCategoriaRef(nombre=r["cat_nombre"], orden=int(r["orden"] or 0))
         )
 
-    et_rows = conn.execute("""
-        SELECT ee.equipo_id, et.nombre AS et_nombre, ee.origen, ee.orden
-        FROM equipo_etiquetas ee
-        JOIN etiquetas et ON et.id = ee.etiqueta_id
-        JOIN equipos e ON e.id = ee.equipo_id
-        WHERE e.slug IS NOT NULL
-        ORDER BY ee.equipo_id, ee.orden, et.nombre
-    """).fetchall()
-    ets_by_slug: dict[str, list[schema.EquipoEtiquetaRef]] = {}
-    for r in et_rows:
-        s = slug_by_id.get(r["equipo_id"])
-        if not s:
-            continue
-        origen = r["origen"] if r["origen"] in ("auto", "manual") else "manual"
-        ets_by_slug.setdefault(s, []).append(
-            schema.EquipoEtiquetaRef(
-                nombre=r["et_nombre"],
-                origen=origen,  # type: ignore[arg-type]
-                orden=int(r["orden"] or 0),
-            )
-        )
-
     out: list[dict] = []
     for r in rows:
         slug = r["slug"]
@@ -299,7 +257,6 @@ def export_equipos(conn) -> list[dict]:
                 nombre_publico_revisado=bool(r["nombre_publico_revisado"]),
                 relevancia_manual=int(r["relevancia_manual"] or 100),
                 categorias=cats_by_slug.get(slug, []),
-                etiquetas=ets_by_slug.get(slug, []),
             ).model_dump()
         )
     return out
@@ -450,10 +407,15 @@ def export_alquileres(conn) -> list[dict]:
             )
         )
 
-    # Pagos en batch
+    # Pagos en batch. Incluye `anulado` + columnas de auditoría (#1184/#1209):
+    # un pago anulado es soft-delete y no debe "revivir" activo al reimportar
+    # (antes se perdía en el viaje y el import lo reinsertaba con el default
+    # de la columna, `anulado=FALSE`).
     pagos_by_alq: dict[int, list[schema.AlquilerPagoRef]] = {}
     pago_rows = conn.execute("""
-        SELECT pedido_id, monto, concepto, fecha
+        SELECT pedido_id, monto, concepto, fecha,
+               COALESCE(anulado, FALSE) AS anulado,
+               anulado_por, anulado_at, anulado_motivo
         FROM alquiler_pagos
         WHERE pedido_id = ANY(%s)
         ORDER BY pedido_id, fecha, id
@@ -464,6 +426,10 @@ def export_alquileres(conn) -> list[dict]:
                 monto=int(pr["monto"]),
                 concepto=pr["concepto"],
                 fecha=_to_iso(pr["fecha"]) or "",
+                anulado=bool(pr["anulado"]),
+                anulado_por=pr["anulado_por"],
+                anulado_at=_to_iso(pr["anulado_at"]),
+                anulado_motivo=pr["anulado_motivo"],
             )
         )
 
@@ -645,7 +611,6 @@ def export_descuentos_jornada(conn) -> list[dict]:
 EXPORTERS = {
     "marcas": export_marcas,
     "categorias": export_categorias,
-    "etiquetas": export_etiquetas,
     "spec_definitions": export_spec_definitions,
     "categoria_spec_templates": export_categoria_spec_templates,
     "equipos": export_equipos,

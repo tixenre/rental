@@ -11,6 +11,11 @@ varias veces MIENTRAS el admin revisaba una sesión anterior en Didit — cada
 reintento pisa `clientes.didit_session_id` con la sesión nueva, así que la sesión
 que terminó aprobada ya no es la "actual". El recheck revisa TODO el historial
 conocido (`kyc_events`), no solo la sesión actual.
+
+La búsqueda + aplicación viven en `services.didit.recheck.recheck_cliente` (fuente
+única, compartida con el self-service del cliente y el barrido de abandonadas —
+ver `test_didit_recheck_cliente.py` y `test_recheck_didit_pendientes_job.py`); estos
+tests ejercen el endpoint admin de punta a punta, monkeypatcheando ese módulo.
 """
 import pytest
 from fastapi import HTTPException
@@ -68,7 +73,10 @@ def _setup(
     """`decisiones`: dict session_id -> decision (o excepción-lanzadora) que
     `retrieve_decision` devuelve para esa sesión puntual."""
     monkeypatch.setattr("routes.didit.require_admin", lambda request: None)
+    # El route hace su propio SELECT (404 si no existe el cliente) antes de
+    # delegar a `recheck_cliente` — ambos usan `get_db()`, se patchean los dos.
     monkeypatch.setattr("routes.didit.get_db", lambda: _Conn(session_row, historial_session_ids))
+    monkeypatch.setattr("services.didit.recheck.get_db", lambda: _Conn(session_row, historial_session_ids))
 
     def _retrieve(session_id):
         d = decisiones.get(session_id, {})
@@ -76,19 +84,22 @@ def _setup(
             return d()
         return d
 
-    monkeypatch.setattr("routes.didit.retrieve_decision", _retrieve)
+    monkeypatch.setattr("services.didit.recheck.retrieve_decision", _retrieve)
 
     if aprobar_calls is not None:
         def _aprobar(**kw):
             aprobar_calls.append(kw)
             return True
-        monkeypatch.setattr("routes.didit.kyc.aprobar", _aprobar)
+        # `recheck_cliente` importa `identity.kyc` de forma perezoza (rompe un
+        # ciclo de import, ver services/didit/recheck.py) — se patchea el módulo
+        # real, no un atributo de `services.didit.recheck`.
+        monkeypatch.setattr("identity.kyc.aprobar", _aprobar)
 
     if estado_calls is not None:
         def _actualizar(**kw):
             estado_calls.append(kw)
             return True
-        monkeypatch.setattr("routes.didit.kyc.actualizar_estado", _actualizar)
+        monkeypatch.setattr("identity.kyc.actualizar_estado", _actualizar)
 
 
 def test_cliente_sin_sesion_didit_409(monkeypatch):

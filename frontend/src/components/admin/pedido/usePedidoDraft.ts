@@ -41,6 +41,16 @@ export function nuevoUidLinea(prefix = "tmp"): string {
   return `${prefix}-${Date.now()}-${_uidSeq}`;
 }
 
+/** Subtotal de una línea del draft — espeja `services.precios.bruto_linea`
+ * del backend: una línea personalizada `cobro_modo='fijo'` (ej. flete, #805)
+ * NO se multiplica por jornadas. Única fuente — antes `PedidoPageCards.tsx` y
+ * `PedidoPageHelpers.tsx` tenían cada uno su propia fórmula, y ya habían
+ * divergido (Cards ignoraba `cobro_modo`). Auditoría cruzada de plata, 2026-07-02. */
+export function subtotalDraftItem(it: DraftItem, jornadas: number): number {
+  const fijo = (it.cobro_modo ?? "jornada") === "fijo";
+  return it.precio_jornada * it.cantidad * (fijo ? 1 : Math.max(1, jornadas));
+}
+
 export type DraftDatos = {
   cliente_id: number | null;
   cliente_nombre: string;
@@ -53,6 +63,10 @@ export type DraftDatos = {
   fecha_hasta: string;
   notas: string;
   descuento_pct: number;
+  /** Fase C-2 (#1219): tipo del override manual — "pct" (default) o "monto"
+   *  ($ fijo), mismo campo de la UI con un selector al lado. */
+  descuento_manual_tipo: "pct" | "monto";
+  descuento_manual_monto: number;
 };
 
 export type PedidoMode = "admin" | "cliente";
@@ -73,6 +87,8 @@ function pedidoToDatos(p: Pedido, keepDateTime = false): DraftDatos {
     fecha_hasta: keepDateTime ? (p.fecha_hasta ?? "") : (p.fecha_hasta ?? "").slice(0, 10),
     notas: p.notas ?? "",
     descuento_pct: p.descuento_pct ?? 0,
+    descuento_manual_tipo: p.descuento_manual_tipo ?? "pct",
+    descuento_manual_monto: p.descuento_manual_monto ?? 0,
   };
 }
 
@@ -102,7 +118,9 @@ function shallowDatosEq(a: DraftDatos, b: DraftDatos): boolean {
     a.fecha_desde === b.fecha_desde &&
     a.fecha_hasta === b.fecha_hasta &&
     a.notas === b.notas &&
-    a.descuento_pct === b.descuento_pct
+    a.descuento_pct === b.descuento_pct &&
+    a.descuento_manual_tipo === b.descuento_manual_tipo &&
+    a.descuento_manual_monto === b.descuento_manual_monto
   );
 }
 
@@ -185,6 +203,8 @@ export function usePedidoDraft(pedido: Pedido | undefined, opts: UsePedidoDraftO
         fecha_hasta: d.fecha_hasta || null,
         notas: d.notas || null,
         descuento_pct: d.descuento_pct || 0,
+        descuento_manual_tipo: d.descuento_manual_tipo,
+        descuento_manual_monto: d.descuento_manual_monto || 0,
       }),
     onSuccess: (p) => {
       qc.setQueryData(["admin", "pedido", p.id], p);

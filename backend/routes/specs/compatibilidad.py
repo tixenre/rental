@@ -12,6 +12,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
 from database import get_db, row_to_dict, MARCA_SUBQUERY
+from services.categorias import expandir_a_descendientes, sql_filtro_equipos_por_categoria, categorias_de_equipos
 from routes.specs.core import router, _require_admin
 
 
@@ -537,20 +538,11 @@ def listar_compatibles(
         """
         params = [equipo_id, equipo_id, equipo_id, equipo_id, equipo_id]
         if categoria_id:
-            candidates_sql += """
-              AND e.id IN (
-                SELECT ec.equipo_id FROM equipo_categorias ec
-                WHERE ec.categoria_id IN (
-                  WITH RECURSIVE sub AS (
-                    SELECT id FROM categorias WHERE id = %s
-                    UNION ALL
-                    SELECT c.id FROM categorias c JOIN sub ON c.parent_id = sub.id
-                  )
-                  SELECT id FROM sub
-                )
-              )
-            """
-            params.append(categoria_id)
+            sub_ids = expandir_a_descendientes(conn, categoria_id)
+            if sub_ids:
+                fragment, _ = sql_filtro_equipos_por_categoria("e", sub_ids)
+                candidates_sql += fragment + "\n"
+                params.extend(sub_ids)
         candidates_sql += " ORDER BY e.nombre"
 
         candidates = conn.execute(candidates_sql, params).fetchall()
@@ -766,16 +758,8 @@ def contexto_compat(equipo_id: int, request: Request):
             raise HTTPException(404, "Equipo no existe")
 
         # Categorías
-        cat_rows = conn.execute(
-            """
-            SELECT c.id, c.nombre, c.parent_id
-            FROM equipo_categorias ec
-            JOIN categorias c ON c.id = ec.categoria_id
-            WHERE ec.equipo_id = %s
-            ORDER BY c.nombre
-            """,
-            (equipo_id,),
-        ).fetchall()
+        cat_map = categorias_de_equipos(conn, [equipo_id])
+        cat_rows = cat_map.get(equipo_id, [])
 
         # Specs cargadas con metadata completa
         spec_rows = conn.execute(

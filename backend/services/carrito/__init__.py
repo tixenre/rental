@@ -17,7 +17,10 @@ from services.carrito.activos import (
     marcar_confirmado,
 )
 from services.carrito.modelos import CANTIDAD_MAX, MAX_ITEMS, SeleccionItem
-from services.carrito.readiness import precios_catalogo_para_reserva
+from services.carrito.readiness import (
+    equipo_visible_catalogo,
+    precios_catalogo_para_reserva,
+)
 from services.carrito.seleccion import (
     a_items_json,
     a_tuplas,
@@ -38,4 +41,5 @@ __all__ = [
     "listar_carritos_admin",
     "marcar_confirmado",
     "precios_catalogo_para_reserva",
+    "equipo_visible_catalogo",
 ]

@@ -57,7 +57,7 @@ def _sessions_active(monkeypatch):
     require_admin del handler (que es lo que este test verifica)."""
     monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
 
-# Los mismos 53 endpoints de _ADMIN_EXIST de test_routes_contract_admin.py.
+# Los mismos 50 endpoints de _ADMIN_EXIST de test_routes_contract_admin.py.
 # Se duplica la lista (no se importa) para que el test sea self-contained y pueda
 # ser mantenido independientemente si los endpoints cambian.
 _ADMIN_EXIST = [
@@ -68,10 +68,7 @@ _ADMIN_EXIST = [
     ("POST", "/api/equipos/1/mantenimiento"),
     ("POST", "/api/equipos/1/kit"),
     ("POST", "/api/admin/equipos/1/kit/reorder"),
-    ("PUT", "/api/equipos/1/etiquetas"),
     ("PUT", "/api/equipos/1/categorias"),
-    ("POST", "/api/admin/etiquetas"),
-    ("POST", "/api/admin/etiquetas/reorder"),
     ("POST", "/api/admin/categorias"),
     ("POST", "/api/admin/categorias/reorder"),
     ("POST", "/api/admin/equipos/1/upload-foto-from-url"),
