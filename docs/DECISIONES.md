@@ -2152,3 +2152,49 @@ cancel-in-progress` ya cancela corridas viejas.
   de `contabilidad/`: primero el mapa completo, después la rama de fixes). El supervisor marca un motor de
   plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
   reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.
+
+### 2026-07-03 — El endpoint de modificación de pedido del cliente aplica el mismo gate de catálogo que la creación (M6, #1209)
+
+- **Contexto.** Hallazgo M6 de la auditoría cruzada de plata (#1209, 52 agentes: 9 finders + verificación
+  adversarial en 2 pasadas): `cliente_crear_pedido` (creación) resuelve el precio de cada ítem vía la
+  puerta del carrito `services/carrito/readiness.py::precios_catalogo_para_reserva`, que además de
+  resolver plata aplica un gate de seguridad — solo equipos `visible_catalogo=1` con precio definido.
+  `cliente_modificar_pedido` (`routes/cliente_portal/solicitudes.py`, el endpoint de modificación de un
+  pedido ya existente) resolvía el precio de un ítem nuevo con `_equipo_precio_catalogo` — que SOLO
+  resuelve plata (`precio_jornada_efectivo`), sin ningún chequeo de visibilidad — así que un cliente podía,
+  vía `POST /api/cliente/pedidos/{id}/modificacion` sobre un pedido en `presupuesto` o `confirmado`,
+  agregar un equipo con `visible_catalogo=0` (oculto del catálogo público) o el recurso interno del Estudio
+  (`es_recurso_interno=TRUE`, el "centinela" que modela el espacio físico — ver _El Estudio (2026-05-27)_)
+  — reservando stock de un recurso que el negocio nunca ofreció públicamente. En `confirmado` el hueco era
+  peor: la propuesta quedaba pendiente para que un admin la apruebe a ciegas, sin ver que el equipo nunca
+  debió ofrecerse.
+- **Decisión.** Se extrajo el gate a una función única, `services/carrito/readiness.py::equipo_visible_catalogo(conn,
+  equipo_id)`, que valida: vivo (`eliminado_at IS NULL`), `visible_catalogo=1`, NO `es_recurso_interno`, y
+  precio definido — lanza `HTTPException(404)` si falla cualquiera. `precios_catalogo_para_reserva`
+  (creación) ahora llama a esta función en vez de tener su propio SELECT inline; `cliente_modificar_pedido`
+  la llama ANTES de resolver el precio, pero SOLO para ítems que no estaban ya en el pedido
+  (`it.equipo_id not in precios`) — un ítem ya reservado (frozen) no se re-gatea aunque se haya ocultado
+  después, para no invalidar algo ya confirmado. El chequeo corre ANTES del branch `presupuesto`/
+  `confirmado`, así que en `confirmado` rechaza la propuesta de una vez en vez de dejarla pendiente. El
+  path admin (`admin_responder_solicitud`, que también llama `_equipo_precio_catalogo`) NO se tocó a
+  propósito: el admin puede legítimamente agregar cualquier equipo — visible o no — igual que
+  `PUT /alquileres/{id}/items`; documentado explícitamente en el docstring para que no se "arregle" por
+  error en el futuro.
+- **Why.** Extraer a una función única (en vez de solo copiar el chequeo dentro de `solicitudes.py`) sigue
+  el patrón motor-único del repo (_`backend/services/carrito/` (2026-06-29)_): un solo lugar decide "qué es
+  un producto real del catálogo", consumido por los dos caminos que persisten plata de cliente (crear +
+  modificar). De paso se sumó `eliminado_at IS NULL` al gate — el SELECT viejo de la creación solo
+  chequeaba `visible_catalogo=1 AND precio_jornada IS NOT NULL`, y el soft-delete de un equipo
+  (`DELETE /equipos/{id}`) NO baja `visible_catalogo` a la vez (confirmado en `routes/equipos/core.py`) —
+  así que un equipo soft-deleted con `visible_catalogo` sin bajar colaba en AMBOS caminos antes de este
+  fix (no solo en la modificación). `es_recurso_interno=FALSE` es defensa en profundidad (hoy redundante
+  en la práctica — el centinela nace con `visible_catalogo=0` — pero no depende de que ese dato nunca
+  cambie).
+- **Consecuencias.** Ningún cambio de contrato público para el uso legítimo (agregar un equipo visible
+  nuevo al pedido sigue funcionando igual; un ítem ya frozen tampoco se ve afectado si se oculta después).
+  Regresión contra Postgres real (`tests/test_cliente_modificar_pedido_gate_db.py`, 4 tests): rechaza un
+  equipo oculto nuevo, rechaza el recurso interno, acepta un equipo visible nuevo (control), y no re-gatea
+  un ítem ya frozen aunque se oculte después — confirmado manualmente que los 2 tests de rechazo fallan
+  (200 en vez de 404) contra el código viejo (revertido temporalmente con `git stash` para verificar) antes
+  de aplicar el fix. Hallazgo de la auditoría cruzada de plata (#1209); el resto de los hallazgos (M1-M5,
+  L1-L3) quedan en ramas propias, sin mergear, mismo criterio "PR como hoja de ruta".

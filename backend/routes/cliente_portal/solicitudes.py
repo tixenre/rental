@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from database import get_db, row_to_dict, to_datetime
 from auth.guards import require_admin
+from services.carrito.readiness import equipo_visible_catalogo
 from services.fechas import validar_rango_fechas, validar_fecha_iso
 from routes.cliente_portal.core import (
     router,
@@ -232,6 +233,12 @@ def _equipo_precio_catalogo(conn, equipo_id: int) -> int:
     # deriva en vivo de sus componentes (C3 #635), un kit/simple usa su precio propio.
     # 0 si el equipo no existe. Mismo resolutor que `cotizar` y `cliente_crear_pedido`
     # → lo que el carrito cotiza es lo que se persiste (sin drift de combos).
+    #
+    # NO gatea visibilidad por sí sola (a propósito: la usa también
+    # `admin_responder_solicitud`, donde el admin puede legítimamente agregar
+    # cualquier equipo — visible o no — igual que en `PUT /alquileres/{id}/items`).
+    # El caller del lado CLIENTE (`cliente_modificar_pedido`) aplica el gate
+    # `equipo_visible_catalogo` ANTES de llamar a esta función.
     from services.precios import precio_jornada_efectivo
     return int(precio_jornada_efectivo(conn, equipo_id) or 0)
 
@@ -286,10 +293,20 @@ def cliente_modificar_pedido(
                 )
 
             # Rellenar precios desde el pedido actual o catálogo (el cliente no
-            # puede definir precios).
+            # puede definir precios). Los equipos YA presentes en el pedido no se
+            # re-gatean (frozen — pueden haberse ocultado después sin que eso
+            # invalide lo ya reservado); los NUEVOS sí pasan por el MISMO gate de
+            # visibilidad que la creación (#1209): sin esto, un cliente podía
+            # agregar por API, vía modificación, un equipo oculto/interno (o
+            # inexistente/soft-deleted) que `cliente_crear_pedido` sí rechaza —
+            # reservando stock de un recurso que el negocio nunca ofreció
+            # públicamente. Corre para AMBOS estados modificables (aplica antes
+            # del branch de abajo): en `confirmado` rechaza la propuesta de una
+            # vez, en vez de dejarla pendiente para que un admin la apruebe a ciegas.
             precios = _precios_actuales(conn, id)
             for it in data.items:
                 if it.equipo_id not in precios:
+                    equipo_visible_catalogo(conn, it.equipo_id)
                     precios[it.equipo_id] = _equipo_precio_catalogo(conn, it.equipo_id)
 
             # ── Caso `presupuesto`: aplicar directo ──────────────────────────

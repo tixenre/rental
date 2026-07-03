@@ -704,6 +704,20 @@ en el dashboard admin — es el gap de gobernanza más directo detrás del miedo
 supervisor marca un motor de plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o
 un PR de fix de plata reportado como shippeado sin confirmar merge real a `dev`/`main`.
 
+### 2026-07-03 — El endpoint de modificación de pedido del cliente aplica el mismo gate de catálogo que la creación (M6, #1209)
+
+`cliente_modificar_pedido` rellenaba el precio de un ítem NUEVO de la propuesta sin pasar por el gate
+`visible_catalogo`/`es_recurso_interno` que sí aplica la creación (`cliente_crear_pedido` →
+`precios_catalogo_para_reserva`) — un cliente podía, vía `POST .../modificacion`, colar en su presupuesto
+un equipo oculto o el recurso interno del Estudio (el "centinela"). Fix: el chequeo se extrajo a la función
+única **`services/carrito/readiness.py::equipo_visible_catalogo`**, reusada por AMBOS consumidores —de
+paso suma `eliminado_at IS NULL`, un gap latente que ni el SELECT viejo de la creación chequeaba (el
+soft-delete de un equipo no baja `visible_catalogo` a la vez)—. Los ítems YA presentes en el pedido
+(frozen) NO se re-gatean; el path admin (`admin_responder_solicitud`) tampoco, a propósito (puede agregar
+cualquier equipo, como en `PUT /alquileres/{id}/items`). El supervisor marca un consumidor nuevo de precio
+de catálogo del lado cliente que no llame a `equipo_visible_catalogo`. Hallazgo de la auditoría cruzada de
+plata (#1209).
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
