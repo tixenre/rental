@@ -119,6 +119,7 @@ _PUBLICOS = [
     ("GET", "/api/disponibilidad"),
     ("GET", "/api/disponibilidad-dias"),
     ("GET", "/api/descuentos-jornada"),
+    ("GET", "/api/descuentos-jornada/interpolar"),
     ("GET", "/api/cliente/registro-info"),
     ("POST", "/api/cliente/registro"),
 ]

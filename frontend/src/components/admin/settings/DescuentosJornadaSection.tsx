@@ -9,7 +9,6 @@ import { Input } from "@/design-system/ui/input";
 
 import { AdminTable, type Column } from "@/components/admin/AdminTable";
 import { descuentosJornadaApi } from "@/lib/admin/api";
-import { interpolarDescuento } from "@/lib/api";
 
 export function DescuentosJornadaSection() {
   const qc = useQueryClient();
@@ -21,6 +20,21 @@ export function DescuentosJornadaSection() {
     queryFn: descuentosJornadaApi.list,
     staleTime: 0,
   });
+
+  const sorted = [...puntos].sort((a, b) => a.jornadas - b.jornadas);
+
+  // Preview "Ej. interpol." — el backend la calcula (fuente única, misma que
+  // /api/cotizar), el front SOLO la pide y la muestra. Antes reimplementaba
+  // la interpolación acá y podía redondear distinto (#1219).
+  const medios = sorted
+    .slice(0, -1)
+    .map((p, i) => Math.round((p.jornadas + sorted[i + 1].jornadas) / 2));
+  const { data: interpolados } = useQuery({
+    queryKey: ["descuentos-jornada-interpolar", medios],
+    queryFn: () => descuentosJornadaApi.interpolar(medios),
+    enabled: medios.length > 0,
+  });
+  const pctPorMedio = new Map((interpolados ?? []).map((r) => [r.jornadas, r.pct]));
 
   const crear = useMutation({
     mutationFn: () => descuentosJornadaApi.create({ jornadas: Number(dias), pct: Number(pct) }),
@@ -37,8 +51,6 @@ export function DescuentosJornadaSection() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["descuentos-jornada"] }),
     onError: () => toast.error("Error al eliminar"),
   });
-
-  const sorted = [...puntos].sort((a, b) => a.jornadas - b.jornadas);
 
   const columns: Column<(typeof sorted)[number]>[] = [
     {
@@ -61,8 +73,8 @@ export function DescuentosJornadaSection() {
       cell: (p, i) => {
         const siguiente = sorted[i + 1];
         const medio = siguiente ? Math.round((p.jornadas + siguiente.jornadas) / 2) : null;
-        const pctMedio = medio ? interpolarDescuento(sorted, medio) : null;
-        return pctMedio !== null ? `${medio} días → ${pctMedio}%` : "—";
+        const pctMedio = medio != null ? pctPorMedio.get(medio) : undefined;
+        return pctMedio !== undefined ? `${medio} días → ${pctMedio}%` : "—";
       },
     },
     {

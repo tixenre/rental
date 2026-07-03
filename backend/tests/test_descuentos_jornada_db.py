@@ -132,3 +132,62 @@ def test_listar_descuentos_jornada_incluye_los_sembrados_ordenados(escala):
         todos = listar_descuentos_jornada(conn)
         propios = [r for r in todos if r["jornadas"] in (J0, J1, J2)]
         assert [r["jornadas"] for r in propios] == [J0, J1, J2]
+
+
+@pytest.fixture(autouse=True)
+def _sessions_active(monkeypatch):
+    monkeypatch.setattr("auth.sessions_store.is_active", lambda jti: {"jti": jti})
+
+
+def _admin_cookie():
+    from auth.session import signer
+
+    # ADMIN_EMAILS en tests = "admin@test.com" (default de conftest.py).
+    return f"session={signer.dumps({'email': 'admin@test.com', 'role': 'admin', 'jti': 'jornadadb-adm'})}"
+
+
+def test_endpoint_interpolar_devuelve_lo_mismo_que_el_backend(escala):
+    """`GET /api/descuentos-jornada/interpolar` — la puerta que usa el preview
+    de /admin/settings (antes reimplementaba la interpolación en el front,
+    #1219). Confirma que el HTTP real coincide con `obtener_descuento_jornadas`
+    para un punto ancla exacto Y para un valor interpolado."""
+    import main
+    from fastapi.testclient import TestClient
+    from database import get_db
+    from descuentos.queries.jornadas import obtener_descuento_jornadas
+
+    medio = (J1 + J2) // 2
+    with get_db() as conn:
+        esperado_j1 = obtener_descuento_jornadas(conn, J1)
+        esperado_medio = obtener_descuento_jornadas(conn, medio)
+
+    with TestClient(main.app, raise_server_exceptions=True) as client:
+        r = client.get(
+            "/api/descuentos-jornada/interpolar",
+            params={"jornadas": [J1, medio]},
+            headers={"Cookie": _admin_cookie()},
+        )
+    assert r.status_code == 200, r.text
+    data = {row["jornadas"]: row["pct"] for row in r.json()}
+    assert data[J1] == esperado_j1
+    assert data[medio] == esperado_medio
+
+
+def test_endpoint_interpolar_vacio_es_422():
+    import main
+    from fastapi.testclient import TestClient
+
+    with TestClient(main.app, raise_server_exceptions=True) as client:
+        r = client.get(
+            "/api/descuentos-jornada/interpolar", headers={"Cookie": _admin_cookie()}
+        )
+    assert r.status_code == 422  # sin `jornadas` — FastAPI/Pydantic lo rechaza antes del handler
+
+
+def test_endpoint_interpolar_rechaza_anonimo():
+    import main
+    from fastapi.testclient import TestClient
+
+    with TestClient(main.app, raise_server_exceptions=True) as client:
+        r = client.get("/api/descuentos-jornada/interpolar", params={"jornadas": [1]})
+    assert r.status_code == 401
