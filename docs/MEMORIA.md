@@ -719,6 +719,21 @@ marca cualquier query nueva de estadísticas/reportes que recalcule `descuento_p
 leer `monto_total`. Regresión: `test_estadisticas_db.py` (Postgres real; pedido con descuento por
 jornadas ganador y descuento de cliente en 0%).
 
+### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
+
+Con descuento (el caso común: cualquier alquiler de varios días tiene descuento automático por jornadas),
+la **Factura** (`services/facturacion/pdf.py::_conceptos`) mostraba el BRUTO por línea con un `% Bonif.`
+hardcodeado en `0,00`, y el **mail de "pedido creado"** (`routes/alquileres/core.py::_pedido_email_context`)
+mostraba el bruto por ítem sin ningún renglón que explicara la diferencia con el "Total" (ya neto) — el
+comprobante/mail no cerraba consigo mismo. Mismo criterio bruto→descuento→neto que ya usaba el
+**Presupuesto** (`pdf_templates._pedido_html`, decisión 2026-06-06 sobre el IVA aparte — **no se toca**).
+La Factura reparte la bonificación proporcionalmente entre las líneas (remanente de redondeo en la
+última) contra el bruto de las LÍNEAS vs. el `imp_neto` YA DECLARADO/congelado en la factura — no el
+pedido en vivo — para que también cierre en una Nota de Crédito. El mail suma una fila de "Descuento"
+visible en la tabla de ítems vía el helper único `services/email/branding.py::discount_row`. El
+supervisor marca una línea de factura o de mail que muestre el bruto sin reconciliar contra el total
+declarado, o un `bonif`/`% Bonif.` hardcodeado reintroducido. Iniciativa: #1209 (2 de 9 hallazgos).
+
 ### 2026-07-03 — `routes/facturacion.py`: rate limit + mapeo de errores en las escrituras (gap de la auditoría de #1184, #1209)
 
 Las escrituras de `backend/routes/facturacion.py` (facturar pedido, nota de crédito, enviar mail, CRUD de
