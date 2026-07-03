@@ -102,8 +102,15 @@ class ComprobanteRequest:
     el importe total (no se discrimina IVA → pasar `alicuota=None`). El core NO
     decide el precio: lo recibe ya calculado por el consumidor (regla de Rambla
     "el front/los demás no calculan plata, una sola fuente"). El IVA, si hay
-    alícuota, lo deriva el core de `importe_neto * pct` con redondeo bancario a 2
-    decimales.
+    alícuota, lo deriva el core de `importe_neto * pct` con ROUND_HALF_UP a 2
+    decimales (ver `comprobante.calcular_importes` — NO es redondeo bancario/
+    HALF_EVEN, a pesar de lo que decía este docstring antes).
+
+    `moneda`/`cotizacion`: MonId/MonCotiz de WSFEv1 (tabla `FEParamGetTiposMonedas`
+    para los códigos válidos). Default "PES"/1 — el caso de Rambla (todo en
+    pesos). Un consumidor que factura en moneda extranjera pasa el código ISO/
+    ARCA correspondiente y la cotización del día; el motor NO la valida ni la
+    busca (eso es responsabilidad del consumidor, como el precio).
     """
 
     emisor: Emisor
@@ -117,6 +124,8 @@ class ComprobanteRequest:
     fecha_vto_pago: Optional[date] = None
     es_nota_credito: bool = False
     cbtes_asoc: tuple[CbteAsoc, ...] = field(default_factory=tuple)
+    moneda: str = "PES"
+    cotizacion: Decimal = Decimal("1")
 
 
 @dataclass(frozen=True)
