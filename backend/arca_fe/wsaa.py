@@ -3,12 +3,19 @@
 Sin estado; sin I/O de BD. Recibe cert/key como bytes (PEM), devuelve (token, sign,
 expira_at). El cacheado en `afip_ta` lo hace el adapter (`services/facturacion/wsaa_cache.py`).
 
+Operaciones: `login`/`login_con_cert` son COMMANDS (mintean un Ticket de Acceso
+en AFIP — hacen I/O de red); `construir_tra`/`firmar_tra` son puros (sin I/O).
+Errores tipados vía `arca_fe.errores`: red → ArcaNetworkError, cert/clave →
+ArcaAuthError, respuesta inesperada → ArcaResponseError.
+
 Única dependencia extra: `cryptography` (ya instalada vía pyjwt[crypto]).
 """
+
 from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from xml.etree import ElementTree as ET
@@ -20,6 +27,11 @@ from cryptography.hazmat.primitives.serialization.pkcs7 import (
 )
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
+from ._ssl_afip import afip_ssl_context
+from .errores import ArcaAuthError, ArcaNetworkError, ArcaResponseError
+
+
+_logger = logging.getLogger(__name__)
 
 _WSAA_SERVICE = "wsfe"
 _TRA_TTL_SECONDS = 12 * 3600  # 12 h — AFIP rechaza expirationTime > 24 h
@@ -68,17 +80,50 @@ def construir_tra(
 # ---------------------------------------------------------------------------
 
 
-def firmar_tra(tra: bytes, cert_pem: bytes, key_pem: bytes) -> bytes:
+def firmar_tra(
+    tra: bytes,
+    cert_pem: bytes,
+    key_pem: bytes,
+    *,
+    key_password: Optional[bytes] = None,
+) -> bytes:
     """Firma el TRA con CMS/PKCS#7 (signed-data, TRA embebido) usando el cert ARCA.
 
     AFIP rechaza una firma detached (`ns1:cms.sign.invalid`) — el TRA tiene
     que viajar embebido dentro del blob CMS.
 
+    `key_password`: passphrase de la clave privada, o None si no está cifrada.
+    Cuando el certificado lo sube un tercero (SaaS multi-emisor) es más
+    probable que la clave venga protegida — se soporta explícitamente en vez
+    de fallar con la excepción cruda de `cryptography`.
+
     Devuelve el mensaje CMS como bytes DER, que luego va en base64 al endpoint
     WSAA `LoginCms`.
+
+    Levanta `ArcaAuthError` si el certificado o la clave no se pueden cargar
+    (PEM inválido, clave cifrada sin passphrase, o passphrase incorrecta) —
+    todos son "no podés autenticar con estas credenciales", el subtipo correcto.
     """
-    cert = load_pem_x509_certificate(cert_pem)
-    private_key = load_pem_private_key(key_pem, password=None)
+    try:
+        cert = load_pem_x509_certificate(cert_pem)
+    except Exception as exc:
+        raise ArcaAuthError(
+            f"No se pudo cargar el certificado PEM: {type(exc).__name__}: {exc}"
+        ) from exc
+    try:
+        private_key = load_pem_private_key(key_pem, password=key_password)
+    except TypeError as exc:
+        # cryptography levanta TypeError cuando la clave está cifrada y no se
+        # pasó password (o viceversa) — mensaje accionable en vez del críptico.
+        raise ArcaAuthError(
+            "La clave privada parece estar cifrada con passphrase: pasá "
+            "`key_password`. (O la clave no está cifrada y se pasó una.)"
+        ) from exc
+    except Exception as exc:
+        raise ArcaAuthError(
+            f"No se pudo cargar la clave privada (¿passphrase incorrecta o PEM "
+            f"inválido?): {type(exc).__name__}: {exc}"
+        ) from exc
 
     cms = (
         PKCS7SignatureBuilder()
@@ -94,8 +139,14 @@ def firmar_tra(tra: bytes, cert_pem: bytes, key_pem: bytes) -> bytes:
 # ---------------------------------------------------------------------------
 
 
-def _tra_cms_b64(tra: bytes, cert_pem: bytes, key_pem: bytes) -> str:
-    der = firmar_tra(tra, cert_pem, key_pem)
+def _tra_cms_b64(
+    tra: bytes,
+    cert_pem: bytes,
+    key_pem: bytes,
+    *,
+    key_password: Optional[bytes] = None,
+) -> str:
+    der = firmar_tra(tra, cert_pem, key_pem, key_password=key_password)
     return base64.b64encode(der).decode("ascii")
 
 
@@ -138,13 +189,21 @@ def login(
                 "SOAPAction": "loginCms",
             },
             timeout=timeout,
-            verify=True,
+            # Mismo ajuste TLS que wsfe/padron (SECLEVEL=1 por los parámetros DH
+            # cortos de AFIP) — sin bajar la verificación del certificado.
+            verify=afip_ssl_context(),
         )
         resp.raise_for_status()
     except httpx.HTTPStatusError as exc:
         cuerpo = exc.response.text[:800] if exc.response.text else "(sin cuerpo)"
-        raise RuntimeError(
+        raise ArcaNetworkError(
             f"WSAA devolvió {exc.response.status_code} para {url}:\n{cuerpo}"
+        ) from exc
+    except httpx.RequestError as exc:
+        # timeout, conexión rechazada, DNS, TLS — falla de transporte, no una
+        # respuesta de AFIP. Se surface tipada en vez de filtrar el httpx crudo.
+        raise ArcaNetworkError(
+            f"No se pudo contactar el WSAA en {url}: {type(exc).__name__}: {exc}"
         ) from exc
     return _parsear_login_response(resp.text)
 
@@ -157,10 +216,13 @@ def login_con_cert(
     *,
     ahora: Optional[datetime] = None,
     timeout: float = 30.0,
+    key_password: Optional[bytes] = None,
 ) -> tuple[str, str, datetime]:
-    """Helper de alto nivel: construye TRA, firma y llama a `login`."""
+    """Helper de alto nivel: construye TRA, firma y llama a `login`.
+
+    `key_password`: passphrase de la clave privada (None si no está cifrada)."""
     tra = construir_tra(servicio, ahora=ahora)
-    der = firmar_tra(tra, cert_pem, key_pem)
+    der = firmar_tra(tra, cert_pem, key_pem, key_password=key_password)
     return login(der, endpoint, timeout=timeout)
 
 
@@ -181,10 +243,14 @@ def _wsaa_url(endpoint: str) -> str:
 
 
 def _parece_base64(b: bytes) -> bool:
+    """True si `b` YA es base64 ASCII válido (no bytes DER crudos). Más
+    estricto que "decodifica como ASCII": valida el alfabeto y el padding
+    base64, así un blob DER que por casualidad fuera todo-ASCII no se confunde
+    con base64 ya codificado (y se codifica, como corresponde)."""
     try:
-        b.decode("ascii")
+        base64.b64decode(b, validate=True)
         return True
-    except UnicodeDecodeError:
+    except (ValueError, TypeError):
         return False
 
 
@@ -197,8 +263,10 @@ def _parsear_login_response(xml_text: str) -> tuple[str, str, datetime]:
     """
     try:
         root = ET.fromstring(xml_text)
-    except ET.ParseError:
-        raise ValueError(f"Respuesta WSAA inválida: {xml_text[:200]}")
+    except ET.ParseError as exc:
+        raise ArcaResponseError(
+            f"Respuesta WSAA inválida: {xml_text[:200]}", raw=xml_text
+        ) from exc
 
     def _iter_find(tree: ET.Element, tag: str) -> Optional[str]:
         for el in tree.iter():
@@ -212,12 +280,15 @@ def _parsear_login_response(xml_text: str) -> tuple[str, str, datetime]:
     if cms_return_text:
         try:
             inner = ET.fromstring(cms_return_text.strip())
+
             def _find(tag: str) -> Optional[str]:
                 return _iter_find(inner, tag)
         except ET.ParseError:
+
             def _find(tag: str) -> Optional[str]:
                 return _iter_find(root, tag)
     else:
+
         def _find(tag: str) -> Optional[str]:
             return _iter_find(root, tag)
 
@@ -226,7 +297,9 @@ def _parsear_login_response(xml_text: str) -> tuple[str, str, datetime]:
     expiration = _find("expirationTime")
 
     if not token or not sign:
-        raise ValueError(f"WSAA no devolvió token/sign: {xml_text[:300]}")
+        raise ArcaResponseError(
+            f"WSAA no devolvió token/sign: {xml_text[:300]}", raw=xml_text
+        )
 
     expira_at: datetime
     if expiration:
@@ -234,9 +307,19 @@ def _parsear_login_response(xml_text: str) -> tuple[str, str, datetime]:
         try:
             expira_at = datetime.fromisoformat(expiration.replace("Z", "+00:00"))
         except ValueError:
-            # fallback: 12h desde ahora
+            # fallback: 12h desde ahora. Se loguea: un formato inesperado en un
+            # campo que AFIP siempre manda es señal de que algo cambió — no se
+            # traga en silencio (el TA seguiría usable, pero queremos saberlo).
+            _logger.warning(
+                "WSAA: expirationTime con formato inesperado (%r) — usando "
+                "fallback de 12h.",
+                expiration,
+            )
             expira_at = datetime.now(timezone.utc) + timedelta(hours=12)
     else:
+        _logger.warning(
+            "WSAA: respuesta sin expirationTime — usando fallback de 12h."
+        )
         expira_at = datetime.now(timezone.utc) + timedelta(hours=12)
 
     if expira_at.tzinfo is None:

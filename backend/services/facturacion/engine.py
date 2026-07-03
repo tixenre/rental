@@ -16,6 +16,7 @@ Reglas invariantes (no violar):
 - No toca el core de reservas
 - Secretos solo en ENV (gating default-deny)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,6 +25,7 @@ from typing import Optional
 from database import get_db, now_ar
 
 from arca_fe import (
+    ArcaError,
     CaeResult,
     CbteTipo,
     CondicionIva,
@@ -120,60 +122,70 @@ def _chequeos_previos(
 
     if req.receptor.doc_tipo == DocTipo.CUIT:
         cuit_ok = cuil_valido(str(req.receptor.doc_nro))
-        chequeos.append({
-            "check": "cuit_receptor",
-            "ok": cuit_ok,
-            "bloqueante": True,
-            "mensaje": (
-                "CUIT del receptor con dígito verificador válido"
-                if cuit_ok
-                else f"CUIT del receptor ({req.receptor.doc_nro}) tiene el dígito verificador mal — ARCA lo va a rechazar"
-            ),
-        })
+        chequeos.append(
+            {
+                "check": "cuit_receptor",
+                "ok": cuit_ok,
+                "bloqueante": True,
+                "mensaje": (
+                    "CUIT del receptor con dígito verificador válido"
+                    if cuit_ok
+                    else f"CUIT del receptor ({req.receptor.doc_nro}) tiene el dígito verificador mal — ARCA lo va a rechazar"
+                ),
+            }
+        )
 
     ri_degradado = (
         perfil_receptor == "responsable_inscripto"
         and req.receptor.condicion_iva != CondicionIva.RESPONSABLE_INSCRIPTO
     )
-    chequeos.append({
-        "check": "perfil_fiscal_receptor",
-        "ok": not ri_degradado,
-        "bloqueante": False,
-        "mensaje": (
-            "El cliente es Responsable Inscripto pero no tiene un CUIT válido cargado — "
-            "se va a facturar como Consumidor Final en vez de Factura A"
-            if ri_degradado
-            else "Perfil fiscal del receptor consistente"
-        ),
-    })
+    chequeos.append(
+        {
+            "check": "perfil_fiscal_receptor",
+            "ok": not ri_degradado,
+            "bloqueante": False,
+            "mensaje": (
+                "El cliente es Responsable Inscripto pero no tiene un CUIT válido cargado — "
+                "se va a facturar como Consumidor Final en vez de Factura A"
+                if ri_degradado
+                else "Perfil fiscal del receptor consistente"
+            ),
+        }
+    )
 
     # total == neto + iva (arca_fe.comprobante.calcular_importes) y el IVA nunca
     # cambia el signo, así que chequear el total (la cifra que ve el admin) o
     # el neto da lo mismo matemáticamente — se muestra el total para no meter
     # jerga fiscal ("neto") en un chequeo pensado para el dueño, no para AFIP.
     total_ok = importes["total"] > 0
-    chequeos.append({
-        "check": "importe_positivo",
-        "ok": total_ok,
-        "bloqueante": True,
-        "mensaje": "Importe total positivo" if total_ok else "El importe total es $0 o negativo",
-    })
+    chequeos.append(
+        {
+            "check": "importe_positivo",
+            "ok": total_ok,
+            "bloqueante": True,
+            "mensaje": "Importe total positivo"
+            if total_ok
+            else "El importe total es $0 o negativo",
+        }
+    )
 
     fechas_ok = (
         req.fecha_serv_desde is None
         or req.fecha_serv_hasta is None
         or req.fecha_serv_desde <= req.fecha_serv_hasta
     )
-    chequeos.append({
-        "check": "fechas_servicio",
-        "ok": fechas_ok,
-        "bloqueante": True,
-        "mensaje": (
-            "Fechas de servicio coherentes"
-            if fechas_ok
-            else "La fecha de inicio del servicio es posterior a la de fin"
-        ),
-    })
+    chequeos.append(
+        {
+            "check": "fechas_servicio",
+            "ok": fechas_ok,
+            "bloqueante": True,
+            "mensaje": (
+                "Fechas de servicio coherentes"
+                if fechas_ok
+                else "La fecha de inicio del servicio es posterior a la de fin"
+            ),
+        }
+    )
 
     return chequeos
 
@@ -220,16 +232,23 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     importes = calcular_importes(req)
 
     # Único llamado a ARCA del preview: de solo lectura, no pide CAE. Si el
-    # cert está vencido o ARCA no responde, mejor enterarse acá (RuntimeError
-    # → 503) que después de que el admin ya confirmó.
+    # cert está vencido o ARCA no responde, mejor enterarse acá que después
+    # de que el admin ya confirmó. `ArcaError` (Auth/Network/Response/
+    # Business) se deja pasar tal cual — el route elige el status HTTP por
+    # subtipo en vez de un 503 genérico para todo.
     token, sign = get_ta(nombre_emisor, conn)
     wsfe = WsfeClient(
-        endpoint=cred.endpoint_wsfe, cuit=cred.cuit, token=token, sign=sign,
+        endpoint=cred.endpoint_wsfe,
+        cuit=cred.cuit,
+        token=token,
+        sign=sign,
     )
     ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
     numero_a_emitir = ultimo + 1
 
-    chequeos = _chequeos_previos(req, perfil_receptor, importes, cred.ambiente, numero_a_emitir)
+    chequeos = _chequeos_previos(
+        req, perfil_receptor, importes, cred.ambiente, numero_a_emitir
+    )
     listo = all(c["ok"] or not c["bloqueante"] for c in chequeos)
 
     from services.facturacion.pdf import _CBTE_TIPO_LABEL
@@ -245,7 +264,9 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
             "doc_tipo": req.receptor.doc_tipo.name,
             "doc_nro": str(req.receptor.doc_nro),
             "condicion_iva": req.receptor.condicion_iva.name.lower(),
-            "razon_social": pedido.get("cliente_razon_social") or pedido.get("cliente_nombre") or "",
+            "razon_social": pedido.get("cliente_razon_social")
+            or pedido.get("cliente_nombre")
+            or "",
         },
         "comprobante": {
             "letra": _CBTE_TIPO_LABEL.get(int(cbte_tipo), "?"),
@@ -260,8 +281,12 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
         },
         "fechas": {
             "emision": hoy.isoformat(),
-            "servicio_desde": req.fecha_serv_desde.isoformat() if req.fecha_serv_desde else None,
-            "servicio_hasta": req.fecha_serv_hasta.isoformat() if req.fecha_serv_hasta else None,
+            "servicio_desde": req.fecha_serv_desde.isoformat()
+            if req.fecha_serv_desde
+            else None,
+            "servicio_hasta": req.fecha_serv_hasta.isoformat()
+            if req.fecha_serv_hasta
+            else None,
             "vto_pago": req.fecha_vto_pago.isoformat() if req.fecha_vto_pago else None,
         },
         "chequeos": chequeos,
@@ -314,7 +339,9 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
         )
 
         hoy = now_ar().date()
-        req = construir_comprobante(pedido, emisor_obj, emisor_obj.condicion_iva, fecha=hoy)
+        req = construir_comprobante(
+            pedido, emisor_obj, emisor_obj.condicion_iva, fecha=hoy
+        )
         cbte_tipo = tipo_comprobante(req)
         importes = calcular_importes(req)
 
@@ -343,7 +370,9 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
         total_dec = importes["total"]
 
         cuit_rec = pedido.get("cliente_cuit") or ""
-        razon_social = pedido.get("cliente_razon_social") or pedido.get("cliente_nombre") or ""
+        razon_social = (
+            pedido.get("cliente_razon_social") or pedido.get("cliente_nombre") or ""
+        )
 
         if vigente:
             factura_id = vigente.id
@@ -365,7 +394,10 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
                 moneda="PES",
                 cliente_cuit=cuit_rec or None,
                 razon_social=razon_social or None,
-                raw_request={"cbte_tipo": int(cbte_tipo), "concepto": int(req.concepto)},
+                raw_request={
+                    "cbte_tipo": int(cbte_tipo),
+                    "concepto": int(req.concepto),
+                },
                 created_by=emitido_por,
             )
 
@@ -391,12 +423,15 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
             # (no es nuestro, es el de la factura previa) y reusarlo duplicaría
             # número+CAE entre pedidos distintos (bug encontrado en prod).
             recuperado: Optional[CaeResult] = None
-            consultado = wsfe.consultar(emisor_obj.punto_venta, int(cbte_tipo), numero_a_emitir)
+            consultado = wsfe.consultar(
+                emisor_obj.punto_venta, int(cbte_tipo), numero_a_emitir
+            )
             if consultado and (consultado.get("Resultado") or "R") == "A":
                 cae_consulta = consultado.get("CodAutorizacion")
                 if cae_consulta:
                     vto_raw = consultado.get("CAEFchVto", "")
                     from arca_fe.wsfe import _parse_fecha
+
                     recuperado = CaeResult(
                         resultado="A",
                         cae=str(cae_consulta),
@@ -408,7 +443,10 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
             if cae_result is None:
                 fecae_payload = armar_fecae(req, numero_a_emitir)
                 cae_result = wsfe.solicitar_cae(fecae_payload)
-        except (RuntimeError, ValueError):
+        except (RuntimeError, ValueError, ArcaError):
+            # `ArcaError` (Auth/Network/Response/Business) se deja pasar tal
+            # cual — el route elige el status HTTP por subtipo (422/502/503)
+            # en vez de un 503 genérico para todo.
             raise
         except Exception as exc:
             # Falla de red/SOAP no controlada (invariante "nunca 500" del módulo):
@@ -590,12 +628,15 @@ def emitir_nota_credito(
             # Misma idempotencia post-timeout que emitir_factura (consultar el
             # PRÓXIMO número, nunca el último ya autorizado — ver comentario ahí).
             recuperado: Optional[CaeResult] = None
-            consultado = wsfe.consultar(emisor_obj.punto_venta, int(cbte_tipo_nc), numero_a_emitir)
+            consultado = wsfe.consultar(
+                emisor_obj.punto_venta, int(cbte_tipo_nc), numero_a_emitir
+            )
             if consultado and (consultado.get("Resultado") or "R") == "A":
                 cae_consulta = consultado.get("CodAutorizacion")
                 if cae_consulta:
                     vto_raw = consultado.get("CAEFchVto", "")
                     from arca_fe.wsfe import _parse_fecha
+
                     recuperado = CaeResult(
                         resultado="A",
                         cae=str(cae_consulta),
@@ -607,7 +648,9 @@ def emitir_nota_credito(
             if cae_result is None:
                 fecae = armar_fecae(req, numero_a_emitir)
                 cae_result = wsfe.solicitar_cae(fecae)
-        except (RuntimeError, ValueError):
+        except (RuntimeError, ValueError, ArcaError):
+            # `ArcaError` se deja pasar tal cual — ver el mismo comentario en
+            # `emitir_factura`.
             raise
         except Exception as exc:
             raise RuntimeError(
@@ -628,7 +671,8 @@ def emitir_nota_credito(
                 fecha=hoy,
             )
             update_cae(
-                nc_id, conn,
+                nc_id,
+                conn,
                 cbte_nro=cae_result.numero,
                 cae=cae_result.cae,
                 cae_vto=cae_result.cae_vto,
@@ -638,9 +682,13 @@ def emitir_nota_credito(
             )
         else:
             update_error(
-                nc_id, conn,
+                nc_id,
+                conn,
                 errores=list(cae_result.errores),
-                raw_response={"resultado": cae_result.resultado, "errores": list(cae_result.errores)},
+                raw_response={
+                    "resultado": cae_result.resultado,
+                    "errores": list(cae_result.errores),
+                },
             )
             # ARCA rechazó la NC: la original nunca se anuló de verdad, revertir.
             revertir_anulacion(factura_id, conn)

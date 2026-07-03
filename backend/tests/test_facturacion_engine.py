@@ -513,3 +513,20 @@ def test_preview_arca_caida_propaga_runtime_error(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Certificado"):
         engine.previsualizar_factura(1, conn=_FakeConn())
+
+
+def test_preview_arca_business_error_se_propaga_sin_envolver(monkeypatch):
+    """`wsfe.ultimo_autorizado()` real levanta `ArcaBusinessError`/
+    `ArcaResponseError` (taxonomía tipada) — `previsualizar_factura` ya NO la
+    envuelve en `RuntimeError`: se deja pasar tal cual para que el route
+    elija el status HTTP por subtipo (422/502/503) en vez de un 503 genérico."""
+    from arca_fe.errores import ArcaBusinessError
+
+    class _WsfeQueExplota(_FakeWsfe):
+        def ultimo_autorizado(self, pto_vta, cbte_tipo):
+            raise ArcaBusinessError("FECompUltimoAutorizado error — 600: no autorizado")
+
+    _patch_preview_common(monkeypatch, _WsfeQueExplota(endpoint="x", cuit=1, token="t", sign="s"))
+
+    with pytest.raises(ArcaBusinessError, match="600"):
+        engine.previsualizar_factura(1, conn=_FakeConn())

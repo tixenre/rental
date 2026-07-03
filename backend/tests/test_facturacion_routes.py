@@ -150,6 +150,44 @@ def test_facturar_pedido_runtime_error_es_503_nunca_500(monkeypatch):
     assert ei.value.status_code == 503
 
 
+@pytest.mark.parametrize(
+    "excepcion,status_esperado",
+    [
+        pytest.param(
+            "ArcaBusinessError", 422,
+            id="business-422-afip-rechazo-por-regla-de-negocio-no-es-transitorio",
+        ),
+        pytest.param(
+            "ArcaResponseError", 502,
+            id="response-502-afip-contesto-en-forma-inesperada-imparseable",
+        ),
+        pytest.param(
+            "ArcaAuthError", 503, id="auth-503-cert-vencido-o-relacion-no-delegada",
+        ),
+        pytest.param(
+            "ArcaNetworkError", 503, id="network-503-timeout-o-afip-caida",
+        ),
+    ],
+)
+def test_facturar_pedido_arca_error_status_por_subtipo(monkeypatch, excepcion, status_esperado):
+    """Cada subtipo de ArcaError elige su propio status HTTP (no un 503
+    genérico para todo) — y el mensaje real de AFIP se preserva en el body."""
+    import arca_fe.errores as errores_mod
+
+    exc_cls = getattr(errores_mod, excepcion)
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr(
+        "services.facturacion.engine.emitir_factura",
+        lambda pedido_id, emitido_por=None: (_ for _ in ()).throw(
+            exc_cls("motivo real de AFIP")
+        ),
+    )
+    with pytest.raises(HTTPException) as ei:
+        facturacion_routes.facturar_pedido(1, _fake_request())
+    assert ei.value.status_code == status_esperado
+    assert "motivo real de AFIP" in ei.value.detail
+
+
 # ── preview_factura: arma sin emitir, ValueError → 400 ──────────────────────
 
 
@@ -191,6 +229,23 @@ def test_preview_factura_runtime_error_es_503_nunca_500(monkeypatch):
     assert ei.value.status_code == 503
 
 
+def test_preview_factura_arca_business_error_es_422(monkeypatch):
+    from arca_fe.errores import ArcaBusinessError
+
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.engine.previsualizar_factura",
+        lambda pedido_id, conn: (_ for _ in ()).throw(
+            ArcaBusinessError("CUIT bloqueado por RG 3990-E")
+        ),
+    )
+    with pytest.raises(HTTPException) as ei:
+        facturacion_routes.preview_factura(1, _fake_request())
+    assert ei.value.status_code == 422
+    assert "RG 3990-E" in ei.value.detail
+
+
 def test_nota_credito_value_error_es_400(monkeypatch):
     monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
     monkeypatch.setattr(
@@ -211,6 +266,22 @@ def test_nota_credito_runtime_error_es_503(monkeypatch):
     with pytest.raises(HTTPException) as ei:
         facturacion_routes.nota_credito(1, _fake_request())
     assert ei.value.status_code == 503
+
+
+def test_nota_credito_arca_business_error_es_422(monkeypatch):
+    from arca_fe.errores import ArcaBusinessError
+
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr(
+        "services.facturacion.engine.emitir_nota_credito",
+        lambda factura_id, emitido_por=None: (_ for _ in ()).throw(
+            ArcaBusinessError("comprobante ya autorizado")
+        ),
+    )
+    with pytest.raises(HTTPException) as ei:
+        facturacion_routes.nota_credito(1, _fake_request())
+    assert ei.value.status_code == 422
+    assert "comprobante ya autorizado" in ei.value.detail
 
 
 # ── descargar_pdf_factura: 404 / 400 / format=html / format=pdf ────────────
@@ -631,6 +702,27 @@ def test_consultar_puntos_venta_arca_caida_es_503_nunca_500(monkeypatch):
     assert exc.value.status_code == 503
 
 
+def test_consultar_puntos_venta_arca_response_error_es_502(monkeypatch):
+    from arca_fe.errores import ArcaResponseError
+
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.get_by_id",
+        lambda emisor_id, conn: _fake_emisor_arca(),
+    )
+
+    def _boom(nombre_emisor, conn):
+        raise ArcaResponseError("ARCA no devolvió ResultGet ni Errors")
+
+    monkeypatch.setattr("services.facturacion.puntos_venta.consultar_puntos_venta", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.consultar_puntos_venta_emisor(1, _fake_request())
+    assert exc.value.status_code == 502
+    assert "ResultGet" in exc.value.detail
+
+
 # ── info_cert_emisor: Nº de serie para comparar contra ARCA ─────────────────
 
 
@@ -712,3 +804,22 @@ def test_refrescar_catalogos_arca_caida_es_503(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         facturacion_routes.refrescar_catalogos_arca(_fake_request())
     assert exc.value.status_code == 503
+
+
+def test_refrescar_catalogos_arca_network_error_es_503(monkeypatch):
+    """ArcaNetworkError también da 503 (igual que RuntimeError) — es la
+    categoría genuinamente transitoria, tiene sentido reintentar."""
+    from arca_fe.errores import ArcaNetworkError
+
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+
+    def _boom(conn):
+        raise ArcaNetworkError("timeout al contactar WSFEv1")
+
+    monkeypatch.setattr("services.facturacion.catalogos.refrescar_catalogos", _boom)
+
+    with pytest.raises(HTTPException) as exc:
+        facturacion_routes.refrescar_catalogos_arca(_fake_request())
+    assert exc.value.status_code == 503
+    assert "timeout" in exc.value.detail

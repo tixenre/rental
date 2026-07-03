@@ -15,6 +15,7 @@ from fastapi.responses import Response
 
 from database import get_db
 from auth.guards import require_admin
+from arca_fe import ArcaBusinessError, ArcaError, ArcaResponseError
 from rate_limit import limiter, ADMIN_WRITE_LIMIT
 # Reusado tal cual de routes/contabilidad.py (misma auditoría 2026-07-02, #1184/#1209):
 # traduce UniqueViolation/NumericValueOutOfRange a 400 limpio en vez de que el
@@ -22,6 +23,29 @@ from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from routes.contabilidad import map_pg_errors
 
 router = APIRouter()
+
+
+def _status_for_arca_error(exc: ArcaError) -> int:
+    """Mapea cada subtipo de `ArcaError` a un status HTTP que refleje qué
+    pasó realmente, en vez de un 503 genérico para todo (antes cada adapter
+    de `services/facturacion/` aplanaba todo a RuntimeError→503 — atrapaba
+    los 4 tipos por igual, pero el front nunca distinguía "AFIP caída,
+    reintentá" de "AFIP rechazó esto por una regla de negocio, corregí algo").
+
+    - ArcaBusinessError → 422: AFIP contestó y rechazó por una regla de
+      negocio real (CAE 'R', bloqueo tipo RG 3990-E) — no es transitorio,
+      reintentar no cambia nada.
+    - ArcaResponseError → 502: AFIP contestó pero en forma inesperada/
+      imparseable — problema de integración (la categoría donde hubiera
+      caído, ruidosamente, el bug de `personaReturn`), no del cliente.
+    - ArcaAuthError/ArcaNetworkError/ArcaError (base) → 503: falla de auth,
+      relación no delegada, o red — transitorio o de configuración, tiene
+      sentido reintentar. Mismo status que ya usaban RuntimeError acá."""
+    if isinstance(exc, ArcaBusinessError):
+        return 422
+    if isinstance(exc, ArcaResponseError):
+        return 502
+    return 503  # ArcaAuthError, ArcaNetworkError, o ArcaError base
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +90,8 @@ def refrescar_catalogos_arca(request: Request):
             resultado = refrescar_catalogos(conn)
         except ValueError as e:
             raise HTTPException(400, str(e))
+        except ArcaError as e:
+            raise HTTPException(_status_for_arca_error(e), str(e))
         except RuntimeError as e:
             raise HTTPException(503, str(e))
         conn.commit()
@@ -298,6 +324,8 @@ def consultar_puntos_venta_emisor(emisor_id: int, request: Request):
             puntos = consultar_puntos_venta(emisor.nombre, conn)
         except ValueError as e:
             raise HTTPException(400, str(e))
+        except ArcaError as e:
+            raise HTTPException(_status_for_arca_error(e), str(e))
         except RuntimeError as e:
             raise HTTPException(503, str(e))
 
@@ -333,6 +361,8 @@ def preview_factura(pedido_id: int, request: Request):
             return previsualizar_factura(pedido_id, conn)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    except ArcaError as e:
+        raise HTTPException(_status_for_arca_error(e), str(e))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
 
@@ -360,6 +390,8 @@ def facturar_pedido(pedido_id: int, request: Request):
         factura = emitir_factura(pedido_id, emitido_por=emitido_por)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    except ArcaError as e:
+        raise HTTPException(_status_for_arca_error(e), str(e))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
 
@@ -385,6 +417,8 @@ def nota_credito(factura_id: int, request: Request):
         nc = emitir_nota_credito(factura_id, emitido_por=emitido_por)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    except ArcaError as e:
+        raise HTTPException(_status_for_arca_error(e), str(e))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
 

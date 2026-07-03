@@ -43,7 +43,9 @@ def refrescar_catalogos(conn) -> dict[str, list[dict]]:
 
     Raises:
         ValueError: no hay ningún emisor activo con cert cargado.
-        RuntimeError: ARCA no respondió o rechazó la consulta.
+        arca_fe.ArcaError: ARCA no respondió o rechazó la consulta — se deja
+        pasar tal cual (sin envolver en RuntimeError) para que el route
+        distinga el subtipo y elija el status HTTP correcto (422/502/503).
     """
     from arca_fe.wsfe import WsfeClient
     from services.facturacion.config import credenciales
