@@ -231,14 +231,19 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     # Único llamado a ARCA del preview: de solo lectura, no pide CAE. Si el
     # cert está vencido o ARCA no responde, mejor enterarse acá (RuntimeError
     # → 503) que después de que el admin ya confirmó.
-    token, sign = get_ta(nombre_emisor, conn)
-    wsfe = WsfeClient(
-        endpoint=cred.endpoint_wsfe,
-        cuit=cred.cuit,
-        token=token,
-        sign=sign,
-    )
-    ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
+    try:
+        token, sign = get_ta(nombre_emisor, conn)
+        wsfe = WsfeClient(
+            endpoint=cred.endpoint_wsfe,
+            cuit=cred.cuit,
+            token=token,
+            sign=sign,
+        )
+        ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
+    except (RuntimeError, ValueError):
+        raise
+    except ArcaError as exc:
+        raise RuntimeError(str(exc)) from exc
     numero_a_emitir = ultimo + 1
 
     chequeos = _chequeos_previos(
