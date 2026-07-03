@@ -2772,3 +2772,40 @@ cancel-in-progress` ya cancela corridas viejas.
   carrito/dashboard cuyo precio salga de `equipos.precio_jornada` crudo en vez de
   `precio_jornada_efectivo`, o una query batch nueva de precios sin evaluar el precedente de #643. Issue
   #1209.
+
+### 2026-07-03 — `backend/descuentos/` reorganizado CQRS-lite (`queries/`+`commands/`), espejo de `contabilidad/`/`services/specs/`
+
+- **Contexto.** El dueño reportó no poder aplicar un descuento manual en el back-office — investigado y
+  resuelto (bug de auth en `/api/cotizar`, no respetaba `dev_bypass_enabled()`, ya en `dev`). En la misma
+  conversación, el dueño adelantó mecanismos de descuento nuevos para más adelante (jerarquía manual>cliente/
+  jornadas, descuento en $ fijo, combos no acumulables — ver Fase C en la issue #1219) y pidió organizar la
+  lógica actual en un módulo propio ANTES de sumarlos, mismo "CQRS liviano" que ya usa `contabilidad/`/
+  `services/specs/`.
+- **Decisión.** Split **move-verbatim** (cero cambio de lógica/SQL) de `services/precios.py::
+  descuento_aplicable`, la reimplementación duplicada de `descuento_origen` en `cotizacion.py`, y
+  `routes/alquileres/core.py::_get_descuento_jornadas` + el CRUD de `descuentos_jornada` hacia
+  `backend/descuentos/` (`queries/decision.py`, `queries/jornadas.py`, `commands/jornadas.py`). Cambio
+  deliberado de firma: `calcular_descuento_aplicable` toma un dict de fuentes con nombre
+  (`{"cliente": pct, "jornadas": pct}`) en vez de 2 floats posicionales — mismo resultado numérico hoy, pero
+  sumar una fuente nueva (ej. Fase C) es agregar una key, no rediseñar la función ni sus callers. Fold-in
+  trivial: `CotizarRequest.descuento_pct` no tenía validador de rango 0-100 (a diferencia de
+  `PedidoDatos.descuento_pct`) — sumado en el mismo archivo que ya se tocaba.
+- **Why.** `_recalcular_total_pedido`/`propagar_descuento_a_presupuestos` (`core.py`) se evaluaron para
+  mover también, pero se descartó: son orquestación de PEDIDOS (se disparan también por cambios de fecha/
+  ítems, no solo de descuento) — moverlas invertiría la dirección de dependencia (`descuentos/` importando
+  de un módulo de rutas), algo que ningún paquete CQRS-lite del repo hace hoy. `services/precios.py::
+  calcular_total` tampoco se mueve — es el motor de TOTALES (IVA, combos), no de descuento; solo pasa a
+  importar la decisión desde el paquete nuevo.
+- **Consecuencias.** Cero cambio de contrato HTTP (`test_routes_contract.py` sin tocar, verde). Candado: 19
+  tests puros nuevos (`test_descuentos_decision.py`) + 5 de integración Postgres real
+  (`test_descuentos_jornada_db.py` — cierra un gap real: ningún test ejercitaba la interpolación de la
+  escala contra un `Decimal` real de psycopg, pese a un fix histórico de `Decimal × float → TypeError` en
+  esa función). Suite completa 2717 passed; integración (contabilidad/alembic/gate de reservas/descuentos)
+  verde contra Postgres real, confirmado que las fallas de un barrido `-m integration` completo son
+  preexistentes (reproducidas idénticas en `dev` sin tocar — contaminación de estado entre tests de DB de
+  dominios no relacionados). Rama aislada `feature/descuentos-cqrs`, PR #1220 sin mergear (convención "PR
+  como hoja de ruta"), issue de tracking #1219 con Fase B (hardening, 5 hallazgos colaterales) y Fase C
+  (features nuevas) sin comprometer. De paso, aparte de esta iniciativa: se encontró y arregló un bug real
+  en `routes/clientes.py::update_cliente` (placeholders `?` de sqlite3 nunca migrados a `%s`, cualquier
+  edición de cliente fallaba en runtime) — pusheado directo a `dev` (commit `5eb5e18`), con test de
+  regresión.

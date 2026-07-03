@@ -902,6 +902,18 @@ criterio que el batch `IN (...)` revertido en `/api/cotizar` (#643, devolvió pr
 carrito de un heartbeat es chico, no hot-path. Test: `test_carritos_activos_precio_combo.py`. El supervisor
 marca un ítem de carrito/dashboard cuyo precio salga de `equipos.precio_jornada` crudo en vez del resolutor.
 
+### 2026-07-03 — `backend/descuentos/` reorganizado CQRS-lite (`queries/`+`commands/`), espejo de `contabilidad/`/`services/specs/`
+
+Split move-verbatim de `descuento_aplicable`/`_get_descuento_jornadas`/CRUD de `descuentos_jornada` (antes en
+`services/precios.py` + `routes/alquileres/*`) a `backend/descuentos/` (`queries/`+`commands/`, mismo patrón
+que `contabilidad/`/`specs/`). Firma extensible: `calcular_descuento_aplicable(fuentes: dict[str, float])` —
+no 2 floats posicionales — para sumar fuentes de descuento futuras sin rediseñar. `_recalcular_total_pedido`/
+`propagar_descuento_a_presupuestos` quedan en `routes/alquileres/core.py` (orquestación de pedidos, no
+decisión de descuento — moverlas invertiría la dependencia hacia un módulo de rutas). `services/precios.py::
+calcular_total` sigue siendo el motor de TOTALES (IVA/combos), solo importa la decisión de acá. El
+supervisor marca lógica de "quién gana el descuento" reimplementada fuera de `descuentos/queries/decision.py`.
+Cómo → `backend/descuentos/CLAUDE.md`; tracking → issue #1219.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)
