@@ -2185,6 +2185,43 @@ cancel-in-progress` ya cancela corridas viejas.
   un fallback explícito que garantice que el total nunca se pierda. Rama `fix/liquidacion-division-cero`
   → PR scoped (sin mergear, hoja de ruta); tracking #1184.
 
+### 2026-07-02 — Fase 3+6: lock de concurrencia en `reportes/cierres.py` + rate limit en `routes/reportes.py`
+
+- **Contexto.** Últimas dos fases pendientes de la hoja de ruta de plata (#1184; hallazgos #8 y #10 de
+  la auditoría cruzada en `docs/SISTEMA_PLATA.md`). `reportes/cierres.py::cerrar_mes`/`reabrir_mes` no
+  tenían ningún candado de concurrencia — el mismo tipo de carrera que se cerró en `contabilidad`
+  (2026-07-02, `_exigir_mes_abierto`/`_lock_mes`) seguía sin mitigar acá: un `cerrar_mes` podía leer el
+  reporte de un mes en T0 y commitear su foto DESPUÉS de que un pago (`alquiler_pagos`) de ese mismo mes
+  se insertara en otra transacción, dejando una foto que no incluye ese pago. Y `routes/reportes.py`
+  tenía sus 3 endpoints de escritura (enviar mail, cerrar/reabrir mes) sin `@limiter.limit` — mismo gap
+  ya cerrado en `contabilidad.py`/`pagos.py`.
+- **Decisión — lock de concurrencia (Fase 3).** `reportes/cierres.py` gana `_lock_mes(conn, mes)`
+  (`pg_advisory_xact_lock`, mismo parseo `'YYYY-MM'`→`YYYYMM` que
+  `contabilidad/commands/movimientos.py::_lock_mes`), llamada al inicio de `cerrar_mes` y `reabrir_mes`.
+  **Namespace nuevo y separado** — `_ADVISORY_NS_REPORTES_MES = 5390421` — NO reusa
+  `_ADVISORY_NS_CONTAB_MES` (5390420): el cierre de liquidación (reparto/comisiones entre dueños) y el
+  cierre contable (cajas/movimientos) son operaciones independientes sobre invariantes distintos;
+  compartir namespace bloquearía sin necesidad un cierre por el otro (ej. cerrar el mes contable no
+  debería esperar a que termine de cerrarse la liquidación de ese mismo mes).
+- **Decisión — rate limit (Fase 6).** `routes/reportes.py` importa `limiter`/`ADMIN_WRITE_LIMIT` de
+  `rate_limit.py` (ya existente) y agrega `@limiter.limit(ADMIN_WRITE_LIMIT)` a los 3 endpoints de
+  escritura: `enviar_reporte_mail` (POST enviar-mail), `cerrar_mes_liquidacion` (POST cierres/{mes}),
+  `reabrir_mes_liquidacion` (DELETE cierres/{mes}).
+- **Why.** El lock de `reportes/cierres.py` no reemplaza el candado preventivo de `contabilidad` (ese
+  protege movimientos internos; este protege el reporte de liquidación) — son dominios distintos que
+  necesitan su propio candado, mismo patrón, sin compartir key space. El rate limit cierra el mismo gap
+  de superficie de ataque que ya se había cerrado en el resto de los routes de escritura de plata.
+- **Consecuencias.** Nuevo test de concurrencia real con Postgres (no solo en teoría, mismo criterio
+  que la auditoría de `contabilidad`): `test_reportes_cierres_db.py::test_lock_serializa_cerrar_mes_concurrente`
+  — dos conexiones reales + `threading.Event`, una toma el lock del mes y lo retiene, la otra intenta
+  `cerrar_mes` del mismo mes y debe quedar bloqueada hasta que la primera libere (commit); se verifica
+  el orden real de eventos, no solo ausencia de errores. Suite completa 2548 passed / 184 skipped (sin
+  regresiones); `test_reportes_cierres_db.py` completo (4 tests) en verde. El supervisor marca: (1)
+  cualquier escritura nueva en `reportes/cierres.py` que no pase por `_lock_mes`; (2) reusar
+  `_ADVISORY_NS_CONTAB_MES` en vez de un namespace propio para un candado de otro dominio de plata; (3)
+  un endpoint de escritura nuevo en `routes/reportes.py` sin `@limiter.limit`. Rama
+  `fix/reportes-lock-rate-limit` → PR scoped (sin mergear, hoja de ruta); tracking #1184.
+
 ### 2026-07-02 — `enviar_mail_factura` roto por 2 bugs encadenados (columna inexistente + kwarg inexistente)
 
 - **Contexto.** Fase 4 de la hoja de ruta de plata (`services/finanzas_flujo/`, ver entradas anteriores de

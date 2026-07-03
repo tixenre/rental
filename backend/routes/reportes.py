@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from database import get_db
 from auth.guards import require_admin
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from reportes.liquidacion import liquidar
 from reportes.reconciliacion import reconciliar
 from reportes.cierres import (
@@ -192,6 +193,7 @@ class EnviarReporteBody(BaseModel):
 
 
 @router.post("/admin/reportes/liquidacion/enviar-mail")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 async def enviar_reporte_mail(request: Request, body: EnviarReporteBody):
     """Genera el PDF del reporte del período y lo manda adjunto a cada
     destinatario. Guarda la lista para prefillar la próxima vez."""
@@ -277,6 +279,7 @@ def _validar_mes_http(mes: str) -> None:
 
 
 @router.post("/admin/reportes/cierres/{mes}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def cerrar_mes_liquidacion(request: Request, mes: str):
     """Cierra un mes: congela la foto inmutable del reporte (números + modelo).
     Idempotente: re-cerrar recalcula la foto con los datos actuales (#721)."""
@@ -287,6 +290,7 @@ def cerrar_mes_liquidacion(request: Request, mes: str):
 
 
 @router.delete("/admin/reportes/cierres/{mes}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def reabrir_mes_liquidacion(request: Request, mes: str):
     """Reabre un mes cerrado: borra la foto → el reporte vuelve a calcularse en
     vivo (para corregir; después se vuelve a cerrar) (#721)."""

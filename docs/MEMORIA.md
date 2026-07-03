@@ -716,6 +716,19 @@ hacia un dueño). Candado: `test_reportes_liquidacion_db.py::test_suma_items_cer
 (Postgres real). El supervisor marca cualquier prorrateo de plata con `NULLIF`/división que pueda dar
 `NULL`/0 sin un fallback explícito que garantice que el total nunca se pierde.
 
+### 2026-07-02 — Fase 3+6: lock de concurrencia en `reportes/cierres.py` + rate limit en `routes/reportes.py`
+
+Últimas dos fases de la hoja de ruta de plata (#1184; hallazgos #8/#10 de la auditoría cruzada).
+`cerrar_mes`/`reabrir_mes` ganan `_lock_mes(conn, mes)` (`pg_advisory_xact_lock`, mismo patrón que
+`contabilidad/commands/movimientos.py`) con namespace **propio** `_ADVISORY_NS_REPORTES_MES = 5390421`
+— NO comparte namespace con `_ADVISORY_NS_CONTAB_MES` (5390420) a propósito: son cierres independientes
+sobre invariantes distintos (reparto/comisiones vs. cajas/movimientos), compartir namespace bloquearía
+sin necesidad un cierre por el otro. Candado: `test_reportes_cierres_db.py::test_lock_serializa_cerrar_mes_concurrente`
+(Postgres real, dos conexiones + `threading.Event` — confirma que la segunda conexión queda bloqueada
+hasta que la primera libera el lock). `routes/reportes.py` gana `@limiter.limit(ADMIN_WRITE_LIMIT)` en
+los 3 endpoints de escritura (`enviar_reporte_mail`, `cerrar_mes_liquidacion`, `reabrir_mes_liquidacion`)
+— mismo gap ya cerrado en `contabilidad.py`/`pagos.py`.
+
 ### 2026-07-02 — `enviar_mail_factura` roto por 2 bugs encadenados (columna inexistente + kwarg inexistente)
 
 Fase 4 de la hoja de ruta de plata. `routes/facturacion.py::enviar_mail_factura` consultaba
