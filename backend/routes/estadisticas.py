@@ -9,6 +9,29 @@ from auth.guards import require_admin
 
 router = APIRouter()
 
+# Fragmento SQL compartido: prorratea `alquileres.monto_total` (el NETO correcto,
+# ya con el descuento GANADOR aplicado — `max(descuento_cliente_pct,
+# descuento_jornadas_pct)`, ver `services/precios.descuento_aplicable`) entre los
+# ítems de un pedido según su participación en el `subtotal` (bruto). Mismo patrón
+# que `reportes/liquidacion.py::SALDADO_CTE` (fragmento SQL compartido vía f-string).
+#
+# Por qué hace falta prorratear en vez de leer `monto_total` directo: es a nivel
+# PEDIDO, no por ítem — un pedido con 2 equipos de dueños distintos no puede
+# repartir "cuánto aportó cada uno" sin esto. Las agregaciones que SÍ son a nivel
+# pedido (totales, por mes, mejor/peor mes) usan `monto_total` directo, sin join a
+# `alquiler_items` (evita multiplicarlo por cada línea del pedido).
+#
+# NO reconstruir el descuento acá (ni `descuento_pct` solo, ni
+# GREATEST(descuento_pct, descuento_jornadas_pct)): `monto_total` YA es la fuente
+# única del neto — recalcularlo es exactamente el bug que esto arregla (#1209).
+_PRORRATEO_CTE = """
+    tot AS (
+        SELECT pedido_id, SUM(subtotal) AS suma_items
+        FROM alquiler_items
+        GROUP BY pedido_id
+    )
+"""
+
 
 @router.get("/estadisticas")
 def get_estadisticas(request: Request):
@@ -25,15 +48,19 @@ def compute_estadisticas(conn) -> dict:
     'Resumen general'). No abre ni cierra la conexión: el caller la administra.
     """
     # ── Totales generales (solo pedidos confirmados/finalizados) ──────────────
+    # A nivel PEDIDO: `monto_total` directo, sin join a `alquiler_items` — sumarlo
+    # por ítem lo multiplicaría por cada línea del pedido. Mismo universo de
+    # pedidos que antes: todo pedido en estos 3 estados tiene ≥1 ítem (invariante
+    # de creación, `routes/alquileres/core.py`), así que no hace falta el join
+    # para filtrar "tiene ítems".
     totales = conn.execute("""
         SELECT
-            COUNT(DISTINCT p.id)           AS total_pedidos,
+            COUNT(*)                       AS total_pedidos,
             COUNT(DISTINCT p.cliente_id)   AS total_clientes,
-            SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0))               AS total_ars,
+            SUM(p.monto_total)             AS total_ars,
             MIN(p.fecha_desde)             AS desde,
             MAX(p.fecha_desde)             AS hasta
         FROM alquileres p
-        JOIN alquiler_items pi ON pi.pedido_id = p.id
         WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
     """).fetchone()
 
@@ -41,10 +68,9 @@ def compute_estadisticas(conn) -> dict:
     por_mes = conn.execute("""
         SELECT
             to_char(p.fecha_desde, 'YYYY-MM')    AS mes,
-            COUNT(DISTINCT p.id)           AS pedidos,
-            SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0))               AS total_ars
+            COUNT(*)                       AS pedidos,
+            SUM(p.monto_total)             AS total_ars
         FROM alquileres p
-        JOIN alquiler_items pi ON pi.pedido_id = p.id
         WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
         GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
         ORDER BY to_char(p.fecha_desde, 'YYYY-MM') DESC
@@ -52,14 +78,18 @@ def compute_estadisticas(conn) -> dict:
     """).fetchall()
 
     # ── Top equipos ───────────────────────────────────────────────────────────
-    top_equipos = conn.execute("""
+    # A nivel ÍTEM: prorratea `monto_total` según la participación de cada línea
+    # en el `subtotal` del pedido (mismo patrón que `reportes/liquidacion.py`).
+    top_equipos = conn.execute(f"""
+        WITH {_PRORRATEO_CTE}
         SELECT
             e.nombre                       AS equipo,
-            SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0))               AS total_ars,
+            SUM(p.monto_total * pi.subtotal::numeric / NULLIF(t.suma_items, 0)) AS total_ars,
             COUNT(*)                       AS veces
         FROM alquiler_items pi
         JOIN alquileres p  ON p.id  = pi.pedido_id
         JOIN equipos e  ON e.id  = pi.equipo_id
+        JOIN tot t ON t.pedido_id = p.id
         WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
         GROUP BY pi.equipo_id, e.nombre
         ORDER BY total_ars DESC
@@ -81,14 +111,17 @@ def compute_estadisticas(conn) -> dict:
     """).fetchall()
 
     # ── Por dueño (basado en equipos.dueno) ───────────────────────────────────
-    por_dueno = conn.execute("""
+    # Mismo prorrateo que top_equipos, agregado por `equipos.dueno`.
+    por_dueno = conn.execute(f"""
+        WITH {_PRORRATEO_CTE}
         SELECT
             COALESCE(e.dueno, 'Rambla')    AS dueno,
-            SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0))               AS total_ars,
+            SUM(p.monto_total * pi.subtotal::numeric / NULLIF(t.suma_items, 0)) AS total_ars,
             COUNT(*)                       AS items
         FROM alquiler_items pi
         JOIN alquileres p ON p.id = pi.pedido_id
         JOIN equipos e ON e.id = pi.equipo_id
+        JOIN tot t ON t.pedido_id = p.id
         WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
         GROUP BY COALESCE(e.dueno, 'Rambla')
         ORDER BY total_ars DESC
@@ -132,38 +165,22 @@ def compute_estadisticas(conn) -> dict:
     """).fetchall()
 
     # ── Mejor y peor mes ───────────────────────────────────────────────────────
+    # A nivel PEDIDO, igual que `totales`/`por_mes`: una sola CTE con `monto_total`
+    # (sin join a ítems), reusada 4 veces en vez de repetir la fórmula del ingreso
+    # en cada subquery. Sobre TODO el histórico (sin el LIMIT 24 de `por_mes`) —
+    # mismo universo que antes.
     mejor_peor = conn.execute("""
+        WITH por_mes_full AS (
+            SELECT to_char(p.fecha_desde, 'YYYY-MM') AS mes, SUM(p.monto_total) AS total
+            FROM alquileres p
+            WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
+            GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
+        )
         SELECT
-            (SELECT mes FROM (
-                SELECT to_char(p.fecha_desde, 'YYYY-MM') AS mes, SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
-                FROM alquileres p
-                JOIN alquiler_items pi ON pi.pedido_id = p.id
-                WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
-                GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
-                ORDER BY total DESC LIMIT 1
-            ) t1) AS mejor_mes,
-            (SELECT MAX(total) FROM (
-                SELECT SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
-                FROM alquileres p
-                JOIN alquiler_items pi ON pi.pedido_id = p.id
-                WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
-                GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
-            ) t2) AS mejor_total,
-            (SELECT mes FROM (
-                SELECT to_char(p.fecha_desde, 'YYYY-MM') AS mes, SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
-                FROM alquileres p
-                JOIN alquiler_items pi ON pi.pedido_id = p.id
-                WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
-                GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
-                ORDER BY total ASC LIMIT 1
-            ) t3) AS peor_mes,
-            (SELECT MIN(total) FROM (
-                SELECT SUM(pi.subtotal * (1 - COALESCE(p.descuento_pct, 0) / 100.0)) AS total
-                FROM alquileres p
-                JOIN alquiler_items pi ON pi.pedido_id = p.id
-                WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')
-                GROUP BY to_char(p.fecha_desde, 'YYYY-MM')
-            ) t4) AS peor_total
+            (SELECT mes   FROM por_mes_full ORDER BY total DESC LIMIT 1) AS mejor_mes,
+            (SELECT MAX(total) FROM por_mes_full)                       AS mejor_total,
+            (SELECT mes   FROM por_mes_full ORDER BY total ASC LIMIT 1) AS peor_mes,
+            (SELECT MIN(total) FROM por_mes_full)                       AS peor_total
     """).fetchone()
 
     mejor_peor_dict = row_to_dict(mejor_peor) if mejor_peor else {}

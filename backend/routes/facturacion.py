@@ -377,7 +377,7 @@ async def enviar_mail_factura(factura_id: int, request: Request):
         # Email del cliente: está en el pedido
         row = conn.execute(
             """
-            SELECT c.owner_email, c.nombre, c.apellido
+            SELECT c.email, c.nombre, c.apellido
             FROM alquileres a
             JOIN clientes c ON c.id = a.cliente_id
             WHERE a.id = %s
@@ -385,10 +385,10 @@ async def enviar_mail_factura(factura_id: int, request: Request):
             (factura.pedido_id,),
         ).fetchone()
 
-    if not row or not row["owner_email"]:
+    if not row or not row["email"]:
         raise HTTPException(400, "El pedido no tiene cliente con email asociado")
 
-    email_cliente = row["owner_email"]
+    email_cliente = row["email"]
     nombre_cliente = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip() or email_cliente
 
     from pdf import _render_pdf
@@ -421,7 +421,7 @@ Total: ${factura.imp_total:,.2f}</p>
         subject=subject,
         body_html=body_html,
         text=text,
-        attachments=[Attachment(filename=filename, content=pdf_bytes, content_type="application/pdf")],
+        attachments=[Attachment(filename=filename, content=pdf_bytes, mimetype="application/pdf")],
         alquiler_id=factura.pedido_id,
         log_key="factura_arca",
     )
