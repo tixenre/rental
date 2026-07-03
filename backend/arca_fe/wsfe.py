@@ -6,6 +6,11 @@ WSDL: este módulo no guarda su propia copia de las URLs de homologación/produc
 (vivían duplicadas acá y en services/facturacion/config.py, con un match de string
 frágil para elegir una u otra) — recibe la URL ya resuelta y la usa tal cual.
 
+Operaciones: `solicitar_cae` es el único COMMAND (emite un CAE — efecto legal
+en AFIP); `ultimo_autorizado`, `consultar` y los `param_*` son QUERIES (lecturas
+sin efecto). Los errores salen tipados vía `arca_fe.errores` (ningún método
+filtra un `zeep.Fault` crudo).
+
 Deps: zeep (SOAP), ya en requirements.txt.
 """
 

@@ -44,6 +44,10 @@ carga, no un dato exigido por RG4892 como el QR/CAE de la factura).
 Igual que `arca_fe.wsfe`: este módulo NO guarda su propia copia de las URLs
 de homologación/producción — el caller (`services/facturacion/padron.py`)
 las resuelve según ambiente y pasa la URL completa del WSDL ya armada.
+
+Operaciones: `get_persona` es una QUERY (consulta de solo lectura — no tiene
+efecto en AFIP). Errores tipados vía `arca_fe.errores` (Fault → ArcaResponseError,
+bloqueo de negocio → ArcaBusinessError).
 """
 
 from __future__ import annotations
