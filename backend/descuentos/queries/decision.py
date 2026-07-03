@@ -39,3 +39,93 @@ def calcular_descuento_origen(fuentes: dict[str, Optional[float]]) -> str:
     if max(normalizados.values()) == 0:
         return "ninguno"
     return max(normalizados, key=normalizados.get)
+
+
+def resolver_descuento_pedido(
+    manual_pct: Optional[float],
+    cliente_pct: Optional[float],
+    jornadas_pct: Optional[float],
+) -> float:
+    """Jerarquía de 3 niveles (Fase C-1, #1219) — NO es una competencia plana.
+
+    Si `manual_pct` está seteado (≠0, un override explícito del admin para
+    ESE pedido puntual), gana OUTRIGHT — no compite por tamaño contra
+    cliente/jornadas. Si es 0 ("sin override"), cae al 2-way de siempre entre
+    cliente y jornadas (`calcular_descuento_aplicable`).
+
+    Nota de diseño: `0` es el sentinel de "sin override" (no `NULL`) — decisión
+    del dueño. Limitación aceptada: no se puede forzar "cero descuento" en un
+    pedido puntual de un cliente que normalmente tiene descuento (0 siempre
+    cae al fallback).
+    """
+    manual = max(0.0, float(manual_pct or 0))
+    if manual:
+        return min(100.0, manual)
+    return calcular_descuento_aplicable({"cliente": cliente_pct, "jornadas": jornadas_pct})
+
+
+def resolver_origen_pedido(
+    manual_pct: Optional[float],
+    cliente_pct: Optional[float],
+    jornadas_pct: Optional[float],
+) -> str:
+    """Origen del descuento ganador bajo la jerarquía de `resolver_descuento_pedido`
+    — "manual" si el override ganó outright, si no el mismo criterio que
+    `calcular_descuento_origen` para el 2-way de fallback."""
+    manual = max(0.0, float(manual_pct or 0))
+    if manual:
+        return "manual"
+    return calcular_descuento_origen({"cliente": cliente_pct, "jornadas": jornadas_pct})
+
+
+def resolver_descuento_monto_pedido(
+    bruto: int,
+    manual_tipo: Optional[str],
+    manual_pct: Optional[float],
+    manual_monto: Optional[float],
+    cliente_pct: Optional[float],
+    jornadas_pct: Optional[float],
+) -> dict:
+    """Descuento del pedido en PESOS — Fase C-2 (#1219): el override manual
+    puede ser un % (de siempre) o un $ fijo, mismo campo de la UI con un
+    selector al lado. Se compone SOBRE `resolver_descuento_pedido` (no la
+    reemplaza) porque el caso "%" es exactamente ese cálculo; el caso "$"
+    necesita `bruto` (que `resolver_descuento_pedido` no conoce, por diseño:
+    es puramente de %) para capear el override y que el neto nunca sea
+    negativo — por eso esta función vive un nivel más arriba, no adentro de
+    la de C-1.
+
+    Devuelve `{"monto": int, "pct": float}` — `pct` es el % EFECTIVO
+    (derivado del monto cuando el override es "$"; el mismo valor de
+    `resolver_descuento_pedido` sin redondeo extra cuando es "%", así el path
+    "%" es byte-idéntico al cálculo previo a C-2).
+
+    `manual_tipo` "monto" + `manual_monto` > 0 → gana OUTRIGHT (misma
+    jerarquía C-1), capeado a `bruto`. `manual_monto` 0/None con
+    `manual_tipo="monto"` es el mismo sentinel "sin override" que `pct=0` →
+    cae al fallback cliente/jornadas.
+    """
+    bruto_i = max(0, int(bruto or 0))
+    if (manual_tipo or "pct") == "monto":
+        monto_manual = max(0.0, float(manual_monto or 0))
+        if monto_manual:
+            monto = min(bruto_i, int(round(monto_manual)))
+            pct_efectivo = round(monto / bruto_i * 100, 2) if bruto_i else 0.0
+            return {"monto": monto, "pct": pct_efectivo}
+    pct = resolver_descuento_pedido(manual_pct, cliente_pct, jornadas_pct)
+    return {"monto": int(round(bruto_i * pct / 100)), "pct": pct}
+
+
+def resolver_origen_pedido_monto(
+    manual_tipo: Optional[str],
+    manual_pct: Optional[float],
+    manual_monto: Optional[float],
+    cliente_pct: Optional[float],
+    jornadas_pct: Optional[float],
+) -> str:
+    """Origen del descuento ganador bajo `resolver_descuento_monto_pedido` —
+    tipo-aware (C-2): "manual" también cuando gana un override en $ fijo. Para
+    el caso "%" delega en `resolver_origen_pedido` sin reimplementar el criterio."""
+    if (manual_tipo or "pct") == "monto" and manual_monto:
+        return "manual"
+    return resolver_origen_pedido(manual_pct, cliente_pct, jornadas_pct)

@@ -1058,6 +1058,13 @@ export type Pedido = {
   monto_pagado: number;
   descuento_pct: number | null;
   descuento_jornadas_pct: number | null;
+  /** Fase C-2 (#1219): tipo del override manual — "pct" (default) o "monto". */
+  descuento_manual_tipo?: "pct" | "monto" | null;
+  descuento_manual_monto?: number | null;
+  /** % y fuente del descuento GANADOR (jerarquía manual > cliente > jornadas) —
+   *  distinto de `descuento_pct` crudo (solo el override). Ver `desglose_de_pedido`. */
+  descuento_efectivo_pct?: number | null;
+  descuento_origen?: "manual" | "cliente" | "jornadas" | "ninguno" | null;
   notas: string | null;
   created_at?: string;
   items: PedidoItem[];
@@ -1119,6 +1126,8 @@ export type PedidoDatosInput = {
   fecha_hasta: string | null;
   notas: string | null;
   descuento_pct: number | null;
+  descuento_manual_tipo?: "pct" | "monto" | null;
+  descuento_manual_monto?: number | null;
 };
 
 // ── Estudio (singleton E1) ───────────────────────────────────────────────────

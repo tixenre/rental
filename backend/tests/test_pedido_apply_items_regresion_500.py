@@ -52,7 +52,7 @@ class FakeConn:
         if "FROM alquileres WHERE id" in sql:
             return self._pedido_data
         if "FROM equipos WHERE id" in sql:
-            return {"id": self._last_params[0]}
+            return {"id": self._last_params[0], "tipo": "simple"}
         return None
 
     def fetchall(self):
@@ -82,13 +82,16 @@ def test_apply_items_preserva_descuento_jornadas(monkeypatch):
     Al editar ítems, el `monto_total` resultante debe tener el descuento
     aplicado (no quedar en el bruto)."""
 
-    # Pedido a 7 jornadas, cliente sin descuento manual.
+    # Pedido a 7 jornadas, sin cliente asignado ni override manual.
     pedido = {
         "id": 1,
+        "cliente_id": None,
         "fecha_desde": "2026-06-01T10:00:00",
         "fecha_hasta": "2026-06-08T10:00:00",  # 7 jornadas
         "descuento_pct": 0,
         "descuento_jornadas_pct": 10.0,
+        "descuento_manual_tipo": "pct",
+        "descuento_manual_monto": 0,
     }
     # Descuentos por jornadas: a 7 jornadas → 10%.
     puntos = [(1, 0.0), (7, 10.0)]

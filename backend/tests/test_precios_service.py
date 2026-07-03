@@ -256,3 +256,61 @@ class TestCobroModo:
             descuento_cliente_pct=10.0,
         )
         assert r["neto"] == 45000
+
+
+# ── Combos no acumulables con el descuento global (Fase C-3, #1219) ───────
+
+
+class TestCombosNoAcumulables:
+    def test_combo_no_recibe_el_descuento_global(self):
+        # Equipo simple: 10.000 × 1 jornada = 10.000 (descontable).
+        # Combo: 20.000 × 1 jornada = 20.000 (YA trae su descuento de
+        # componente horneado en el precio — no se le vuelve a aplicar el
+        # 10% de cliente encima).
+        # bruto = 30.000; descuento = 10% de 10.000 (solo el simple) = 1.000.
+        r = calcular_total(
+            items=[
+                {"equipo_id": 1, "cantidad": 1, "precio_jornada": 10000, "es_combo": False},
+                {"equipo_id": 2, "cantidad": 1, "precio_jornada": 20000, "es_combo": True},
+            ],
+            jornadas=1,
+            descuento_cliente_pct=10.0,
+        )
+        assert r["bruto"] == 30000
+        assert r["descuento_monto"] == 1000
+        assert r["neto"] == 29000
+
+    def test_es_combo_ausente_se_trata_como_no_combo(self):
+        # Sin `es_combo` en el dict (default de ItemPrecio, total=False):
+        # comportamiento IDÉNTICO a antes de C-3 — participa del descuento.
+        r = calcular_total(
+            items=[{"equipo_id": 1, "cantidad": 1, "precio_jornada": 10000}],
+            jornadas=1,
+            descuento_cliente_pct=10.0,
+        )
+        assert r["neto"] == 9000
+
+    def test_todo_combos_no_hay_descuento_aunque_haya_pct(self):
+        r = calcular_total(
+            items=[{"equipo_id": 2, "cantidad": 1, "precio_jornada": 20000, "es_combo": True}],
+            jornadas=1,
+            descuento_cliente_pct=50.0,
+        )
+        assert r["descuento_monto"] == 0
+        assert r["neto"] == 20000
+
+    def test_override_manual_monto_se_capea_al_bruto_descontable_no_al_total(self):
+        # Bruto descontable (solo el simple) = 10.000; combo = 20.000, exento.
+        # Un override manual de $50.000 no puede comerse el combo — se capea
+        # a los 10.000 descontables.
+        r = calcular_total(
+            items=[
+                {"equipo_id": 1, "cantidad": 1, "precio_jornada": 10000, "es_combo": False},
+                {"equipo_id": 2, "cantidad": 1, "precio_jornada": 20000, "es_combo": True},
+            ],
+            jornadas=1,
+            descuento_manual_tipo="monto",
+            descuento_manual_monto=50000,
+        )
+        assert r["descuento_monto"] == 10000  # capeado, no 30.000
+        assert r["neto"] == 20000  # el combo queda intacto

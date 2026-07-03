@@ -79,12 +79,14 @@ def setup():
             "VALUES (%s,'Equipo lista-detalle',5,1000,1)",
             (EQ_ID,),
         )
-        # descuento_pct=5 (cliente) vs descuento_jornadas_pct=20 (jornadas) — gana jornadas.
+        # Sin override manual (descuento_pct=0); descuento_cliente_pct=5 (snapshot
+        # del cliente) vs descuento_jornadas_pct=20 (jornadas) — gana jornadas
+        # (fallback de la jerarquía, Fase C-1 #1219 — el manual está en 0).
         conn.execute(
             "INSERT INTO alquileres "
             "(id, cliente_id, cliente_nombre, estado, fecha_desde, fecha_hasta, "
-            " descuento_pct, descuento_jornadas_pct) "
-            "VALUES (%s,%s,'Cliente lista-detalle','presupuesto',%s,%s,5,20)",
+            " descuento_pct, descuento_cliente_pct, descuento_jornadas_pct) "
+            "VALUES (%s,%s,'Cliente lista-detalle','presupuesto',%s,%s,0,5,20)",
             (PEDIDO_ID, CLIENTE_ID, FD, FH),
         )
         conn.execute(

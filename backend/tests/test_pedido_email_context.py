@@ -77,7 +77,10 @@ class TestContextoFormato:
                 "id": 1,
                 "items": [{"nombre": "Cámara", "cantidad": 1, "subtotal": 30000}],
                 "descuento_monto": 3000,
-                "descuento_pct": 10,
+                # `descuento_efectivo_pct` (el % GANADOR, lo que expone
+                # `desglose_de_pedido` desde la Fase C-1, #1219) — no
+                # `descuento_pct` crudo, que es solo el override manual.
+                "descuento_efectivo_pct": 10,
             }
         )
         html = ctx["items_html"]

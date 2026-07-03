@@ -26,7 +26,7 @@ import { authedPostJson } from "@/lib/authedFetch";
  * inmediato). */
 const COTIZAR_DEBOUNCE_MS = 300;
 
-export type DescuentoOrigen = "cliente" | "jornadas" | "ninguno";
+export type DescuentoOrigen = "manual" | "cliente" | "jornadas" | "ninguno";
 
 /** Detalle por equipo que el front MUESTRA (no calcula): el backend lo resuelve
  *  en `/api/cotizar` con el precio efectivo (combo-aware). Ver FASE 3 / #1110. */
@@ -158,8 +158,14 @@ export function useCotizacion(args: {
   fechaHasta?: string | null;
   /** Solo admin: cotizar para el cliente del pedido. */
   clienteId?: number | null;
-  /** Solo admin: override del descuento del cliente (el builder lo edita en vivo). */
+  /** Solo admin: override manual del pedido en % (el builder lo edita en vivo). */
   descuentoPct?: number | null;
+  /** Solo admin, Fase C-2 (#1219): tipo del override manual — "pct" (default)
+   *  o "monto" ($ fijo). Mismo campo de la UI, un selector al lado. */
+  descuentoTipo?: "pct" | "monto" | null;
+  /** Solo admin, Fase C-2: override manual del pedido en $ fijo, usado cuando
+   *  `descuentoTipo === "monto"`. */
+  descuentoMonto?: number | null;
   /**
    * Solo admin, para el editor de un pedido YA EXISTENTE: respeta el
    * `precioJornada` de cada ítem (el snapshot congelado del pedido, editable
@@ -177,6 +183,8 @@ export function useCotizacion(args: {
     fechaHasta,
     clienteId,
     descuentoPct,
+    descuentoTipo,
+    descuentoMonto,
     respetarPrecioItem = false,
     enabled = true,
   } = args;
@@ -199,6 +207,8 @@ export function useCotizacion(args: {
     fecha_hasta: fechaHasta ?? null,
     cliente_id: clienteId ?? null,
     descuento_pct: descuentoPct ?? null,
+    descuento_manual_tipo: descuentoTipo ?? null,
+    descuento_manual_monto: descuentoMonto ?? null,
     respetar_precio_item: respetarPrecioItem,
   };
 
@@ -240,12 +250,17 @@ export function useCotizacion(args: {
 }
 
 /** Etiqueta de la fila de descuento. Cuando gana el del cliente se personaliza
- *  con su nombre ("Descuento para Tincho") — atención manual del dueño. */
+ *  con su nombre ("Descuento para Tincho") — atención manual del dueño.
+ *  "manual" (jerarquía, #1219): el admin lo seteó a mano para ESE pedido —
+ *  gana outright, no compite con cliente/jornadas. */
 export function descuentoLabel(
   origen: DescuentoOrigen,
   jornadas: number,
   nombreCliente?: string | null,
 ): string {
+  if (origen === "manual") {
+    return "Descuento manual";
+  }
   if (origen === "jornadas") {
     return `Descuento jornadas (${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"})`;
   }

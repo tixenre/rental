@@ -10,7 +10,14 @@
 """
 import pytest
 
-from descuentos.queries.decision import calcular_descuento_aplicable, calcular_descuento_origen
+from descuentos.queries.decision import (
+    calcular_descuento_aplicable,
+    calcular_descuento_origen,
+    resolver_descuento_pedido,
+    resolver_origen_pedido,
+    resolver_descuento_monto_pedido,
+    resolver_origen_pedido_monto,
+)
 from descuentos.queries.jornadas import interpolar_descuento_jornadas
 
 
@@ -104,3 +111,88 @@ class TestInterpolarDescuentoJornadas:
 
     def test_sin_puntos_devuelve_cero(self):
         assert interpolar_descuento_jornadas([], 5) == 0.0
+
+
+# ── resolver_descuento_pedido / resolver_origen_pedido (jerarquía C-1) ────
+
+
+class TestResolverDescuentoPedido:
+    def test_manual_gana_outright_aunque_sea_menor(self):
+        # 5% manual gana sobre 20% de jornadas — NO compite por tamaño.
+        assert resolver_descuento_pedido(5.0, 0, 20.0) == 5.0
+
+    def test_manual_cero_cae_al_fallback(self):
+        assert resolver_descuento_pedido(0, 10.0, 20.0) == 20.0
+
+    def test_manual_none_cae_al_fallback(self):
+        assert resolver_descuento_pedido(None, 10.0, 20.0) == 20.0
+
+    def test_sin_nada_queda_en_cero(self):
+        assert resolver_descuento_pedido(0, 0, 0) == 0.0
+
+    def test_manual_topa_en_100(self):
+        assert resolver_descuento_pedido(150.0, 0, 0) == 100.0
+
+
+class TestResolverOrigenPedido:
+    def test_manual_gana_el_origen(self):
+        assert resolver_origen_pedido(5.0, 10.0, 20.0) == "manual"
+
+    def test_sin_manual_delega_al_2way(self):
+        assert resolver_origen_pedido(0, 10.0, 20.0) == "jornadas"
+
+    def test_sin_nada_es_ninguno(self):
+        assert resolver_origen_pedido(0, 0, 0) == "ninguno"
+
+
+# ── resolver_descuento_monto_pedido / resolver_origen_pedido_monto (C-2) ──
+
+
+class TestResolverDescuentoMontoPedido:
+    def test_tipo_pct_es_byte_identico_al_calculo_previo(self):
+        # bruto=10000, manual 5% gana outright sobre jornadas 20% → 500.
+        r = resolver_descuento_monto_pedido(10_000, "pct", 5.0, 0, 0, 20.0)
+        assert r == {"monto": 500, "pct": 5.0}
+
+    def test_default_tipo_none_se_trata_como_pct(self):
+        r = resolver_descuento_monto_pedido(10_000, None, 0, 0, 10.0, 20.0)
+        assert r == {"monto": 2000, "pct": 20.0}
+
+    def test_tipo_monto_gana_outright_capeado_a_bruto(self):
+        # Override de $50.000 sobre un bruto de $10.000 → capeado a 10.000 (neto no negativo).
+        r = resolver_descuento_monto_pedido(10_000, "monto", 0, 50_000, 0, 20.0)
+        assert r == {"monto": 10_000, "pct": 100.0}
+
+    def test_tipo_monto_normal_deriva_pct_efectivo(self):
+        r = resolver_descuento_monto_pedido(10_000, "monto", 0, 2_500, 10.0, 20.0)
+        assert r == {"monto": 2500, "pct": 25.0}
+
+    def test_tipo_monto_cero_cae_al_fallback_pct(self):
+        # monto=0 con tipo="monto" es el mismo sentinel "sin override" que pct=0.
+        r = resolver_descuento_monto_pedido(10_000, "monto", 0, 0, 10.0, 20.0)
+        assert r == {"monto": 2000, "pct": 20.0}
+
+    def test_tipo_monto_gana_sobre_manual_pct_estale(self):
+        # El pct manual queda "stale" (irrelevante) cuando tipo="monto" gana.
+        r = resolver_descuento_monto_pedido(10_000, "monto", 99.0, 1_000, 0, 0)
+        assert r == {"monto": 1000, "pct": 10.0}
+
+    def test_bruto_cero_no_divide_por_cero(self):
+        r = resolver_descuento_monto_pedido(0, "monto", 0, 5_000, 0, 0)
+        assert r == {"monto": 0, "pct": 0.0}
+
+    def test_sin_nada_queda_en_cero(self):
+        r = resolver_descuento_monto_pedido(10_000, "pct", 0, 0, 0, 0)
+        assert r == {"monto": 0, "pct": 0.0}
+
+
+class TestResolverOrigenPedidoMonto:
+    def test_tipo_monto_gana_el_origen(self):
+        assert resolver_origen_pedido_monto("monto", 0, 5_000, 10.0, 20.0) == "manual"
+
+    def test_tipo_monto_cero_delega_al_2way(self):
+        assert resolver_origen_pedido_monto("monto", 0, 0, 10.0, 20.0) == "jornadas"
+
+    def test_tipo_pct_delega_a_resolver_origen_pedido(self):
+        assert resolver_origen_pedido_monto("pct", 5.0, 0, 10.0, 20.0) == "manual"
+        assert resolver_origen_pedido_monto("pct", 0, 0, 10.0, 20.0) == "jornadas"
