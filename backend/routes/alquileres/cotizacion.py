@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from database import get_db, to_datetime
 from rate_limit import limiter
 from auth.guards import is_admin_email
-from auth.session import get_session
+from auth.session import dev_bypass_enabled, get_session
 from services.precios import (
     bruto_linea,
     calcular_total,
@@ -83,7 +83,11 @@ def cotizar(data: CotizarRequest, request: Request):
         tiene_fechas = bool(d0 and d1)
 
         session = get_session(request)
-        es_admin = bool(session and is_admin_email(session.get("email")))
+        # Mismo criterio que `require_admin` (auth/guards.py): el bypass de
+        # dev (ADMIN_BYPASS_AUTH=1, nunca en prod) también cuenta como admin
+        # acá — si no, el preview en vivo ignora el override de descuento
+        # aunque el guardado (que sí pasa por require_admin) lo haya aceptado.
+        es_admin = dev_bypass_enabled() or bool(session and is_admin_email(session.get("email")))
         respetar_precio_item = es_admin and bool(data.respetar_precio_item)
 
         # Precios desde el backend. Equipos inexistentes/eliminados se ignoran
