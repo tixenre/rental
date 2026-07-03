@@ -87,7 +87,7 @@ export function NombreTemplateBuilder({
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos", "preview", categoriaNombre],
     queryFn: () => adminApi.listEquipos({ categoria: categoriaNombre, per_page: 100 }),
-    staleTime: 60_000,
+    staleTime: 0,
   });
   const equiposOpts = equiposQ.data?.items ?? [];
 
@@ -95,7 +95,7 @@ export function NombreTemplateBuilder({
     queryKey: ["admin", "equipo-specs", previewEquipoId],
     queryFn: () => adminApi.getEquipoSpecs(previewEquipoId!),
     enabled: previewEquipoId != null,
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   const previewEquipo = previewEquipoId ? equiposOpts.find((e) => e.id === previewEquipoId) : null;

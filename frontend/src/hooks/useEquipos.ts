@@ -526,7 +526,7 @@ export function discoverFilterableSpecs(equipos: Equipment[]): SpecFilterDef[] {
 
 type EquiposQueryResult = { items: Equipment[]; usingFallback: boolean };
 
-export function useEquipos(startDate?: Date, endDate?: Date) {
+export function useEquipos(startDate?: Date, endDate?: Date, opts?: { staleTime?: number }) {
   const desde = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
   const hasta = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
 
@@ -540,7 +540,11 @@ export function useEquipos(startDate?: Date, endDate?: Date) {
     // staleTime corto (30s) para que los cambios desde back-office se reflejen
     // rápido en el catálogo público. Sin esto, el cliente podía ver datos
     // viejos hasta 5min después de un cambio del admin.
-    staleTime: 30_000,
+    // `opts.staleTime` (ej. 0): override explícito para call-sites DENTRO del
+    // back-office — comparten esta misma query key con el catálogo público
+    // (misma cache), pero cada observer decide su propia frescura, así que
+    // el admin puede pedir "siempre al día" sin bajarle el cache al público.
+    staleTime: opts?.staleTime ?? 30_000,
     retry: 1,
   });
 
@@ -551,19 +555,19 @@ export function useEquipos(startDate?: Date, endDate?: Date) {
   };
 }
 
-export function useCategorias() {
+export function useCategorias(opts?: { staleTime?: number }) {
   return useQuery({
     queryKey: ["categorias"],
     queryFn: apiGetCategorias,
-    staleTime: 60_000,
+    staleTime: opts?.staleTime ?? 60_000,
   });
 }
 
-export function useMarcas() {
+export function useMarcas(opts?: { staleTime?: number }) {
   return useQuery<{ items: BackendMarca[] }>({
     queryKey: ["marcas"],
     queryFn: apiGetMarcs,
-    staleTime: 60_000,
+    staleTime: opts?.staleTime ?? 60_000,
     retry: 1,
   });
 }

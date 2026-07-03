@@ -28,13 +28,13 @@ function AdminDashboard() {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["admin", "dashboard"],
     queryFn: () => adminApi.dashboard(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
   // Conteo de pedidos con saldo pendiente (atajo a cobranzas).
   const saldoQ = useQuery({
     queryKey: ["admin", "pedidos", "con_saldo_count"],
     queryFn: () => adminApi.listPedidos({ con_saldo: true, per_page: 1 }),
-    staleTime: 60_000,
+    staleTime: 0,
   });
   const conSaldo = saldoQ.data?.total ?? 0;
 

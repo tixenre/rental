@@ -40,6 +40,7 @@ export function BrandingSection() {
   const ogQ = useQuery({
     queryKey: ["settings", "og_image_url"],
     queryFn: () => fetchSetting("og_image_url"),
+    staleTime: 0,
   });
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -65,6 +66,7 @@ export function BrandingSection() {
   const phoneQ = useQuery({
     queryKey: ["settings", "whatsapp_phone"],
     queryFn: () => fetchSetting("whatsapp_phone"),
+    staleTime: 0,
   });
   const [phoneInput, setPhoneInput] = useState("");
   useEffect(() => {
@@ -89,6 +91,7 @@ export function BrandingSection() {
   const taglinesQ = useQuery({
     queryKey: ["settings", "hero_taglines"],
     queryFn: () => fetchSetting("hero_taglines"),
+    staleTime: 0,
   });
   const [taglineRows, setTaglineRows] = useState<HeroTagline[]>(HERO_TAGLINES_DEFAULT);
   useEffect(() => {

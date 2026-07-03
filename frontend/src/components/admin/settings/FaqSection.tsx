@@ -18,7 +18,7 @@ export function FaqSection() {
     queryKey: ["settings", "faq_json"],
     queryFn: () => adminApi.getSetting("faq_json"),
     retry: false,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   // Arranca del setting guardado, o de las FAQ por defecto (hardcodeadas).

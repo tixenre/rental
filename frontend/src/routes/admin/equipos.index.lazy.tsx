@@ -151,24 +151,24 @@ function EquiposPage() {
   const kpisQ = useQuery({
     queryKey: ["admin", "equipos", "kpis"],
     queryFn: () => adminApi.equiposKpis(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
   // Categorías para el selector de bulk "set categoría" (issue #231).
   const categoriasQ = useQuery({
     queryKey: ["admin", "categorias"],
     queryFn: () => adminApi.listCategorias(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
   const marcasQ = useQuery({
     queryKey: ["admin", "marcas-list"],
     queryFn: () => adminApi.adminListMarcas(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
   // Banner de calidad de inventario: equipos sin serie. Issue #91.
   const sinSerieQ = useQuery({
     queryKey: ["admin", "equipos-sin-serie"],
     queryFn: () => adminApi.getEquiposSinSerie(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   const invalidate = () => {
