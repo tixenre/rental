@@ -360,9 +360,15 @@ def test_get_client_usa_el_endpoint_tal_cual_y_lo_cachea(monkeypatch):
         ("param_tipos_doc", "FEParamGetTiposDoc", ()),
         ("param_tipos_concepto", "FEParamGetTiposConcepto", ()),
         ("param_condicion_iva_receptor", "FEParamGetCondicionIvaReceptor", ("A",)),
+        ("param_tipos_tributos", "FEParamGetTiposTributos", ()),
+        ("param_tipos_opcional", "FEParamGetTiposOpcional", ()),
+        ("param_tipos_monedas", "FEParamGetTiposMonedas", ()),
     ],
 )
 def test_param_devuelve_dicts_con_acceso_por_clave(metodo, operacion, args):
+    """Nombres de operación y campo hijo verificados contra el WSDL real de
+    WSFEv1 (FETributoResponse.ResultGet=TributoTipo[], OpcionalTipoResponse.
+    ResultGet=OpcionalTipo[], MonedaResponse.ResultGet=Moneda[])."""
     from arca_fe.wsfe import WsfeClient
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
@@ -377,6 +383,9 @@ def test_param_devuelve_dicts_con_acceso_por_clave(metodo, operacion, args):
         "FEParamGetTiposDoc": "DocTipo",
         "FEParamGetTiposConcepto": "ConceptoTipo",
         "FEParamGetCondicionIvaReceptor": "CondicionIvaReceptor",
+        "FEParamGetTiposTributos": "TributoTipo",
+        "FEParamGetTiposOpcional": "OpcionalTipo",
+        "FEParamGetTiposMonedas": "Moneda",
     }[operacion]
     mock_result_get = MagicMock(spec=[child_field])
     setattr(mock_result_get, child_field, [item])
@@ -448,3 +457,71 @@ def test_consultar_fault_con_codigo_no_existe_como_substring_no_se_silencia():
 
         with pytest.raises(ArcaResponseError, match="60210"):
             client.consultar(2, 13, 60210)
+
+
+# ---------------------------------------------------------------------------
+# param_cotizacion — forma de respuesta distinta (ResultGet es UN objeto
+# Cotizacion, no un array), verificada contra el WSDL real
+# ---------------------------------------------------------------------------
+
+
+def test_param_cotizacion_devuelve_dict_plano(monkeypatch):
+    from arca_fe.wsfe import WsfeClient
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    cotizacion = MagicMock(spec=["MonId", "MonCotiz", "FchCotiz"])
+    cotizacion.MonId = "DOL"
+    cotizacion.MonCotiz = 1050.5
+    cotizacion.FchCotiz = "20260703"
+    mock_resp = MagicMock(spec=["ResultGet", "Errors"])
+    mock_resp.ResultGet = cotizacion
+    mock_resp.Errors = None
+
+    captured = {}
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+
+        def _get_cotizacion(**kwargs):
+            captured.update(kwargs)
+            return mock_resp
+
+        mock_service.FEParamGetCotizacion.side_effect = _get_cotizacion
+        mock_client_fn.return_value.service = mock_service
+
+        result = client.param_cotizacion("DOL", fecha=date(2026, 7, 3))
+
+    assert result == {"mon_id": "DOL", "cotizacion": 1050.5, "fecha": "20260703"}
+    assert captured["MonId"] == "DOL"
+    assert captured["FchCotiz"] == "20260703"
+
+
+def test_param_cotizacion_sin_fecha_no_manda_fchcotiz(monkeypatch):
+    """`fecha=None` (default) → pide la cotización más reciente, sin filtrar
+    por fecha — no se debe mandar el parámetro FchCotiz en absoluto."""
+    from arca_fe.wsfe import WsfeClient
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    cotizacion = MagicMock(spec=["MonId", "MonCotiz", "FchCotiz"])
+    cotizacion.MonId = "PES"
+    cotizacion.MonCotiz = 1.0
+    cotizacion.FchCotiz = "20260703"
+    mock_resp = MagicMock(spec=["ResultGet", "Errors"])
+    mock_resp.ResultGet = cotizacion
+    mock_resp.Errors = None
+
+    captured = {}
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+
+        def _get_cotizacion(**kwargs):
+            captured.update(kwargs)
+            return mock_resp
+
+        mock_service.FEParamGetCotizacion.side_effect = _get_cotizacion
+        mock_client_fn.return_value.service = mock_service
+
+        client.param_cotizacion("PES")
+
+    assert "FchCotiz" not in captured
