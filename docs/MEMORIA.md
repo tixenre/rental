@@ -704,6 +704,23 @@ en el dashboard admin — es el gap de gobernanza más directo detrás del miedo
 supervisor marca un motor de plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o
 un PR de fix de plata reportado como shippeado sin confirmar merge real a `dev`/`main`.
 
+### 2026-07-03 — `facturas.imp_neto/imp_iva/imp_total`: INTEGER → NUMERIC(12,2), dejan de truncar al centavo (#1209)
+
+Hallazgo de la auditoría cruzada de plata (entrada anterior): el motor de facturación calcula neto/IVA/
+total EXACTOS al centavo (`Decimal`, `arca_fe.calcular_importes`) y esos son los valores que se le mandan
+a ARCA (`armar_fecae`) y se codifican en el QR fiscal (`armar_qr`) para obtener el CAE — pero al persistir
+la fila en `facturas` (columnas entonces INTEGER) se truncaban con `int(round(float(...)))`, siguiendo por
+error la convención de "enteros ARS" de la plata **interna** (`backend/contabilidad/`, 2026-06-07). Una
+factura cuyo neto no fuera múltiplo de 100 (ej. neto=$1001 → IVA 21%=$210,21) quedaba con
+`imp_iva=210`/`imp_total=1211` en la tabla y en el PDF impreso, mientras el CAE/QR ya autorizados ante ARCA
+decían $210,21/$1211,21 — el comprobante legal impreso quedaba por debajo de lo que ARCA realmente
+autorizó. Fix: `imp_neto`/`imp_iva`/`imp_total` pasan a NUMERIC(12,2) (schema en dos capas: `init_db()` +
+migración `h3i4j5k6l7m8`) y `engine.py` deja de truncar — persiste el mismo `Decimal` que ya se calculó.
+`pdf.py` NO necesitó cambios: `_money`/`_plain` ya formateaban con `.2f`, solo mostraban "00" de centavos
+porque el valor guardado venía sin ellos. Esta tabla es la ÚNICA excepción a "enteros ARS" — es un
+documento fiscal, no plata interna; el resto de `backend/contabilidad/` no se toca. El supervisor marca
+un `int(round(...))` reintroducido sobre estos tres campos. Cómo → `docs/SISTEMA_FACTURACION.md` §6/§9.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

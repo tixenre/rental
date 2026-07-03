@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Optional
 
 
@@ -27,9 +28,10 @@ class Factura:
     doc_nro: str
     condicion_iva_receptor: int
     concepto: int
-    imp_neto: int
-    imp_iva: int
-    imp_total: int
+    # NUMERIC(12,2): Decimal exacto al centavo (bug #1209 — ver engine.py).
+    imp_neto: Decimal
+    imp_iva: Decimal
+    imp_total: Decimal
     moneda: str
     cliente_cuit: Optional[str]
     razon_social: Optional[str]
@@ -193,9 +195,9 @@ def insert_factura(
     doc_nro: str,
     condicion_iva_receptor: int,
     concepto: int,
-    imp_neto: int,
-    imp_iva: int,
-    imp_total: int,
+    imp_neto: Decimal,
+    imp_iva: Decimal,
+    imp_total: Decimal,
     moneda: str = "PES",
     cliente_cuit: Optional[str] = None,
     razon_social: Optional[str] = None,
