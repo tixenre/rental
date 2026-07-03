@@ -2153,6 +2153,81 @@ cancel-in-progress` ya cancela corridas viejas.
   plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
   reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.
 
+### 2026-07-03 — `facturas.imp_neto/imp_iva/imp_total`: INTEGER → NUMERIC(12,2), dejan de truncar al centavo (#1209)
+
+- **Contexto.** Bug de severidad media encontrado al auditar `services/facturacion` (línea de la auditoría
+  cruzada de plata, decisión anterior). `services/facturacion/engine.py` calcula el neto/IVA/total EXACTOS
+  al centavo en `Decimal` vía `arca_fe.comprobante.calcular_importes` (`neto = req.importe_neto.quantize(...)`;
+  `iva = (neto * alicuota.pct / 100).quantize(...)`; `assert total == neto + iva`) — y esos son los valores
+  que se le mandan a ARCA en `armar_fecae` (`emitir_factura`/`emitir_nota_credito`, ambas llaman
+  `wsfe.solicitar_cae(fecae_payload)` con `_fmt(neto)`/`_fmt(iva)`/`_fmt(total)`, string con 2 decimales) y
+  se codifican en el QR fiscal vía `armar_qr(..., importe_total=importes["total"], ...)` (RG4892) para
+  obtener el CAE. Pero al armar el dict que se persiste en `facturas` (`imp_neto=neto_int, imp_iva=iva_int,
+  imp_total=total_int`, con `neto_int = int(round(float(importes["neto"])))` y análogos), esos Decimal
+  exactos se truncaban a peso entero — la tabla `facturas` seguía, por error, la convención de "enteros ARS"
+  de `backend/contabilidad/` (2026-06-07), que es la convención correcta para la plata **interna** pero NO
+  para un documento fiscal cuyo importe legal ya quedó fijado al centavo en ARCA.
+- **Escenario de falla concreto (verificado con un test, no solo teórico).** Un pedido Factura A (RI) con
+  `monto_total` (neto) = $1001 — un entero de pesos, pero NO múltiplo de 100. IVA 21% de 1001 = 210,21 (con
+  centavos, aunque el neto no los tenga). ARCA autoriza y el QR codifica: neto 1001.00, IVA 210.21, TOTAL
+  1211.21. La fila en `facturas` guardaba `imp_iva=210`, `imp_total=1211` (truncados) y el PDF impreso decía
+  "IVA 21%: $210,00" / "Importe Total: $1.211,00" — **$0,21 por debajo** de lo que el CAE/QR realmente
+  autorizaron. Pasa en cualquier factura cuyo neto no sea múltiplo de 100 (común con descuentos o precios no
+  redondos) — no es un caso de borde raro.
+- **Efecto secundario descubierto al leer `comprobante_pedido.py`.** `construir_comprobante_nc` (usada para
+  anular con Nota de Crédito) reconstruye el importe de la NC leyendo el SNAPSHOT ya persistido de la factura
+  original (`importe_neto = Decimal(original.imp_neto)`) — a propósito, para que la NC cancele exactamente lo
+  facturado y no lo que el pedido diga "en vivo" (decisión 2026-06-29, test
+  `test_construir_comprobante_nc_usa_snapshot_no_pedido_en_vivo`). Con `imp_neto` truncado, ese snapshot
+  YA VENÍA MAL — la NC hubiera heredado el mismo redondeo. El fix de la columna corrige este camino gratis,
+  sin tocar `comprobante_pedido.py`.
+- **Decisión — fix mínimo, sin tocar el core de ARCA.** (1) `facturas.imp_neto`/`imp_iva`/`imp_total` pasan
+  de INTEGER a NUMERIC(12,2) — en `database/schema.py::init_db()` (`CREATE TABLE` con el tipo nuevo para
+  instalaciones frescas + un bloque `DO $$ ... ALTER COLUMN ... TYPE NUMERIC(12,2) USING ...::NUMERIC(12,2)`
+  idempotente, guardado tras chequear `information_schema.columns.data_type = 'integer'`, para DBs
+  existentes que corran `init_db()` sin pasar por Alembic) y en la migración nueva `h3i4j5k6l7m8` (mismo
+  `ALTER COLUMN ... TYPE` sin guard — Alembic ya trackea si se aplicó; `downgrade()` sí usa `ROUND(...)` antes
+  de volver a INTEGER, por si para entonces hay filas con centavos reales que perderían precisión al bajar).
+  (2) `engine.py` deja de truncar: `neto_dec/iva_dec/total_dec = importes["neto"|"iva"|"total"]` directo,
+  sin `int(round(float(...)))`, en los 2 call-sites (`emitir_factura` e `emitir_nota_credito`). (3) `repo.py`:
+  el dataclass `Factura` y la firma de `insert_factura` cambian el type hint de `int` a `Decimal` en los tres
+  campos (cosmético para type-checking; en runtime Python no lo exige, pero documenta el contrato real).
+  (4) `pdf.py` **NO necesitó ningún cambio** — `_money`/`_plain` ya formatean con `f"{float(n):,.2f}"`, así
+  que ya mostraban 2 decimales; solo mostraban "00" de centavos porque el valor guardado venía sin ellos.
+  Verificado manualmente (`factura_html` con `imp_iva=Decimal("210.21")` → el HTML contiene literalmente
+  "210,21", no "210,00") antes de descartar tocar ese archivo.
+- **Por qué NUMERIC(12,2) y no cambiar el `int(round(...))` por otra cosa.** Se consideró dejar la columna
+  INTEGER y solo redondear "mejor" en algún otro punto — descartado: el problema no es CÓMO se redondea, es
+  QUE se redondea un documento fiscal cuyo importe legal ya es fraccionario por diseño (IVA discriminado).
+  NUMERIC(12,2) (no NUMERIC sin precisión, no FLOAT — mismo criterio que `g1a2b3c4d5e6` para `descuento_pct`:
+  FLOAT introduce error de punto flotante en plata) replica exactamente la precisión de 2 decimales que ARCA
+  exige en `ImpNeto`/`ImpIVA`/`ImpTotal`. El `USING ...::NUMERIC(12,2)` (sin `ROUND`) en el `upgrade()` es
+  seguro porque el valor de origen es INTEGER — no hay parte fraccionaria que perder al ampliar precisión (a
+  diferencia de la migración inversa `g1a2b3c4d5e6`, que sí necesitaba `ROUND` porque iba de más a menos
+  precisión). Precedente seguido para el patrón de dos capas: `g1a2b3c4d5e6_descuentos_float_a_numeric.py`
+  (mismo tipo de bug — plata perdiendo precisión por el tipo de columna equivocado).
+- **Verificación.** Test nuevo `tests/test_facturacion_centavos.py`: (a)
+  `test_emitir_factura_persiste_centavos_exactos_no_trunca` arma un pedido RI con neto=$1001, mockea
+  WSFE/DB (mismo patrón que `test_facturacion_engine.py`, sin red ni Postgres real), y verifica que lo
+  persistido en `insert_factura` (`imp_neto`/`imp_iva`/`imp_total`) coincide EXACTO —
+  `Decimal("1001.00")`/`Decimal("210.21")`/`Decimal("1211.21")`— con lo que el mismo test capturó en el
+  payload `FECAESolicitar` mandado a ARCA (`det["ImpIVA"] == "210.21"`); (b)
+  `test_pdf_muestra_centavos_no_redondea_a_peso_entero` renderiza `factura_html` con esos mismos valores y
+  confirma que el HTML contiene "210,21"/"1.211,21" y NO contiene "210,00"/"1.211,00". Suite completa
+  (2550 unit + 2457 con Postgres real vía `RESERVAS_DB_TEST=1`, excluyendo `test_catalogo_motor_shape.py`
+  que ya falla igual en `origin/dev` sin este cambio — verificado clonando el repo limpio) y
+  `test_alembic_upgrade_db.py` (`ALEMBIC_DB_TEST=1`, que corre `init_db()+upgrade head` contra una BD
+  descartable) en verde; confirmado además a mano que re-correr `init_db()` sobre una tabla `facturas` ya
+  existente con columnas INTEGER (simulando una BD vieja no migrada) las deja en NUMERIC(12,2) — el guard
+  `DO $$` idempotente funciona. pyflakes limpio en los 5 archivos tocados.
+- **Consecuencias.** Sin cambios de contrato público más allá de más precisión (el JSON de
+  `/api/admin/facturas` y `/facturas/{id}/pdf` sigue devolviendo los mismos campos, ahora con centavos
+  reales en vez de siempre ".00"). No afecta `backend/contabilidad/` ni ningún reporte que sume plata
+  interna — `facturas` no es consumida fuera del paquete `services/facturacion/` + su route (verificado con
+  `grep -rl facturas backend/`). El supervisor marca un `int(round(...))` reintroducido sobre
+  `imp_neto`/`imp_iva`/`imp_total`, o un cambio de esta tabla que la vuelva a alinear con "enteros ARS" sin
+  entender que es la excepción fiscal. PR sin mergear (rama `fix/factura-centavos-arca` → `dev`); issue #1209.
+
 ### 2026-07-02 — `reportes/liquidacion.py::filas_atribucion` perdía plata en silencio con `suma_items = 0`
 
 - **Contexto.** Fase 5 de la hoja de ruta de plata (#1184; hallazgo #4 de la auditoría cruzada,

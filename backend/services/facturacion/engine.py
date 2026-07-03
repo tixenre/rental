@@ -155,10 +155,17 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
         doc_tipo = int(req.receptor.doc_tipo)
         doc_nro = str(req.receptor.doc_nro)
         cond_iva_rec = int(req.receptor.condicion_iva)
-        # La tabla usa "enteros ARS" = pesos sin centavos (igual que alquiler_pagos).
-        neto_int = int(round(float(importes["neto"])))
-        iva_int = int(round(float(importes["iva"])))
-        total_int = int(round(float(importes["total"])))
+        # Se persiste el Decimal EXACTO al centavo que ya calculó `calcular_importes`
+        # — el MISMO valor que se le manda a ARCA en `armar_fecae` y se codifica en
+        # el QR fiscal (`armar_qr`, más abajo, con `importes["total"]` sin truncar).
+        # A diferencia de la plata "interna" (enteros ARS de `backend/contabilidad/`,
+        # 2026-06-07), este es un documento fiscal: redondear a entero acá dejaba el
+        # PDF impreso por debajo de lo que el CAE/QR autorizaron ante ARCA en
+        # cualquier factura cuyo neto no fuera múltiplo de 100 (bug #1209).
+        # `imp_neto`/`imp_iva`/`imp_total` son NUMERIC(12,2).
+        neto_dec = importes["neto"]
+        iva_dec = importes["iva"]
+        total_dec = importes["total"]
 
         cuit_rec = pedido.get("cliente_cuit") or ""
         razon_social = pedido.get("cliente_razon_social") or pedido.get("cliente_nombre") or ""
@@ -177,9 +184,9 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
                 doc_nro=doc_nro,
                 condicion_iva_receptor=cond_iva_rec,
                 concepto=int(req.concepto),
-                imp_neto=neto_int,
-                imp_iva=iva_int,
-                imp_total=total_int,
+                imp_neto=neto_dec,
+                imp_iva=iva_dec,
+                imp_total=total_dec,
                 moneda="PES",
                 cliente_cuit=cuit_rec or None,
                 razon_social=razon_social or None,
@@ -356,9 +363,10 @@ def emitir_nota_credito(
         lock_n = _advisory_hash(emisor_obj.punto_venta, int(cbte_tipo_nc))
         conn.execute("SELECT pg_advisory_xact_lock(%s)", (lock_n,))
 
-        neto_int = int(round(float(importes["neto"])))
-        iva_int = int(round(float(importes["iva"])))
-        total_int = int(round(float(importes["total"])))
+        # Mismo criterio que en emitir_factura: Decimal exacto al centavo, no truncado.
+        neto_dec = importes["neto"]
+        iva_dec = importes["iva"]
+        total_dec = importes["total"]
 
         # Anular la original ANTES de insertar la NC: el índice único parcial
         # uq_factura_vigente_por_pedido permite una sola fila 'pendiente'/'emitida'
@@ -377,9 +385,9 @@ def emitir_nota_credito(
             doc_nro=original.doc_nro,
             condicion_iva_receptor=original.condicion_iva_receptor,
             concepto=original.concepto,
-            imp_neto=neto_int,
-            imp_iva=iva_int,
-            imp_total=total_int,
+            imp_neto=neto_dec,
+            imp_iva=iva_dec,
+            imp_total=total_dec,
             moneda="PES",
             cliente_cuit=original.cliente_cuit,
             razon_social=original.razon_social,
