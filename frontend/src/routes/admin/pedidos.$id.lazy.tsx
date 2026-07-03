@@ -708,7 +708,14 @@ function PedidoEditorPage() {
               <div className="border-t hairline my-1" />
               <BdRow l="Total" v={fmtArs(total)} strong />
             </div>
-            <FieldLabel label="Descuento manual (0 = automático)" className="mt-3">
+            {/* Div plano, NO <FieldLabel> (que renderiza un <label> nativo):
+                un <label> reenvía cualquier click dentro de su área al PRIMER
+                control enfocable de adentro (acá, el botón "%") — clickear
+                "cerca" del input $ pero todavía dentro del label revertía el
+                selector a "%" solo. Con 2+ controles adentro, un <label> no
+                es seguro; FieldLabel sigue bien para los campos de un solo input. */}
+            <div className="block mt-3">
+              <span className="block t-eyebrow mb-1">Descuento manual (0 = automático)</span>
               <div className="flex items-center gap-2">
                 <SegmentedControl
                   value={datos.descuento_manual_tipo}
@@ -764,7 +771,7 @@ function PedidoEditorPage() {
                   </div>
                 )}
               </div>
-            </FieldLabel>
+            </div>
           </RailSection>
 
           {/* Cobranza */}
