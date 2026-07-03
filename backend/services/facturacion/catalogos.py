@@ -43,9 +43,10 @@ def refrescar_catalogos(conn) -> dict[str, list[dict]]:
 
     Raises:
         ValueError: no hay ningún emisor activo con cert cargado.
-        RuntimeError: ARCA no respondió o rechazó la consulta.
+        arca_fe.ArcaError: ARCA no respondió o rechazó la consulta — se deja
+        pasar tal cual (sin envolver en RuntimeError) para que el route
+        distinga el subtipo y elija el status HTTP correcto (422/502/503).
     """
-    from arca_fe import ArcaError
     from arca_fe.wsfe import WsfeClient
     from services.facturacion.config import credenciales
     from services.facturacion.emisores_repo import elegir_autenticador
@@ -61,18 +62,13 @@ def refrescar_catalogos(conn) -> dict[str, list[dict]]:
     token, sign = get_ta(emisor, conn)
     wsfe = WsfeClient(endpoint=cred.endpoint_wsfe, cuit=cred.cuit, token=token, sign=sign)
 
-    try:
-        doc_tipo = [{"id": d["Id"], "desc": d["Desc"]} for d in wsfe.param_tipos_doc()]
-        concepto = [{"id": c["Id"], "desc": c["Desc"]} for c in wsfe.param_tipos_concepto()]
+    doc_tipo = [{"id": d["Id"], "desc": d["Desc"]} for d in wsfe.param_tipos_doc()]
+    concepto = [{"id": c["Id"], "desc": c["Desc"]} for c in wsfe.param_tipos_concepto()]
 
-        condicion_iva_receptor: dict[int, str] = {}
-        for clase in _CLASES_CMP:
-            for c in wsfe.param_condicion_iva_receptor(clase):
-                condicion_iva_receptor[c["Id"]] = c["Desc"]
-    except ArcaError as exc:
-        # Taxonomía tipada del motor → RuntimeError (convención de este
-        # adapter, que el route mapea a 503) preservando el mensaje.
-        raise RuntimeError(str(exc)) from exc
+    condicion_iva_receptor: dict[int, str] = {}
+    for clase in _CLASES_CMP:
+        for c in wsfe.param_condicion_iva_receptor(clase):
+            condicion_iva_receptor[c["Id"]] = c["Desc"]
     condicion_iva_receptor_lista = [
         {"id": k, "desc": v} for k, v in sorted(condicion_iva_receptor.items())
     ]

@@ -515,11 +515,11 @@ def test_preview_arca_caida_propaga_runtime_error(monkeypatch):
         engine.previsualizar_factura(1, conn=_FakeConn())
 
 
-def test_preview_arca_business_error_en_ultimo_autorizado_se_traduce(monkeypatch):
-    """Regresión: `wsfe.ultimo_autorizado()` real levanta `ArcaBusinessError`/
-    `ArcaResponseError` (taxonomía tipada), no `RuntimeError` directamente —
-    sin el `except ArcaError` alrededor de esta llamada, esto escapaba de
-    `previsualizar_factura` sin traducir (500 sin manejar en vez de 503)."""
+def test_preview_arca_business_error_se_propaga_sin_envolver(monkeypatch):
+    """`wsfe.ultimo_autorizado()` real levanta `ArcaBusinessError`/
+    `ArcaResponseError` (taxonomía tipada) — `previsualizar_factura` ya NO la
+    envuelve en `RuntimeError`: se deja pasar tal cual para que el route
+    elija el status HTTP por subtipo (422/502/503) en vez de un 503 genérico."""
     from arca_fe.errores import ArcaBusinessError
 
     class _WsfeQueExplota(_FakeWsfe):
@@ -528,5 +528,5 @@ def test_preview_arca_business_error_en_ultimo_autorizado_se_traduce(monkeypatch
 
     _patch_preview_common(monkeypatch, _WsfeQueExplota(endpoint="x", cuit=1, token="t", sign="s"))
 
-    with pytest.raises(RuntimeError, match="600"):
+    with pytest.raises(ArcaBusinessError, match="600"):
         engine.previsualizar_factura(1, conn=_FakeConn())

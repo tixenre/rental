@@ -66,12 +66,11 @@ def test_emisor_sin_cert_propaga_value_error(monkeypatch):
         consultar_puntos_venta("pablo", conn=object())
 
 
-def test_arca_caida_propaga_runtime_error(monkeypatch):
-    """Regresión: `param_puntos_venta()` real levanta `ArcaBusinessError`/
-    `ArcaResponseError` (taxonomía tipada del motor), NO `RuntimeError`
-    directamente — mockear un RuntimeError acá no ejercita la traducción real
-    y daba falsa confianza (bug real: sin el `except ArcaError` en
-    `consultar_puntos_venta`, esto escapaba como 500 sin manejar, no 503)."""
+def test_arca_caida_propaga_arca_error(monkeypatch):
+    """`param_puntos_venta()` real levanta `ArcaBusinessError`/`ArcaResponseError`
+    (taxonomía tipada del motor) — `consultar_puntos_venta` ya NO la envuelve
+    en `RuntimeError`: se deja pasar tal cual para que el route elija el
+    status HTTP por subtipo (422/502/503) en vez de un 503 genérico."""
     from arca_fe.errores import ArcaBusinessError
 
     _patch_auth(monkeypatch)
@@ -84,5 +83,5 @@ def test_arca_caida_propaga_runtime_error(monkeypatch):
 
     monkeypatch.setattr("arca_fe.wsfe.WsfeClient.param_puntos_venta", _boom)
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ArcaBusinessError, match="600"):
         consultar_puntos_venta("pablo", conn=object())

@@ -28,8 +28,8 @@ def get_ta(emisor: str, conn, servicio: str = "wsfe") -> tuple[str, str]:
     (dentro de `with get_db() as conn:`).
     """
     from services.facturacion.config import credenciales
-    from arca_fe.wsaa import login_con_cert
     from arca_fe import ArcaError
+    from arca_fe.wsaa import login_con_cert
 
     cred = credenciales(emisor, conn)
     ahora = datetime.now(timezone.utc)
@@ -63,16 +63,15 @@ def get_ta(emisor: str, conn, servicio: str = "wsfe") -> tuple[str, str]:
             cred.key_pem.encode() if isinstance(cred.key_pem, str) else cred.key_pem,
             cred.endpoint_wsaa,
         )
-    except (RuntimeError, ValueError):
+    except (RuntimeError, ValueError, ArcaError):
+        # `login_con_cert` ya tipa sus fallas (ArcaAuthError/ArcaNetworkError/
+        # ArcaResponseError, ver arca_fe/wsaa.py) — se dejan pasar tal cual,
+        # sin envolver en RuntimeError, para que el route elija el status
+        # HTTP por subtipo (422/502/503) en vez de un 503 genérico para todo.
         raise
-    except ArcaError as exc:
-        # El motor arca_fe usa su propia taxonomía tipada (ArcaError); la
-        # aplanamos a RuntimeError —la convención de este adapter, que el route
-        # mapea a HTTP 503— preservando el mensaje. La granularidad tipada
-        # queda para un consumidor que la quiera (el SaaS), no para el route.
-        raise RuntimeError(str(exc)) from exc
     except Exception as exc:
-        # httpx.RequestError (timeout/red) u otra no controlada.
+        # Solo llega acá algo que NI login_con_cert tipó — verdaderamente
+        # inesperado.
         raise RuntimeError(
             f"Error al contactar WSAA ({cred.endpoint_wsaa}): {type(exc).__name__}: {exc}"
         ) from exc
