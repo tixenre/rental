@@ -230,10 +230,19 @@ class AlquilerPagoRef(_Base):
     """Pago embebido dentro de un Alquiler. No tiene clave natural propia
     — la combinación (numero_pedido + fecha + monto + concepto) se trata
     como identidad para evitar duplicarlos en re-imports.
+
+    `anulado` + sus columnas de auditoría viajan tal cual (#1184/#1209): un
+    pago anulado es soft-delete y NO debe "revivir" activo tras un
+    export→import — antes se perdían en el viaje y el import los reinsertaba
+    con el default de la columna (`anulado=FALSE`).
     """
     monto: int
     concepto: str | None = None
     fecha: str  # ISO date string
+    anulado: bool = False
+    anulado_por: str | None = None
+    anulado_at: str | None = None  # ISO datetime string
+    anulado_motivo: str | None = None
 
 
 class Alquiler(_Base):

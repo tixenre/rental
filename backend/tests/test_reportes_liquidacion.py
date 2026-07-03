@@ -8,7 +8,7 @@ detalle por dueño). La parte SQL se valida en staging con datos reales.
 import pytest
 
 from reportes.comisiones import DEFAULT_MODELO, repartir, validar_modelo
-from reportes.liquidacion import agregar
+from reportes.liquidacion import agregar, combinar_meses
 
 
 class TestRepartir:
@@ -147,3 +147,93 @@ class TestCierresPuros:
         assert mes_de_rango("2026-06-01", "2026-06-15") is None  # medio mes
         assert mes_de_rango("2026-06-02", "2026-06-30") is None  # no arranca el 1
         assert mes_de_rango("2026-06-01", "2026-07-31") is None  # dos meses
+
+    def test_meses_en_rango(self):
+        from reportes.cierres import _meses_en_rango
+
+        assert _meses_en_rango("2026-01-01", "2026-12-31") == [
+            f"2026-{m:02d}" for m in range(1, 13)
+        ]
+        assert _meses_en_rango("2026-06-01", "2026-06-30") == ["2026-06"]
+        assert _meses_en_rango("2026-11-15", "2027-02-10") == [
+            "2026-11", "2026-12", "2027-01", "2027-02",
+        ]  # cruza año
+
+
+class TestCombinarMeses:
+    """`combinar_meses` (#1209): junta N reportes por-mes (foto congelada o en
+    vivo, le da igual) en un solo reporte multi-mes. Sumar es seguro porque un
+    pedido pertenece a un único mes de saldado — nunca se solapan."""
+
+    def _mes(self, mes: str, pablo_total: int, pablo_benef: int, rambla_benef: int):
+        """Un reporte de un solo mes con la forma de `liquidar`, con un único
+        pedido de Pablo repartido según se indique."""
+        return {
+            "resumen": {
+                "total": pablo_total,
+                "pedidos": 1,
+                "por_beneficiario": {"Pablo": pablo_benef, "Rambla": rambla_benef},
+            },
+            "por_mes": [
+                {
+                    "mes": mes,
+                    "total": pablo_total,
+                    "por_beneficiario": {"Pablo": pablo_benef, "Rambla": rambla_benef},
+                }
+            ],
+            "por_dia": [{"dia": f"{mes}-10", "total": pablo_total,
+                         "por_beneficiario": {"Pablo": pablo_benef, "Rambla": rambla_benef}}],
+            "por_dueno": [
+                {
+                    "dueno": "Pablo",
+                    "monto_generado": pablo_total,
+                    "pedidos": 1,
+                    "reparto": {"Pablo": pablo_benef, "Rambla": rambla_benef},
+                    "equipos": [{"equipo": "Sony FX3", "monto": pablo_total, "veces": 1}],
+                }
+            ],
+            "modelo": {"Pablo": {"Pablo": 100}},
+            "beneficiarios": ["Pablo", "Rambla"],
+        }
+
+    def test_suma_resumen_sin_duplicar(self):
+        junio = self._mes("2026-06", 100000, 50000, 50000)  # foto vieja (50/50)
+        julio = self._mes("2026-07", 40000, 40000, 0)  # en vivo, modelo nuevo (100% Pablo)
+        d = combinar_meses([junio, julio])
+        assert d["resumen"]["total"] == 140000
+        assert d["resumen"]["pedidos"] == 2
+        assert d["resumen"]["por_beneficiario"] == {"Pablo": 90000, "Rambla": 50000}
+
+    def test_por_mes_conserva_cada_fuente_por_separado(self):
+        junio = self._mes("2026-06", 100000, 50000, 50000)
+        julio = self._mes("2026-07", 40000, 40000, 0)
+        d = combinar_meses([junio, julio])
+        por_mes = {m["mes"]: m for m in d["por_mes"]}
+        assert por_mes["2026-06"]["por_beneficiario"]["Pablo"] == 50000  # foto intacta
+        assert por_mes["2026-07"]["por_beneficiario"]["Pablo"] == 40000  # en vivo intacto
+
+    def test_por_dueno_acumula_equipos_y_veces(self):
+        junio = self._mes("2026-06", 100000, 50000, 50000)
+        julio = self._mes("2026-07", 40000, 40000, 0)
+        d = combinar_meses([junio, julio])
+        pablo = {x["dueno"]: x for x in d["por_dueno"]}["Pablo"]
+        assert pablo["monto_generado"] == 140000
+        assert pablo["pedidos"] == 2
+        assert pablo["equipos"][0]["equipo"] == "Sony FX3"
+        assert pablo["equipos"][0]["monto"] == 140000
+        assert pablo["equipos"][0]["veces"] == 2
+
+    def test_beneficiarios_es_la_union_en_orden_de_aparicion(self):
+        junio = self._mes("2026-06", 100000, 50000, 50000)
+        junio["beneficiarios"] = ["Pablo", "Rambla"]
+        julio = self._mes("2026-07", 40000, 40000, 0)
+        julio["beneficiarios"] = ["Pablo", "Rambla", "Tincho"]
+        d = combinar_meses([junio, julio])
+        assert d["beneficiarios"] == ["Pablo", "Rambla", "Tincho"]
+
+    def test_lista_vacia(self):
+        d = combinar_meses([])
+        assert d["resumen"]["total"] == 0
+        assert d["resumen"]["pedidos"] == 0
+        assert d["por_mes"] == [] and d["por_dia"] == [] and d["por_dueno"] == []
+        assert d["beneficiarios"] == []
