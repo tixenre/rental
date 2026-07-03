@@ -340,14 +340,23 @@ export function EquipoFormDialogV2({
     if (!data) return;
     // Mapear { spec_def_id → value } a Spec[]. El id de cada Spec es
     // `spec-${spec_def_id}` para poder mapear de vuelta al guardar
-    // (putEquipoSpecs). El label se resuelve contra el template EN VIVO de la
-    // categoría seleccionada en el efecto de re-etiquetado de abajo; acá
-    // arrancamos con un fallback hasta que el template cargue.
+    // (putEquipoSpecs). El label sale de `data.template` — el MISMO response
+    // ya trae el template resuelto (WITH RECURSIVE por categorías del
+    // equipo), así que no hace falta esperar a la query/efecto de
+    // re-etiquetado de abajo (ese sigue existiendo para cuando el admin
+    // cambia la categoría de specs EN VIVO dentro del form — acá cubrimos
+    // el arranque). Antes sembraba con un fallback numérico ("spec 45")
+    // hasta que el re-etiquetado corría; en esa ventana cualquier
+    // consumidor que matchea specs por label (el preview de nombre público
+    // auto-generado, ej.) no encontraba el spec y el placeholder quedaba
+    // vacío — confirmado en vivo.
+    const labelById = new Map(data.template.map((t) => [t.spec_def_id, t.label]));
     const next: Spec[] = [];
     for (const [defIdStr, value] of Object.entries(data.specs)) {
       const v = value == null ? "" : String(value);
       if (!v.trim()) continue;
-      next.push({ id: `spec-${defIdStr}`, label: `spec ${defIdStr}`, value: v });
+      const label = labelById.get(Number(defIdStr)) ?? `spec ${defIdStr}`;
+      next.push({ id: `spec-${defIdStr}`, label, value: v });
     }
     setSpecs(next);
   }, [equipoSpecsQ.data, initial]);
