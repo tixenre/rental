@@ -60,6 +60,28 @@ def test_parse_fecha_malformada_loguea_y_devuelve_none(caplog):
 # ---------------------------------------------------------------------------
 
 
+# Nombres de campo verificados contra el WSDL real de WSFEv1
+# (https://.../wsfev1/service.asmx?WSDL): el detalle FECAEDetResponse expone
+# Resultado/CAE/CAEFchVto/CbteDesde/Observaciones/Errors; la respuesta,
+# FeDetResp/Errors. `spec=` acá hace que un typo de campo en wsfe.py (leer un
+# atributo que la respuesta real no tiene) reviente el mock — que es cómo se
+# coló el bug de `personaReturn` cuando el mock NO tenía spec.
+_DET_FIELDS = ["Resultado", "CAE", "CAEFchVto", "CbteDesde", "Observaciones", "Errors"]
+_ERRCONT_FIELDS = ["Err"]
+_OBSCONT_FIELDS = ["Obs"]
+_ITEM_FIELDS = ["Code", "Msg"]
+
+
+def _make_items(pares):
+    items = []
+    for code, msg in pares:
+        it = MagicMock(spec=_ITEM_FIELDS)
+        it.Code = code
+        it.Msg = msg
+        items.append(it)
+    return items
+
+
 def _make_det(
     resultado: str,
     cae: Optional[str] = None,
@@ -68,35 +90,23 @@ def _make_det(
     obs: Optional[list] = None,
     errs: Optional[list] = None,
 ):
-    """Construye un mock del FECAEDetResponse de zeep."""
-    det = MagicMock()
+    """Construye un mock del FECAEDetResponse de zeep (campos del WSDL real)."""
+    det = MagicMock(spec=_DET_FIELDS)
     det.Resultado = resultado
     det.CAE = cae
     det.CAEFchVto = cae_vto
     det.CbteDesde = cbte_desde
 
     if obs:
-        obs_container = MagicMock()
-        obs_items = []
-        for code, msg in obs:
-            o = MagicMock()
-            o.Code = code
-            o.Msg = msg
-            obs_items.append(o)
-        obs_container.Obs = obs_items
+        obs_container = MagicMock(spec=_OBSCONT_FIELDS)
+        obs_container.Obs = _make_items(obs)
         det.Observaciones = obs_container
     else:
         det.Observaciones = None
 
     if errs:
-        err_container = MagicMock()
-        err_items = []
-        for code, msg in errs:
-            e = MagicMock()
-            e.Code = code
-            e.Msg = msg
-            err_items.append(e)
-        err_container.Err = err_items
+        err_container = MagicMock(spec=_ERRCONT_FIELDS)
+        err_container.Err = _make_items(errs)
         det.Errors = err_container
     else:
         det.Errors = None
@@ -105,17 +115,12 @@ def _make_det(
 
 
 def _make_fecae_response(det, cab_errs: Optional[list] = None):
-    resp = MagicMock()
+    resp = MagicMock(spec=["FeDetResp", "Errors"])
+    resp.FeDetResp = MagicMock(spec=["FECAEDetResponse"])
     resp.FeDetResp.FECAEDetResponse = [det]
     if cab_errs:
-        err_container = MagicMock()
-        err_items = []
-        for code, msg in cab_errs:
-            e = MagicMock()
-            e.Code = code
-            e.Msg = msg
-            err_items.append(e)
-        err_container.Err = err_items
+        err_container = MagicMock(spec=_ERRCONT_FIELDS)
+        err_container.Err = _make_items(cab_errs)
         resp.Errors = err_container
     else:
         resp.Errors = None
@@ -206,10 +211,10 @@ def test_solicitar_cae_sin_fedetresp_pero_con_errors_levanta_business():
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
 
-    err = MagicMock()
+    err = MagicMock(spec=_ITEM_FIELDS)
     err.Code = 600
     err.Msg = "Autenticación fallida"
-    err_container = MagicMock()
+    err_container = MagicMock(spec=_ERRCONT_FIELDS)
     err_container.Err = [err]
     resp = MagicMock(spec=["Errors"])  # NO tiene FeDetResp
     resp.Errors = err_container
@@ -250,7 +255,7 @@ def test_ultimo_autorizado_mock():
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
 
-    mock_resp = MagicMock()
+    mock_resp = MagicMock(spec=["CbteNro", "Errors"])
     mock_resp.CbteNro = 42
     mock_resp.Errors = None
 
@@ -291,12 +296,12 @@ def test_consultar_no_existe_por_error_602_combinacion_virgen():
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
 
-    err = MagicMock()
+    err = MagicMock(spec=_ITEM_FIELDS)
     err.Code = 602
     err.Msg = "No existen datos en nuestros registros para los parámetros ingresados."
-    err_container = MagicMock()
+    err_container = MagicMock(spec=_ERRCONT_FIELDS)
     err_container.Err = [err]
-    mock_resp = MagicMock()
+    mock_resp = MagicMock(spec=["Errors", "ResultGet"])
     mock_resp.Errors = err_container
 
     with patch.object(client, "_client") as mock_client_fn:
@@ -366,7 +371,6 @@ def test_param_devuelve_dicts_con_acceso_por_clave(metodo, operacion, args):
     # zeep.helpers.serialize_object para un CompoundValue real, así que
     # ejercita la misma rama de código sin necesitar un mock de zeep interno.
     item = {"Id": 80, "Desc": "CUIT"}
-    mock_result_get = MagicMock()
     child_field = {
         "FEParamGetPtosVenta": "PtoVenta",
         "FEParamGetTiposCbte": "CbteTipo",
@@ -374,8 +378,9 @@ def test_param_devuelve_dicts_con_acceso_por_clave(metodo, operacion, args):
         "FEParamGetTiposConcepto": "ConceptoTipo",
         "FEParamGetCondicionIvaReceptor": "CondicionIvaReceptor",
     }[operacion]
+    mock_result_get = MagicMock(spec=[child_field])
     setattr(mock_result_get, child_field, [item])
-    mock_resp = MagicMock()
+    mock_resp = MagicMock(spec=["ResultGet", "Errors"])
     mock_resp.ResultGet = mock_result_get
     mock_resp.Errors = None
 
@@ -399,12 +404,12 @@ def test_consultar_error_real_no_se_confunde_con_no_existe():
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
 
-    err = MagicMock()
+    err = MagicMock(spec=_ITEM_FIELDS)
     err.Code = 500
     err.Msg = "Error interno de AFIP"
-    err_container = MagicMock()
+    err_container = MagicMock(spec=_ERRCONT_FIELDS)
     err_container.Err = [err]
-    mock_resp = MagicMock()
+    mock_resp = MagicMock(spec=["Errors", "ResultGet"])
     mock_resp.Errors = err_container
 
     with patch.object(client, "_client") as mock_client_fn:
