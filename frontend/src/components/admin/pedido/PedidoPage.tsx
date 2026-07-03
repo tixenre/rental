@@ -649,9 +649,15 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
               draft.setDatos({
                 ...draft.datos!,
                 descuento_manual_tipo: v,
-                // Resetear el otro campo: sin esto queda inerte en la base y
-                // puede reaparecer solo si el admin vuelve a tocar el selector.
-                ...(v === "monto" ? { descuento_pct: 0 } : { descuento_manual_monto: 0 }),
+                // Convertir al equivalente del OTRO campo (el % y el $
+                // efectivos que ya muestra el desglose, del backend) — cambiar
+                // de unidad no debería perder el descuento actual. El campo
+                // que se deja de usar se resetea (sin esto queda un valor
+                // "fantasma" que podía reaparecer si el admin volvía a tocar
+                // el selector).
+                ...(v === "monto"
+                  ? { descuento_manual_monto: totales.descuentoMonto, descuento_pct: 0 }
+                  : { descuento_pct: totales.descuentoPct, descuento_manual_monto: 0 }),
               })
             }
             descuentoManualMonto={draft.datos.descuento_manual_monto}

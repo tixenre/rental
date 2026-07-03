@@ -725,11 +725,16 @@ function PedidoEditorPage() {
                         d && {
                           ...d,
                           descuento_manual_tipo: v as "pct" | "monto",
-                          // Resetear el otro campo: sin esto, el valor viejo
-                          // queda "inerte" en la base (ignorado mientras el
-                          // tipo no lo use) y puede reaparecer solo si el
-                          // admin vuelve a tocar el selector — confuso.
-                          ...(v === "monto" ? { descuento_pct: 0 } : { descuento_manual_monto: 0 }),
+                          // Convertir al equivalente del OTRO campo (el % y el
+                          // $ efectivos que ya muestra el desglose, calculados
+                          // por el backend) en vez de resetear a 0 — cambiar
+                          // de unidad no debería perder el descuento actual.
+                          // El campo que se deja de usar se resetea (sin esto
+                          // queda un valor "fantasma" que podía reaparecer si
+                          // el admin volvía a tocar el selector).
+                          ...(v === "monto"
+                            ? { descuento_manual_monto: totales.descuentoMonto, descuento_pct: 0 }
+                            : { descuento_pct: totales.descuentoPct, descuento_manual_monto: 0 }),
                         },
                     )
                   }
