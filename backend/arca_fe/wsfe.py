@@ -11,6 +11,13 @@ en AFIP); `ultimo_autorizado`, `consultar` y los `param_*` son QUERIES (lecturas
 sin efecto). Los errores salen tipados vía `arca_fe.errores` (ningún método
 filtra un `zeep.Fault` crudo).
 
+`param_*` cubre todos los catálogos vivos de WSFEv1 que un consumidor puede
+necesitar para armar un `ComprobanteRequest` sin hardcodear ids a mano:
+puntos de venta, tipos de comprobante/documento/concepto, condición IVA del
+receptor, tributos, datos opcionales (incluidos los de FCE MiPyme), monedas,
+y la cotización oficial del día (`param_cotizacion`) — todos verificados
+contra el WSDL real y el manual oficial de WSFEv1.
+
 Deps: zeep (SOAP), ya en requirements.txt.
 """
 
@@ -333,6 +340,63 @@ class WsfeClient:
             zeep.helpers.serialize_object(resp.ResultGet.CondicionIvaReceptor, dict)
             or []
         )
+
+    def param_tipos_tributos(self) -> list[dict]:
+        """Ids/descripciones de tributos válidos para `Tributo.id` (Impuestos
+        Internos, percepciones de IIBB, etc.) — fuente única para no
+        hardcodear un id a mano en el consumidor."""
+        client = self._client()
+        resp = self._soap(
+            "FEParamGetTiposTributos", client.service.FEParamGetTiposTributos, Auth=self._auth()
+        )
+        _check_errors(resp, "FEParamGetTiposTributos")
+        if resp.ResultGet is None:
+            return []
+        return zeep.helpers.serialize_object(resp.ResultGet.TributoTipo, dict) or []
+
+    def param_tipos_opcional(self) -> list[dict]:
+        """Ids/descripciones de datos opcionales válidos para `Opcional.id`
+        (ej. los de la Factura de Crédito Electrónica MiPyme: CBU, alias)."""
+        client = self._client()
+        resp = self._soap(
+            "FEParamGetTiposOpcional", client.service.FEParamGetTiposOpcional, Auth=self._auth()
+        )
+        _check_errors(resp, "FEParamGetTiposOpcional")
+        if resp.ResultGet is None:
+            return []
+        return zeep.helpers.serialize_object(resp.ResultGet.OpcionalTipo, dict) or []
+
+    def param_tipos_monedas(self) -> list[dict]:
+        """Códigos de moneda válidos para `ComprobanteRequest.moneda`/`MonId`."""
+        client = self._client()
+        resp = self._soap(
+            "FEParamGetTiposMonedas", client.service.FEParamGetTiposMonedas, Auth=self._auth()
+        )
+        _check_errors(resp, "FEParamGetTiposMonedas")
+        if resp.ResultGet is None:
+            return []
+        return zeep.helpers.serialize_object(resp.ResultGet.Moneda, dict) or []
+
+    def param_cotizacion(self, mon_id: str, fecha: Optional[date] = None) -> dict:
+        """Cotización oficial de ARCA para `mon_id` (`ComprobanteRequest.cotizacion`).
+        `fecha=None` → la más reciente. El motor NO la aplica solo — que un
+        comprobante use la cotización del día es decisión/timing del
+        consumidor (mismo criterio que el precio: el core no decide, ejecuta
+        con lo que le pasan)."""
+        client = self._client()
+        kwargs = {"Auth": self._auth(), "MonId": mon_id}
+        if fecha is not None:
+            kwargs["FchCotiz"] = fecha.strftime("%Y%m%d")
+        resp = self._soap(
+            "FEParamGetCotizacion", client.service.FEParamGetCotizacion, **kwargs
+        )
+        _check_errors(resp, "FEParamGetCotizacion")
+        cot = resp.ResultGet
+        return {
+            "mon_id": getattr(cot, "MonId", mon_id),
+            "cotizacion": getattr(cot, "MonCotiz", None),
+            "fecha": getattr(cot, "FchCotiz", None),
+        }
 
 
 # ---------------------------------------------------------------------------
