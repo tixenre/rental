@@ -13,8 +13,18 @@
  *    pase (arma pedidos para terceros). Anónimo / sin cliente → consumidor final.
  */
 
+import { useEffect, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { authedPostJson } from "@/lib/authedFetch";
+
+/** Debounce del recálculo en vivo. Sin esto, `useCotizacion` le pega a
+ * `/api/cotizar` en CADA tecla (tipear un %, arrastrar una fecha, cambiar una
+ * cantidad) → editando activamente se supera el rate-limit del endpoint
+ * (30/min) → 429 → el desglose se queda mostrando el último valor bueno en
+ * silencio (bug "el descuento no se aplica"). Coalescemos los cambios rápidos
+ * en UN solo request. El primer cálculo NO se debouncea (estado inicial
+ * inmediato). */
+const COTIZAR_DEBOUNCE_MS = 300;
 
 export type DescuentoOrigen = "cliente" | "jornadas" | "ninguno";
 
@@ -160,7 +170,7 @@ export function useCotizacion(args: {
    */
   respetarPrecioItem?: boolean;
   enabled?: boolean;
-}): { data: Cotizacion; isFetching: boolean } {
+}): { data: Cotizacion; isFetching: boolean; isError: boolean } {
   const {
     items,
     fechaDesde,
@@ -192,20 +202,40 @@ export function useCotizacion(args: {
     respetar_precio_item: respetarPrecioItem,
   };
 
-  const hayItems = body.items.length > 0;
+  // Debounce: la query usa el body DEBOUNCEADO. Al tipear rápido, `bodyKey`
+  // cambia por tecla pero solo el último (tras COTIZAR_DEBOUNCE_MS de quietud)
+  // dispara un fetch → un request por edición, no por tecla. El estado inicial
+  // es inmediato (`useState(body)`).
+  const bodyKey = JSON.stringify(body);
+  const [debounced, setDebounced] = useState({ key: bodyKey, body });
+  useEffect(() => {
+    if (bodyKey === debounced.key) return;
+    const t = setTimeout(() => setDebounced({ key: bodyKey, body }), COTIZAR_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce: dispara por el hash del body; `body` se captura fresco cuando cambia el hash
+  }, [bodyKey, debounced.key]);
+
+  const hayItems = debounced.body.items.length > 0;
   const q = useQuery({
-    queryKey: ["cotizar", body],
-    queryFn: () => authedPostJson<CotizarResp>("/api/cotizar", body),
+    queryKey: ["cotizar", debounced.body],
+    queryFn: () => authedPostJson<CotizarResp>("/api/cotizar", debounced.body),
     enabled: enabled && hayItems,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
 
+  // `isFetching` cubre TAMBIÉN el intervalo de debounce (hay una edición
+  // pendiente de recalcular) → el consumidor puede mostrar "recalculando…" y
+  // no presentar el número viejo como definitivo. `isError` surfacea un fallo
+  // del recálculo (ej. 429) en vez de quedarse mudo con el valor stale.
+  const pendingDebounce = bodyKey !== debounced.key;
+
   // Carrito vacío → cero, sin arrastrar el último valor cacheado por
   // `keepPreviousData` (si no, al vaciar el carrito quedaría el total viejo).
   return {
     data: hayItems && q.data ? adaptar(q.data) : COTIZACION_VACIA,
-    isFetching: q.isFetching,
+    isFetching: q.isFetching || pendingDebounce,
+    isError: q.isError,
   };
 }
 
