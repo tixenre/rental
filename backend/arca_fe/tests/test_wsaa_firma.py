@@ -139,6 +139,128 @@ def test_firma_codificable_en_base64(test_keypair):
 
 
 # ---------------------------------------------------------------------------
+# Tests de clave privada con passphrase + errores tipados
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def test_keypair_cifrado():
+    """Igual que test_keypair pero con la clave privada cifrada con passphrase
+    conocida (b"secreto")."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name(
+        [x509.NameAttribute(NameOID.COMMON_NAME, "test-rambla-arca-cifrado")]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(dt.datetime.now(dt.timezone.utc))
+        .not_valid_after(dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=1))
+        .sign(key, hashes.SHA256())
+    )
+    key_pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.TraditionalOpenSSL,
+        serialization.BestAvailableEncryption(b"secreto"),
+    )
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+    return cert_pem, key_pem
+
+
+def test_firmar_tra_con_clave_cifrada_y_password_correcta(test_keypair_cifrado):
+    from arca_fe.wsaa import construir_tra, firmar_tra
+
+    cert_pem, key_pem = test_keypair_cifrado
+    der = firmar_tra(
+        construir_tra(), cert_pem, key_pem, key_password=b"secreto"
+    )
+    assert der[0] == 0x30  # DER SEQUENCE
+
+
+def test_firmar_tra_clave_cifrada_sin_password_levanta_auth(test_keypair_cifrado):
+    """Clave cifrada + sin passphrase → ArcaAuthError con mensaje accionable,
+    no el TypeError críptico de cryptography."""
+    from arca_fe.wsaa import construir_tra, firmar_tra
+    from arca_fe.errores import ArcaAuthError
+
+    cert_pem, key_pem = test_keypair_cifrado
+    with pytest.raises(ArcaAuthError, match="passphrase"):
+        firmar_tra(construir_tra(), cert_pem, key_pem)
+
+
+def test_firmar_tra_clave_cifrada_password_incorrecta_levanta_auth(
+    test_keypair_cifrado,
+):
+    from arca_fe.wsaa import construir_tra, firmar_tra
+    from arca_fe.errores import ArcaAuthError
+
+    cert_pem, key_pem = test_keypair_cifrado
+    with pytest.raises(ArcaAuthError):
+        firmar_tra(construir_tra(), cert_pem, key_pem, key_password=b"mala")
+
+
+def test_firmar_tra_cert_invalido_levanta_auth(test_keypair):
+    from arca_fe.wsaa import construir_tra, firmar_tra
+    from arca_fe.errores import ArcaAuthError
+
+    _, key_pem = test_keypair
+    with pytest.raises(ArcaAuthError, match="certificado"):
+        firmar_tra(construir_tra(), b"-----BEGIN CERTIFICATE-----\nno-es-pem\n", key_pem)
+
+
+# ---------------------------------------------------------------------------
+# Tests de _parece_base64 (estricto) y errores de transporte
+# ---------------------------------------------------------------------------
+
+
+def test_parece_base64_estricto():
+    """El heurístico viejo ("¿decodifica como ASCII?") daba un falso positivo
+    para bytes ASCII que NO son base64 (ej. con espacio o '!'), y esos se
+    usaban crudos en vez de codificarse. Con validate=True eso se rechaza."""
+    from arca_fe.wsaa import _parece_base64
+
+    # base64 válido → True
+    assert _parece_base64(base64.b64encode(b"hola mundo")) is True
+    # ASCII pero NO base64 (espacio y '!') → el viejo daba True (falso
+    # positivo); el nuevo da False → se codifica, como corresponde.
+    assert _parece_base64(b"hello world!") is False
+    # bytes DER crudos (no alfabeto base64) → False → se codificarán
+    assert _parece_base64(b"\x30\x82\x01\x00\xff\xfe") is False
+
+
+def test_login_request_error_es_arca_network_error(monkeypatch):
+    """Un timeout/conexión (httpx.RequestError) se traduce a ArcaNetworkError,
+    no se filtra el httpx crudo al consumidor."""
+    import httpx
+    from arca_fe.wsaa import login
+    from arca_fe.errores import ArcaNetworkError
+
+    def _boom(*a, **k):
+        raise httpx.ConnectTimeout("timeout simulado")
+
+    monkeypatch.setattr(httpx, "post", _boom)
+    with pytest.raises(ArcaNetworkError, match="No se pudo contactar"):
+        login(b"Zm9v", "https://wsaahomo.afip.gov.ar")
+
+
+def test_parsear_respuesta_sin_expiration_loguea_fallback(caplog):
+    """Sin expirationTime → fallback de 12h PERO logueado (no silencioso)."""
+    import logging
+    from arca_fe.wsaa import _parsear_login_response
+
+    xml = """<loginTicketResponse version="1.0">
+  <credentials><token>T</token><sign>S</sign></credentials>
+</loginTicketResponse>"""
+    with caplog.at_level(logging.WARNING, logger="arca_fe.wsaa"):
+        token, sign, expira_at = _parsear_login_response(xml)
+    assert token == "T"
+    assert any("expirationTime" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
 # Tests de parseo de respuesta WSAA (sin red)
 # ---------------------------------------------------------------------------
 
