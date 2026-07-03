@@ -1,9 +1,10 @@
-"""Tests de services.facturacion.padron — resolver_persona() elige cualquier
-emisor activo con cert para autenticar y devuelve la PersonaArca si AFIP la
-encontró; CUALQUIER otra cosa (sin emisor disponible, AFIP caído, CUIT sin
-datos ni motivo) levanta RuntimeError con el motivo real — nunca degrada a
-None en silencio. Nunca rompe el FORMULARIO (el caller/route lo atrapa y
-sigue siendo editable a mano), pero tampoco esconde la causa."""
+"""Tests de services.facturacion.padron — resolver_persona() reintenta con
+CADA emisor activo con cert hasta que uno devuelva la PersonaArca (cada
+emisor delega su relación de ARCA de forma independiente); CUALQUIER otra
+cosa (sin emisor disponible, AFIP caído, TODOS los emisores sin datos ni
+motivo) levanta RuntimeError con el motivo real — nunca degrada a None en
+silencio. Nunca rompe el FORMULARIO (el caller/route lo atrapa y sigue
+siendo editable a mano), pero tampoco esconde la causa."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -69,7 +70,7 @@ def test_afip_sin_datos_ni_motivo_levanta_nombrando_el_emisor_autenticador(monke
         resolver_persona("23373891029", conn=object())
 
 
-def test_usa_el_primer_emisor_activo_con_cert(monkeypatch):
+def test_usa_el_unico_emisor_activo_con_cert(monkeypatch):
     captured = {}
 
     monkeypatch.setattr(
@@ -107,6 +108,48 @@ def test_usa_el_primer_emisor_activo_con_cert(monkeypatch):
     # hace que la relación no matchee y la consulta degrade silenciosamente a
     # "no se pudo autocompletar" — bug real de prod con un CUIT válido.
     assert captured["servicio"] == WSAA_SERVICIO == "ws_sr_constancia_inscripcion"
+
+
+def test_reintenta_con_el_siguiente_emisor_si_el_primero_no_tiene_la_relacion(monkeypatch):
+    """Caso real de prod: dos emisores activos con cert, cada uno delega su
+    propia relación 'Consulta de constancia de inscripción' en ARCA de forma
+    independiente — que el primero (elegido por orden condicion_iva/id) no la
+    tenga delegada NO puede tirar abajo la consulta si otro emisor sí la
+    tiene. resolver_persona reintenta con el siguiente antes de rendirse."""
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.list_emisores",
+        lambda conn: [_emisor(nombre="martin_santini"), _emisor(nombre="rambla")],
+    )
+
+    class _FakeCred:
+        ambiente = "homologacion"
+        cuit = 20300000000
+
+    monkeypatch.setattr(
+        "services.facturacion.config.credenciales", lambda emisor, conn: _FakeCred()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.wsaa_cache.get_ta",
+        lambda emisor, conn, servicio=None: ("tok", "sign"),
+    )
+
+    class _FakePersona:
+        razon_social = "Empresa XYZ"
+
+    def _get_persona(self, cuit):
+        # El emisor autenticador usado en esta consulta viaja en `self` vía
+        # el `cuit_representada` con el que se construyó el PadronClient —
+        # acá lo simulamos con un contador global simple.
+        _get_persona.calls += 1
+        return None if _get_persona.calls == 1 else _FakePersona()
+
+    _get_persona.calls = 0
+    monkeypatch.setattr("arca_fe.padron.PadronClient.get_persona", _get_persona)
+
+    result = resolver_persona("23373891029", conn=object())
+
+    assert result.razon_social == "Empresa XYZ"
+    assert _get_persona.calls == 2
 
 
 def test_falla_real_levanta_runtime_error_con_motivo(monkeypatch):
