@@ -646,7 +646,13 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
             setDescuentoPct={(v) => draft.setDatos({ ...draft.datos!, descuento_pct: v })}
             descuentoManualTipo={draft.datos.descuento_manual_tipo}
             setDescuentoManualTipo={(v) =>
-              draft.setDatos({ ...draft.datos!, descuento_manual_tipo: v })
+              draft.setDatos({
+                ...draft.datos!,
+                descuento_manual_tipo: v,
+                // Resetear el otro campo: sin esto queda inerte en la base y
+                // puede reaparecer solo si el admin vuelve a tocar el selector.
+                ...(v === "monto" ? { descuento_pct: 0 } : { descuento_manual_monto: 0 }),
+              })
             }
             descuentoManualMonto={draft.datos.descuento_manual_monto}
             setDescuentoManualMonto={(v) =>

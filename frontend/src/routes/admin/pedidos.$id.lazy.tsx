@@ -720,7 +720,18 @@ function PedidoEditorPage() {
                 <SegmentedControl
                   value={datos.descuento_manual_tipo}
                   onChange={(v) =>
-                    setDatos((d) => d && { ...d, descuento_manual_tipo: v as "pct" | "monto" })
+                    setDatos(
+                      (d) =>
+                        d && {
+                          ...d,
+                          descuento_manual_tipo: v as "pct" | "monto",
+                          // Resetear el otro campo: sin esto, el valor viejo
+                          // queda "inerte" en la base (ignorado mientras el
+                          // tipo no lo use) y puede reaparecer solo si el
+                          // admin vuelve a tocar el selector — confuso.
+                          ...(v === "monto" ? { descuento_pct: 0 } : { descuento_manual_monto: 0 }),
+                        },
+                    )
                   }
                   options={[
                     { value: "pct", label: "%" },
