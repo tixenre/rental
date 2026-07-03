@@ -191,3 +191,21 @@ def test_endpoint_interpolar_rechaza_anonimo():
     with TestClient(main.app, raise_server_exceptions=True) as client:
         r = client.get("/api/descuentos-jornada/interpolar", params={"jornadas": [1]})
     assert r.status_code == 401
+
+
+def test_endpoint_interpolar_rechaza_sesion_no_admin():
+    """`require_admin` explícito (antes de este fix, la falta de allowlist en
+    middleware.py dejaba pasar a CUALQUIER sesión logueada, no solo admin —
+    hallazgo del dueño probando en vivo)."""
+    import main
+    from fastapi.testclient import TestClient
+    from auth.session import signer
+
+    cookie = f"session={signer.dumps({'email': 'cliente@test.com', 'role': 'cliente', 'cliente_id': 1, 'jti': 'jornadadb-cli'})}"
+    with TestClient(main.app, raise_server_exceptions=True) as client:
+        r = client.get(
+            "/api/descuentos-jornada/interpolar",
+            params={"jornadas": [1]},
+            headers={"Cookie": cookie},
+        )
+    assert r.status_code == 403
