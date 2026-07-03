@@ -5,16 +5,29 @@
  * La gestión completa (crear, editar, subir certs) está en /admin/facturacion/emisores.
  */
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { CheckCircle2, XCircle, ExternalLink, RefreshCw } from "lucide-react";
 
 import { facturacionApi } from "@/lib/admin/api";
 
 export function FacturacionSection() {
+  const qc = useQueryClient();
   const estadoQ = useQuery({
     queryKey: ["facturacion-estado"],
     queryFn: facturacionApi.getEstado,
     staleTime: 0,
+  });
+
+  const refrescarCatalogos = useMutation({
+    mutationFn: facturacionApi.refrescarCatalogos,
+    onSuccess: (r) => {
+      toast.success(
+        `Catálogos actualizados — ${r.doc_tipo} tipos de doc, ${r.concepto} conceptos, ${r.condicion_iva_receptor} condiciones IVA`,
+      );
+      qc.invalidateQueries({ queryKey: ["facturacion-estado"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const emisoresQ = useQuery({
@@ -47,6 +60,34 @@ export function FacturacionSection() {
           >
             {estadoQ.data.ambiente === "produccion" ? "Producción" : "Homologación (pruebas)"}
           </span>
+        </div>
+      )}
+
+      {estadoQ.data && (
+        <div className="flex items-center justify-between gap-2 rounded border hairline bg-background px-3 py-2">
+          <div className="text-xs text-muted-foreground">
+            <span className="t-eyebrow">Catálogos ARCA</span> (tipo de documento, concepto,
+            condición IVA del receptor — las etiquetas del PDF salen de acá, no del código):{" "}
+            {estadoQ.data.catalogos_actualizados_at ? (
+              <>
+                actualizados el{" "}
+                {new Date(estadoQ.data.catalogos_actualizados_at).toLocaleString("es-AR")}
+              </>
+            ) : (
+              <span className="text-destructive">nunca se actualizaron</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => refrescarCatalogos.mutate()}
+            disabled={refrescarCatalogos.isPending}
+            className="shrink-0 flex items-center gap-1.5 h-8 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink disabled:opacity-40"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${refrescarCatalogos.isPending ? "animate-spin" : ""}`}
+            />
+            {refrescarCatalogos.isPending ? "Actualizando…" : "Actualizar catálogos ARCA"}
+          </button>
         </div>
       )}
 

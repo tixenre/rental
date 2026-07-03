@@ -7,6 +7,7 @@ Fase 7: CRUD emisores (credenciales dinámicas, cifradas).
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -30,19 +31,84 @@ router = APIRouter()
 
 @router.get("/admin/facturacion/estado")
 def estado_facturacion(request: Request):
-    """Estado de configuración: ambiente activo + lista de emisores (sin secretos)."""
+    """Estado de configuración: ambiente activo + lista de emisores (sin
+    secretos) + cuándo se actualizaron por última vez los catálogos de ARCA
+    (doc_tipo/concepto/condición IVA receptor — ver services.facturacion.catalogos)."""
     require_admin(request)
 
     from config import settings as app_settings
     ambiente = "produccion" if app_settings.is_production else "homologacion"
 
+    from services.facturacion.catalogos import ultimo_refresco
     from services.facturacion.emisores_repo import list_emisores
     with get_db() as conn:
         emisores = list_emisores(conn)
+        catalogos_actualizados_at = ultimo_refresco(conn)
 
     return {
         "ambiente": ambiente,
         "emisores": [_emisor_to_dict(e) for e in emisores],
+        "catalogos_actualizados_at": catalogos_actualizados_at,
+    }
+
+
+@router.post("/admin/arca/catalogos/refrescar")
+def refrescar_catalogos_arca(request: Request):
+    """Actualiza los catálogos de ARCA (doc_tipo/concepto/condición IVA
+    receptor) que se muestran en el PDF de la factura — las etiquetas salen
+    de acá, nunca de una traducción escrita a mano en el código."""
+    require_admin(request)
+
+    from services.facturacion.catalogos import refrescar_catalogos
+
+    with get_db() as conn:
+        try:
+            resultado = refrescar_catalogos(conn)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+        conn.commit()
+
+    return {
+        "ok": True,
+        "doc_tipo": len(resultado["doc_tipo"]),
+        "concepto": len(resultado["concepto"]),
+        "condicion_iva_receptor": len(resultado["condicion_iva_receptor"]),
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /admin/arca/padron/{cuit} — autocompletar razón social/domicilio/IVA
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/arca/padron/{cuit}")
+def consultar_padron(cuit: str, request: Request):
+    """Autocompleta razón social/domicilio/condición IVA desde el padrón de
+    ARCA (ws_sr_constancia_inscripcion) — mismo autocompletado que hace el
+    facturador oficial al tipear un CUIT. Best-effort: nunca un error HTTP —
+    el formulario sigue siendo editable a mano. `resolver_persona` levanta
+    RuntimeError para cualquier cosa que no sea un CUIT encontrado (ya no
+    hay un "sin datos" silencioso) — se muestra tal cual, es más útil para
+    diagnosticar que un genérico "sin datos"."""
+    require_admin(request)
+
+    from services.facturacion.padron import resolver_persona
+    with get_db() as conn:
+        try:
+            persona = resolver_persona(cuit, conn)
+        except RuntimeError as e:
+            return {"encontrado": False, "motivo": str(e)}
+
+    return {
+        "encontrado": True,
+        "razon_social": persona.razon_social,
+        "nombre": persona.nombre,
+        "apellido": persona.apellido,
+        "domicilio": persona.domicilio,
+        "condicion_iva": persona.condicion_iva,
+        "estado_clave": persona.estado_clave,
     }
 
 
@@ -71,6 +137,9 @@ def crear_emisor(request: Request, body: dict):
     pto_vta = body.get("pto_vta")
     condicion_iva = (body.get("condicion_iva") or "").strip()
     razon_social = (body.get("razon_social") or "").strip() or None
+    domicilio = (body.get("domicilio") or "").strip() or None
+    iibb = (body.get("iibb") or "").strip() or None
+    inicio_actividades = (body.get("inicio_actividades") or "").strip() or None
     notas = (body.get("notas") or "").strip() or None
 
     if not nombre or not cuit or not pto_vta or not condicion_iva:
@@ -91,6 +160,9 @@ def crear_emisor(request: Request, body: dict):
                 pto_vta=pto_vta_int,
                 condicion_iva=condicion_iva,
                 razon_social=razon_social,
+                domicilio=domicilio,
+                iibb=iibb,
+                inicio_actividades=inicio_actividades,
                 notas=notas,
             )
             from services.facturacion.emisores_repo import get_by_id
@@ -121,6 +193,9 @@ def actualizar_emisor(emisor_id: int, request: Request, body: dict):
                 condicion_iva=body.get("condicion_iva"),
                 activo=body.get("activo"),
                 razon_social=body.get("razon_social"),
+                domicilio=body.get("domicilio"),
+                iibb=body.get("iibb"),
+                inicio_actividades=body.get("inicio_actividades"),
                 notas=body.get("notas"),
             )
             emisor = get_by_id(emisor_id, conn)
@@ -173,6 +248,62 @@ def cargar_cert(emisor_id: int, request: Request, body: dict):
     return {"ok": True, "cert_cargado": emisor.cert_cargado}
 
 
+@router.get("/admin/emisores-arca/{emisor_id}/cert-info")
+def info_cert_emisor(emisor_id: int, request: Request):
+    """Metadata del certificado cargado (Subject, Nº de serie, vigencia) —
+    NUNCA el PEM/clave privada. Sirve para comparar 1 a 1 contra el
+    "Computador Fiscal" que figura delegado en el Administrador de
+    Relaciones de Clave Fiscal de ARCA: si el número de serie no coincide,
+    la relación fue delegada a un certificado DISTINTO del que este emisor
+    usa hoy para autenticar — causa real de prod: ARCA respondía sin datos
+    ni motivo aunque la relación estuviera bien delegada, porque estaba
+    delegada al certificado viejo."""
+    require_admin(request)
+
+    from cryptography import x509
+
+    from services.facturacion.emisores_repo import get_cert_pem
+
+    try:
+        with get_db() as conn:
+            cert_pem, _ = get_cert_pem(emisor_id, conn)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    cert = x509.load_pem_x509_certificate(cert_pem)
+    return {
+        "subject": cert.subject.rfc4514_string(),
+        "numero_serie": format(cert.serial_number, "X"),
+        "vigente_desde": cert.not_valid_before_utc.date().isoformat(),
+        "vigente_hasta": cert.not_valid_after_utc.date().isoformat(),
+    }
+
+
+@router.get("/admin/emisores-arca/{emisor_id}/puntos-venta")
+def consultar_puntos_venta_emisor(emisor_id: int, request: Request):
+    """Consulta a ARCA (WSFE `FEParamGetPtosVenta`) los puntos de venta
+    habilitados de este emisor — para validar/elegir el número en vez de
+    cargarlo a mano y descubrir recién al pedir el primer CAE que estaba mal.
+    Requiere que el emisor ya tenga cert cargado."""
+    require_admin(request)
+
+    from services.facturacion.emisores_repo import get_by_id
+    from services.facturacion.puntos_venta import consultar_puntos_venta
+
+    with get_db() as conn:
+        emisor = get_by_id(emisor_id, conn)
+        if emisor is None:
+            raise HTTPException(404, "Emisor no encontrado")
+        try:
+            puntos = consultar_puntos_venta(emisor.nombre, conn)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except RuntimeError as e:
+            raise HTTPException(503, str(e))
+
+    return {"puntos_venta": puntos}
+
+
 @router.delete("/admin/emisores-arca/{emisor_id}", status_code=204)
 @limiter.limit(ADMIN_WRITE_LIMIT)
 @map_pg_errors
@@ -183,6 +314,27 @@ def desactivar_emisor(emisor_id: int, request: Request):
     with get_db() as conn:
         delete_emisor(emisor_id, conn)
         conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# GET /alquileres/{id}/facturar/preview
+# ---------------------------------------------------------------------------
+
+
+@router.get("/alquileres/{pedido_id}/facturar/preview")
+def preview_factura(pedido_id: int, request: Request):
+    """Arma el comprobante y calcula sus importes SIN emitir — para que el
+    admin confirme los datos antes de pedir un CAE real (irreversible)."""
+    require_admin(request)
+
+    try:
+        from services.facturacion.engine import previsualizar_factura
+        with get_db() as conn:
+            return previsualizar_factura(pedido_id, conn)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +453,7 @@ def listar_facturas(
 _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
 
-def _factura_html_o_404(factura_id: int, conn, layout: str = "clasica"):
+def _factura_html_o_404(factura_id: int, conn, layout: str = "celular"):
     """Carga la factura + renderiza su HTML al vuelo. La factura no cambia una
     vez emitida, así que no hace falta guardar el PDF: regenerar da lo mismo."""
     from services.facturacion.repo import get_by_id
@@ -315,24 +467,33 @@ def _factura_html_o_404(factura_id: int, conn, layout: str = "clasica"):
         raise HTTPException(400, "Solo se pueden ver/descargar/enviar facturas emitidas")
 
     pedido = _get_pedido(conn, factura.pedido_id)
-    return factura, factura_html(factura, pedido, layout=layout)
+    try:
+        html_str = factura_html(factura, pedido, layout=layout)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    return factura, html_str
 
 
 @router.get("/facturas/{factura_id}/pdf")
 async def descargar_pdf_factura(
-    factura_id: int, request: Request, format: str = "pdf", layout: str = "clasica"
+    factura_id: int, request: Request, format: str = "pdf", layout: str = "celular"
 ):
     """PDF de una factura, renderizado on-demand. `format=html` devuelve el preview
     (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py).
-    `layout`: 'clasica' (default, réplica oficial AFIP/ARCA) · 'celular' (compacta,
-    para compartir por WhatsApp) · 'formal' (A4, identidad de la celular)."""
+    `layout`: 'celular' (default de Rambla — compacta 4:5) · 'clasica' (réplica
+    oficial AFIP/ARCA, A4) · 'formal' (A4, identidad de la celular)."""
     require_admin(request)
 
     if layout not in ("clasica", "celular", "formal"):
-        layout = "clasica"
+        layout = "celular"
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
+        if format == "html":
+            cert_pem = key_pem = None
+        else:
+            from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+            cert_pem, key_pem = get_or_create_signing_cert(conn)
 
     if format == "html":
         from fastapi.responses import HTMLResponse
@@ -340,8 +501,14 @@ async def descargar_pdf_factura(
 
     from pdf import _render_pdf
     from services.facturacion.pdf import factura_filename, page_size_for_layout
+    from services.facturacion.pdf_seguridad import asegurar_pdf
     try:
         pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
+        # asegurar_pdf firma con pyhanko, cuyo sign_pdf sync internamente hace
+        # asyncio.run() — explota si se llama directo desde acá (ya estamos
+        # dentro del loop de FastAPI). to_thread lo corre en un thread aparte,
+        # sin loop activo, donde ese asyncio.run() interno sí puede crear el suyo.
+        pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF: {e}")
 
@@ -370,9 +537,11 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     require_admin(request)
 
     from services.email import send_raw_email, Attachment
+    from services.facturacion.pdf_seguridad import get_or_create_signing_cert
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn)
+        cert_pem, key_pem = get_or_create_signing_cert(conn)
 
         # Email del cliente: está en el pedido
         row = conn.execute(
@@ -393,8 +562,10 @@ async def enviar_mail_factura(factura_id: int, request: Request):
 
     from pdf import _render_pdf
     from services.facturacion.pdf import factura_filename
+    from services.facturacion.pdf_seguridad import asegurar_pdf
     try:
         pdf_bytes = await _render_pdf(html_str)
+        pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF para el mail: {e}")
 
@@ -480,6 +651,9 @@ def _emisor_to_dict(e) -> dict:
         "cert_cargado": e.cert_cargado,
         "activo": e.activo,
         "razon_social": e.razon_social,
+        "domicilio": e.domicilio,
+        "iibb": e.iibb,
+        "inicio_actividades": e.inicio_actividades,
         "notas": e.notas,
         "created_at": e.created_at.isoformat() if e.created_at else None,
         "updated_at": e.updated_at.isoformat() if e.updated_at else None,

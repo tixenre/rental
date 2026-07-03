@@ -88,6 +88,35 @@ def test_factura_404_si_todavia_no_se_emitio(monkeypatch):
     assert ei.value.status_code == 404
 
 
+def test_factura_503_si_faltan_datos_de_arca(monkeypatch):
+    """factura_html falla fuerte si faltan datos de ARCA — el route lo
+    convierte en 503, nunca en un 500 crudo."""
+    monkeypatch.setattr(
+        "routes.cliente_portal.documentos.require_cliente",
+        lambda request: {"cliente_id": 1},
+    )
+    monkeypatch.setattr(
+        "routes.cliente_portal.documentos.get_db",
+        lambda: _FakeConn(pedido_row={"id": 422}),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_factura_principal_emitida",
+        lambda pedido_id, conn: _fake_factura(),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+
+    def _raise(*a, **kw):
+        raise RuntimeError("Factura 14 está 'emitida' pero le faltan datos de ARCA (cae)")
+
+    monkeypatch.setattr("services.facturacion.pdf.factura_html", _raise)
+
+    with pytest.raises(HTTPException) as ei:
+        asyncio.run(documentos_routes.cliente_pedido_factura(422, _fake_request()))
+    assert ei.value.status_code == 503
+
+
 def test_factura_format_html_devuelve_preview(monkeypatch):
     monkeypatch.setattr(
         "routes.cliente_portal.documentos.require_cliente",

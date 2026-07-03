@@ -6,7 +6,7 @@ este módulo solo la lee y transforma — NO recalcula (regla "el backend no rec
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -105,7 +105,7 @@ def construir_comprobante(
     # Concepto = SERVICIOS (2) → requiere FchServDesde/Hasta/VtoPago
     fecha_desde = _parse_fecha(pedido.get("fecha_desde"))
     fecha_hasta = _parse_fecha(pedido.get("fecha_hasta"))
-    fecha_vto_pago = fecha_hasta  # vencimiento = fin del servicio
+    fecha_vto_pago = _fecha_vto_pago(fecha_hasta, fecha)
 
     return ComprobanteRequest(
         emisor=emisor_obj,
@@ -122,9 +122,29 @@ def construir_comprobante(
     )
 
 
+def _fecha_vto_pago(fecha_hasta: Optional[date], fecha_comprobante: date) -> date:
+    """ARCA rechaza (10036) un FchVtoPago anterior a la fecha del comprobante.
+
+    `fecha_hasta` (fin del alquiler) es un vencimiento razonable cuando se
+    factura DURANTE el servicio, pero acá se factura casi siempre DESPUÉS de
+    que el pedido ya terminó — en ese caso queda en el pasado y ARCA lo
+    rechaza. El vencimiento nunca puede ser anterior a hoy (la fecha del
+    comprobante que se está emitiendo)."""
+    if fecha_hasta is None or fecha_hasta < fecha_comprobante:
+        return fecha_comprobante
+    return fecha_hasta
+
+
 def _parse_fecha(s) -> Optional[date]:
+    """`fecha_desde`/`fecha_hasta` vienen de columnas TIMESTAMP (`datetime.datetime`,
+    no `datetime.date`) — hay que chequear `datetime` ANTES que `date` porque
+    `datetime` es subclase de `date`: `isinstance(dt, date)` da True y devolvía
+    el datetime completo sin truncar. `_fecha_vto_pago` comparaba ese datetime
+    contra un `date` (`hoy`) y explotaba con TypeError en prod."""
     if not s:
         return None
+    if isinstance(s, datetime):
+        return s.date()
     if isinstance(s, date):
         return s
     s = str(s)[:10]
@@ -171,7 +191,7 @@ def construir_comprobante_nc(
         fecha=fecha,
         fecha_serv_desde=fecha_desde,
         fecha_serv_hasta=fecha_hasta,
-        fecha_vto_pago=fecha_hasta,
+        fecha_vto_pago=_fecha_vto_pago(fecha_hasta, fecha),
         es_nota_credito=True,
         cbtes_asoc=cbtes_asoc,
     )

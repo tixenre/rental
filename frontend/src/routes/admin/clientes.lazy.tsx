@@ -49,6 +49,7 @@ import { ClienteFormDialog } from "@/components/admin/ClienteFormDialog";
 import { ClientesDuplicadosDialog } from "@/components/admin/ClientesDuplicadosDialog";
 import { InvitarClienteDialog } from "@/components/admin/InvitarClienteDialog";
 import { useDocumentTitle } from "@/lib/use-document-title";
+import { AuthedHttpError } from "@/lib/authedFetch";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
 import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
@@ -329,29 +330,36 @@ function ClienteHistorialSheet({
   const [generando, setGenerando] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [rechequeando, setRechequeando] = useState(false);
+  const [sessionIdManual, setSessionIdManual] = useState("");
 
   useEffect(() => {
     setLinkVerif(null);
     setCopiado(false);
+    setSessionIdManual("");
   }, [cliente?.id]);
 
-  async function rechequearVerificacion() {
+  async function rechequearVerificacion(sessionIdOverride?: string) {
     if (!cliente) return;
     setRechequeando(true);
     try {
-      const r = await adminApi.rechequearVerificacion(cliente.id);
+      const r = await adminApi.rechequearVerificacion(cliente.id, sessionIdOverride);
       const actualizado = await adminApi.getCliente(cliente.id);
       onUpdated(actualizado);
       qc.invalidateQueries({ queryKey: ["admin", "clientes"] });
+      const sesionCorta = r.session_id ? ` (sesión ${r.session_id.slice(0, 8)}…)` : "";
       if (actualizado.dni_validado_at) {
         toast.success("Didit ya lo tiene aprobado — identidad verificada.");
       } else if (r.status === "Declined") {
-        toast.error("Didit lo sigue mostrando rechazado.");
+        toast.error(`Didit lo sigue mostrando rechazado${sesionCorta}.`);
       } else {
-        toast.message(`Didit responde: ${r.status || "sin novedades"}.`);
+        toast.message(`Didit responde: ${r.status || "sin novedades"}${sesionCorta}.`);
       }
-    } catch {
-      toast.error("No se pudo re-chequear con Didit");
+    } catch (err) {
+      toast.error(
+        err instanceof AuthedHttpError && err.status === 409
+          ? "Este cliente todavía no inició una verificación con Didit."
+          : "No se pudo re-chequear con Didit",
+      );
     } finally {
       setRechequeando(false);
     }
@@ -488,25 +496,46 @@ function ClienteHistorialSheet({
                 {cliente.dni_verificacion_motivo && (
                   <p className="text-xs text-muted-foreground">{cliente.dni_verificacion_motivo}</p>
                 )}
-                {(cliente.dni_verificacion_estado === "rechazado" ||
-                  cliente.dni_verificacion_estado === "en_revision") && (
-                  <div className="space-y-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={rechequeando}
-                      onClick={rechequearVerificacion}
-                    >
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
-                    </Button>
-                    <p className="text-2xs text-muted-foreground">
-                      Le vuelve a preguntar a Didit el estado actual — útil si ya lo aprobaste a
-                      mano en su dashboard.
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={rechequeando}
+                    onClick={() => rechequearVerificacion()}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {rechequeando ? "Consultando a Didit…" : "Re-chequear con Didit"}
+                  </Button>
+                  <p className="text-2xs text-muted-foreground">
+                    Le vuelve a preguntar a Didit — revisa todo el historial de intentos del
+                    cliente, no solo el último, así encuentra la sesión aprobada aunque haya
+                    reintentado después. Si nunca inició una verificación, no hace nada.
+                  </p>
+                  <details className="text-2xs">
+                    <summary className="cursor-pointer text-muted-foreground select-none">
+                      ¿Sabés el session_id exacto? Consultalo directo
+                    </summary>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <Input
+                        value={sessionIdManual}
+                        onChange={(e) => setSessionIdManual(e.target.value)}
+                        placeholder="session_id de Didit (ej. de una sesión sin historial acá)"
+                        className="flex-1 font-mono text-xs"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={rechequeando || !sessionIdManual.trim()}
+                        onClick={() => rechequearVerificacion(sessionIdManual.trim())}
+                        className="shrink-0"
+                      >
+                        Consultar
+                      </Button>
+                    </div>
+                  </details>
+                </div>
                 {linkVerif ? (
                   <div className="space-y-1.5">
                     <p className="text-xs text-muted-foreground">

@@ -15,8 +15,12 @@ from datetime import datetime, timedelta, timezone
 _MARGEN_MINUTOS = 30
 
 
-def get_ta(emisor: str, conn) -> tuple[str, str]:
-    """Devuelve (token, sign) vigentes para el emisor.
+def get_ta(emisor: str, conn, servicio: str = "wsfe") -> tuple[str, str]:
+    """Devuelve (token, sign) vigentes para el emisor + servicio.
+
+    Un TA autentica una relación (CUIT del cert ↔ SERVICIO) — el de "wsfe" no
+    sirve para otro servicio (ej. "ws_sr_constancia_inscripcion"), por eso el
+    cache es por (ambiente, emisor, servicio), no solo por emisor.
 
     Si el TA está vencido (o no existe), llama al WSAA y persiste el nuevo.
     `conn` es una conexión de `database.get_db()` ya en contexto de transacción
@@ -34,10 +38,10 @@ def get_ta(emisor: str, conn) -> tuple[str, str]:
         """
         SELECT token, sign, expira_at
           FROM afip_ta
-         WHERE ambiente = %s AND emisor = %s
+         WHERE ambiente = %s AND emisor = %s AND servicio = %s
         FOR UPDATE
         """,
-        (cred.ambiente, emisor),
+        (cred.ambiente, emisor, servicio),
     ).fetchone()
 
     if row and _vigente(row["expira_at"], limite):
@@ -52,7 +56,7 @@ def get_ta(emisor: str, conn) -> tuple[str, str]:
 
     try:
         token, sign, expira_at = login_con_cert(
-            "wsfe",
+            servicio,
             cred.cert_pem.encode() if isinstance(cred.cert_pem, str) else cred.cert_pem,
             cred.key_pem.encode() if isinstance(cred.key_pem, str) else cred.key_pem,
             cred.endpoint_wsaa,
@@ -67,14 +71,14 @@ def get_ta(emisor: str, conn) -> tuple[str, str]:
 
     conn.execute(
         """
-        INSERT INTO afip_ta (ambiente, emisor, token, sign, expira_at)
-        VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (ambiente, emisor)
+        INSERT INTO afip_ta (ambiente, emisor, servicio, token, sign, expira_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (ambiente, emisor, servicio)
         DO UPDATE SET token = EXCLUDED.token,
                       sign  = EXCLUDED.sign,
                       expira_at = EXCLUDED.expira_at
         """,
-        (cred.ambiente, emisor, token, sign, expira_at),
+        (cred.ambiente, emisor, servicio, token, sign, expira_at),
     )
 
     return token, sign

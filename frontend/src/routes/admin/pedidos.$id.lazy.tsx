@@ -164,10 +164,6 @@ function PedidoEditorPage() {
     fechaHasta: draft.datos?.fecha_hasta || null,
     clienteId: p?.cliente_id ?? null,
     descuentoPct: draft.datos?.descuento_pct ?? null,
-    // Pedido ya existente: el total en vivo tiene que coincidir con lo que
-    // persiste el guardado (`_recalcular_total_pedido`, que usa el precio de
-    // línea congelado) — no con el precio de catálogo de hoy.
-    respetarPrecioItem: true,
   });
 
   // Modales
@@ -278,19 +274,8 @@ function PedidoEditorPage() {
   // Totales vivos desde useCotizacion
   const totales = cotizacionQ.data;
   const total = totales.total;
-  // Estado del recálculo en vivo: mientras recalcula (debounce + fetch) o si
-  // falló (ej. 429 del rate-limit), NO presentamos el número viejo como
-  // definitivo — lo marcamos. Evita el bug del desglose congelado que mostraba
-  // un descuento stale en silencio.
-  const recalculando = cotizacionQ.isFetching;
-  const cotizarError = cotizacionQ.isError;
   const pagadoMonto = p.monto_pagado ?? 0;
   const restante = Math.max(0, total - pagadoMonto);
-  // Cobrado por encima del total actual: pasa si se bajó el precio (ítem/desc)
-  // DESPUÉS de haber cobrado. No se oculta — se muestra para que el admin lo
-  // resuelva (crédito al cliente, devolución) en vez de descubrirlo recién en
-  // la reconciliación mensual.
-  const excedente = Math.max(0, pagadoMonto - total);
 
   // stockMap: { equipo_id → { cantidad: libres, reservado: 0 } }
   const stockMap: Record<string, { cantidad: number; reservado: number }> = Object.fromEntries(
@@ -695,9 +680,7 @@ function PedidoEditorPage() {
 
           {/* Desglose — vivo via useCotizacion */}
           <RailSection label="Desglose">
-            {/* Si el recálculo falló (ej. 429 del rate-limit), el número mostrado
-                es viejo → lo atenuamos para no presentarlo como definitivo. */}
-            <div className={`space-y-1 text-sm ${cotizarError ? "opacity-40" : ""}`}>
+            <div className="space-y-1 text-sm">
               <BdRow
                 l={`Bruto · ${jornadas} jornada${jornadas !== 1 ? "s" : ""}`}
                 v={fmtArs(totales.subtotal)}
@@ -717,13 +700,6 @@ function PedidoEditorPage() {
               <div className="border-t hairline my-1" />
               <BdRow l="Total" v={fmtArs(total)} strong />
             </div>
-            {cotizarError ? (
-              <div className="mt-1 text-xs text-destructive">
-                No se pudo recalcular el total — reintentando…
-              </div>
-            ) : recalculando ? (
-              <div className="mt-1 text-xs text-muted-foreground">Actualizando…</div>
-            ) : null}
             <FieldLabel label="Descuento manual" className="mt-3 max-w-[140px]">
               <div className="relative">
                 <Input
@@ -759,40 +735,21 @@ function PedidoEditorPage() {
               <span
                 className={cn(
                   "font-mono text-xs font-semibold",
-                  excedente > 0
-                    ? "text-destructive"
-                    : pagadoMonto >= total && total > 0
-                      ? "text-verde-ink"
-                      : "text-destructive",
+                  pagadoMonto >= total && total > 0 ? "text-verde-ink" : "text-destructive",
                 )}
               >
-                {excedente > 0
-                  ? `de más ${fmtArs(excedente)}`
-                  : pagadoMonto >= total && total > 0
-                    ? "pagado"
-                    : `resta ${fmtArs(restante)}`}
+                {pagadoMonto >= total && total > 0 ? "pagado" : `resta ${fmtArs(restante)}`}
               </span>
             </div>
             <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
               <div
                 className={cn(
                   "h-full transition-colors",
-                  excedente > 0
-                    ? "bg-destructive"
-                    : pagadoMonto >= total && total > 0
-                      ? "bg-verde"
-                      : "bg-amber",
+                  pagadoMonto >= total && total > 0 ? "bg-verde" : "bg-amber",
                 )}
                 style={{ width: `${total ? Math.min(100, (pagadoMonto / total) * 100) : 0}%` }}
               />
             </div>
-            {excedente > 0 && (
-              <p className="mt-1 text-2xs text-destructive">
-                Se cobró {fmtArs(excedente)} de más — probablemente el pedido se editó
-                (ítem/descuento) después de cobrarlo. Resolvé con una devolución o dejalo como
-                crédito a favor del cliente.
-              </p>
-            )}
             {(p.pagos ?? []).map((pago) => (
               <PagoRow key={pago.id} pago={pago} pedidoId={p.id} />
             ))}
@@ -1019,11 +976,19 @@ function FacturacionRailSection({
     queryFn: () => facturacionApi.listFacturasPedido(pedidoId),
   });
 
+  const [showPreview, setShowPreview] = useState(false);
+
+  const preview = useMutation({
+    mutationFn: () => facturacionApi.previewFactura(pedidoId),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const facturar = useMutation({
     mutationFn: () => facturacionApi.facturarPedido(pedidoId),
     onSuccess: () => {
       toast.success("Factura emitida");
       qc.invalidateQueries({ queryKey: ["admin", "facturas", pedidoId] });
+      setShowPreview(false);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1048,7 +1013,13 @@ function FacturacionRailSection({
     (f: Factura) => f.nota_credito_de == null && f.estado !== "anulada",
   );
   const nc = facturas.find((f: Factura) => f.nota_credito_de != null);
-  const puedeFacturar = ESTADOS_FACTURABLES.includes(estadoPedido) && !principal;
+  // Un intento previo en estado 'error' es reintentable — el backend inserta
+  // un nuevo intento y vuelve a pedirle el CAE a ARCA (`get_factura_vigente`
+  // solo considera 'pendiente'/'emitida', el índice único parcial excluye
+  // 'error'). Sin este chequeo, un primer intento fallido dejaba el pedido
+  // sin forma de facturar nunca más (bug real de prod).
+  const puedeFacturar =
+    ESTADOS_FACTURABLES.includes(estadoPedido) && (!principal || principal.estado === "error");
   const puedeAnular = principal?.estado === "emitida" && !nc;
 
   const cbteLetra = principal
@@ -1101,13 +1072,12 @@ function FacturacionRailSection({
           )}
 
           {principal.estado === "emitida" && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap gap-1.5">
               <a
                 href={`/api/facturas/${principal.id}/pdf?format=html`}
                 target="_blank"
                 rel="noreferrer"
-                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
               >
                 <Eye className="h-3 w-3" /> Ver
               </a>
@@ -1115,8 +1085,7 @@ function FacturacionRailSection({
                 href={`/api/facturas/${principal.id}/pdf`}
                 target="_blank"
                 rel="noreferrer"
-                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
               >
                 <Download className="h-3 w-3" /> Descargar PDF
               </a>
@@ -1125,8 +1094,7 @@ function FacturacionRailSection({
                 target="_blank"
                 rel="noreferrer"
                 title="Versión compacta para compartir por WhatsApp"
-                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
               >
                 <Smartphone className="h-3 w-3" /> Para WhatsApp
               </a>
@@ -1134,8 +1102,7 @@ function FacturacionRailSection({
                 type="button"
                 onClick={() => enviarMail.mutate(principal.id)}
                 disabled={enviarMail.isPending}
-                // eslint-disable-next-line no-restricted-syntax -- text-[11px]: sin equiv DS
-                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-ink disabled:opacity-50"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 disabled:opacity-50"
               >
                 <Mail className="h-3 w-3" />
                 {enviarMail.isPending ? "Enviando…" : "Enviar por mail"}
@@ -1165,23 +1132,133 @@ function FacturacionRailSection({
         </div>
       )}
 
-      {!principal && !q.isLoading && (
+      {(!principal || principal.estado === "error") && !q.isLoading && (
         <Button
           variant="outline"
           size="sm"
           className="w-full"
-          disabled={!puedeFacturar || facturar.isPending}
+          disabled={!puedeFacturar || preview.isPending}
           title={
             !ESTADOS_FACTURABLES.includes(estadoPedido)
               ? "El pedido debe estar confirmado para facturar"
               : undefined
           }
-          onClick={() => facturar.mutate()}
+          onClick={() => {
+            setShowPreview(true);
+            preview.mutate();
+          }}
         >
           <Receipt className="h-3.5 w-3.5 mr-1" />
-          {facturar.isPending ? "Emitiendo…" : "Facturar"}
+          {preview.isPending ? "Calculando…" : principal ? "Reintentar" : "Facturar"}
         </Button>
       )}
+
+      <AlertDialog open={showPreview} onOpenChange={setShowPreview}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar factura</AlertDialogTitle>
+            <AlertDialogDescription>
+              Revisá los datos antes de emitir — una vez que ARCA da el CAE, solo se puede corregir
+              con una Nota de Crédito.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {preview.isPending && (
+            <div className="text-sm text-muted-foreground py-2">Calculando…</div>
+          )}
+          {preview.isError && (
+            <div className="text-sm text-destructive py-2">{(preview.error as Error).message}</div>
+          )}
+          {preview.data && (
+            <div className="rounded-lg border hairline p-3 space-y-2 text-sm">
+              {preview.data.ambiente === "homologacion" && (
+                // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica homologación (Tier 3), ya usada en esta pantalla
+                <div className="font-mono text-2xs text-amber-600 border border-amber-400/50 rounded px-1.5 py-0.5 inline-block">
+                  TEST · homologación
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Comprobante</span>
+                <span className="font-mono">
+                  Factura {preview.data.comprobante.letra}{" "}
+                  {String(preview.data.comprobante.pto_vta).padStart(5, "0")}-
+                  {String(preview.data.comprobante.numero_a_emitir).padStart(8, "0")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Emisor</span>
+                <span>{preview.data.emisor.nombre}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Receptor</span>
+                <span className="text-right">
+                  {preview.data.receptor.razon_social || "Consumidor final"}
+                  {preview.data.receptor.doc_tipo !== "CONSUMIDOR_FINAL" && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({preview.data.receptor.doc_tipo} {preview.data.receptor.doc_nro})
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t hairline pt-2">
+                <span className="text-muted-foreground">Neto</span>
+                <span className="font-mono">{formatARS(preview.data.importes.neto)}</span>
+              </div>
+              {preview.data.importes.iva > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">IVA</span>
+                  <span className="font-mono">{formatARS(preview.data.importes.iva)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between font-medium">
+                <span>Total</span>
+                <span className="font-mono">{formatARS(preview.data.importes.total)}</span>
+              </div>
+              {preview.data.fechas.vto_pago && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Vencimiento de pago</span>
+                  <span>{formatFechaCorta(preview.data.fechas.vto_pago)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {preview.data && (
+            <div className="space-y-1.5">
+              {preview.data.chequeos.map((c) => (
+                <div key={c.check} className="flex items-start gap-2 text-xs">
+                  {c.ok ? (
+                    <Check className="h-3.5 w-3.5 shrink-0 mt-0.5 text-verde-ink" />
+                  ) : c.bloqueante ? (
+                    <X className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive" />
+                  ) : (
+                    // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica de advertencia (Tier 3), ya usada en esta pantalla
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
+                  )}
+                  <span
+                    className={cn(
+                      !c.ok && c.bloqueante ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {c.mensaje}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!preview.data?.listo || facturar.isPending}
+              onClick={() => facturar.mutate()}
+            >
+              {facturar.isPending ? "Emitiendo…" : "Confirmar y emitir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RailSection>
   );
 }

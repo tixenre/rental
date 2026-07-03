@@ -6,7 +6,9 @@
  */
 import { createLazyFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Download, Eye, Mail } from "lucide-react";
+import { toast } from "sonner";
 
 import { facturacionApi, type FacturaEstado } from "@/lib/admin/api";
 import { formatARS, formatFechaDisplay } from "@/lib/format";
@@ -45,6 +47,12 @@ function FacturasPage() {
   const count = q.data?.count ?? 0;
 
   const hasFiltros = !!(emisor || estado || desde || hasta);
+
+  const enviarMail = useMutation({
+    mutationFn: (facturaId: number) => facturacionApi.enviarMailFactura(facturaId),
+    onSuccess: (data) => toast.success(`Factura enviada a ${data.to}`),
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="px-4 md:px-6 py-6 space-y-6 max-w-5xl mx-auto">
@@ -156,6 +164,7 @@ function FacturasPage() {
                 <th className="px-4 py-2.5 font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground">
                   Estado
                 </th>
+                <th className="px-4 py-2.5 font-mono text-2xs uppercase tracking-[0.15em] text-muted-foreground" />
               </tr>
             </thead>
             <tbody className="divide-y hairline">
@@ -166,6 +175,7 @@ function FacturasPage() {
                 const nroFmt = f.cbte_nro
                   ? `${String(f.pto_vta).padStart(5, "0")}-${String(f.cbte_nro).padStart(8, "0")}`
                   : "—";
+                const enviandoEsta = enviarMail.isPending && enviarMail.variables === f.id;
                 return (
                   <tr key={f.id} className="hover:bg-surface-elevated/60 transition-colors">
                     <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
@@ -201,6 +211,39 @@ function FacturasPage() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {f.estado === "emitida" && (
+                        <div className="flex items-center gap-2.5 justify-end">
+                          <a
+                            href={`/api/facturas/${f.id}/pdf?format=html`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Ver"
+                            className="text-muted-foreground hover:text-ink"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </a>
+                          <a
+                            href={`/api/facturas/${f.id}/pdf`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Descargar PDF"
+                            className="text-muted-foreground hover:text-ink"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => enviarMail.mutate(f.id)}
+                            disabled={enviandoEsta}
+                            title="Enviar por mail"
+                            className="text-muted-foreground hover:text-ink disabled:opacity-50"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );

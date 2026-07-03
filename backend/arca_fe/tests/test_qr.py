@@ -97,3 +97,20 @@ def test_importe_dos_decimales():
     assert p["importe"] == pytest.approx(333.33)
 
 
+# ── SVG vectorial: sin resolución nativa fija, no se pixela en ningún zoom ──
+# (bug real: un PNG con resolución fija se veía pixelado al hacer zoom o al
+# pasar por la compresión de WhatsApp — la misma imagen se reusaba achicada
+# en las 3 facturas, la más chica (celular) la mostraba a 78px)
+
+
+def test_qr_es_svg_vectorial_no_bitmap():
+    from arca_fe.qr import _build_qr_svg
+
+    svg = _build_qr_svg("https://www.afip.gob.ar/fe/qr/?p=" + "x" * 180, size=150)
+    assert svg.startswith("<svg ")
+    assert "<path" in svg  # vectorial: dibujado con paths, no un <image>/bitmap
+    assert 'width="150"' in svg
+    assert 'height="150"' in svg
+    assert "viewBox=" in svg  # preserva la proporción interna al escalar
+
+

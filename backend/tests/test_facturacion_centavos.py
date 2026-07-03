@@ -10,6 +10,7 @@ test_facturacion_engine.py).
 """
 from __future__ import annotations
 
+import json
 from datetime import date
 from decimal import Decimal
 
@@ -20,6 +21,29 @@ from services.facturacion.config import CredARCA
 from services.facturacion.repo import Factura
 
 pytestmark = pytest.mark.unit
+
+# Catálogos ARCA (doc_tipo/condición IVA receptor) resueltos vía `database.get_db`
+# desde `services.facturacion.pdf._catalogo` — mismo fake que `test_facturacion_pdf.py`.
+_CATALOGOS_SEED = {
+    "arca_catalogo_doc_tipo": [{"id": 80, "desc": "CUIT"}],
+    "arca_catalogo_concepto": [{"id": 2, "desc": "Servicios"}],
+    "arca_catalogo_condicion_iva_receptor": [{"id": 1, "desc": "IVA Responsable Inscripto"}],
+}
+
+
+class _FakeCatalogConn:
+    def execute(self, sql, params=None):
+        key = params[0] if params else None
+        value = json.dumps(_CATALOGOS_SEED[key]) if key in _CATALOGOS_SEED else None
+
+        class _R:
+            def fetchone(self_inner):
+                return {"value": value} if value is not None else None
+
+        return _R()
+
+    def close(self):
+        pass
 
 
 class _FakeConn:
@@ -158,13 +182,14 @@ def test_emitir_factura_persiste_centavos_exactos_no_trunca(monkeypatch):
     assert factura.imp_total == Decimal("1211.21")
 
 
-def test_pdf_muestra_centavos_no_redondea_a_peso_entero():
+def test_pdf_muestra_centavos_no_redondea_a_peso_entero(monkeypatch):
     """El PDF de una factura con centavos los tiene que mostrar, no truncarlos.
 
     `pdf._money`/`_plain` ya formatean con `.2f` — el bug estaba 100% en la
     persistencia (engine.py), no en el render; este test lo confirma end-to-end
     con los valores exactos que hubiera dejado el escenario de arriba.
     """
+    monkeypatch.setattr("database.get_db", lambda: _FakeCatalogConn())
     from services.facturacion.pdf import factura_html
 
     factura = Factura(

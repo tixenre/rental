@@ -18,32 +18,16 @@ from datetime import date
 from functools import lru_cache
 
 # ---------------------------------------------------------------------------
-# Datos de los emisores (env o defaults razonables para homologación).
-# domicilio/IIBB/inicio de actividades son datos legales fijos por emisor —
-# mismo patrón que ya regía para domicilio (env var, no hay tabla para esto).
+# Letra + "es nota de crédito" del comprobante — esto NO es una traducción de
+# ARCA que podamos pedirle mal (como pasaba con el padrón): es el ESQUEMA de
+# numeración de `FEParamGetTiposCbte`, fijo desde que existe WSFEv1 (1/3=A,
+# 6/8=B, 11/13=C — el mismo id que ya usa `arca_fe.modelos.CbteTipo` para
+# armar el pedido de CAE). Pedirle esto a ARCA en cada render sería consultar
+# un catálogo para reconstruir un esquema que el propio código ya necesita
+# saber de antemano para EMITIR el comprobante — al revés de doc_tipo/
+# concepto/condición IVA, que son prosa que sí podemos traer tal cual.
 # ---------------------------------------------------------------------------
 
-_EMISORES_DATA: dict[str, dict] = {
-    "pablo": {
-        "cond_iva_label": "IVA Responsable Inscripto",
-        "domicilio": os.getenv("AFIP_PABLO_DOMICILIO", "Mar del Plata, Buenos Aires"),
-        # No son obligatorios para que la factura electrónica sea válida (la
-        # validez la da el CAE/QR de ARCA, no estos datos) — son la
-        # convención "clásica" del talonario impreso. Sin configurar → el
-        # renglón entero se omite (nunca se muestra un "—" vacío).
-        "iibb": os.getenv("AFIP_PABLO_IIBB", ""),
-        "inicio_actividades": os.getenv("AFIP_PABLO_INICIO_ACTIVIDADES", ""),
-    },
-    "santini": {
-        "cond_iva_label": "Responsable Monotributo",
-        "domicilio": os.getenv("AFIP_SANTINI_DOMICILIO", "Falucho 4625, Mar del Plata"),
-        "iibb": os.getenv("AFIP_SANTINI_IIBB", ""),
-        "inicio_actividades": os.getenv("AFIP_SANTINI_INICIO_ACTIVIDADES", ""),
-    },
-}
-
-# Letra + código de comprobante AFIP (`FEParamGetTiposCbte`) — el código de 2
-# dígitos que va en la "caja de letra" ES el cbte_tipo, ya cero-paddeado.
 _CBTE_TIPO_LABEL: dict[int, str] = {
     1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C",
 }
@@ -51,15 +35,52 @@ _CBTE_TIPO_NOTA: dict[int, bool] = {
     3: True, 8: True, 13: True,
 }
 
-_DOC_TIPO_LABEL: dict[int, str] = {
-    80: "CUIT", 86: "CUIL", 96: "DNI", 99: "Documento",
-}
+# Doc tipo / concepto / condición IVA receptor: las ETIQUETAS salen de ARCA
+# (`FEParamGetTiposDoc`/`FEParamGetTiposConcepto`/`FEParamGetCondicionIvaReceptor`,
+# cacheadas — ver `services.facturacion.catalogos`), no de una traducción
+# escrita a mano acá. Si el catálogo nunca se refrescó, `_catalogo` falla
+# fuerte (RuntimeError → 503) en vez de mostrar un texto inventado.
 
-_COND_IVA_LABEL: dict[int, str] = {
-    1: "IVA Responsable Inscripto",
-    4: "IVA Exento",
-    5: "Consumidor Final",
-    6: "Responsable Monotributo",
+
+def _catalogo(fn, id_) -> str:
+    from database import get_db
+
+    conn = get_db()
+    try:
+        return fn(id_, conn)
+    finally:
+        conn.close()
+
+
+# Alícuotas de IVA — MISMA fuente que la que arma el pedido de CAE
+# (`arca_fe.modelos.IVA_0/10_5/21/27`, id del WS FEParamGetTiposIva ya
+# verificado para la emisión real). Nunca un segundo listado separado: si se
+# agrega una alícuota nueva, se agrega ahí y acá lo hereda solo.
+def _alicuotas_iva_pct() -> tuple[float, ...]:
+    from arca_fe.modelos import IVA_0, IVA_10_5, IVA_21, IVA_27
+
+    return tuple(float(a.pct) for a in (IVA_0, IVA_10_5, IVA_21, IVA_27))
+
+
+def _iva_pct_label(imp_neto, imp_iva) -> str:
+    """% de IVA a mostrar, DERIVADO de los importes reales de la factura (no
+    un valor fijo) — necesario para no asumir 21% en un motor que otro
+    negocio pueda usar con otra alícuota."""
+    if not imp_neto:
+        return "21%"
+    pct_crudo = float(imp_iva) / float(imp_neto) * 100
+    pct = min(_alicuotas_iva_pct(), key=lambda p: abs(p - pct_crudo))
+    texto = f"{pct:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{texto}%"
+
+# `condicion_iva` del EMISOR es un string propio de `emisores_arca`
+# (_CONDICIONES_VALIDAS en emisores_repo.py) — vocabulario NUESTRO (no de
+# ARCA), tabla distinta a la del receptor (códigos numéricos de ARCA,
+# `label_condicion_iva_receptor` en `services.facturacion.catalogos`).
+_EMISOR_COND_IVA_LABEL: dict[str, str] = {
+    "responsable_inscripto": "IVA Responsable Inscripto",
+    "monotributo": "Responsable Monotributo",
+    "exento": "IVA Exento",
 }
 
 
@@ -97,22 +118,29 @@ def _e(s) -> str:
     return _html.escape(str(s or ""))
 
 
+_EMISOR_ROW_CAMPOS = ("razon_social", "cuit", "condicion_iva", "domicilio", "iibb", "inicio_actividades")
+
+
 def _emisor_row(nombre: str) -> dict:
-    """Lee razon_social + cuit de emisores_arca. Fallback: vacío."""
+    """Lee los datos legales del emisor desde `emisores_arca` — administrables
+    desde el back-office, NUNCA hardcodeados por nombre (un emisor nuevo
+    heredaba en silencio los datos de "santini" antes de este fix)."""
     try:
         from database import get_db
         conn = get_db()
         try:
             row = conn.execute(
-                "SELECT razon_social, cuit FROM emisores_arca WHERE nombre = %s", (nombre,)
+                "SELECT razon_social, cuit, condicion_iva, domicilio, iibb, inicio_actividades "
+                "FROM emisores_arca WHERE nombre = %s",
+                (nombre,),
             ).fetchone()
         finally:
             conn.close()
         if row:
-            return {"razon_social": row["razon_social"] or "", "cuit": row["cuit"] or ""}
+            return {campo: row[campo] or "" for campo in _EMISOR_ROW_CAMPOS}
     except Exception:
         pass
-    return {"razon_social": "", "cuit": ""}
+    return {campo: "" for campo in _EMISOR_ROW_CAMPOS}
 
 
 # ---------------------------------------------------------------------------
@@ -186,92 +214,76 @@ def _arca_logo(width: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-def factura_filename(factura, *, layout: str = "clasica") -> str:
-    """Nombre de archivo canónico del PDF de una factura/NC (admin + portal cliente)."""
+def factura_filename(factura, *, layout: str = "celular") -> str:
+    """Nombre de archivo canónico del PDF de una factura/NC (admin + portal cliente).
+
+    Sin sufijo para el layout DEFAULT de Rambla (celular, 4:5); los demás
+    layouts (pedidos explícitamente) llevan su nombre como sufijo."""
     letra = _CBTE_TIPO_LABEL.get(factura.cbte_tipo, "X")
     prefijo = "NC" if _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False) else "Factura"
-    sufijo = "" if layout == "clasica" else f"-{layout}"
+    sufijo = "" if layout == "celular" else f"-{layout}"
     return f"{prefijo}-{letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}{sufijo}.pdf"
 
 
+# Default de Rambla: el concepto facturado es una sola línea "Rambla #N" (el
+# número del pedido), sin desglose por equipo ni texto adicional — decisión
+# de negocio, no un requisito de ARCA (WSFE solo pide los importes agregados;
+# el desglose por ítem es puramente de presentación). El nombre es
+# configurable (`FACTURACION_CONCEPTO_MARCA`) para que otro negocio que reuse
+# este motor pueda poner el suyo en vez de "Rambla".
+CONCEPTO_MARCA = os.getenv("FACTURACION_CONCEPTO_MARCA", "Rambla")
+
+
 def _conceptos(pedido: dict, factura) -> list[dict]:
-    """Ítems del comprobante ← `pedido.items`. Si no hay líneas (pedidos
-    viejos o ítems personalizados sin persistir), cae a una sola línea con
-    el neto total de la factura — nunca inventa un desglose que no existe.
+    """Ítem único del comprobante: `"{CONCEPTO_MARCA} #{numero_pedido}"`, sin
+    desglose por equipo — ver `CONCEPTO_MARCA`."""
+    numero = pedido.get("numero_pedido") or pedido.get("id", "")
+    desc = f"{CONCEPTO_MARCA} #{numero}"
+    return [{
+        "codigo": "001", "desc": desc, "detalle": "",
+        "cant": "1,00", "uMedida": "unidad", "bonif": "0,00",
+        "precioUnitFmt": _plain(factura.imp_neto), "subtotalFmt": _plain(factura.imp_neto),
+        "importeStr": _money(factura.imp_neto),
+    }]
 
-    Cuando hay descuento (el caso común: cualquier alquiler de varios días
-    tiene descuento automático por jornadas), el `% Bonif.` de la grilla
-    AFIP/ARCA deja de estar hardcodeado en 0 y el `Subtotal`/`Importe` de
-    cada línea pasa a ser el NETO de esa línea (post-bonificación) — así la
-    suma de las líneas cierra EXACTO con `factura.imp_neto` (el mismo criterio
-    bruto→descuento→neto que ya usa el Presupuesto,
-    `pdf_templates._pedido_html`). El total a repartir sale de comparar el
-    bruto de las líneas contra `factura.imp_neto` (el neto YA DECLARADO/
-    congelado en la factura) — no del pedido en vivo — para que el desglose
-    cierre también en una Nota de Crédito, cuyos importes vienen frozen del
-    comprobante original y pueden no coincidir con el pedido si cambió después.
-    El reparto es proporcional al bruto de cada línea, con el remanente de
-    redondeo absorbido en la ÚLTIMA línea para que la suma sea exacta, no una
-    aproximación."""
-    items = pedido.get("items") or []
-    if not items:
-        desc = (
-            pedido.get("descripcion")
-            or f"Alquiler de equipos — Pedido #{pedido.get('numero_pedido') or pedido.get('id', '')}"
+
+def _validar_datos_arca(factura) -> None:
+    """El comprobante NUNCA sale incompleto: si a una factura 'emitida' le
+    falta CAE/número/vencimiento/QR es un bug de datos, no un detalle visual
+    — mejor un 503 explícito que un PDF que parece válido y no lo es."""
+    faltantes = [
+        campo for campo, val in (
+            ("cae", factura.cae),
+            ("cbte_nro", factura.cbte_nro),
+            ("cae_vto", factura.cae_vto),
+            ("qr_payload", factura.qr_payload),
         )
-        return [{
-            "codigo": "001", "desc": desc, "detalle": "",
-            "cant": "1,00", "uMedida": "unidad", "bonif": "0,00",
-            "precioUnitFmt": _plain(factura.imp_neto), "subtotalFmt": _plain(factura.imp_neto),
-            "importeStr": _money(factura.imp_neto),
-        }]
-
-    jornadas = pedido.get("cantidad_jornadas") or 1
-    bruto_total = sum(int(it.get("subtotal") or 0) for it in items)
-    descuento_total = max(0, bruto_total - int(factura.imp_neto or 0))
-
-    out = []
-    bonif_acumulado = 0
-    for i, it in enumerate(items):
-        cobro_fijo = (it.get("cobro_modo") or "jornada") == "fijo"
-        detalle = "Cargo único" if cobro_fijo else f"{jornadas} jornada{'s' if jornadas != 1 else ''}"
-        subtotal_bruto = it.get("subtotal") or 0
-        cantidad = it.get("cantidad") or 1
-
-        bonif_linea = 0
-        if descuento_total > 0 and bruto_total > 0:
-            if i == len(items) - 1:
-                bonif_linea = descuento_total - bonif_acumulado
-            else:
-                bonif_linea = int(round(subtotal_bruto * descuento_total / bruto_total))
-                bonif_acumulado += bonif_linea
-        bonif_pct = round(bonif_linea / subtotal_bruto * 100, 2) if subtotal_bruto else 0.0
-        subtotal_neto = subtotal_bruto - bonif_linea
-
-        out.append({
-            "codigo": f"{i + 1:03d}",
-            "desc": it.get("nombre") or it.get("nombre_libre") or "Ítem",
-            "detalle": detalle,
-            "cant": _plain(cantidad),
-            "uMedida": "unidad",
-            "bonif": _plain(bonif_pct),
-            "precioUnitFmt": _plain(it.get("precio_jornada") or 0),
-            "subtotalFmt": _plain(subtotal_neto),
-            "importeStr": _money(subtotal_neto),
-        })
-    return out
+        if not val
+    ]
+    if faltantes:
+        raise RuntimeError(
+            f"Factura {factura.id} está 'emitida' pero le faltan datos de ARCA "
+            f"({', '.join(faltantes)}) — no se puede generar un comprobante válido."
+        )
 
 
 def _build_ctx(factura, pedido: dict) -> dict:
-    em_key = factura.emisor if factura.emisor in _EMISORES_DATA else "santini"
-    em_data = _EMISORES_DATA[em_key]
+    from services.facturacion.catalogos import (
+        label_concepto,
+        label_condicion_iva_receptor,
+        label_doc_tipo,
+    )
+
+    _validar_datos_arca(factura)
+
     em_row = _emisor_row(factura.emisor)
+    em_cond_label = _EMISOR_COND_IVA_LABEL.get(em_row["condicion_iva"], "—")
 
     letra = _CBTE_TIPO_LABEL.get(factura.cbte_tipo, "C")
     es_nc = _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False)
     cod = f"{factura.cbte_tipo:02d}"
 
-    doc_label = _DOC_TIPO_LABEL.get(factura.doc_tipo, "Documento")
+    doc_label = _catalogo(label_doc_tipo, factura.doc_tipo)
     doc_nro = factura.cliente_cuit or factura.doc_nro or "—"
     # CUIT/CUIL con guiones si vienen en crudo (11 dígitos).
     if doc_nro and doc_nro.isdigit() and len(doc_nro) == 11:
@@ -288,21 +300,23 @@ def _build_ctx(factura, pedido: dict) -> dict:
     vto_pago = fecha_desde
 
     mostrar_iva = letra in ("A", "B") and factura.imp_iva > 0
-
-    qr_url = ""
-    if factura.qr_payload:
-        qr_url = factura.qr_payload
+    concepto_label = _catalogo(label_concepto, factura.concepto)
+    # Ley 27.743 / RG 5614: leyenda de Transparencia Fiscal al Consumidor,
+    # obligatoria en toda venta/locación/prestación A CONSUMIDOR FINAL — en
+    # este motor eso son las Facturas B/C (la A es RI-a-RI, no consumidor
+    # final por definición, así que queda fuera del alcance de la norma).
+    transparencia_fiscal = letra in ("B", "C")
 
     return {
-        "letra": letra, "cod": cod, "es_nc": es_nc,
+        "letra": letra, "cod": cod, "es_nc": es_nc, "concepto": concepto_label,
         "titulo": ("NOTA DE CRÉDITO " if es_nc else "FACTURA ") + letra,
         "emisor": {
             "razonSocial": em_row["razon_social"] or "—",
             "cuit": em_row["cuit"] or "—",
-            "cond": em_data["cond_iva_label"],
-            "dom": em_data["domicilio"],
-            "iibb": em_data["iibb"],
-            "inicio": em_data["inicio_actividades"],
+            "cond": em_cond_label,
+            "dom": em_row["domicilio"] or "—",
+            "iibb": em_row["iibb"],
+            "inicio": em_row["inicio_actividades"],
             "ptoVta": f"{factura.pto_vta:05d}",
         },
         "comp": {
@@ -314,31 +328,46 @@ def _build_ctx(factura, pedido: dict) -> dict:
             "nombre": factura.razon_social or pedido.get("cliente_nombre") or "—",
             "docLabel": doc_label,
             "docNro": doc_nro,
-            "cond": _COND_IVA_LABEL.get(factura.condicion_iva_receptor, "—"),
+            "cond": _catalogo(label_condicion_iva_receptor, factura.condicion_iva_receptor),
             "dom": pedido.get("cliente_domicilio_fiscal") or "—",
             "venta": venta,
         },
         "conceptos": _conceptos(pedido, factura),
         "tot": {
             "discrimina": mostrar_iva,
+            "transparencia": transparencia_fiscal,
             "netoStr": _money(factura.imp_neto), "ivaStr": _money(factura.imp_iva),
             "subStr": _money(factura.imp_neto), "otrosStr": _money(0),
-            "totalStr": _money(factura.imp_total), "ivaPct": "21%",
+            "totalStr": _money(factura.imp_total),
+            "ivaPct": _iva_pct_label(factura.imp_neto, factura.imp_iva),
         },
-        "cae": {"nro": factura.cae or "—", "vto": _fdate(factura.cae_vto)},
-        "qr": {"url": qr_url, "has": bool(qr_url), "pending": not qr_url},
+        "cae": {"nro": factura.cae, "vto": _fdate(factura.cae_vto)},
+        "qr": {"url": factura.qr_payload},
     }
 
 
+def _transparencia_fiscal_lines(f: dict) -> tuple[str, str, str]:
+    """Texto de la leyenda de Transparencia Fiscal al Consumidor (Ley 27.743 /
+    RG 5614), con los importes REALES de la factura — nunca hardcodeados.
+    `otrosStr` es el mismo total de "otros tributos" que ya existe en el
+    comprobante (hoy siempre $0 para Rambla: no hay impuestos internos ni
+    tributos municipales en el rubro); un tenant que sí los tenga cargaría
+    ese mismo campo (`ImpTrib`) y esta leyenda lo reflejaría sin cambios."""
+    return (
+        "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)",
+        f"IVA Contenido: {f['tot']['ivaStr']}",
+        f"Otros Impuestos Nacionales Indirectos: {f['tot']['otrosStr']}",
+    )
+
+
 def _qr_img(url: str, size: int) -> str:
-    try:
-        from arca_fe.qr import _build_qr_image_data_uri
-        return (
-            f'<img src="{_build_qr_image_data_uri(url)}" width="{size}" height="{size}" '
-            f'alt="QR AFIP" style="display:block">'
-        )
-    except Exception:
-        return ""
+    """SVG inline (vectorial — sin resolución nativa fija, no se pixela en
+    ningún zoom). Nunca atrapa errores: si `segno` no puede generarlo, el
+    caller (`factura_html`) tiene que fallar fuerte, no entregar un
+    comprobante con un hueco donde debería ir el QR exigido por RG4892."""
+    from arca_fe.qr import _build_qr_svg
+    svg = _build_qr_svg(url, size)
+    return svg.replace("<svg ", '<svg style="display:block" ', 1)
 
 
 # ---------------------------------------------------------------------------
@@ -347,13 +376,7 @@ def _qr_img(url: str, size: int) -> str:
 
 
 def _factura_clasica_html(f: dict) -> str:
-    if f["qr"]["has"]:
-        qr_block = _qr_img(f["qr"]["url"], 112)
-    else:
-        qr_block = (
-            '<div style="width:112px;height:112px;border:1px solid #000;display:flex;'
-            'align-items:center;justify-content:center;font-size:9px;color:#666;">QR</div>'
-        )
+    qr_block = _qr_img(f["qr"]["url"], 112)
 
     iibb_line = (
         f'<div style="margin-bottom:4px;"><span style="font-weight:700;">Ingresos Brutos:</span> {_e(f["emisor"]["iibb"])}</div>'
@@ -363,6 +386,16 @@ def _factura_clasica_html(f: dict) -> str:
         f'<div><span style="font-weight:700;">Fecha de Inicio de Actividades:</span> {_e(f["emisor"]["inicio"])}</div>'
         if f["emisor"]["inicio"] else ""
     )
+
+    transparencia_block = ""
+    if f["tot"]["transparencia"]:
+        titulo_tf, iva_tf, otros_tf = _transparencia_fiscal_lines(f)
+        transparencia_block = f"""
+        <div style="margin-top:10px;font-size:8px;line-height:1.5;">
+          <div style="font-weight:700;">{_e(titulo_tf)}</div>
+          <div>{_e(iva_tf)}</div>
+          <div>{_e(otros_tf)}</div>
+        </div>"""
 
     filas_items = "".join(f"""
       <div style="display:grid;grid-template-columns:52px 1fr 62px 74px 96px 58px 100px;font-size:10px;">
@@ -459,6 +492,7 @@ def _factura_clasica_html(f: dict) -> str:
             <div style="display:flex;justify-content:flex-end;gap:8px;"><span style="font-weight:700;">Fecha de Vto. de CAE:</span><span style="font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
             <div style="margin-top:10px;font-size:9px;color:#333;">Comprobante Autorizado — Verifique la validez de este comprobante en www.arca.gob.ar</div>
             <div style="margin-top:4px;font-size:9px;color:#333;">Pág. 1/1</div>
+            {transparencia_block}
           </div>
         </div>
 """
@@ -487,95 +521,114 @@ def _factura_clasica_html(f: dict) -> str:
 
 
 def _factura_mobile_html(f: dict) -> str:
-    if f["qr"]["has"]:
-        qr_block = _qr_img(f["qr"]["url"], 120)
-    else:
-        qr_block = (
-            '<div style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;'
-            'font-family:\'JetBrains Mono\',monospace;font-size:10px;color:#8a97a3;">QR…</div>'
-        )
+    tipo_txt = "Nota de crédito" if f["es_nc"] else "Factura"
+
+    qr_block = _qr_img(f["qr"]["url"], 165)
 
     conceptos_html = "".join(f"""
-        <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid #f2f5f7;">
-          <div style="min-width:0;">
-            <div style="font-size:14px;font-weight:600;">{_e(c['desc'])}</div>
-            <div style="font-size:12px;color:#8a97a3;margin-top:1px;">{_e(c['detalle'])}</div>
-          </div>
-          <div style="font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;">{_e(c['importeStr'])}</div>
+        <div style="padding:10px 0;border-top:1px solid #eef1f4;display:flex;justify-content:space-between;gap:16px;">
+          <span style="font-size:16px;font-weight:700;">{_e(c['desc'])}</span>
+          <span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;">{_e(c['importeStr'])}</span>
         </div>""" for c in f["conceptos"])
+
+    iibb_line = (
+        f'<div style="font-size:12px;color:#5b6875;margin-top:2px;">IIBB {_e(f["emisor"]["iibb"])}</div>'
+        if f["emisor"]["iibb"] else ""
+    )
 
     if f["tot"]["discrimina"]:
         totales_iva = f"""
-        <div style="display:flex;justify-content:space-between;font-size:14px;color:#5b6875;padding:2.5px 0;"><span>Neto gravado</span><span style="font-variant-numeric:tabular-nums;letter-spacing:0.04em;">{_e(f['tot']['netoStr'])}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:14px;color:#5b6875;padding:2.5px 0;"><span>IVA {_e(f['tot']['ivaPct'])}</span><span style="font-variant-numeric:tabular-nums;letter-spacing:0.04em;">{_e(f['tot']['ivaStr'])}</span></div>
-        <div style="height:1px;background:#eef1f4;margin:10px 0;"></div>"""
+        <div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#5b6875;padding:2px 0;"><span>Neto gravado</span><span style="font-variant-numeric:tabular-nums;">{_e(f['tot']['netoStr'])}</span></div>
+        <div style="display:flex;justify-content:space-between;gap:24px;font-size:14px;color:#5b6875;padding:2px 0;"><span>IVA {_e(f['tot']['ivaPct'])}</span><span style="font-variant-numeric:tabular-nums;">{_e(f['tot']['ivaStr'])}</span></div>
+        <div style="height:2px;background:#c9d0d6;margin:6px 0;"></div>"""
     else:
         totales_iva = ""
 
+    inicio_cell = (
+        '<div><div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;letter-spacing:0.08em;'
+        'text-transform:uppercase;color:#98a3ae;line-height:1;">Inicio de actividades</div>'
+        f'<div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f["emisor"]["inicio"])}</div></div>'
+        if f["emisor"]["inicio"] else ""
+    )
+
+    transparencia_block = ""
+    if f["tot"]["transparencia"]:
+        titulo_tf, iva_tf, otros_tf = _transparencia_fiscal_lines(f)
+        transparencia_block = f"""
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #e6e9ec;font-size:10.5px;color:#98a3ae;line-height:1.5;">
+        <div style="font-weight:700;color:#5b6875;">{_e(titulo_tf)}</div>
+        <div>{_e(iva_tf)}</div>
+        <div>{_e(otros_tf)}</div>
+      </div>"""
+
     body = f"""
-    <div style="padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <div style="min-width:0;display:flex;align-items:center;">
-        <div style="width:132px;color:#16202b;">{_arca_logo(132)}</div>
-      </div>
-      <div style="flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:54px;height:60px;border:1.5px solid #16202b;border-radius:10px;">
-        <span style="font-size:31px;font-weight:800;line-height:1;">{_e(f['letra'])}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:0.08em;margin-top:2px;">COD {_e(f['cod'])}</span>
+    <div style="padding:24px 28px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+      <div style="width:170px;color:#16202b;padding-top:4px;">{_arca_logo(170)}</div>
+      <div style="flex:none;display:flex;align-items:center;gap:14px;">
+        <div style="text-align:right;">
+          <div style="font-size:20px;font-weight:800;letter-spacing:-0.01em;line-height:1.1;">{_e(tipo_txt.upper())}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;margin-top:2px;">Cód. {_e(f['cod'])}</div>
+        </div>
+        <div style="flex:none;display:flex;align-items:center;justify-content:center;width:64px;height:64px;border:1.5px solid #16202b;border-radius:10px;overflow:hidden;">
+          <span style="font-size:44px;font-weight:800;line-height:1;">{_e(f['letra'])}</span>
+        </div>
       </div>
     </div>
 
-    <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:8px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">Factura electrónica · Original</div>
-
-    <div style="padding:11px 20px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px 14px;">
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Punto de venta</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['emisor']['ptoVta'])}</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Comp. Nro</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['comp']['nro'])}</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Fecha de emisión</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['comp']['fecha'])}</div></div>
-      <div style="grid-column:span 2;"><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Período facturado</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['periodo']['desde'])} → {_e(f['periodo']['hasta'])}</div></div>
-      <div><div style="font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:0.06em;text-transform:uppercase;color:#98a3ae;line-height:1;">Vto. de pago</div><div style="font-size:13.5px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;">{_e(f['periodo']['vto'])}</div></div>
+    <div style="margin:18px 28px 0;background:#f7f8fa;border-radius:10px;text-align:center;font-size:14px;padding:10px;">
+      CAE N° <span style="font-weight:700;font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span> · Vto. CAE <span style="font-weight:700;font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span>
     </div>
 
-    <div style="padding:14px 20px;border-bottom:1px solid #eef1f4;display:flex;flex-direction:column;gap:12px;">
-      <div style="display:flex;gap:8px;">
-        <div style="flex:none;width:42px;height:19px;display:flex;align-items:center;gap:5px;">
+    <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px 16px;">
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Fecha de emisión</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['comp']['fecha'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Vto. de pago</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['periodo']['vto'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Período facturado</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['periodo']['desde'])} → {_e(f['periodo']['hasta'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Punto de venta</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['emisor']['ptoVta'])}</div></div>
+      <div><div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:#98a3ae;line-height:1;">Comp. Nro</div><div style="font-size:14px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['comp']['nro'])}</div></div>
+      {inicio_cell}
+    </div>
+
+    <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
           <span style="width:6px;height:6px;border-radius:999px;background:#1c5fb8;flex:none;"></span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#98a3ae;">De</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Emisor</span>
         </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:16px;font-weight:700;line-height:1.19;">{_e(f['emisor']['razonSocial'])}</div>
-          <div style="font-size:12.5px;color:#5b6875;margin-top:3px;font-variant-numeric:tabular-nums;">CUIT <span style="font-weight:600;color:#16202b;">{_e(f['emisor']['cuit'])}</span> · {_e(f['emisor']['cond'])}</div>
-          <div style="font-size:12.5px;color:#5b6875;">{_e(f['emisor']['dom'])}</div>
-        </div>
+        <div style="font-size:19px;font-weight:800;line-height:1.15;">{_e(f['emisor']['razonSocial'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:4px;">CUIT <span style="font-weight:600;color:#16202b;font-variant-numeric:tabular-nums;">{_e(f['emisor']['cuit'])}</span> · {_e(f['emisor']['cond'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:2px;">{_e(f['emisor']['dom'])}</div>
+        {iibb_line}
       </div>
-      <div style="display:flex;gap:8px;">
-        <div style="flex:none;width:42px;height:19px;display:flex;align-items:center;gap:5px;">
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
           <span style="width:6px;height:6px;border-radius:999px;background:#16202b;flex:none;"></span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:#98a3ae;">Para</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Receptor</span>
         </div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:16px;font-weight:700;line-height:1.19;">{_e(f['receptor']['nombre'])}</div>
-          <div style="font-size:12.5px;color:#5b6875;margin-top:3px;font-variant-numeric:tabular-nums;">{_e(f['receptor']['docLabel'])} <span style="font-weight:600;color:#16202b;">{_e(f['receptor']['docNro'])}</span> · {_e(f['receptor']['cond'])}</div>
-          <div style="font-size:12.5px;color:#5b6875;">{_e(f['receptor']['dom'])}</div>
-        </div>
+        <div style="font-size:19px;font-weight:800;line-height:1.15;">{_e(f['receptor']['nombre'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:4px;">{_e(f['receptor']['docLabel'])} <span style="font-weight:600;color:#16202b;font-variant-numeric:tabular-nums;">{_e(f['receptor']['docNro'])}</span> · {_e(f['receptor']['cond'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:2px;">{_e(f['receptor']['dom'])}</div>
+        <div style="font-size:13px;color:#5b6875;margin-top:2px;">Cond. venta: {_e(f['receptor']['venta'])}</div>
       </div>
     </div>
 
-    <div style="padding:14px 20px;border-bottom:1px solid #eef1f4;">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:#8a97a3;margin-bottom:6px;">Conceptos</div>{conceptos_html}
+    <div style="padding:16px 28px;border-bottom:1px solid #eef1f4;flex:1;min-height:0;overflow:hidden;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Conceptos · <span style="color:#16202b;">{_e(f['concepto'])}</span></div>
+      {conceptos_html}
     </div>
 
-    <div style="padding:14px 20px 16px;border-bottom:1px solid #eef1f4;">{totales_iva}
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <span style="font-size:15px;font-weight:700;">Total</span>
-        <span style="font-size:26px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
-      </div>
-    </div>
-
-    <div style="padding:14px 20px 18px;background:#f5f7f9;display:flex;gap:14px;align-items:center;">
-      <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:10px;padding:7px;">{qr_block}</div>
-      <div style="flex:1;min-width:0;font-size:12.5px;color:#5b6875;line-height:1.4;">
-        <div style="font-weight:600;color:#16202b;margin-bottom:3px;">Comprobante autorizado</div>
-        <div>CAE N° <span style="color:#16202b;font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
-        <div>Vto. CAE <span style="color:#16202b;font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
-        <div style="margin-top:5px;">Escaneá el QR para validar en arca.gob.ar</div>
+    <div style="padding:20px 28px 24px;background:#f7f8fa;">
+      <div style="display:flex;gap:20px;align-items:flex-start;">
+        <div style="flex:none;background:#fff;border:1px solid #e6e9ec;border-radius:12px;padding:8px;">{qr_block}</div>
+        <div style="flex:1;min-width:0;">{totales_iva}
+          <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#98a3ae;">Total</span>
+            <span style="font-size:34px;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">{_e(f['tot']['totalStr'])}</span>
+          </div>
+          <div style="margin-top:14px;font-size:11.5px;color:#98a3ae;line-height:1.4;">
+            Comprobante autorizado por ARCA · Verificá la validez escaneando el QR o en <span style="color:#5b6875;font-weight:600;">www.arca.gob.ar</span>
+          </div>
+          {transparencia_block}
+        </div>
       </div>
     </div>
 """
@@ -588,12 +641,24 @@ def _factura_mobile_html(f: dict) -> str:
 {_fonts_css()}
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
-  html,body {{ background:#fff; }}
-  body {{ width:392px; background:#fff; font-family:'TT Commons',ui-sans-serif,sans-serif;
-          color:#16202b; overflow:hidden; }}
+  html,body {{ height:100%; background:{_MOBILE_PAGE_BG}; }}
+  body {{ min-height:100vh; display:flex; align-items:center; justify-content:center;
+          font-family:'TT Commons',ui-sans-serif,sans-serif; color:#16202b; }}
+  /* `.page` conserva su tamaño NATURAL en px (Playwright renderiza el PDF a
+     una página de exactamente este tamaño — ahí 100vh/100vw igualan el
+     tamaño natural y el scale() da 1, sin cambiar el PDF) y el `transform:
+     scale()` la ajusta al viewport SOLO cuando se ve como preview
+     (`format=html`) en una ventana de otro tamaño — llena el alto/ancho
+     disponible sin perder la proporción 4:5. */
+  .page {{ flex:none; width:{MOBILE_PAGE_WIDTH}px; height:{MOBILE_PAGE_HEIGHT}px;
+           padding:{_MOBILE_CARD_MARGIN}px;
+           transform:scale(min(calc(100vh / {MOBILE_PAGE_HEIGHT}px), calc(100vw / {MOBILE_PAGE_WIDTH}px))); }}
+  .card {{ width:{_MOBILE_CARD_WIDTH}px; height:{_MOBILE_CARD_HEIGHT}px; display:flex; flex-direction:column;
+           background:#fff; border-radius:28px; border:1px solid #ecebe8;
+           box-shadow:0 1px 3px rgba(22,32,43,0.06); overflow:hidden; }}
 </style>
 </head>
-<body>{body}
+<body><div class="page"><div class="card">{body}</div></div>
 </body>
 </html>"""
 
@@ -604,13 +669,9 @@ def _factura_mobile_html(f: dict) -> str:
 
 
 def _factura_formal_html(f: dict) -> str:
-    if f["qr"]["has"]:
-        qr_block = _qr_img(f["qr"]["url"], 150)
-    else:
-        qr_block = (
-            '<div style="width:150px;height:150px;display:flex;align-items:center;justify-content:center;'
-            'font-family:\'JetBrains Mono\',monospace;font-size:11px;color:#8a97a3;">QR…</div>'
-        )
+    tipo_banner = "Nota de crédito electrónica · Original" if f["es_nc"] else "Factura electrónica · Original"
+
+    qr_block = _qr_img(f["qr"]["url"], 150)
 
     iibb_line = (
         f'<div><span style="font-weight:600;color:#16202b;">Ingresos Brutos:</span> {_e(f["emisor"]["iibb"])}</div>'
@@ -620,6 +681,16 @@ def _factura_formal_html(f: dict) -> str:
         f'<div><span style="font-weight:600;color:#16202b;">Inicio de Actividades:</span> {_e(f["emisor"]["inicio"])}</div>'
         if f["emisor"]["inicio"] else ""
     )
+
+    transparencia_block = ""
+    if f["tot"]["transparencia"]:
+        titulo_tf, iva_tf, otros_tf = _transparencia_fiscal_lines(f)
+        transparencia_block = f"""
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid #eef1f4;font-size:12.5px;color:#8a97a3;line-height:1.5;">
+              <div style="font-weight:700;color:#5b6875;">{_e(titulo_tf)}</div>
+              <div>{_e(iva_tf)}</div>
+              <div>{_e(otros_tf)}</div>
+            </div>"""
 
     filas_items = "".join(f"""
       <div style="display:grid;grid-template-columns:1fr 90px 150px 150px;gap:0;padding:12px 0;border-bottom:1px solid #eef1f4;align-items:baseline;">
@@ -645,7 +716,7 @@ def _factura_formal_html(f: dict) -> str:
           </div>
         </div>
 
-        <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:0.2em;text-transform:uppercase;padding:11px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">Factura electrónica · Original</div>
+        <div style="background:#f7f8fa;color:#98a3ae;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:0.2em;text-transform:uppercase;padding:11px;border-top:1px solid #eef1f4;border-bottom:1px solid #eef1f4;">{_e(tipo_banner)}</div>
 
         <div style="padding:30px 44px;display:grid;grid-template-columns:1fr 1fr;gap:36px;border-bottom:1px solid #eef1f4;">
           <div>
@@ -703,6 +774,7 @@ def _factura_formal_html(f: dict) -> str:
             <div style="font-size:15px;margin-bottom:3px;"><span style="color:#5b6875;">CAE N° </span><span style="font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['nro'])}</span></div>
             <div style="font-size:15px;margin-bottom:12px;"><span style="color:#5b6875;">Vto. CAE </span><span style="font-weight:600;font-variant-numeric:tabular-nums;">{_e(f['cae']['vto'])}</span></div>
             <div style="font-size:13px;color:#8a97a3;line-height:1.45;">Verificá la validez de este comprobante escaneando el QR o en www.arca.gob.ar</div>
+            {transparencia_block}
           </div>
         </div>
 """
@@ -735,28 +807,37 @@ _LAYOUTS = {
     "formal": _factura_formal_html,
 }
 
-# Ancho fijo del comprobante "celular" (mismo valor que el `width` del body
-# en `_factura_mobile_html`). Alto = None → `pdf._render_pdf` mide el alto
-# real del contenido (el comprobante no es A4, es una tarjeta angosta que
-# tiene que terminar donde termina el contenido, no a media hoja).
-MOBILE_PAGE_WIDTH = 392
+# La celular es una TARJETA de esquinas redondeadas flotando sobre un fondo
+# (no un rectángulo a página completa) — el ancho de página incluye el
+# margen visible alrededor de la tarjeta en los 4 lados. Proporción 4:5 FIJA
+# (identidad visual): header/CAE/info/emisor-receptor arriba y QR/total/
+# leyendas abajo quedan anclados en su lugar; lo único que se ajusta con la
+# cantidad de conceptos es el espacio del medio (`flex:1` en la sección de
+# conceptos) — la tarjeta en sí nunca cambia de alto.
+_MOBILE_CARD_WIDTH = 640
+_MOBILE_CARD_MARGIN = 24
+_MOBILE_PAGE_BG = "#f4f2ef"
+MOBILE_PAGE_WIDTH = _MOBILE_CARD_WIDTH + 2 * _MOBILE_CARD_MARGIN
+MOBILE_PAGE_HEIGHT = round(MOBILE_PAGE_WIDTH * 5 / 4)  # ancho:alto = 4:5
+_MOBILE_CARD_HEIGHT = MOBILE_PAGE_HEIGHT - 2 * _MOBILE_CARD_MARGIN
 
 
 def page_size_for_layout(layout: str) -> tuple[int, int | None] | None:
     """Tamaño de página para `pdf._render_pdf(html, page_size=...)`.
-    None → A4 (default, clásica/formal). Un tuple → tamaño propio (celular)."""
-    return (MOBILE_PAGE_WIDTH, None) if layout == "celular" else None
+    None → A4 (default, clásica/formal). Un tuple → tamaño propio (celular,
+    4:5 fijo — ver `_MOBILE_CARD_HEIGHT`)."""
+    return (MOBILE_PAGE_WIDTH, MOBILE_PAGE_HEIGHT) if layout == "celular" else None
 
 
-def factura_html(factura, pedido: dict, layout: str = "clasica") -> str:
+def factura_html(factura, pedido: dict, layout: str = "celular") -> str:
     """Genera el HTML completo de la factura (Factura A/B/C o Nota de Crédito).
 
     `factura` es una instancia de `services.facturacion.repo.Factura`.
     `pedido` viene de `services.facturacion.engine._get_pedido` (items + cliente
-    enriquecidos). `layout`: 'clasica' (default, réplica oficial AFIP/ARCA) ·
-    'celular' (compacta, para compartir por WhatsApp) · 'formal' (A4, identidad
-    de la celular).
+    enriquecidos). `layout`: 'celular' (default de Rambla, compacta 4:5) ·
+    'clasica' (réplica oficial AFIP/ARCA, A4) · 'formal' (A4, identidad de la
+    celular).
     """
-    builder = _LAYOUTS.get(layout, _factura_clasica_html)
+    builder = _LAYOUTS.get(layout, _factura_mobile_html)
     ctx = _build_ctx(factura, pedido)
     return builder(ctx)

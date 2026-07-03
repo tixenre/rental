@@ -12,6 +12,9 @@ export type EmisorArca = {
   cert_cargado: boolean;
   activo: boolean;
   razon_social: string | null;
+  domicilio: string | null;
+  iibb: string | null;
+  inicio_actividades: string | null;
   notas: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -20,6 +23,7 @@ export type EmisorArca = {
 export type EstadoFacturacion = {
   ambiente: "homologacion" | "produccion";
   emisores: EmisorArca[];
+  catalogos_actualizados_at: string | null;
 };
 
 export type FacturaEstado = "pendiente" | "emitida" | "error" | "anulada";
@@ -59,8 +63,54 @@ export type FacturasListResp = {
   count: number;
 };
 
+export type PadronResult =
+  | {
+      encontrado: true;
+      razon_social: string;
+      nombre: string;
+      apellido: string;
+      domicilio: string;
+      condicion_iva: string;
+      estado_clave: string;
+    }
+  // `motivo` presente = no pudimos ni completar la consulta (WSAA/relación/
+  // cert/red) — distinto de "ARCA no tiene datos para este CUIT" (sin motivo).
+  | { encontrado: false; motivo?: string };
+
+export type ChequeoPreview = { check: string; ok: boolean; bloqueante: boolean; mensaje: string };
+
+export type PreviewFactura = {
+  ambiente: "homologacion" | "produccion";
+  emisor: { nombre: string; cuit: number; condicion_iva: string };
+  receptor: { doc_tipo: string; doc_nro: string; condicion_iva: string; razon_social: string };
+  comprobante: { letra: string; tipo_nro: number; numero_a_emitir: number; pto_vta: number };
+  importes: { neto: number; iva: number; total: number };
+  fechas: {
+    emision: string;
+    servicio_desde: string | null;
+    servicio_hasta: string | null;
+    vto_pago: string | null;
+  };
+  chequeos: ChequeoPreview[];
+  listo: boolean;
+};
+
 export const facturacionApi = {
   getEstado: () => authedJson<EstadoFacturacion>("/api/admin/facturacion/estado"),
+
+  // Autocompletar razón social/domicilio/condición IVA desde el padrón ARCA.
+  consultarPadron: (cuit: string) =>
+    authedJson<PadronResult>(`/api/admin/arca/padron/${encodeURIComponent(cuit)}`),
+
+  // Actualiza los catálogos de ARCA (doc_tipo/concepto/condición IVA
+  // receptor) que se muestran en el PDF de la factura.
+  refrescarCatalogos: () =>
+    authedPostJson<{
+      ok: boolean;
+      doc_tipo: number;
+      concepto: number;
+      condicion_iva_receptor: number;
+    }>("/api/admin/arca/catalogos/refrescar", {}),
 
   // Emisores
   listEmisores: () => authedJson<EmisorArca[]>("/api/admin/emisores-arca"),
@@ -79,8 +129,22 @@ export const facturacionApi = {
     }),
   desactivarEmisor: (id: number) =>
     authedJson<void>(`/api/admin/emisores-arca/${id}`, { method: "DELETE" }),
+  // Puntos de venta habilitados en ARCA para ESTE emisor (requiere cert cargado).
+  consultarPuntosVenta: (id: number) =>
+    authedJson<{ puntos_venta: { nro: number }[] }>(`/api/admin/emisores-arca/${id}/puntos-venta`),
+  // Metadata del cert cargado (subject/serie/vigencia) — para comparar contra
+  // el "Computador Fiscal" delegado en el Administrador de Relaciones de ARCA.
+  consultarCertInfo: (id: number) =>
+    authedJson<{
+      subject: string;
+      numero_serie: string;
+      vigente_desde: string;
+      vigente_hasta: string;
+    }>(`/api/admin/emisores-arca/${id}/cert-info`),
 
   // Facturas
+  previewFactura: (pedidoId: number) =>
+    authedJson<PreviewFactura>(`/api/alquileres/${pedidoId}/facturar/preview`),
   facturarPedido: (pedidoId: number) =>
     authedPostJson<Factura>(`/api/alquileres/${pedidoId}/facturar`, {}),
   listFacturasPedido: (pedidoId: number) =>

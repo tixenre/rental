@@ -8,11 +8,31 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, KeyRound, CheckCircle2, XCircle, Pencil, ChevronDown, Upload } from "lucide-react";
+import {
+  Plus,
+  KeyRound,
+  CheckCircle2,
+  XCircle,
+  Pencil,
+  ChevronDown,
+  Upload,
+  Search,
+  Fingerprint,
+  MoreHorizontal,
+  Power,
+} from "lucide-react";
 
 import { facturacionApi, type EmisorArca } from "@/lib/admin/api";
+import { usePadronLookup } from "@/lib/admin/usePadronLookup";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/design-system/ui/dropdown-menu";
 
 export const Route = createLazyFileRoute("/admin/facturacion/emisores")({
   component: EmisoresPage,
@@ -150,6 +170,11 @@ function EmisorCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const certInfo = useMutation({
+    mutationFn: () => facturacionApi.consultarCertInfo(emisor.id),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const condLabel =
     CONDICIONES.find((c) => c.value === emisor.condicion_iva)?.label ?? emisor.condicion_iva;
 
@@ -186,33 +211,59 @@ function EmisorCard({
             <div className="text-xs text-muted-foreground mt-1 italic">{emisor.notas}</div>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={onCert}
-            className="h-8 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5"
-          >
-            <KeyRound className="h-3.5 w-3.5" />
-            {emisor.cert_cargado ? "Renovar cert" : "Cargar cert"}
-          </button>
-          <button
-            type="button"
-            onClick={onEdit}
-            className="h-8 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Editar
-          </button>
-          <button
-            type="button"
-            onClick={() => toggle.mutate()}
-            disabled={toggle.isPending}
-            className="h-8 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink"
-          >
-            {emisor.activo ? "Desactivar" : "Activar"}
-          </button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Acciones de ${emisor.nombre}`}
+              className="h-8 w-8 grid place-items-center rounded-md text-muted-foreground hover:text-ink hover:bg-muted shrink-0"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {emisor.cert_cargado && (
+              <DropdownMenuItem onClick={() => certInfo.mutate()} disabled={certInfo.isPending}>
+                <Fingerprint className="mr-2 h-4 w-4" />
+                {certInfo.isPending ? "Leyendo…" : "Ver cert"}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={onCert}>
+              <KeyRound className="mr-2 h-4 w-4" />
+              {emisor.cert_cargado ? "Renovar cert" : "Cargar cert"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onEdit}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => toggle.mutate()} disabled={toggle.isPending}>
+              <Power className="mr-2 h-4 w-4" />
+              {emisor.activo ? "Desactivar" : "Activar"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+      {certInfo.data && (
+        <div className="rounded-md border hairline bg-surface-elevated px-3 py-2 text-xs space-y-1 font-mono">
+          <div>
+            <span className="text-muted-foreground">Nº de serie: </span>
+            {certInfo.data.numero_serie}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Subject: </span>
+            {certInfo.data.subject}
+          </div>
+          <div>
+            <span className="text-muted-foreground">Vigencia: </span>
+            {certInfo.data.vigente_desde} → {certInfo.data.vigente_hasta}
+          </div>
+          <div className="text-muted-foreground/70">
+            Comparar el Nº de serie contra el "Computador Fiscal" en Administración de Certificados
+            Digitales de ARCA.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -243,14 +294,31 @@ function EmisorFormModal({
   const [cuit, setCuit] = useState(emisor?.cuit ?? "");
   const [ptoVta, setPtoVta] = useState(String(emisor?.pto_vta ?? ""));
   const [condicion, setCondicion] = useState<string>(emisor?.condicion_iva ?? "monotributo");
+  const [domicilio, setDomicilio] = useState(emisor?.domicilio ?? "");
+  const [iibb, setIibb] = useState(emisor?.iibb ?? "");
+  const [inicioActividades, setInicioActividades] = useState(emisor?.inicio_actividades ?? "");
   const [notas, setNotas] = useState(emisor?.notas ?? "");
   // Cert opcional al crear
   const [cert, setCert] = useState("");
   const [key, setKey] = useState("");
 
+  const padron = usePadronLookup((datos) => {
+    if (datos.razon_social) setRazonSocial(datos.razon_social);
+    if (datos.domicilio) setDomicilio(datos.domicilio);
+    if (datos.condicion_iva) setCondicion(datos.condicion_iva);
+  });
+
   const certOk = cert.includes("BEGIN CERTIFICATE");
   const keyOk = key.includes("PRIVATE KEY");
   const withCert = isNew && (cert.length > 0 || key.length > 0);
+
+  const puntosVenta = useMutation({
+    mutationFn: async () => {
+      const { puntos_venta } = await facturacionApi.consultarPuntosVenta(emisor!.id);
+      return puntos_venta;
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const qc = useQueryClient();
   const save = useMutation({
@@ -261,6 +329,9 @@ function EmisorFormModal({
         cuit,
         pto_vta: parseInt(ptoVta, 10),
         condicion_iva: condicion as EmisorArca["condicion_iva"],
+        domicilio: domicilio || null,
+        iibb: iibb || null,
+        inicio_actividades: inicioActividades || null,
         notas: notas || null,
         activo: emisor?.activo ?? true,
       };
@@ -312,27 +383,94 @@ function EmisorFormModal({
             className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
           />
         </Field>
-        <Field label="CUIT">
-          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
-          <input
-            type="text"
-            inputMode="numeric"
-            value={cuit}
-            onChange={(e) => setCuit(formatCuit(e.target.value))}
-            placeholder="20-30000000-0"
-            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
-          />
+        <Field
+          label="CUIT"
+          hint={
+            !padron.motivo && !padron.inactivo && padron.noEncontrado
+              ? "ARCA no tiene datos para este CUIT — cargá a mano."
+              : undefined
+          }
+        >
+          <div className="flex gap-1.5">
+            {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+            <input
+              type="text"
+              inputMode="numeric"
+              value={cuit}
+              onChange={(e) => setCuit(formatCuit(e.target.value))}
+              placeholder="20-30000000-0"
+              className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => padron.buscar(cuit)}
+              disabled={padron.buscando || cuit.replace(/\D/g, "").length !== 11}
+              title="Autocompletar razón social/domicilio/condición IVA desde ARCA"
+              className="shrink-0 h-9 px-3 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <Search className="h-3.5 w-3.5" />
+              {padron.buscando ? "Buscando…" : "Buscar"}
+            </button>
+          </div>
+          {padron.motivo && <ErrorBanner>{padron.motivo}</ErrorBanner>}
+          {!padron.motivo && padron.inactivo && (
+            <ErrorBanner>Este CUIT figura inactivo en AFIP.</ErrorBanner>
+          )}
         </Field>
         <Field label="Punto de Venta">
-          {/* eslint-disable-next-line no-restricted-syntax -- input nativo type="number"; DS Input no soporta este tipo */}
-          <input
-            type="number"
-            value={ptoVta}
-            onChange={(e) => setPtoVta(e.target.value)}
-            placeholder="1"
-            min={1}
-            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
-          />
+          <div className="flex gap-1.5">
+            {/* eslint-disable-next-line no-restricted-syntax -- input nativo type="number"; DS Input no soporta este tipo */}
+            <input
+              type="number"
+              value={ptoVta}
+              onChange={(e) => setPtoVta(e.target.value)}
+              placeholder="1"
+              min={1}
+              className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+            />
+            {!isNew && emisor?.cert_cargado && (
+              <button
+                type="button"
+                onClick={() => puntosVenta.mutate()}
+                disabled={puntosVenta.isPending}
+                title="Consultar los puntos de venta habilitados en ARCA para este emisor"
+                className="shrink-0 h-9 px-3 rounded-md border hairline text-xs text-muted-foreground hover:text-ink flex items-center gap-1.5 disabled:opacity-40"
+              >
+                <Search className="h-3.5 w-3.5" />
+                {puntosVenta.isPending ? "Consultando…" : "Consultar en ARCA"}
+              </button>
+            )}
+          </div>
+          {puntosVenta.isError && (
+            <ErrorBanner>
+              No se pudo consultar ARCA: {(puntosVenta.error as Error).message}
+            </ErrorBanner>
+          )}
+          {puntosVenta.data && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {puntosVenta.data.length === 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  ARCA no tiene puntos de venta electrónicos habilitados para este CUIT.
+                </span>
+              ) : (
+                puntosVenta.data.map((p) => (
+                  <button
+                    key={p.nro}
+                    type="button"
+                    onClick={() => setPtoVta(String(p.nro))}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md border hairline text-xs font-mono",
+                      String(p.nro) === ptoVta
+                        ? "bg-ink text-background border-ink"
+                        : "bg-surface-elevated text-muted-foreground hover:text-ink",
+                    )}
+                  >
+                    {String(p.nro).padStart(5, "0")}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </Field>
         <Field label="Condición IVA del emisor">
           <div className="relative">
@@ -349,6 +487,42 @@ function EmisorFormModal({
             </select>
             <ChevronDown className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
+        </Field>
+        <Field label="Domicilio comercial" hint="Aparece en el PDF de la factura">
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={domicilio}
+            onChange={(e) => setDomicilio(e.target.value)}
+            placeholder="Falucho 4625, Mar del Plata"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm"
+          />
+        </Field>
+        <Field
+          label="Ingresos Brutos (opcional)"
+          hint="Sin configurar, el renglón se omite del PDF (no es obligatorio para la validez fiscal)"
+        >
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={iibb}
+            onChange={(e) => setIibb(e.target.value)}
+            placeholder="901-123456-7"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+          />
+        </Field>
+        <Field
+          label="Fecha de Inicio de Actividades (opcional)"
+          hint="Sin configurar, el renglón se omite del PDF"
+        >
+          {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
+          <input
+            type="text"
+            value={inicioActividades}
+            onChange={(e) => setInicioActividades(e.target.value)}
+            placeholder="01/03/2018"
+            className="w-full h-9 rounded-md border hairline bg-surface-elevated px-3 text-sm font-mono"
+          />
         </Field>
         <Field label="Notas (opcional)">
           {/* eslint-disable-next-line no-restricted-syntax -- input nativo en modal de baja complejidad */}
@@ -525,6 +699,17 @@ function Field({
         {label}
       </div>
       {hint && <p className="text-xs text-muted-foreground/70 -mt-0.5">{hint}</p>}
+      {children}
+    </div>
+  );
+}
+
+// Mismo tratamiento que el error de Factura ARCA en el rail del pedido —
+// una sola forma de mostrar un error real de ARCA, con el texto tal cual
+// (nunca genérico) en vez de un simple hint gris.
+function ErrorBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-1.5 rounded border border-destructive/20 bg-destructive/5 px-2 py-1.5 text-xs text-destructive">
       {children}
     </div>
   );

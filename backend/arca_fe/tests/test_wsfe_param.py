@@ -245,6 +245,87 @@ def test_consultar_no_existe_por_error_602_combinacion_virgen():
     assert result is None
 
 
+# ── _get_client: usa el endpoint tal cual, sin URLs propias duplicadas ──────
+
+
+def test_get_client_usa_el_endpoint_tal_cual_y_lo_cachea(monkeypatch):
+    """`endpoint` es la URL completa del WSDL, ya resuelta por el caller según
+    ambiente — `_get_client` no debe tener su propia copia de las URLs de
+    homologación/producción ni adivinar cuál usar por matching de substring
+    (regresión: antes, un endpoint que no contuviera "homo"/"wswhomo" caía
+    siempre a la URL de PRODUCCIÓN hardcodeada acá, sin importar qué URL le
+    hubiera pasado el caller)."""
+    from arca_fe import wsfe
+
+    monkeypatch.setattr(wsfe, "_CLIENT_CACHE", {})
+    calls = []
+
+    class _FakeZeepClient:
+        def __init__(self, wsdl, transport=None):
+            calls.append(wsdl)
+
+    monkeypatch.setattr(wsfe.zeep, "Client", _FakeZeepClient)
+
+    cliente1 = wsfe._get_client("https://ejemplo-cualquiera.test/wsdl")
+    cliente2 = wsfe._get_client("https://ejemplo-cualquiera.test/wsdl")
+
+    assert calls == ["https://ejemplo-cualquiera.test/wsdl"]
+    assert cliente1 is cliente2
+
+
+# ── param_*: serialize_object tiene que quedar con target_cls=dict, NUNCA
+# list — un dict plano ya cumple el mismo isinstance(obj, (dict, CompoundValue))
+# que evalúa zeep.helpers.serialize_object, así que reproduce el bug real sin
+# necesitar un CompoundValue de verdad: con target_cls=list, serialize_object
+# hace `result = list(); result["Id"] = ...` → TypeError en producción
+# ("list indices must be integers or slices, not str"), porque las llamadas
+# viejas pasaban `list` en vez de `dict` como segundo argumento — bug real
+# encontrado recién en prod al apretar "Actualizar catálogos ARCA".
+
+
+@pytest.mark.parametrize(
+    "metodo,operacion,args",
+    [
+        ("param_puntos_venta", "FEParamGetPtosVenta", ()),
+        ("param_tipos_cbte", "FEParamGetTiposCbte", ()),
+        ("param_tipos_doc", "FEParamGetTiposDoc", ()),
+        ("param_tipos_concepto", "FEParamGetTiposConcepto", ()),
+        ("param_condicion_iva_receptor", "FEParamGetCondicionIvaReceptor", ("A",)),
+    ],
+)
+def test_param_devuelve_dicts_con_acceso_por_clave(metodo, operacion, args):
+    from arca_fe.wsfe import WsfeClient
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    # Un dict plano cumple isinstance(obj, dict) — el mismo chequeo que hace
+    # zeep.helpers.serialize_object para un CompoundValue real, así que
+    # ejercita la misma rama de código sin necesitar un mock de zeep interno.
+    item = {"Id": 80, "Desc": "CUIT"}
+    mock_result_get = MagicMock()
+    child_field = {
+        "FEParamGetPtosVenta": "PtoVenta",
+        "FEParamGetTiposCbte": "CbteTipo",
+        "FEParamGetTiposDoc": "DocTipo",
+        "FEParamGetTiposConcepto": "ConceptoTipo",
+        "FEParamGetCondicionIvaReceptor": "CondicionIvaReceptor",
+    }[operacion]
+    setattr(mock_result_get, child_field, [item])
+    mock_resp = MagicMock()
+    mock_resp.ResultGet = mock_result_get
+    mock_resp.Errors = None
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        getattr(mock_service, operacion).return_value = mock_resp
+        mock_client_fn.return_value.service = mock_service
+
+        resultado = getattr(client, metodo)(*args)
+
+    assert resultado == [{"Id": 80, "Desc": "CUIT"}]
+    assert resultado[0]["Id"] == 80  # regresión: con target_cls=list esto explota
+
+
 def test_consultar_error_real_no_se_confunde_con_no_existe():
     """Un error de AFIP que NO es 10016/602 tiene que seguir levantando."""
     from arca_fe.wsfe import WsfeClient

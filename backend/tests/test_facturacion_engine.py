@@ -10,7 +10,7 @@ encontrados en producción:
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -298,3 +298,218 @@ def test_construir_comprobante_nc_usa_snapshot_no_pedido_en_vivo():
     assert req.importe_neto == Decimal(original.imp_neto), (
         "la NC tiene que cancelar el monto de la factura ORIGINAL, no el pedido en vivo"
     )
+
+
+# ── FchVtoPago nunca antes de la fecha del comprobante (ARCA rechaza: 10036) ─
+# Bug real en prod: se facturaba casi siempre DESPUÉS de que el pedido ya
+# terminó, así que `fecha_hasta` (fin del alquiler) quedaba en el pasado y
+# ARCA lo rechazaba con "El campo FchVtoPago no puede ser anterior a la
+# fecha del comprobante."
+
+
+def test_vto_pago_usa_fecha_hasta_si_todavia_no_paso():
+    """Si se factura ANTES de que termine el alquiler, el vencimiento sigue
+    siendo el fin del servicio (fecha_hasta) — comportamiento previo intacto."""
+    from services.facturacion.comprobante_pedido import construir_comprobante
+    from arca_fe import Emisor, CondicionIva
+
+    pedido = {**_fake_pedido(), "fecha_desde": "2026-07-05", "fecha_hasta": "2026-07-10"}
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+
+    req = construir_comprobante(
+        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 1),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 7, 10)
+
+
+def test_vto_pago_cae_a_fecha_del_comprobante_si_el_pedido_ya_termino():
+    """Caso real de prod: se factura DESPUÉS del alquiler (fecha_hasta en el
+    pasado) — el vencimiento no puede quedar antes que la fecha de emisión."""
+    from services.facturacion.comprobante_pedido import construir_comprobante
+    from arca_fe import Emisor, CondicionIva
+
+    pedido = {**_fake_pedido(), "fecha_desde": "2026-06-30", "fecha_hasta": "2026-07-01"}
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+
+    req = construir_comprobante(
+        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 7, 15)
+
+
+def test_vto_pago_sin_fecha_hasta_usa_fecha_del_comprobante():
+    from services.facturacion.comprobante_pedido import construir_comprobante
+    from arca_fe import Emisor, CondicionIva
+
+    pedido = {**_fake_pedido(), "fecha_hasta": None}
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+
+    req = construir_comprobante(
+        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 7, 15)
+
+
+def test_vto_pago_con_fecha_hasta_como_datetime_no_string():
+    """Regresión de prod: `fecha_desde`/`fecha_hasta` son columnas TIMESTAMP —
+    psycopg3 las devuelve como `datetime.datetime`, no como string ISO (que es
+    todo lo que probaban los tests de arriba). `datetime` es subclase de
+    `date`, así que `_parse_fecha` los dejaba pasar SIN truncar a `.date()`,
+    y comparar ese datetime contra un `date` en `_fecha_vto_pago` explotaba
+    con "TypeError: can't compare datetime.datetime to datetime.date" —
+    reproducido en vivo en el preview de una factura real (pedido #418)."""
+    from services.facturacion.comprobante_pedido import construir_comprobante
+    from arca_fe import Emisor, CondicionIva
+
+    pedido = {
+        **_fake_pedido(),
+        "fecha_desde": datetime(2026, 6, 30, 9, 0),
+        "fecha_hasta": datetime(2026, 7, 1, 18, 0),
+    }
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+
+    req = construir_comprobante(
+        pedido, emisor_obj, CondicionIva.MONOTRIBUTO, fecha=date(2026, 7, 15),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 7, 15)
+    assert req.fecha_serv_desde == date(2026, 6, 30)
+    assert req.fecha_serv_hasta == date(2026, 7, 1)
+
+
+def test_vto_pago_de_la_nc_tambien_respeta_la_fecha_del_comprobante():
+    from services.facturacion.comprobante_pedido import construir_comprobante_nc
+    from arca_fe import Emisor, CondicionIva, CbteAsoc, CbteTipo
+
+    original = _fake_original_factura()
+    pedido = {**_fake_pedido(), "fecha_hasta": "2026-07-01"}
+    emisor_obj = Emisor(cuit=20300000000, punto_venta=2, condicion_iva=CondicionIva.MONOTRIBUTO)
+    cbte_asoc = CbteAsoc(tipo=CbteTipo.FACTURA_C, punto_venta=2, numero=1)
+
+    req = construir_comprobante_nc(
+        original, pedido, emisor_obj, fecha=date(2026, 8, 1), cbtes_asoc=(cbte_asoc,),
+    )
+
+    assert req.fecha_vto_pago == date(2026, 8, 1)
+
+
+# ── previsualizar_factura: arma el comprobante + consulta ARCA (solo lectura,
+# NUNCA pide CAE) ────────────────────────────────────────────────────────────
+
+
+def _patch_preview_common(monkeypatch, wsfe_instance):
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: _fake_pedido())
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: wsfe_instance)
+
+
+def test_preview_consulta_ultimo_autorizado_pero_nunca_pide_cae(monkeypatch):
+    """El preview SÍ llama a ARCA (FECompUltimoAutorizado, de solo lectura —
+    valida credenciales y muestra el número real), pero jamás a solicitar_cae
+    ni consultar (eso es exclusivo de emitir_factura)."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    wsfe.ultimo = 4
+    _patch_preview_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "now_ar", lambda: datetime(2026, 7, 15))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["comprobante"]["letra"] == "C"  # monotributo → Factura C
+    assert result["comprobante"]["numero_a_emitir"] == 5
+    assert result["emisor"]["nombre"] == "santini"
+    assert result["receptor"]["doc_tipo"] == "DNI"
+    assert result["fechas"]["vto_pago"] == "2026-07-15"  # fecha_hasta (07-01) ya pasó → hoy
+    assert wsfe.solicitar_calls == [], "el preview NUNCA debe pedir un CAE"
+    assert wsfe.consultar_calls == [], "consultar() es de la idempotencia de emitir_factura, no del preview"
+
+
+def test_preview_chequeos_ok_caso_normal(monkeypatch):
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    _patch_preview_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "now_ar", lambda: datetime(2026, 7, 15))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["listo"] is True
+    assert all(c["ok"] for c in result["chequeos"])
+
+
+def test_preview_chequeo_cuit_invalido_bloquea(monkeypatch):
+    """Un CUIT con el dígito verificador mal formado bloquea — ARCA lo
+    rechazaría de entrada, mejor que el admin lo sepa antes de confirmar."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": "20301234560",  # dígito verificador incorrecto (a propósito)
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    cuit_check = next(c for c in result["chequeos"] if c["check"] == "cuit_receptor")
+    assert cuit_check["ok"] is False
+    assert result["listo"] is False
+
+
+def test_preview_chequeo_ri_sin_cuit_valido_avisa_pero_no_bloquea(monkeypatch):
+    """RI sin CUIT cae a Consumidor Final (comportamiento ya existente) — el
+    preview lo muestra como advertencia, no como bloqueo (igual se puede
+    emitir, solo que como C/B en vez de A)."""
+    pedido_ri_sin_cuit = {**_fake_pedido(), "cliente_perfil_impuestos": "responsable_inscripto"}
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri_sin_cuit)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    perfil_check = next(c for c in result["chequeos"] if c["check"] == "perfil_fiscal_receptor")
+    assert perfil_check["ok"] is False
+    assert result["listo"] is True, "es una advertencia, no un bloqueo"
+
+
+def test_preview_chequeo_importe_cero_bloquea(monkeypatch):
+    pedido_gratis = {**_fake_pedido(), "monto_total": 0, "iva_monto": 0}
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_gratis)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    importe_check = next(c for c in result["chequeos"] if c["check"] == "importe_positivo")
+    assert importe_check["ok"] is False
+    assert result["listo"] is False
+
+
+def test_preview_pedido_no_confirmado_levanta_value_error(monkeypatch):
+    monkeypatch.setattr(
+        engine, "_get_pedido", lambda conn, pedido_id: {**_fake_pedido(), "estado": "presupuesto"}
+    )
+    with pytest.raises(ValueError, match="presupuesto"):
+        engine.previsualizar_factura(1, conn=_FakeConn())
+
+
+def test_preview_arca_caida_propaga_runtime_error(monkeypatch):
+    """Si ARCA no responde (o el cert está vencido), el preview lo dice de
+    entrada en vez de que el admin confirme y recién ahí se entere."""
+    _patch_preview_common(monkeypatch, wsfe_instance=None)
+
+    def _explota(emisor, conn):
+        raise RuntimeError("Certificado de 'santini' no cargado.")
+
+    monkeypatch.setattr(engine, "get_ta", _explota)
+
+    with pytest.raises(RuntimeError, match="Certificado"):
+        engine.previsualizar_factura(1, conn=_FakeConn())

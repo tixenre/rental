@@ -22,6 +22,9 @@ class EmisorArca:
     cert_cargado: bool       # True si cert_enc y key_enc no son null
     activo: bool
     razon_social: Optional[str]   # nombre legal para imprimir en el PDF
+    domicilio: Optional[str]           # domicilio comercial (PDF de la factura)
+    iibb: Optional[str]                # Ingresos Brutos; vacío → renglón omitido en el PDF
+    inicio_actividades: Optional[str]  # Fecha de Inicio de Actividades; ídem
     notas: Optional[str]
     created_at: datetime
     updated_at: datetime
@@ -37,6 +40,9 @@ def _row_to_emisor(row: dict) -> EmisorArca:
         cert_cargado=bool(row["cert_enc"] and row["key_enc"]),
         activo=row["activo"],
         razon_social=row["razon_social"],
+        domicilio=row["domicilio"],
+        iibb=row["iibb"],
+        inicio_actividades=row["inicio_actividades"],
         notas=row["notas"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -78,6 +84,16 @@ def get_activo_para_condicion(condicion_iva: str, conn) -> Optional[EmisorArca]:
     return _row_to_emisor(row) if row else None
 
 
+def elegir_autenticador(conn) -> Optional[str]:
+    """El primer emisor activo con cert cargado — sirve para autenticar
+    consultas cuyo dato no depende de CUÁL CUIT autentica (padrón de
+    cualquier CUIT, catálogos globales de WSFE como FEParamGetTiposDoc)."""
+    for emisor in list_emisores(conn):
+        if emisor.activo and emisor.cert_cargado:
+            return emisor.nombre
+    return None
+
+
 def get_cert_pem(emisor_id: int, conn) -> tuple[bytes, bytes]:
     """Devuelve (cert_pem, key_pem) descifrados. Lanza ValueError si no hay cert."""
     row = conn.execute(
@@ -107,16 +123,25 @@ def create_emisor(
     pto_vta: int,
     condicion_iva: str,
     razon_social: Optional[str] = None,
+    domicilio: Optional[str] = None,
+    iibb: Optional[str] = None,
+    inicio_actividades: Optional[str] = None,
     notas: Optional[str] = None,
 ) -> int:
     _validate_condicion_iva(condicion_iva)
     row = conn.execute(
         """
-        INSERT INTO emisores_arca (nombre, cuit, pto_vta, condicion_iva, razon_social, notas)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        INSERT INTO emisores_arca (
+            nombre, cuit, pto_vta, condicion_iva, razon_social,
+            domicilio, iibb, inicio_actividades, notas
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
-        (nombre, cuit.strip(), pto_vta, condicion_iva, razon_social or None, notas),
+        (
+            nombre, cuit.strip(), pto_vta, condicion_iva, razon_social or None,
+            domicilio or None, iibb or None, inicio_actividades or None, notas,
+        ),
     ).fetchone()
     return row["id"]
 
@@ -131,6 +156,9 @@ def update_emisor(
     condicion_iva: Optional[str] = None,
     activo: Optional[bool] = None,
     razon_social: Optional[str] = None,
+    domicilio: Optional[str] = None,
+    iibb: Optional[str] = None,
+    inicio_actividades: Optional[str] = None,
     notas: Optional[str] = None,
 ) -> None:
     sets: list[str] = ["updated_at = now()"]
@@ -149,6 +177,12 @@ def update_emisor(
         sets.append("activo = %s"); params.append(activo)
     if razon_social is not None:
         sets.append("razon_social = %s"); params.append(razon_social or None)
+    if domicilio is not None:
+        sets.append("domicilio = %s"); params.append(domicilio or None)
+    if iibb is not None:
+        sets.append("iibb = %s"); params.append(iibb or None)
+    if inicio_actividades is not None:
+        sets.append("inicio_actividades = %s"); params.append(inicio_actividades or None)
     if notas is not None:
         sets.append("notas = %s"); params.append(notas)
 
