@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
 import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
+import { MoneyInput } from "@/design-system/ui/money-input";
 import { Label } from "@/design-system/ui/label";
 import { Badge } from "@/design-system/ui/badge";
 import { Pill } from "@/design-system/ui/Pill";
@@ -332,14 +333,14 @@ export function TotalesCard({
                 className="w-16 shrink-0"
               />
               {descuentoManualTipo === "monto" ? (
-                <DraftNumberInput
+                <MoneyInput
                   min={0}
                   max={brutoDescontable}
-                  step="100"
+                  step={100}
                   value={descuentoManualMonto}
-                  onCommit={setDescuentoManualMonto}
+                  onChange={setDescuentoManualMonto}
                   ariaLabel="Descuento $ manual"
-                  className="h-7 w-24 text-right text-sm"
+                  className="h-7 w-28 text-right text-sm"
                 />
               ) : (
                 <DraftNumberInput

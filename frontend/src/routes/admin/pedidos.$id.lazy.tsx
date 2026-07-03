@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { MoneyInput } from "@/design-system/ui/money-input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Skeleton } from "@/design-system/ui/skeleton";
 import {
@@ -745,25 +746,14 @@ function PedidoEditorPage() {
                   className="w-20 shrink-0"
                 />
                 {datos.descuento_manual_tipo === "monto" ? (
-                  <Input
-                    type="number"
+                  <MoneyInput
                     min={0}
                     max={totales.subtotalDescontable}
                     step={100}
                     value={datos.descuento_manual_monto}
                     className="max-w-[140px]"
-                    onChange={(e) =>
-                      setDatos(
-                        (d) =>
-                          d && {
-                            ...d,
-                            descuento_manual_monto: Math.max(
-                              0,
-                              Math.min(totales.subtotalDescontable, Number(e.target.value) || 0),
-                            ),
-                          },
-                      )
-                    }
+                    ariaLabel="Descuento $ manual"
+                    onChange={(v) => setDatos((d) => d && { ...d, descuento_manual_monto: v })}
                   />
                 ) : (
                   <div className="relative max-w-[140px]">
