@@ -42,6 +42,19 @@ def test_parse_fecha_vacio():
     assert _parse_fecha("") is None
 
 
+def test_parse_fecha_malformada_loguea_y_devuelve_none(caplog):
+    """Una fecha con formato inesperado (no vacía) → None PERO logueada, no
+    tragada en silencio. Cubre también el caso de 8 chars no-dígitos, que
+    antes podía explotar con ValueError sin manejar."""
+    import logging
+    from arca_fe.wsfe import _parse_fecha
+
+    with caplog.at_level(logging.WARNING, logger="arca_fe.wsfe"):
+        assert _parse_fecha("2024-6-1x") is None
+        assert _parse_fecha("aaaabbcc") is None  # 8 chars, no dígitos
+    assert sum("formato inesperado" in r.message for r in caplog.records) == 2
+
+
 # ---------------------------------------------------------------------------
 # Tests de parseo de respuesta FECAESolicitar
 # ---------------------------------------------------------------------------
