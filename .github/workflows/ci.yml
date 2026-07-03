@@ -23,7 +23,7 @@ concurrency:
 jobs:
   no-content-images:
     name: Guardrail — cero fotos de contenido en el repo
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, rambla]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,7 +35,7 @@ jobs:
 
   typecheck:
     name: TypeScript typecheck
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, rambla]
     # El frontend vive en frontend/ (simétrico a backend/) → los npm corren ahí.
     defaults:
       run:
@@ -55,7 +55,7 @@ jobs:
 
   lint:
     name: Lint + formato (eslint/prettier)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, rambla]
     defaults:
       run:
         working-directory: frontend
@@ -72,7 +72,7 @@ jobs:
 
   python-syntax:
     name: Python lint + syntax
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, rambla]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -98,7 +98,7 @@ jobs:
 
   python-tests:
     name: Python tests (pytest)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, rambla]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -124,6 +124,12 @@ jobs:
 
   db-migrations:
     name: Migraciones Alembic (Postgres real)
+    # Se queda en GitHub-hosted (no self-hosted): declara `services: postgres`,
+    # que Actions levanta como contenedor Docker del lado del runner — necesita el
+    # daemon de Docker del host. El runner self-hosted corre en Railway (PaaS sin
+    # socket de Docker expuesto a los servicios), así que no puede levantar
+    # services containers. Migrarlo requeriría instalar Postgres directo (apt) en
+    # vez de vía `services:` — queda para una fase aparte.
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -268,7 +274,7 @@ jobs:
 
   build:
     name: Build frontend
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, rambla]
     defaults:
       run:
         working-directory: frontend
