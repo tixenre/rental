@@ -3,6 +3,11 @@
 Sin estado; sin I/O de BD. Recibe cert/key como bytes (PEM), devuelve (token, sign,
 expira_at). El cacheado en `afip_ta` lo hace el adapter (`services/facturacion/wsaa_cache.py`).
 
+Operaciones: `login`/`login_con_cert` son COMMANDS (mintean un Ticket de Acceso
+en AFIP — hacen I/O de red); `construir_tra`/`firmar_tra` son puros (sin I/O).
+Errores tipados vía `arca_fe.errores`: red → ArcaNetworkError, cert/clave →
+ArcaAuthError, respuesta inesperada → ArcaResponseError.
+
 Única dependencia extra: `cryptography` (ya instalada vía pyjwt[crypto]).
 """
 
