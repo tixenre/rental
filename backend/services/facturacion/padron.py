@@ -20,9 +20,14 @@ verificar la relación del lado correcto. RuntimeError para (a), (b) y (c),
 que el route (admin-only) muestra tal cual. No participa del flujo de
 emisión de comprobantes (no toca `arca_fe.wsfe`/`engine.py`).
 
-Cualquier emisor activo con cert cargado sirve para autenticar la consulta —
-el padrón responde por CUALQUIER CUIT consultado, no solo el que autentica.
+Puede haber más de un emisor activo con cert cargado y solo alguno de ellos
+tener la relación 'Consulta de constancia de inscripción' delegada en ARCA
+(cada emisor delega la suya de forma independiente) — por eso NO alcanza con
+probar uno solo: `resolver_persona` reintenta con cada emisor activo con cert,
+en orden, hasta que uno devuelva persona; recién si TODOS responden "sin
+datos ni motivo" se levanta el RuntimeError nombrando a todos.
 """
+
 from __future__ import annotations
 
 from arca_fe.padron import PadronClient, PersonaArca, WSAA_SERVICIO
@@ -47,43 +52,50 @@ def resolver_persona(cuit_buscado: str, conn) -> PersonaArca:
     el formulario, que sigue editable a mano."""
     from services.facturacion.config import credenciales
     from services.facturacion.wsaa_cache import get_ta
+    from arca_fe import ArcaError
 
-    from services.facturacion.emisores_repo import elegir_autenticador
+    from services.facturacion.emisores_repo import list_emisores
 
-    emisor_autenticador = elegir_autenticador(conn)
-    if emisor_autenticador is None:
+    candidatos = [e.nombre for e in list_emisores(conn) if e.activo and e.cert_cargado]
+    if not candidatos:
         raise RuntimeError(
             "No hay ningún emisor activo con certificado cargado para autenticar "
             "la consulta al padrón."
         )
 
-    try:
-        cred = credenciales(emisor_autenticador, conn)
-        token, sign = get_ta(emisor_autenticador, conn, servicio=WSAA_SERVICIO)
-        endpoint = _PADRON_PROD if cred.ambiente == "produccion" else _PADRON_HOMO
-        client = PadronClient(
-            endpoint=endpoint, cuit_representada=cred.cuit, token=token, sign=sign
-        )
-        persona = client.get_persona(cuit_buscado)
-    except RuntimeError:
-        # `get_persona` ya arma un RuntimeError con el mensaje de negocio de
-        # AFIP en texto plano (ej. "No consta... adhesión al domicilio fiscal
-        # electrónico...") — mostrarlo tal cual, sin envolverlo de nuevo.
-        raise
-    except Exception as exc:
-        raise RuntimeError(
-            f"No se pudo consultar el padrón con el emisor '{emisor_autenticador}': "
-            f"{type(exc).__name__}: {exc}"
-        ) from exc
+    intentos: list[str] = []
+    for emisor_autenticador in candidatos:
+        try:
+            cred = credenciales(emisor_autenticador, conn)
+            token, sign = get_ta(emisor_autenticador, conn, servicio=WSAA_SERVICIO)
+            endpoint = _PADRON_PROD if cred.ambiente == "produccion" else _PADRON_HOMO
+            client = PadronClient(
+                endpoint=endpoint, cuit_representada=cred.cuit, token=token, sign=sign
+            )
+            persona = client.get_persona(cuit_buscado)
+        except RuntimeError:
+            raise
+        except ArcaError as exc:
+            # `get_persona` ya arma un ArcaBusinessError/ArcaResponseError con el
+            # mensaje de AFIP en texto plano (ej. "No consta... adhesión al
+            # domicilio fiscal electrónico...") — lo aplanamos a RuntimeError
+            # (convención del adapter → 503) mostrándolo tal cual, sin envolver.
+            raise RuntimeError(str(exc)) from exc
+        except Exception as exc:
+            raise RuntimeError(
+                f"No se pudo consultar el padrón con el emisor '{emisor_autenticador}': "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
 
-    if persona is None:
-        raise RuntimeError(
-            f"ARCA no devolvió datos ni motivo para este CUIT, autenticando con "
-            f"el emisor '{emisor_autenticador}' (CUIT {cred.cuit}). Si el CUIT "
-            f"buscado tiene Constancia de Inscripción vigente (verificable en el "
-            f"propio portal de ARCA), revisá que el CUIT {cred.cuit} — el del "
-            f"emisor autenticador, no necesariamente el buscado — tenga la "
-            f"relación 'Consulta de constancia de inscripción' delegada en el "
-            f"Administrador de Relaciones de Clave Fiscal."
-        )
-    return persona
+        if persona is not None:
+            return persona
+        intentos.append(f"'{emisor_autenticador}' (CUIT {cred.cuit})")
+
+    raise RuntimeError(
+        f"ARCA no devolvió datos ni motivo para este CUIT, autenticando con "
+        f"{' ni con '.join(intentos)}. Si el CUIT buscado tiene Constancia de "
+        f"Inscripción vigente (verificable en el propio portal de ARCA), revisá "
+        f"que alguno de esos CUIT — el del emisor autenticador, no necesariamente "
+        f"el buscado — tenga la relación 'Consulta de constancia de inscripción' "
+        f"delegada en el Administrador de Relaciones de Clave Fiscal."
+    )

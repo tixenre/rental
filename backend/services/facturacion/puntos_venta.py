@@ -22,7 +22,8 @@ def consultar_puntos_venta(nombre_emisor: str, conn) -> list[dict]:
 
     Raises:
         ValueError: emisor no encontrado/inactivo/sin cert (mapea a 400).
-        RuntimeError: ARCA no respondió o rechazó la consulta (mapea a 503).
+        arca_fe.ArcaError: ARCA no respondió o rechazó la consulta — se deja
+        pasar tal cual para que el route elija el status HTTP por subtipo.
     """
     from arca_fe.wsfe import WsfeClient
     from services.facturacion.config import credenciales

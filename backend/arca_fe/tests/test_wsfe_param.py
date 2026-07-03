@@ -3,6 +3,7 @@
 Prueba el parseo de fechas, la normalización del endpoint, y la lógica de parseo
 de respuestas CAE (éxito y rechazo) con objetos mock en vez de llamadas SOAP reales.
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -41,9 +42,44 @@ def test_parse_fecha_vacio():
     assert _parse_fecha("") is None
 
 
+def test_parse_fecha_malformada_loguea_y_devuelve_none(caplog):
+    """Una fecha con formato inesperado (no vacía) → None PERO logueada, no
+    tragada en silencio. Cubre también el caso de 8 chars no-dígitos, que
+    antes podía explotar con ValueError sin manejar."""
+    import logging
+    from arca_fe.wsfe import _parse_fecha
+
+    with caplog.at_level(logging.WARNING, logger="arca_fe.wsfe"):
+        assert _parse_fecha("2024-6-1x") is None
+        assert _parse_fecha("aaaabbcc") is None  # 8 chars, no dígitos
+    assert sum("formato inesperado" in r.message for r in caplog.records) == 2
+
+
 # ---------------------------------------------------------------------------
 # Tests de parseo de respuesta FECAESolicitar
 # ---------------------------------------------------------------------------
+
+
+# Nombres de campo verificados contra el WSDL real de WSFEv1
+# (https://.../wsfev1/service.asmx?WSDL): el detalle FECAEDetResponse expone
+# Resultado/CAE/CAEFchVto/CbteDesde/Observaciones/Errors; la respuesta,
+# FeDetResp/Errors. `spec=` acá hace que un typo de campo en wsfe.py (leer un
+# atributo que la respuesta real no tiene) reviente el mock — que es cómo se
+# coló el bug de `personaReturn` cuando el mock NO tenía spec.
+_DET_FIELDS = ["Resultado", "CAE", "CAEFchVto", "CbteDesde", "Observaciones", "Errors"]
+_ERRCONT_FIELDS = ["Err"]
+_OBSCONT_FIELDS = ["Obs"]
+_ITEM_FIELDS = ["Code", "Msg"]
+
+
+def _make_items(pares):
+    items = []
+    for code, msg in pares:
+        it = MagicMock(spec=_ITEM_FIELDS)
+        it.Code = code
+        it.Msg = msg
+        items.append(it)
+    return items
 
 
 def _make_det(
@@ -54,35 +90,23 @@ def _make_det(
     obs: Optional[list] = None,
     errs: Optional[list] = None,
 ):
-    """Construye un mock del FECAEDetResponse de zeep."""
-    det = MagicMock()
+    """Construye un mock del FECAEDetResponse de zeep (campos del WSDL real)."""
+    det = MagicMock(spec=_DET_FIELDS)
     det.Resultado = resultado
     det.CAE = cae
     det.CAEFchVto = cae_vto
     det.CbteDesde = cbte_desde
 
     if obs:
-        obs_container = MagicMock()
-        obs_items = []
-        for code, msg in obs:
-            o = MagicMock()
-            o.Code = code
-            o.Msg = msg
-            obs_items.append(o)
-        obs_container.Obs = obs_items
+        obs_container = MagicMock(spec=_OBSCONT_FIELDS)
+        obs_container.Obs = _make_items(obs)
         det.Observaciones = obs_container
     else:
         det.Observaciones = None
 
     if errs:
-        err_container = MagicMock()
-        err_items = []
-        for code, msg in errs:
-            e = MagicMock()
-            e.Code = code
-            e.Msg = msg
-            err_items.append(e)
-        err_container.Err = err_items
+        err_container = MagicMock(spec=_ERRCONT_FIELDS)
+        err_container.Err = _make_items(errs)
         det.Errors = err_container
     else:
         det.Errors = None
@@ -91,17 +115,12 @@ def _make_det(
 
 
 def _make_fecae_response(det, cab_errs: Optional[list] = None):
-    resp = MagicMock()
+    resp = MagicMock(spec=["FeDetResp", "Errors"])
+    resp.FeDetResp = MagicMock(spec=["FECAEDetResponse"])
     resp.FeDetResp.FECAEDetResponse = [det]
     if cab_errs:
-        err_container = MagicMock()
-        err_items = []
-        for code, msg in cab_errs:
-            e = MagicMock()
-            e.Code = code
-            e.Msg = msg
-            err_items.append(e)
-        err_container.Err = err_items
+        err_container = MagicMock(spec=_ERRCONT_FIELDS)
+        err_container.Err = _make_items(cab_errs)
         resp.Errors = err_container
     else:
         resp.Errors = None
@@ -180,13 +199,63 @@ def test_solicitar_cae_con_observaciones():
     assert "502" in result.observaciones[0]
 
 
+def test_solicitar_cae_sin_fedetresp_pero_con_errors_levanta_business():
+    """Si AFIP rechaza el pedido COMPLETO (ej. Auth inválido), FeDetResp puede
+    venir ausente. `resp.FeDetResp.FECAEDetResponse[0]` a ciegas explotaba con
+    un AttributeError/IndexError críptico; ahora se chequea ANTES y se levanta
+    ArcaBusinessError con el motivo real de AFIP. (El mock usa spec sin
+    FeDetResp — un MagicMock sin spec autogeneraría el campo y ocultaría el
+    bug.)"""
+    from arca_fe.wsfe import WsfeClient
+    from arca_fe.errores import ArcaBusinessError
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    err = MagicMock(spec=_ITEM_FIELDS)
+    err.Code = 600
+    err.Msg = "Autenticación fallida"
+    err_container = MagicMock(spec=_ERRCONT_FIELDS)
+    err_container.Err = [err]
+    resp = MagicMock(spec=["Errors"])  # NO tiene FeDetResp
+    resp.Errors = err_container
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.FECAESolicitar.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        with pytest.raises(ArcaBusinessError, match="600") as ei:
+            client.solicitar_cae({})
+
+    assert ei.value.codigo == 600
+
+
+def test_solicitar_cae_sin_fedetresp_ni_errors_levanta_response():
+    """Respuesta sin FeDetResp y sin Errors — inentendible; ArcaResponseError
+    explícito, no un AttributeError."""
+    from arca_fe.wsfe import WsfeClient
+    from arca_fe.errores import ArcaResponseError
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    resp = MagicMock(spec=[])  # ni FeDetResp ni Errors
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.FECAESolicitar.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        with pytest.raises(ArcaResponseError, match="respuesta inesperada"):
+            client.solicitar_cae({})
+
+
 def test_ultimo_autorizado_mock():
     """FECompUltimoAutorizado devuelve int."""
     from arca_fe.wsfe import WsfeClient
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
 
-    mock_resp = MagicMock()
+    mock_resp = MagicMock(spec=["CbteNro", "Errors"])
     mock_resp.CbteNro = 42
     mock_resp.Errors = None
 
@@ -227,12 +296,12 @@ def test_consultar_no_existe_por_error_602_combinacion_virgen():
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
 
-    err = MagicMock()
+    err = MagicMock(spec=_ITEM_FIELDS)
     err.Code = 602
     err.Msg = "No existen datos en nuestros registros para los parámetros ingresados."
-    err_container = MagicMock()
+    err_container = MagicMock(spec=_ERRCONT_FIELDS)
     err_container.Err = [err]
-    mock_resp = MagicMock()
+    mock_resp = MagicMock(spec=["Errors", "ResultGet"])
     mock_resp.Errors = err_container
 
     with patch.object(client, "_client") as mock_client_fn:
@@ -291,9 +360,15 @@ def test_get_client_usa_el_endpoint_tal_cual_y_lo_cachea(monkeypatch):
         ("param_tipos_doc", "FEParamGetTiposDoc", ()),
         ("param_tipos_concepto", "FEParamGetTiposConcepto", ()),
         ("param_condicion_iva_receptor", "FEParamGetCondicionIvaReceptor", ("A",)),
+        ("param_tipos_tributos", "FEParamGetTiposTributos", ()),
+        ("param_tipos_opcional", "FEParamGetTiposOpcional", ()),
+        ("param_tipos_monedas", "FEParamGetTiposMonedas", ()),
     ],
 )
 def test_param_devuelve_dicts_con_acceso_por_clave(metodo, operacion, args):
+    """Nombres de operación y campo hijo verificados contra el WSDL real de
+    WSFEv1 (FETributoResponse.ResultGet=TributoTipo[], OpcionalTipoResponse.
+    ResultGet=OpcionalTipo[], MonedaResponse.ResultGet=Moneda[])."""
     from arca_fe.wsfe import WsfeClient
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
@@ -302,16 +377,19 @@ def test_param_devuelve_dicts_con_acceso_por_clave(metodo, operacion, args):
     # zeep.helpers.serialize_object para un CompoundValue real, así que
     # ejercita la misma rama de código sin necesitar un mock de zeep interno.
     item = {"Id": 80, "Desc": "CUIT"}
-    mock_result_get = MagicMock()
     child_field = {
         "FEParamGetPtosVenta": "PtoVenta",
         "FEParamGetTiposCbte": "CbteTipo",
         "FEParamGetTiposDoc": "DocTipo",
         "FEParamGetTiposConcepto": "ConceptoTipo",
         "FEParamGetCondicionIvaReceptor": "CondicionIvaReceptor",
+        "FEParamGetTiposTributos": "TributoTipo",
+        "FEParamGetTiposOpcional": "OpcionalTipo",
+        "FEParamGetTiposMonedas": "Moneda",
     }[operacion]
+    mock_result_get = MagicMock(spec=[child_field])
     setattr(mock_result_get, child_field, [item])
-    mock_resp = MagicMock()
+    mock_resp = MagicMock(spec=["ResultGet", "Errors"])
     mock_resp.ResultGet = mock_result_get
     mock_resp.Errors = None
 
@@ -327,17 +405,20 @@ def test_param_devuelve_dicts_con_acceso_por_clave(metodo, operacion, args):
 
 
 def test_consultar_error_real_no_se_confunde_con_no_existe():
-    """Un error de AFIP que NO es 10016/602 tiene que seguir levantando."""
+    """Un error de AFIP que NO es 10016/602 tiene que seguir levantando —
+    ahora ArcaBusinessError, con el código en `.codigo` y el par en `.errores`
+    (dato estructurado, no solo el string)."""
     from arca_fe.wsfe import WsfeClient
+    from arca_fe.errores import ArcaBusinessError
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
 
-    err = MagicMock()
+    err = MagicMock(spec=_ITEM_FIELDS)
     err.Code = 500
     err.Msg = "Error interno de AFIP"
-    err_container = MagicMock()
+    err_container = MagicMock(spec=_ERRCONT_FIELDS)
     err_container.Err = [err]
-    mock_resp = MagicMock()
+    mock_resp = MagicMock(spec=["Errors", "ResultGet"])
     mock_resp.Errors = err_container
 
     with patch.object(client, "_client") as mock_client_fn:
@@ -345,5 +426,102 @@ def test_consultar_error_real_no_se_confunde_con_no_existe():
         mock_service.FECompConsultar.return_value = mock_resp
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(RuntimeError, match="500"):
+        with pytest.raises(ArcaBusinessError, match="500") as ei:
             client.consultar(2, 13, 1)
+
+    assert ei.value.codigo == 500
+    assert ei.value.errores == ((500, "Error interno de AFIP"),)
+
+
+def test_consultar_fault_con_codigo_no_existe_como_substring_no_se_silencia():
+    """Word-boundary, no substring crudo: un Fault real cuyo texto contiene
+    "602" como PARTE de un número más largo (ej. un nº de comprobante 60210)
+    NO tiene que confundirse con el código 602 ("no existe") y silenciarse a
+    None. Antes se hacía `str(602) in str(exc)` — "602" matcheaba dentro de
+    "60210" y tragaba el error real. Ahora `\\b602\\b` exige límites de
+    palabra, así que solo el código 602 exacto cuenta como "no existe". Un
+    Fault que no es "no existe" se traduce a ArcaResponseError (no filtra el
+    zeep.Fault crudo al consumidor)."""
+    import zeep.exceptions
+    from arca_fe.wsfe import WsfeClient
+    from arca_fe.errores import ArcaResponseError
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.FECompConsultar.side_effect = zeep.exceptions.Fault(
+            "Rechazo real procesando el comprobante 60210"
+        )
+        mock_client_fn.return_value.service = mock_service
+
+        with pytest.raises(ArcaResponseError, match="60210"):
+            client.consultar(2, 13, 60210)
+
+
+# ---------------------------------------------------------------------------
+# param_cotizacion — forma de respuesta distinta (ResultGet es UN objeto
+# Cotizacion, no un array), verificada contra el WSDL real
+# ---------------------------------------------------------------------------
+
+
+def test_param_cotizacion_devuelve_dict_plano(monkeypatch):
+    from arca_fe.wsfe import WsfeClient
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    cotizacion = MagicMock(spec=["MonId", "MonCotiz", "FchCotiz"])
+    cotizacion.MonId = "DOL"
+    cotizacion.MonCotiz = 1050.5
+    cotizacion.FchCotiz = "20260703"
+    mock_resp = MagicMock(spec=["ResultGet", "Errors"])
+    mock_resp.ResultGet = cotizacion
+    mock_resp.Errors = None
+
+    captured = {}
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+
+        def _get_cotizacion(**kwargs):
+            captured.update(kwargs)
+            return mock_resp
+
+        mock_service.FEParamGetCotizacion.side_effect = _get_cotizacion
+        mock_client_fn.return_value.service = mock_service
+
+        result = client.param_cotizacion("DOL", fecha=date(2026, 7, 3))
+
+    assert result == {"mon_id": "DOL", "cotizacion": 1050.5, "fecha": "20260703"}
+    assert captured["MonId"] == "DOL"
+    assert captured["FchCotiz"] == "20260703"
+
+
+def test_param_cotizacion_sin_fecha_no_manda_fchcotiz(monkeypatch):
+    """`fecha=None` (default) → pide la cotización más reciente, sin filtrar
+    por fecha — no se debe mandar el parámetro FchCotiz en absoluto."""
+    from arca_fe.wsfe import WsfeClient
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    cotizacion = MagicMock(spec=["MonId", "MonCotiz", "FchCotiz"])
+    cotizacion.MonId = "PES"
+    cotizacion.MonCotiz = 1.0
+    cotizacion.FchCotiz = "20260703"
+    mock_resp = MagicMock(spec=["ResultGet", "Errors"])
+    mock_resp.ResultGet = cotizacion
+    mock_resp.Errors = None
+
+    captured = {}
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+
+        def _get_cotizacion(**kwargs):
+            captured.update(kwargs)
+            return mock_resp
+
+        mock_service.FEParamGetCotizacion.side_effect = _get_cotizacion
+        mock_client_fn.return_value.service = mock_service
+
+        client.param_cotizacion("PES")
+
+    assert "FchCotiz" not in captured

@@ -7,6 +7,7 @@ para evitar que dos workers pidan el TA simultáneamente.
 Nota: no usa threading.Lock porque Railway corre un solo proceso uvicorn; el
 FOR UPDATE de Postgres es suficiente para serializar.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -27,6 +28,7 @@ def get_ta(emisor: str, conn, servicio: str = "wsfe") -> tuple[str, str]:
     (dentro de `with get_db() as conn:`).
     """
     from services.facturacion.config import credenciales
+    from arca_fe import ArcaError
     from arca_fe.wsaa import login_con_cert
 
     cred = credenciales(emisor, conn)
@@ -61,10 +63,15 @@ def get_ta(emisor: str, conn, servicio: str = "wsfe") -> tuple[str, str]:
             cred.key_pem.encode() if isinstance(cred.key_pem, str) else cred.key_pem,
             cred.endpoint_wsaa,
         )
-    except (RuntimeError, ValueError):
+    except (RuntimeError, ValueError, ArcaError):
+        # `login_con_cert` ya tipa sus fallas (ArcaAuthError/ArcaNetworkError/
+        # ArcaResponseError, ver arca_fe/wsaa.py) — se dejan pasar tal cual,
+        # sin envolver en RuntimeError, para que el route elija el status
+        # HTTP por subtipo (422/502/503) en vez de un 503 genérico para todo.
         raise
     except Exception as exc:
-        # httpx.HTTPStatusError (AFIP 4xx/5xx), httpx.RequestError (timeout/red), etc.
+        # Solo llega acá algo que NI login_con_cert tipó — verdaderamente
+        # inesperado.
         raise RuntimeError(
             f"Error al contactar WSAA ({cred.endpoint_wsaa}): {type(exc).__name__}: {exc}"
         ) from exc

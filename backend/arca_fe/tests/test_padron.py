@@ -5,9 +5,20 @@ de AFIP) devuelva None sin explotar.
 
 Los idImpuesto (30=RI, 32=Exento) están verificados contra pyafipws — el
 código viejo los tenía invertidos (32 disparaba "responsable_inscripto"),
-lo que habría detectado un cliente EXENTO como RI."""
+lo que habría detectado un cliente EXENTO como RI.
+
+**Disciplina de mock (regresión #personaReturn):** la respuesta de nivel
+superior se mockea con `spec=["personaReturn"]` — el nombre del campo real
+del WSDL `getPersonaResponse`. Un `MagicMock()` SIN spec auto-genera
+cualquier atributo que se le pida, así que un test podía "pasar" leyendo el
+campo equivocado (`resp.persona`, que no existe en la respuesta real) sin que
+nada lo notara — que es precisamente cómo se coló el bug de prod. Con spec, si
+el código lee un campo que AFIP no manda, el mock levanta `AttributeError` en
+vez de fabricar un objeto fantasma."""
+
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,8 +26,12 @@ import pytest
 pytestmark = pytest.mark.unit
 
 
-def _persona_juridica(razon_social="Empresa XYZ SRL", id_impuesto=30, estado_clave="ACTIVO"):
-    persona = MagicMock(spec=["datosGenerales", "datosRegimenGeneral", "datosMonotributo"])
+def _persona_juridica(
+    razon_social="Empresa XYZ SRL", id_impuesto=30, estado_clave="ACTIVO"
+):
+    persona = MagicMock(
+        spec=["datosGenerales", "datosRegimenGeneral", "datosMonotributo"]
+    )
     dg = MagicMock()
     dg.razonSocial = razon_social
     dg.estadoClave = estado_clave
@@ -40,7 +55,9 @@ def _persona_juridica(razon_social="Empresa XYZ SRL", id_impuesto=30, estado_cla
 
 
 def _persona_fisica_monotributo(nombre="Juan", apellido="Pérez", estado_clave="ACTIVO"):
-    persona = MagicMock(spec=["datosGenerales", "datosMonotributo", "datosRegimenGeneral"])
+    persona = MagicMock(
+        spec=["datosGenerales", "datosMonotributo", "datosRegimenGeneral"]
+    )
     dg = MagicMock()
     dg.razonSocial = ""
     dg.nombre = nombre
@@ -57,8 +74,8 @@ def test_get_persona_juridica_responsable_inscripto():
     from arca_fe.padron import PadronClient
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
-    resp = MagicMock()
-    resp.persona = _persona_juridica(id_impuesto=30)
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = _persona_juridica(id_impuesto=30)
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
@@ -79,8 +96,8 @@ def test_get_persona_juridica_exento():
     from arca_fe.padron import PadronClient
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
-    resp = MagicMock()
-    resp.persona = _persona_juridica(id_impuesto=32)
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = _persona_juridica(id_impuesto=32)
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
@@ -96,8 +113,8 @@ def test_get_persona_expone_estado_clave():
     from arca_fe.padron import PadronClient
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
-    resp = MagicMock()
-    resp.persona = _persona_juridica(estado_clave="INACTIVO")
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = _persona_juridica(estado_clave="INACTIVO")
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
@@ -113,8 +130,8 @@ def test_get_persona_fisica_monotributo_arma_nombre_completo():
     from arca_fe.padron import PadronClient
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
-    resp = MagicMock()
-    resp.persona = _persona_fisica_monotributo()
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = _persona_fisica_monotributo()
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
@@ -135,8 +152,8 @@ def test_get_persona_fisica_expone_nombre_y_apellido_por_separado():
     from arca_fe.padron import PadronClient
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
-    resp = MagicMock()
-    resp.persona = _persona_fisica_monotributo(nombre="Juan", apellido="Pérez")
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = _persona_fisica_monotributo(nombre="Juan", apellido="Pérez")
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
@@ -155,8 +172,8 @@ def test_get_persona_juridica_no_tiene_nombre_ni_apellido_separado():
     from arca_fe.padron import PadronClient
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
-    resp = MagicMock()
-    resp.persona = _persona_juridica()
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = _persona_juridica()
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
@@ -173,8 +190,8 @@ def test_get_persona_sin_datos_devuelve_none():
     from arca_fe.padron import PadronClient
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
-    resp = MagicMock()
-    resp.persona = None
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = None
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
@@ -189,12 +206,19 @@ def test_get_persona_bloqueada_por_regla_de_negocio_levanta_con_motivo():
     (ej. RG 3990-E, sin adhesión a Domicilio Fiscal Electrónico) — la
     respuesta viene SIN datosGenerales pero CON errorConstancia poblado
     (manual "WS_SR_constancia_inscripcion" §5.3). Antes esto se leía igual
-    que "el CUIT no existe"; ahora levanta con el motivo real de AFIP."""
+    que "el CUIT no existe"; ahora levanta ArcaBusinessError con el motivo
+    real de AFIP y sus mensajes estructurados en `.errores`."""
     from arca_fe.padron import PadronClient
+    from arca_fe.errores import ArcaBusinessError
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
     persona = MagicMock(
-        spec=["datosGenerales", "errorConstancia", "errorRegimenGeneral", "errorMonotributo"]
+        spec=[
+            "datosGenerales",
+            "errorConstancia",
+            "errorRegimenGeneral",
+            "errorMonotributo",
+        ]
     )
     persona.datosGenerales = None
     persona.errorRegimenGeneral = None
@@ -202,16 +226,20 @@ def test_get_persona_bloqueada_por_regla_de_negocio_levanta_con_motivo():
     err = MagicMock()
     err.error = "No consta en nuestros registros que Ud. ha cumplido con la adhesión al domicilio fiscal electrónico"
     persona.errorConstancia = err
-    resp = MagicMock()
-    resp.persona = persona
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = persona
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
         mock_service.getPersona.return_value = resp
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(RuntimeError, match="domicilio fiscal electrónico"):
+        with pytest.raises(
+            ArcaBusinessError, match="domicilio fiscal electrónico"
+        ) as ei:
             client.get_persona("23373891029")
+
+    assert ei.value.errores == ((None, err.error),)
 
 
 def test_get_persona_sin_datosgenerales_ni_error_sigue_devolviendo_none():
@@ -221,14 +249,19 @@ def test_get_persona_sin_datosgenerales_ni_error_sigue_devolviendo_none():
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
     persona = MagicMock(
-        spec=["datosGenerales", "errorConstancia", "errorRegimenGeneral", "errorMonotributo"]
+        spec=[
+            "datosGenerales",
+            "errorConstancia",
+            "errorRegimenGeneral",
+            "errorMonotributo",
+        ]
     )
     persona.datosGenerales = None
     persona.errorConstancia = None
     persona.errorRegimenGeneral = None
     persona.errorMonotributo = None
-    resp = MagicMock()
-    resp.persona = persona
+    resp = MagicMock(spec=["personaReturn"])
+    resp.personaReturn = persona
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
@@ -243,10 +276,11 @@ def test_get_persona_fault_levanta_con_el_texto_de_afip():
     "no se encuentran datos"/"sin resultados", tratándolos como silencio
     limpio (None) — eso escondía motivos reales indistinguibles entre sí (un
     CUIT real bloqueado por WSAA/relación/cert se leía IGUAL que un CUIT
-    inexistente). Ahora CUALQUIER Fault levanta RuntimeError con el texto de
-    AFIP tal cual, sin heurística de por medio."""
+    inexistente). Ahora CUALQUIER Fault levanta ArcaResponseError con el texto
+    de AFIP tal cual (en el mensaje y en `.raw`), sin heurística de por medio."""
     import zeep.exceptions
     from arca_fe.padron import PadronClient
+    from arca_fe.errores import ArcaResponseError
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
 
@@ -257,22 +291,27 @@ def test_get_persona_fault_levanta_con_el_texto_de_afip():
         )
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(RuntimeError, match="No se encuentran datos"):
+        with pytest.raises(ArcaResponseError, match="No se encuentran datos") as ei:
             client.get_persona("20999999999")
+
+    assert "No se encuentran datos" in ei.value.raw
 
 
 def test_get_persona_fault_desconocido_tambien_levanta_con_su_texto():
     import zeep.exceptions
     from arca_fe.padron import PadronClient
+    from arca_fe.errores import ArcaResponseError
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
 
     with patch.object(client, "_client") as mock_client_fn:
         mock_service = MagicMock()
-        mock_service.getPersona.side_effect = zeep.exceptions.Fault("coe.alreadyAuthenticated")
+        mock_service.getPersona.side_effect = zeep.exceptions.Fault(
+            "coe.alreadyAuthenticated"
+        )
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(RuntimeError, match="coe.alreadyAuthenticated"):
+        with pytest.raises(ArcaResponseError, match="coe.alreadyAuthenticated"):
             client.get_persona("20999999999")
 
 
@@ -299,3 +338,62 @@ def test_get_client_usa_el_endpoint_tal_cual_y_lo_cachea(monkeypatch):
 
     assert calls == ["https://ejemplo-cualquiera.test/wsdl"]
     assert cliente1 is cliente2
+
+
+# ── Regresión #personaReturn: la respuesta cruda del WSDL real ──────────────
+
+
+def test_lee_personaReturn_de_una_respuesta_con_la_forma_real_del_wsdl():
+    """Con `SimpleNamespace` (no MagicMock: NO fabrica atributos inexistentes)
+    imitando la forma real de `getPersonaResponse` — el dato viaja en
+    `personaReturn`, NO en `persona`. Si el código volviera a leer el campo
+    equivocado, `getattr(resp, "personaReturn", None)` daría None y este test
+    fallaría con un `assert ... is not None` — el bug ya no puede degradar a
+    "sin datos" en silencio."""
+    from arca_fe.padron import PadronClient
+
+    resp = SimpleNamespace(
+        personaReturn=SimpleNamespace(
+            datosGenerales=SimpleNamespace(
+                razonSocial="Rambla SRL",
+                nombre="",
+                apellido="",
+                estadoClave="ACTIVO",
+                domicilioFiscal=None,
+            ),
+            datosMonotributo=None,
+            datosRegimenGeneral=None,
+            errorConstancia=None,
+            errorMonotributo=None,
+            errorRegimenGeneral=None,
+        )
+    )
+    client = PadronClient("https://x", 20300000000, "t", "s")
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.getPersona.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        persona = client.get_persona("23373891029")
+
+    assert persona is not None
+    assert persona.razon_social == "Rambla SRL"
+    assert persona.estado_clave == "ACTIVO"
+
+
+def test_respuesta_sin_personaReturn_es_silencio_limpio():
+    """`resp` sin el campo `personaReturn` (AFIP realmente no encontró nada)
+    devuelve None — acá no hay ningún dato que se esté ignorando por leer el
+    campo equivocado."""
+    from arca_fe.padron import PadronClient
+
+    resp = SimpleNamespace()
+    client = PadronClient("https://x", 20300000000, "t", "s")
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.getPersona.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        assert client.get_persona("23373891029") is None

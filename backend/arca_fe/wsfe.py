@@ -6,11 +6,25 @@ WSDL: este módulo no guarda su propia copia de las URLs de homologación/produc
 (vivían duplicadas acá y en services/facturacion/config.py, con un match de string
 frágil para elegir una u otra) — recibe la URL ya resuelta y la usa tal cual.
 
+Operaciones: `solicitar_cae` es el único COMMAND (emite un CAE — efecto legal
+en AFIP); `ultimo_autorizado`, `consultar` y los `param_*` son QUERIES (lecturas
+sin efecto). Los errores salen tipados vía `arca_fe.errores` (ningún método
+filtra un `zeep.Fault` crudo).
+
+`param_*` cubre todos los catálogos vivos de WSFEv1 que un consumidor puede
+necesitar para armar un `ComprobanteRequest` sin hardcodear ids a mano:
+puntos de venta, tipos de comprobante/documento/concepto, condición IVA del
+receptor, tributos, datos opcionales (incluidos los de FCE MiPyme), monedas,
+y la cotización oficial del día (`param_cotizacion`) — todos verificados
+contra el WSDL real y el manual oficial de WSFEv1.
+
 Deps: zeep (SOAP), ya en requirements.txt.
 """
+
 from __future__ import annotations
 
-import ssl
+import logging
+import re
 import urllib3
 from dataclasses import dataclass
 from datetime import date
@@ -25,6 +39,11 @@ import zeep.helpers
 import zeep.transports
 from requests.adapters import HTTPAdapter
 
+from ._ssl_afip import afip_ssl_context
+from .errores import ArcaBusinessError, ArcaResponseError
+
+_logger = logging.getLogger(__name__)
+
 # Caché local de clientes SOAP (por endpoint, dentro del proceso)
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
 
@@ -35,17 +54,15 @@ _CODES_NO_EXISTE = (10016, 602)
 
 
 class _AfipSSLAdapter(HTTPAdapter):
-    """Los servidores de prod de AFIP usan parámetros DH cortos (DH_KEY_TOO_SMALL).
-    SECLEVEL=1 los acepta sin bajar la verificación de certificado."""
+    """Ver `_ssl_afip.afip_ssl_context` — mismo ajuste que `padron.py` (y,
+    para el cliente httpx de `wsaa.py`, `afip_ssl_context()` directo)."""
 
     def init_poolmanager(self, num_pools, maxsize, block=False):
-        ctx = ssl.create_default_context()
-        ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
         self.poolmanager = urllib3.PoolManager(
             num_pools=num_pools,
             maxsize=maxsize,
             block=block,
-            ssl_context=ctx,
+            ssl_context=afip_ssl_context(),
         )
 
 
@@ -93,9 +110,24 @@ class WsfeClient:
     def _client(self) -> zeep.Client:
         return _get_client(self.endpoint)
 
+    @staticmethod
+    def _soap(op: str, fn, /, *args, **kwargs):
+        """Ejecuta una operación SOAP y traduce un `zeep.exceptions.Fault` a
+        `ArcaResponseError` — para no filtrar la dependencia `zeep` al
+        consumidor de la librería (que debería poder atrapar solo `ArcaError`).
+        El texto del Fault viaja en `.raw`."""
+        try:
+            return fn(*args, **kwargs)
+        except zeep.exceptions.Fault as exc:
+            raise ArcaResponseError(
+                f"{op}: SOAP Fault de AFIP — {exc}", raw=str(exc)
+            ) from exc
+
     # ------------------------------------------------------------------
+    # QUERIES (lecturas — sin efecto en AFIP)
+    # ------------------------------------------------------------------
+
     # FECompUltimoAutorizado — último comprobante autorizado
-    # ------------------------------------------------------------------
 
     def ultimo_autorizado(self, pto_vta: int, cbte_tipo: int) -> int:
         """Devuelve el último número de comprobante autorizado para (pto_vta, cbte_tipo).
@@ -103,7 +135,9 @@ class WsfeClient:
         Si nunca se emitió ninguno, ARCA devuelve 0.
         """
         client = self._client()
-        resp = client.service.FECompUltimoAutorizado(
+        resp = self._soap(
+            "FECompUltimoAutorizado",
+            client.service.FECompUltimoAutorizado,
             Auth=self._auth(),
             PtoVta=pto_vta,
             CbteTipo=cbte_tipo,
@@ -111,9 +145,7 @@ class WsfeClient:
         _check_errors(resp, "FECompUltimoAutorizado")
         return int(resp.CbteNro)
 
-    # ------------------------------------------------------------------
     # FECompConsultar — consultar un comprobante ya autorizado
-    # ------------------------------------------------------------------
 
     def consultar(
         self, pto_vta: int, cbte_tipo: int, numero: int
@@ -133,9 +165,18 @@ class WsfeClient:
                 },
             )
         except zeep.exceptions.Fault as exc:
-            if any(str(c) in str(exc) for c in _CODES_NO_EXISTE) or "no existe" in str(exc).lower():
+            texto = str(exc)
+            # Word-boundary, no substring crudo: un código real (602/10016) no
+            # tiene que poder matchear como parte de un número más largo no
+            # relacionado en el texto de AFIP — silenciaría un error real.
+            if (
+                any(re.search(rf"\b{c}\b", texto) for c in _CODES_NO_EXISTE)
+                or "no existe" in texto.lower()
+            ):
                 return None
-            raise
+            raise ArcaResponseError(
+                f"FECompConsultar: SOAP Fault de AFIP — {exc}", raw=texto
+            ) from exc
 
         if resp is None:
             return None
@@ -155,8 +196,10 @@ class WsfeClient:
         return zeep.helpers.serialize_object(resp.ResultGet, dict)
 
     # ------------------------------------------------------------------
-    # FECAESolicitar — solicitar CAE
+    # COMMANDS (efecto en AFIP — emite un comprobante legal)
     # ------------------------------------------------------------------
+
+    # FECAESolicitar — solicitar CAE
 
     def solicitar_cae(self, fecae: dict) -> CaeResult:
         """Envía FECAESolicitar y parsea la respuesta en un CaeResult.
@@ -166,12 +209,33 @@ class WsfeClient:
         from .modelos import CaeResult  # import local para evitar circulares
 
         client = self._client()
-        resp = client.service.FECAESolicitar(
+        resp = self._soap(
+            "FECAESolicitar",
+            client.service.FECAESolicitar,
             Auth=self._auth(),
             FeCAEReq=fecae,
         )
 
-        result_obj = resp.FeDetResp.FECAEDetResponse[0]
+        # Chequear el detalle ANTES de indexarlo: si AFIP rechazó el pedido
+        # completo (ej. Auth inválido), FeDetResp puede venir ausente —
+        # `resp.FeDetResp.FECAEDetResponse[0]` a ciegas explotaría con un
+        # AttributeError/IndexError críptico en vez de mostrar el motivo real.
+        det_resp = getattr(resp, "FeDetResp", None)
+        detalles = (
+            getattr(det_resp, "FECAEDetResponse", None) if det_resp is not None else None
+        )
+        if not detalles:
+            # Sin detalle: surfaceamos el motivo. Si hay Errors de cabecera,
+            # `_check_errors` levanta ArcaBusinessError con los códigos; si no
+            # hay ni detalle ni Errors, es una respuesta que no entendemos.
+            _check_errors(resp, "FECAESolicitar")
+            raise ArcaResponseError(
+                "FECAESolicitar: AFIP no devolvió FeDetResp/FECAEDetResponse ni "
+                "Errors — respuesta inesperada, no se puede determinar el resultado.",
+                raw=str(resp),
+            )
+
+        result_obj = detalles[0]
         resultado = result_obj.Resultado  # 'A' | 'R' | 'P'
 
         cae: Optional[str] = None
@@ -209,13 +273,15 @@ class WsfeClient:
         )
 
     # ------------------------------------------------------------------
-    # FEParamGetPtosVenta / FEParamGetTiposCbte — validaciones
+    # QUERIES (FEParamGet* — catálogos/validaciones, sin efecto en AFIP)
     # ------------------------------------------------------------------
 
     def param_puntos_venta(self) -> list[dict]:
         """Devuelve los puntos de venta habilitados para el CUIT."""
         client = self._client()
-        resp = client.service.FEParamGetPtosVenta(Auth=self._auth())
+        resp = self._soap(
+            "FEParamGetPtosVenta", client.service.FEParamGetPtosVenta, Auth=self._auth()
+        )
         _check_errors(resp, "FEParamGetPtosVenta")
         if resp.ResultGet is None:
             return []
@@ -224,7 +290,9 @@ class WsfeClient:
     def param_tipos_cbte(self) -> list[dict]:
         """Devuelve los tipos de comprobante disponibles."""
         client = self._client()
-        resp = client.service.FEParamGetTiposCbte(Auth=self._auth())
+        resp = self._soap(
+            "FEParamGetTiposCbte", client.service.FEParamGetTiposCbte, Auth=self._auth()
+        )
         _check_errors(resp, "FEParamGetTiposCbte")
         if resp.ResultGet is None:
             return []
@@ -233,7 +301,9 @@ class WsfeClient:
     def param_tipos_doc(self) -> list[dict]:
         """Tipos de documento del receptor (CUIT/CUIL/DNI/...) vigentes en ARCA."""
         client = self._client()
-        resp = client.service.FEParamGetTiposDoc(Auth=self._auth())
+        resp = self._soap(
+            "FEParamGetTiposDoc", client.service.FEParamGetTiposDoc, Auth=self._auth()
+        )
         _check_errors(resp, "FEParamGetTiposDoc")
         if resp.ResultGet is None:
             return []
@@ -242,7 +312,11 @@ class WsfeClient:
     def param_tipos_concepto(self) -> list[dict]:
         """Tipos de concepto (Productos/Servicios/Ambos) vigentes en ARCA."""
         client = self._client()
-        resp = client.service.FEParamGetTiposConcepto(Auth=self._auth())
+        resp = self._soap(
+            "FEParamGetTiposConcepto",
+            client.service.FEParamGetTiposConcepto,
+            Auth=self._auth(),
+        )
         _check_errors(resp, "FEParamGetTiposConcepto")
         if resp.ResultGet is None:
             return []
@@ -253,13 +327,76 @@ class WsfeClient:
         comprobante ("A", "B", "C", "M"). AFIP no tiene un valor "todas" —
         hay que pedirlas por clase (verificado contra pyafipws)."""
         client = self._client()
-        resp = client.service.FEParamGetCondicionIvaReceptor(
-            Auth=self._auth(), ClaseCmp=clase_cmp
+        resp = self._soap(
+            "FEParamGetCondicionIvaReceptor",
+            client.service.FEParamGetCondicionIvaReceptor,
+            Auth=self._auth(),
+            ClaseCmp=clase_cmp,
         )
         _check_errors(resp, "FEParamGetCondicionIvaReceptor")
         if resp.ResultGet is None:
             return []
-        return zeep.helpers.serialize_object(resp.ResultGet.CondicionIvaReceptor, dict) or []
+        return (
+            zeep.helpers.serialize_object(resp.ResultGet.CondicionIvaReceptor, dict)
+            or []
+        )
+
+    def param_tipos_tributos(self) -> list[dict]:
+        """Ids/descripciones de tributos válidos para `Tributo.id` (Impuestos
+        Internos, percepciones de IIBB, etc.) — fuente única para no
+        hardcodear un id a mano en el consumidor."""
+        client = self._client()
+        resp = self._soap(
+            "FEParamGetTiposTributos", client.service.FEParamGetTiposTributos, Auth=self._auth()
+        )
+        _check_errors(resp, "FEParamGetTiposTributos")
+        if resp.ResultGet is None:
+            return []
+        return zeep.helpers.serialize_object(resp.ResultGet.TributoTipo, dict) or []
+
+    def param_tipos_opcional(self) -> list[dict]:
+        """Ids/descripciones de datos opcionales válidos para `Opcional.id`
+        (ej. los de la Factura de Crédito Electrónica MiPyme: CBU, alias)."""
+        client = self._client()
+        resp = self._soap(
+            "FEParamGetTiposOpcional", client.service.FEParamGetTiposOpcional, Auth=self._auth()
+        )
+        _check_errors(resp, "FEParamGetTiposOpcional")
+        if resp.ResultGet is None:
+            return []
+        return zeep.helpers.serialize_object(resp.ResultGet.OpcionalTipo, dict) or []
+
+    def param_tipos_monedas(self) -> list[dict]:
+        """Códigos de moneda válidos para `ComprobanteRequest.moneda`/`MonId`."""
+        client = self._client()
+        resp = self._soap(
+            "FEParamGetTiposMonedas", client.service.FEParamGetTiposMonedas, Auth=self._auth()
+        )
+        _check_errors(resp, "FEParamGetTiposMonedas")
+        if resp.ResultGet is None:
+            return []
+        return zeep.helpers.serialize_object(resp.ResultGet.Moneda, dict) or []
+
+    def param_cotizacion(self, mon_id: str, fecha: Optional[date] = None) -> dict:
+        """Cotización oficial de ARCA para `mon_id` (`ComprobanteRequest.cotizacion`).
+        `fecha=None` → la más reciente. El motor NO la aplica solo — que un
+        comprobante use la cotización del día es decisión/timing del
+        consumidor (mismo criterio que el precio: el core no decide, ejecuta
+        con lo que le pasan)."""
+        client = self._client()
+        kwargs = {"Auth": self._auth(), "MonId": mon_id}
+        if fecha is not None:
+            kwargs["FchCotiz"] = fecha.strftime("%Y%m%d")
+        resp = self._soap(
+            "FEParamGetCotizacion", client.service.FEParamGetCotizacion, **kwargs
+        )
+        _check_errors(resp, "FEParamGetCotizacion")
+        cot = resp.ResultGet
+        return {
+            "mon_id": getattr(cot, "MonId", mon_id),
+            "cotizacion": getattr(cot, "MonCotiz", None),
+            "fecha": getattr(cot, "FchCotiz", None),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -270,12 +407,17 @@ class WsfeClient:
 def _parse_fecha(s: Any) -> Optional[date]:
     if s is None:
         return None
-    s = str(s).strip()
-    if len(s) == 8:
-        return date(int(s[:4]), int(s[4:6]), int(s[6:8]))
+    raw = str(s).strip()
+    if not raw:
+        return None  # ausente/vacío es legítimo (no una fecha malformada)
     try:
-        return date.fromisoformat(s[:10])
+        if len(raw) == 8 and raw.isdigit():
+            return date(int(raw[:4]), int(raw[4:6]), int(raw[6:8]))
+        return date.fromisoformat(raw[:10])
     except ValueError:
+        # No se pierde en silencio: una fecha de AFIP (ej. CAEFchVto) con
+        # formato inesperado es señal de que algo cambió del otro lado.
+        _logger.warning("WSFE: fecha con formato inesperado (%r) — se ignora.", s)
         return None
 
 
@@ -285,5 +427,18 @@ def _check_errors(resp: Any, op: str) -> None:
 
 
 def _raise_errors(errs: Any, op: str) -> None:
-    msgs = [f"{e.Code}: {e.Msg}" for e in errs]
-    raise RuntimeError(f"{op} error — {'; '.join(msgs)}")
+    """Levanta `ArcaBusinessError` con los pares (código, mensaje) que AFIP
+    puso en `Errors.Err` — datos estructurados (`.errores`, `.codigo`) para que
+    el consumidor no tenga que re-parsear el string del mensaje."""
+    pares: tuple[tuple[Optional[int], str], ...] = tuple(
+        (_int_o_none(e.Code), str(e.Msg)) for e in errs
+    )
+    msgs = "; ".join(f"{cod}: {msg}" for cod, msg in pares)
+    raise ArcaBusinessError(f"{op} error — {msgs}", errores=pares)
+
+
+def _int_o_none(v: Any) -> Optional[int]:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
