@@ -719,6 +719,18 @@ visible en la tabla de ítems vía el helper único `services/email/branding.py:
 supervisor marca una línea de factura o de mail que muestre el bruto sin reconciliar contra el total
 declarado, o un `bonif`/`% Bonif.` hardcodeado reintroducido. Iniciativa: #1209 (2 de 9 hallazgos).
 
+### 2026-07-03 — `routes/facturacion.py`: rate limit + mapeo de errores en las escrituras (gap de la auditoría de #1184, #1209)
+
+Las escrituras de `backend/routes/facturacion.py` (facturar pedido, nota de crédito, enviar mail, CRUD de
+emisores ARCA) ahora llevan `@limiter.limit(ADMIN_WRITE_LIMIT)` + `@map_pg_errors` — **reusados tal cual**
+de `routes/contabilidad.py` (mismo import, mismo patrón), no reimplementados. Cierra el hueco que dejó la
+auditoría de plata 2026-07-02 (#1184): esa pasada blindó contabilidad/pagos/reportes pero no tocó
+facturación, pese a que también pega a ARCA y a Postgres sin freno. Única excepción: el endpoint async
+`enviar_mail_factura` NO lleva `@map_pg_errors` (el decorator hace `fn(*args, **kwargs)` sin `await`, no
+detecta excepciones de una corrutina — mismo motivo por el que `subir_comprobante`, también async, en
+`contabilidad.py` tampoco lo lleva). El supervisor marca un endpoint de escritura de facturación nuevo sin
+`@limiter.limit`, o un `except Exception` ad-hoc en esos routes en vez de `map_pg_errors`.
+
 ### 2026-07-03 — La vista multi-mes/anual de reportes ahora respeta los meses cerrados (`liquidar_rango`)
 
 Uno de los 14 hallazgos de la auditoría cruzada de plata (severidad media): la vista "Mes a mes"/el total
