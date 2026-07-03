@@ -255,18 +255,38 @@ export function EquipoFormDialogV2({
   }, [watchedTipo, form]);
 
   // ── Manual override del precio/día ─────────────────────────────────
+  // `precioJornadaManual` arrancaba SIEMPRE en `false`, sin sembrarse del
+  // flag real `initial.precio_jornada_manual` — abrir un equipo que YA
+  // tenía el precio fijado a mano disparaba igual el auto-cálculo de acá
+  // abajo apenas `usdRate`/`roi_pct` estaban disponibles (que es casi
+  // inmediato), pisando en silencio el precio manual con el de fórmula.
+  // Confirmado en vivo: el label decía "(auto)" para un equipo marcado
+  // manual en la base.
   const [precioJornadaManual, setPrecioUnidadManual] = useState(false);
+  useEffect(() => {
+    setPrecioUnidadManual(initial?.precio_jornada_manual ?? false);
+  }, [initial?.id, initial?.precio_jornada_manual]);
   const watchedUsd = form.watch("precio_usd");
   const watchedRoi = form.watch("roi_pct");
   useEffect(() => {
     if (precioJornadaManual) return;
+    // Chequeo directo a `initial.precio_jornada_manual` (no solo al estado
+    // derivado `precioJornadaManual`): cuando `initial` llega async, el
+    // efecto que lo siembra y este pueden correr en el MISMO commit — un
+    // `setPrecioUnidadManual(true)` recién encolado en el otro efecto no se
+    // refleja todavía en la clausura de ESTE efecto en el mismo pase (React
+    // no re-lee estado recién encolado entre efectos del mismo commit).
+    // Sin este chequeo, un equipo con precio manual en la base igual se
+    // pisaba apenas abría el form — confirmado en vivo (mismo patrón de
+    // carrera que el override de nombre público, más arriba).
+    if (initial?.precio_jornada_manual) return;
     const calc = calcularPrecioJornada(
       watchedUsd ? Number(watchedUsd) : null,
       usdRate,
       watchedRoi ? Number(watchedRoi) : null,
     );
     if (calc !== null) form.setValue("precio_jornada", calc, { shouldDirty: true });
-  }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form]);
+  }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form, initial?.precio_jornada_manual]);
 
   // ── Cargar ficha cuando estamos editando ──────────────────────────
   // Ficha legacy = solo descripción, notas, nombre público template y
@@ -853,6 +873,12 @@ export function EquipoFormDialogV2({
         foto_url: fotoUrlInicial,
         fecha_compra: rest.fecha_compra || null,
         precio_jornada: rest.precio_jornada ?? null,
+        // Explícito para saltear la heurística de inferencia del backend
+        // (que asume "manual" si llega precio_jornada SIN roi_pct) — este
+        // form manda roi_pct SIEMPRE junto con precio_jornada, así que esa
+        // heurística sola nunca detectaría un precio recién tipeado a mano
+        // acá; el toggle local YA sabe la verdad, se la pasamos directo.
+        precio_jornada_manual: precioJornadaManual,
         precio_usd: rest.precio_usd ?? null,
         roi_pct: rest.roi_pct ?? null,
         valor_reposicion: rest.valor_reposicion ?? null,
@@ -1360,7 +1386,13 @@ export function EquipoFormDialogV2({
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {photoCands.map((u) => {
                 const isPicking = pickingPhotoUrl === u;
-                const isSelected = form.watch("foto_url") === u;
+                // `fotoActual` (no `form.watch("foto_url")` crudo): en EDIT
+                // mode, elegir un candidato sube directo a la galería sin
+                // tocar el campo del form (mismo bug ya arreglado en el
+                // preview grande del costado) — comparar contra el mismo
+                // valor derivado mantiene el aro de "seleccionada" correcto
+                // en los dos modos.
+                const isSelected = fotoActual === u;
                 return (
                   <button
                     key={u}
