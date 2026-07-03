@@ -407,10 +407,15 @@ def export_alquileres(conn) -> list[dict]:
             )
         )
 
-    # Pagos en batch
+    # Pagos en batch. Incluye `anulado` + columnas de auditoría (#1184/#1209):
+    # un pago anulado es soft-delete y no debe "revivir" activo al reimportar
+    # (antes se perdía en el viaje y el import lo reinsertaba con el default
+    # de la columna, `anulado=FALSE`).
     pagos_by_alq: dict[int, list[schema.AlquilerPagoRef]] = {}
     pago_rows = conn.execute("""
-        SELECT pedido_id, monto, concepto, fecha
+        SELECT pedido_id, monto, concepto, fecha,
+               COALESCE(anulado, FALSE) AS anulado,
+               anulado_por, anulado_at, anulado_motivo
         FROM alquiler_pagos
         WHERE pedido_id = ANY(%s)
         ORDER BY pedido_id, fecha, id
@@ -421,6 +426,10 @@ def export_alquileres(conn) -> list[dict]:
                 monto=int(pr["monto"]),
                 concepto=pr["concepto"],
                 fecha=_to_iso(pr["fecha"]) or "",
+                anulado=bool(pr["anulado"]),
+                anulado_por=pr["anulado_por"],
+                anulado_at=_to_iso(pr["anulado_at"]),
+                anulado_motivo=pr["anulado_motivo"],
             )
         )
 
