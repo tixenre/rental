@@ -45,6 +45,7 @@ Igual que `arca_fe.wsfe`: este módulo NO guarda su propia copia de las URLs
 de homologación/producción — el caller (`services/facturacion/padron.py`)
 las resuelve según ambiente y pasa la URL completa del WSDL ya armada.
 """
+
 from __future__ import annotations
 
 import ssl
@@ -57,6 +58,8 @@ import zeep
 import zeep.helpers
 import zeep.transports
 from requests.adapters import HTTPAdapter
+
+from .errores import ArcaBusinessError, ArcaResponseError
 
 WSAA_SERVICIO = "ws_sr_constancia_inscripcion"
 
@@ -81,7 +84,10 @@ class _AfipSSLAdapter(HTTPAdapter):
         ctx = ssl.create_default_context()
         ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
         self.poolmanager = urllib3.PoolManager(
-            num_pools=num_pools, maxsize=maxsize, block=block, ssl_context=ctx,
+            num_pools=num_pools,
+            maxsize=maxsize,
+            block=block,
+            ssl_context=ctx,
         )
 
 
@@ -139,13 +145,15 @@ class PadronClient:
     def get_persona(self, cuit_buscado: str) -> Optional[PersonaArca]:
         """Consulta el padrón para `cuit_buscado`. None solo cuando AFIP no
         devolvió NINGÚN dato ni motivo (silencio limpio — respuesta vacía sin
-        `persona`, o `persona` sin `datosGenerales` y sin ningún error*
-        poblado). Levanta RuntimeError con el texto de AFIP tal cual para
-        cualquier otra cosa: un Fault SOAP, o un bloqueo de negocio (ej. CUIT
-        sin adhesión a Domicilio Fiscal Electrónico, RG 3990-E — `persona`
+        `personaReturn`, o sin `datosGenerales` y sin ningún error* poblado).
+        Para cualquier otra cosa levanta la taxonomía tipada de `errores`:
+        `ArcaResponseError` ante un Fault SOAP (texto de AFIP en el mensaje y
+        en `.raw`); `ArcaBusinessError` ante un bloqueo de negocio (ej. CUIT
+        sin adhesión a Domicilio Fiscal Electrónico, RG 3990-E — `personaReturn`
         viene sin `datosGenerales` pero con `errorConstancia`/
         `errorRegimenGeneral`/`errorMonotributo` poblado, ver manual oficial
-        "WS_SR_constancia_inscripcion" v3.7 §5.3).
+        "WS_SR_constancia_inscripcion" v3.7 §5.3), con los mensajes en
+        `.errores`.
 
         Antes se filtraban los Fault que mencionaban "no se encuentran datos"/
         "sin resultados" tratándolos como silencio limpio — esa heurística
@@ -162,16 +170,19 @@ class PadronClient:
                 idPersona=int(_solo_digitos(cuit_buscado)),
             )
         except zeep.exceptions.Fault as exc:
-            raise RuntimeError(str(exc)) from exc
+            raise ArcaResponseError(str(exc), raw=str(exc)) from exc
 
         persona = getattr(resp, "personaReturn", None) if resp is not None else None
         if persona is None:
             return None
 
         if getattr(persona, "datosGenerales", None) is None:
-            motivo = _error_constancia(persona)
-            if motivo:
-                raise RuntimeError(motivo)
+            mensajes = _errores_constancia(persona)
+            if mensajes:
+                raise ArcaBusinessError(
+                    "; ".join(mensajes),
+                    errores=tuple((None, m) for m in mensajes),
+                )
             return None
 
         return _parsear_persona(cuit_buscado, persona)
@@ -181,7 +192,7 @@ def _solo_digitos(s: str) -> str:
     return "".join(c for c in str(s) if c.isdigit())
 
 
-def _error_constancia(persona: Any) -> Optional[str]:
+def _errores_constancia(persona: Any) -> list[str]:
     """Junta el/los mensaje(s) de error que AFIP puso en `errorConstancia`/
     `errorRegimenGeneral`/`errorMonotributo` (cada uno con un campo `error`,
     ver manual §5.3) cuando bloqueó la constancia por una regla de negocio."""
@@ -191,7 +202,7 @@ def _error_constancia(persona: Any) -> Optional[str]:
         msg = getattr(err, "error", None) if err is not None else None
         if msg:
             mensajes.append(str(msg))
-    return "; ".join(mensajes) if mensajes else None
+    return mensajes
 
 
 def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
@@ -229,7 +240,9 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
     else:
         dr = getattr(persona, "datosRegimenGeneral", None)
         impuestos = getattr(dr, "impuesto", None) if dr is not None else None
-        ids = {getattr(i, "idImpuesto", None) for i in impuestos} if impuestos else set()
+        ids = (
+            {getattr(i, "idImpuesto", None) for i in impuestos} if impuestos else set()
+        )
         if _ID_IMPUESTO_EXENTO in ids:
             condicion_iva = "exento"
         elif _ID_IMPUESTO_RI in ids:

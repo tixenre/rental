@@ -3,6 +3,7 @@
 Prueba el parseo de fechas, la normalización del endpoint, y la lógica de parseo
 de respuestas CAE (éxito y rechazo) con objetos mock en vez de llamadas SOAP reales.
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -327,8 +328,11 @@ def test_param_devuelve_dicts_con_acceso_por_clave(metodo, operacion, args):
 
 
 def test_consultar_error_real_no_se_confunde_con_no_existe():
-    """Un error de AFIP que NO es 10016/602 tiene que seguir levantando."""
+    """Un error de AFIP que NO es 10016/602 tiene que seguir levantando —
+    ahora ArcaBusinessError, con el código en `.codigo` y el par en `.errores`
+    (dato estructurado, no solo el string)."""
     from arca_fe.wsfe import WsfeClient
+    from arca_fe.errores import ArcaBusinessError
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
 
@@ -345,8 +349,11 @@ def test_consultar_error_real_no_se_confunde_con_no_existe():
         mock_service.FECompConsultar.return_value = mock_resp
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(RuntimeError, match="500"):
+        with pytest.raises(ArcaBusinessError, match="500") as ei:
             client.consultar(2, 13, 1)
+
+    assert ei.value.codigo == 500
+    assert ei.value.errores == ((500, "Error interno de AFIP"),)
 
 
 def test_consultar_fault_con_codigo_no_existe_como_substring_no_se_silencia():
@@ -355,9 +362,12 @@ def test_consultar_fault_con_codigo_no_existe_como_substring_no_se_silencia():
     NO tiene que confundirse con el código 602 ("no existe") y silenciarse a
     None. Antes se hacía `str(602) in str(exc)` — "602" matcheaba dentro de
     "60210" y tragaba el error real. Ahora `\\b602\\b` exige límites de
-    palabra, así que solo el código 602 exacto cuenta como "no existe"."""
+    palabra, así que solo el código 602 exacto cuenta como "no existe". Un
+    Fault que no es "no existe" se traduce a ArcaResponseError (no filtra el
+    zeep.Fault crudo al consumidor)."""
     import zeep.exceptions
     from arca_fe.wsfe import WsfeClient
+    from arca_fe.errores import ArcaResponseError
 
     client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
 
@@ -368,5 +378,5 @@ def test_consultar_fault_con_codigo_no_existe_como_substring_no_se_silencia():
         )
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises((RuntimeError, zeep.exceptions.Fault)):
+        with pytest.raises(ArcaResponseError, match="60210"):
             client.consultar(2, 13, 60210)

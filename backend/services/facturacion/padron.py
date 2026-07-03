@@ -27,6 +27,7 @@ probar uno solo: `resolver_persona` reintenta con cada emisor activo con cert,
 en orden, hasta que uno devuelva persona; recién si TODOS responden "sin
 datos ni motivo" se levanta el RuntimeError nombrando a todos.
 """
+
 from __future__ import annotations
 
 from arca_fe.padron import PadronClient, PersonaArca, WSAA_SERVICIO
@@ -51,6 +52,7 @@ def resolver_persona(cuit_buscado: str, conn) -> PersonaArca:
     el formulario, que sigue editable a mano."""
     from services.facturacion.config import credenciales
     from services.facturacion.wsaa_cache import get_ta
+    from arca_fe import ArcaError
 
     from services.facturacion.emisores_repo import list_emisores
 
@@ -72,10 +74,13 @@ def resolver_persona(cuit_buscado: str, conn) -> PersonaArca:
             )
             persona = client.get_persona(cuit_buscado)
         except RuntimeError:
-            # `get_persona` ya arma un RuntimeError con el mensaje de negocio de
-            # AFIP en texto plano (ej. "No consta... adhesión al domicilio fiscal
-            # electrónico...") — mostrarlo tal cual, sin envolverlo de nuevo.
             raise
+        except ArcaError as exc:
+            # `get_persona` ya arma un ArcaBusinessError/ArcaResponseError con el
+            # mensaje de AFIP en texto plano (ej. "No consta... adhesión al
+            # domicilio fiscal electrónico...") — lo aplanamos a RuntimeError
+            # (convención del adapter → 503) mostrándolo tal cual, sin envolver.
+            raise RuntimeError(str(exc)) from exc
         except Exception as exc:
             raise RuntimeError(
                 f"No se pudo consultar el padrón con el emisor '{emisor_autenticador}': "

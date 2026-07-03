@@ -5,6 +5,7 @@ expira_at). El cacheado en `afip_ta` lo hace el adapter (`services/facturacion/w
 
 Única dependencia extra: `cryptography` (ya instalada vía pyjwt[crypto]).
 """
+
 from __future__ import annotations
 
 import base64
@@ -19,6 +20,8 @@ from cryptography.hazmat.primitives.serialization.pkcs7 import (
     PKCS7SignatureBuilder,
 )
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+from .errores import ArcaNetworkError, ArcaResponseError
 
 
 _WSAA_SERVICE = "wsfe"
@@ -143,7 +146,7 @@ def login(
         resp.raise_for_status()
     except httpx.HTTPStatusError as exc:
         cuerpo = exc.response.text[:800] if exc.response.text else "(sin cuerpo)"
-        raise RuntimeError(
+        raise ArcaNetworkError(
             f"WSAA devolvió {exc.response.status_code} para {url}:\n{cuerpo}"
         ) from exc
     return _parsear_login_response(resp.text)
@@ -197,8 +200,10 @@ def _parsear_login_response(xml_text: str) -> tuple[str, str, datetime]:
     """
     try:
         root = ET.fromstring(xml_text)
-    except ET.ParseError:
-        raise ValueError(f"Respuesta WSAA inválida: {xml_text[:200]}")
+    except ET.ParseError as exc:
+        raise ArcaResponseError(
+            f"Respuesta WSAA inválida: {xml_text[:200]}", raw=xml_text
+        ) from exc
 
     def _iter_find(tree: ET.Element, tag: str) -> Optional[str]:
         for el in tree.iter():
@@ -212,12 +217,15 @@ def _parsear_login_response(xml_text: str) -> tuple[str, str, datetime]:
     if cms_return_text:
         try:
             inner = ET.fromstring(cms_return_text.strip())
+
             def _find(tag: str) -> Optional[str]:
                 return _iter_find(inner, tag)
         except ET.ParseError:
+
             def _find(tag: str) -> Optional[str]:
                 return _iter_find(root, tag)
     else:
+
         def _find(tag: str) -> Optional[str]:
             return _iter_find(root, tag)
 
@@ -226,7 +234,9 @@ def _parsear_login_response(xml_text: str) -> tuple[str, str, datetime]:
     expiration = _find("expirationTime")
 
     if not token or not sign:
-        raise ValueError(f"WSAA no devolvió token/sign: {xml_text[:300]}")
+        raise ArcaResponseError(
+            f"WSAA no devolvió token/sign: {xml_text[:300]}", raw=xml_text
+        )
 
     expira_at: datetime
     if expiration:
