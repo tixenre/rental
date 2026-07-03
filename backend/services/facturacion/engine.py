@@ -229,21 +229,18 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     importes = calcular_importes(req)
 
     # Único llamado a ARCA del preview: de solo lectura, no pide CAE. Si el
-    # cert está vencido o ARCA no responde, mejor enterarse acá (RuntimeError
-    # → 503) que después de que el admin ya confirmó.
-    try:
-        token, sign = get_ta(nombre_emisor, conn)
-        wsfe = WsfeClient(
-            endpoint=cred.endpoint_wsfe,
-            cuit=cred.cuit,
-            token=token,
-            sign=sign,
-        )
-        ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
-    except (RuntimeError, ValueError):
-        raise
-    except ArcaError as exc:
-        raise RuntimeError(str(exc)) from exc
+    # cert está vencido o ARCA no responde, mejor enterarse acá que después
+    # de que el admin ya confirmó. `ArcaError` (Auth/Network/Response/
+    # Business) se deja pasar tal cual — el route elige el status HTTP por
+    # subtipo en vez de un 503 genérico para todo.
+    token, sign = get_ta(nombre_emisor, conn)
+    wsfe = WsfeClient(
+        endpoint=cred.endpoint_wsfe,
+        cuit=cred.cuit,
+        token=token,
+        sign=sign,
+    )
+    ultimo = wsfe.ultimo_autorizado(emisor_obj.punto_venta, int(cbte_tipo))
     numero_a_emitir = ultimo + 1
 
     chequeos = _chequeos_previos(
@@ -436,12 +433,11 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
             if cae_result is None:
                 fecae_payload = armar_fecae(req, numero_a_emitir)
                 cae_result = wsfe.solicitar_cae(fecae_payload)
-        except (RuntimeError, ValueError):
+        except (RuntimeError, ValueError, ArcaError):
+            # `ArcaError` (Auth/Network/Response/Business) se deja pasar tal
+            # cual — el route elige el status HTTP por subtipo (422/502/503)
+            # en vez de un 503 genérico para todo.
             raise
-        except ArcaError as exc:
-            # Taxonomía tipada del motor → aplanada a RuntimeError (convención
-            # del adapter, que el route mapea a 503), preservando el mensaje.
-            raise RuntimeError(str(exc)) from exc
         except Exception as exc:
             # Falla de red/SOAP no controlada (invariante "nunca 500" del módulo):
             # la TX nunca llegó a commitear (nada quedó en 'pendiente' zombie).
@@ -641,10 +637,10 @@ def emitir_nota_credito(
             if cae_result is None:
                 fecae = armar_fecae(req, numero_a_emitir)
                 cae_result = wsfe.solicitar_cae(fecae)
-        except (RuntimeError, ValueError):
+        except (RuntimeError, ValueError, ArcaError):
+            # `ArcaError` se deja pasar tal cual — ver el mismo comentario en
+            # `emitir_factura`.
             raise
-        except ArcaError as exc:
-            raise RuntimeError(str(exc)) from exc
         except Exception as exc:
             raise RuntimeError(
                 f"Error al comunicarse con WSFEv1 ({cred.endpoint_wsfe}): "

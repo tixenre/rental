@@ -154,11 +154,11 @@ def test_refrescar_catalogos_sin_emisor_con_cert_levanta_value_error(monkeypatch
         refrescar_catalogos(conn)
 
 
-def test_refrescar_catalogos_arca_caida_propaga_runtime_error(monkeypatch):
-    """Regresión: `param_tipos_doc()` real levanta `ArcaBusinessError`
-    (taxonomía tipada del motor), no `RuntimeError` directamente — mockear un
-    RuntimeError acá no ejercita la traducción real (bug real: sin el
-    `except ArcaError` en `refrescar_catalogos`, esto escapaba sin manejar)."""
+def test_refrescar_catalogos_arca_caida_propaga_arca_error(monkeypatch):
+    """`param_tipos_doc()` real levanta `ArcaBusinessError` (taxonomía tipada
+    del motor) — `refrescar_catalogos` ya NO la envuelve en `RuntimeError`:
+    se deja pasar tal cual para que el route (`routes/facturacion.py`) elija
+    el status HTTP por subtipo (422/502/503) en vez de un 503 genérico."""
     from arca_fe.errores import ArcaBusinessError
 
     conn = _FakeAppSettingsConn()
@@ -170,7 +170,7 @@ def test_refrescar_catalogos_arca_caida_propaga_runtime_error(monkeypatch):
         ),
     )
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ArcaBusinessError, match="600"):
         refrescar_catalogos(conn)
 
 
