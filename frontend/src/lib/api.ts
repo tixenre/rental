@@ -189,7 +189,12 @@ export function interpolarDescuento(puntos: DescuentoJornada[], jornadas: number
     const { jornadas: j1, pct: p1 } = sorted[i + 1];
     if (jornadas >= j0 && jornadas <= j1) {
       const t = (jornadas - j0) / (j1 - j0);
-      return Math.round((p0 + t * (p1 - p0)) * 10) / 10;
+      // 2 decimales — espeja `interpolar_descuento_jornadas` del backend
+      // (`round(x, 2)`). Antes redondeaba a 1 decimal acá: la preview podía
+      // mostrar un % distinto al que el backend iba a aplicar de verdad
+      // (ej. "3.2%" en vez de "3.24%") — no afectaba lo cobrado (siempre sale
+      // del backend), pero sí la preview de /admin/settings.
+      return Math.round((p0 + t * (p1 - p0)) * 100) / 100;
     }
   }
   return 0;
