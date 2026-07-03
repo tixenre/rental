@@ -716,6 +716,18 @@ detecta excepciones de una corrutina — mismo motivo por el que `subir_comproba
 `contabilidad.py` tampoco lo lleva). El supervisor marca un endpoint de escritura de facturación nuevo sin
 `@limiter.limit`, o un `except Exception` ad-hoc en esos routes en vez de `map_pg_errors`.
 
+### 2026-07-03 — El pipeline de carritos activos (dashboard admin) incluye el precio derivado de un combo
+
+`_enrich_items` (`services/carrito/activos.py`, alimenta `monto_estimado`/`pipeline_ars` de
+`GET /admin/carritos`) leía `equipos.precio_jornada` **crudo** por ítem — NULL para un `tipo='combo'` (el
+precio de un combo se deriva de sus componentes) — así que el combo quedaba en 0 y el filtro `if precio > 0`
+lo descartaba del estimado. Ahora resuelve cada ítem con la fuente única `precios.precio_jornada_efectivo`
+(_2026-06-29 — módulo único del carrito_), igual que `readiness.py`. Solo afecta la **métrica interna** del
+dashboard admin — no toca cotizado==cobrado ni nada que vea el cliente. Fetch por-ítem, no batch: mismo
+criterio que el batch `IN (...)` revertido en `/api/cotizar` (#643, devolvió precios vacíos en prod); el
+carrito de un heartbeat es chico, no hot-path. Test: `test_carritos_activos_precio_combo.py`. El supervisor
+marca un ítem de carrito/dashboard cuyo precio salga de `equipos.precio_jornada` crudo en vez del resolutor.
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

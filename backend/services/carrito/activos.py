@@ -91,7 +91,7 @@ def _enrich_items(
 
     Devuelve (lista_enriquecida, monto_estimado_ars).
     """
-    from services.precios import calcular_total, jornadas_periodo, ItemPrecio
+    from services.precios import calcular_total, jornadas_periodo, ItemPrecio, precio_jornada_efectivo
     from database import to_datetime
 
     d0 = to_datetime(fecha_desde) if fecha_desde else None
@@ -105,11 +105,19 @@ def _enrich_items(
         for it in items:
             # alias `e` por convención de queries sobre equipos (MEMORIA 2026-05-26)
             row = conn.execute(
-                "SELECT e.nombre, e.precio_jornada FROM equipos e WHERE e.id = %s",
+                "SELECT e.nombre FROM equipos e WHERE e.id = %s",
                 (it.equipo_id,),
             ).fetchone()
             nombre = row["nombre"] if row else str(it.equipo_id)
-            precio = int(row["precio_jornada"] or 0) if row else 0
+            # Precio EFECTIVO por la fuente única (MEMORIA 2026-06-29): un combo
+            # NO tiene `precio_jornada` propio (es NULL, se deriva de sus
+            # componentes) — leer la columna cruda lo dejaba en 0 y el combo se
+            # descartaba del estimado/pipeline del dashboard admin (bug hallado
+            # por auditoría de plata). Fetch por-ítem (no batch): el batch
+            # `IN (...)` de #643 en `/api/cotizar` devolvió el mapa de precios
+            # vacío en prod → total $0; acá el carrito es chico (no hot-path)
+            # y no vale ese riesgo.
+            precio = int(precio_jornada_efectivo(conn, it.equipo_id) or 0)
 
             enriched.append({
                 "equipo_id": it.equipo_id,
