@@ -17,8 +17,9 @@ from services.specs import (
     descartar_propuesta,
     encolar_propuesta,
     listar_propuestas_pendientes,
+    listar_no_reconocidos_agrupados,
 )
-from services.specs_ingesta.commands.proponer import proponer_desde_unmatched
+from services.specs_ingesta.commands.proponer import proponer_desde_equipo, proponer_desde_unmatched
 
 _OPT_IN = os.getenv("RESERVAS_DB_TEST") == "1"
 _DB_URL = os.getenv("DATABASE_URL", "")
@@ -44,8 +45,14 @@ pytestmark = [
 _ORIGEN_TEST = "test_specs_ingesta_proponer_db"
 
 
+_NOMBRE_EQUIPO_TEST = "ZZ-TEST-proponer-equipo"
+
+
 def _limpiar(conn):
     conn.execute("DELETE FROM spec_propuestas_pendientes WHERE origen = %s", (_ORIGEN_TEST,))
+    # equipo_id es ON DELETE CASCADE — borrar el equipo ya limpia sus propuestas,
+    # pero el DELETE de arriba corre primero por si alguna quedó con otro origen.
+    conn.execute("DELETE FROM equipos WHERE nombre LIKE %s", (f"{_NOMBRE_EQUIPO_TEST}%",))
 
 
 @pytest.fixture(autouse=True)
@@ -59,6 +66,13 @@ def _cleanup():
     with get_db() as conn:
         _limpiar(conn)
         conn.commit()
+
+
+def _crear_equipo_test(conn, sufijo: str) -> int:
+    return conn.insert_returning(
+        "INSERT INTO equipos (nombre, cantidad) VALUES (%s, 1)",
+        (f"{_NOMBRE_EQUIPO_TEST}-{sufijo}",),
+    )
 
 
 class TestCanalC:
@@ -168,3 +182,110 @@ class TestProponerDesdeUnmatched:
 
         assert len(ids1) == 1
         assert ids2 == [], "correr 2 veces sobre el mismo dataset no debe re-proponer lo ya pendiente"
+
+
+class TestProponerDesdeEquipo:
+    """El productor 'live' (#1203): sin umbral, atribuido a un equipo."""
+
+    def test_propone_sin_esperar_repeticion(self):
+        from database import get_db
+
+        with get_db() as conn:
+            eq = _crear_equipo_test(conn, "1")
+            unmatched = [{"label": "Interior Color", "value": "White"}]
+            ids = proponer_desde_equipo(conn, eq, "Modificadores", unmatched, origen=_ORIGEN_TEST)
+            conn.commit()
+            pendientes = [p for p in listar_propuestas_pendientes(conn) if p["origen"] == _ORIGEN_TEST]
+
+        assert len(ids) == 1, "un solo equipo alcanza — no hace falta cruzar ningún umbral"
+        assert pendientes[0]["equipo_id"] == eq
+        assert pendientes[0]["payload"]["count"] == 1
+        assert pendientes[0]["payload"]["ejemplos"] == ["White"]
+
+    def test_no_duplica_mismo_equipo_mismo_label(self):
+        from database import get_db
+
+        with get_db() as conn:
+            eq = _crear_equipo_test(conn, "2")
+            unmatched = [{"label": "Interior Color", "value": "White"}]
+            ids1 = proponer_desde_equipo(conn, eq, "Modificadores", unmatched, origen=_ORIGEN_TEST)
+            conn.commit()
+            ids2 = proponer_desde_equipo(conn, eq, "Modificadores", unmatched, origen=_ORIGEN_TEST)
+            conn.commit()
+
+        assert len(ids1) == 1
+        assert ids2 == [], "resubir el mismo HTML no debe inflar la cola"
+
+    def test_dos_equipos_mismo_label_generan_dos_propuestas(self):
+        """Atribución preservada: el mismo label sin match en 2 equipos
+        distintos son 2 filas — el panel agrupado (no este query) es quien
+        las junta para mostrar, la fuente cruda no colapsa la atribución."""
+        from database import get_db
+
+        with get_db() as conn:
+            eq_a = _crear_equipo_test(conn, "3a")
+            eq_b = _crear_equipo_test(conn, "3b")
+            unmatched = [{"label": "Interior Color", "value": "White"}]
+            ids_a = proponer_desde_equipo(conn, eq_a, "Modificadores", unmatched, origen=_ORIGEN_TEST)
+            ids_b = proponer_desde_equipo(conn, eq_b, "Modificadores", unmatched, origen=_ORIGEN_TEST)
+            conn.commit()
+
+        assert len(ids_a) == 1 and len(ids_b) == 1
+        assert ids_a != ids_b
+
+    def test_sin_categoria_no_propone(self):
+        from database import get_db
+
+        with get_db() as conn:
+            eq = _crear_equipo_test(conn, "4")
+            ids = proponer_desde_equipo(
+                conn, eq, None, [{"label": "X", "value": "Y"}], origen=_ORIGEN_TEST
+            )
+
+        assert ids == [], "sin categoría detectada no hay dónde clasificar la propuesta"
+
+
+class TestListarNoReconocidosAgrupados:
+    def test_agrupa_por_label_y_junta_equipos(self):
+        from database import get_db
+
+        with get_db() as conn:
+            eq_a = _crear_equipo_test(conn, "5a")
+            eq_b = _crear_equipo_test(conn, "5b")
+            proponer_desde_equipo(
+                conn, eq_a, "Modificadores",
+                [{"label": "Interior Color", "value": "White"}], origen=_ORIGEN_TEST,
+            )
+            proponer_desde_equipo(
+                conn, eq_b, "Modificadores",
+                [{"label": "Interior Color", "value": "Silver"}], origen=_ORIGEN_TEST,
+            )
+            conn.commit()
+            grupos = listar_no_reconocidos_agrupados(conn)
+
+        grupo = next(
+            g for g in grupos
+            if g["label_normalizado"] == "interior color" and g["categoria"] == "Modificadores"
+        )
+        assert set(grupo["equipo_ids"]) == {eq_a, eq_b}
+        assert set(grupo["ejemplos"]) == {"White", "Silver"}
+        assert len(grupo["propuesta_ids"]) == 2
+
+    def test_grupo_sin_equipo_tiene_lista_vacia(self):
+        """Las propuestas agregadas del CLI offline (sin equipo_id) también
+        aparecen en el panel, con equipos=[] — no se pierden de la vista."""
+        from database import get_db
+
+        with get_db() as conn:
+            ids = proponer_desde_unmatched(
+                conn, "Modificadores",
+                [[{"label": "Material of Construction", "value": "Nylon"}]] * 3,
+                origen=_ORIGEN_TEST,
+            )
+            conn.commit()
+            grupos = listar_no_reconocidos_agrupados(conn)
+
+        assert len(ids) == 1
+        grupo = next(g for g in grupos if g["label_normalizado"] == "material of construction")
+        assert grupo["equipo_ids"] == []
+        assert grupo["equipo_nombres"] == []

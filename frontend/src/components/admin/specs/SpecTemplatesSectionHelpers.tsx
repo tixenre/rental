@@ -242,7 +242,7 @@ export function SpecTemplateFormModal({
     queryKey: ["admin", "spec-definitions"],
     queryFn: () => adminApi.listSpecDefinitions(),
     enabled: isNew,
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   // En modo asignar: spec seleccionada del catálogo. Si vino prefillKey,
@@ -280,7 +280,7 @@ export function SpecTemplateFormModal({
       return new Set(r.items.map((t) => t.spec_def_id));
     },
     enabled: isNew,
-    staleTime: 10_000,
+    staleTime: 0,
   });
 
   const candidatas = useMemo(() => {

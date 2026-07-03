@@ -122,8 +122,8 @@ export function EquipoFormDialogV2({
   const isEdit = !!initial;
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const { rate: usdRate } = useUsdRate();
-  const roiDefault = useRoiPctDefault();
+  const { rate: usdRate } = useUsdRate({ staleTime: 0 });
+  const roiDefault = useRoiPctDefault({ staleTime: 0 });
 
   // "Aplicar" (guardar sin cerrar) vs "Guardar" (cerrar al terminar). El
   // botón Aplicar setea este ref a false antes de disparar el submit; en el
@@ -193,10 +193,25 @@ export function EquipoFormDialogV2({
       setNombrePublico(override);
       setNombrePublicoAuto(false);
     } else {
-      setNombrePublico("");
+      // Sin override explícito: sembramos con el nombre EFECTIVO ya calculado
+      // (equipos.nombre_publico) en vez de dejar el campo vacío. Sin esto, un
+      // equipo cuyo nombre viene del ficha-template legado (texto YA
+      // renderizado, sin placeholders — una foto vieja, no un molde vivo)
+      // mostraba el campo en blanco mientras ese texto congelado seguía
+      // siendo lo que ve el catálogo público: el admin no tenía forma de
+      // verlo ni de saber que estaba ahí (bug real, encontrado en vivo —
+      // equipo con specs editadas cuyo nombre nunca reaccionaba).
+      // Si hay molde de categoría real, el efecto de auto-gen de abajo pisa
+      // esto enseguida con el valor recién calculado (sin flicker: corre
+      // antes de que el usuario interactúe). Si NO hay molde, este valor se
+      // queda — y el próximo Guardar lo persiste como override real
+      // (mismo criterio que "tipear apaga el auto-gen"), autocurando el
+      // dato congelado equipo por equipo con el uso normal, sin necesitar
+      // una migración aparte.
+      setNombrePublico(initial?.nombre_publico?.trim() || "");
       setNombrePublicoAuto(true);
     }
-  }, [initial?.id, initial?.nombre_publico_override]);
+  }, [initial?.id, initial?.nombre_publico_override, initial?.nombre_publico]);
 
   // Specs traídos del HTML upload: se guardan en una lista separada para
   // que el usuario los apruebe uno por uno (vs los specs actuales).
@@ -204,6 +219,7 @@ export function EquipoFormDialogV2({
 
   // ── HTML source ────────────────────────────────────────────────────
   const [uploadingHtml, setUploadingHtml] = useState(false);
+  const [reExtracting, setReExtracting] = useState(false);
   const [htmlSourceUrl, setHtmlSourceUrl] = useState(initial?.html_source_url ?? null);
   useEffect(() => {
     setHtmlSourceUrl(initial?.html_source_url ?? null);
@@ -641,8 +657,67 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
-  // HTML source — sube el archivo, persiste en R2 y extrae specs
+  // HTML source — sube el archivo, persiste en R2 y extrae specs. También
+  // usado por re-extract (#1203): mismo resultado, sin volver a subir el
+  // archivo — comparten `_aplicarSpecsExtraidos` (aplica al template o
+  // manda a revisión), no hay 2 formas de procesar el mismo resultado.
   // ════════════════════════════════════════════════════════════════════
+  const _aplicarSpecsExtraidos = (
+    specsExtraidos: { label: string; value: string; spec_key?: string }[],
+    tituloSinSpecs: string,
+  ) => {
+    const propuestos: Spec[] = withIds(specsExtraidos ?? []);
+    if (propuestos.length === 0) {
+      toast.success(tituloSinSpecs, { description: "No se extrajeron specs del archivo" });
+      return;
+    }
+    const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+    const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+    for (const t of templateItems ?? []) {
+      if (t.spec_key) tmplByKey.set(t.spec_key, t);
+      if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
+    }
+    const findTmpl = (p: Spec) =>
+      (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
+      tmplByLabel.get(p.label.trim().toLowerCase());
+
+    const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
+    const requierenRevision = propuestos.filter((p) => !findTmpl(p));
+
+    if (autoAplicables.length > 0) {
+      setSpecs((prev) => {
+        const next = [...prev];
+        for (const p of autoAplicables) {
+          const tmpl = findTmpl(p)!;
+          const targetId = `spec-${tmpl.spec_def_id}`;
+          const idx = next.findIndex(
+            (x) =>
+              x.id === targetId ||
+              x.id === `tmpl-${tmpl.spec_def_id}` ||
+              sameLabel(x.label, tmpl.label),
+          );
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], value: p.value };
+          } else {
+            next.push({
+              id: targetId,
+              label: tmpl.label,
+              value: p.value,
+              spec_key: p.spec_key,
+            });
+          }
+        }
+        return next;
+      });
+    }
+    if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
+
+    const parts: string[] = [];
+    if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
+    if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
+    toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
+  };
+
   const handleHtmlUpload = async (file: File) => {
     if (!initial?.id) return;
     setUploadingHtml(true);
@@ -654,62 +729,24 @@ export function EquipoFormDialogV2({
         specs?: { label: string; value: string; spec_key?: string }[];
       }>(`/api/admin/equipos/${initial.id}/upload-html-source`, { method: "POST", body: fd });
       setHtmlSourceUrl(r.html_source_url);
-
-      const propuestos: Spec[] = withIds(r.specs ?? []);
-      if (propuestos.length > 0) {
-        const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        for (const t of templateItems ?? []) {
-          if (t.spec_key) tmplByKey.set(t.spec_key, t);
-          if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
-        }
-        const findTmpl = (p: Spec) =>
-          (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
-          tmplByLabel.get(p.label.trim().toLowerCase());
-
-        const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
-        const requierenRevision = propuestos.filter((p) => !findTmpl(p));
-
-        if (autoAplicables.length > 0) {
-          setSpecs((prev) => {
-            const next = [...prev];
-            for (const p of autoAplicables) {
-              const tmpl = findTmpl(p)!;
-              const targetId = `spec-${tmpl.spec_def_id}`;
-              const idx = next.findIndex(
-                (x) =>
-                  x.id === targetId ||
-                  x.id === `tmpl-${tmpl.spec_def_id}` ||
-                  sameLabel(x.label, tmpl.label),
-              );
-              if (idx >= 0) {
-                next[idx] = { ...next[idx], value: p.value };
-              } else {
-                next.push({
-                  id: targetId,
-                  label: tmpl.label,
-                  value: p.value,
-                  spec_key: p.spec_key,
-                });
-              }
-            }
-            return next;
-          });
-        }
-        if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
-
-        const parts: string[] = [];
-        if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
-        if (requierenRevision.length)
-          parts.push(`${requierenRevision.length} pendientes de revisar`);
-        toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
-      } else {
-        toast.success("HTML guardado", { description: "No se extrajeron specs del archivo" });
-      }
+      _aplicarSpecsExtraidos(r.specs ?? [], "HTML guardado");
     } catch (e) {
       toast.error(`Error al subir HTML: ${e instanceof Error ? e.message : ""}`);
     } finally {
       setUploadingHtml(false);
+    }
+  };
+
+  const handleReExtractSpecs = async () => {
+    if (!initial?.id) return;
+    setReExtracting(true);
+    try {
+      const r = await adminApi.reExtractSpecs(initial.id);
+      _aplicarSpecsExtraidos(r.specs ?? [], "HTML re-procesado");
+    } catch (e) {
+      toast.error(`Error al re-extraer specs: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setReExtracting(false);
     }
   };
 
@@ -930,6 +967,17 @@ export function EquipoFormDialogV2({
         return;
       }
 
+      // Invalidar las queries PÚBLICAS (catálogo + ficha de equipo) — el save
+      // arriba ya invalida lo admin (vía saveMut.onSettled del route padre),
+      // pero nombre público/specs/categorías se escriben acá con llamadas
+      // directas que ese onSettled no cubre. Sin esto, el catálogo público
+      // sigue mostrando el dato viejo hasta que su staleTime (30-60s) vence
+      // solo — "tarda en reproducirse" no era timing raro, era que nadie le
+      // avisaba. Prefix-match: no hace falta el slug/rango de fechas exacto.
+      void qc.invalidateQueries({ queryKey: ["equipos"] });
+      void qc.invalidateQueries({ queryKey: ["equipo"] });
+      void qc.invalidateQueries({ queryKey: ["categorias"] });
+
       if (fallidos.length > 0) {
         toast.warning(isEdit ? "Equipo actualizado con avisos" : "Equipo creado con avisos", {
           description: `Falló: ${fallidos.join(" · ")}`,
@@ -1136,9 +1184,27 @@ export function EquipoFormDialogV2({
                 )}
               </Button>
               {htmlSourceUrl && (
-                <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
-                  <FileCode className="h-3 w-3" /> HTML guardado
-                </span>
+                <>
+                  <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
+                    <FileCode className="h-3 w-3" /> HTML guardado
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleReExtractSpecs()}
+                    disabled={reExtracting || uploadingHtml}
+                    title="Re-corre la extracción sobre el HTML ya guardado, sin resubirlo — útil después de agregar un spec nuevo al registry"
+                  >
+                    {reExtracting ? (
+                      <>
+                        <Spinner size="xs" className="mr-1" /> Buscando…
+                      </>
+                    ) : (
+                      "Buscar valores actualizados"
+                    )}
+                  </Button>
+                </>
               )}
             </>
           )}
