@@ -59,7 +59,15 @@ SALDADO_CTE = f"""
 
 def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
     """Filas `(fecha, dueno, equipo, monto)`: el monto prorrateado que cada equipo
-    aportó, fechado en el día en que su pedido quedó saldado, dentro del rango."""
+    aportó, fechado en el día en que su pedido quedó saldado, dentro del rango.
+
+    Cuando `suma_items = 0` (todos los ítems del pedido tienen `subtotal` 0, ej.
+    100% de descuento a nivel ítem) pero `monto_total > 0`, el prorrateo
+    proporcional no tiene base — antes eso daba `NULL` (vía `NULLIF`) y la plata
+    del pedido desaparecía en silencio del reporte. Fix: en ese caso se reparte
+    el `monto_total` **en partes iguales** entre los ítems del pedido (fallback
+    explícito, no "a Rambla" — no hay forma de saber a qué dueño atribuirlo sin
+    una base de prorrateo real), garantizando que la plata nunca se pierda."""
     from database import row_to_dict
     sql = f"""
         WITH {SALDADO_CTE},
@@ -69,7 +77,7 @@ def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
             WHERE fecha_saldado::date BETWEEN %s::date AND %s::date
         ),
         tot AS (
-            SELECT pedido_id, SUM(subtotal) AS suma_items
+            SELECT pedido_id, SUM(subtotal) AS suma_items, COUNT(*) AS cant_items
             FROM alquiler_items
             GROUP BY pedido_id
         )
@@ -77,7 +85,10 @@ def filas_atribucion(conn, desde: str, hasta: str) -> list[dict]:
                al.id                                              AS pedido_id,
                COALESCE(e.dueno, 'Rambla')                        AS dueno,
                COALESCE(e.nombre, pi.nombre_libre)                AS equipo,
-               al.monto_total * pi.subtotal::numeric / NULLIF(t.suma_items, 0) AS monto
+               CASE
+                   WHEN t.suma_items = 0 THEN al.monto_total::numeric / t.cant_items
+                   ELSE al.monto_total * pi.subtotal::numeric / t.suma_items
+               END                                                AS monto
         FROM en_rango r
         JOIN alquileres al ON al.id = r.pedido_id
         JOIN alquiler_items pi ON pi.pedido_id = al.id

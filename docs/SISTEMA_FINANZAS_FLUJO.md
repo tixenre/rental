@@ -136,10 +136,16 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
    fix, el segundo bug seguía dejando la función completamente rota. Candado:
    `test_facturacion_routes.py::test_enviar_mail_factura_no_rompe_con_undefined_column` +
    `test_enviar_mail_factura_400_si_sin_email`.
-4. **`reportes/liquidacion.py::filas_atribucion`** — si `suma_items = 0` pero `monto_total > 0` (ítems
-   con subtotal 0, ej. 100% descuento a nivel ítem), el prorrateo da `NULL` → se trata como 0 → la
-   plata de ese pedido **desaparece en silencio** del reporte de liquidación, sin que ningún chequeo
-   de reconciliación lo detecte. Edge case raro, pero real.
+4. ~~**`reportes/liquidacion.py::filas_atribucion`**~~ — **RESUELTO (Fase 5, #1184).** Si
+   `suma_items = 0` pero `monto_total > 0` (ítems con subtotal 0, ej. 100% descuento a nivel ítem), el
+   prorrateo daba `NULL` (vía `NULLIF`) → se trataba como 0 → la plata de ese pedido **desaparecía en
+   silencio** del reporte de liquidación, sin que ningún chequeo de reconciliación lo detectara. Fix:
+   `CASE WHEN t.suma_items = 0 THEN al.monto_total / t.cant_items ELSE ... END` — reparte el
+   `monto_total` en **partes iguales** entre los ítems del pedido (no hay base real de prorrateo
+   cuando todos los subtotales son 0; repartir parejo es el fallback más neutral, no arbitrario hacia
+   un dueño). Candado: `test_reportes_liquidacion_db.py::test_suma_items_cero_no_pierde_plata`
+   (Postgres real, un pedido con 2 ítems subtotal 0 confirma que el total del reporte sigue incluyendo
+   su `monto_total` completo).
 5. **Front — reimplementaba el cálculo de línea en vez de leer lo que ya calculó el backend** (viola
    "el front no calcula plata", 2026-06-29):
    - ~~`PedidoPageCards.tsx` vs `PedidoPageHelpers.tsx` (editor admin)~~ — **RESUELTO (Fase 1)**:
