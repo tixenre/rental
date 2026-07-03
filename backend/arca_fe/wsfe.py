@@ -10,7 +10,7 @@ Deps: zeep (SOAP), ya en requirements.txt.
 """
 from __future__ import annotations
 
-import ssl
+import re
 import urllib3
 from dataclasses import dataclass
 from datetime import date
@@ -25,6 +25,8 @@ import zeep.helpers
 import zeep.transports
 from requests.adapters import HTTPAdapter
 
+from ._ssl_afip import afip_ssl_context
+
 # Caché local de clientes SOAP (por endpoint, dentro del proceso)
 _CLIENT_CACHE: dict[str, zeep.Client] = {}
 
@@ -35,17 +37,15 @@ _CODES_NO_EXISTE = (10016, 602)
 
 
 class _AfipSSLAdapter(HTTPAdapter):
-    """Los servidores de prod de AFIP usan parámetros DH cortos (DH_KEY_TOO_SMALL).
-    SECLEVEL=1 los acepta sin bajar la verificación de certificado."""
+    """Ver `_ssl_afip.afip_ssl_context` — mismo ajuste que `padron.py` (y,
+    para el cliente httpx de `wsaa.py`, `afip_ssl_context()` directo)."""
 
     def init_poolmanager(self, num_pools, maxsize, block=False):
-        ctx = ssl.create_default_context()
-        ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
         self.poolmanager = urllib3.PoolManager(
             num_pools=num_pools,
             maxsize=maxsize,
             block=block,
-            ssl_context=ctx,
+            ssl_context=afip_ssl_context(),
         )
 
 
@@ -133,7 +133,14 @@ class WsfeClient:
                 },
             )
         except zeep.exceptions.Fault as exc:
-            if any(str(c) in str(exc) for c in _CODES_NO_EXISTE) or "no existe" in str(exc).lower():
+            texto = str(exc)
+            # Word-boundary, no substring crudo: un código real (602/10016) no
+            # tiene que poder matchear como parte de un número más largo no
+            # relacionado en el texto de AFIP — silenciaría un error real.
+            if (
+                any(re.search(rf"\b{c}\b", texto) for c in _CODES_NO_EXISTE)
+                or "no existe" in texto.lower()
+            ):
                 return None
             raise
 

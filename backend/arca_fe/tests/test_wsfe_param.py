@@ -347,3 +347,26 @@ def test_consultar_error_real_no_se_confunde_con_no_existe():
 
         with pytest.raises(RuntimeError, match="500"):
             client.consultar(2, 13, 1)
+
+
+def test_consultar_fault_con_codigo_no_existe_como_substring_no_se_silencia():
+    """Word-boundary, no substring crudo: un Fault real cuyo texto contiene
+    "602" como PARTE de un número más largo (ej. un nº de comprobante 60210)
+    NO tiene que confundirse con el código 602 ("no existe") y silenciarse a
+    None. Antes se hacía `str(602) in str(exc)` — "602" matcheaba dentro de
+    "60210" y tragaba el error real. Ahora `\\b602\\b` exige límites de
+    palabra, así que solo el código 602 exacto cuenta como "no existe"."""
+    import zeep.exceptions
+    from arca_fe.wsfe import WsfeClient
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.FECompConsultar.side_effect = zeep.exceptions.Fault(
+            "Rechazo real procesando el comprobante 60210"
+        )
+        mock_client_fn.return_value.service = mock_service
+
+        with pytest.raises((RuntimeError, zeep.exceptions.Fault)):
+            client.consultar(2, 13, 60210)
