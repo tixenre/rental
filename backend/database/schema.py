@@ -1348,7 +1348,10 @@ def _init_db_schema(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_jornadas_pct FLOAT DEFAULT 0")
+    # NUMERIC(5,2), no FLOAT — mismo tipo que la migración g1a2b3c4d5e6 le dio a las
+    # otras 3 columnas de descuento (drift detectado en la Fase B de #1219: un bootstrap
+    # 100% vía init_db(), sin Alembic, quedaba con esta columna en un tipo distinto).
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_jornadas_pct NUMERIC(5,2) DEFAULT 0")
 
     # email infra (migración a4e8c2b9d710)
     conn.execute("""

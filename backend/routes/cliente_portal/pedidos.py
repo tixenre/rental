@@ -201,7 +201,8 @@ def cliente_pedidos(request: Request):
     with get_db() as conn:
         pedidos = conn.execute("""
             SELECT id, numero_pedido, estado, fecha_desde, fecha_hasta,
-                   monto_total, monto_pagado, descuento_pct, notas, created_at
+                   monto_total, monto_pagado, descuento_pct, descuento_jornadas_pct,
+                   notas, created_at
             FROM alquileres
             WHERE cliente_id = %s
             ORDER BY created_at DESC NULLS LAST, numero_pedido DESC
@@ -215,9 +216,20 @@ def cliente_pedidos(request: Request):
             [p["id"] for p in pedidos], conn
         )
 
+        # Perfil fiscal del cliente, una sola vez para toda la lista (no por
+        # pedido) — `_enriquecer_pedido_con_total` lo respeta si ya viene seteado.
+        perfil_row = conn.execute(
+            "SELECT perfil_impuestos FROM clientes WHERE id = %s", (cliente_id,)
+        ).fetchone()
+        perfil_impuestos = row_to_dict(perfil_row).get("perfil_impuestos") if perfil_row else None
+
+        from routes.alquileres import _enriquecer_pedido_con_total
+
         result = []
         for p in pedidos:
             d = row_to_dict(p)
+            d["cliente_id"] = cliente_id
+            d["cliente_perfil_impuestos"] = perfil_impuestos
             d["items"] = [
                 _proyectar(it, _ITEM_CAMPOS_PORTAL)
                 for it in items_por_pedido.get(p["id"], [])
@@ -247,6 +259,11 @@ def cliente_pedidos(request: Request):
                 **_documentos_disponibles(d.get("estado", "")),
                 "factura": p["id"] in pedidos_con_factura,
             }
+
+            # Mismo desglose canónico que el detalle (#496) — antes esta lista
+            # no lo traía y podía mostrar 0%/$0 de descuento cuando ganaba el
+            # de jornadas (asimetría encontrada en la Fase B de #1219).
+            _enriquecer_pedido_con_total(conn, d)
 
             result.append(d)
         return result
