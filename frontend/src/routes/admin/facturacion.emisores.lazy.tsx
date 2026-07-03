@@ -364,8 +364,7 @@ function EmisorFormModal({
   });
 
   const asignarPtoVta = useMutation({
-    mutationFn: (nro: number) =>
-      facturacionApi.updateEmisor(creadoConCert!.id, { pto_vta: nro }),
+    mutationFn: (nro: number) => facturacionApi.updateEmisor(creadoConCert!.id, { pto_vta: nro }),
     onSuccess: (_data, nro) => {
       toast.success(`Punto de venta ${String(nro).padStart(5, "0")} detectado y asignado`);
       qc.invalidateQueries({ queryKey: ["admin", "emisores-arca"] });
@@ -675,8 +674,8 @@ function PuntoVentaResolver({
   if (q.isError) {
     return (
       <ErrorBanner>
-        No se pudo detectar el punto de venta automáticamente:{" "}
-        {(q.error as Error).message} — cargalo a mano.
+        No se pudo detectar el punto de venta automáticamente: {(q.error as Error).message} —
+        cargalo a mano.
       </ErrorBanner>
     );
   }
