@@ -11,7 +11,7 @@ import { QtyInput } from "@/design-system/ui/qty-input";
 import { cn } from "@/lib/utils";
 import { adminApi } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
-import { type DraftItem } from "@/components/admin/pedido/usePedidoDraft";
+import { type DraftItem, subtotalDraftItem } from "@/components/admin/pedido/usePedidoDraft";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 
 export function PagoRow({
@@ -95,12 +95,10 @@ export function ItemRow({
     id: it.uid,
   });
   const esLibre = it.equipo_id == null;
-  const fijo = (it.cobro_modo ?? "jornada") === "fijo";
   const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
   const disponible = max - it.cantidad;
   const overstock = it.cantidad > max && !!stock;
-  // Subtotal: las líneas 'fijo' no multiplican por jornadas (espeja bruto_linea del backend).
-  const subtotal = it.precio_jornada * it.cantidad * (fijo ? 1 : Math.max(1, jornadas));
+  const subtotal = subtotalDraftItem(it, jornadas);
 
   return (
     <li

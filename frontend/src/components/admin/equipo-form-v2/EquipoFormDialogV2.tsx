@@ -122,8 +122,8 @@ export function EquipoFormDialogV2({
   const isEdit = !!initial;
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const { rate: usdRate } = useUsdRate();
-  const roiDefault = useRoiPctDefault();
+  const { rate: usdRate } = useUsdRate({ staleTime: 0 });
+  const roiDefault = useRoiPctDefault({ staleTime: 0 });
 
   // "Aplicar" (guardar sin cerrar) vs "Guardar" (cerrar al terminar). El
   // botón Aplicar setea este ref a false antes de disparar el submit; en el
@@ -255,18 +255,38 @@ export function EquipoFormDialogV2({
   }, [watchedTipo, form]);
 
   // ── Manual override del precio/día ─────────────────────────────────
+  // `precioJornadaManual` arrancaba SIEMPRE en `false`, sin sembrarse del
+  // flag real `initial.precio_jornada_manual` — abrir un equipo que YA
+  // tenía el precio fijado a mano disparaba igual el auto-cálculo de acá
+  // abajo apenas `usdRate`/`roi_pct` estaban disponibles (que es casi
+  // inmediato), pisando en silencio el precio manual con el de fórmula.
+  // Confirmado en vivo: el label decía "(auto)" para un equipo marcado
+  // manual en la base.
   const [precioJornadaManual, setPrecioUnidadManual] = useState(false);
+  useEffect(() => {
+    setPrecioUnidadManual(initial?.precio_jornada_manual ?? false);
+  }, [initial?.id, initial?.precio_jornada_manual]);
   const watchedUsd = form.watch("precio_usd");
   const watchedRoi = form.watch("roi_pct");
   useEffect(() => {
     if (precioJornadaManual) return;
+    // Chequeo directo a `initial.precio_jornada_manual` (no solo al estado
+    // derivado `precioJornadaManual`): cuando `initial` llega async, el
+    // efecto que lo siembra y este pueden correr en el MISMO commit — un
+    // `setPrecioUnidadManual(true)` recién encolado en el otro efecto no se
+    // refleja todavía en la clausura de ESTE efecto en el mismo pase (React
+    // no re-lee estado recién encolado entre efectos del mismo commit).
+    // Sin este chequeo, un equipo con precio manual en la base igual se
+    // pisaba apenas abría el form — confirmado en vivo (mismo patrón de
+    // carrera que el override de nombre público, más arriba).
+    if (initial?.precio_jornada_manual) return;
     const calc = calcularPrecioJornada(
       watchedUsd ? Number(watchedUsd) : null,
       usdRate,
       watchedRoi ? Number(watchedRoi) : null,
     );
     if (calc !== null) form.setValue("precio_jornada", calc, { shouldDirty: true });
-  }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form]);
+  }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form, initial?.precio_jornada_manual]);
 
   // ── Cargar ficha cuando estamos editando ──────────────────────────
   // Ficha legacy = solo descripción, notas, nombre público template y
@@ -332,7 +352,7 @@ export function EquipoFormDialogV2({
     enabled: !!initial?.id && open,
   });
   useEffect(() => {
-    if (!initial) {
+    if (!initial?.id) {
       setSpecs([]);
       return;
     }
@@ -340,17 +360,37 @@ export function EquipoFormDialogV2({
     if (!data) return;
     // Mapear { spec_def_id → value } a Spec[]. El id de cada Spec es
     // `spec-${spec_def_id}` para poder mapear de vuelta al guardar
-    // (putEquipoSpecs). El label se resuelve contra el template EN VIVO de la
-    // categoría seleccionada en el efecto de re-etiquetado de abajo; acá
-    // arrancamos con un fallback hasta que el template cargue.
+    // (putEquipoSpecs). El label sale de `data.template` — el MISMO response
+    // ya trae el template resuelto (WITH RECURSIVE por categorías del
+    // equipo), así que no hace falta esperar a la query/efecto de
+    // re-etiquetado de abajo (ese sigue existiendo para cuando el admin
+    // cambia la categoría de specs EN VIVO dentro del form — acá cubrimos
+    // el arranque). Antes sembraba con un fallback numérico ("spec 45")
+    // hasta que el re-etiquetado corría; en esa ventana cualquier
+    // consumidor que matchea specs por label (el preview de nombre público
+    // auto-generado, ej.) no encontraba el spec y el placeholder quedaba
+    // vacío — confirmado en vivo.
+    const labelById = new Map(data.template.map((t) => [t.spec_def_id, t.label]));
     const next: Spec[] = [];
     for (const [defIdStr, value] of Object.entries(data.specs)) {
       const v = value == null ? "" : String(value);
       if (!v.trim()) continue;
-      next.push({ id: `spec-${defIdStr}`, label: `spec ${defIdStr}`, value: v });
+      const label = labelById.get(Number(defIdStr)) ?? `spec ${defIdStr}`;
+      next.push({ id: `spec-${defIdStr}`, label, value: v });
     }
     setSpecs(next);
-  }, [equipoSpecsQ.data, initial]);
+    // `initial?.id` (no `initial` entero) a propósito: Aplicar/Guardar
+    // invalida `["admin","equipo",id]` (route padre), que refetchea el
+    // equipo y le da a `initial` una referencia NUEVA — con `initial`
+    // completo en deps este efecto volvía a correr sobre el MISMO
+    // `equipoSpecsQ.data` (nadie invalida `["admin","equipo-specs",id]`
+    // en el save) y pisaba specs recién guardadas con la foto vieja
+    // pre-edición: tipear algo en Ficha técnica + Aplicar/Guardar
+    // revertía el campo a lo que tenía antes de tipear, aunque el POST
+    // ya había persistido el valor nuevo (confirmado en vivo + DB). Solo
+    // re-sembrar cuando cambia el EQUIPO (o entre vacío↔con-equipo), no
+    // en cada refetch incidental de otros campos del mismo equipo.
+  }, [equipoSpecsQ.data, initial?.id]);
 
   // ── Categorías ─────────────────────────────────────────────────────
   const catsQ = useQuery({
@@ -833,6 +873,12 @@ export function EquipoFormDialogV2({
         foto_url: fotoUrlInicial,
         fecha_compra: rest.fecha_compra || null,
         precio_jornada: rest.precio_jornada ?? null,
+        // Explícito para saltear la heurística de inferencia del backend
+        // (que asume "manual" si llega precio_jornada SIN roi_pct) — este
+        // form manda roi_pct SIEMPRE junto con precio_jornada, así que esa
+        // heurística sola nunca detectaría un precio recién tipeado a mano
+        // acá; el toggle local YA sabe la verdad, se la pasamos directo.
+        precio_jornada_manual: precioJornadaManual,
         precio_usd: rest.precio_usd ?? null,
         roi_pct: rest.roi_pct ?? null,
         valor_reposicion: rest.valor_reposicion ?? null,
@@ -967,6 +1013,17 @@ export function EquipoFormDialogV2({
         return;
       }
 
+      // Invalidar las queries PÚBLICAS (catálogo + ficha de equipo) — el save
+      // arriba ya invalida lo admin (vía saveMut.onSettled del route padre),
+      // pero nombre público/specs/categorías se escriben acá con llamadas
+      // directas que ese onSettled no cubre. Sin esto, el catálogo público
+      // sigue mostrando el dato viejo hasta que su staleTime (30-60s) vence
+      // solo — "tarda en reproducirse" no era timing raro, era que nadie le
+      // avisaba. Prefix-match: no hace falta el slug/rango de fechas exacto.
+      void qc.invalidateQueries({ queryKey: ["equipos"] });
+      void qc.invalidateQueries({ queryKey: ["equipo"] });
+      void qc.invalidateQueries({ queryKey: ["categorias"] });
+
       if (fallidos.length > 0) {
         toast.warning(isEdit ? "Equipo actualizado con avisos" : "Equipo creado con avisos", {
           description: `Falló: ${fallidos.join(" · ")}`,
@@ -1063,7 +1120,19 @@ export function EquipoFormDialogV2({
   // ════════════════════════════════════════════════════════════════════
   // Render
   // ════════════════════════════════════════════════════════════════════
-  const fotoActual = pendingFilePreview || form.watch("foto_url");
+  // `form.watch("foto_url")` es el valor SEMBRADO UNA VEZ al montar
+  // (react-hook-form `defaultValues`, no reactivo). En EDIT mode, subir una
+  // foto nueva o cambiar cuál es la principal en la galería actualiza
+  // `gallery.fotos` (React Query, correctamente sincronizado con el backend)
+  // pero nunca toca ese valor sembrado — la miniatura de la galería se veía
+  // bien, pero el preview grande del costado seguía mostrando la foto vieja
+  // hasta cerrar y reabrir el form. La galería es la fuente viva; `foto_url`
+  // del form queda de fallback para CREATE mode (ahí `gallery.fotos` está
+  // siempre vacío — la query es `enabled: !!initial?.id`, y en create no hay
+  // id todavía) y para el raro caso de un equipo en EDIT sin fotos en la
+  // galería.
+  const fotoGaleriaActual = gallery.fotos.find((f) => f.es_principal)?.url;
+  const fotoActual = pendingFilePreview || fotoGaleriaActual || form.watch("foto_url");
 
   // ── Confirmación al cerrar con cambios sin guardar (#232) ──────────
   // Detectamos cambios desde 4 fuentes: form fields (react-hook-form),
@@ -1317,7 +1386,13 @@ export function EquipoFormDialogV2({
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {photoCands.map((u) => {
                 const isPicking = pickingPhotoUrl === u;
-                const isSelected = form.watch("foto_url") === u;
+                // `fotoActual` (no `form.watch("foto_url")` crudo): en EDIT
+                // mode, elegir un candidato sube directo a la galería sin
+                // tocar el campo del form (mismo bug ya arreglado en el
+                // preview grande del costado) — comparar contra el mismo
+                // valor derivado mantiene el aro de "seleccionada" correcto
+                // en los dos modos.
+                const isSelected = fotoActual === u;
                 return (
                   <button
                     key={u}

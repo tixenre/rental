@@ -27,7 +27,7 @@ export function HorariosSection() {
     queryKey: ["settings", "horarios_retiro"],
     queryFn: () => adminApi.getSetting("horarios_retiro"),
     retry: false,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   // Inicializa el estado desde el setting (o defaults: L-V abierto, finde

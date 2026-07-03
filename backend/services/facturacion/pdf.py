@@ -197,7 +197,22 @@ def factura_filename(factura, *, layout: str = "clasica") -> str:
 def _conceptos(pedido: dict, factura) -> list[dict]:
     """Ítems del comprobante ← `pedido.items`. Si no hay líneas (pedidos
     viejos o ítems personalizados sin persistir), cae a una sola línea con
-    el neto total de la factura — nunca inventa un desglose que no existe."""
+    el neto total de la factura — nunca inventa un desglose que no existe.
+
+    Cuando hay descuento (el caso común: cualquier alquiler de varios días
+    tiene descuento automático por jornadas), el `% Bonif.` de la grilla
+    AFIP/ARCA deja de estar hardcodeado en 0 y el `Subtotal`/`Importe` de
+    cada línea pasa a ser el NETO de esa línea (post-bonificación) — así la
+    suma de las líneas cierra EXACTO con `factura.imp_neto` (el mismo criterio
+    bruto→descuento→neto que ya usa el Presupuesto,
+    `pdf_templates._pedido_html`). El total a repartir sale de comparar el
+    bruto de las líneas contra `factura.imp_neto` (el neto YA DECLARADO/
+    congelado en la factura) — no del pedido en vivo — para que el desglose
+    cierre también en una Nota de Crédito, cuyos importes vienen frozen del
+    comprobante original y pueden no coincidir con el pedido si cambió después.
+    El reparto es proporcional al bruto de cada línea, con el remanente de
+    redondeo absorbido en la ÚLTIMA línea para que la suma sea exacta, no una
+    aproximación."""
     items = pedido.get("items") or []
     if not items:
         desc = (
@@ -212,22 +227,37 @@ def _conceptos(pedido: dict, factura) -> list[dict]:
         }]
 
     jornadas = pedido.get("cantidad_jornadas") or 1
+    bruto_total = sum(int(it.get("subtotal") or 0) for it in items)
+    descuento_total = max(0, bruto_total - int(factura.imp_neto or 0))
+
     out = []
+    bonif_acumulado = 0
     for i, it in enumerate(items):
         cobro_fijo = (it.get("cobro_modo") or "jornada") == "fijo"
         detalle = "Cargo único" if cobro_fijo else f"{jornadas} jornada{'s' if jornadas != 1 else ''}"
-        subtotal = it.get("subtotal") or 0
+        subtotal_bruto = it.get("subtotal") or 0
         cantidad = it.get("cantidad") or 1
+
+        bonif_linea = 0
+        if descuento_total > 0 and bruto_total > 0:
+            if i == len(items) - 1:
+                bonif_linea = descuento_total - bonif_acumulado
+            else:
+                bonif_linea = int(round(subtotal_bruto * descuento_total / bruto_total))
+                bonif_acumulado += bonif_linea
+        bonif_pct = round(bonif_linea / subtotal_bruto * 100, 2) if subtotal_bruto else 0.0
+        subtotal_neto = subtotal_bruto - bonif_linea
+
         out.append({
             "codigo": f"{i + 1:03d}",
             "desc": it.get("nombre") or it.get("nombre_libre") or "Ítem",
             "detalle": detalle,
             "cant": _plain(cantidad),
             "uMedida": "unidad",
-            "bonif": "0,00",
+            "bonif": _plain(bonif_pct),
             "precioUnitFmt": _plain(it.get("precio_jornada") or 0),
-            "subtotalFmt": _plain(subtotal),
-            "importeStr": _money(subtotal),
+            "subtotalFmt": _plain(subtotal_neto),
+            "importeStr": _money(subtotal_neto),
         })
     return out
 

@@ -99,7 +99,7 @@ export function CalendarioWidget({
   const calQ = useQuery({
     queryKey: ["admin", "calendario", rangeStart, rangeEnd],
     queryFn: () => adminApi.getCalendario(rangeStart, rangeEnd),
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   const byDay = useMemo(() => {

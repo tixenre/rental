@@ -37,7 +37,9 @@ export function EquipoSearchSheet({
   const categoriasQ = useQuery({
     queryKey: ["categorias"],
     queryFn: () => adminApi.listCategorias(),
-    staleTime: 60_000,
+    // Comparte cache con el catálogo público (mismo key) — override a 0 acá
+    // porque este sheet es admin-only, sin tocar el staleTime del público.
+    staleTime: 0,
   });
 
   const lista = useMemo(() => {

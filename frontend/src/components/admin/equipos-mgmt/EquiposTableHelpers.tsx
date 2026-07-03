@@ -71,7 +71,7 @@ export function StockInline({ equipo, onSaved }: { equipo: Equipo; onSaved: () =
  * No commitea hasta blur o Enter (evita una request por cada keystroke).
  */
 export function RoiInline({ equipo, onSaved }: { equipo: Equipo; onSaved: () => void }) {
-  const { rate: usdRate } = useUsdRate();
+  const { rate: usdRate } = useUsdRate({ staleTime: 0 });
   const [value, setValue] = useState<string>(equipo.roi_pct != null ? String(equipo.roi_pct) : "");
   const initialRef = useRef(equipo.roi_pct);
 
@@ -169,7 +169,7 @@ export function RoiInline({ equipo, onSaved }: { equipo: Equipo; onSaved: () => 
  * guarda solo el precio.
  */
 export function PrecioJornadaInline({ equipo, onSaved }: { equipo: Equipo; onSaved: () => void }) {
-  const { rate: usdRate } = useUsdRate();
+  const { rate: usdRate } = useUsdRate({ staleTime: 0 });
   const [value, setValue] = useState<string>(
     equipo.precio_jornada != null ? String(equipo.precio_jornada) : "",
   );

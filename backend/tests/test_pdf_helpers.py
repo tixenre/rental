@@ -140,6 +140,39 @@ class TestParseValor:
         assert _parse_valor(1500.6) == 1501
 
 
+class TestBrutoItemPdf:
+    """`_bruto_item_pdf` — bruto de un ítem en el presupuesto/PDF, cobro_modo-aware
+    (auditoría cruzada de plata, 2026-07-02). Antes `_pedido_html`/`_sum_bruto`
+    multiplicaban siempre por jornadas, ignorando una línea 'fijo' (#805)."""
+
+    def test_linea_jornada_multiplica_por_jornadas(self):
+        from pdf_templates import _bruto_item_pdf
+
+        it = {"precio_jornada": 1000, "cantidad": 2, "cobro_modo": "jornada"}
+        assert _bruto_item_pdf(it, 3) == 1000 * 2 * 3
+
+    def test_linea_fija_no_multiplica_por_jornadas(self):
+        from pdf_templates import _bruto_item_pdf
+
+        it = {"precio_jornada": 20000, "cantidad": 1, "cobro_modo": "fijo"}
+        assert _bruto_item_pdf(it, 3) == 20000
+
+    def test_sin_cobro_modo_default_jornada(self):
+        from pdf_templates import _bruto_item_pdf
+
+        it = {"precio_jornada": 1000, "cantidad": 1}
+        assert _bruto_item_pdf(it, 3) == 1000 * 3
+
+    def test_sum_bruto_respeta_lineas_fijas(self):
+        from pdf_templates import _sum_bruto
+
+        items = [
+            {"precio_jornada": 1000, "cantidad": 1, "cobro_modo": "jornada"},
+            {"precio_jornada": 20000, "cantidad": 1, "cobro_modo": "fijo"},
+        ]
+        assert _sum_bruto(items, 3) == (1000 * 3) + 20000
+
+
 class TestAbsImageUrl:
     """Resolver foto_url a URL absoluta para que Playwright pueda cargarla."""
 

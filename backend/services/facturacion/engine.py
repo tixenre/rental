@@ -68,10 +68,10 @@ def _get_pedido(conn, pedido_id: int) -> dict:
     from database import row_to_dict
     from routes.alquileres import (
         _enriquecer_pedido_con_cliente_fiscal,
-        _enriquecer_pedido_con_total,
         _enriquecer_pedido_con_cliente,
         _batch_get_alquiler_items,
     )
+    from services.finanzas_flujo.pedido import desglose_de_pedido
 
     row = conn.execute(
         "SELECT * FROM alquileres WHERE id = %s",
@@ -81,11 +81,14 @@ def _get_pedido(conn, pedido_id: int) -> dict:
         raise ValueError(f"Pedido {pedido_id} no encontrado")
     pedido = row_to_dict(row)
 
-    # Cargar items (necesarios para _enriquecer_pedido_con_total)
+    # Cargar items (necesarios para desglose_de_pedido)
     items_map = _batch_get_alquiler_items(conn, [pedido_id])
     pedido["items"] = items_map.get(pedido_id, [])
 
-    _enriquecer_pedido_con_total(conn, pedido)
+    # El desglose de plata (bruto/neto/IVA, cobro_modo-aware) pasa por la
+    # fachada de finanzas_flujo, no por routes.alquileres — un service no
+    # debería importar de un route (auditoría cruzada de plata, 2026-07-02).
+    desglose_de_pedido(conn, pedido)
     _enriquecer_pedido_con_cliente_fiscal(conn, pedido)
     _enriquecer_pedido_con_cliente(conn, pedido)
     return pedido

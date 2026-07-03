@@ -82,7 +82,7 @@ export function EquiposPanel({
   const equiposQ = useQuery({
     queryKey: ["admin", "equipos-en-categoria", categoriaId],
     queryFn: () => adminApi.listEquipos({ categoria: categoriaNombre, per_page: 500 }),
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   // El backend usa CTE recursivo: trae equipos de la categoría Y de

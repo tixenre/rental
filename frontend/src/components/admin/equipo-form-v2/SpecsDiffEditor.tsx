@@ -49,7 +49,7 @@ import {
 } from "@/design-system/ui/select";
 import type { SpecTemplate } from "@/lib/admin/api";
 
-import { type Spec, sameLabel, extractNumericPart } from "./spec-helpers";
+import { type Spec, extractNumericPart } from "./spec-helpers";
 import { TablaValueInput } from "./TablaValueInput";
 
 const lower = (s: string) => s.trim().toLowerCase();
@@ -163,8 +163,12 @@ export function SpecsDiffEditor({
     // Reconstruir el array global preservando los template-bound en su lugar
     // (el lookup por label en render no depende del orden del array, pero
     // mantenemos un array consistente: primero los template-bound en orden
-    // del template, después los custom reordenados).
-    const next = [...templateBound.map((x) => x.spec), ...reorderedCustom];
+    // del template, después los custom reordenados). Filtra los ghosts
+    // (specs del template todavía sin valor, `spec.value === ""`) — mismo
+    // filtro que `templateBoundIds` ya aplica arriba; sin él, reordenar
+    // CUALQUIER spec custom materializaba de golpe todos los placeholders
+    // vacíos del template como si el admin los hubiera tocado.
+    const next = [...templateBound.filter((x) => !x.ghost).map((x) => x.spec), ...reorderedCustom];
     onChange(next);
   };
 

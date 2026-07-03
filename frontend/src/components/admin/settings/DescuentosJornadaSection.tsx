@@ -19,7 +19,7 @@ export function DescuentosJornadaSection() {
   const { data: puntos = [], isLoading } = useQuery({
     queryKey: ["descuentos-jornada"],
     queryFn: descuentosJornadaApi.list,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
 
   const crear = useMutation({

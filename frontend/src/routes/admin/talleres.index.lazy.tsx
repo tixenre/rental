@@ -1158,7 +1158,7 @@ function EdicionSubRow({
     queryKey: ["admin", "ediciones", edicion.id, "inscripciones"],
     queryFn: () => authedJson<Inscripcion[]>(`/api/admin/ediciones/${edicion.id}/inscripciones`),
     enabled: expanded && activeTab === "inscripciones",
-    staleTime: 1000 * 30,
+    staleTime: 0,
   });
 
   const toggleActivoMut = useMutation({
@@ -1835,7 +1835,7 @@ function TalleresAdminPage() {
   } = useQuery({
     queryKey: ["admin", "talleres"],
     queryFn: () => authedJson<TallerConcepto[]>("/api/admin/talleres"),
-    staleTime: 1000 * 60,
+    staleTime: 0,
   });
 
   function handleNuevoConceptoSuccess(created: TallerConcepto) {

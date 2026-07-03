@@ -95,12 +95,12 @@ export function EmailsAdmin() {
   const listQ = useQuery({
     queryKey: ["admin", "email-templates"],
     queryFn: () => adminApi.listEmailTemplates(),
-    staleTime: 30_000,
+    staleTime: 0,
   });
   const statusQ = useQuery({
     queryKey: ["admin", "email-status"],
     queryFn: () => adminApi.getEmailStatus(),
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   const items = listQ.data?.items ?? [];
@@ -218,7 +218,7 @@ function RecordatorioControls() {
   const q = useQuery({
     queryKey: ["admin", "settings", "recordatorios"],
     queryFn: () => adminApi.listSettings(),
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   const map = useMemo(() => {

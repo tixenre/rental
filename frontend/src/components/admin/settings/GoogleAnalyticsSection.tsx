@@ -17,7 +17,7 @@ export function GoogleAnalyticsSection() {
   const settingQ = useQuery({
     queryKey: ["settings", "ga4_measurement_id"],
     queryFn: () => adminApi.getSetting("ga4_measurement_id"),
-    staleTime: 60_000,
+    staleTime: 0,
     retry: false,
   });
 

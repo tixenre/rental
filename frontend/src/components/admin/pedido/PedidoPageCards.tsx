@@ -37,7 +37,12 @@ import {
 import { cn } from "@/lib/utils";
 
 import { adminApi, pedidoPdfUrl, type PedidoHistorialItem } from "@/lib/admin/api";
-import { type DraftItem, type DraftDatos, type PedidoMode } from "./usePedidoDraft";
+import {
+  type DraftItem,
+  type DraftDatos,
+  type PedidoMode,
+  subtotalDraftItem,
+} from "./usePedidoDraft";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
 import { EquipoSearchSheet } from "./EquipoSearchSheet";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "./EnviarDocsDialog";
@@ -110,7 +115,7 @@ export function ItemsCard({
           const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
           const disponible = max - it.cantidad;
           const overstock = it.cantidad > max;
-          const subtotal = it.precio_jornada * it.cantidad * jornadas;
+          const subtotal = subtotalDraftItem(it, jornadas);
 
           return (
             <li key={`${it.equipo_id}-${idx}`} className="px-4 py-3 space-y-2.5">

@@ -50,6 +50,15 @@ const queryClient = new QueryClient({
   },
 });
 
+// Back-office sin cache de frescura: pocos admins, prioridad total a ver el
+// dato recién guardado sobre ahorrar un fetch (el público SÍ se beneficia de
+// cachear, así que su staleTime de 30-60s queda intacto — ver hooks
+// compartidos en useEquipos.ts/useSettings.ts, que exponen un override
+// explícito para sus call-sites admin en vez de tocar el default público).
+// setQueryDefaults matchea por PREFIJO — cubre toda query cuya key empiece
+// con "admin" (la convención ya usada en absolutamente todo el back-office).
+queryClient.setQueryDefaults(["admin"], { staleTime: 0 });
+
 // Hydrate React Query desde el catálogo inlineado por el backend en /rental.
 // El handler Python inyecta <script id="__INITIAL__" type="application/json">
 // con {equipos, categorias} → primer render sin round-trip a Miami.

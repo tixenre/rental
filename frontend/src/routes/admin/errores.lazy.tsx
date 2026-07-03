@@ -76,7 +76,7 @@ function ErroresPage() {
     queryKey: ["admin", "server-errors"],
     queryFn: () => adminApi.listServerErrors(),
     refetchInterval: 5 * 60_000,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   const { data, refetch, dataUpdatedAt } = query;

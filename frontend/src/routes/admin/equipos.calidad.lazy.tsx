@@ -36,7 +36,7 @@ function CalidadPage() {
   const calidadQ = useQuery({
     queryKey: ["admin", "inventario", "calidad"],
     queryFn: () => adminApi.getCalidadInventario(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   return (
@@ -63,7 +63,7 @@ function SugerenciasSection() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin", "inventario", "sugerencias"],
     queryFn: () => adminApi.getSugerenciasInventario(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
   const [busy, setBusy] = useState<string | null>(null);
 

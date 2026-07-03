@@ -34,7 +34,7 @@ export function CambioYPreciosSection() {
   const settingQ = useQuery({
     queryKey: ["settings", "usd_rate"],
     queryFn: () => adminApi.getSetting("usd_rate"),
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   // Cargar el valor actual cuando llega de la red.
@@ -245,7 +245,7 @@ function PreciosManualesPanel({ onRecalcSelected }: { onRecalcSelected: (ids: nu
   const manualesQ = useQuery({
     queryKey: ["admin", "precios-manuales"],
     queryFn: () => adminApi.listarPreciosManuales(),
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   const items = manualesQ.data?.items ?? [];
