@@ -1371,6 +1371,21 @@ def _init_db_schema(conn):
     # lado. Default 'pct' + monto=0 → comportamiento IDÉNTICO a antes de C-2.
     conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_tipo VARCHAR(10) DEFAULT 'pct'")
     conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_monto INTEGER DEFAULT 0")
+    # descuento_pct NUMERIC(5,2) → NUMERIC(7,4): el toggle %/$ del builder
+    # convierte el override manual al equivalente de la otra unidad — con solo
+    # 2 decimales, la ida y vuelta %→$→% perdía unos pesos en el redondeo
+    # intermedio (#1219). Idempotente (no-op si ya está migrado); también en
+    # migración w1x2y3z4a5b6.
+    conn.execute("""
+        DO $$
+        BEGIN
+            IF (SELECT numeric_scale FROM information_schema.columns
+                WHERE table_name = 'alquileres' AND column_name = 'descuento_pct') = 2 THEN
+                ALTER TABLE alquileres ALTER COLUMN descuento_pct TYPE NUMERIC(7,4)
+                    USING descuento_pct::NUMERIC(7,4);
+            END IF;
+        END $$;
+    """)
 
     # email infra (migración a4e8c2b9d710)
     conn.execute("""

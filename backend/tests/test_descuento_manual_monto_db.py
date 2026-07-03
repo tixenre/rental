@@ -199,7 +199,10 @@ def test_confirmado_con_override_monto_queda_congelado(setup):
 
     assert row["monto_total"] == 2200  # 3000 − 800, sin cambios
     assert ped["monto_neto"] == 2200  # desglose de display tampoco se movió
-    assert ped["descuento_efectivo_pct"] == round(800 / 3000 * 100, 2)
+    # 4 decimales (no 2): el toggle %/$ del builder convierte el override al
+    # equivalente de la otra unidad — con 2 decimales la ida y vuelta $→%→$
+    # perdía pesos en el redondeo intermedio (#1219).
+    assert ped["descuento_efectivo_pct"] == round(800 / 3000 * 100, 4)
     assert ped["descuento_origen"] == "manual"
 
 

@@ -329,7 +329,7 @@ export function TotalesCard({
               {descuentoManualTipo === "monto" ? (
                 <DraftNumberInput
                   min={0}
-                  step="1"
+                  step="100"
                   value={descuentoManualMonto}
                   onCommit={setDescuentoManualMonto}
                   ariaLabel="Descuento $ manual"
@@ -339,7 +339,7 @@ export function TotalesCard({
                 <DraftNumberInput
                   min={0}
                   max={100}
-                  step="0.5"
+                  step="0.1"
                   value={descuentoPct}
                   onCommit={setDescuentoPct}
                   ariaLabel="Descuento % manual"

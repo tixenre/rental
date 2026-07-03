@@ -185,6 +185,18 @@ class TestResolverDescuentoMontoPedido:
         r = resolver_descuento_monto_pedido(10_000, "pct", 0, 0, 0, 0)
         assert r == {"monto": 0, "pct": 0.0}
 
+    def test_round_trip_monto_a_pct_y_vuelta_no_pierde_pesos(self):
+        """El toggle %/$ del builder convierte al equivalente de la otra
+        unidad — con 4 decimales (no 2) la ida y vuelta $→%→$ tiene que
+        preservar el monto original (o quedar a lo sumo a 1 peso, nunca los
+        ~$2 que perdía con 2 decimales). Caso real reportado por el dueño:
+        $50.000 sobre un bruto de $791.100."""
+        bruto = 791_100
+        ida = resolver_descuento_monto_pedido(bruto, "monto", 0, 50_000, 0, 0)
+        assert ida["monto"] == 50_000
+        vuelta = resolver_descuento_monto_pedido(bruto, "pct", ida["pct"], 0, 0, 0)
+        assert abs(vuelta["monto"] - 50_000) <= 1
+
 
 class TestResolverOrigenPedidoMonto:
     def test_tipo_monto_gana_el_origen(self):

@@ -748,6 +748,7 @@ function PedidoEditorPage() {
                   <Input
                     type="number"
                     min={0}
+                    step={100}
                     value={datos.descuento_manual_monto}
                     className="max-w-[140px]"
                     onChange={(e) =>
@@ -766,6 +767,7 @@ function PedidoEditorPage() {
                       type="number"
                       min={0}
                       max={100}
+                      step={0.1}
                       value={datos.descuento_pct}
                       className="pr-7"
                       onChange={(e) =>

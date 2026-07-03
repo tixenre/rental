@@ -110,7 +110,12 @@ def resolver_descuento_monto_pedido(
         monto_manual = max(0.0, float(manual_monto or 0))
         if monto_manual:
             monto = min(bruto_i, int(round(monto_manual)))
-            pct_efectivo = round(monto / bruto_i * 100, 2) if bruto_i else 0.0
+            # 4 decimales (no 2): el toggle %/$ del builder convierte el
+            # override al equivalente de la otra unidad usando este `pct` —
+            # con solo 2 decimales, la ida y vuelta %→$→% perdía unos pesos
+            # en el redondeo intermedio (ej. $50.000 → "6.32%" → $49.998).
+            # Con 4, el redondeo intermedio pierde centavos, no pesos.
+            pct_efectivo = round(monto / bruto_i * 100, 4) if bruto_i else 0.0
             return {"monto": monto, "pct": pct_efectivo}
     pct = resolver_descuento_pedido(manual_pct, cliente_pct, jornadas_pct)
     return {"monto": int(round(bruto_i * pct / 100)), "pct": pct}
