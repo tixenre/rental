@@ -562,7 +562,9 @@ def _pedido_html(pedido):
     neto = int(pedido["monto_neto"] if pedido.get("monto_neto") is not None
                else (pedido.get("monto_total") or _sum_bruto(items, j)))
     bruto = int(pedido.get("bruto") or _sum_bruto(items, j) or neto)
-    desc_pct = float(pedido.get("descuento_pct") or 0)
+    # `descuento_efectivo_pct` (el % GANADOR) — no el `descuento_pct` crudo, que
+    # desde la Fase C-1 (#1219) es solo el override manual del pedido.
+    desc_pct = float(pedido.get("descuento_efectivo_pct") or 0)
     desc = int(pedido["descuento_monto"] if pedido.get("descuento_monto") is not None
                else max(0, bruto - neto))
     if pedido.get("monto_neto") is None and desc:

@@ -45,6 +45,8 @@ import {
   subtotalDraftItem,
 } from "./usePedidoDraft";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
+import { descuentoLabel, type DescuentoOrigen } from "@/lib/cotizacion";
+import { SegmentedControl } from "@/design-system/ui/segmented-control";
 import { EquipoSearchSheet } from "./EquipoSearchSheet";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "./EnviarDocsDialog";
 
@@ -258,6 +260,13 @@ export function TotalesCard({
   jornadas,
   descuentoPct,
   setDescuentoPct,
+  descuentoManualTipo,
+  setDescuentoManualTipo,
+  descuentoManualMonto,
+  setDescuentoManualMonto,
+  descuentoEfectivoPct,
+  descuentoOrigen,
+  nombreCliente,
   pagado,
   saldo,
   mode = "admin",
@@ -269,13 +278,27 @@ export function TotalesCard({
   ivaPct: number;
   ivaMonto: number;
   jornadas: number;
+  /** Override MANUAL crudo (`alquileres.descuento_pct`, 0 = sin override) —
+   * solo para el input editable del admin. Para MOSTRAR usar
+   * `descuentoEfectivoPct`/`descuentoOrigen` (el que ganó de verdad). */
   descuentoPct: number;
   setDescuentoPct: (v: number) => void;
+  /** Fase C-2 (#1219): tipo del override manual — "pct" (usa `descuentoPct`)
+   * o "monto" (usa `descuentoManualMonto`, $ fijo). Mismo campo, un selector. */
+  descuentoManualTipo: "pct" | "monto";
+  setDescuentoManualTipo: (v: "pct" | "monto") => void;
+  descuentoManualMonto: number;
+  setDescuentoManualMonto: (v: number) => void;
+  /** % ganador real (jerarquía manual > cliente > jornadas, `/api/cotizar`). */
+  descuentoEfectivoPct: number;
+  descuentoOrigen: DescuentoOrigen;
+  nombreCliente?: string | null;
   pagado: number;
   saldo: number;
   mode?: PedidoMode;
 }) {
   const isCliente = mode === "cliente";
+  const labelDescuento = descuentoLabel(descuentoOrigen, jornadas, nombreCliente);
   return (
     <section className="rounded-lg border hairline bg-background overflow-hidden">
       <div className="px-4 py-3 space-y-2.5 text-sm">
@@ -284,29 +307,53 @@ export function TotalesCard({
           <span className="tabular-nums">{fmtArs(bruto)}</span>
         </div>
         {isCliente ? (
-          descuentoPct > 0 && (
+          descuentoEfectivoPct > 0 && (
             <div className="flex items-center justify-between gap-3 text-muted-foreground">
-              <span>Descuento {descuentoPct}%</span>
+              <span>{labelDescuento || `Descuento ${descuentoEfectivoPct}%`}</span>
               <span className="tabular-nums">−{fmtArs(bruto - totalNeto)}</span>
             </div>
           )
         ) : (
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Descuento %</span>
-            <DraftNumberInput
-              min={0}
-              max={100}
-              step="0.5"
-              value={descuentoPct}
-              onCommit={setDescuentoPct}
-              ariaLabel="Descuento %"
-              className="h-7 w-20 text-right text-sm"
-            />
+            <span className="text-muted-foreground">Descuento manual (0 = automático)</span>
+            <div className="flex items-center gap-1.5">
+              <SegmentedControl
+                value={descuentoManualTipo}
+                onChange={(v) => setDescuentoManualTipo(v as "pct" | "monto")}
+                options={[
+                  { value: "pct", label: "%" },
+                  { value: "monto", label: "$" },
+                ]}
+                className="w-16 shrink-0"
+              />
+              {descuentoManualTipo === "monto" ? (
+                <DraftNumberInput
+                  min={0}
+                  step="1"
+                  value={descuentoManualMonto}
+                  onCommit={setDescuentoManualMonto}
+                  ariaLabel="Descuento $ manual"
+                  className="h-7 w-24 text-right text-sm"
+                />
+              ) : (
+                <DraftNumberInput
+                  min={0}
+                  max={100}
+                  step="0.5"
+                  value={descuentoPct}
+                  onCommit={setDescuentoPct}
+                  ariaLabel="Descuento % manual"
+                  className="h-7 w-20 text-right text-sm"
+                />
+              )}
+            </div>
           </div>
         )}
-        {!isCliente && descuentoPct > 0 && (
+        {/* Fila de MONTO del descuento efectivo — no del override crudo (que
+            puede estar en 0 mientras igual gana cliente/jornadas). */}
+        {!isCliente && descuentoEfectivoPct > 0 && (
           <div className="flex justify-between text-muted-foreground">
-            <span>−{descuentoPct}%</span>
+            <span>{labelDescuento || `−${descuentoEfectivoPct}%`}</span>
             <span className="tabular-nums">−{fmtArs(bruto - totalNeto)}</span>
           </div>
         )}

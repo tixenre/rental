@@ -1348,7 +1348,29 @@ def _init_db_schema(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_jornadas_pct FLOAT DEFAULT 0")
+    # NUMERIC(5,2), no FLOAT — mismo tipo que la migración g1a2b3c4d5e6 le dio a las
+    # otras 3 columnas de descuento (drift detectado en la Fase B de #1219: un bootstrap
+    # 100% vía init_db(), sin Alembic, quedaba con esta columna en un tipo distinto).
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_jornadas_pct NUMERIC(5,2) DEFAULT 0")
+    # Snapshot del descuento del CLIENTE al momento del último recálculo (Fase
+    # C-1, #1219) — mismo patrón que descuento_jornadas_pct de arriba: sin esto,
+    # `desglose_de_pedido` tendría que leer `clientes.descuento` EN VIVO para
+    # mostrar el desglose de un pedido ya confirmado, y si el cliente cambia su
+    # descuento después de confirmar, el desglose (bruto/neto mostrados)
+    # divergiría de `monto_total` ya persistido — la clase de bug "dos cálculos
+    # del mismo número" (#405). `alquileres.descuento_pct` es el override MANUAL
+    # (0 = sin override); esta columna es la contribución del cliente, congelada
+    # igual que jornadas — se refresca en cada recálculo real (edición del admin,
+    # o el presupuesto siguiendo al cliente en vivo).
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_cliente_pct NUMERIC(5,2) DEFAULT 0")
+    # Override manual en % o en $ fijo (Fase C-2, #1219): `descuento_manual_tipo`
+    # decide cómo se interpreta el override de ESTE pedido — 'pct' (de siempre,
+    # usa `descuento_pct`) o 'monto' (usa `descuento_manual_monto`, pesos fijos,
+    # capeado a `bruto` en `descuentos.queries.decision.resolver_descuento_monto_pedido`
+    # para que el neto nunca sea negativo). Mismo campo de la UI, un selector al
+    # lado. Default 'pct' + monto=0 → comportamiento IDÉNTICO a antes de C-2.
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_tipo VARCHAR(10) DEFAULT 'pct'")
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_monto INTEGER DEFAULT 0")
 
     # email infra (migración a4e8c2b9d710)
     conn.execute("""

@@ -277,6 +277,8 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
     fechaHasta: draft.datos?.fecha_hasta || null,
     clienteId: pedido?.cliente_id ?? null,
     descuentoPct: draft.datos?.descuento_pct ?? null,
+    descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
+    descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
   });
 
   if (pedidoQ.isLoading) {
@@ -515,10 +517,12 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
                           cliente_nombre: nombreCliente(c),
                           cliente_email: c.email ?? "",
                           cliente_telefono: c.telefono ?? "",
-                          // El descuento sigue al cliente: si el nuevo no tiene
-                          // uno propio, se resetea a 0 (antes quedaba pegado el
-                          // del cliente anterior).
-                          descuento_pct: c.descuento ?? 0,
+                          // `descuento_pct` (override manual) NO se toca acá
+                          // (jerarquía, backend #1219): 0 = "sin override, seguí
+                          // al cliente en vivo" — copiar el % del cliente acá lo
+                          // convertiría en un override falso que deja de
+                          // actualizarse solo si el cliente cambia su descuento
+                          // después.
                         })
                       }
                     />
@@ -640,6 +644,17 @@ export function PedidoPage({ pedidoId, mode = "admin", mensaje, onClose }: Pedid
             jornadas={jornadas}
             descuentoPct={draft.datos.descuento_pct}
             setDescuentoPct={(v) => draft.setDatos({ ...draft.datos!, descuento_pct: v })}
+            descuentoManualTipo={draft.datos.descuento_manual_tipo}
+            setDescuentoManualTipo={(v) =>
+              draft.setDatos({ ...draft.datos!, descuento_manual_tipo: v })
+            }
+            descuentoManualMonto={draft.datos.descuento_manual_monto}
+            setDescuentoManualMonto={(v) =>
+              draft.setDatos({ ...draft.datos!, descuento_manual_monto: v })
+            }
+            descuentoEfectivoPct={totales.descuentoPct}
+            descuentoOrigen={totales.descuentoOrigen}
+            nombreCliente={draft.datos.cliente_nombre}
             pagado={pagado}
             saldo={saldo}
             mode={mode}

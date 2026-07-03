@@ -1,14 +1,17 @@
 """Descuentos por jornadas (#501 — extraído del god-module `routes/alquileres.py`).
 
-CRUD de los descuentos por cantidad de jornadas (la escala de descuento que se
-aplica según cuántos días dura el alquiler). Registra sus rutas en el router
-compartido del paquete `routes.alquileres`.
+Transporte HTTP fino sobre el motor `backend/descuentos/` (CQRS-lite): la
+lógica de la escala de descuento por cantidad de jornadas vive en
+`descuentos.queries.jornadas` / `descuentos.commands.jornadas`. Registra sus
+rutas en el router compartido del paquete `routes.alquileres`.
 """
 from fastapi import Request, HTTPException
 from pydantic import BaseModel
 
-from database import get_db, row_to_dict
+from database import get_db
 from auth.guards import require_admin
+from descuentos.commands.jornadas import crear_descuento_jornada, eliminar_descuento_jornada
+from descuentos.queries.jornadas import listar_descuentos_jornada
 from routes.alquileres.core import router
 
 
@@ -23,36 +26,21 @@ class DescuentoJornadaIn(BaseModel):
 def get_descuentos_jornada():
     """Devuelve los puntos ancla de descuentos por jornadas (público — lo usa el carrito)."""
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT id, jornadas, pct FROM descuentos_jornada ORDER BY jornadas ASC"
-        ).fetchall()
-        return [row_to_dict(r) for r in rows]
+        return listar_descuentos_jornada(conn)
 
 
 @router.post("/admin/descuentos-jornada", status_code=201)
 def create_descuento_jornada(data: DescuentoJornadaIn, request: Request):
     require_admin(request)
-    if data.jornadas < 1:
-        raise HTTPException(400, "jornadas debe ser >= 1")
-    if not (0 <= data.pct <= 100):
-        raise HTTPException(400, "pct debe estar entre 0 y 100")
     with get_db() as conn:
-        conn.execute(
-            "INSERT INTO descuentos_jornada (jornadas, pct) VALUES (%s, %s) "
-            "ON CONFLICT (jornadas) DO UPDATE SET pct = EXCLUDED.pct",
-            (data.jornadas, data.pct)
-        )
-        conn.commit()
-        row = conn.execute(
-            "SELECT id, jornadas, pct FROM descuentos_jornada WHERE jornadas = %s",
-            (data.jornadas,)
-        ).fetchone()
-        return row_to_dict(row)
+        try:
+            return crear_descuento_jornada(conn, jornadas=data.jornadas, pct=data.pct)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
 
 @router.delete("/admin/descuentos-jornada/{id}", status_code=204)
 def delete_descuento_jornada(id: int, request: Request):
     require_admin(request)
     with get_db() as conn:
-        conn.execute("DELETE FROM descuentos_jornada WHERE id = %s", (id,))
-        conn.commit()
+        eliminar_descuento_jornada(conn, id)

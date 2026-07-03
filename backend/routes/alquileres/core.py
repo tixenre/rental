@@ -22,8 +22,10 @@ from identity import nombre_validado
 from services.email import send_email, Attachment
 from services.email.service import get_admin_to
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
-from services.precios import bruto_linea, calcular_total, jornadas_periodo
+from services.precios import bruto_linea, calcular_total, jornadas_periodo, tipos_equipo_batch
 from services.fechas import validar_rango_fechas, validar_fecha_iso
+from descuentos.queries.jornadas import obtener_descuento_jornadas
+from descuentos.queries.cliente import obtener_descuento_cliente
 from config import SITE_URL
 
 # Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
@@ -74,7 +76,7 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
                {MARCA_SUBQUERY},
                e.modelo, e.serie, e.valor_reposicion,
                e.foto_url, e.foto_url_sm, e.foto_url_thumb, e.cantidad AS stock_total,
-               e.nombre_publico, e.nombre_publico_largo,
+               e.nombre_publico, e.nombre_publico_largo, e.tipo AS equipo_tipo,
                ef.contenido_incluido_json
         FROM alquiler_items pi
         LEFT JOIN equipos e ON e.id = pi.equipo_id
@@ -120,37 +122,6 @@ def _next_numero_pedido(conn) -> int:
     return conn.execute("SELECT nextval('numero_pedido_seq')").fetchone()[0]
 
 
-def _get_descuento_jornadas(conn, jornadas: int) -> float:
-    """Interpolación lineal entre los puntos ancla de descuentos_jornada.
-
-    Con puntos (1, 0%), (2, 3%), (7, 10%):
-      - 4 jornadas → interpola entre (2,3%) y (7,10%) → 5.8%
-      - 7+ jornadas → 10% (se queda en el último punto)
-    """
-    rows = conn.execute(
-        "SELECT jornadas, pct FROM descuentos_jornada ORDER BY jornadas ASC"
-    ).fetchall()
-    if not rows:
-        return 0.0
-    # `pct` es NUMERIC en la DB (migración g1a2b3c4d5e6) → psycopg lo devuelve
-    # como Decimal. Se coerce a float acá para que la interpolación
-    # (`t * (p1 - p0)` con t float) no rompa con `float * Decimal` → TypeError
-    # → cotizar 500 → totales en $0. Pasaba en alquileres de jornadas
-    # intermedias (las que interpolan entre puntos ancla).
-    puntos = [(int(r["jornadas"]), float(r["pct"])) for r in rows]
-    if jornadas <= puntos[0][0]:
-        return float(puntos[0][1])
-    if jornadas >= puntos[-1][0]:
-        return float(puntos[-1][1])
-    for i in range(len(puntos) - 1):
-        j0, p0 = puntos[i]
-        j1, p1 = puntos[i + 1]
-        if j0 <= jornadas <= j1:
-            t = (jornadas - j0) / (j1 - j0)
-            return round(p0 + t * (p1 - p0), 2)
-    return 0.0
-
-
 def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dict]]:
     """Trae items de múltiples pedidos en 2 queries en lugar de N+1.
 
@@ -165,7 +136,7 @@ def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dic
                {MARCA_SUBQUERY},
                e.modelo, e.serie, e.valor_reposicion,
                e.foto_url, e.foto_url_sm, e.foto_url_thumb, e.cantidad AS stock_total,
-               e.nombre_publico, e.nombre_publico_largo
+               e.nombre_publico, e.nombre_publico_largo, e.tipo AS equipo_tipo
         FROM alquiler_items pi
         LEFT JOIN equipos e ON e.id = pi.equipo_id
         WHERE pi.pedido_id IN ({ph})
@@ -440,6 +411,12 @@ class PedidoDatos(BaseModel):
     fecha_hasta:      Optional[str]   = None
     notas:            Optional[str]   = None
     descuento_pct:    Optional[float] = None
+    # Override manual en % o en $ fijo (Fase C-2, #1219): mismo campo de la UI,
+    # un selector al lado. `descuento_manual_tipo` decide cuál de los dos
+    # honra la jerarquía — "pct" (default, usa `descuento_pct` de arriba) o
+    # "monto" (usa `descuento_manual_monto`, pesos fijos).
+    descuento_manual_tipo:  Optional[str]   = None
+    descuento_manual_monto: Optional[float] = None
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
@@ -453,6 +430,29 @@ class PedidoDatos(BaseModel):
             return v
         if v < 0 or v > 100:
             raise ValueError("descuento_pct debe estar entre 0 y 100")
+        return v
+
+    @field_validator("descuento_manual_tipo")
+    @classmethod
+    def validate_descuento_manual_tipo(cls, v):
+        if v is None:
+            return v
+        if v not in ("pct", "monto"):
+            raise ValueError("descuento_manual_tipo debe ser 'pct' o 'monto'")
+        return v
+
+    @field_validator("descuento_manual_monto")
+    @classmethod
+    def validate_descuento_manual_monto(cls, v):
+        if v is None:
+            return v
+        if v < 0:
+            raise ValueError("descuento_manual_monto no puede ser negativo")
+        # `alquileres.descuento_manual_monto` es INTEGER — sin este tope, un
+        # valor fuera de rango llega crudo a Postgres como `NumericValueOutOfRange`
+        # (mismo gap que cerró la auditoría de contabilidad, 2026-07-02).
+        if v >= 2_147_483_647:
+            raise ValueError("descuento_manual_monto demasiado alto")
         return v
 
 
@@ -526,7 +526,10 @@ def _pedido_email_context(pedido: dict) -> dict:
     # $X y un total menor sin ninguna aclaración de por qué.
     descuento = int(pedido.get("descuento_monto") or 0)
     if descuento > 0:
-        desc_pct = float(pedido.get("descuento_pct") or 0)
+        # `descuento_efectivo_pct` (el % GANADOR, expuesto por `desglose_de_pedido`)
+        # — no el `descuento_pct` crudo, que desde la Fase C-1 (#1219) es solo el
+        # override manual (0 = sin override) y puede no coincidir con lo que ganó.
+        desc_pct = float(pedido.get("descuento_efectivo_pct") or 0)
         label = "Descuento" + (f" ({desc_pct:g}%)" if desc_pct else "")
         filas += _eb.discount_row(
             escape(label), escape(f"− {_fmt_ars(descuento)}")
@@ -667,6 +670,10 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
 
     with get_db() as conn:
         try:
+            # `descuento_pct` (override manual del pedido) arranca en 0 = "sin
+            # override, seguí al cliente en vivo" (Fase C-1, #1219) — YA NO se
+            # copia el descuento del cliente acá; `_apply_pedido_items` (más
+            # abajo) lo resuelve en vivo vía `obtener_descuento_cliente`.
             descuento_pct = 0.0
             if data.cliente_id:
                 c = conn.execute("SELECT * FROM clientes WHERE id=%s", (data.cliente_id,)).fetchone()
@@ -674,7 +681,6 @@ def create_pedido(data: PedidoCreate, background: Optional[BackgroundTasks] = No
                     cliente_nombre   = nombre_completo_cliente(c["nombre"], c["apellido"])
                     cliente_email    = cliente_email    or c["email"]
                     cliente_telefono = cliente_telefono or c["telefono"]
-                    descuento_pct    = c["descuento"] or 0.0
 
             # Ambas fechas o ninguna: un pedido con una sola fecha es incoherente
             # (no se puede calcular jornadas ni chequear stock).
@@ -796,8 +802,15 @@ def _recalcular_total_pedido(conn, id: int) -> None:
     (neto). Lee los ítems, las fechas y el `descuento_pct` del propio pedido —
     no recibe nada de afuera. No toca stock ni estado.
 
-    Lo usan `_apply_pedido_datos` (editar fechas/cliente/descuento), la edición
-    de ítems y la propagación del descuento del cliente a sus presupuestos.
+    Jerarquía de descuento (Fase C-1, #1219): `alquileres.descuento_pct` es el
+    override MANUAL del pedido (0 = sin override) — el descuento del cliente
+    se lee EN VIVO acá (`obtener_descuento_cliente`), nunca se asume snapshoteado
+    en la fila. Ver `resolver_descuento_pedido`.
+
+    Lo usan `_apply_pedido_datos` (editar fechas/cliente/descuento) y la
+    edición de ítems. `propagar_descuento_a_presupuestos` también dispara esto
+    cuando cambia el descuento de un cliente (nada que "propagar" al override
+    manual — se lee en vivo).
     """
     p = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
     if not p:
@@ -818,27 +831,52 @@ def _recalcular_total_pedido(conn, id: int) -> None:
             jornadas,
         )
         conn.execute("UPDATE alquiler_items SET subtotal=%s WHERE id=%s", (sub, it["id"]))
-    descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+    descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
+    descuento_cliente_pct = obtener_descuento_cliente(conn, p["cliente_id"])
+    # `es_combo` (Fase C-3, #1219): resuelve qué líneas quedan afuera del
+    # descuento global de cliente/jornadas/manual — ya traen el suyo propio.
+    tipos = tipos_equipo_batch(conn, [it["equipo_id"] for it in items if it["equipo_id"]])
     total_desglose = calcular_total(
         items=[
             {"equipo_id": it["equipo_id"], "cantidad": it["cantidad"],
-             "precio_jornada": it["precio_jornada"], "cobro_modo": it["cobro_modo"]}
+             "precio_jornada": it["precio_jornada"], "cobro_modo": it["cobro_modo"],
+             "es_combo": tipos.get(it["equipo_id"]) == "combo"}
             for it in items
         ],
         jornadas=jornadas,
-        descuento_cliente_pct=p["descuento_pct"] or 0,
+        descuento_cliente_pct=descuento_cliente_pct,
         descuento_jornadas_pct=descuento_jornadas_pct,
+        descuento_manual_pct=p["descuento_pct"] or 0,
+        descuento_manual_tipo=p["descuento_manual_tipo"] or "pct",
+        descuento_manual_monto=p["descuento_manual_monto"] or 0,
         perfil_impuestos=None,  # persiste NETO; IVA es derivado al mostrar.
     )
+    # `descuento_cliente_pct` se persiste como SNAPSHOT (igual que jornadas) —
+    # sin esto, mostrar el desglose de un pedido ya confirmado tendría que
+    # volver a consultar `clientes.descuento` EN VIVO, y si el cliente cambió
+    # su descuento después de confirmar, el desglose mostrado divergiría de
+    # `monto_total` ya persistido (bug clase #405). Ver `desglose_de_pedido`.
     conn.execute(
-        "UPDATE alquileres SET monto_total=%s, descuento_jornadas_pct=%s WHERE id=%s",
-        (total_desglose["neto"], descuento_jornadas_pct, id),
+        "UPDATE alquileres SET monto_total=%s, descuento_jornadas_pct=%s, "
+        "descuento_cliente_pct=%s WHERE id=%s",
+        (total_desglose["neto"], descuento_jornadas_pct, descuento_cliente_pct, id),
     )
 
 
-def propagar_descuento_a_presupuestos(conn, cliente_id: int, nuevo_pct: float) -> int:
-    """Aplica el nuevo descuento del cliente a sus pedidos NO confirmados y los
-    recotiza. Devuelve cuántos presupuestos tocó.
+def propagar_descuento_a_presupuestos(conn, cliente_id: int) -> int:
+    """Recotiza los presupuestos del cliente que SIGUEN su descuento en vivo
+    (sin override manual) cuando el descuento del cliente cambia. Devuelve
+    cuántos presupuestos tocó.
+
+    Jerarquía de descuento (Fase C-1, #1219): ya no sobreescribe
+    `alquileres.descuento_pct` — ese campo es el override MANUAL del pedido
+    (0 = sin override, sigue al cliente en vivo). Antes, esta función pisaba
+    ese campo sin condición en cada presupuesto abierto, lo que de paso
+    clobbereaba cualquier override manual que ya existiera (bug real
+    encontrado auditando #1219). Ahora solo dispara `_recalcular_total_pedido`
+    (que ya lee el descuento del cliente EN VIVO) y solo para los presupuestos
+    que efectivamente no tienen override — el resto no depende del cliente,
+    no hace falta tocarlos.
 
     Solo afecta el estado `presupuesto` (no confirmado): los pedidos confirmados
     o cerrados conservan el snapshot del descuento con que se crearon — es un
@@ -849,12 +887,12 @@ def propagar_descuento_a_presupuestos(conn, cliente_id: int, nuevo_pct: float) -
     ids = [
         r["id"]
         for r in conn.execute(
-            "SELECT id FROM alquileres WHERE cliente_id=%s AND estado='presupuesto'",
+            "SELECT id FROM alquileres WHERE cliente_id=%s AND estado='presupuesto' "
+            "AND (descuento_pct IS NULL OR descuento_pct = 0)",
             (cliente_id,),
         ).fetchall()
     ]
     for pid in ids:
-        conn.execute("UPDATE alquileres SET descuento_pct=%s WHERE id=%s", (nuevo_pct or 0, pid))
         _recalcular_total_pedido(conn, pid)
     return len(ids)
 
@@ -887,8 +925,11 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
             payload.setdefault("cliente_nombre",   nombre_completo_cliente(c["nombre"], c["apellido"]))
             payload.setdefault("cliente_email",    c["email"])
             payload.setdefault("cliente_telefono", c["telefono"])
-            if "descuento_pct" not in payload:
-                payload["descuento_pct"] = c["descuento"] or 0.0
+            # `descuento_pct` (override manual) YA NO se copia acá (Fase C-1,
+            # #1219) — 0 = "sin override, seguí al cliente en vivo" y el nuevo
+            # cliente se resuelve en vivo en `_recalcular_total_pedido`. Si el
+            # pedido ya tenía un override explícito, asignar OTRO cliente no
+            # debería resetearlo solo — el admin lo cambia a mano si quiere.
 
     if "fecha_desde" in payload or "fecha_hasta" in payload:
         nueva_desde = payload.get("fecha_desde") or p["fecha_desde"]
@@ -917,6 +958,8 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
         "fecha_desde" in payload
         or "fecha_hasta" in payload
         or "descuento_pct" in payload
+        or "descuento_manual_tipo" in payload
+        or "descuento_manual_monto" in payload
         or cliente_cambio
     ):
         _recalcular_total_pedido(conn, id)
@@ -974,26 +1017,35 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     # `orden` por posición; subtotal por línea vía `bruto_linea` (respeta cobro_modo).
     rows = []
     for orden, ln in enumerate(lineas):
-        if ln["equipo_id"] is not None and not conn.execute(
-            "SELECT id FROM equipos WHERE id=%s", (ln["equipo_id"],)
-        ).fetchone():
-            raise HTTPException(404, f"Equipo {ln['equipo_id']} no encontrado")
+        if ln["equipo_id"] is not None:
+            eq = conn.execute(
+                "SELECT id, tipo FROM equipos WHERE id=%s", (ln["equipo_id"],)
+            ).fetchone()
+            if not eq:
+                raise HTTPException(404, f"Equipo {ln['equipo_id']} no encontrado")
+            # `es_combo` (Fase C-3, #1219): no acumula el descuento global — ya
+            # trae el suyo propio horneado en `precio_jornada`.
+            ln["es_combo"] = eq["tipo"] == "combo"
         subtotal = bruto_linea(ln, jornadas)
         rows.append((
             id, ln["equipo_id"], ln["cantidad"], ln["precio_jornada"],
             subtotal, orden, ln["nombre_libre"], ln["cobro_modo"],
         ))
 
-    # Re-aplicar AMBOS descuentos (cliente + jornadas), como hacen las
-    # otras 2 sedes. Antes solo se aplicaba el del cliente → editar ítems
-    # perdía el descuento por jornadas (#500). Acá se calcula desde los ítems
-    # en memoria (los que estamos por insertar), no desde la base.
-    descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+    # Re-aplicar la jerarquía completa (manual > cliente-en-vivo > jornadas),
+    # como hacen las otras 2 sedes. Antes solo se aplicaba el del cliente →
+    # editar ítems perdía el descuento por jornadas (#500). Acá se calcula
+    # desde los ítems en memoria (los que estamos por insertar), no desde la base.
+    descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
+    descuento_cliente_pct = obtener_descuento_cliente(conn, p["cliente_id"])
     total_desglose = calcular_total(
         items=lineas,  # incluye cobro_modo por línea (líneas 'fijo' no × jornadas)
         jornadas=jornadas,
-        descuento_cliente_pct=p["descuento_pct"] or 0,
+        descuento_cliente_pct=descuento_cliente_pct,
         descuento_jornadas_pct=descuento_jornadas_pct,
+        descuento_manual_pct=p["descuento_pct"] or 0,
+        descuento_manual_tipo=p["descuento_manual_tipo"] or "pct",
+        descuento_manual_monto=p["descuento_manual_monto"] or 0,
         perfil_impuestos=None,  # persiste NETO; IVA derivado al mostrar.
     )
     monto_total = total_desglose["neto"]
@@ -1004,8 +1056,9 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
         VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
     """, rows)
     conn.execute(
-        "UPDATE alquileres SET monto_total=%s, descuento_jornadas_pct=%s WHERE id=%s",
-        (monto_total, descuento_jornadas_pct, id),
+        "UPDATE alquileres SET monto_total=%s, descuento_jornadas_pct=%s, "
+        "descuento_cliente_pct=%s WHERE id=%s",
+        (monto_total, descuento_jornadas_pct, descuento_cliente_pct, id),
     )
 
     return _get_alquiler_detail(conn, id)

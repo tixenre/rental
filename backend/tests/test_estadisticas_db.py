@@ -2,7 +2,7 @@
 del descuento en las agregaciones del dashboard: `estadisticas.py` recalculaba el
 ingreso con `subtotal * (1 - descuento_pct / 100)`, que solo mira el descuento de
 CLIENTE — ignorando el descuento por JORNADAS cuando era el GANADOR (`max()`, ver
-`services/precios.descuento_aplicable`). `alquileres.monto_total` YA es el neto
+`descuentos.queries.decision.calcular_descuento_aplicable`). `alquileres.monto_total` YA es el neto
 correcto (persistido por `_recalcular_total_pedido`); las queries ahora lo leen
 directo (a nivel pedido: totales/por_mes/mejor_peor) o lo prorratean por ítem (a
 nivel equipo/dueño: top_equipos/por_dueno) en vez de reconstruirlo.
@@ -47,8 +47,8 @@ P_ID = 9_301_101
 NOMBRE_EQUIPO = "Cámara test #1209"
 
 # Escenario del bug: 1 equipo a $10.000/día, 7 jornadas, 0% descuento de CLIENTE
-# pero 10% descuento por JORNADAS (ganador — `descuento_aplicable` toma el máximo,
-# no la suma). El bug reconstruía el ingreso con `subtotal * (1 - descuento_pct /
+# pero 10% descuento por JORNADAS (ganador — `calcular_descuento_aplicable` toma el
+# máximo, no la suma). El bug reconstruía el ingreso con `subtotal * (1 - descuento_pct /
 # 100)`, que solo mira el pct de CLIENTE (0 acá) → hubiera devuelto el BRUTO
 # ($70.000) en vez del NETO real cobrado y persistido en `monto_total` ($63.000).
 PRECIO_JORNADA = 10_000

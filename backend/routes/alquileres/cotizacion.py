@@ -8,7 +8,7 @@ ruta sobre el router compartido del paquete `routes.alquileres`.
 from typing import Optional
 
 from fastapi import Request
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from database import get_db, to_datetime
 from rate_limit import limiter
@@ -19,8 +19,11 @@ from services.precios import (
     calcular_total,
     jornadas_periodo,
     precio_jornada_efectivo,
+    tipos_equipo_batch,
 )
-from routes.alquileres.core import router, _get_descuento_jornadas
+from descuentos.queries.decision import resolver_origen_pedido_monto
+from descuentos.queries.jornadas import obtener_descuento_jornadas
+from routes.alquileres.core import router
 
 
 class CotizarItem(BaseModel):
@@ -43,6 +46,11 @@ class CotizarRequest(BaseModel):
     #    en vivo en el builder; gana sobre el `clientes.descuento` guardado).
     cliente_id: Optional[int] = None
     descuento_pct: Optional[float] = None
+    # Override manual en % o en $ fijo (Fase C-2, #1219): mismo par que
+    # `PedidoDatos` (routes/alquileres/core.py) — el builder los edita en vivo
+    # para que el preview coincida con lo que se va a persistir.
+    descuento_manual_tipo: Optional[str] = None
+    descuento_manual_monto: Optional[float] = None
     # Solo lo honra una sesión admin: respeta el `precio_jornada` que manda cada
     # ítem de catálogo (el snapshot congelado del pedido que se está editando)
     # en vez de re-buscarlo en `equipos`. Sin esto, el editor de pedidos admin
@@ -51,6 +59,41 @@ class CotizarRequest(BaseModel):
     # precio de línea) → dos totales del mismo pedido que podían no coincidir.
     # Ver MEMORIA 2026-06-06 "Datos del pedido: plata congelada".
     respetar_precio_item: Optional[bool] = False
+
+    # Mismo validador que `PedidoDatos.descuento_pct` (routes/alquileres/core.py)
+    # — este override vivía sin cota de rango (hallazgo de la Fase A del split
+    # de descuentos/, #1184): un admin podía mandar un negativo al preview en
+    # vivo sin que nada lo rechazara.
+    @field_validator("descuento_pct")
+    @classmethod
+    def validate_descuento(cls, v):
+        if v is None:
+            return v
+        if v < 0 or v > 100:
+            raise ValueError("descuento_pct debe estar entre 0 y 100")
+        return v
+
+    @field_validator("descuento_manual_tipo")
+    @classmethod
+    def validate_descuento_manual_tipo(cls, v):
+        if v is None:
+            return v
+        if v not in ("pct", "monto"):
+            raise ValueError("descuento_manual_tipo debe ser 'pct' o 'monto'")
+        return v
+
+    @field_validator("descuento_manual_monto")
+    @classmethod
+    def validate_descuento_manual_monto(cls, v):
+        if v is None:
+            return v
+        if v < 0:
+            raise ValueError("descuento_manual_monto no puede ser negativo")
+        # Mismo tope que `PedidoDatos` (routes/alquileres/core.py) — preview y
+        # guardado no deberían divergir en qué rechazan.
+        if v >= 2_147_483_647:
+            raise ValueError("descuento_manual_monto demasiado alto")
+        return v
 
 
 @router.post("/cotizar")
@@ -94,6 +137,12 @@ def cotizar(data: CotizarRequest, request: Request):
         # (cotización best-effort: el carrito puede tener algo que ya no está).
         # Fetch por-ítem (lookup por PK indexada): se revirtió el batch `IN (...)`
         # de #643 que devolvía precios_map vacío en prod → total $0 (regresión).
+        # `tipos_equipo_batch` (solo id+tipo, query aparte) SÍ va en batch — no
+        # toca el precio, resuelve `es_combo` para el descuento no-acumulable
+        # (Fase C-3, #1219).
+        tipos = tipos_equipo_batch(
+            conn, [it.equipo_id for it in data.items if it.equipo_id is not None]
+        )
         items_para_total = []
         for it in data.items:
             if it.cantidad <= 0:
@@ -127,6 +176,7 @@ def cotizar(data: CotizarRequest, request: Request):
                 "cantidad": it.cantidad,
                 "precio_jornada": precio,
                 "cobro_modo": "jornada",
+                "es_combo": tipos.get(it.equipo_id) == "combo",
             })
         subtotal_por_jornada = sum(
             it["precio_jornada"] * it["cantidad"] for it in items_para_total
@@ -137,6 +187,9 @@ def cotizar(data: CotizarRequest, request: Request):
         perfil = None
         descuento_cliente_pct = 0.0
         descuento_jornadas_pct = 0.0
+        descuento_manual_pct = 0.0
+        descuento_manual_tipo = "pct"
+        descuento_manual_monto = 0.0
         if tiene_fechas:
             # ¿Qué cliente? El logueado (sesión cliente) o, si es admin, el
             # `cliente_id` pedido (el builder admin cotiza para terceros).
@@ -154,27 +207,36 @@ def cotizar(data: CotizarRequest, request: Request):
                 if c:
                     perfil = c["perfil_impuestos"]
                     descuento_cliente_pct = c["descuento"] or 0.0
-            # Override de descuento del admin (lo edita en vivo en el builder).
-            if es_admin and data.descuento_pct is not None:
-                descuento_cliente_pct = data.descuento_pct
-            descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+            # Override MANUAL del admin (lo edita en vivo en el builder del
+            # pedido) — jerarquía (Fase C-1, #1219): gana OUTRIGHT sobre
+            # cliente/jornadas, ya NO reemplaza el descuento del cliente para
+            # que compita por tamaño. Fase C-2 (#1219): el override puede ser
+            # % (de siempre) o $ fijo, mismo campo de la UI.
+            if es_admin and data.descuento_pct:
+                descuento_manual_pct = data.descuento_pct
+            if es_admin and data.descuento_manual_tipo:
+                descuento_manual_tipo = data.descuento_manual_tipo
+            if es_admin and data.descuento_manual_monto:
+                descuento_manual_monto = data.descuento_manual_monto
+            descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
 
         desglose = calcular_total(
             items=items_para_total,
             jornadas=jornadas,
             descuento_cliente_pct=descuento_cliente_pct,
             descuento_jornadas_pct=descuento_jornadas_pct,
+            descuento_manual_pct=descuento_manual_pct,
+            descuento_manual_tipo=descuento_manual_tipo,
+            descuento_manual_monto=descuento_manual_monto,
             perfil_impuestos=perfil,
         )
 
-        # Cuál descuento ganó (para el label del UI), mismo criterio que
-        # `descuento_aplicable`: en empate gana el del cliente.
-        if descuento_cliente_pct == 0 and descuento_jornadas_pct == 0:
-            descuento_origen = "ninguno"
-        elif descuento_cliente_pct >= descuento_jornadas_pct:
-            descuento_origen = "cliente"
-        else:
-            descuento_origen = "jornadas"
+        # Cuál descuento ganó (para el label del UI) — misma jerarquía que
+        # decidió el pct en `calcular_total`, así nunca puede divergir.
+        descuento_origen = resolver_origen_pedido_monto(
+            descuento_manual_tipo, descuento_manual_pct, descuento_manual_monto,
+            descuento_cliente_pct, descuento_jornadas_pct,
+        )
 
         # Desglose POR LÍNEA para que el front MUESTRE (no calcule) el detalle por
         # equipo: `subtotal_por_jornada` (siempre, el "$X/día" del ítem) + `bruto`/`neto`
@@ -182,12 +244,14 @@ def cotizar(data: CotizarRequest, request: Request):
         # con el mismo redondeo por línea que usaba el front; la suma de netos por línea
         # puede diferir del neto total por unos pesos (redondeo independiente por línea)
         # → el TOTAL autoritativo es `neto` (top-level), las líneas son detalle de display.
-        # `equipo_id` None = línea personalizada (#805).
+        # `equipo_id` None = línea personalizada (#805). Combos (`es_combo`, Fase
+        # C-3 #1219) no reciben el % ganador — ya vienen con su propio descuento
+        # de componente horneado en `precio_jornada`.
         pct_aplicado = desglose["descuento_pct"]
         lineas = []
         for it in items_para_total:
             bruto = bruto_linea(it, jornadas)
-            dto = int(round(bruto * pct_aplicado / 100))
+            dto = 0 if it.get("es_combo") else int(round(bruto * pct_aplicado / 100))
             lineas.append({
                 "equipo_id": it["equipo_id"],
                 "cantidad": it["cantidad"],
