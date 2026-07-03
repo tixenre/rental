@@ -11,8 +11,8 @@ router = APIRouter()
 
 # Fragmento SQL compartido: prorratea `alquileres.monto_total` (el NETO correcto,
 # ya con el descuento GANADOR aplicado — `max(descuento_cliente_pct,
-# descuento_jornadas_pct)`, ver `services/precios.descuento_aplicable`) entre los
-# ítems de un pedido según su participación en el `subtotal` (bruto). Mismo patrón
+# descuento_jornadas_pct)`, ver `descuentos.queries.decision.calcular_descuento_aplicable`)
+# entre los ítems de un pedido según su participación en el `subtotal` (bruto). Mismo patrón
 # que `reportes/liquidacion.py::SALDADO_CTE` (fragmento SQL compartido vía f-string).
 #
 # Por qué hace falta prorratear en vez de leer `monto_total` directo: es a nivel

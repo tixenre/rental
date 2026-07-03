@@ -8,7 +8,7 @@ ruta sobre el router compartido del paquete `routes.alquileres`.
 from typing import Optional
 
 from fastapi import Request
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from database import get_db, to_datetime
 from rate_limit import limiter
@@ -20,7 +20,9 @@ from services.precios import (
     jornadas_periodo,
     precio_jornada_efectivo,
 )
-from routes.alquileres.core import router, _get_descuento_jornadas
+from descuentos.queries.decision import calcular_descuento_origen
+from descuentos.queries.jornadas import obtener_descuento_jornadas
+from routes.alquileres.core import router
 
 
 class CotizarItem(BaseModel):
@@ -51,6 +53,19 @@ class CotizarRequest(BaseModel):
     # precio de línea) → dos totales del mismo pedido que podían no coincidir.
     # Ver MEMORIA 2026-06-06 "Datos del pedido: plata congelada".
     respetar_precio_item: Optional[bool] = False
+
+    # Mismo validador que `PedidoDatos.descuento_pct` (routes/alquileres/core.py)
+    # — este override vivía sin cota de rango (hallazgo de la Fase A del split
+    # de descuentos/, #1184): un admin podía mandar un negativo al preview en
+    # vivo sin que nada lo rechazara.
+    @field_validator("descuento_pct")
+    @classmethod
+    def validate_descuento(cls, v):
+        if v is None:
+            return v
+        if v < 0 or v > 100:
+            raise ValueError("descuento_pct debe estar entre 0 y 100")
+        return v
 
 
 @router.post("/cotizar")
@@ -157,7 +172,7 @@ def cotizar(data: CotizarRequest, request: Request):
             # Override de descuento del admin (lo edita en vivo en el builder).
             if es_admin and data.descuento_pct is not None:
                 descuento_cliente_pct = data.descuento_pct
-            descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+            descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
 
         desglose = calcular_total(
             items=items_para_total,
@@ -167,14 +182,11 @@ def cotizar(data: CotizarRequest, request: Request):
             perfil_impuestos=perfil,
         )
 
-        # Cuál descuento ganó (para el label del UI), mismo criterio que
-        # `descuento_aplicable`: en empate gana el del cliente.
-        if descuento_cliente_pct == 0 and descuento_jornadas_pct == 0:
-            descuento_origen = "ninguno"
-        elif descuento_cliente_pct >= descuento_jornadas_pct:
-            descuento_origen = "cliente"
-        else:
-            descuento_origen = "jornadas"
+        # Cuál descuento ganó (para el label del UI) — mismo dict normalizado
+        # que decidió el pct en `calcular_total`, así nunca puede divergir.
+        descuento_origen = calcular_descuento_origen(
+            {"cliente": descuento_cliente_pct, "jornadas": descuento_jornadas_pct}
+        )
 
         # Desglose POR LÍNEA para que el front MUESTRE (no calcule) el detalle por
         # equipo: `subtotal_por_jornada` (siempre, el "$X/día" del ítem) + `bruto`/`neto`

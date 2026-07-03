@@ -4,9 +4,9 @@ Antes: `_apply_pedido_items` ignoraba el descuento por jornadas → editar
 los ítems de un pedido perdía el descuento (el `monto_total` saltaba a más
 caro solo por tocar los ítems).
 
-Ahora: la función recalcula `descuento_jornadas_pct` desde `_get_descuento_jornadas`,
-lo pasa al `calcular_total` canónico y persiste tanto `monto_total` como
-`descuento_jornadas_pct` en `alquileres`.
+Ahora: la función recalcula `descuento_jornadas_pct` desde `obtener_descuento_jornadas`
+(`backend/descuentos/`), lo pasa al `calcular_total` canónico y persiste tanto
+`monto_total` como `descuento_jornadas_pct` en `alquileres`.
 """
 
 import pytest

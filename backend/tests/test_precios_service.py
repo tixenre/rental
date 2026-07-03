@@ -16,7 +16,6 @@ from services.precios import (
     IVA_PCT,
     PERFIL_RI,
     calcular_total,
-    descuento_aplicable,
     es_responsable_inscripto,
     jornadas_periodo,
 )
@@ -64,39 +63,6 @@ class TestJornadasPeriodo:
     def test_misma_fecha_devuelve_uno(self):
         d = datetime(2026, 6, 1, 10, 0)
         assert jornadas_periodo(d, d) == 1
-
-
-# ── descuento_aplicable ──────────────────────────────────────────────────
-
-
-class TestDescuentoAplicable:
-    def test_cliente_mayor_que_jornadas(self):
-        assert descuento_aplicable(15.0, 5.0) == 15.0
-
-    def test_jornadas_mayor_que_cliente(self):
-        assert descuento_aplicable(5.0, 15.0) == 15.0
-
-    def test_empate(self):
-        # En empate da lo mismo en monto. El front etiqueta "cliente".
-        assert descuento_aplicable(10.0, 10.0) == 10.0
-
-    def test_ambos_cero(self):
-        assert descuento_aplicable(0, 0) == 0.0
-
-    def test_none_se_trata_como_cero(self):
-        assert descuento_aplicable(None, 5.0) == 5.0
-        assert descuento_aplicable(5.0, None) == 5.0
-        assert descuento_aplicable(None, None) == 0.0
-
-    def test_negativos_se_clampan_a_cero(self):
-        # Defensivo: nunca permitir descuento "que aumenta el precio".
-        assert descuento_aplicable(-10.0, 5.0) == 5.0
-
-    def test_mayores_a_100_se_topan(self):
-        # Un descuento > 100% daría neto/total NEGATIVO → se topa en 100.
-        assert descuento_aplicable(150.0, 5.0) == 100.0
-        assert descuento_aplicable(5.0, 200.0) == 100.0
-        assert descuento_aplicable(100.0, 0) == 100.0
 
 
 # ── es_responsable_inscripto ─────────────────────────────────────────────

@@ -13,9 +13,9 @@ jornadas truncadas (bug #502).
 Modelo (alineado bit a bit con ``src/lib/cart-total.ts`` del front):
 
 - Precios del catálogo son **netos** (sin IVA).
-- Descuento NO acumulativo: gana ``max(descuento_cliente, descuento_jornadas)``.
-  En empate gana el del cliente — convención de etiquetado del front; en
-  monto no hay diferencia.
+- Descuento NO acumulativo: gana el mayor entre las fuentes vigentes — la
+  decisión de "quién gana" vive en ``descuentos.queries.decision.
+  calcular_descuento_aplicable`` (paquete ``backend/descuentos/``, no acá).
 - ``monto_total`` se PERSISTE neto (con descuento aplicado, sin IVA).
   El IVA es derivado al mostrar/facturar: solo para
   ``perfil_impuestos == 'responsable_inscripto'`` se suma 21%.
@@ -28,6 +28,8 @@ from __future__ import annotations
 from math import ceil
 from datetime import datetime
 from typing import Optional, TypedDict
+
+from descuentos.queries.decision import calcular_descuento_aplicable
 
 
 IVA_PCT = 21.0
@@ -86,23 +88,6 @@ def jornadas_periodo(
     if horas <= 0:
         return 1
     return max(1, ceil(horas / 24))
-
-
-def descuento_aplicable(
-    descuento_cliente_pct: Optional[float],
-    descuento_jornadas_pct: Optional[float],
-) -> float:
-    """Descuentos NO acumulativos: gana el de mayor valor.
-
-    En empate gana el del cliente (es una atención manual del dueño;
-    convención de etiquetado alineada con el front). En el monto no
-    cambia nada — los dos pcts son iguales en empate.
-    """
-    cli = max(0.0, float(descuento_cliente_pct or 0))
-    jor = max(0.0, float(descuento_jornadas_pct or 0))
-    # Topar en 100: un descuento > 100% daría neto/total NEGATIVO. Solo lo
-    # podría setear un admin, pero acotamos para no perder plata por un typo.
-    return min(100.0, max(cli, jor))
 
 
 def es_responsable_inscripto(perfil_impuestos: Optional[str]) -> bool:
@@ -210,7 +195,7 @@ def calcular_total(
       items:                       [{equipo_id, cantidad, precio_jornada}], precios NETOS.
       jornadas:                    cantidad de jornadas (usar ``jornadas_periodo``).
       descuento_cliente_pct:       ``clientes.descuento`` (0..100).
-      descuento_jornadas_pct:      interpolado por ``_get_descuento_jornadas``.
+      descuento_jornadas_pct:      interpolado por ``descuentos.queries.jornadas.obtener_descuento_jornadas``.
       perfil_impuestos:            ``'responsable_inscripto'`` para sumar IVA 21%.
 
     El backend debe PERSISTIR ``neto`` en ``alquileres.monto_total`` (sin IVA).
@@ -218,7 +203,9 @@ def calcular_total(
     """
     j = max(1, int(jornadas or 1))
     bruto = sum(bruto_linea(it, j) for it in items)
-    pct = descuento_aplicable(descuento_cliente_pct, descuento_jornadas_pct)
+    pct = calcular_descuento_aplicable(
+        {"cliente": descuento_cliente_pct, "jornadas": descuento_jornadas_pct}
+    )
     descuento_monto = int(round(bruto * pct / 100))
     neto = int(bruto - descuento_monto)
     con_iva = es_responsable_inscripto(perfil_impuestos)

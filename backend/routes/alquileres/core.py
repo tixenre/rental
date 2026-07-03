@@ -24,6 +24,7 @@ from services.email.service import get_admin_to
 from services.ical import build_vcalendar, google_calendar_url, reserva_to_vevent
 from services.precios import bruto_linea, calcular_total, jornadas_periodo
 from services.fechas import validar_rango_fechas, validar_fecha_iso
+from descuentos.queries.jornadas import obtener_descuento_jornadas
 from config import SITE_URL
 
 # Motor de reservas: la fuente única vive en el paquete `reservas`. Acá se
@@ -118,37 +119,6 @@ def _get_alquiler_items(conn, pedido_id: int) -> list[dict]:
 def _next_numero_pedido(conn) -> int:
     """Devuelve el próximo número de pedido usando una SEQUENCE de PostgreSQL (race-free)."""
     return conn.execute("SELECT nextval('numero_pedido_seq')").fetchone()[0]
-
-
-def _get_descuento_jornadas(conn, jornadas: int) -> float:
-    """Interpolación lineal entre los puntos ancla de descuentos_jornada.
-
-    Con puntos (1, 0%), (2, 3%), (7, 10%):
-      - 4 jornadas → interpola entre (2,3%) y (7,10%) → 5.8%
-      - 7+ jornadas → 10% (se queda en el último punto)
-    """
-    rows = conn.execute(
-        "SELECT jornadas, pct FROM descuentos_jornada ORDER BY jornadas ASC"
-    ).fetchall()
-    if not rows:
-        return 0.0
-    # `pct` es NUMERIC en la DB (migración g1a2b3c4d5e6) → psycopg lo devuelve
-    # como Decimal. Se coerce a float acá para que la interpolación
-    # (`t * (p1 - p0)` con t float) no rompa con `float * Decimal` → TypeError
-    # → cotizar 500 → totales en $0. Pasaba en alquileres de jornadas
-    # intermedias (las que interpolan entre puntos ancla).
-    puntos = [(int(r["jornadas"]), float(r["pct"])) for r in rows]
-    if jornadas <= puntos[0][0]:
-        return float(puntos[0][1])
-    if jornadas >= puntos[-1][0]:
-        return float(puntos[-1][1])
-    for i in range(len(puntos) - 1):
-        j0, p0 = puntos[i]
-        j1, p1 = puntos[i + 1]
-        if j0 <= jornadas <= j1:
-            t = (jornadas - j0) / (j1 - j0)
-            return round(p0 + t * (p1 - p0), 2)
-    return 0.0
 
 
 def _batch_get_alquiler_items(conn, pedido_ids: list[int]) -> dict[int, list[dict]]:
@@ -818,7 +788,7 @@ def _recalcular_total_pedido(conn, id: int) -> None:
             jornadas,
         )
         conn.execute("UPDATE alquiler_items SET subtotal=%s WHERE id=%s", (sub, it["id"]))
-    descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+    descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
     total_desglose = calcular_total(
         items=[
             {"equipo_id": it["equipo_id"], "cantidad": it["cantidad"],
@@ -988,7 +958,7 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     # otras 2 sedes. Antes solo se aplicaba el del cliente → editar ítems
     # perdía el descuento por jornadas (#500). Acá se calcula desde los ítems
     # en memoria (los que estamos por insertar), no desde la base.
-    descuento_jornadas_pct = _get_descuento_jornadas(conn, jornadas)
+    descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
     total_desglose = calcular_total(
         items=lineas,  # incluye cobro_modo por línea (líneas 'fijo' no × jornadas)
         jornadas=jornadas,
