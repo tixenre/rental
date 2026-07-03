@@ -10,6 +10,9 @@ import {
   HelpCircle,
   MessageCircle,
   FileText,
+  Package,
+  ClipboardList,
+  Bell,
 } from "lucide-react";
 import {
   Sheet,
@@ -28,6 +31,14 @@ const SECONDARY = [
   { label: "Preguntas frecuentes", href: "/preguntas-frecuentes", icon: HelpCircle },
   { label: "Términos", href: "/terminos", icon: FileText },
 ];
+
+// Espeja las 4 solapas del portal (cliente.portal.tsx: Pedidos/Listas/Notificaciones/Perfil).
+const PORTAL_TABS = [
+  { tab: "pedidos", label: "Mis pedidos", icon: Package },
+  { tab: "listas", label: "Mis listas", icon: ClipboardList },
+  { tab: "notificaciones", label: "Notificaciones", icon: Bell },
+  { tab: "perfil", label: "Mi perfil", icon: User },
+] as const;
 
 /**
  * Menú de navegación entre áreas (hamburguesa + sheet lateral).
@@ -110,18 +121,22 @@ export function AreaMenu({ current }: { current?: AreaKey | "cliente" }) {
             </SheetClose>
             {isLogged ? (
               <>
-                {/* Una sola entrada de cuenta → el portal (tab Perfil). Pedidos vive
-                    como tab del portal y en el logo del topbar, no duplicado acá. */}
-                <SheetClose asChild>
-                  <Link
-                    to="/cliente/portal"
-                    search={{ tab: "perfil" }}
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink transition hover:bg-muted"
-                  >
-                    <User className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    Mi perfil
-                  </Link>
-                </SheetClose>
+                {/* Las 4 solapas del portal, cada una con su propia entrada — el
+                    menú es la navegación principal en mobile (no solo un atajo al
+                    perfil): sin esto, pedidos/listas/notificaciones quedaban solo
+                    detrás del bottom-nav del portal, que el dueño no descubría. */}
+                {PORTAL_TABS.map((t) => (
+                  <SheetClose asChild key={t.tab}>
+                    <Link
+                      to="/cliente/portal"
+                      search={{ tab: t.tab }}
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink transition hover:bg-muted"
+                    >
+                      <t.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      {t.label}
+                    </Link>
+                  </SheetClose>
+                ))}
                 <button
                   type="button"
                   onClick={handleLogout}
