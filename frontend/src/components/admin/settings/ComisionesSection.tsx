@@ -22,7 +22,7 @@ export function ComisionesSection() {
     queryKey: ["settings", "comisiones_modelo"],
     queryFn: () => adminApi.getSetting("comisiones_modelo"),
     retry: false,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   // Inicializa desde el setting (o el default) una vez que el fetch terminó.

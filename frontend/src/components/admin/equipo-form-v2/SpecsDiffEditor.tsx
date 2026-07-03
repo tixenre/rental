@@ -97,13 +97,31 @@ export function SpecsDiffEditor({
   // primera vez, updateSpec lo materializa en specs[]. Esto asegura que
   // el form siempre muestre todos los specs disponibles del template,
   // independiente de timing/sincronización.
-  const specByLabel = new Map<string, Spec>();
-  for (const s of specs) specByLabel.set(lower(s.label), s);
+  //
+  // El match es por spec_def_id (extraído de `spec-N`/`tmpl-N`), NO por
+  // label — bug real encontrado en vivo: el label de una spec guardada
+  // arranca como fallback ("spec 3") hasta que un efecto aparte en
+  // EquipoFormDialogV2 lo re-etiqueta contra el template ya cargado. Si
+  // ese re-etiquetado corre DESPUÉS de este render (carrera real, no solo
+  // teórica — timing de queries en paralelo), el match por label fallaba
+  // en silencio y la spec aparecía duplicada en "Custom" con su label sin
+  // resolver, mientras el template-bound mostraba un ghost vacío para el
+  // mismo spec_def_id. Matchear por id es inmune a esa carrera — no
+  // depende de que el re-etiquetado ya haya corrido.
+  const specDefId = (id: string): number | null => {
+    const m = /^(?:spec|tmpl)-(\d+)$/.exec(id);
+    return m ? Number(m[1]) : null;
+  };
+  const specByDefId = new Map<number, Spec>();
+  for (const s of specs) {
+    const defId = specDefId(s.id);
+    if (defId != null) specByDefId.set(defId, s);
+  }
 
   const templateBound: Array<{ spec: Spec; tmpl: SpecTemplate; ghost: boolean }> = [];
   for (const t of templateItems ?? []) {
     if (!t.label?.trim()) continue;
-    const existing = specByLabel.get(lower(t.label));
+    const existing = specByDefId.get(t.spec_def_id);
     if (existing) {
       templateBound.push({ spec: existing, tmpl: t, ghost: false });
     } else {

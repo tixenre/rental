@@ -190,6 +190,92 @@ def agregar(filas: list[dict], modelo: dict) -> dict:
     }
 
 
+def combinar_meses(meses_data: list[dict]) -> dict:
+    """Combina N reportes por-mes (cada uno con la forma de `liquidar`: `resumen`/
+    `por_mes`/`por_dia`/`por_dueno`/`modelo`/`beneficiarios`) en un solo reporte
+    multi-mes. A esta función le da igual si cada mes viene de una foto congelada
+    (`cierres.snapshot_de`) o de un cálculo en vivo — solo suma. Es seguro porque
+    un pedido se atribuye a UN ÚNICO mes de saldado (nunca se solapan entre los
+    reportes de entrada), así que sumar total/pedidos/"veces alquilado" no duplica
+    nada. Pura — no toca DB. La usa `cierres.liquidar_rango` para que la vista
+    multi-mes/anual respete los meses cerrados en vez de recalcularlos (#1209)."""
+    total = 0
+    pedidos = 0
+    por_benef: dict[str, int] = defaultdict(int)
+    por_mes: list[dict] = []
+    por_dia: list[dict] = []
+    beneficiarios: list[str] = []
+    modelo: dict = {}
+    duenos: dict[str, dict] = {}
+
+    for data in meses_data:
+        resumen = data.get("resumen", {})
+        total += resumen.get("total", 0)
+        pedidos += resumen.get("pedidos", 0)
+        for b, v in resumen.get("por_beneficiario", {}).items():
+            por_benef[b] += v
+        por_mes.extend(data.get("por_mes", []))
+        por_dia.extend(data.get("por_dia", []))
+
+        for d in data.get("por_dueno", []):
+            acc = duenos.setdefault(
+                d["dueno"],
+                {
+                    "dueno": d["dueno"],
+                    "monto_generado": 0,
+                    "pedidos": 0,
+                    "reparto": defaultdict(int),
+                    "equipos": defaultdict(lambda: [0, 0]),  # [monto, veces]
+                },
+            )
+            acc["monto_generado"] += d.get("monto_generado", 0)
+            acc["pedidos"] += d.get("pedidos", 0)
+            for b, v in d.get("reparto", {}).items():
+                acc["reparto"][b] += v
+            for eq in d.get("equipos", []):
+                agg = acc["equipos"][eq["equipo"]]
+                agg[0] += eq.get("monto", 0)
+                agg[1] += eq.get("veces", 0)
+
+        # El modelo/beneficiarios "representativo" es el del último mes de la
+        # lista (si es abierto, el vigente hoy; si está cerrado, el que se
+        # congeló) — solo metadata para mostrar columnas; cada monto ya quedó
+        # repartido con el modelo correcto de SU propio mes, no con este.
+        if data.get("modelo"):
+            modelo = data["modelo"]
+        for b in data.get("beneficiarios", []):
+            if b not in beneficiarios:
+                beneficiarios.append(b)
+
+    por_dueno = [
+        {
+            "dueno": acc["dueno"],
+            "monto_generado": acc["monto_generado"],
+            "pedidos": acc["pedidos"],
+            "reparto": dict(acc["reparto"]),
+            "equipos": sorted(
+                (
+                    {"equipo": e, "monto": m, "veces": v}
+                    for e, (m, v) in acc["equipos"].items()
+                ),
+                key=lambda x: x["monto"],
+                reverse=True,
+            ),
+        }
+        for acc in duenos.values()
+    ]
+    por_dueno.sort(key=lambda d: d["monto_generado"], reverse=True)
+
+    return {
+        "resumen": {"total": total, "pedidos": pedidos, "por_beneficiario": dict(por_benef)},
+        "por_mes": sorted(por_mes, key=lambda m: m["mes"]),
+        "por_dia": sorted(por_dia, key=lambda d: d["dia"]),
+        "por_dueno": por_dueno,
+        "modelo": modelo,
+        "beneficiarios": beneficiarios,
+    }
+
+
 def liquidar(conn, desde: str, hasta: str) -> dict:
     """Reporte completo de liquidación para el rango. Carga el modelo de comisiones,
     atribuye y agrega. Devuelve también el `modelo` aplicado (para mostrarlo)."""

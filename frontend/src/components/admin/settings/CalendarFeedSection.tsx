@@ -25,7 +25,7 @@ export function CalendarFeedSection() {
   const feedQ = useQuery({
     queryKey: ["calendar-feed"],
     queryFn: () => adminApi.getCalendarFeed(),
-    staleTime: 60_000,
+    staleTime: 0,
     retry: false,
   });
 

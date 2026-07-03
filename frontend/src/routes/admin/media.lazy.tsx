@@ -98,7 +98,7 @@ function MediaDashboardPage() {
   } = useQuery({
     queryKey: ["admin", "media", "stats"],
     queryFn: () => adminApi.getStats(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   const gcDryRun = useMutation({
