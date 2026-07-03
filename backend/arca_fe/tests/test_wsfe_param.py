@@ -181,6 +181,56 @@ def test_solicitar_cae_con_observaciones():
     assert "502" in result.observaciones[0]
 
 
+def test_solicitar_cae_sin_fedetresp_pero_con_errors_levanta_business():
+    """Si AFIP rechaza el pedido COMPLETO (ej. Auth inválido), FeDetResp puede
+    venir ausente. `resp.FeDetResp.FECAEDetResponse[0]` a ciegas explotaba con
+    un AttributeError/IndexError críptico; ahora se chequea ANTES y se levanta
+    ArcaBusinessError con el motivo real de AFIP. (El mock usa spec sin
+    FeDetResp — un MagicMock sin spec autogeneraría el campo y ocultaría el
+    bug.)"""
+    from arca_fe.wsfe import WsfeClient
+    from arca_fe.errores import ArcaBusinessError
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    err = MagicMock()
+    err.Code = 600
+    err.Msg = "Autenticación fallida"
+    err_container = MagicMock()
+    err_container.Err = [err]
+    resp = MagicMock(spec=["Errors"])  # NO tiene FeDetResp
+    resp.Errors = err_container
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.FECAESolicitar.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        with pytest.raises(ArcaBusinessError, match="600") as ei:
+            client.solicitar_cae({})
+
+    assert ei.value.codigo == 600
+
+
+def test_solicitar_cae_sin_fedetresp_ni_errors_levanta_response():
+    """Respuesta sin FeDetResp y sin Errors — inentendible; ArcaResponseError
+    explícito, no un AttributeError."""
+    from arca_fe.wsfe import WsfeClient
+    from arca_fe.errores import ArcaResponseError
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20123456789, "tok", "sig")
+
+    resp = MagicMock(spec=[])  # ni FeDetResp ni Errors
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.FECAESolicitar.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        with pytest.raises(ArcaResponseError, match="respuesta inesperada"):
+            client.solicitar_cae({})
+
+
 def test_ultimo_autorizado_mock():
     """FECompUltimoAutorizado devuelve int."""
     from arca_fe.wsfe import WsfeClient
