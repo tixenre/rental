@@ -704,6 +704,23 @@ en el dashboard admin — es el gap de gobernanza más directo detrás del miedo
 supervisor marca un motor de plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o
 un PR de fix de plata reportado como shippeado sin confirmar merge real a `dev`/`main`.
 
+### 2026-07-03 — La vista multi-mes/anual de reportes ahora respeta los meses cerrados (`liquidar_rango`)
+
+Uno de los 14 hallazgos de la auditoría cruzada de plata (severidad media): la vista "Mes a mes"/el total
+anual (`_data_liquidacion` en `routes/reportes.py`) recalculaba TODO el rango en vivo con `liquidar()`,
+ignorando que un mes individual dentro del rango podía estar **cerrado** — solo la tarjeta de un mes exacto
+usaba `snapshot_de`. Resultado: la fila de junio dentro del año y el total anual podían mostrar un reparto
+de comisiones distinto al de la tarjeta de junio, para el MISMO mes cerrado. Fix: `reportes/cierres.py`
+suma `liquidar_rango(conn, desde, hasta)` — para cada mes calendario que el rango cubre COMPLETO, usa la
+foto (`snapshot_de`) si está cerrado o `liquidar()` en vivo si no, y combina los N reportes por-mes con la
+función pura nueva `liquidacion.combinar_meses` (sumar es seguro: un pedido pertenece a un único mes de
+saldado, nunca se solapan). Los fragmentos de mes en los bordes (rango no alineado a mes calendario) siguen
+en vivo, como antes. `_data_liquidacion` delega en `liquidar_rango` cuando el rango NO es un único mes
+exacto; la vista de un mes puntual no cambió. El supervisor marca un cálculo de reporte multi-mes que
+recalcule en vivo sin chequear `cierre_de`/`snapshot_de` por mes, o lógica de "está cerrado" reimplementada
+fuera de `reportes/cierres.py`. Tests: `test_liquidar_rango_multimes_respeta_mes_cerrado` (Postgres real,
+reproduce el escenario exacto) + `TestCombinarMeses` (puros). Tracking #1209.
+
 ### 2026-07-03 — dataio export/import perdía `anulado` de `alquiler_pagos`: un pago anulado revivía activo tras backup/restore
 
 El exportador/importador de `dataio` (`exporters.py`/`importers.py`, distinto del `pg_dump` que se usa
