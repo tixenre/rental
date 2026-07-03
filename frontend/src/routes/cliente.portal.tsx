@@ -34,7 +34,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { nombreCliente } from "@/lib/cliente-nombre";
-import { esPathInternoSeguro } from "@/lib/verificacion";
+import { esPathInternoSeguro, recheckVerificacionIdentidad } from "@/lib/verificacion";
 import {
   fmt,
   fmtDate,
@@ -188,6 +188,12 @@ export default function ClientePortal() {
     let intentos = 0;
     const MAX_INTENTOS = 8; // ~24s (cada 3s)
 
+    // Self-recheck contra Didit en paralelo al polling pasivo: si el webhook se
+    // perdió (falla de origen conocida), esto resuelve el estado sin esperar a
+    // que un admin lo note. Best-effort — si falla, seguimos poll-eando
+    // /api/cliente/me igual (el webhook puede llegar solo).
+    void recheckVerificacionIdentidad();
+
     const limpiar = (verificado: boolean) => {
       if (!alive) return;
       setConfirmandoVerif(false);
@@ -210,6 +216,13 @@ export default function ClientePortal() {
           if (alive) setPerfil(p);
           if (p.dni_validado_at) {
             limpiar(true);
+            return;
+          }
+          // "rechazado" es un estado terminal (Didit ya decidió) — no tiene sentido
+          // seguir poll-eando los ~24s completos; el tab Identidad ya muestra el
+          // motivo y el botón para reintentar (IdentidadSection).
+          if (p.dni_verificacion_estado === "rechazado") {
+            limpiar(false);
             return;
           }
         }

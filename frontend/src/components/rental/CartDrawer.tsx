@@ -6,7 +6,8 @@ import { useCart } from "@/lib/cart-store";
 import { type Equipment } from "@/data/equipment";
 import { useClienteSession } from "@/lib/iva";
 import { createOrder, OrderVerificationError } from "@/lib/orders";
-import { chequearEstadoCuenta, iniciarVerificacionIdentidad } from "@/lib/verificacion";
+import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
+import type { VerificacionPanelEstado } from "@/components/rental/VerificacionRequeridaPanel";
 import { stepUpWithPasskey, passkeyErrorMessage } from "@/lib/passkey";
 import { aceptarTyc, validarCheckout } from "@/lib/checkout";
 import { toLocalISO } from "@/lib/rental-dates";
@@ -57,7 +58,8 @@ export function CartDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
-  const [needsVerif, setNeedsVerif] = useState(false);
+  const [verifEstado, setVerifEstado] = useState<VerificacionPanelEstado | null>(null);
+  const [verifMotivo, setVerifMotivo] = useState<string | null>(null);
   const [iniciandoVerif, setIniciandoVerif] = useState(false);
   const [notas, setNotas] = useState("");
   const [showNotas, setShowNotas] = useState(false);
@@ -220,12 +222,14 @@ export function CartDrawer({
     setSubmitting(true);
     setSubmitError(null);
     setNeedsLogin(false);
-    setNeedsVerif(false);
+    setVerifEstado(null);
+    setVerifMotivo(null);
 
     // #27 — Pre-check de cuenta antes de submitear (fuente única en
     // verificacion.ts). Sin sesión → panel login/registro; logueado pero sin
-    // DNI validado → panel de verificación de identidad; en vez del 401/403 críptico.
-    const estado = await chequearEstadoCuenta();
+    // DNI validado → panel de verificación de identidad (distingue no-verificado
+    // / en-revision / rechazado); en vez del 401/403 críptico.
+    const { estado, motivo } = await chequearEstadoVerificacion();
     if (estado === "no-logueado") {
       setNeedsLogin(true);
       setSubmitting(false);
@@ -236,8 +240,9 @@ export function CartDrawer({
       setSubmitting(false);
       return;
     }
-    if (estado === "no-verificado") {
-      setNeedsVerif(true);
+    if (estado === "no-verificado" || estado === "en-revision" || estado === "rechazado") {
+      setVerifEstado(estado);
+      setVerifMotivo(motivo ?? null);
       setSubmitting(false);
       return;
     }
@@ -292,7 +297,7 @@ export function CartDrawer({
       // Backstop: si el backend rechaza por identidad (403), mostramos el panel
       // de verificación en vez del toast genérico.
       if (err instanceof OrderVerificationError) {
-        setNeedsVerif(true);
+        setVerifEstado("no-verificado");
         setSubmitting(false);
         return;
       }
@@ -371,7 +376,8 @@ export function CartDrawer({
       needsLogin={needsLogin}
       onLogin={goToLogin}
       onRegister={goToRegister}
-      needsVerif={needsVerif}
+      verifEstado={verifEstado}
+      verifMotivo={verifMotivo}
       iniciandoVerif={iniciandoVerif}
       onVerificar={onVerificar}
       clienteSession={clienteSession}
