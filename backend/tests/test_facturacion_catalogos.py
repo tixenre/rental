@@ -155,11 +155,19 @@ def test_refrescar_catalogos_sin_emisor_con_cert_levanta_value_error(monkeypatch
 
 
 def test_refrescar_catalogos_arca_caida_propaga_runtime_error(monkeypatch):
+    """Regresión: `param_tipos_doc()` real levanta `ArcaBusinessError`
+    (taxonomía tipada del motor), no `RuntimeError` directamente — mockear un
+    RuntimeError acá no ejercita la traducción real (bug real: sin el
+    `except ArcaError` en `refrescar_catalogos`, esto escapaba sin manejar)."""
+    from arca_fe.errores import ArcaBusinessError
+
     conn = _FakeAppSettingsConn()
     _patch_auth(monkeypatch)
     monkeypatch.setattr(
         "arca_fe.wsfe.WsfeClient.param_tipos_doc",
-        lambda self: (_ for _ in ()).throw(RuntimeError("FEParamGetTiposDoc error")),
+        lambda self: (_ for _ in ()).throw(
+            ArcaBusinessError("FEParamGetTiposDoc error — 600: no autorizado")
+        ),
     )
 
     with pytest.raises(RuntimeError):
