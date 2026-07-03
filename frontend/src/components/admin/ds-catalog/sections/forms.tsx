@@ -9,6 +9,7 @@ import { useState } from "react";
 import { SegmentedControl } from "@/design-system/ui/segmented-control";
 import { QtyInput } from "@/design-system/ui/qty-input";
 import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
+import { MoneyInput } from "@/design-system/ui/money-input";
 import { useForm } from "react-hook-form";
 import { type DateRange } from "react-day-picker";
 
@@ -359,6 +360,23 @@ export const formsSection: CatalogSection = {
             </Sample>
             <Sample label="size sm">
               <QtyInput value={qty} onChange={setQty} size="sm" />
+            </Sample>
+          </Row>
+        );
+      },
+    },
+    {
+      name: "MoneyInput",
+      files: ["design-system/ui/money-input.tsx"],
+      blurb:
+        'Input de plata: se ve formateado como "$791.100" SIEMPRE, incluso mientras se edita — el usuario tipea solo dígitos, nunca separadores. El enmascarado se resuelve sobre los dígitos crudos (no delega en el input nativo type="number", que rechaza el formato).',
+      render: () => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [monto, setMonto] = useState(791100);
+        return (
+          <Row className="gap-6">
+            <Sample label="monto (sin max)">
+              <MoneyInput value={monto} onChange={setMonto} ariaLabel="Monto" />
             </Sample>
           </Row>
         );
