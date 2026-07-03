@@ -164,7 +164,7 @@ class PadronClient:
         except zeep.exceptions.Fault as exc:
             raise RuntimeError(str(exc)) from exc
 
-        persona = getattr(resp, "persona", None) if resp is not None else None
+        persona = getattr(resp, "personaReturn", None) if resp is not None else None
         if persona is None:
             return None
 
