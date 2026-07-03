@@ -1,23 +1,48 @@
-# Sistema: Plata — mapa cruzado de todos los motores que tocan dinero
+# Sistema: Finanzas/Flujo — el módulo orquestador + el mapa cruzado de todos los motores que tocan dinero
 
-> Manual técnico **cruzado** (fuente única del **cómo se conecta la plata entre motores**).
-> Cada motor individual ya tiene su propio manual/invariantes (`backend/contabilidad/CLAUDE.md`,
-> `backend/reservas/CLAUDE.md`, `docs/SISTEMA_FACTURACION.md`, `docs/SISTEMA_CARRITO.md`) — **este
-> doc no los repite**, los referencia y muestra cómo encajan. Las reglas de criterio y el _porqué_
-> viven en `MEMORIA.md`/`DECISIONES.md`. Índice maestro en `MANIFIESTO.md` §8.
+> Manual técnico **cruzado** (fuente única del **cómo se conecta la plata entre motores**) — y del
+> módulo orquestador `backend/services/finanzas_flujo/` (mismo patrón 1:1 manual↔módulo que
+> `SISTEMA_CARRITO.md`↔`services/carrito/`). Cada motor individual ya tiene su propio manual/
+> invariantes (`backend/contabilidad/CLAUDE.md`, `backend/reservas/CLAUDE.md`,
+> `docs/SISTEMA_FACTURACION.md`, `docs/SISTEMA_CARRITO.md`) — **este doc no los repite**, los
+> referencia y muestra cómo encajan. Las reglas de criterio y el _porqué_ viven en
+> `MEMORIA.md`/`DECISIONES.md`. Índice maestro en `MANIFIESTO.md` §8.
 >
 > **Origen:** nace de la auditoría 2026-07-02 (post fix #405 + auditoría de `contabilidad/`), a
 > pedido del dueño ante el miedo de "drift de plata" — demasiados lugares tocan dinero y no había
-> un mapa único de quién gobierna qué número. Verificado con 6 auditorías paralelas sobre los
-> motores no cubiertos por la auditoría de `contabilidad/` (precios ×2, reportes/liquidación,
-> facturación, el camino de congelamiento de precio, y un trace end-to-end + estado de la
-> reconciliación) — y descubrió, de paso, que el fix original del bug #405 (#1181) nunca se
-> mergeó a `dev`/`main`.
+> un mapa único de quién gobierna qué número, ni una implementación real de ese mapa (solo
+> documentación). Verificado con 6 auditorías paralelas sobre los motores no cubiertos por la
+> auditoría de `contabilidad/` (precios ×2, reportes/liquidación, facturación, el camino de
+> congelamiento de precio, y un trace end-to-end + estado de la reconciliación) — y descubrió, de
+> paso, que el fix original del bug #405 (#1181) nunca se mergeó a `dev`/`main`. El dueño pidió que
+> el mapa fuera **código real, no solo prosa** → nace `services/finanzas_flujo/` (Fase 1 de la hoja
+> de ruta que sigue a esta auditoría).
 
 ## Qué resuelve
 
 Nadie recalcula "el mismo número" dos veces por caminos independientes. Cada pregunta de plata
-tiene **un solo motor dueño**; el resto **consume**, nunca reimplementa.
+tiene **un solo motor dueño**; el resto **consume**, nunca reimplementa — y desde Fase 1, ese
+"consume" pasa por un único punto de entrada de código: `backend/services/finanzas_flujo/`.
+
+## El módulo orquestador: `backend/services/finanzas_flujo/`
+
+Facade de **solo lectura** — no reimplementa ni reemplaza ningún motor (`precios`,
+`reportes/liquidacion`, `contabilidad`, `facturacion` siguen siendo dueños de su lógica). Expone una
+API única y estable para "preguntar un número de plata"; nunca escribe (las mutaciones siguen
+pasando por cada motor directo: `create_pedido_retry`, `contabilidad.commands.*`, rutas de
+`alquiler_pagos`).
+
+```
+backend/services/finanzas_flujo/
+  pedido.py   → desglose_de_pedido(conn, pedido) -> dict   [Fase 1, implementado]
+                OWNA: fixea el bug de cobro_modo. Delega en services.precios.calcular_total.
+  liquidacion.py, contabilidad.py, facturacion.py, reconciliacion.py → fases siguientes
+```
+
+**Candado:** `backend/tests/test_finanzas_flujo_source_scan.py` — verifica que `pdf_templates.py`
+usa el helper cobro_modo-aware (no reimplementa la multiplicación) y que
+`services/facturacion/engine.py` importa la fachada (no `routes.alquileres` directo — un service no
+debe depender de un route).
 
 ## Fuente única de cada número
 
@@ -72,6 +97,8 @@ reconciliación. No hay badge/contador en el dashboard admin. Es la pieza de gob
 - `backend/tests/test_carrito_precio_efectivo.py` — source-scan: los 3 caminos de plata persistida
   (cotizar/crear/modificar) usan `precio_jornada_efectivo`, ninguno reinlinea el switch de combo.
 - `backend/tests/test_reportes_cierres_db.py` — cierre de la liquidación.
+- `backend/tests/test_finanzas_flujo_pedido.py` — desglose de pedido, cobro_modo-aware (Fase 1).
+- `backend/tests/test_finanzas_flujo_source_scan.py` — PDF y facturación pasan por la fachada.
 - Facturación: candados propios en `docs/SISTEMA_FACTURACION.md`.
 
 ## Hallazgos de la auditoría cruzada (2026-07-02) — estado: por priorizar con el dueño
@@ -88,17 +115,18 @@ bug #405 está potencialmente activo en producción hoy mismo.** Mergeable state
 máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
 
 ### Bugs reales (activos hoy)
-1. **`_enriquecer_pedido_con_total` (`routes/alquileres/core.py`) ignora `cobro_modo`** — ALTO. Una
-   línea personalizada `cobro_modo='fijo'` (ej. flete, no debe multiplicarse por jornadas, #805) se
-   multiplica igual por jornadas en este desglose de *display*. Se usa en **6 lugares reales**: detalle
-   de pedido (admin y portal cliente), 2 generadores de PDF, y **`services/facturacion/engine.py`** —
-   el motor de facturación real puede mostrar/facturar un desglose incorrecto para pedidos con líneas
-   "fijo" + jornadas > 1. `monto_total` persistido (el que se cobra) sigue siendo correcto — es el
-   desglose que se MUESTRA/factura el que puede no cuadrar. `test_alquiler_detail_desglose.py` no
-   tiene ningún caso con `cobro_modo='fijo'` — gap de test real.
-2. **Mismo bug en el PDF** — `pdf_templates.py` (fila de subtotal del presupuesto) multiplica
-   `precio_jornada × cantidad × jornadas` sin mirar `cobro_modo` — un cliente puede ver la fila
-   "Flete" no sumar con el total del PDF.
+1. ~~**`_enriquecer_pedido_con_total` (`routes/alquileres/core.py`) ignora `cobro_modo`**~~ —
+   **RESUELTO (Fase 1, `services/finanzas_flujo/pedido.py::desglose_de_pedido`).** Una línea
+   personalizada `cobro_modo='fijo'` (ej. flete, #805) se multiplicaba igual por jornadas en este
+   desglose de *display*, en los 6 lugares reales que lo usan: detalle de pedido (admin y portal
+   cliente), 2 generadores de PDF/mail, y **`services/facturacion/engine.py`** (el motor de
+   facturación real). `_enriquecer_pedido_con_total` ahora es un wrapper que delega en la fachada;
+   `services/facturacion/engine.py` migró a importarla directo (ya no depende de `routes.alquileres`).
+   Candado: `test_finanzas_flujo_pedido.py` (unit, 5 casos) + `test_finanzas_flujo_source_scan.py`.
+2. ~~**Mismo bug en el PDF**~~ — **RESUELTO (Fase 1).** `pdf_templates.py` reimplementaba
+   `precio_jornada × cantidad × jornadas` desde cero, sin `cobro_modo`. Ahora `_pedido_html`/
+   `_sum_bruto` usan el helper `_bruto_item_pdf` (mismo criterio que `bruto_linea`). Candado:
+   `test_pdf_helpers.py::TestBrutoItemPdf` + el source-scan de arriba.
 3. **`routes/facturacion.py` (`enviar_mail_factura`)** — consulta `c.owner_email`, columna que **no
    existe** en `clientes` (vive en otra tabla). Rompe con `UndefinedColumn` cada vez que un admin usa
    "enviar factura por mail". Sin test que lo cubra. Fix trivial: `c.owner_email` → `c.email`.
@@ -106,14 +134,16 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
    con subtotal 0, ej. 100% descuento a nivel ítem), el prorrateo da `NULL` → se trata como 0 → la
    plata de ese pedido **desaparece en silencio** del reporte de liquidación, sin que ningún chequeo
    de reconciliación lo detecte. Edge case raro, pero real.
-5. **Front — 3 lugares reimplementan el cálculo de línea en vez de leer lo que ya calculó el
-   backend** (viola "el front no calcula plata", 2026-06-29):
-   - `PedidoPageCards.tsx` vs `PedidoPageHelpers.tsx` (editor admin) — **ya divergidas**: Cards ignora
-     `cobro_modo`, Helpers sí lo respeta.
-   - `CartDrawerView.tsx`/`CartMiniBarView.tsx` (carrito público) — recalculan el desglose con
-     `pricePerDay` cacheado del store en vez de usar el helper `lineaPorEquipo()` que **ya existe**
-     para esto (`lib/cotizacion.ts`) — puede divergir si el precio cambió y el store quedó stale.
-   - En los 3 casos lo persistido/cobrado sigue siendo correcto — es el número que se MUESTRA el que
+5. **Front — reimplementaba el cálculo de línea en vez de leer lo que ya calculó el backend** (viola
+   "el front no calcula plata", 2026-06-29):
+   - ~~`PedidoPageCards.tsx` vs `PedidoPageHelpers.tsx` (editor admin)~~ — **RESUELTO (Fase 1)**:
+     ambos importan `subtotalDraftItem` desde `usePedidoDraft.ts` — ya no pueden divergir, llaman
+     literalmente a la misma función.
+   - `CartDrawerView.tsx`/`CartMiniBarView.tsx` (carrito público) — **pendiente, fuera de Fase 1**
+     (requiere threadear el objeto `Cotizacion` completo a 3 call-sites, cambio de mayor alcance; el
+     carrito público hoy no tiene líneas `cobro_modo='fijo'`, así que es solo riesgo de staleness de
+     precio cacheado, no el bug concreto). Documentado como fase futura opcional.
+   - En ambos casos lo persistido/cobrado sigue siendo correcto — es el número que se MUESTRA el que
      puede no coincidir.
 6. **`frontend/src/lib/pricing.ts`** — TODO explícito en el código dice "por ahora es lineal, sin
    descuentos" (#73) pero el backend YA implementó descuentos hace tiempo. Se usa en `PriceBlock`
