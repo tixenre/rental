@@ -1,12 +1,12 @@
 """Tests de Fase 1: spec_key end-to-end en el pipeline de normalización.
 
 Verifica:
-- _specs_dict_to_array produce {spec_key, label, value} por item.
+- specs_dict_to_array produce {spec_key, label, value} por item.
 - Label viene del registry (fuente única) — no de _SPEC_LABELS borrado.
 - lens_mount → label "Montura" para Cámaras (antes era "Lens mount" divergente).
-- Specs sin registry_labels reciben fallback label (nunca se descartan).
-- Cobertura: qué spec_keys del registry emite _build_result por categoría.
-- _normalize_label del companion unifica _ ↔ espacio.
+- Specs sin spec_def en la categoría reciben fallback label (nunca se descartan).
+- Cobertura: qué spec_keys del registry emite build_result por categoría.
+- normalize_label del resolver unifica _ ↔ espacio.
 """
 
 import pytest
@@ -14,24 +14,25 @@ from pathlib import Path
 
 pytestmark = pytest.mark.unit
 
-from services.equipo_html_extractor import _specs_dict_to_array, _build_result
+from services.specs_ingesta.parse.serialize import specs_dict_to_array
+from services.specs_ingesta.queries.resultado import build_result
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "html"
 
 
-# ── _specs_dict_to_array ────────────────────────────────────────────────────
+# ── specs_dict_to_array ─────────────────────────────────────────────────────
 
 
 def test_specs_dict_incluye_spec_key():
-    result = _specs_dict_to_array({"lens_mount": "E", "fps_max": 120})
+    result = specs_dict_to_array({"lens_mount": "E", "fps_max": 120}, "Cámaras")
     keys = {item["spec_key"] for item in result}
     assert "lens_mount" in keys
     assert "fps_max" in keys
 
 
 def test_specs_dict_item_tiene_tres_campos():
-    result = _specs_dict_to_array({"lens_mount": "E"})
+    result = specs_dict_to_array({"lens_mount": "E"}, "Cámaras")
     item = result[0]
     assert "spec_key" in item
     assert "label" in item
@@ -39,37 +40,32 @@ def test_specs_dict_item_tiene_tres_campos():
 
 
 def test_specs_dict_fallback_label_sin_registry():
-    # Sin registry_labels, el label es la key limpia (title-case) — no se descarta.
-    result = _specs_dict_to_array({"lens_mount": "E"})
-    item = next(x for x in result if x["spec_key"] == "lens_mount")
+    # Key sin spec_def en la categoría: el label es la key limpia (title-case) — no se descarta.
+    result = specs_dict_to_array({"unknown_spec_key": "E"}, "Cámaras")
+    item = next(x for x in result if x["spec_key"] == "unknown_spec_key")
     assert item["label"]  # no vacío
     assert item["value"] == "E"
 
 
 def test_specs_dict_label_de_registry_labels():
-    registry_labels = {"lens_mount": "Montura", "fps_max": "FPS máx"}
-    result = _specs_dict_to_array({"lens_mount": "E", "fps_max": 120}, registry_labels=registry_labels)
+    result = specs_dict_to_array({"lens_mount": "E", "fps_max": 120}, "Cámaras")
     by_key = {item["spec_key"]: item for item in result}
     assert by_key["lens_mount"]["label"] == "Montura"
-    assert by_key["fps_max"]["label"] == "FPS máx"
 
 
 def test_zero_descartes_spec_key_desconocido():
-    # Una key que no existe en registry_labels igual aparece en la salida.
-    registry_labels = {"lens_mount": "Montura"}
-    result = _specs_dict_to_array(
-        {"lens_mount": "E", "unknown_future_key": "valor"}, registry_labels=registry_labels
-    )
+    # Una key que no existe en el registry de la categoría igual aparece en la salida.
+    result = specs_dict_to_array({"lens_mount": "E", "unknown_future_key": "valor"}, "Cámaras")
     keys = {item["spec_key"] for item in result}
     assert "unknown_future_key" in keys, "spec desconocida no debe descartarse"
 
 
-# ── _build_result — label sale del registry ─────────────────────────────────
+# ── build_result — label sale del registry ──────────────────────────────────
 
 
 def test_lens_mount_label_montura_para_camaras():
     """Caso testigo principal: lens_mount → label "Montura" (del registry), no "Lens mount"."""
-    r = _build_result(
+    r = build_result(
         marca="Sony", modelo="FX6",
         specs={"lens_mount": "E", "camera_subtipo": "Cinema Camera"},
         extras={},
@@ -85,7 +81,7 @@ def test_lens_mount_label_montura_para_camaras():
 
 def test_todos_los_items_tienen_spec_key():
     """Invariante: ningún item de specs puede carecer de spec_key."""
-    r = _build_result(
+    r = build_result(
         marca="Sony", modelo="FX6",
         specs={"lens_mount": "E", "fps_max": 120, "resolucion_max": "4K"},
         extras={"white_balance": "Auto"},
@@ -110,7 +106,7 @@ _KNOWN_ORPHANS_GLOBAL: set[str] = set()  # 6b-i: bicolor/rgb removidos → color
 
 
 def _registry_all_keys() -> set[str]:
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     keys: set[str] = set()
     for cat_reg in REGISTRY.categorias.values():
         keys.update(s.key for s in cat_reg.specs)
@@ -119,7 +115,7 @@ def _registry_all_keys() -> set[str]:
 
 def test_cobertura_real_camaras():
     """Parser de Cámaras no emite keys huérfanas (emitidas pero no en el registry)."""
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
     html = _load_fixture("camara_minimal.html")
     r = extract_from_html(html, categoria_hint="Cámaras")
     emitted = {s["spec_key"] for s in r["specs"] if s.get("spec_key")}
@@ -133,7 +129,7 @@ def test_cobertura_real_camaras():
 
 def test_cobertura_real_lentes():
     """Parser de Lentes no emite keys huérfanas."""
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
     html = _load_fixture("lente_minimal.html")
     r = extract_from_html(html, categoria_hint="Lentes")
     emitted = {s["spec_key"] for s in r["specs"] if s.get("spec_key")}
@@ -147,7 +143,7 @@ def test_cobertura_real_lentes():
 
 def test_cobertura_real_iluminacion():
     """Parser de Iluminación no emite keys huérfanas."""
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
     html = _load_fixture("luz_minimal.html")
     r = extract_from_html(html, categoria_hint="Iluminación")
     emitted = {s["spec_key"] for s in r["specs"] if s.get("spec_key")}
@@ -167,7 +163,7 @@ def test_cobertura_real_modificadores():
     Quick Open Type, Light Loss/Gain, Light Compatibility, Dimensions).
     El fixture usa esos labels reales — mismo formato que los HTMLs de B&H.
     """
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
     html = _load_fixture("softbox_bh.html")
     r = extract_from_html(html, categoria_hint="Modificadores")
     by_key = {s["spec_key"]: s for s in r["specs"] if s.get("spec_key")}
@@ -194,8 +190,8 @@ def test_cobertura_real_modificadores():
 
 
 def _get_normalize_label():
-    from services.generic_html_extractor import _normalize_label
-    return _normalize_label
+    from services.specs_ingesta.queries.resolver import normalize_label
+    return normalize_label
 
 
 def test_normalize_label_unifica_guion_y_espacio():
@@ -218,7 +214,7 @@ def _load_fixture(name: str) -> str:
 
 
 def test_extract_camara_specs_tienen_spec_key():
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
     html = _load_fixture("camara_minimal.html")
     r = extract_from_html(html)
     assert r["specs"], "debe extraer al menos un spec"
@@ -227,7 +223,7 @@ def test_extract_camara_specs_tienen_spec_key():
 
 
 def test_extract_lente_specs_tienen_spec_key():
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
     html = _load_fixture("lente_minimal.html")
     r = extract_from_html(html)
     assert r["specs"], "debe extraer al menos un spec"
@@ -236,7 +232,7 @@ def test_extract_lente_specs_tienen_spec_key():
 
 
 def test_extract_luz_specs_tienen_spec_key():
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
     html = _load_fixture("luz_minimal.html")
     r = extract_from_html(html)
     assert r["specs"], "debe extraer al menos un spec"
@@ -246,7 +242,7 @@ def test_extract_luz_specs_tienen_spec_key():
 
 def test_extract_camara_lens_mount_label_canonico():
     """lens_mount extraído de fixture HTML → label canónico del registry, no "Lens mount"."""
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
     html = _load_fixture("camara_minimal.html")
     r = extract_from_html(html)
     by_key = {item["spec_key"]: item for item in r["specs"]}
@@ -261,7 +257,7 @@ def test_extract_camara_lens_mount_label_canonico():
 
 def test_extract_luz_wattage_cae_en_consumo_w():
     """'Wattage: 200 W' en el fixture HTML → spec_key 'consumo_w', nunca 'potencia_w'."""
-    from services.equipo_html_extractor import extract_from_html
+    from services.specs_ingesta import extract_from_html
     html = _load_fixture("luz_minimal.html")
     r = extract_from_html(html)
     by_key = {item["spec_key"]: item for item in r["specs"]}
@@ -285,13 +281,10 @@ def test_parser_luz_no_emite_keys_huerfanas():
       - bicolor, rgb: emitidos siempre como bool por el parser pero aún no
         formalizados como SpecDef en el registry (issue pendiente).
     """
-    import sys
-    from pathlib import Path
-    _tools = Path(__file__).parent.parent.parent / "tools"
-    sys.path.insert(0, str(_tools))
-    from iluminacion_parser import map_luz_specs, BHSpecsParser
+    from services.specs_ingesta.parsers.iluminacion import map_luz_specs
+    from services.specs_ingesta.parsers.base import BHSpecsParser
 
-    from specs import REGISTRY
+    from services.specs import REGISTRY
     cat = REGISTRY.get("Iluminación")
     registry_keys = {s.key for s in cat.specs}
 

@@ -1,4 +1,4 @@
-import * as React from "react";
+import { useEffect, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "./button";
@@ -34,12 +34,41 @@ export function QtyInput({
   function increment() {
     onChange(max !== undefined ? Math.min(max, value + 1) : value + 1);
   }
+
+  // Borrador local — no el `value` autoritativo directo. `handleChange`
+  // hacía `parseInt(e.target.value, 10)` y, si el campo estaba vacío
+  // (NaN, `!Number.isFinite`), retornaba SIN llamar a `onChange`: como el
+  // input queda controlado por `value` (el prop, sin cambiar), el próximo
+  // render de CUALQUIER otra cosa en la página lo pisaba de vuelta al
+  // número viejo — no se podía borrar un dígito y escribir uno nuevo.
+  // Acá se edita libre en un string local; confirma con cada tecla que YA
+  // parsea a un número válido (a diferencia de KitComponentEditor, este es
+  // un stepper — se espera feedback en vivo, ej. subtotales), pero sin
+  // forzar un valor no vacío en el medio de una edición. Al salir del
+  // campo, si quedó vacío/inválido, vuelve al último valor válido.
+  const [draft, setDraft] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setDraft(String(value));
+  }, [value, focused]);
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const parsed = parseInt(e.target.value, 10);
+    const raw = e.target.value;
+    setDraft(raw);
+    if (raw.trim() === "") return;
+    const parsed = parseInt(raw, 10);
     if (!Number.isFinite(parsed)) return;
     const clamped =
       max !== undefined ? Math.min(max, Math.max(min, parsed)) : Math.max(min, parsed);
     onChange(clamped);
+  }
+
+  function handleBlur() {
+    setFocused(false);
+    if (draft.trim() === "" || !Number.isFinite(parseInt(draft, 10))) {
+      setDraft(String(value));
+    }
   }
 
   return (
@@ -57,9 +86,11 @@ export function QtyInput({
         type="number"
         min={min}
         max={max}
-        value={value}
+        value={draft}
         aria-label="Cantidad"
+        onFocus={() => setFocused(true)}
         onChange={handleChange}
+        onBlur={handleBlur}
         className={cn(
           "rounded-md border text-center font-mono text-sm tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring p-0",
           inputH,

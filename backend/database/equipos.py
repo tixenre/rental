@@ -1,40 +1,10 @@
 """database/equipos.py — enriquecimiento de equipos (#501 Fase 5).
 
 Helpers `attach_*` que, dado un lote de equipos (list[dict]), les adjuntan en vivo
-sus tags, kit, categorías, ficha y specs (destacadas + estructuradas). Move-verbatim
+su kit, categorías, ficha y specs (destacadas + estructuradas). Move-verbatim
 desde `database.py`. `attach_kit` deriva el contenido de la puerta única
 `services.contenido` (fuente única del "qué incluye").
 """
-
-
-def attach_tags(conn, equipos: list[dict]) -> list[dict]:
-    """Agrega etiquetas a la lista de equipos (ordenadas por `orden`)."""
-    if not equipos:
-        return equipos
-
-    ids = [e["id"] for e in equipos]
-    placeholders = ",".join(["%s"] * len(ids))
-
-    cur = conn.cursor()
-    cur.execute(f"""
-        SELECT ee.equipo_id, et.nombre, et.prioridad
-        FROM equipo_etiquetas ee
-        JOIN etiquetas et ON et.id = ee.etiqueta_id
-        WHERE ee.equipo_id IN ({placeholders})
-        ORDER BY ee.equipo_id, ee.orden
-    """, ids)
-
-    rows = cur.fetchall()
-    tag_map: dict[int, list] = {e["id"]: [] for e in equipos}
-
-    for r in rows:
-        tag_map[r["equipo_id"]].append(r["nombre"])
-
-    for e in equipos:
-        e["etiquetas"] = tag_map[e["id"]]
-
-    cur.close()
-    return equipos
 
 
 def attach_kit(conn, equipos: list[dict]) -> list[dict]:
@@ -67,25 +37,11 @@ def attach_categorias(conn, equipos: list[dict]) -> list[dict]:
     """Agrega `categorias` (lista de {id, nombre, parent_id}) a cada equipo."""
     if not equipos:
         return equipos
+    from services.categorias.queries.ancestry import categorias_de_equipos
     ids = [e["id"] for e in equipos]
-    placeholders = ",".join(["%s"] * len(ids))
-    cur = conn.cursor()
-    cur.execute(f"""
-        SELECT ec.equipo_id, c.id, c.nombre, c.parent_id
-        FROM equipo_categorias ec
-        JOIN categorias c ON c.id = ec.categoria_id
-        WHERE ec.equipo_id IN ({placeholders})
-        ORDER BY ec.equipo_id, ec.orden
-    """, ids)
-    rows = cur.fetchall()
-    cat_map: dict[int, list] = {e["id"]: [] for e in equipos}
-    for r in rows:
-        cat_map[r["equipo_id"]].append({
-            "id": r["id"], "nombre": r["nombre"], "parent_id": r["parent_id"],
-        })
+    cat_map = categorias_de_equipos(conn, ids)
     for e in equipos:
-        e["categorias"] = cat_map[e["id"]]
-    cur.close()
+        e["categorias"] = cat_map.get(e["id"], [])
     return equipos
 
 
@@ -138,38 +94,32 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
     if not equipos:
         return equipos
     from services.spec_render import render_spec_value
+    from services.specs import get_equipo_specs_rows
+
     ids = [e["id"] for e in equipos]
-    placeholders = ",".join(["%s"] * len(ids))
-    cur = conn.cursor()
-    # Para destacadas de tipo bool, solo emitir cuando el valor es "Sí"/true.
-    # Una spec "Macro: No" no aporta como quick fact en la card — destacar
-    # solo cuando el lente ES macro, no cuando no lo es.
-    cur.execute(f"""
-        SELECT es.equipo_id, sd.label, sd.tipo, sd.unidad, es.value,
-               COALESCE(sd.prioridad, 100) AS prioridad
-        FROM equipo_specs es
-        JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
-        JOIN spec_definitions sd ON sd.id = es.spec_def_id
-        JOIN categoria_spec_templates t
-            ON t.spec_def_id = es.spec_def_id
-           AND t.categoria_id = ec.categoria_id
-        WHERE COALESCE(sd.favorito, FALSE) = TRUE
-          AND es.equipo_id IN ({placeholders})
-          AND (
-            sd.tipo != 'bool'
-            OR LOWER(TRIM(es.value)) IN ('sí', 'si', 'yes', 'true', '1')
-          )
-        ORDER BY es.equipo_id, COALESCE(sd.prioridad, 100), sd.label
-    """, ids)
-    rows = cur.fetchall()
-    cur.close()
+    rows_by_equipo = get_equipo_specs_rows(conn, ids)
 
     dest_map: dict[int, list[dict]] = {e["id"]: [] for e in equipos}
-    seen: dict[int, set] = {e["id"]: set() for e in equipos}
-    for r in rows:
-        eid = r["equipo_id"]
-        key = r["label"]
-        if key not in seen[eid]:
+    for eid in ids:
+        # get_equipo_specs_rows ordena por (equipo_id, spec_def_id) — lo
+        # reordenamos acá por (prioridad, label), el orden real de esta
+        # pantalla (y el que decide qué gana un empate de label más abajo).
+        rows = sorted(rows_by_equipo.get(eid, []), key=lambda r: (r["prioridad"], r["label"]))
+        seen: set[str] = set()
+        for r in rows:
+            if not r["en_card"]:
+                continue
+            # Para destacadas de tipo bool, solo emitir cuando el valor es
+            # "Sí"/true. Una spec "Macro: No" no aporta como quick fact en
+            # la card — destacar solo cuando el lente ES macro, no cuando no lo es.
+            if r["tipo"] == "bool" and str(r["value"]).strip().lower() not in (
+                "sí", "si", "yes", "true", "1"
+            ):
+                continue
+            key = r["label"]
+            if key in seen:
+                continue
+            seen.add(key)
             # Para bool, el value queda vacío — el frontend muestra solo el
             # label como badge (ej. "MACRO" en lugar de "MACRO Sí").
             # El resto pasa por el renderer canónico (mismo que el nombre
@@ -178,7 +128,6 @@ def attach_specs_destacados(conn, equipos: list[dict]) -> list[dict]:
                 r["value"], r["tipo"], r["unidad"]
             )
             dest_map[eid].append({"label": r["label"], "value": value})
-            seen[eid].add(key)
 
     for e in equipos:
         e["specs_destacados"] = dest_map[e["id"]]
@@ -200,60 +149,42 @@ def attach_specs_estructuradas(conn, equipos: list[dict]) -> list[dict]:
     if not equipos:
         return equipos
     from services.spec_render import render_spec_value, _is_empty_value
+    from services.specs import get_equipo_specs_rows
+
     ids = [e["id"] for e in equipos]
-    placeholders = ",".join(["%s"] * len(ids))
-    cur = conn.cursor()
-    cur.execute(f"""
-        SELECT DISTINCT ON (es.equipo_id, sd.id)
-            es.equipo_id, sd.spec_key, sd.label, sd.tipo, sd.unidad,
-            es.value,
-            COALESCE(sd.prioridad, 100) AS prioridad,
-            COALESCE(sd.favorito, FALSE) AS en_card,
-            COALESCE(sd.en_filtros, FALSE) AS en_filtros,
-            COALESCE(sd.favorito, FALSE) AS destacado
-        FROM equipo_specs es
-        JOIN equipo_categorias ec ON ec.equipo_id = es.equipo_id
-        JOIN spec_definitions sd ON sd.id = es.spec_def_id
-        JOIN categoria_spec_templates t
-            ON t.spec_def_id = es.spec_def_id
-           AND t.categoria_id = ec.categoria_id
-        WHERE es.equipo_id IN ({placeholders})
-        ORDER BY es.equipo_id, sd.id, COALESCE(sd.prioridad, 100)
-    """, ids)
-    rows = cur.fetchall()
-    cur.close()
+    rows_by_equipo = get_equipo_specs_rows(conn, ids)
 
     _BOOL_FALSE = frozenset({"false", "no", "0", "n", "falso", "off", "disabled"})
 
     specs_map: dict[int, dict[str, dict]] = {e["id"]: {} for e in equipos}
-    for r in rows:
-        eid = r["equipo_id"]
-        key = r["spec_key"]
-        if key in specs_map[eid]:
-            continue  # dedup: mantenemos el de mayor prioridad (DISTINCT ON)
-        raw_val: str | None = r["value"]
-        # Omitir specs efectivamente vacías o bool-false: no aportan en la ficha.
-        if _is_empty_value(raw_val):
-            continue
-        if r["tipo"] == "bool" and str(raw_val).lower().strip() in _BOOL_FALSE:
-            continue
-        value_display = render_spec_value(raw_val, r["tipo"], r["unidad"])
-        if not value_display:
-            continue
-        specs_map[eid][key] = {
-            "label": r["label"],
-            # `value` queda CRUDO (lo usan los filtros públicos por specsRaw).
-            # `value_display` es el render canónico (mismo que el nombre
-            # público) para mostrar en la ficha — "[24,70]" mm → "24-70 mm".
-            "value": raw_val,
-            "value_display": value_display,
-            "tipo": r["tipo"],
-            "unidad": r["unidad"],
-            "prioridad": r["prioridad"],
-            "en_card": bool(r["en_card"]),
-            "en_filtros": bool(r["en_filtros"]),
-            "destacado": bool(r["destacado"]),
-        }
+    for eid in ids:
+        for r in rows_by_equipo.get(eid, []):
+            key = r["spec_key"]
+            if key in specs_map[eid]:
+                continue  # dedup: get_equipo_specs_rows ya se quedó con el de mayor prioridad
+            raw_val: str | None = r["value"]
+            # Omitir specs efectivamente vacías o bool-false: no aportan en la ficha.
+            if _is_empty_value(raw_val):
+                continue
+            if r["tipo"] == "bool" and str(raw_val).lower().strip() in _BOOL_FALSE:
+                continue
+            value_display = render_spec_value(raw_val, r["tipo"], r["unidad"])
+            if not value_display:
+                continue
+            specs_map[eid][key] = {
+                "label": r["label"],
+                # `value` queda CRUDO (lo usan los filtros públicos por specsRaw).
+                # `value_display` es el render canónico (mismo que el nombre
+                # público) para mostrar en la ficha — "[24,70]" mm → "24-70 mm".
+                "value": raw_val,
+                "value_display": value_display,
+                "tipo": r["tipo"],
+                "unidad": r["unidad"],
+                "prioridad": r["prioridad"],
+                "en_card": bool(r["en_card"]),
+                "en_filtros": bool(r["en_filtros"]),
+                "destacado": bool(r["destacado"]),
+            }
     for e in equipos:
         e["specs"] = specs_map[e["id"]]
     return equipos

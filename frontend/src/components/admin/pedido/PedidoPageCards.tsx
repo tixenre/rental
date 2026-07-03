@@ -21,6 +21,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
+import { MoneyInput } from "@/design-system/ui/money-input";
 import { Label } from "@/design-system/ui/label";
 import { Badge } from "@/design-system/ui/badge";
 import { Pill } from "@/design-system/ui/Pill";
@@ -37,8 +39,15 @@ import {
 import { cn } from "@/lib/utils";
 
 import { adminApi, pedidoPdfUrl, type PedidoHistorialItem } from "@/lib/admin/api";
-import { type DraftItem, type DraftDatos, type PedidoMode } from "./usePedidoDraft";
+import {
+  type DraftItem,
+  type DraftDatos,
+  type PedidoMode,
+  subtotalDraftItem,
+} from "./usePedidoDraft";
 import { fmtArs, formatFechaDisplay } from "@/lib/format";
+import { descuentoLabel, type DescuentoOrigen } from "@/lib/cotizacion";
+import { SegmentedControl } from "@/design-system/ui/segmented-control";
 import { EquipoSearchSheet } from "./EquipoSearchSheet";
 import { EnviarDocsDialog, DOCS_PEDIDO } from "./EnviarDocsDialog";
 
@@ -110,7 +119,7 @@ export function ItemsCard({
           const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
           const disponible = max - it.cantidad;
           const overstock = it.cantidad > max;
-          const subtotal = it.precio_jornada * it.cantidad * jornadas;
+          const subtotal = subtotalDraftItem(it, jornadas);
 
           return (
             <li key={`${it.equipo_id}-${idx}`} className="px-4 py-3 space-y-2.5">
@@ -158,13 +167,11 @@ export function ItemsCard({
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
-                  <Input
-                    type="number"
+                  <DraftNumberInput
                     min={1}
                     value={it.cantidad}
-                    onChange={(e) =>
-                      updateItem(it.uid, { cantidad: parseInt(e.target.value) || 1 })
-                    }
+                    onCommit={(v) => updateItem(it.uid, { cantidad: v })}
+                    ariaLabel="Cantidad"
                     className={cn(
                       "h-9 w-10 text-center text-sm p-0 sm:h-7",
                       overstock && "border-destructive text-destructive",
@@ -185,13 +192,11 @@ export function ItemsCard({
                       {fmtArs(it.precio_jornada)}
                     </div>
                   ) : (
-                    <Input
-                      type="number"
+                    <DraftNumberInput
                       min={0}
                       value={it.precio_jornada}
-                      onChange={(e) =>
-                        updateItem(it.uid, { precio_jornada: parseInt(e.target.value) || 0 })
-                      }
+                      onCommit={(v) => updateItem(it.uid, { precio_jornada: v })}
+                      ariaLabel="Precio por jornada"
                       className="h-9 w-24 text-sm text-base sm:text-sm sm:h-7"
                     />
                   )}
@@ -248,6 +253,7 @@ export function ItemsCard({
 
 export function TotalesCard({
   bruto,
+  brutoDescontable,
   totalNeto,
   total,
   conIva,
@@ -256,24 +262,49 @@ export function TotalesCard({
   jornadas,
   descuentoPct,
   setDescuentoPct,
+  descuentoManualTipo,
+  setDescuentoManualTipo,
+  descuentoManualMonto,
+  setDescuentoManualMonto,
+  descuentoEfectivoPct,
+  descuentoOrigen,
+  nombreCliente,
   pagado,
   saldo,
   mode = "admin",
 }: {
   bruto: number;
+  /** Bruto SIN las líneas de combo (C-3, #1219) — tope real del input $ del
+   *  override manual: no se le puede descontar más a un pedido que a su
+   *  parte descontable. */
+  brutoDescontable: number;
   totalNeto: number;
   total: number;
   conIva: boolean;
   ivaPct: number;
   ivaMonto: number;
   jornadas: number;
+  /** Override MANUAL crudo (`alquileres.descuento_pct`, 0 = sin override) —
+   * solo para el input editable del admin. Para MOSTRAR usar
+   * `descuentoEfectivoPct`/`descuentoOrigen` (el que ganó de verdad). */
   descuentoPct: number;
   setDescuentoPct: (v: number) => void;
+  /** Fase C-2 (#1219): tipo del override manual — "pct" (usa `descuentoPct`)
+   * o "monto" (usa `descuentoManualMonto`, $ fijo). Mismo campo, un selector. */
+  descuentoManualTipo: "pct" | "monto";
+  setDescuentoManualTipo: (v: "pct" | "monto") => void;
+  descuentoManualMonto: number;
+  setDescuentoManualMonto: (v: number) => void;
+  /** % ganador real (jerarquía manual > cliente > jornadas, `/api/cotizar`). */
+  descuentoEfectivoPct: number;
+  descuentoOrigen: DescuentoOrigen;
+  nombreCliente?: string | null;
   pagado: number;
   saldo: number;
   mode?: PedidoMode;
 }) {
   const isCliente = mode === "cliente";
+  const labelDescuento = descuentoLabel(descuentoOrigen, jornadas, nombreCliente);
   return (
     <section className="rounded-lg border hairline bg-background overflow-hidden">
       <div className="px-4 py-3 space-y-2.5 text-sm">
@@ -282,34 +313,54 @@ export function TotalesCard({
           <span className="tabular-nums">{fmtArs(bruto)}</span>
         </div>
         {isCliente ? (
-          descuentoPct > 0 && (
+          descuentoEfectivoPct > 0 && (
             <div className="flex items-center justify-between gap-3 text-muted-foreground">
-              <span>Descuento {descuentoPct}%</span>
+              <span>{labelDescuento || `Descuento ${descuentoEfectivoPct}%`}</span>
               <span className="tabular-nums">−{fmtArs(bruto - totalNeto)}</span>
             </div>
           )
         ) : (
           <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">Descuento %</span>
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              step="0.5"
-              value={descuentoPct}
-              onChange={(e) => {
-                // Clamp 0–100: el atributo max no impide tipear >100, y el
-                // backend rechaza >100 con 422. Clampeamos en la UI.
-                const v = parseFloat(e.target.value) || 0;
-                setDescuentoPct(Math.min(100, Math.max(0, v)));
-              }}
-              className="h-7 w-20 text-right text-sm"
-            />
+            <span className="text-muted-foreground">Descuento manual (0 = automático)</span>
+            <div className="flex items-center gap-1.5">
+              <SegmentedControl
+                value={descuentoManualTipo}
+                onChange={(v) => setDescuentoManualTipo(v as "pct" | "monto")}
+                options={[
+                  { value: "pct", label: "%" },
+                  { value: "monto", label: "$" },
+                ]}
+                className="w-16 shrink-0"
+              />
+              {descuentoManualTipo === "monto" ? (
+                <MoneyInput
+                  min={0}
+                  max={brutoDescontable}
+                  step={100}
+                  value={descuentoManualMonto}
+                  onChange={setDescuentoManualMonto}
+                  ariaLabel="Descuento $ manual"
+                  className="h-7 w-28 text-right text-sm"
+                />
+              ) : (
+                <DraftNumberInput
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={descuentoPct}
+                  onCommit={setDescuentoPct}
+                  ariaLabel="Descuento % manual"
+                  className="h-7 w-20 text-right text-sm"
+                />
+              )}
+            </div>
           </div>
         )}
-        {!isCliente && descuentoPct > 0 && (
+        {/* Fila de MONTO del descuento efectivo — no del override crudo (que
+            puede estar en 0 mientras igual gana cliente/jornadas). */}
+        {!isCliente && descuentoEfectivoPct > 0 && (
           <div className="flex justify-between text-muted-foreground">
-            <span>−{descuentoPct}%</span>
+            <span>{labelDescuento || `−${descuentoEfectivoPct}%`}</span>
             <span className="tabular-nums">−{fmtArs(bruto - totalNeto)}</span>
           </div>
         )}
@@ -354,7 +405,14 @@ export function PagosSidebar({
   total: number;
   pagado: number;
   saldo: number;
-  pagos: { id: number; monto: number; concepto: string | null; fecha: string }[];
+  pagos: {
+    id: number;
+    monto: number;
+    concepto: string | null;
+    fecha: string;
+    anulado?: boolean;
+    anulado_motivo?: string | null;
+  }[];
 }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
@@ -375,9 +433,10 @@ export function PagosSidebar({
   });
 
   const delMut = useMutation({
-    mutationFn: (pagoId: number) => adminApi.deletePago(pedidoId, pagoId),
+    mutationFn: ({ pagoId, motivo }: { pagoId: number; motivo: string }) =>
+      adminApi.anularPago(pedidoId, pagoId, motivo),
     onSuccess: () => {
-      toast.success("Pago eliminado");
+      toast.success("Pago anulado");
       qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
     },
@@ -407,21 +466,43 @@ export function PagosSidebar({
       {pagos.length > 0 && (
         <div className="divide-y hairline rounded-md border hairline overflow-hidden">
           {pagos.map((pg) => (
-            <div key={pg.id} className="flex items-center justify-between px-3 py-2 text-xs">
+            <div
+              key={pg.id}
+              className={cn(
+                "flex items-center justify-between px-3 py-2 text-xs",
+                pg.anulado && "opacity-50",
+              )}
+            >
               <div>
-                <div className="tabular-nums font-medium text-ink">{fmtArs(pg.monto)}</div>
+                <div
+                  className={cn("tabular-nums font-medium text-ink", pg.anulado && "line-through")}
+                >
+                  {fmtArs(pg.monto)}
+                </div>
                 <div className="text-muted-foreground">
-                  {pg.fecha}
-                  {pg.concepto ? ` · ${pg.concepto}` : ""}
+                  <span className={cn(pg.anulado && "line-through")}>
+                    {pg.fecha}
+                    {pg.concepto ? ` · ${pg.concepto}` : ""}
+                  </span>
+                  {pg.anulado && pg.anulado_motivo && (
+                    <span className="text-destructive"> · Anulado: {pg.anulado_motivo}</span>
+                  )}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => delMut.mutate(pg.id)}
-                className="rounded p-1 text-muted-foreground hover:text-destructive transition"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              {!pg.anulado && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const motivo = window.prompt("Motivo de la anulación del pago:");
+                    if (motivo && motivo.trim())
+                      delMut.mutate({ pagoId: pg.id, motivo: motivo.trim() });
+                  }}
+                  disabled={delMut.isPending}
+                  className="rounded p-1 text-muted-foreground hover:text-destructive transition"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           ))}
         </div>

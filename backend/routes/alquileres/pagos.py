@@ -10,10 +10,12 @@ import logging
 from typing import Optional
 
 from fastapi import Request, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import get_db, row_to_dict, now_ar
 from auth.guards import require_admin
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
+from routes.contabilidad import map_pg_errors
 from routes.alquileres.core import (
     router,
     _maybe_finalizar,
@@ -29,18 +31,22 @@ logger = logging.getLogger(__name__)
 # Cualquiera de los tres puede cobrar; el default es Rambla (en transferencia).
 # Cada destinatario mapea a una caja en Contabilidad (Pablo/Tincho → su caja de
 # socio; Rambla → Fondo Rambla), donde la plata cobrada se atribuye sola.
-from contabilidad.cuentas import COBRADORES as DESTINATARIOS_PAGO  # fuente única
+from contabilidad.constants import COBRADORES as DESTINATARIOS_PAGO  # fuente única
 METODOS_PAGO = ("transferencia", "efectivo")
 DESTINATARIO_PAGO_DEFAULT = "Rambla"
 METODO_PAGO_DEFAULT = "transferencia"
 
 
 class PagoCreate(BaseModel):
-    monto:        int
-    concepto:     Optional[str] = None
-    fecha:        Optional[str] = None   # YYYY-MM-DD; si no viene usa hoy
-    destinatario: Optional[str] = None   # Tincho|Pablo (default Tincho)
-    metodo:       Optional[str] = None   # transferencia|efectivo (default transferencia)
+    monto:        int = Field(gt=0, le=2_000_000_000)
+    concepto:     Optional[str] = Field(default=None, max_length=500)
+    fecha:        Optional[str] = Field(default=None, max_length=10)   # YYYY-MM-DD; si no viene usa hoy
+    destinatario: Optional[str] = Field(default=None, max_length=20)   # Tincho|Pablo (default Tincho)
+    metodo:       Optional[str] = Field(default=None, max_length=20)   # transferencia|efectivo (default transferencia)
+
+
+class AnularPagoBody(BaseModel):
+    motivo: str = Field(max_length=500)
 
 
 def _resolver_destino_metodo(
@@ -68,6 +74,9 @@ def _recalcular_monto_pagado(conn, pedido_id: int):
 
     No hace commit — el caller debe commitear inmediatamente después para que
     el UPDATE no quede huérfano si falla algo posterior en la misma transacción.
+
+    `AND NOT anulado`: un pago anulado (soft-delete, #1184) no cuenta para lo
+    pagado — mismo criterio que `movimientos` con sus movimientos anulados.
     """
     conn.execute(
         """
@@ -75,7 +84,7 @@ def _recalcular_monto_pagado(conn, pedido_id: int):
            SET monto_pagado = (
                SELECT COALESCE(SUM(monto), 0)
                  FROM alquiler_pagos
-                WHERE pedido_id = %s
+                WHERE pedido_id = %s AND NOT anulado
            )
          WHERE id = %s
         """,
@@ -102,11 +111,11 @@ def list_pagos(id: int, request: Request):
 
 
 @router.post("/alquileres/{id}/pagos", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def agregar_pago(id: int, data: PagoCreate, request: Request):
     """Agrega una entrada de pago y recalcula monto_pagado."""
-    require_admin(request)
-    if data.monto <= 0:
-        raise HTTPException(400, "El monto debe ser mayor a 0")
+    admin = require_admin(request)
     destinatario, metodo = _resolver_destino_metodo(data.destinatario, data.metodo)
     with get_db() as conn:
         try:
@@ -118,9 +127,9 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
 
             fecha = data.fecha or now_ar().date().isoformat()
             conn.execute("""
-                INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha)
-                VALUES (%s,%s,%s,%s,%s,%s)
-            """, (id, data.monto, data.concepto, destinatario, metodo, fecha))
+                INSERT INTO alquiler_pagos (pedido_id, monto, concepto, destinatario, metodo, fecha, created_by)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+            """, (id, data.monto, data.concepto, destinatario, metodo, fecha, admin.get("email")))
 
             _recalcular_monto_pagado(conn, id)
             _maybe_finalizar(conn, id)
@@ -134,23 +143,38 @@ def agregar_pago(id: int, data: PagoCreate, request: Request):
             raise
 
 
-@router.delete("/alquileres/{id}/pagos/{pago_id}", status_code=200)
-def eliminar_pago(id: int, pago_id: int, request: Request):
-    require_admin(request)
-    """Elimina una entrada de pago y recalcula monto_pagado."""
+@router.post("/alquileres/{id}/pagos/{pago_id}/anular", status_code=200)
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
+def anular_pago(id: int, pago_id: int, data: AnularPagoBody, request: Request):
+    """Anula una entrada de pago (soft-delete con motivo) y recalcula monto_pagado.
+
+    Reemplaza el viejo `DELETE` (hard-delete, sin motivo, sin actor) — auditoría
+    2026-07-02 (#1184): esta tabla alimenta todo el motor contable y no
+    respetaba "la plata no se borra" que `movimientos` sí respeta. Mismo patrón
+    que `anular_movimiento`."""
+    admin = require_admin(request)
+    motivo = (data.motivo or "").strip()
+    if not motivo:
+        raise HTTPException(400, "Para anular un pago hay que indicar un motivo.")
     with get_db() as conn:
         try:
             if not conn.execute("SELECT id FROM alquileres WHERE id=%s", (id,)).fetchone():
                 raise HTTPException(404, "Pedido no encontrado")
-            if not conn.execute(
-                "SELECT id FROM alquiler_pagos WHERE id=%s AND pedido_id=%s", (pago_id, id)
-            ).fetchone():
-                raise HTTPException(404, "Pago no encontrado")
+            actualizado = conn.execute(
+                """UPDATE alquiler_pagos
+                   SET anulado = TRUE, anulado_por = %s, anulado_at = CURRENT_TIMESTAMP,
+                       anulado_motivo = %s
+                   WHERE id = %s AND pedido_id = %s AND NOT anulado
+                   RETURNING id""",
+                (admin.get("email"), motivo, pago_id, id),
+            ).fetchone()
+            if not actualizado:
+                raise HTTPException(404, "Pago no encontrado (o ya estaba anulado)")
 
-            conn.execute("DELETE FROM alquiler_pagos WHERE id=%s", (pago_id,))
             _recalcular_monto_pagado(conn, id)
 
-            # Si se quitó pago, puede que ya no esté finalizado → revertir si aplica
+            # Si se anuló el pago, puede que ya no esté finalizado → revertir si aplica
             p = conn.execute("SELECT estado, monto_total, monto_pagado FROM alquileres WHERE id=%s", (id,)).fetchone()
             if p and p["estado"] == "finalizado" and (p["monto_pagado"] or 0) < (p["monto_total"] or 0):
                 conn.execute("UPDATE alquileres SET estado='devuelto' WHERE id=%s", (id,))
@@ -158,8 +182,11 @@ def eliminar_pago(id: int, pago_id: int, request: Request):
             conn.commit()
             pedido = _get_alquiler_detail(conn, id)
             return pedido
+        except HTTPException:
+            conn.rollback()
+            raise
         except Exception:
-            logger.error("Error registrando pago en pedido %s", id, exc_info=True)
+            logger.error("Error anulando pago en pedido %s", id, exc_info=True)
             conn.rollback()
             raise
 
@@ -171,18 +198,22 @@ def list_all_pagos(
     metodo: Optional[str] = Query(None),
     desde: Optional[str] = Query(None, description="YYYY-MM-DD inclusive"),
     hasta: Optional[str] = Query(None, description="YYYY-MM-DD inclusive"),
+    incluir_anulados: bool = Query(False),
     limit: int = Query(500, le=2000),
 ):
     """Ledger global de pagos — vista de logs del back-office.
 
     Lista las filas de `alquiler_pagos` (la fuente ÚNICA de "pagado") con su
     pedido y cliente, ordenadas por fecha desc. Filtros opcionales por
-    destinatario, método y rango de fechas (inclusive). Devuelve también el
+    destinatario, método y rango de fechas (inclusive). Por defecto excluye
+    los anulados (mismo patrón que `listar_movimientos`). Devuelve también el
     total del subconjunto filtrado.
     """
     require_admin(request)
     where = ["1=1"]
     params: list = []
+    if not incluir_anulados:
+        where.append("NOT ap.anulado")
     if destinatario:
         where.append("ap.destinatario = %s")
         params.append(destinatario)
@@ -199,7 +230,8 @@ def list_all_pagos(
         rows = conn.execute(
             f"""
             SELECT ap.id, ap.pedido_id, ap.monto, ap.concepto,
-                   ap.destinatario, ap.metodo, ap.fecha,
+                   ap.destinatario, ap.metodo, ap.fecha, ap.created_by,
+                   ap.anulado, ap.anulado_por, ap.anulado_at, ap.anulado_motivo,
                    al.numero_pedido, al.cliente_nombre
               FROM alquiler_pagos ap
               JOIN alquileres al ON al.id = ap.pedido_id

@@ -13,7 +13,6 @@ DATA_DIR = REPO_ROOT / "data" / "catalog"
 CATALOG_ENTITIES: tuple[str, ...] = (
     "marcas",
     "categorias",
-    "etiquetas",
     "spec_definitions",
     "categoria_spec_templates",
     "equipos",

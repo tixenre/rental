@@ -71,8 +71,10 @@ _ADMIN = [
     ("DELETE", "/api/alquileres/1"),
     ("GET", "/api/alquileres/1/pagos"),
     ("POST", "/api/alquileres/1/pagos"),
-    ("DELETE", "/api/alquileres/1/pagos/1"),
+    ("POST", "/api/alquileres/1/pagos/1/anular"),
     ("GET", "/api/admin/pagos"),
+    ("GET", "/api/descuentos-jornada"),
+    ("GET", "/api/descuentos-jornada/interpolar"),
     ("POST", "/api/admin/descuentos-jornada"),
     ("DELETE", "/api/admin/descuentos-jornada/1"),
     ("PATCH", "/api/alquileres/1/datos"),
@@ -118,7 +120,6 @@ _PUBLICOS = [
     ("POST", "/api/cotizar"),
     ("GET", "/api/disponibilidad"),
     ("GET", "/api/disponibilidad-dias"),
-    ("GET", "/api/descuentos-jornada"),
     ("GET", "/api/cliente/registro-info"),
     ("POST", "/api/cliente/registro"),
 ]
@@ -135,7 +136,9 @@ _TODOS = _PROTEGIDOS + _PUBLICOS
 _VALIDA_ANTES_DEL_GUARD = {
     ("PATCH", "/api/alquileres/1"),
     ("POST", "/api/alquileres/1/pagos"),
+    ("POST", "/api/alquileres/1/pagos/1/anular"),
     ("POST", "/api/admin/descuentos-jornada"),
+    ("GET", "/api/descuentos-jornada/interpolar"),  # jornadas: list[int] = Query(...) obligatorio
     ("PUT", "/api/alquileres/1/items"),
     ("POST", "/api/alquileres/1/enviar-documentos"),
     ("PATCH", "/api/admin/solicitudes/1"),

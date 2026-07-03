@@ -356,7 +356,6 @@ _EQUIPOS_WRITE_ENDPOINTS = [
     ("DELETE", "/api/equipos/1/mantenimiento/1"),
     ("POST", "/api/equipos/1/kit"),
     ("DELETE", "/api/equipos/1/kit/1"),
-    ("PUT", "/api/equipos/1/etiquetas"),
     ("PUT", "/api/equipos/1/categorias"),
 ]
 

@@ -30,8 +30,11 @@ import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { ShareButton } from "@/components/rental/equipment/shared/ShareButton";
 import { createOrder, OrderVerificationError } from "@/lib/orders";
-import { chequearEstadoCuenta, iniciarVerificacionIdentidad } from "@/lib/verificacion";
-import { VerificacionRequeridaPanel } from "@/components/rental/VerificacionRequeridaPanel";
+import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
+import {
+  VerificacionRequeridaPanel,
+  type VerificacionPanelEstado,
+} from "@/components/rental/VerificacionRequeridaPanel";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useHeroPhotos, heroImgProps } from "@/lib/studio/hero-photos";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
@@ -329,7 +332,8 @@ export function CartSheet({
   const navigate = useNavigate();
   const [solicitado, setSolicitado] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [needsVerif, setNeedsVerif] = useState(false);
+  const [verifEstado, setVerifEstado] = useState<VerificacionPanelEstado | null>(null);
+  const [verifMotivo, setVerifMotivo] = useState<string | null>(null);
   const [iniciandoVerif, setIniciandoVerif] = useState(false);
 
   const entries = Object.entries(cartItems)
@@ -358,12 +362,14 @@ export function CartSheet({
       return;
     }
     setSubmitting(true);
-    setNeedsVerif(false);
+    setVerifEstado(null);
+    setVerifMotivo(null);
 
     // Pre-check de cuenta (fuente única en verificacion.ts). Sin sesión →
     // toast con link a login; logueado pero sin DNI validado → panel de
-    // verificación; en vez del 401/403 críptico.
-    const estado = await chequearEstadoCuenta();
+    // verificación (distingue no-verificado / en-revision / rechazado); en vez
+    // del 401/403 críptico.
+    const { estado, motivo } = await chequearEstadoVerificacion();
     if (estado === "no-logueado") {
       toast.error("Debés iniciar sesión para solicitar un rental.", {
         duration: 5000,
@@ -380,8 +386,9 @@ export function CartSheet({
       setSubmitting(false);
       return;
     }
-    if (estado === "no-verificado") {
-      setNeedsVerif(true);
+    if (estado === "no-verificado" || estado === "en-revision" || estado === "rechazado") {
+      setVerifEstado(estado);
+      setVerifMotivo(motivo ?? null);
       setSubmitting(false);
       return;
     }
@@ -410,7 +417,7 @@ export function CartSheet({
       // Backstop: si el backend rechaza por identidad (403), mostramos el panel
       // de verificación en vez del toast genérico.
       if (err instanceof OrderVerificationError) {
-        setNeedsVerif(true);
+        setVerifEstado("no-verificado");
         return;
       }
       const msg = err instanceof Error ? err.message : "Error al enviar el pedido";
@@ -654,8 +661,10 @@ export function CartSheet({
                 Consultanos por WhatsApp
               </a>
             </div>
-          ) : needsVerif ? (
+          ) : verifEstado ? (
             <VerificacionRequeridaPanel
+              estado={verifEstado}
+              motivo={verifMotivo}
               iniciando={iniciandoVerif}
               onVerificar={async () => {
                 setIniciandoVerif(true);

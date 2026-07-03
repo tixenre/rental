@@ -6,13 +6,13 @@ Parte del epic #93. Incluye:
 - #352 Sugerencias automáticas (detectores + apply para inconsistencias).
 """
 
-import re
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from database import get_db, MARCA_SUBQUERY
 from auth.guards import require_admin
+from services.categorias import add_categoria_masivo, validar_existe, equipos_sin_categoria, categoria_por_id
+
 
 router = APIRouter()
 
@@ -46,15 +46,7 @@ def get_calidad_inventario(_admin: dict = Depends(require_admin)):
         """).fetchone()
 
         # Equipos sin categoría: no aparecen en equipo_categorias.
-        sin_categoria = conn.execute("""
-            SELECT COUNT(*)
-            FROM equipos e
-            WHERE e.eliminado_at IS NULL
-              AND e.es_recurso_interno = FALSE
-              AND NOT EXISTS (
-                SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id
-              )
-        """).fetchone()[0]
+        sin_categoria = equipos_sin_categoria(conn)
 
         faltantes = {
             "serie":              row["sin_serie"],
@@ -131,140 +123,6 @@ def _detect_marcas_duplicadas(conn) -> list[dict]:
     return out
 
 
-# Heurística de categoría sospechosa: keywords de equipo → categoría esperada.
-# Conservador en los keywords — sólo tokens claros, con detección por palabra
-# completa (no substring) para evitar falsos positivos como "Black" matcheando
-# "ac" (batería).
-_CATEGORIA_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "cámara":     ("cam", "cámara", "camara", "camera"),
-    "lente":      ("lens", "lente"),
-    "luz":        ("led", "luz", "light", "softbox", "reflector"),
-    "micrófono":  ("mic", "micrófono", "microfono", "microphone"),
-    "audio":      ("recorder", "grabador", "preamp", "mixer", "mezcladora"),
-    "trípode":    ("tripod", "trípode", "tripode", "monopod"),
-    "estabilizador": ("gimbal", "estabilizador", "ronin", "stabilizer"),
-    "batería":    ("v-mount", "vmount", "battery", "batería", "bateria"),
-    "monitor":    ("monitor", "feelworld", "atomos"),
-    "almacenamiento": ("ssd", "memoria"),
-}
-
-
-def _matches_keyword(text: str, kw: str) -> bool:
-    """True si `kw` aparece como palabra completa en `text` (lower). Usa
-    lookarounds en ASCII para evitar que "ac" matchee "black"."""
-    pattern = r"(?<![a-z0-9])" + re.escape(kw.lower()) + r"(?![a-z0-9])"
-    return bool(re.search(pattern, text))
-
-
-def _build_keyword_to_cats(conn) -> dict[str, list[dict]]:
-    """Para cada bucket de _CATEGORIA_KEYWORDS, encuentra qué categorías
-    reales de la BD matchean (por palabra completa en su nombre). Devuelve
-    map bucket → [{id, nombre, depth, ancestors: set[int]}], ordenadas por
-    depth desc (las más específicas primero)."""
-    cats = conn.execute("SELECT id, nombre, parent_id FROM categorias").fetchall()
-    by_id: dict[int, dict] = {c["id"]: dict(c) for c in cats}
-
-    def ancestors_of(cat: dict) -> set[int]:
-        out: set[int] = set()
-        cur = cat
-        while cur.get("parent_id"):
-            pid = cur["parent_id"]
-            if pid in out:
-                break  # protección contra ciclos
-            out.add(pid)
-            cur = by_id.get(pid) or {}
-        return out
-
-    def depth_of(cat: dict) -> int:
-        return len(ancestors_of(cat))
-
-    result: dict[str, list[dict]] = {}
-    for bucket, kws in _CATEGORIA_KEYWORDS.items():
-        matches = []
-        for cid, c in by_id.items():
-            nombre_lower = (c["nombre"] or "").lower()
-            if any(_matches_keyword(nombre_lower, kw) for kw in kws):
-                matches.append({
-                    "id": cid,
-                    "nombre": c["nombre"],
-                    "depth": depth_of(c),
-                    "ancestors": ancestors_of(c),
-                })
-        # Más profundas primero (más específicas).
-        matches.sort(key=lambda m: (-m["depth"], m["nombre"]))
-        result[bucket] = matches
-    return result
-
-
-def _detect_categoria_sospechosa(conn) -> list[dict]:
-    """Detecta equipos donde el nombre tiene un keyword que sugiere una
-    categoría existente en la BD que el equipo no tiene. Usa el árbol de
-    categorías: sugiere la más profunda (específica) disponible, y no
-    flaggea si el equipo ya tiene una categoría del mismo bucket o un
-    descendiente de la sugerida."""
-    keyword_to_cats = _build_keyword_to_cats(conn)
-    if not any(keyword_to_cats.values()):
-        return []  # no hay categorías matcheables en la BD
-
-    rows = conn.execute(f"""
-        SELECT
-          e.id, e.nombre, {MARCA_SUBQUERY},
-          COALESCE(
-            (SELECT array_agg(ec.categoria_id) FROM equipo_categorias ec WHERE ec.equipo_id = e.id),
-            ARRAY[]::int[]
-          ) AS categoria_ids,
-          (SELECT COALESCE(string_agg(c.nombre, ', '), '(sin categoría)')
-             FROM equipo_categorias ec
-             JOIN categorias c ON c.id = ec.categoria_id
-             WHERE ec.equipo_id = e.id) AS categorias_actuales
-        FROM equipos e
-        WHERE e.eliminado_at IS NULL
-          AND e.es_recurso_interno = FALSE
-        ORDER BY e.id
-    """).fetchall()
-
-    out = []
-    for r in rows:
-        nombre_lower = (r["nombre"] or "").lower()
-        equipo_cat_ids: set[int] = set(r["categoria_ids"] or [])
-
-        for bucket, kws in _CATEGORIA_KEYWORDS.items():
-            if not any(_matches_keyword(nombre_lower, kw) for kw in kws):
-                continue
-            candidates = keyword_to_cats.get(bucket, [])
-            if not candidates:
-                continue
-            # ¿El equipo ya tiene alguna categoría de este bucket? Saltamos.
-            already_in_bucket = any(c["id"] in equipo_cat_ids for c in candidates)
-            if already_in_bucket:
-                continue
-            # ¿Tiene un descendiente de alguna candidata? También saltamos
-            # (no queremos sugerir un padre cuando el hijo ya está).
-            best = None
-            for c in candidates:
-                if equipo_cat_ids & {c["id"], *c.get("ancestors", set())}:
-                    continue
-                best = c
-                break
-            if not best:
-                continue
-            out.append({
-                "tipo": "categoria_sospechosa",
-                "ref": f"{r['id']}:{best['id']}",  # equipo_id:categoria_id
-                "titulo": f"'{r['marca'] or ''} {r['nombre']}' no tiene la categoría '{best['nombre']}'",
-                "detalle": (
-                    f"Categoría actual: {r['categorias_actuales']}. "
-                    f"El nombre sugiere '{bucket}' — match real en la BD: '{best['nombre']}'."
-                ),
-                "equipo_id": r["id"],
-                "categoria_sugerida": best["nombre"],
-                "accion": "asignar_categoria",
-                "accion_label": f"Asignar '{best['nombre']}'",
-            })
-            break  # una sospecha por equipo
-    return out
-
-
 def _detect_precio_sin_usd(conn) -> list[dict]:
     """Detecta equipos con precio_jornada cargado pero precio_usd vacío.
     Apply = computar precio_usd usando usd_rate de app_settings."""
@@ -312,7 +170,7 @@ def get_sugerencias(_admin: dict = Depends(require_admin)):
         items: list[dict] = []
         items += _detect_marcas_duplicadas(conn)
         items += _detect_precio_sin_usd(conn)
-        items += _detect_categoria_sospechosa(conn)
+
         ignoradas = _load_ignoradas(conn)
         items = [s for s in items if (s["tipo"], s["ref"]) not in ignoradas]
         return {"items": items, "total": len(items)}
@@ -340,17 +198,6 @@ def aplicar_sugerencia(body: AplicarSugerenciaBody, _admin: dict = Depends(requi
             return _apply_fusionar_marcas(conn, clave=body.ref)
         if body.tipo == "precio_sin_usd":
             return _apply_calcular_usd(conn)
-        if body.tipo == "categoria_sospechosa":
-            # ref viene como "equipo_id:categoria_id"
-            try:
-                equipo_id_str, categoria_id_str = body.ref.split(":")
-                return _apply_asignar_categoria(
-                    conn,
-                    equipo_id=int(equipo_id_str),
-                    categoria_id=int(categoria_id_str),
-                )
-            except (ValueError, AttributeError):
-                raise HTTPException(400, "ref inválido para categoria_sospechosa.")
         raise HTTPException(400, f"Tipo de sugerencia desconocido: {body.tipo}")
 
 
@@ -393,31 +240,17 @@ def _apply_fusionar_marcas(conn, clave: str) -> dict:
 
 
 def _apply_asignar_categoria(conn, equipo_id: int, categoria_id: int) -> dict:
-    """Asigna `categoria_id` al `equipo_id`. La categoría viene resuelta
-    desde el detector (que ya elige la más específica disponible en la BD)
-    así que acá solo verificamos que ambos existan e insertamos."""
-    eq = conn.execute(
+    """Asigna `categoria_id` al `equipo_id` usando el módulo de categorías."""
+    if not conn.execute(
         "SELECT id FROM equipos WHERE id = %s AND eliminado_at IS NULL",
         (equipo_id,),
-    ).fetchone()
-    if not eq:
+    ).fetchone():
         raise HTTPException(404, "Equipo no encontrado.")
-    cat = conn.execute(
-        "SELECT id, nombre FROM categorias WHERE id = %s",
-        (categoria_id,),
-    ).fetchone()
-    if not cat:
-        raise HTTPException(404, "Categoría no encontrada.")
-    conn.execute(
-        """
-        INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-        VALUES (%s, %s, 0)
-        ON CONFLICT (equipo_id, categoria_id) DO NOTHING
-        """,
-        (equipo_id, categoria_id),
-    )
-    conn.commit()
-    return {"ok": True, "message": f"Categoría '{cat['nombre']}' asignada al equipo."}
+    validar_existe(conn, categoria_id)
+    cat = categoria_por_id(conn, categoria_id)
+    cat_name = cat["nombre"] if cat else ""
+    add_categoria_masivo(conn, [equipo_id], categoria_id)
+    return {"ok": True, "message": f"Categoría '{cat_name}' asignada al equipo."}
 
 
 def _apply_calcular_usd(conn) -> dict:

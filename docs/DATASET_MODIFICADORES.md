@@ -24,7 +24,7 @@ acá la taxonomía es **cerrada** — el seeder NO crea sub-cats nuevas.
   `~/Desktop/Paginas/Modificadores_Luz/`)
 - `backend/seeds/modificadores.py` — seed (crea spec_definitions desde
   el registry y persiste equipo_specs)
-- `backend/specs/categorias/modificadores.py` — el `CAT` (CategoriaRegistry) con las 12 specs
+- `backend/services/specs/registry/catalogo/modificadores.py` — el `CAT` (CategoriaRegistry) con las 12 specs
 
 ## `specs` de Modificadores — 12 campos
 

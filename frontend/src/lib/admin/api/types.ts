@@ -138,7 +138,6 @@ export type Equipo = {
   html_source_url?: string | null;
   /** Timestamp ISO si el equipo está soft-deleted. null = activo (#206). */
   eliminado_at?: string | null;
-  etiquetas?: string[];
   kit?: KitComponente[];
   categorias?: CategoriaRef[];
   ficha?: Ficha;
@@ -146,6 +145,11 @@ export type Equipo = {
   nombre_publico?: string | null;
   /** Nombre público extendido (PDFs formales: albarán, contrato). */
   nombre_publico_largo?: string | null;
+  /** Override manual del nombre público — gana sobre el molde de categoría
+   *  siempre (ver services/nombre_builder.py). Se edita vía `aprobarNombre`. */
+  nombre_publico_override?: string | null;
+  /** true = nombre aprobado/editado a mano; false = pendiente de revisión. */
+  nombre_publico_revisado?: boolean;
   /** Relevancia manual (1=más destacado, 100=neutro). */
   relevancia_manual?: number;
   /** Score de popularidad (0..100, normalizado por categoría). */
@@ -172,20 +176,8 @@ export type EquiposListResp = {
   items: Equipo[];
 };
 
-export type EquipoInput = Partial<
-  Omit<Equipo, "id" | "etiquetas" | "kit" | "categorias" | "ficha">
-> & {
+export type EquipoInput = Partial<Omit<Equipo, "id" | "kit" | "categorias" | "ficha">> & {
   nombre: string;
-};
-
-export type Etiqueta = { nombre: string; total?: number };
-
-export type EtiquetaAdmin = {
-  id: number;
-  nombre: string;
-  prioridad: number;
-  parent_id: number | null;
-  total: number;
 };
 
 // Categoría: vive en su propia taxonomía (tabla `categorias`).
@@ -212,22 +204,6 @@ export type Categoria = {
   children?: Categoria[];
   // legacy flat
   subtags?: { nombre: string; total: number }[];
-};
-
-export type ClasificarItem = {
-  id: number;
-  nombre: string;
-  marca: string | null;
-  propuestas: string[];
-  actuales: string[];
-};
-
-export type ClasificarResult = {
-  total: number;
-  matched: number;
-  unmatched: number;
-  applied: number;
-  items: ClasificarItem[];
 };
 
 // ── Mantenimiento por equipo ─────────────────────────────────────────────
@@ -418,6 +394,19 @@ export type SpecTemplate = {
   rol_compatibilidad: RolCompatibilidad;
 };
 
+/** Grupo de specs sin match del panel admin (#1203) — un label sin
+ *  reconocer, agregado a través de todos los equipos que lo encontraron. */
+export type NoReconocidoGrupo = {
+  categoria: string;
+  label: string;
+  label_normalizado: string;
+  ejemplos: string[];
+  propuesta_ids: number[];
+  equipo_ids: number[];
+  equipo_nombres: string[];
+  ultima_vez: string;
+};
+
 /** Body para asignar una spec ya existente a una categoría. */
 export type SpecAssignmentInput = {
   spec_def_id: number;
@@ -588,6 +577,11 @@ export interface PagoLogRow {
   destinatario: string | null;
   metodo: string | null;
   fecha: string;
+  created_by: string | null;
+  anulado: boolean;
+  anulado_por: string | null;
+  anulado_at: string | null;
+  anulado_motivo: string | null;
   numero_pedido: number | null;
   cliente_nombre: string | null;
 }
@@ -1039,6 +1033,11 @@ export type PedidoPago = {
   concepto: string | null;
   fecha: string;
   created_at?: string;
+  created_by?: string | null;
+  anulado?: boolean;
+  anulado_por?: string | null;
+  anulado_at?: string | null;
+  anulado_motivo?: string | null;
 };
 
 export type Pedido = {
@@ -1059,6 +1058,13 @@ export type Pedido = {
   monto_pagado: number;
   descuento_pct: number | null;
   descuento_jornadas_pct: number | null;
+  /** Fase C-2 (#1219): tipo del override manual — "pct" (default) o "monto". */
+  descuento_manual_tipo?: "pct" | "monto" | null;
+  descuento_manual_monto?: number | null;
+  /** % y fuente del descuento GANADOR (jerarquía manual > cliente > jornadas) —
+   *  distinto de `descuento_pct` crudo (solo el override). Ver `desglose_de_pedido`. */
+  descuento_efectivo_pct?: number | null;
+  descuento_origen?: "manual" | "cliente" | "jornadas" | "ninguno" | null;
   notas: string | null;
   created_at?: string;
   items: PedidoItem[];
@@ -1120,6 +1126,8 @@ export type PedidoDatosInput = {
   fecha_hasta: string | null;
   notas: string | null;
   descuento_pct: number | null;
+  descuento_manual_tipo?: "pct" | "monto" | null;
+  descuento_manual_monto?: number | null;
 };
 
 // ── Estudio (singleton E1) ───────────────────────────────────────────────────

@@ -180,6 +180,16 @@ Recorrer las áreas clave: catálogo, portal cliente, back-office admin.
 - Shadows brand: instancias de `--shadow-*` / total `shadow-` classes
 - Clasificar: < 10% → 🔴, 10-50% → 🟡, > 50% → ✅
 
+**3d. Specimens de la vitrina (`/admin/diseno`, pestaña "Design System") — espejar el contenedor real.**
+Un componente de producción afinado para su contenedor real (ej. `EquipmentCard`: `aspect-square` +
+`content-visibility:auto` con `contain-intrinsic-size`, pensado para la grilla **angosta** del
+catálogo) se **rompe visualmente** si el specimen lo embebe en un lienzo genérico ancho — la foto se
+dispara de tamaño y las cards se solapan. Caso testigo real: se shippeó a staging así (cazado por el
+dueño visualmente, no por `tsc`/`eslint`/`prettier`, que no ven layout — la ruta es admin-gated y no
+se ve en local sin sesión); fix `f465a18d` espejando las columnas de grilla reales
+(`categoria.$slug.tsx`). **Al revisar o proponer un specimen nuevo: espejá las restricciones de su
+contenedor de producción** (ancho de grilla / columnas), nunca un grid genérico ancho.
+
 ### 4 · Gobernanza del doc (Fase 3)
 
 Leer `docs/DESIGN_SYSTEM.md` y contrastar con el código:

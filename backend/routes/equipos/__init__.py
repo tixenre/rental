@@ -32,7 +32,6 @@ __all__ = [
     "_attach_disponibilidad",
     "_crea_ciclo_kit",
     "_normalize_fecha_compra",
-    "admin_clasificar",
     "admin_dashboard_uso",
     "admin_equipos_sin_serie",
 ]
@@ -45,7 +44,6 @@ from routes.equipos.dashboard import admin_dashboard_uso, admin_equipos_sin_seri
 from routes.equipos.ficha import FichaUpdate
 from routes.equipos.fotos import UploadFotoFromUrlInput
 from routes.equipos.kit import KitItem, _crea_ciclo_kit
-from routes.equipos.taxonomia import admin_clasificar
 from routes.equipos import mantenimiento as _mantenimiento
 from routes.equipos import taxonomia as _taxonomia
 

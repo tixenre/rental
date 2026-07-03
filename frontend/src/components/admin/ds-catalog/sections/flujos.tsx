@@ -244,7 +244,7 @@ function CartDrawerDemo() {
         needsLogin={false}
         onLogin={() => {}}
         onRegister={() => {}}
-        needsVerif={false}
+        verifEstado={null}
         iniciandoVerif={false}
         onVerificar={() => {}}
         clienteSession={null}

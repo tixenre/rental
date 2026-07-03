@@ -3,27 +3,55 @@
 > **Manual técnico vivo.** Reúne el detalle del sistema de specs y catálogo que antes vivía
 > en `MANIFIESTO.md` §6 (parte) y §7. El MANIFIESTO ahora solo orienta y apunta acá.
 >
-> **Fuente de verdad del schema:** [`backend/specs/__init__.py`](../backend/specs/__init__.py)
-> (define `REGISTRY: Registry`; modular: una categoría por archivo en `backend/specs/categorias/`).
+> **Fuente de verdad del schema:** [`backend/services/specs/`](../backend/services/specs/)
+> (barrel público; `registry/` define `REGISTRY: Registry`, modular: una categoría por archivo en
+> `registry/catalogo/`). Cada `CategoriaRegistry` solo declara `nombre` (ancla por nombre a una
+> categoría real del catálogo) + `specs` — no navegación ni jerarquía visual, eso lo maneja el dueño
+> a mano desde `/admin/categorias` (desenredo categorías↔specs, #1163 F6).
 > Para conteos exactos de specs por categoría, mirá el registry — no los números fijos de un doc.
 >
 > Reemplaza al borrador histórico `docs/archive/DISEÑO_SPECS.md` (diseño original ya implementado).
+>
+> ⏰ **Staleness conocida (no introducida por #1163 F6, pero notada al pasar):** las §2/§5/§6
+> describen un workflow de seeders **por categoría** (`backend/seeds/<categoria>.py` con
+> `categorize()`, sub-cats "on-the-fly" por stock) que ya **no existe** — se eliminó en una
+> "Fase C" anterior a esta iniciativa. El flujo activo de carga bulk es
+> `tools/specs_import_preview.py` + `dataio.cli import` (ver `services/specs/commands/seed.py`
+> docstring). Esas secciones quedan sin reescribir acá — encoladas aparte.
 
 ---
 
 ## 1. Autocompletar de specs (admin UI, por equipo)
 
-> **Cuándo se usa:** admin agrega un equipo nuevo individual en el form y pega la URL B&H. Equipo a
-> equipo, on-demand, vía UI. **NO confundir** con el seed bulk inicial (ver §2).
+> **Cuándo se usa:** admin agrega/edita un equipo individual y sube el HTML de su página B&H
+> guardada. Equipo a equipo, on-demand, vía UI. **NO confundir** con el seed bulk inicial (ver §2).
+>
+> ⏰ **Reescrito 2026-07 (rediseño `specs_ingesta`, issue #1176)** — reemplaza una versión vieja de
+> esta sección que describía un flujo Firecrawl+LLM (`POST /admin/equipos/autocompletar`,
+> `/batch-enriquecer`, `/autocompletar-from-html`) que **ya no existe**: esos endpoints se retiraron.
 
-- **URL única** en la autocompletar bar: bindeada al campo `bh_url` del form, con botones copy/abrir inline.
-- **Backend**: endpoint canónico `POST /admin/equipos/autocompletar` (alias deprecated `/enriquecer`). Scrape con Firecrawl + extract con LLM. Devuelve `AutocompletarResult` normalizado.
-- **Normalizer de specs**: backend traduce labels EN→ES (Weight→Peso, Lens Mount→Montura, etc.) y convierte unidades (lbs→kg, in→cm, °F→°C, ranges, dimensiones N×N×N).
-- **Cache del scrape**: el `AutocompletarResult` completo se guarda en `equipo_fichas.raw_json`. Habilita los botones de re-aplicar por sección en el form V2 sin volver a scrapear.
-- **Batch**: `POST /admin/equipos/batch-enriquecer` procesa hasta 3 equipos por request (cap defensivo, max 50 ids en body). Frontend re-batchea hasta terminar. Resultado se persiste en raw_json (cache). Sleep 1s entre scrapes para no rate-limitear B&H.
-- **Parser determinístico embebido (URL path)**: el endpoint URL existente ahora pide `rawHtml` a Firecrawl además del `json` extract. Si el rawHtml tiene JSON-LD estructurado (B&H lo siempre tiene), se corre `services/luces_html_extractor.py` (el MISMO pipeline del seed). Cuando el parser detecta ≥3 specs canónicos, OVERRIDE marca/modelo/specs/foto del LLM extract con la versión normalizada. Si no detecta nada (no es lighting, parser falla), se mantiene el flujo LLM intacto. → **Resultado: URL paste ahora también da calidad seed para luces sin tocar la UX**.
-- **HTML upload (fallback / cuando Firecrawl falla)**: `POST /admin/equipos/autocompletar-from-html` acepta un `.html` guardado manualmente (Cmd+S → Webpage Complete desde B&H/manufacturer) y corre el mismo pipeline directo sobre el HTML, sin Firecrawl. Sirve cuando B&H bloquea Firecrawl con bot-detection o cuando la URL no es accesible. UI: botón "Subir HTML guardado" en el diálogo de autocompletar.
-- **Paridad URL ↔ HTML upload**: ambos paths llaman a `luces_html_extractor.extract_from_html()` que reusa `tools/iluminacion_parser.py` + `iluminacion_normalizar.py`. Cualquier mejora al parser/normalizer mejora los TRES paths (seed bulk + URL autocompletar + HTML upload) automáticamente.
+- **Un solo endpoint**: `POST /admin/equipos/{id}/upload-html-source` — el admin sube un `.html`
+  guardado (Cmd+S → Webpage Complete desde B&H). **Sin LLM ni scraping en vivo**: Railway no puede
+  bajar la página de B&H (mismo bloqueo de bots que cualquier scraper) — solo parsea el HTML que le
+  suben. Guarda el blob en R2 (`equipos/{id}/source.html`, path determinístico — re-subir
+  sobreescribe) y devuelve `AutocompletarResult` con los specs extraídos; el front confirma antes de
+  persistir vía `PUT /admin/equipos/{id}/specs` (la extracción NUNCA persiste sola).
+- **Motor determinístico único**: `services.specs_ingesta.extract_from_html(html, categoria_hint)` —
+  fuente única para este endpoint Y para el CLI offline (`services/specs_ingesta/cli.py`, misma
+  compu del dueño), verificado byte-idéntico sobre el mismo HTML. Manual técnico completo (arquitectura,
+  split de runtime, gotchas) → [`backend/services/specs_ingesta/CLAUDE.md`](../backend/services/specs_ingesta/CLAUDE.md);
+  historia de la consolidación → [`docs/PLAN_SPECS_INGESTA.md`](PLAN_SPECS_INGESTA.md).
+- **Dispatcher por categoría**: detecta Cámaras / Lentes / Adaptadores / Filtros / Modificadores /
+  Iluminación por título + JSON-LD (o usa `categoria_hint` si el admin ya la eligió) y rutea al parser
+  bespoke de esa categoría (labels canónicos → `spec_key` del registry, ficha limpia). Sin categoría
+  reconocida → extractor genérico: extrae **todos** los pares label/value del HTML y los resuelve
+  contra el índice de aliases del registry — lo que no matchea se muestra "sin template" en vez de
+  descartarse en silencio.
+- **Asume estructura B&H** (JSON-LD `Product.additionalProperty` + atributos `data-selenium`). Un
+  HTML de otro sitio (eBay, la página del fabricante) da specs pobres o vacías con el motor
+  determinístico — no hay fallback a LLM en este endpoint. Suplir esos casos (y proponer specs/
+  aliases nuevos al registry) es la capa offline-only planeada en `specs_ingesta` (F7, todavía no
+  construida).
 
 ---
 
@@ -85,18 +113,21 @@
 
 | Acción | Sin Claude | Con Claude |
 |---|---|---|
-| Agregar 1 luz nueva — URL paste (Firecrawl OK) | Sí — calidad seed automática (parser embebido) | — |
-| Agregar 1 luz nueva — URL paste falla (Firecrawl rate-limit / bot-detection) | Sí — subir HTML guardado (Cmd+S → upload) | — |
-| Agregar equipo no-luz (cámara, lente, accesorio) — categoría existente | Sí — admin UI + autocompletar (LLM extract). Para calidad seed: bulk via Claude hasta wirear dispatcher HTML por categoría | — |
+| Agregar equipo nuevo (cualquier categoría con parser bespoke) — categoría existente | Sí — admin UI: guardar el HTML de B&H (Cmd+S) y subirlo (§1); calidad seed automática | — |
+| Agregar equipo de categoría sin parser bespoke, o de un sitio no-B&H | Sí — admin UI (extractor genérico, calidad menor: labels "sin template" a confirmar a mano) | Sí — CLI offline + capa LLM (F7, no construida todavía) para mejor calidad |
 | Editar precio / foto / nombre / spec value | Sí — admin UI | — |
 | Agregar spec key nueva al catálogo global | Sí — `/admin/equipos/specs` | — |
 | Importar bulk de una categoría NUEVA (ej. cámaras) — primera vez | — | Sí — curar HTMLs + parser específico + seed |
 | Refactor del schema (ej. partir `peso` en sub-campos) | — | Sí — plan + migration |
 
-**Limitaciones:**
-- El parser determinístico hoy solo cubre **luces** (`iluminacion_parser`) en el endpoint del admin. Cámaras/lentes/accesorios YA tienen parsers determinísticos propios (`tools/camaras_parser.py`, `tools/lentes_parser.py`) usados para el seed bulk, pero el endpoint `/admin/equipos/autocompletar-from-html` todavía hardcodea `luces_html_extractor`. Falta dispatcher por categoría (sniff por content o param explícito).
-- El parser asume estructura B&H. Otros sites (Adorama, manufacturer pages) caen al LLM extract.
-- Si Firecrawl no puede acceder al URL (bot-detection más agresivo de B&H, sitio caído), fallback a HTML upload.
+**Limitaciones (estado actual, post F5 de `specs_ingesta` — ver §1):**
+- El dispatcher por categoría ya existe y cubre Cámaras/Lentes/Adaptadores/Filtros/Modificadores/
+  Iluminación con parser bespoke; el resto cae al extractor genérico (sin descartes silenciosos, pero
+  con menos curación).
+- El parser asume estructura B&H (JSON-LD + `data-selenium`). Un HTML de otro sitio (eBay, la página
+  del fabricante) da specs pobres o vacías — no hay fallback a LLM en este endpoint (a diferencia de
+  una versión anterior de este flujo). Suplirlo es la capa offline-only planeada (F7, no construida).
+- No hay scraping en vivo por URL — el admin siempre sube el `.html` guardado a mano.
 
 El JSON del dataset NO se edita post-seed (es dev artifact). Para cambios puntuales: admin UI. Para reseed masivo (raro): editar JSON + re-correr seed (idempotente, no pisa campos manuales como `precio_jornada`).
 
@@ -106,9 +137,9 @@ El JSON del dataset NO se edita post-seed (es dev artifact). Para cambios puntua
 
 ## 3. Compatibilidades cross-categoría
 
-Los equipos se relacionan entre sí por **specs compartidos** — el motor de compatibilidad (`backend/routes/specs.py::_compute_compat`) decide si dos equipos son compatibles, parciales o incompatibles según sus valores en specs marcadas con `es_compatibilidad=TRUE`.
+Los equipos se relacionan entre sí por **specs compartidos** — el motor de compatibilidad (`backend/routes/specs/compatibilidad.py`) decide si dos equipos son compatibles, parciales o incompatibles según sus valores en specs marcadas con `es_compatibilidad=TRUE`. El motor no se movió al paquete `services/specs/` (#1163): es lógica de matching, no CRUD, y sigue leyendo specs ya persistidas.
 
-**Specs compartidos** (declarados en el **registry de specs** — [`backend/specs/shared/`](../backend/specs/shared/); el `rol_compatibilidad` de Cámaras/Lentes vive en [`backend/specs/categorias/`](../backend/specs/categorias/)):
+**Specs compartidos** (declarados en el **registry de specs** — [`backend/services/specs/registry/shared/`](../backend/services/specs/registry/shared/); el `rol_compatibilidad` de Cámaras/Lentes vive en [`backend/services/specs/registry/catalogo/`](../backend/services/specs/registry/catalogo/)):
 
 | Spec | Modo | Aplica a | Resuelve |
 |---|---|---|---|
@@ -119,8 +150,8 @@ Los equipos se relacionan entre sí por **specs compartidos** — el motor de co
 
 **Cómo se conecta** (operativa):
 
-1. Las specs compartidas declaran `es_compatibilidad=True` + `compatibilidad_modo` (y `enum_options` ordenadas si son jerárquicas) en el **registry** (`backend/specs/shared/`). `seeds/registry_seeder.py` las **upserta** en `spec_definitions` con esas columnas al sembrar el registry.
-2. Lentes y Cámaras declaran además `rol_compatibilidad` (`contenedor` o `contenido`) en `backend/specs/categorias/{lentes,camaras}.py` → el mismo seeder lo persiste, para que el motor sepa quién proyecta y quién recibe.
+1. Las specs compartidas declaran `es_compatibilidad=True` + `compatibilidad_modo` (y `enum_options` ordenadas si son jerárquicas) en el **registry** (`backend/services/specs/registry/shared/`). `services/specs/commands/seed.py` las **upserta** en `spec_definitions` con esas columnas al sembrar el registry.
+2. Lentes y Cámaras declaran además `rol_compatibilidad` (`contenedor` o `contenido`) en `backend/services/specs/registry/catalogo/{lentes,camaras}.py` → el mismo seeder lo persiste, para que el motor sepa quién proyecta y quién recibe.
 3. El endpoint `GET /admin/equipos/{id}/compatibles` cruza specs de ambos equipos y devuelve overall ∈ `{compatible, compatible_con_crop, parcial, incompatible, requiere_adaptador, sin_relacion}` + razones por spec.
 
 **Casos típicos resueltos automáticamente** (sin tocar el motor):
@@ -289,31 +320,47 @@ Cuando agregamos un spec_key nuevo a una categoría (en seed `backend/seeds/<cat
 > **Fecha**: 2026-05-17. Reemplaza el borrador histórico `docs/archive/DISEÑO_SPECS.md`.
 > Cuando hay duda, esto manda.
 
-### Single source of truth: `backend/specs/__init__.py`
+### Single source of truth: `backend/services/specs/`
 
-Pydantic v2 registry. Todas las cats, sub-cats y specs están declaradas
-en un solo lugar (modular: una categoría por archivo en `backend/specs/categorias/`).
-Cualquier consumer (seeds, parsers, API, UI metadata) lo importa.
+Pydantic v2 registry. Todas las cats y specs están declaradas en un solo lugar
+(modular: una categoría por archivo en `backend/services/specs/registry/catalogo/`).
+Cada `CategoriaRegistry` solo declara `nombre` (ancla a una categoría real del
+catálogo) + `specs` — no navegación ni jerarquía visual (desenredo
+categorías↔specs, #1163 F6: `sub_categorias`/`grupo_visual`/`prioridad` a nivel
+categoría se sacaron por muertos — el seeder solo los pasaba a una función que
+los ignoraba). Cualquier consumer (seed, parsers, API, UI metadata) importa
+del barrel:
 
 ```python
-from specs import REGISTRY, get_categoria, get_spec, validate_dataset
+from services.specs import REGISTRY, get_categoria, get_spec, validate_dataset
 ```
 
-**Cambios estructurales (PR feat/specs-registry)**:
+**Cambios estructurales (PR feat/specs-registry, histórico)**:
 - Borrados: `seeds/spec_templates.py::TEMPLATES`, `seeds/<cat>.py::SPECS_X` (eran duplicados — generaban drift)
 - DB: `spec_definitions` ahora tiene UNIQUE `(categoria_raiz_id, spec_key)` (antes era UNIQUE global → colisión "tipo" cross-cat)
 - Cada cat tiene su `<cat>_subtipo` propio (camera_subtipo, iluminacion_subtipo, adaptador_subtipo, filtro_subtipo)
-- Datasets validan contra el registry en parse-time (`specs.validation.validate_dataset`)
+- Datasets validan contra el registry en parse-time (`services.specs.queries.validation.validate_dataset` — sin caller en vivo hoy, ver `services/specs/CLAUDE.md`)
+
+**Rediseño a CQRS-lite (#1163, F0-F6)**: el paquete se reorganizó espejando
+`services/categorias/` (`registry/` declarativo, `commands/` = única puerta de
+escritura, `queries/` nunca mutan) y se agregó el **embudo de alias de valor**
+(`normalize/value_funnel.py::mapear_valor` — normaliza 'FF'→'Full-frame' al
+persistir, gratis para compat y búsqueda) + **búsqueda derivada de specs en
+vivo** (`queries/search_source.py`). Detalle → [`docs/PLAN_SPECS_REDISENO.md`](PLAN_SPECS_REDISENO.md)
+y [`services/specs/CLAUDE.md`](../backend/services/specs/CLAUDE.md).
 
 ### El stack en una imagen
 
 ```
-backend/specs/__init__.py  (REGISTRY: Registry — objeto Pydantic v2)
+backend/services/specs/__init__.py  (barrel: REGISTRY, seed_all_categorias, persistir_specs, ...)
     │
-    ├──► seeds/registry_seeder.py  → DB (spec_definitions + categoria_spec_templates)
-    │                                ↑ idempotente, walks REGISTRY
+    ├──► services/specs/commands/seed.py  → DB (spec_definitions + categoria_spec_templates)
+    │                                        ↑ idempotente, walks REGISTRY, corre en cada boot
     │
-    └──► specs/validation.py  → valida docs/<cat>.json en parse
+    ├──► services/specs/commands/persist.py  → equipo_specs (choke-point único de escritura,
+    │                                            pasa por el embudo de alias de valor)
+    │
+    └──► services/specs/queries/validation.py  → valida docs/<cat>.json en parse (sin caller en vivo)
 
 HTMLs B&H ($RAMBLA_HTMLS_DIR/<categoría>/, default ~/Desktop/Paginas/<categoría>/)
     │ tools/<categoría>_parser.py  (emite keys del registry)
@@ -321,17 +368,15 @@ HTMLs B&H ($RAMBLA_HTMLS_DIR/<categoría>/, default ~/Desktop/Paginas/<categorí
 docs/<categoría>.json  (dataset canónico, validado contra registry)
     │
     ▼
-backend/seeds/<categoría>.py
-    ├── seed_categoria_from_registry()  → specs + sub-cats
-    ├── resolve_equipo_id() + apply_overrides()  → preserva equipo.id
-    └── write_keywords()  → equipo_fichas.keywords_json
+tools/specs_import_preview.py + dataio.cli import  (reemplaza a los seeders
+    │                                                 por-categoría, eliminados en Fase C)
     ▼
 DB Postgres
 ```
 
 ### Specs por categoría (6 activas)
 
-> Conteos de specs: snapshot orientativo. La verdad está en `backend/specs/categorias/<cat>.py`.
+> Conteos de specs: snapshot orientativo. La verdad está en `backend/services/specs/registry/catalogo/<cat>.py`.
 
 | Categoría | # specs | Subtipo canónico | Specs core |
 |---|---|---|---|
@@ -366,18 +411,23 @@ El motor de compat matchea por **string-equality del spec_key + value**. La comp
 - `multi_enum`: JSON array. Usados en `color_modes`, `control_inalambrico`, `alimentacion`
 - IDs estables del dataset: `marca_modelo_apertura[_linea]`
 
-### Sub-categorías por raíz
+### Sub-categorías por raíz — 100% manual, desenredada de specs (#1163 F6)
 
-```
-Cámaras    → Foto | Video > {Montura E, RF, EF, L, Z, PL, BMD} | Acción     (multi-cat)
-Lentes     → Zoom | Fijo | Vintage | Especiales | Montura {E, EF, M42, ...}  (multi-cat)
-Adaptadores→ Montura {E, RF, EF, ...}                                         (única, por body mount)
-Filtros    → {82mm, 77mm, ...}                                                (única, por diámetro)
-Iluminación→ LED daylight/bicolor | LED RGB | Tungsteno | Flash | ...         (única)
-Modificadores→ Softbox | Fresnel | Spotlight | Difusión-Frame                 (única, fija)
-```
+El árbol de sub-categorías bajo cada raíz (Foto/Video, Zoom/Fijo, Softbox/Fresnel,
+etc.) ya **no se declara en el registry de specs** — el registry de una categoría
+(`CategoriaRegistry`) solo tiene `nombre` + `specs`. El árbol completo (incluida
+la raíz misma) lo maneja el dueño **100% a mano** desde `/admin/categorias`
+(motor único `services/categorias/`, decisión 2026-05-30). El seeder de specs
+(`services/specs/commands/seed.py`) solo **resuelve por nombre** una raíz ya
+existente para colgarle `spec_definitions` — nunca crea ni edita la categoría
+ni sus hijas; si el dueño la borró, esa categoría del registry se saltea en
+silencio (`categoria_ausente` en el resultado del seed).
 
-Las sub-cats de **montura** y **diámetro** se crean on-the-fly al primer equipo. En el catálogo público (`CategorySidebar.tsx`), Lentes + Adaptadores + Filtros se agrupan visualmente bajo **"Óptica"**.
+En el catálogo público (`CategorySidebar.tsx`), Lentes + Adaptadores + Filtros
+se agrupan visualmente bajo **"Óptica"** vía `categorias.grupo_visual` (columna
+real de la tabla `categorias`, editable desde el admin — no relacionada con el
+campo homónimo que el registry de specs llegó a tener y que #1163 F6 sacó por
+muerto).
 
 ### Keywords automáticas
 
@@ -411,14 +461,11 @@ python -m backend.seeds.{camaras,lentes,adaptadores,filtros,iluminacion}
 # Admin sube HTML B&H → endpoint usa el mismo parser → inserta canónico
 ```
 
-### Agregar specs / cats / sub-cats
+### Agregar specs a una categoría (las sub-cats se crean a mano en `/admin/categorias`, no acá)
 
-1. **Editar** la categoría en `backend/specs/categorias/<cat>.py` (la registra `backend/specs/__init__.py`)
+1. **Editar** la categoría en `backend/services/specs/registry/catalogo/<cat>.py` (la registra `backend/services/specs/registry/__init__.py`)
 2. **Validar** localmente: `python -m pytest backend/tests/test_specs_registry.py`
-3. **Reseed** (o esperar al próximo deploy — el lifecycle DB corre `seed_all_categorias`):
-   ```bash
-   python -m backend.seeds.camaras  # o la cat que corresponda
-   ```
+3. **Reseed**: el lifecycle de la app corre `seed_all_categorias()` en cada boot (`main.py::_seed_registry`) — no hace falta un comando manual.
 
 Si una spec_key debe ser compartida con otra cat (compat matching): declararla idénticamente en ambas (mismo `tipo`, mismas `enum_options`, misma `unidad`). El test `test_shared_keys_consistentes_entre_cats` lo enforcea.
 
@@ -428,8 +475,9 @@ Si una spec_key debe ser compartida con otra cat (compat matching): declararla i
 |---|---|
 | Specs no aparecen como compatibilidad | `SpecDef.es_compatibilidad` en el registry; reseed |
 | Match jerárquico no funciona | `SpecDef.compatibilidad_modo` + `rol_compatibilidad` en el registry |
-| Dataset rompe seed con error de validación | Output de `specs.validation.validate_dataset()` — el dataset desalineó del registry |
+| Dataset rompe seed con error de validación | Output de `services.specs.queries.validation.validate_dataset()` — el dataset desalineó del registry |
 | Equipos duplicados al re-seed | `docs/equipos_match.json` debe tener entry con `action: update` |
 | Keywords salen mal | `SPEC_KEYWORDS_TEMPLATES` en `nombre_builder.py` |
-| Falta sub-cat de montura/diámetro en sidebar | Sub-cats on-the-fly por stock — verificar `categorize_*()` en el seed |
+| Falta una sub-categoría en el sidebar | El árbol es 100% manual (`/admin/categorias`) desde #1163 F6 — no hay creación on-the-fly por specs |
+| Categoría del registry no siembra nada (`categoria_ausente`) | El seeder solo RESUELVE por nombre — la raíz no existe (o el dueño la borró/renombró) en `categorias` |
 | Spec "tipo" cruza enums entre cats | No debería ocurrir: cada cat tiene `<cat>_subtipo`. Si pasa, el registry tiene drift |

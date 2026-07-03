@@ -1,0 +1,209 @@
+"""Specs canónicas de Cámaras. Cinema/Mirrorless/DSLR/Foto.
+
+Las specs flash-specific (`flash_modes`, `recycle_time`, etc.) y EVF-tradicional
+(`eye_point`, `evf_coverage`) se eliminaron — no aplican al inventario de
+cine y mirrorless modernas. Si en el futuro se agrega un cuerpo con flash
+incorporado serio, se agregan acá de vuelta.
+"""
+
+from __future__ import annotations
+
+from ..models import CategoriaRegistry, SpecDef
+from ..shared import LENS_MOUNT_ENUM, FORMATO_ENUM, autofocus, dimensions_mm, estabilizacion, materials, peso_g
+
+
+CAT = CategoriaRegistry(
+    nombre="Cámaras",
+    specs=[
+        # ─── Identidad ────────────────────────────────────────────────
+        SpecDef(
+            key="camera_subtipo", label="Tipo", tipo="enum",
+            enum_options=[
+                "Cinema Camera", "Mirrorless", "DSLR", "Vlogging",
+                "Action Camera", "Compact", "Medium Format",
+            ],
+            prioridad=10, en_card=True, en_filtros=True, en_nombre=True,
+            destacado=True, ayuda="Form factor de la cámara",
+        ),
+        SpecDef(
+            key="lens_mount", label="Montura", tipo="enum",
+            enum_options=LENS_MOUNT_ENUM,
+            prioridad=15, en_card=True, en_filtros=True, en_nombre=True,
+            destacado=True,
+            ayuda="Null para cámaras con lente fijo (action cams, smartphones)",
+            es_compatibilidad=True, compatibilidad_modo="exacta",
+            aliases=["Mount", "Lens Mounting", "Mount Type", "Camera Mount"],
+        ),
+        SpecDef(
+            key="formato", label="Formato", tipo="enum",
+            enum_options=FORMATO_ENUM,
+            prioridad=20, en_card=True, en_filtros=True, en_nombre=True, destacado=True,
+            es_compatibilidad=True, compatibilidad_modo="jerarquia",
+            rol_compatibilidad="contenido",
+            aliases=["Sensor Type", "Sensor Format", "Sensor Size", "Sensor Size Type"],
+            # Sinónimos de VALOR (embudo #1163 F3) — abreviaturas de uso real,
+            # no variantes de formato (esas ya matchean por normalización).
+            value_aliases={"Full-frame": ["FF"], "Super 35": ["S35"]},
+        ),
+        SpecDef(
+            key="resolucion_max", label="Resolución máxima", tipo="enum",
+            enum_options=["FHD", "2K", "4K", "5K", "5.7K", "6K", "8K", "12K"],
+            prioridad=30, en_card=True, en_filtros=True, en_nombre=True, destacado=True,
+            aliases=["Max Video Resolution", "Video Resolution", "Maximum Resolution"],
+        ),
+        # ─── Performance ──────────────────────────────────────────────
+        SpecDef(key="fps_max", label="FPS máx", tipo="number", unidad="fps",
+                prioridad=40, en_filtros=True, destacado=True,
+                ayuda="Frame rate máximo en cualquier resolución",
+                aliases=["Frame Rate", "Maximum Frame Rate", "Max Frame Rate", "Video Frame Rate"]),
+        SpecDef(key="megapixels", label="Megapixels", tipo="number", unidad="MP",
+                prioridad=45, en_filtros=True,
+                aliases=["Effective Megapixels", "Resolution (Megapixels)"]),
+        SpecDef(key="codecs", label="Codecs principales", tipo="string",
+                prioridad=60, destacado=True,
+                ayuda="Ej: ProRes, REDCODE, XAVC S-I 4:2:2"),
+        SpecDef(key="iso_nativo", label="ISO nativo", tipo="rango", unidad="ISO",
+                prioridad=65, en_filtros=True, ayuda="Rango nativo. Ej: '80-102400'"),
+        SpecDef(key="iso_extendido", label="ISO extendido", tipo="rango", unidad="ISO",
+                prioridad=67, ayuda="Con boost. Ej: '80-409600'"),
+        SpecDef(key="rango_dinamico_stops", label="Rango dinámico", tipo="number",
+                unidad="stops", prioridad=70, en_filtros=True),
+        # ─── Features ─────────────────────────────────────────────────
+        estabilizacion(prioridad=75),
+        autofocus(prioridad=80),
+        SpecDef(key="fast_slow_motion", label="Cámara lenta/rápida", tipo="bool",
+                prioridad=85, ayuda="Soporta variable frame rate / S&Q"),
+        SpecDef(key="lens_communication", label="Comunicación electrónica lente", tipo="bool",
+                prioridad=90),
+        SpecDef(key="gps", label="GPS", tipo="bool", prioridad=92),
+        SpecDef(key="ip_streaming", label="Streaming IP", tipo="bool",
+                prioridad=95, ayuda="Para broadcast / live streaming"),
+        SpecDef(key="netflix_approved", label="Aprobado por Netflix", tipo="bool",
+                prioridad=98, en_card=True, en_filtros=True),
+        SpecDef(key="continuous_shooting_fps", label="Ráfaga (stills)", tipo="number",
+                unidad="fps", prioridad=99, ayuda="Burst rate para fotografía"),
+        SpecDef(key="max_aperture", label="Apertura máxima (fixed-lens)", tipo="string",
+                prioridad=101, ayuda="Solo para cámaras con lente fijo (GoPro, etc.)"),
+        SpecDef(key="sensor_crop", label="Sensor crop", tipo="string",
+                prioridad=102),
+        SpecDef(key="recording_limit_min", label="Límite de grabación", tipo="number",
+                unidad="min", prioridad=103, ayuda="Algunos modelos tienen tope 29min59s"),
+        peso_g(prioridad=100, ayuda="Peso del cuerpo solo, sin batería ni media"),
+        # ─── Conectividad / I/O ───────────────────────────────────────
+        SpecDef(key="video_io", label="Conexiones video", tipo="string",
+                prioridad=110, en_filtros=True,
+                ayuda="Ej: HDMI Type A, 12G-SDI, 3G-SDI"),
+        SpecDef(key="audio_io", label="Conexiones audio", tipo="string",
+                prioridad=115,
+                ayuda="Ej: 1× 3.5mm TRS Stereo Microphone Input, 1× 3.5mm Headphone Output"),
+        SpecDef(key="power_io", label="Conexiones de alimentación", tipo="string",
+                prioridad=120,
+                ayuda="Ej: DC In, USB-C PD, D-Tap"),
+        SpecDef(key="other_io", label="Otras conexiones", tipo="string",
+                prioridad=125,
+                ayuda="Ej: USB-C 3.2 Gen 2 (data), Timecode, multi/USB"),
+        SpecDef(
+            key="wireless", label="Wireless", tipo="multi_enum",
+            enum_options=["Wi-Fi", "Bluetooth", "NFC", "5G", "LTE"],
+            prioridad=130, en_filtros=True,
+        ),
+        SpecDef(key="mobile_app_compatible", label="App móvil compatible", tipo="bool",
+                prioridad=135),
+        # ─── Batería / energía ────────────────────────────────────────
+        SpecDef(key="battery", label="Batería", tipo="string",
+                prioridad=140, en_card=True,
+                ayuda="Modelo de batería nativa. Ej: NP-FZ100, BP-A30, BP-955",
+                aliases=["Battery Type", "Battery Pack", "Battery Model"]),
+        # consumo_w: canónico, mismo spec_key que Iluminación (extracción/aliases
+        # compartidos). Antes era 'power_consumption_w' — renombrado por #535.
+        SpecDef(key="consumo_w", label="Consumo eléctrico", tipo="number", unidad="W",
+                prioridad=145,
+                aliases=["Power", "Wattage", "Power Consumption", "Power Draw",
+                         "Power Input", "Rated Power"]),
+        # ─── Captura / sensor adicional ───────────────────────────────
+        SpecDef(
+            key="capture_type", label="Tipo de captura", tipo="enum",
+            enum_options=["Stills", "Video", "Stills & Video"],
+            prioridad=150, en_filtros=True,
+        ),
+        SpecDef(
+            key="shutter_type", label="Tipo de obturador", tipo="enum",
+            enum_options=["Mechanical", "Electronic", "Hybrid"],
+            prioridad=155, en_filtros=True,
+            aliases=["Shutter Type", "Shutter"],
+        ),
+        SpecDef(
+            key="shutter_scan", label="Readout del sensor", tipo="enum",
+            enum_options=["Global Shutter", "Rolling Shutter"],
+            prioridad=156, en_filtros=True,
+            aliases=["Sensor Readout", "Shutter Readout"],
+        ),
+        SpecDef(key="shutter_speed", label="Velocidad de obturación", tipo="string",
+                prioridad=160, ayuda="Ej: 1/8000 to 30 seconds"),
+        SpecDef(key="built_in_nd", label="Filtro ND integrado", tipo="bool",
+                prioridad=165, en_card=True, en_filtros=True,
+                ayuda="Cinema cameras: ND interno fijo o variable"),
+        SpecDef(key="internal_recording", label="Grabación interna", tipo="string",
+                prioridad=170, destacado=True,
+                ayuda="Resolución máx + framerate + bitrate más alto"),
+        SpecDef(key="gamma_curve", label="Curva de gamma / log", tipo="string",
+                prioridad=175, destacado=True,
+                ayuda="Ej: S-Log3, V-Log, C-Log3, REDLogFilm"),
+        # ─── Audio ────────────────────────────────────────────────────
+        SpecDef(key="audio_recording", label="Grabación de audio", tipo="string",
+                prioridad=180, ayuda="Ej: 2-Channel 16-Bit 48 kHz LPCM"),
+        SpecDef(key="built_in_microphone", label="Micrófono integrado", tipo="bool",
+                prioridad=185),
+        # ─── Storage / media ──────────────────────────────────────────
+        SpecDef(key="media_card_slots", label="Slots de memoria", tipo="string",
+                prioridad=190, en_filtros=True,
+                ayuda="Ej: Dual CFexpress Type A / SDXC UHS-II"),
+        SpecDef(key="internal_storage", label="Almacenamiento interno", tipo="string",
+                prioridad=195, ayuda="Algunos cuerpos (REDs, FX) tienen SSD interno"),
+        # ─── Display / EVF ────────────────────────────────────────────
+        SpecDef(key="display_type", label="Pantalla", tipo="string",
+                prioridad=200, ayuda="Ej: 3.0\" LCD Touchscreen, 1.6M dot"),
+        # ─── Foto ─────────────────────────────────────────────────────
+        SpecDef(key="focus_points", label="Puntos de AF", tipo="number",
+                prioridad=205, ayuda="Cantidad de puntos del sistema AF"),
+        SpecDef(key="exposure_modes", label="Modos de exposición", tipo="string",
+                prioridad=210, ayuda="Ej: P, A, S, M, Auto"),
+        # ─── Físico / ambiental ───────────────────────────────────────
+        dimensions_mm(prioridad=215, ayuda="Ej: 129.7 × 77.8 × 84.5 mm (W × H × D)"),
+        SpecDef(key="operating_conditions", label="Condiciones operativas", tipo="string",
+                prioridad=220, ayuda="Ej: 0 to 40°C / 5-80% humidity"),
+        SpecDef(key="tripod_mount", label="Rosca de trípode", tipo="string",
+                prioridad=225, ayuda="Ej: 1/4-20, 3/8-16"),
+        SpecDef(key="shoe_mount", label="Zapata", tipo="string",
+                prioridad=230, ayuda="Ej: Multi Interface Shoe, 1× Cold Shoe"),
+        materials(prioridad=235, ayuda="Ej: Magnesium Alloy, Polycarbonate"),
+        # ─── Capturados de HTMLs B&H — completar ficha técnica ────────
+        SpecDef(key="white_balance", label="Balance de blancos", tipo="string", prioridad=300, ayuda="Rango K + presets"),
+        SpecDef(key="bulb_time_mode", label="Modo Bulb / Time", tipo="string", prioridad=301),
+        SpecDef(key="metering_method", label="Modo de medición", tipo="string", prioridad=302, ayuda="Ej: Spot, Multi-Zone, Center-Weighted"),
+        SpecDef(key="exposure_compensation", label="Compensación exposición", tipo="string", prioridad=303),
+        SpecDef(key="metering_range", label="Rango de medición", tipo="string", prioridad=304),
+        SpecDef(key="interval_recording", label="Grabación por intervalo", tipo="bool", prioridad=305),
+        SpecDef(key="self_timer", label="Disparador automático", tipo="string", prioridad=306),
+        SpecDef(key="aspect_ratio", label="Relación de aspecto", tipo="string", prioridad=307, ayuda="Ej: 16:9, 4:3, 1:1"),
+        SpecDef(key="image_file_format", label="Formato de imagen", tipo="string", prioridad=308, ayuda="Ej: JPEG, HEIF, RAW"),
+        SpecDef(key="bit_depth", label="Profundidad de bits", tipo="string", prioridad=309),
+        SpecDef(key="autofocus_sensitivity", label="Sensibilidad AF", tipo="string", prioridad=310),
+        SpecDef(key="built_in_cc", label="Filtro CC integrado", tipo="bool", prioridad=314, ayuda="Color correction"),
+        SpecDef(key="internal_filter_holder", label="Porta-filtros interno", tipo="bool", prioridad=315),
+        SpecDef(key="color_filter_system", label="Filtro de color del sensor", tipo="string", prioridad=322, ayuda="Ej: Bayer RGB Primary"),
+        SpecDef(key="scanning_system", label="Sistema de escaneo", tipo="string", prioridad=323, ayuda="Progressive / Interlaced"),
+        SpecDef(key="processor", label="Procesador", tipo="string", prioridad=324),
+        SpecDef(key="signal_system", label="Sistema de señal", tipo="string", prioridad=325, ayuda="NTSC/PAL"),
+        SpecDef(key="system_frequency", label="Frecuencia de sistema", tipo="string", prioridad=326, ayuda="Hz disponibles"),
+        SpecDef(key="time_code", label="Time code", tipo="string", prioridad=327),
+        SpecDef(key="phantom_power", label="Phantom power", tipo="string", prioridad=328, ayuda="Para mics XLR. Ej: +48V"),
+        SpecDef(key="shutter_angle", label="Ángulo de obturador", tipo="string", prioridad=329, ayuda="Solo cine. Ej: 0 a 360°"),
+        SpecDef(key="charging_time", label="Tiempo de carga", tipo="string", prioridad=331),
+        SpecDef(key="battery_life", label="Duración estimada batería", tipo="string", prioridad=332),
+        SpecDef(key="environmental_resistance", label="Resistencia ambiental", tipo="string", prioridad=333, ayuda="IP rating, water/dust resistant"),
+        SpecDef(key="impact_resistance", label="Resistencia a impacto", tipo="string", prioridad=334),
+        SpecDef(key="built_in_light", label="Luz integrada", tipo="bool", prioridad=335),
+        SpecDef(key="creative_effects", label="Efectos creativos", tipo="string", prioridad=337, ayuda="Lista de efectos predefinidos"),
+    ],
+)

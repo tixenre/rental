@@ -10,7 +10,7 @@ La fuente de verdad de "lo oficial" son los JSONs commiteados en
 Entrypoints públicos:
     from backend.dataio import orchestrator
     orchestrator.export_all(conn, out_dir)
-    orchestrator.import_all(conn, in_dir, dry_run=False, prune=False)
+    orchestrator.import_all(conn, in_dir, dry_run=False)
 """
 
 from . import exporters, importers, natural_keys, orchestrator, paths, schema, slug

@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { MoneyInput } from "@/design-system/ui/money-input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Skeleton } from "@/design-system/ui/skeleton";
 import {
@@ -86,7 +87,8 @@ import { DateRangePickerModal } from "@/components/rental/DateRangePickerModal";
 import { computeJornadas, parseDateTimeParts, toLocalISO } from "@/lib/rental-dates";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useCotizacion } from "@/lib/cotizacion";
+import { useCotizacion, descuentoLabel } from "@/lib/cotizacion";
+import { SegmentedControl } from "@/design-system/ui/segmented-control";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
 import { nombreCliente } from "@/lib/cliente-nombre";
@@ -164,6 +166,8 @@ function PedidoEditorPage() {
     fechaHasta: draft.datos?.fecha_hasta || null,
     clienteId: p?.cliente_id ?? null,
     descuentoPct: draft.datos?.descuento_pct ?? null,
+    descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
+    descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
   });
 
   // Modales
@@ -452,9 +456,11 @@ function PedidoEditorPage() {
                             cliente_nombre: nombreCliente(c),
                             cliente_email: c.email ?? "",
                             cliente_telefono: c.telefono ?? "",
-                            // El descuento sigue al cliente: si el nuevo no tiene
-                            // uno propio, se resetea a 0.
-                            descuento_pct: c.descuento ?? 0,
+                            // `descuento_pct` (override MANUAL) NO se toca acá
+                            // (Fase C-1, #1219) — el descuento del cliente ya
+                            // se sigue EN VIVO cuando no hay override (0 =
+                            // "sin override"); copiarlo acá creaba un override
+                            // fantasma que dejaba de seguir al cliente en vivo.
                           }
                         : d,
                     )
@@ -687,7 +693,10 @@ function PedidoEditorPage() {
               />
               {totales.descuentoPct > 0 && (
                 <BdRow
-                  l={`Descuento ${totales.descuentoPct}%`}
+                  l={
+                    descuentoLabel(totales.descuentoOrigen, jornadas, datos.cliente_nombre) ||
+                    `Descuento ${totales.descuentoPct}%`
+                  }
                   v={`– ${fmtArs(totales.descuentoMonto)}`}
                   neg
                 />
@@ -700,29 +709,81 @@ function PedidoEditorPage() {
               <div className="border-t hairline my-1" />
               <BdRow l="Total" v={fmtArs(total)} strong />
             </div>
-            <FieldLabel label="Descuento manual" className="mt-3 max-w-[140px]">
-              <div className="relative">
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={datos.descuento_pct}
-                  className="pr-7"
-                  onChange={(e) =>
+            {/* Div plano, NO <FieldLabel> (que renderiza un <label> nativo):
+                un <label> reenvía cualquier click dentro de su área al PRIMER
+                control enfocable de adentro (acá, el botón "%") — clickear
+                "cerca" del input $ pero todavía dentro del label revertía el
+                selector a "%" solo. Con 2+ controles adentro, un <label> no
+                es seguro; FieldLabel sigue bien para los campos de un solo input. */}
+            <div className="block mt-3">
+              <span className="block t-eyebrow mb-1">Descuento manual (0 = automático)</span>
+              <div className="flex items-center gap-2">
+                <SegmentedControl
+                  value={datos.descuento_manual_tipo}
+                  onChange={(v) =>
                     setDatos(
                       (d) =>
                         d && {
                           ...d,
-                          descuento_pct: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                          descuento_manual_tipo: v as "pct" | "monto",
+                          // Convertir al equivalente del OTRO campo (el % y el
+                          // $ efectivos que ya muestra el desglose, calculados
+                          // por el backend) en vez de resetear a 0 — cambiar
+                          // de unidad no debería perder el descuento actual.
+                          // El campo que se deja de usar se resetea (sin esto
+                          // queda un valor "fantasma" que podía reaparecer si
+                          // el admin volvía a tocar el selector).
+                          ...(v === "monto"
+                            ? { descuento_manual_monto: totales.descuentoMonto, descuento_pct: 0 }
+                            : { descuento_pct: totales.descuentoPct, descuento_manual_monto: 0 }),
                         },
                     )
                   }
+                  options={[
+                    { value: "pct", label: "%" },
+                    { value: "monto", label: "$" },
+                  ]}
+                  className="w-20 shrink-0"
                 />
-                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                  %
-                </span>
+                {datos.descuento_manual_tipo === "monto" ? (
+                  <MoneyInput
+                    min={0}
+                    max={totales.subtotalDescontable}
+                    step={100}
+                    value={datos.descuento_manual_monto}
+                    className="max-w-[140px]"
+                    ariaLabel="Descuento $ manual"
+                    onChange={(v) => setDatos((d) => d && { ...d, descuento_manual_monto: v })}
+                  />
+                ) : (
+                  <div className="relative max-w-[140px]">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={datos.descuento_pct}
+                      className="pr-7"
+                      onChange={(e) =>
+                        setDatos(
+                          (d) =>
+                            d && {
+                              ...d,
+                              descuento_pct: Math.max(
+                                0,
+                                Math.min(100, Number(e.target.value) || 0),
+                              ),
+                            },
+                        )
+                      }
+                    />
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      %
+                    </span>
+                  </div>
+                )}
               </div>
-            </FieldLabel>
+            </div>
           </RailSection>
 
           {/* Cobranza */}

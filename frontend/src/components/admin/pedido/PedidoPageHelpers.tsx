@@ -7,25 +7,33 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
 import { Input } from "@/design-system/ui/input";
+import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 import { QtyInput } from "@/design-system/ui/qty-input";
 import { cn } from "@/lib/utils";
 import { adminApi } from "@/lib/admin/api";
 import { formatARS, formatFechaCorta, fmtArs } from "@/lib/format";
-import { type DraftItem } from "@/components/admin/pedido/usePedidoDraft";
+import { type DraftItem, subtotalDraftItem } from "@/components/admin/pedido/usePedidoDraft";
 import { EquipoThumb } from "@/components/admin/pedido/EquipoThumb";
 
 export function PagoRow({
   pago,
   pedidoId,
 }: {
-  pago: { id: number; monto: number; concepto: string | null; fecha: string };
+  pago: {
+    id: number;
+    monto: number;
+    concepto: string | null;
+    fecha: string;
+    anulado?: boolean;
+    anulado_motivo?: string | null;
+  };
   pedidoId: number;
 }) {
   const qc = useQueryClient();
   const delMut = useMutation({
-    mutationFn: () => adminApi.deletePago(pedidoId, pago.id),
+    mutationFn: (motivo: string) => adminApi.anularPago(pedidoId, pago.id, motivo),
     onSuccess: () => {
-      toast.success("Pago eliminado");
+      toast.success("Pago anulado");
       qc.invalidateQueries({ queryKey: ["admin", "pedido", pedidoId] });
       qc.invalidateQueries({ queryKey: ["admin", "pedidos"] });
     },
@@ -33,21 +41,35 @@ export function PagoRow({
   });
 
   return (
-    <div className="flex items-center justify-between text-xs mt-1">
+    <div
+      className={cn("flex items-center justify-between text-xs mt-1", pago.anulado && "opacity-50")}
+    >
       <span className="text-muted-foreground">
-        {pago.concepto || "Pago"} · {formatFechaCorta(pago.fecha)}
+        <span className={cn(pago.anulado && "line-through")}>
+          {pago.concepto || "Pago"} · {formatFechaCorta(pago.fecha)}
+        </span>
+        {pago.anulado && pago.anulado_motivo && (
+          <span className="text-destructive"> · Anulado: {pago.anulado_motivo}</span>
+        )}
       </span>
       <div className="flex items-center gap-1">
-        <span className="font-mono">{formatARS(pago.monto)}</span>
-        <IconButton
-          aria-label="Eliminar pago"
-          size="xs"
-          onClick={() => delMut.mutate()}
-          disabled={delMut.isPending}
-          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-        >
-          <X className="h-3 w-3" />
-        </IconButton>
+        <span className={cn("font-mono", pago.anulado && "line-through")}>
+          {formatARS(pago.monto)}
+        </span>
+        {!pago.anulado && (
+          <IconButton
+            aria-label="Anular pago"
+            size="xs"
+            onClick={() => {
+              const motivo = window.prompt("Motivo de la anulación del pago:");
+              if (motivo && motivo.trim()) delMut.mutate(motivo.trim());
+            }}
+            disabled={delMut.isPending}
+            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          >
+            <X className="h-3 w-3" />
+          </IconButton>
+        )}
       </div>
     </div>
   );
@@ -74,12 +96,10 @@ export function ItemRow({
     id: it.uid,
   });
   const esLibre = it.equipo_id == null;
-  const fijo = (it.cobro_modo ?? "jornada") === "fijo";
   const max = stock ? Math.max(0, stock.cantidad - stock.reservado) : it.cantidad;
   const disponible = max - it.cantidad;
   const overstock = it.cantidad > max && !!stock;
-  // Subtotal: las líneas 'fijo' no multiplican por jornadas (espeja bruto_linea del backend).
-  const subtotal = it.precio_jornada * it.cantidad * (fijo ? 1 : Math.max(1, jornadas));
+  const subtotal = subtotalDraftItem(it, jornadas);
 
   return (
     <li
@@ -155,12 +175,11 @@ export function ItemRow({
 
         {/* Precio editable por jornada */}
         <div className="flex items-center gap-1">
-          <Input
-            type="number"
+          <DraftNumberInput
             min={0}
             value={it.precio_jornada}
-            aria-label="Precio por jornada"
-            onChange={(e) => updateItem(it.uid, { precio_jornada: parseInt(e.target.value) || 0 })}
+            ariaLabel="Precio por jornada"
+            onCommit={(v) => updateItem(it.uid, { precio_jornada: v })}
             className="h-9 w-24 text-sm"
           />
           {esLibre ? (

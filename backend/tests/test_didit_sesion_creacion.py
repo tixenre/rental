@@ -76,6 +76,9 @@ def test_cliente_registra_iniciado_al_crear_su_sesion(monkeypatch):
         ),
     )
     monkeypatch.setattr("routes.didit.kyc.registrar_consentimiento", lambda cliente_id: None)
-    res = cliente_iniciar_verificacion(request=object(), body=None)
+    # `.__wrapped__`: la función tiene @limiter.limit encima (slowapi exige un
+    # Request real para trackear la IP) — bypaseamos el decorador en el unit test,
+    # mismo patrón que test_busquedas.py.
+    res = cliente_iniciar_verificacion.__wrapped__(request=object(), body=None)
     assert res == {"session_id": "sess-cliente", "url": "https://verify.didit.me/y"}
     assert eventos == [(7, "iniciado", "sess-cliente")]

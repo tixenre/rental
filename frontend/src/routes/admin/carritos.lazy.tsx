@@ -42,7 +42,7 @@ function CarritosPage() {
     queryKey: ["admin", "carritos"],
     queryFn: () => adminApi.listCarritos(),
     refetchInterval: 120_000,
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   const [filtro, setFiltro] = useState<Filtro>("todos");

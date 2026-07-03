@@ -13,9 +13,9 @@ jornadas truncadas (bug #502).
 Modelo (alineado bit a bit con ``src/lib/cart-total.ts`` del front):
 
 - Precios del catálogo son **netos** (sin IVA).
-- Descuento NO acumulativo: gana ``max(descuento_cliente, descuento_jornadas)``.
-  En empate gana el del cliente — convención de etiquetado del front; en
-  monto no hay diferencia.
+- Descuento NO acumulativo: gana el mayor entre las fuentes vigentes — la
+  decisión de "quién gana" vive en ``descuentos.queries.decision.
+  calcular_descuento_aplicable`` (paquete ``backend/descuentos/``, no acá).
 - ``monto_total`` se PERSISTE neto (con descuento aplicado, sin IVA).
   El IVA es derivado al mostrar/facturar: solo para
   ``perfil_impuestos == 'responsable_inscripto'`` se suma 21%.
@@ -28,6 +28,8 @@ from __future__ import annotations
 from math import ceil
 from datetime import datetime
 from typing import Optional, TypedDict
+
+from descuentos.queries.decision import resolver_descuento_monto_pedido
 
 
 IVA_PCT = 21.0
@@ -46,16 +48,23 @@ class ItemPrecio(TypedDict, total=False):
     jornadas, como los equipos del catálogo) o 'fijo' (monto único — precio ×
     cantidad, SIN multiplicar por jornadas; para líneas personalizadas tipo flete).
     `equipo_id` puede faltar/ser None en líneas personalizadas (no del catálogo).
+    `es_combo` (opcional, Fase C-3 #1219, default False): la línea es un
+    equipo `tipo='combo'` — ya trae su propio descuento por componente
+    horneado en `precio_jornada` (`precio_combo`); el descuento GLOBAL
+    (cliente/jornadas/manual) no se le vuelve a aplicar encima. Resolverlo es
+    responsabilidad del caller (ver `tipos_equipo_batch`).
     """
     equipo_id: Optional[int]
     cantidad: int
     precio_jornada: int
     cobro_modo: str
+    es_combo: bool
 
 
 class TotalDesglose(TypedDict):
-    bruto: int               # Σ(precio_jornada × cantidad × jornadas)
-    descuento_pct: float     # % aplicado (el ganador: max(cliente, jornadas))
+    bruto: int               # Σ(precio_jornada × cantidad × jornadas), TODAS las líneas
+    bruto_descontable: int   # bruto SIN las líneas es_combo — el tope real del descuento manual en $ (C-3, #1219)
+    descuento_pct: float     # % efectivo aplicado (el ganador de la jerarquía: manual > max(cliente, jornadas))
     descuento_monto: int     # bruto - neto
     neto: int                # bruto - descuento_monto — lo que se PERSISTE en monto_total
     con_iva: bool            # True si el perfil es responsable_inscripto
@@ -86,23 +95,6 @@ def jornadas_periodo(
     if horas <= 0:
         return 1
     return max(1, ceil(horas / 24))
-
-
-def descuento_aplicable(
-    descuento_cliente_pct: Optional[float],
-    descuento_jornadas_pct: Optional[float],
-) -> float:
-    """Descuentos NO acumulativos: gana el de mayor valor.
-
-    En empate gana el del cliente (es una atención manual del dueño;
-    convención de etiquetado alineada con el front). En el monto no
-    cambia nada — los dos pcts son iguales en empate.
-    """
-    cli = max(0.0, float(descuento_cliente_pct or 0))
-    jor = max(0.0, float(descuento_jornadas_pct or 0))
-    # Topar en 100: un descuento > 100% daría neto/total NEGATIVO. Solo lo
-    # podría setear un admin, pero acotamos para no perder plata por un typo.
-    return min(100.0, max(cli, jor))
 
 
 def es_responsable_inscripto(perfil_impuestos: Optional[str]) -> bool:
@@ -163,6 +155,20 @@ def precios_combo_batch(conn, equipo_ids) -> dict[int, int]:
     return {eid: _precio_combo_calc(comps) for eid, comps in por_combo.items()}
 
 
+def tipos_equipo_batch(conn, equipo_ids) -> dict[int, str]:
+    """`tipo` (simple/kit/combo) de varios equipos en UNA sola query — evita N+1
+    al resolver qué líneas son `es_combo` para `calcular_total` (Fase C-3,
+    #1219: los combos no acumulan el descuento GLOBAL de cliente/jornadas/
+    manual encima de su propio descuento por componente)."""
+    ids = list(equipo_ids)
+    if not ids:
+        return {}
+    rows = conn.execute(
+        "SELECT id, tipo FROM equipos WHERE id = ANY(%s)", (ids,)
+    ).fetchall()
+    return {r["id"]: r["tipo"] for r in rows}
+
+
 def precio_jornada_efectivo(conn, equipo_id: int) -> Optional[int]:
     """Precio por jornada EFECTIVO de un equipo, resuelto en UN solo lugar: para un
     COMBO se deriva en vivo de sus componentes (`precio_combo`, C3 #635); un kit/simple
@@ -203,28 +209,57 @@ def calcular_total(
     descuento_cliente_pct: Optional[float] = 0.0,
     descuento_jornadas_pct: Optional[float] = 0.0,
     perfil_impuestos: Optional[str] = None,
+    descuento_manual_pct: Optional[float] = 0.0,
+    descuento_manual_tipo: Optional[str] = "pct",
+    descuento_manual_monto: Optional[float] = 0,
 ) -> TotalDesglose:
     """Cálculo canónico del total de un pedido.
 
     Argumentos:
       items:                       [{equipo_id, cantidad, precio_jornada}], precios NETOS.
       jornadas:                    cantidad de jornadas (usar ``jornadas_periodo``).
-      descuento_cliente_pct:       ``clientes.descuento`` (0..100).
-      descuento_jornadas_pct:      interpolado por ``_get_descuento_jornadas``.
+      descuento_cliente_pct:       ``clientes.descuento`` (0..100), leído EN VIVO por el caller.
+      descuento_jornadas_pct:      interpolado por ``descuentos.queries.jornadas.obtener_descuento_jornadas``.
       perfil_impuestos:            ``'responsable_inscripto'`` para sumar IVA 21%.
+      descuento_manual_pct:        override explícito del pedido en % (``alquileres.descuento_pct``,
+                                    0 = sin override), usado cuando ``descuento_manual_tipo == "pct"``.
+      descuento_manual_tipo:       ``"pct"`` (default, de siempre) o ``"monto"`` (Fase C-2, #1219):
+                                    el override es un $ fijo en vez de un %.
+      descuento_manual_monto:      override explícito del pedido en $ (``alquileres.descuento_manual_monto``),
+                                    usado cuando ``descuento_manual_tipo == "monto"``. Capeado al bruto
+                                    DESCONTABLE (no al bruto total — ver nota de combos abajo).
+
+    Jerarquía (Fase C-1, #1219): si el override manual está seteado (≠0 según
+    su tipo) gana OUTRIGHT sobre cliente/jornadas — ver
+    ``descuentos.queries.decision.resolver_descuento_monto_pedido``.
+
+    Combos no acumulables (Fase C-3, #1219): las líneas con ``es_combo=True``
+    (ver ``tipos_equipo_batch``) ya traen su propio descuento por componente
+    horneado en ``precio_jornada`` (``precio_combo``) — el descuento GLOBAL
+    (cliente/jornadas/manual) se calcula solo sobre el bruto de las líneas
+    NO-combo (``bruto_descontable``) y no las toca. ``bruto`` (el subtotal que
+    se MUESTRA) sigue siendo la suma de TODAS las líneas.
 
     El backend debe PERSISTIR ``neto`` en ``alquileres.monto_total`` (sin IVA).
     El ``total_final`` (con IVA si aplica) es lo que se MUESTRA al cliente RI.
     """
     j = max(1, int(jornadas or 1))
     bruto = sum(bruto_linea(it, j) for it in items)
-    pct = descuento_aplicable(descuento_cliente_pct, descuento_jornadas_pct)
-    descuento_monto = int(round(bruto * pct / 100))
+    bruto_descontable = sum(
+        bruto_linea(it, j) for it in items if not it.get("es_combo")
+    )
+    resuelto = resolver_descuento_monto_pedido(
+        bruto_descontable, descuento_manual_tipo, descuento_manual_pct, descuento_manual_monto,
+        descuento_cliente_pct, descuento_jornadas_pct,
+    )
+    descuento_monto = resuelto["monto"]
+    pct = resuelto["pct"]
     neto = int(bruto - descuento_monto)
     con_iva = es_responsable_inscripto(perfil_impuestos)
     iva_monto = int(round(neto * IVA_PCT / 100)) if con_iva else 0
     return {
         "bruto": int(bruto),
+        "bruto_descontable": int(bruto_descontable),
         "descuento_pct": pct,
         "descuento_monto": descuento_monto,
         "neto": neto,

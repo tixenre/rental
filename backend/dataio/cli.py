@@ -7,7 +7,6 @@ Uso:
     python -m backend.dataio.cli export --out /tmp/cat/    # ubicación custom
     python -m backend.dataio.cli import                    # ← data/catalog/
     python -m backend.dataio.cli import --dry-run          # no commitea
-    python -m backend.dataio.cli import --prune-m2m        # peligroso
     python -m backend.dataio.cli diff                      # DB vs JSON
     python -m backend.dataio.cli validate                  # solo schema
     python -m backend.dataio.cli init-slugs                # one-shot, ver doc
@@ -86,7 +85,6 @@ def cmd_import(args: argparse.Namespace) -> int:
             conn,
             in_dir,
             dry_run=args.dry_run,
-            prune_m2m=args.prune_m2m,
             only=only,
         )
         if not args.dry_run:
@@ -238,11 +236,6 @@ def build_parser() -> argparse.ArgumentParser:
     pi = sub.add_parser("import", help="JSONs → DB (upsert)")
     pi.add_argument("--in", dest="in_dir", help="Directorio fuente (default: data/catalog/)")
     pi.add_argument("--dry-run", action="store_true", help="No commitea")
-    pi.add_argument(
-        "--prune-m2m",
-        action="store_true",
-        help="Borra M2M (equipo_categorias/etiquetas) antes de insertar las del JSON",
-    )
     pi.add_argument(
         "--scope",
         choices=["catalog", "operacional", "all"],

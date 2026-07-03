@@ -1,8 +1,12 @@
 """Módulo de contabilidad (#809) — motor único de la plata "de adentro".
 
-Espeja el patrón de `backend/reportes/` (una dirección física por dominio de
-plata): SQL → filas planas → función pura → JSON; el HTTP es transporte fino en
-`routes/contabilidad.py`.
+Organizado CQRS-lite (espeja `services/specs/` y `services/specs_ingesta/`):
+`queries/` lee, nunca muta; `commands/` es la única puerta de mutación.
+`commands/` puede importar de `queries/`; `queries/` NUNCA importa de
+`commands/`. `constants.py` tiene lo que ambos lados necesitan (cobradores,
+tipos de cuenta/movimiento, partes de la rendición) — vive fuera de
+`queries/`/`commands/` justamente porque `queries/` lo necesita y no puede
+importarlo desde el lado de escritura.
 
 Principio rector (no negociar):
 - Los **ingresos por alquiler NO se re-cargan a mano**: DERIVAN de
@@ -12,7 +16,5 @@ Principio rector (no negociar):
   (gasto/transferencia/retiro/aporte/ajuste). Cada movimiento mueve plata entre
   cuentas; el saldo de cada cuenta se deriva.
 
-Fase 1 (esta entrega): `cuentas` (CRUD + validación) y `saldos` (derivación de
-ingresos + cálculo de saldos por cuenta). Gastos, rendición, P&L y cierre llegan
-en fases siguientes.
+Detalle de la estructura + invariantes → `CLAUDE.md` de este paquete.
 """

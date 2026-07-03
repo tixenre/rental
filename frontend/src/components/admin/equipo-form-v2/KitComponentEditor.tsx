@@ -30,6 +30,7 @@ import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Button } from "@/design-system/ui/button";
 import { Badge } from "@/design-system/ui/badge";
+import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 
 import { adminApi, type Equipo, type KitComponente } from "@/lib/admin/api";
 
@@ -342,16 +343,12 @@ function SortableItem({
           {item.marca && <div className="text-xs text-muted-foreground">{item.marca}</div>}
         </div>
 
-        <Input
-          type="number"
-          min={1}
+        <DraftNumberInput
           value={item.cantidad}
+          min={1}
           className="w-16 h-8 text-center"
-          onChange={(e) =>
-            onUpdate(item.componente_id, {
-              cantidad: Math.max(1, parseInt(e.target.value || "1", 10)),
-            })
-          }
+          ariaLabel="Cantidad"
+          onCommit={(v) => onUpdate(item.componente_id, { cantidad: v })}
           disabled={busy === item.componente_id}
         />
         <Button
@@ -418,16 +415,12 @@ function SortableItem({
       <div className="flex items-center gap-2 pl-6">
         <div className="flex items-center gap-1">
           <span className="text-xs text-muted-foreground w-14">Cant.</span>
-          <Input
-            type="number"
-            min={1}
+          <DraftNumberInput
             value={item.cantidad}
+            min={1}
             className="w-16 h-7 text-center text-sm"
-            onChange={(e) =>
-              onUpdate(item.componente_id, {
-                cantidad: Math.max(1, parseInt(e.target.value || "1", 10)),
-              })
-            }
+            ariaLabel="Cantidad"
+            onCommit={(v) => onUpdate(item.componente_id, { cantidad: v })}
             disabled={busy === item.componente_id}
           />
         </div>
@@ -435,18 +428,13 @@ function SortableItem({
         <div className="flex items-center gap-1">
           <span className="text-xs text-muted-foreground w-16">Descuento</span>
           <div className="flex items-center gap-0.5">
-            <Input
-              type="number"
+            <DraftNumberInput
+              value={descuento}
               min={0}
               max={100}
-              step={1}
-              value={descuento}
               className="w-16 h-7 text-center text-sm"
-              onChange={(e) =>
-                onUpdate(item.componente_id, {
-                  descuento_pct: Math.max(0, Math.min(100, parseFloat(e.target.value || "0"))),
-                })
-              }
+              ariaLabel="Descuento"
+              onCommit={(v) => onUpdate(item.componente_id, { descuento_pct: v })}
               disabled={busy === item.componente_id}
             />
             <span className="text-xs text-muted-foreground">%</span>

@@ -19,13 +19,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Upload,
-  Plus,
   Trash2,
   Search,
   Link as LinkIcon,
   Image as ImageIcon,
   FileCode,
-  X,
   Printer,
 } from "lucide-react";
 import { Spinner } from "@/design-system/ui/spinner";
@@ -77,8 +75,7 @@ import { KitEditor } from "./KitEditor";
 import { ComboEditor } from "./ComboEditor";
 import { ContenidoIncluidoEditor } from "./ContenidoIncluidoEditor";
 import { SpecsDiffEditor } from "./SpecsDiffEditor";
-import { type Spec, newSpec, withIds, sameLabel, findSpecValue, uniq } from "./spec-helpers";
-import { generarNombrePublico, categoriaSoportaAutoGen } from "./nombre-publico";
+import { type Spec, newSpec, withIds, sameLabel, uniq } from "./spec-helpers";
 import { renderNombrePublicoTemplate } from "@/lib/equipment/nombre-template";
 import {
   Field,
@@ -113,7 +110,7 @@ export function EquipoFormDialogV2({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   initial?: Equipo | null;
-  onSubmit: (data: EquipoInput, etiquetas: string[]) => Promise<Equipo>;
+  onSubmit: (data: EquipoInput) => Promise<Equipo>;
   saving?: boolean;
   /** "dialog" (modal, default) o "page" (editor de página completa con
    *  2 columnas + aside + save bar fija, como el mock del handoff). */
@@ -125,8 +122,8 @@ export function EquipoFormDialogV2({
   const isEdit = !!initial;
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const { rate: usdRate } = useUsdRate();
-  const roiDefault = useRoiPctDefault();
+  const { rate: usdRate } = useUsdRate({ staleTime: 0 });
+  const roiDefault = useRoiPctDefault({ staleTime: 0 });
 
   // "Aplicar" (guardar sin cerrar) vs "Guardar" (cerrar al terminar). El
   // botón Aplicar setea este ref a false antes de disparar el submit; en el
@@ -170,20 +167,51 @@ export function EquipoFormDialogV2({
   const [specs, setSpecs] = useState<Spec[]>([]);
   // B1 #635: contenido incluido (dim. 3)
   const [contenidoIncluido, setContenidoIncluido] = useState<ContenidoIncluidoItem[]>([]);
-  // Etiquetas unificadas: en V2 keywords y etiquetas son lo mismo. En save se
-  // envían a los dos backends (etiquetas vía onSubmit, keywords_json vía setFicha).
+  // keywords_json ya no se edita a mano acá — se calcula solo desde las specs
+  // (compute_keywords, ver services/nombre_builder.py). El form solo lo
+  // carga y lo reenvía sin tocar (round-trip), para no pisarlo a null en
+  // cada guardado — nunca se renderiza ni se muta desde la UI.
   const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
 
   // ── Nombre público ─────────────────────────────────────────────────
-  // Input libre + toggle "generar automático desde categoría" (ver nombre-publico.ts).
-  // El toggle arranca ON: si la categoría tiene template, el form regenera el
-  // nombre desde los specs. El usuario puede toggle OFF para editar a mano,
-  // pero por design queda enganchado al template — si el dueño modifica el
-  // template en /admin/equipos/specs, la próxima vez que abra el equipo el
-  // nombre se actualiza automáticamente (#calidad-datos).
+  // Input libre + toggle "generar automático desde categoría". El toggle
+  // arranca ON: si la categoría de specs tiene un molde (nombre_publico_
+  // template, seteado desde /admin/equipos/specs), el nombre se arma solo
+  // desde los specs — es una fuente VIVA (services/nombre_service.py la lee
+  // en cada guardado, no una copia). El usuario puede toggle OFF para
+  // escribir a mano: eso se guarda como `nombre_publico_override`, que
+  // gana SIEMPRE sobre el molde de categoría (así cambiar el molde no pisa
+  // un nombre elegido a mano — ver services/nombre_builder.py, 2026-07).
   const [nombrePublico, setNombrePublico] = useState("");
   const [nombrePublicoAuto, setNombrePublicoAuto] = useState(true);
+  // Carga inicial / reset: el override (equipos.nombre_publico_override) es
+  // la ÚNICA fuente de "hay un nombre a mano" — separado del efecto de ficha
+  // de abajo porque vive en otra tabla (equipos, no equipo_fichas).
+  useEffect(() => {
+    const override = initial?.nombre_publico_override?.trim() || "";
+    if (override) {
+      setNombrePublico(override);
+      setNombrePublicoAuto(false);
+    } else {
+      // Sin override explícito: sembramos con el nombre EFECTIVO ya calculado
+      // (equipos.nombre_publico) en vez de dejar el campo vacío. Sin esto, un
+      // equipo cuyo nombre viene del ficha-template legado (texto YA
+      // renderizado, sin placeholders — una foto vieja, no un molde vivo)
+      // mostraba el campo en blanco mientras ese texto congelado seguía
+      // siendo lo que ve el catálogo público: el admin no tenía forma de
+      // verlo ni de saber que estaba ahí (bug real, encontrado en vivo —
+      // equipo con specs editadas cuyo nombre nunca reaccionaba).
+      // Si hay molde de categoría real, el efecto de auto-gen de abajo pisa
+      // esto enseguida con el valor recién calculado (sin flicker: corre
+      // antes de que el usuario interactúe). Si NO hay molde, este valor se
+      // queda — y el próximo Guardar lo persiste como override real
+      // (mismo criterio que "tipear apaga el auto-gen"), autocurando el
+      // dato congelado equipo por equipo con el uso normal, sin necesitar
+      // una migración aparte.
+      setNombrePublico(initial?.nombre_publico?.trim() || "");
+      setNombrePublicoAuto(true);
+    }
+  }, [initial?.id, initial?.nombre_publico_override, initial?.nombre_publico]);
 
   // Specs traídos del HTML upload: se guardan en una lista separada para
   // que el usuario los apruebe uno por uno (vs los specs actuales).
@@ -191,6 +219,7 @@ export function EquipoFormDialogV2({
 
   // ── HTML source ────────────────────────────────────────────────────
   const [uploadingHtml, setUploadingHtml] = useState(false);
+  const [reExtracting, setReExtracting] = useState(false);
   const [htmlSourceUrl, setHtmlSourceUrl] = useState(initial?.html_source_url ?? null);
   useEffect(() => {
     setHtmlSourceUrl(initial?.html_source_url ?? null);
@@ -226,18 +255,38 @@ export function EquipoFormDialogV2({
   }, [watchedTipo, form]);
 
   // ── Manual override del precio/día ─────────────────────────────────
+  // `precioJornadaManual` arrancaba SIEMPRE en `false`, sin sembrarse del
+  // flag real `initial.precio_jornada_manual` — abrir un equipo que YA
+  // tenía el precio fijado a mano disparaba igual el auto-cálculo de acá
+  // abajo apenas `usdRate`/`roi_pct` estaban disponibles (que es casi
+  // inmediato), pisando en silencio el precio manual con el de fórmula.
+  // Confirmado en vivo: el label decía "(auto)" para un equipo marcado
+  // manual en la base.
   const [precioJornadaManual, setPrecioUnidadManual] = useState(false);
+  useEffect(() => {
+    setPrecioUnidadManual(initial?.precio_jornada_manual ?? false);
+  }, [initial?.id, initial?.precio_jornada_manual]);
   const watchedUsd = form.watch("precio_usd");
   const watchedRoi = form.watch("roi_pct");
   useEffect(() => {
     if (precioJornadaManual) return;
+    // Chequeo directo a `initial.precio_jornada_manual` (no solo al estado
+    // derivado `precioJornadaManual`): cuando `initial` llega async, el
+    // efecto que lo siembra y este pueden correr en el MISMO commit — un
+    // `setPrecioUnidadManual(true)` recién encolado en el otro efecto no se
+    // refleja todavía en la clausura de ESTE efecto en el mismo pase (React
+    // no re-lee estado recién encolado entre efectos del mismo commit).
+    // Sin este chequeo, un equipo con precio manual en la base igual se
+    // pisaba apenas abría el form — confirmado en vivo (mismo patrón de
+    // carrera que el override de nombre público, más arriba).
+    if (initial?.precio_jornada_manual) return;
     const calc = calcularPrecioJornada(
       watchedUsd ? Number(watchedUsd) : null,
       usdRate,
       watchedRoi ? Number(watchedRoi) : null,
     );
     if (calc !== null) form.setValue("precio_jornada", calc, { shouldDirty: true });
-  }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form]);
+  }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form, initial?.precio_jornada_manual]);
 
   // ── Cargar ficha cuando estamos editando ──────────────────────────
   // Ficha legacy = solo descripción, notas, nombre público template y
@@ -256,21 +305,9 @@ export function EquipoFormDialogV2({
     if (f) {
       setDescripcion(f.descripcion ?? "");
       setNotas(f.notas ?? "");
-      // Si el nombre público guardado no tiene tokens, lo usamos como literal.
-      // Si tiene tokens ({...}), lo dejamos vacío — el usuario regenera con auto.
-      const tpl = (f.nombre_publico_template ?? "").trim();
-      const hasTokens = /\{[^}]+\}/.test(tpl);
-      setNombrePublico(hasTokens ? "" : tpl);
-      // Detectar override manual: si hay texto literal sin tokens, asumimos
-      // que el dueño puso un nombre a mano y no queremos que auto-gen lo
-      // pise al abrir (issue de auditoría). toggle OFF en ese caso.
-      if (tpl && !hasTokens) {
-        setNombrePublicoAuto(false);
-      } else {
-        setNombrePublicoAuto(true);
-      }
+      // nombrePublico/nombrePublicoAuto: cargados por el efecto de arriba
+      // desde `initial.nombre_publico_override` (equipos, no equipo_fichas).
 
-      // Unificar keywords_json (ficha) + etiquetas (equipo top-level).
       let kws: string[] = [];
       try {
         const arr = f.keywords_json ? JSON.parse(f.keywords_json) : [];
@@ -278,7 +315,7 @@ export function EquipoFormDialogV2({
       } catch {
         kws = [];
       }
-      setTags(uniq([...(initial?.etiquetas ?? []), ...kws]));
+      setTags(uniq(kws));
 
       // Contenido incluido (B1 #635)
       try {
@@ -298,7 +335,6 @@ export function EquipoFormDialogV2({
       setDescripcion("");
       setNotas("");
       setTags([]);
-      setNombrePublico("");
       setContenidoIncluido([]);
     }
   }, [fichaQ.data, initial]);
@@ -316,7 +352,7 @@ export function EquipoFormDialogV2({
     enabled: !!initial?.id && open,
   });
   useEffect(() => {
-    if (!initial) {
+    if (!initial?.id) {
       setSpecs([]);
       return;
     }
@@ -324,17 +360,37 @@ export function EquipoFormDialogV2({
     if (!data) return;
     // Mapear { spec_def_id → value } a Spec[]. El id de cada Spec es
     // `spec-${spec_def_id}` para poder mapear de vuelta al guardar
-    // (putEquipoSpecs). El label se resuelve contra el template EN VIVO de la
-    // categoría seleccionada en el efecto de re-etiquetado de abajo; acá
-    // arrancamos con un fallback hasta que el template cargue.
+    // (putEquipoSpecs). El label sale de `data.template` — el MISMO response
+    // ya trae el template resuelto (WITH RECURSIVE por categorías del
+    // equipo), así que no hace falta esperar a la query/efecto de
+    // re-etiquetado de abajo (ese sigue existiendo para cuando el admin
+    // cambia la categoría de specs EN VIVO dentro del form — acá cubrimos
+    // el arranque). Antes sembraba con un fallback numérico ("spec 45")
+    // hasta que el re-etiquetado corría; en esa ventana cualquier
+    // consumidor que matchea specs por label (el preview de nombre público
+    // auto-generado, ej.) no encontraba el spec y el placeholder quedaba
+    // vacío — confirmado en vivo.
+    const labelById = new Map(data.template.map((t) => [t.spec_def_id, t.label]));
     const next: Spec[] = [];
     for (const [defIdStr, value] of Object.entries(data.specs)) {
       const v = value == null ? "" : String(value);
       if (!v.trim()) continue;
-      next.push({ id: `spec-${defIdStr}`, label: `spec ${defIdStr}`, value: v });
+      const label = labelById.get(Number(defIdStr)) ?? `spec ${defIdStr}`;
+      next.push({ id: `spec-${defIdStr}`, label, value: v });
     }
     setSpecs(next);
-  }, [equipoSpecsQ.data, initial]);
+    // `initial?.id` (no `initial` entero) a propósito: Aplicar/Guardar
+    // invalida `["admin","equipo",id]` (route padre), que refetchea el
+    // equipo y le da a `initial` una referencia NUEVA — con `initial`
+    // completo en deps este efecto volvía a correr sobre el MISMO
+    // `equipoSpecsQ.data` (nadie invalida `["admin","equipo-specs",id]`
+    // en el save) y pisaba specs recién guardadas con la foto vieja
+    // pre-edición: tipear algo en Ficha técnica + Aplicar/Guardar
+    // revertía el campo a lo que tenía antes de tipear, aunque el POST
+    // ya había persistido el valor nuevo (confirmado en vivo + DB). Solo
+    // re-sembrar cuando cambia el EQUIPO (o entre vacío↔con-equipo), no
+    // en cada refetch incidental de otros campos del mismo equipo.
+  }, [equipoSpecsQ.data, initial?.id]);
 
   // ── Categorías ─────────────────────────────────────────────────────
   const catsQ = useQuery({
@@ -476,14 +532,36 @@ export function EquipoFormDialogV2({
   }, [templateItems, equipoSpecsQ.data]);
 
   // ── Auto-generación del nombre público ────────────────────────────
-  // Cuando el toggle está ON y la categoría tiene template, regenera al
-  // tocar cualquier campo relevante. Montura/Formato/Resolución se leen
-  // de los specs por label (ya no son inputs dedicados).
+  // Preview del molde de la categoría de specs (el mismo que lee el backend
+  // en vivo — services.nombre_service._categoria_template_de). Sin molde de
+  // categoría no hay auto-gen: ya no hay fallback hardcodeado por categoría
+  // (existía en nombre-publico.ts, retirado — era exactamente el patrón que
+  // el backend eliminó en #415 por dar nombres que "el back-end nunca iba a
+  // producir": la preview tiene que mostrar SOLO lo que se va a guardar).
   const watchedMarca = form.watch("marca");
   const watchedModelo = form.watch("modelo");
   useEffect(() => {
     if (!nombrePublicoAuto) return;
-    // Prioridad 1: template definido por el admin en la categoría (DB).
+    // Chequeo directo a `initial.nombre_publico_override` (no solo al estado
+    // derivado `nombrePublicoAuto`): cuando `initial` llega async, el efecto
+    // que carga el override y este pueden correr en el mismo commit — un
+    // `setNombrePublicoAuto(false)` recién encolado en el otro efecto no se
+    // refleja todavía en la clausura de ESTE efecto en el mismo pase (React
+    // no re-lee estado recién encolado entre efectos del mismo commit), así
+    // que sin este chequeo este efecto podía pisar el override recién
+    // cargado con "" — confirmado en vivo (equipo con override guardado
+    // abría con el campo vacío pese al toggle ya en OFF).
+    if (initial?.nombre_publico_override?.trim()) return;
+    // Sin molde de categoría no hay nada que auto-generar — bail ANTES de
+    // tocar el input. `nombrePublicoAuto` arranca en `true` por default y el
+    // toggle para apagarlo queda OCULTO cuando `autoGenDisponible` es falso
+    // (no hay molde), así que sin este chequeo el efecto seguía disparando en
+    // cada cambio de marca/modelo/specs y BORRABA silenciosamente el nombre
+    // que el usuario tipeó a mano — confirmado en vivo (modo creación: tipear
+    // el nombre público y después la marca lo vaciaba). No alcanza con que
+    // el toggle esté oculto: el efecto mismo tiene que respetar la ausencia
+    // de molde, no solo la UI.
+    if (!categoriaTemplate) return;
     // Buscar el output_config de cada spec en el template (las definiciones
     // viven en templateItems con tipo + output_config; los valores en specs).
     const tmplByLabel = new Map(
@@ -505,19 +583,7 @@ export function EquipoFormDialogV2({
         };
       }),
     });
-    if (fromTemplate) {
-      setNombrePublico(fromTemplate);
-      return;
-    }
-    // Prioridad 2: template hardcoded (nombre-publico.ts) por categoría conocida.
-    const gen = generarNombrePublico(categoriaRoot, {
-      marca: watchedMarca ?? "",
-      modelo: watchedModelo ?? "",
-      montura: findSpecValue(specs, "Montura"),
-      formato: findSpecValue(specs, "Formato"),
-      resolucion: findSpecValue(specs, "Resolución"),
-    });
-    if (gen) setNombrePublico(gen);
+    setNombrePublico(fromTemplate ?? "");
   }, [
     nombrePublicoAuto,
     categoriaRoot,
@@ -526,11 +592,12 @@ export function EquipoFormDialogV2({
     watchedModelo,
     specs,
     initial?.nombre,
+    initial?.nombre_publico_override,
     templateItems,
   ]);
 
-  /** Hay alguna fuente de auto-gen disponible? Template DB o hardcoded. */
-  const autoGenDisponible = !!categoriaTemplate || categoriaSoportaAutoGen(categoriaRoot);
+  /** Hay auto-gen disponible? Solo si la categoría de specs tiene molde en DB. */
+  const autoGenDisponible = !!categoriaTemplate;
 
   // ════════════════════════════════════════════════════════════════════
   // Buscar fotos (solo foto, ~5s)
@@ -630,8 +697,67 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
-  // HTML source — sube el archivo, persiste en R2 y extrae specs
+  // HTML source — sube el archivo, persiste en R2 y extrae specs. También
+  // usado por re-extract (#1203): mismo resultado, sin volver a subir el
+  // archivo — comparten `_aplicarSpecsExtraidos` (aplica al template o
+  // manda a revisión), no hay 2 formas de procesar el mismo resultado.
   // ════════════════════════════════════════════════════════════════════
+  const _aplicarSpecsExtraidos = (
+    specsExtraidos: { label: string; value: string; spec_key?: string }[],
+    tituloSinSpecs: string,
+  ) => {
+    const propuestos: Spec[] = withIds(specsExtraidos ?? []);
+    if (propuestos.length === 0) {
+      toast.success(tituloSinSpecs, { description: "No se extrajeron specs del archivo" });
+      return;
+    }
+    const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+    const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+    for (const t of templateItems ?? []) {
+      if (t.spec_key) tmplByKey.set(t.spec_key, t);
+      if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
+    }
+    const findTmpl = (p: Spec) =>
+      (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
+      tmplByLabel.get(p.label.trim().toLowerCase());
+
+    const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
+    const requierenRevision = propuestos.filter((p) => !findTmpl(p));
+
+    if (autoAplicables.length > 0) {
+      setSpecs((prev) => {
+        const next = [...prev];
+        for (const p of autoAplicables) {
+          const tmpl = findTmpl(p)!;
+          const targetId = `spec-${tmpl.spec_def_id}`;
+          const idx = next.findIndex(
+            (x) =>
+              x.id === targetId ||
+              x.id === `tmpl-${tmpl.spec_def_id}` ||
+              sameLabel(x.label, tmpl.label),
+          );
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], value: p.value };
+          } else {
+            next.push({
+              id: targetId,
+              label: tmpl.label,
+              value: p.value,
+              spec_key: p.spec_key,
+            });
+          }
+        }
+        return next;
+      });
+    }
+    if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
+
+    const parts: string[] = [];
+    if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
+    if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
+    toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
+  };
+
   const handleHtmlUpload = async (file: File) => {
     if (!initial?.id) return;
     setUploadingHtml(true);
@@ -643,58 +769,7 @@ export function EquipoFormDialogV2({
         specs?: { label: string; value: string; spec_key?: string }[];
       }>(`/api/admin/equipos/${initial.id}/upload-html-source`, { method: "POST", body: fd });
       setHtmlSourceUrl(r.html_source_url);
-
-      const propuestos: Spec[] = withIds(r.specs ?? []);
-      if (propuestos.length > 0) {
-        const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        for (const t of templateItems ?? []) {
-          if (t.spec_key) tmplByKey.set(t.spec_key, t);
-          if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
-        }
-        const findTmpl = (p: Spec) =>
-          (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
-          tmplByLabel.get(p.label.trim().toLowerCase());
-
-        const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
-        const requierenRevision = propuestos.filter((p) => !findTmpl(p));
-
-        if (autoAplicables.length > 0) {
-          setSpecs((prev) => {
-            const next = [...prev];
-            for (const p of autoAplicables) {
-              const tmpl = findTmpl(p)!;
-              const targetId = `spec-${tmpl.spec_def_id}`;
-              const idx = next.findIndex(
-                (x) =>
-                  x.id === targetId ||
-                  x.id === `tmpl-${tmpl.spec_def_id}` ||
-                  sameLabel(x.label, tmpl.label),
-              );
-              if (idx >= 0) {
-                next[idx] = { ...next[idx], value: p.value };
-              } else {
-                next.push({
-                  id: targetId,
-                  label: tmpl.label,
-                  value: p.value,
-                  spec_key: p.spec_key,
-                });
-              }
-            }
-            return next;
-          });
-        }
-        if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
-
-        const parts: string[] = [];
-        if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
-        if (requierenRevision.length)
-          parts.push(`${requierenRevision.length} pendientes de revisar`);
-        toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
-      } else {
-        toast.success("HTML guardado", { description: "No se extrajeron specs del archivo" });
-      }
+      _aplicarSpecsExtraidos(r.specs ?? [], "HTML guardado");
     } catch (e) {
       toast.error(`Error al subir HTML: ${e instanceof Error ? e.message : ""}`);
     } finally {
@@ -702,18 +777,17 @@ export function EquipoFormDialogV2({
     }
   };
 
-  // ════════════════════════════════════════════════════════════════════
-  // Tags (etiquetas + keywords unificadas)
-  // ════════════════════════════════════════════════════════════════════
-  const addTag = () => {
-    const v = tagInput.trim().toLowerCase();
-    if (!v) return;
-    if (tags.includes(v)) {
-      setTagInput("");
-      return;
+  const handleReExtractSpecs = async () => {
+    if (!initial?.id) return;
+    setReExtracting(true);
+    try {
+      const r = await adminApi.reExtractSpecs(initial.id);
+      _aplicarSpecsExtraidos(r.specs ?? [], "HTML re-procesado");
+    } catch (e) {
+      toast.error(`Error al re-extraer specs: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setReExtracting(false);
     }
-    setTags([...tags, v]);
-    setTagInput("");
   };
 
   // ════════════════════════════════════════════════════════════════════
@@ -780,9 +854,6 @@ export function EquipoFormDialogV2({
         }
       }
 
-      // Tags unificadas (chip UI) → se envían a ambos backends: etiquetas (top-level
-      // equipo, para filtros/categorización) y keywords_json (ficha, para chips públicos).
-      const etiquetas = uniq(tags.map((t) => t.trim()).filter(Boolean));
       const { visible_catalogo, ficha_completa, tipo, ...rest } = values;
 
       const fotoUrlForm = rest.foto_url || null;
@@ -802,6 +873,12 @@ export function EquipoFormDialogV2({
         foto_url: fotoUrlInicial,
         fecha_compra: rest.fecha_compra || null,
         precio_jornada: rest.precio_jornada ?? null,
+        // Explícito para saltear la heurística de inferencia del backend
+        // (que asume "manual" si llega precio_jornada SIN roi_pct) — este
+        // form manda roi_pct SIEMPRE junto con precio_jornada, así que esa
+        // heurística sola nunca detectaría un precio recién tipeado a mano
+        // acá; el toggle local YA sabe la verdad, se la pasamos directo.
+        precio_jornada_manual: precioJornadaManual,
         precio_usd: rest.precio_usd ?? null,
         roi_pct: rest.roi_pct ?? null,
         valor_reposicion: rest.valor_reposicion ?? null,
@@ -815,7 +892,7 @@ export function EquipoFormDialogV2({
       let equipoId: number | undefined;
 
       try {
-        const saved = await onSubmit(payload, etiquetas);
+        const saved = await onSubmit(payload);
         equipoId = saved?.id ?? initial?.id;
         if (!equipoId) {
           toast.error("No se pudo guardar el equipo");
@@ -844,11 +921,11 @@ export function EquipoFormDialogV2({
           }
         }
 
-        // Ficha legacy: descripción + notas + keywords + nombre público.
-        // Las specs estructuradas ya NO van acá — viven en equipo_specs y
-        // se persisten vía putEquipoSpecs (más abajo).
-        const tieneFicha =
-          isEdit || !!descripcion || !!notas || tags.length > 0 || !!nombrePublico.trim();
+        // Ficha legacy: descripción + notas + keywords + contenido incluido.
+        // El nombre público ya NO va acá — vive en equipos.nombre_publico_override
+        // (ver más abajo). Las specs estructuradas tampoco — viven en equipo_specs
+        // y se persisten vía putEquipoSpecs (más abajo).
+        const tieneFicha = isEdit || !!descripcion || !!notas || tags.length > 0;
         if (tieneFicha) {
           try {
             const validos = contenidoIncluido.filter((ci) => ci.nombre.trim().length > 0);
@@ -856,15 +933,6 @@ export function EquipoFormDialogV2({
               descripcion: descripcion || null,
               notas: notas || null,
               keywords_json: tags.length ? JSON.stringify(tags) : null,
-              // Si el toggle "auto" está ON y tenemos un template de categoría,
-              // persistimos el TEMPLATE con tokens ("{marca} {modelo} ...").
-              // Al re-abrir el form, hasTokens detectará tokens → toggle queda ON.
-              // Cuando está OFF, guardamos el literal escrito por el dueño
-              // (override fijo, no se regenera).
-              nombre_publico_template:
-                nombrePublicoAuto && categoriaTemplate
-                  ? categoriaTemplate
-                  : nombrePublico.trim() || null,
               // B1 #635: contenido incluido — filtramos los ítems sin nombre
               // (el usuario puede tener una fila vacía sin completar; no la
               // enviamos para no fallar la validación del backend y perder
@@ -880,6 +948,35 @@ export function EquipoFormDialogV2({
             qc.setQueryData(["admin", "equipo-ficha", equipoId], fichaGuardada);
           } catch (e) {
             fallidos.push(`ficha (${e instanceof Error ? e.message : "error"})`);
+          }
+        }
+
+        // Nombre público: override manual vía el endpoint dedicado — gana
+        // SIEMPRE sobre el molde de categoría (ver services/nombre_builder.py).
+        // "Auto ON + hay molde de categoría" → el backend ya lo arma en vivo,
+        // no hay nada que guardar acá; si tenía un override viejo (volvió a
+        // auto), lo soltamos para que el molde tome el control de nuevo.
+        const usaMoldeDeCategoria = nombrePublicoAuto && !!categoriaTemplate;
+        const texto = usaMoldeDeCategoria ? "" : nombrePublico.trim();
+        const teniaOverride = !!initial?.nombre_publico_override?.trim();
+        // Solo llamamos al endpoint si hay algo que CAMBIAR — nunca en cada
+        // guardado sin condición. Si el campo está vacío y nunca hubo
+        // override, no tocamos nada: un equipo que nadie re-guardó desde
+        // antes del molde vivo puede tener un `nombre_publico` "fósil" de un
+        // mecanismo viejo (auto-build hardcodeado, retirado) — limpiar el
+        // override en ese caso dispara actualizar_nombres_de igual y lo
+        // pisaría a vacío sin que el usuario haya tocado el nombre.
+        if (texto) {
+          try {
+            await adminApi.aprobarNombre(equipoId, { override: texto, revisado: true });
+          } catch (e) {
+            fallidos.push(`nombre público (${e instanceof Error ? e.message : "error"})`);
+          }
+        } else if (teniaOverride) {
+          try {
+            await adminApi.aprobarNombre(equipoId, { override: null, revisado: false });
+          } catch (e) {
+            fallidos.push(`nombre público (${e instanceof Error ? e.message : "error"})`);
           }
         }
 
@@ -915,6 +1012,17 @@ export function EquipoFormDialogV2({
         toast.error(e instanceof Error ? e.message : "Error al guardar");
         return;
       }
+
+      // Invalidar las queries PÚBLICAS (catálogo + ficha de equipo) — el save
+      // arriba ya invalida lo admin (vía saveMut.onSettled del route padre),
+      // pero nombre público/specs/categorías se escriben acá con llamadas
+      // directas que ese onSettled no cubre. Sin esto, el catálogo público
+      // sigue mostrando el dato viejo hasta que su staleTime (30-60s) vence
+      // solo — "tarda en reproducirse" no era timing raro, era que nadie le
+      // avisaba. Prefix-match: no hace falta el slug/rango de fechas exacto.
+      void qc.invalidateQueries({ queryKey: ["equipos"] });
+      void qc.invalidateQueries({ queryKey: ["equipo"] });
+      void qc.invalidateQueries({ queryKey: ["categorias"] });
 
       if (fallidos.length > 0) {
         toast.warning(isEdit ? "Equipo actualizado con avisos" : "Equipo creado con avisos", {
@@ -1012,14 +1120,26 @@ export function EquipoFormDialogV2({
   // ════════════════════════════════════════════════════════════════════
   // Render
   // ════════════════════════════════════════════════════════════════════
-  const fotoActual = pendingFilePreview || form.watch("foto_url");
+  // `form.watch("foto_url")` es el valor SEMBRADO UNA VEZ al montar
+  // (react-hook-form `defaultValues`, no reactivo). En EDIT mode, subir una
+  // foto nueva o cambiar cuál es la principal en la galería actualiza
+  // `gallery.fotos` (React Query, correctamente sincronizado con el backend)
+  // pero nunca toca ese valor sembrado — la miniatura de la galería se veía
+  // bien, pero el preview grande del costado seguía mostrando la foto vieja
+  // hasta cerrar y reabrir el form. La galería es la fuente viva; `foto_url`
+  // del form queda de fallback para CREATE mode (ahí `gallery.fotos` está
+  // siempre vacío — la query es `enabled: !!initial?.id`, y en create no hay
+  // id todavía) y para el raro caso de un equipo en EDIT sin fotos en la
+  // galería.
+  const fotoGaleriaActual = gallery.fotos.find((f) => f.es_principal)?.url;
+  const fotoActual = pendingFilePreview || fotoGaleriaActual || form.watch("foto_url");
 
   // ── Confirmación al cerrar con cambios sin guardar (#232) ──────────
   // Detectamos cambios desde 4 fuentes: form fields (react-hook-form),
   // specs propuestos del autocompletar, ficha externa importada, archivo
   // de foto pendiente de upload. Cubre los casos típicos de pérdida de
   // datos en silencio. Falsos negativos posibles: cambios SOLO en
-  // descripcion/notas/tags/specs manuales sin tocar form fields.
+  // descripcion/notas/specs manuales sin tocar form fields.
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const hasUnsavedChanges =
     form.formState.isDirty || specsPropuestos.length > 0 || pendingFile !== null;
@@ -1122,9 +1242,27 @@ export function EquipoFormDialogV2({
                 )}
               </Button>
               {htmlSourceUrl && (
-                <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
-                  <FileCode className="h-3 w-3" /> HTML guardado
-                </span>
+                <>
+                  <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
+                    <FileCode className="h-3 w-3" /> HTML guardado
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleReExtractSpecs()}
+                    disabled={reExtracting || uploadingHtml}
+                    title="Re-corre la extracción sobre el HTML ya guardado, sin resubirlo — útil después de agregar un spec nuevo al registry"
+                  >
+                    {reExtracting ? (
+                      <>
+                        <Spinner size="xs" className="mr-1" /> Buscando…
+                      </>
+                    ) : (
+                      "Buscar valores actualizados"
+                    )}
+                  </Button>
+                </>
               )}
             </>
           )}
@@ -1173,33 +1311,46 @@ export function EquipoFormDialogV2({
               <div className="space-y-1.5">
                 <Input
                   value={nombrePublico}
-                  onChange={(e) => setNombrePublico(e.target.value)}
+                  onChange={(e) => {
+                    // Tipear a mano es la señal de "esto es mío" — apaga el
+                    // auto-gen. Sin esto, `nombrePublicoAuto` (default true)
+                    // queda armado en silencio mientras no hay molde (el
+                    // toggle para verlo/apagarlo está oculto), y el texto
+                    // tipeado se borra apenas se elige una categoría de specs
+                    // que sí tiene molde — confirmado en vivo (Angulo 5).
+                    setNombrePublico(e.target.value);
+                    setNombrePublicoAuto(false);
+                  }}
                   placeholder={
                     autoGenDisponible
-                      ? "Generado automático según la categoría"
+                      ? "Generado automático según el molde de la categoría"
                       : "Ej: Cable HDMI 2.0 50cm"
                   }
                 />
                 {autoGenDisponible && (
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Switch checked={nombrePublicoAuto} onCheckedChange={setNombrePublicoAuto} />
-                    Generar automático desde {categoriaRoot?.toLowerCase()}
+                    Generar automático desde el molde de {categoriaRoot}
                     {!nombrePublicoAuto && (
-                      <span className="opacity-60">
-                        (off — el valor escrito se guarda como override fijo)
-                      </span>
+                      <span className="opacity-60">(off — se guarda como nombre fijo)</span>
                     )}
                   </label>
                 )}
                 {autoGenDisponible && nombrePublicoAuto && (
                   <p className="text-2xs text-muted-foreground italic">
-                    Tu edición se mantiene en esta sesión. Si cambia el template o los specs, el
-                    campo se regenera (toggle OFF para fijarlo).
+                    Molde vivo de la categoría — si el dueño lo cambia desde /admin/equipos/specs,
+                    este nombre se actualiza solo (toggle OFF para fijarlo a mano).
+                  </p>
+                )}
+                {!nombrePublicoAuto && (
+                  <p className="text-2xs text-muted-foreground italic">
+                    Nombre fijo: gana siempre, aunque cambie el molde de la categoría.
                   </p>
                 )}
                 {!autoGenDisponible && categoriaRoot && (
                   <p className="text-xs text-muted-foreground italic">
-                    Sin template auto para "{categoriaRoot}". Escribilo a mano.
+                    "{categoriaRoot}" todavía no tiene molde configurado. Escribilo a mano — se
+                    guarda como nombre fijo (o configurá el molde en /admin/equipos/specs).
                   </p>
                 )}
               </div>
@@ -1235,7 +1386,13 @@ export function EquipoFormDialogV2({
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {photoCands.map((u) => {
                 const isPicking = pickingPhotoUrl === u;
-                const isSelected = form.watch("foto_url") === u;
+                // `fotoActual` (no `form.watch("foto_url")` crudo): en EDIT
+                // mode, elegir un candidato sube directo a la galería sin
+                // tocar el campo del form (mismo bug ya arreglado en el
+                // preview grande del costado) — comparar contra el mismo
+                // valor derivado mantiene el aro de "seleccionada" correcto
+                // en los dos modos.
+                const isSelected = fotoActual === u;
                 return (
                   <button
                     key={u}
@@ -1514,43 +1671,6 @@ export function EquipoFormDialogV2({
               setSpecsPropuestos((prev) => prev.filter((x) => x.id !== s.id));
             }}
           />
-
-          <Field label="Etiquetas">
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap gap-1">
-                {tags.map((t) => (
-                  <Badge key={t} variant="secondary" className="text-2xs gap-1">
-                    {t}
-                    <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-                {tags.length === 0 && (
-                  <span className="text-xs text-muted-foreground italic">Sin etiquetas</span>
-                )}
-              </div>
-              <div className="flex gap-1">
-                <Input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addTag();
-                    }
-                  }}
-                  placeholder="Etiqueta y Enter… (ej. 4K, full frame, cinema)"
-                />
-                <Button type="button" size="icon" variant="outline" onClick={addTag}>
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Se usan para búsqueda, filtros del catálogo y chips visibles en la ficha pública.
-              </p>
-            </div>
-          </Field>
         </div>
       </CollapsibleSection>
 

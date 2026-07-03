@@ -142,7 +142,11 @@ Nada se da por bueno sin verlo:
 - **Perf budget** — sin CLS al hidratar, sin regresión de LCP, lazy donde corresponde.
 - **Suite + gates de CI** — `npx prettier --check` (bloqueante), `npx tsc --noEmit`, `npx eslint <archivos>`
   (no `eslint .` completo — cuelga en macOS; por archivos o esperá CI), `npm run build`, `npm run check:routes`
-  (si tocaste ruteo: una lista con sub-rutas va como `.index`).
+  (si tocaste ruteo: una lista con sub-rutas va como `.index`). Si tocaste el **contrato de props de un
+  componente compartido**: `tsc` con cache incremental puede dar OK falso (corré fresco,
+  `rm tsconfig.tsbuildinfo`) y el CI del PR mergea con el `dev` actual — que puede traer call-sites
+  nuevos aparecidos después de tu último merge local; re-mergeá y re-verificá antes de cerrar
+  (gotcha detallado en `mantenimiento`).
 
 ### 5 · TRACKEAR + cerrar
 

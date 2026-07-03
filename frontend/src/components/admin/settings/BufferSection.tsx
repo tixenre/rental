@@ -14,7 +14,7 @@ export function BufferSection() {
   const settingQ = useQuery({
     queryKey: ["settings", "buffer_horas_alquiler"],
     queryFn: () => adminApi.getSetting("buffer_horas_alquiler"),
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   useEffect(() => {

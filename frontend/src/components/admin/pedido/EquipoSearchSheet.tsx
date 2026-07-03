@@ -37,7 +37,9 @@ export function EquipoSearchSheet({
   const categoriasQ = useQuery({
     queryKey: ["categorias"],
     queryFn: () => adminApi.listCategorias(),
-    staleTime: 60_000,
+    // Comparte cache con el catálogo público (mismo key) — override a 0 acá
+    // porque este sheet es admin-only, sin tocar el staleTime del público.
+    staleTime: 0,
   });
 
   const lista = useMemo(() => {
@@ -54,7 +56,7 @@ export function EquipoSearchSheet({
     const SIN = "Sin categoría";
     const map = new Map<string, Equipo[]>();
     for (const eq of lista) {
-      const cat = eq.etiquetas?.[0] ?? SIN;
+      const cat = eq.categorias?.[0]?.nombre ?? SIN;
       const arr = map.get(cat) ?? [];
       arr.push(eq);
       map.set(cat, arr);

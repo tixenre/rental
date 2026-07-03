@@ -108,7 +108,7 @@ _LISTA_ROOT_KEYS = ["total", "page", "per_page", "items"]
 # Claves mínimas de un equipo en la lista
 _EQUIPO_LISTA_KEYS = {
     "id", "nombre", "tipo", "precio_jornada",
-    "etiquetas", "kit", "categorias", "specs", "specs_destacados",
+    "kit", "categorias", "specs", "specs_destacados",
 }
 
 # Claves mínimas de un equipo en el detalle (superset de la lista + fotos)
@@ -253,16 +253,16 @@ class TestDetalleShape:
 # equipos) sin clavarlo al número exacto (que varía según los datos del catálogo).
 #
 # Distribución esperada para la lista pública (sin desde/hasta):
-#   COUNT · main SELECT · marcas batch · attach_tags · attach_kit/contenido ·
+#   COUNT · main SELECT · marcas batch · attach_kit/contenido ·
 #   attach_categorias · attach_ficha · attach_specs_estructuradas ·
 #   attach_specs_destacados · precios_combo_batch (si hay combos) ·
 #   _stock_sin_reservas × 2 (equipos + componentes_de)
-#   ≈ 11-13 queries
+#   ≈ 10-12 queries
 #
 # Para el detalle:
-#   main SELECT · attach_tags · attach_ficha · attach_categorias ·
+#   main SELECT · attach_ficha · attach_categorias ·
 #   attach_specs_estructuradas · contenido_de · fotos · precio_combo (si combo)
-#   ≈ 7-9 queries
+#   ≈ 6-8 queries
 
 
 class TestQueryCount:

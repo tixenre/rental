@@ -10,6 +10,7 @@ import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Input } from "@/design-system/ui/input";
+import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 import { Button } from "@/design-system/ui/button";
 import { Label } from "@/design-system/ui/label";
 import { uploadFileToBucket } from "@/lib/equipment/photos";
@@ -24,7 +25,15 @@ export function ContenidoIncluidoEditor({
   items: ContenidoIncluidoItem[];
   onChange: (next: ContenidoIncluidoItem[]) => void;
 }) {
-  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [uploadingItem, setUploadingItem] = useState<ContenidoIncluidoItem | null>(null);
+
+  // `items` siempre al día para leer dentro de callbacks async (la subida de
+  // foto tarda; si en el medio el admin agrega/borra un ítem, el closure de
+  // `handleFotoUpload` que arrancó antes seguía viendo el array de cuando
+  // arrancó — el índice capturado en el click podía terminar apuntando a un
+  // ítem distinto, o a uno inexistente).
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   const update = (idx: number, patch: Partial<ContenidoIncluidoItem>) => {
     const next = items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
@@ -39,16 +48,27 @@ export function ContenidoIncluidoEditor({
     onChange([...items, { nombre: "", cantidad: 1, foto_url: null }]);
   };
 
-  const handleFotoUpload = async (idx: number, file: File) => {
-    setUploadingIdx(idx);
+  const handleFotoUpload = async (item: ContenidoIncluidoItem, file: File) => {
+    setUploadingItem(item);
     try {
       const url = await uploadFileToBucket(equipoId, file);
-      update(idx, { foto_url: url });
+      // Ubicar el ítem por REFERENCIA (no por índice capturado al click):
+      // `update`/`remove` solo reemplazan el ítem editado — los demás
+      // conservan su referencia entre renders — así que sigue siendo el
+      // mismo objeto aunque el array se haya reordenado/mutado mientras
+      // la subida estaba en curso.
+      const current = itemsRef.current;
+      const idx = current.indexOf(item);
+      if (idx === -1) {
+        toast.error("El ítem se eliminó antes de terminar la subida — foto no aplicada");
+        return;
+      }
+      onChange(current.map((it, i) => (i === idx ? { ...it, foto_url: url } : it)));
       toast.success("Foto subida");
     } catch (e) {
       toast.error(`No se pudo subir: ${e instanceof Error ? e.message : ""}`);
     } finally {
-      setUploadingIdx(null);
+      setUploadingItem(null);
     }
   };
 
@@ -68,10 +88,10 @@ export function ContenidoIncluidoEditor({
             <ContenidoItemRow
               key={idx}
               item={it}
-              uploading={uploadingIdx === idx}
+              uploading={uploadingItem === it}
               onChangeName={(v) => update(idx, { nombre: v })}
               onChangeCantidad={(v) => update(idx, { cantidad: v })}
-              onUploadFoto={(f) => handleFotoUpload(idx, f)}
+              onUploadFoto={(f) => handleFotoUpload(it, f)}
               onRemove={() => remove(idx)}
             />
           ))}
@@ -155,13 +175,12 @@ function ContenidoItemRow({
       />
 
       {/* Cantidad */}
-      <Input
-        type="number"
+      <DraftNumberInput
         min={1}
         value={item.cantidad}
-        onChange={(e) => onChangeCantidad(Math.max(1, parseInt(e.target.value || "1", 10)))}
+        onCommit={onChangeCantidad}
         className="w-16 h-8 text-center text-sm"
-        aria-label="Cantidad"
+        ariaLabel="Cantidad"
       />
 
       <Button

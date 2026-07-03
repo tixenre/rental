@@ -16,7 +16,7 @@ export function FacturacionSection() {
   const estadoQ = useQuery({
     queryKey: ["facturacion-estado"],
     queryFn: facturacionApi.getEstado,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   const refrescarCatalogos = useMutation({
@@ -33,7 +33,7 @@ export function FacturacionSection() {
   const emisoresQ = useQuery({
     queryKey: ["admin", "emisores-arca"],
     queryFn: facturacionApi.listEmisores,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   return (

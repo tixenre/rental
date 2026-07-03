@@ -75,6 +75,22 @@ Después, lectura profunda de cada `SKILL.md`:
 - **Cross-refs rotas** — ¿los punteros internos del skill siguen siendo válidos? (rutas, secciones,
   archivos referenciados)
 - **Auto-mejora** — ¿el buzón tiene propuestas para este skill? ¿son válidas hoy?
+- **Staleness por divergencia de los manuales `docs/SISTEMA_*.md`** — detecta si un manual quedó
+  atrás de su motor: cada `SISTEMA_X.md` describe unos paths de código (§ "Paths"); si esos paths
+  tuvieron commits después de la última vez que el manual se tocó, el manual **puede** estar
+  desactualizado (no es certeza — filtrar false positives de cambios triviales). Corré por manual:
+
+  ```bash
+  # Última modificación del manual vs. último commit real a los paths que describe
+  git log -1 --format=%ad --date=short -- docs/SISTEMA_AUTH.md
+  git log -1 --format=%ad --date=short -- backend/auth/ backend/identity/
+  # Si el motor tiene commits MÁS RECIENTES que el manual → candidato a revisar (no auto-aplicar,
+  # proponer en el digest del cierre).
+  ```
+
+  **Detecta + propone, no mantiene solo** — el supervisor (por cambio) y quien toca el código siguen
+  siendo el mantenimiento real de cada manual; esto es la red que cierra el círculo cuando ese hábito
+  falla. Corré este check en cada cierre de gobernanza (§6), listá los candidatos en el digest.
 
 ### 3 · Consumir el buzón (`docs/PROPUESTAS_SKILLS.md`)
 

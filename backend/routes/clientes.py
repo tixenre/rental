@@ -297,14 +297,16 @@ def update_cliente(id: int, data: ClienteUpdate, request: Request):
             updates = data.model_dump(exclude_unset=True)
             if not updates:
                 raise HTTPException(400, "Nada para actualizar")
-            set_clause = ", ".join(f"{k}=?" for k in updates) + ", updated_at=CURRENT_TIMESTAMP"
+            set_clause = ", ".join(f"{k}=%s" for k in updates) + ", updated_at=CURRENT_TIMESTAMP"
             conn.execute(f"UPDATE clientes SET {set_clause} WHERE id=%s", list(updates.values()) + [id])
-            # Si cambió el descuento del cliente, propagarlo a sus presupuestos
-            # (pedidos NO confirmados). Los confirmados/cerrados quedan congelados
-            # con su snapshot — lock de precio. Misma transacción → atómico.
+            # Si cambió el descuento del cliente, recotizar sus presupuestos SIN
+            # override manual (pedidos NO confirmados; los confirmados/cerrados
+            # quedan congelados — lock de precio). El descuento del cliente ya se
+            # lee EN VIVO (Fase C-1, #1219) — no hace falta pasarlo, solo disparar
+            # el recálculo. Misma transacción → ve el UPDATE de arriba → atómico.
             if "descuento" in updates and (updates["descuento"] or 0) != (actual["descuento"] or 0):
                 from routes.alquileres import propagar_descuento_a_presupuestos
-                propagar_descuento_a_presupuestos(conn, id, updates["descuento"] or 0)
+                propagar_descuento_a_presupuestos(conn, id)
             conn.commit()
             row = conn.execute("SELECT * FROM clientes WHERE id=%s", (id,)).fetchone()
             return row_to_dict(row)

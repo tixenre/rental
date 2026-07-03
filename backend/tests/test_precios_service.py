@@ -16,7 +16,6 @@ from services.precios import (
     IVA_PCT,
     PERFIL_RI,
     calcular_total,
-    descuento_aplicable,
     es_responsable_inscripto,
     jornadas_periodo,
 )
@@ -64,39 +63,6 @@ class TestJornadasPeriodo:
     def test_misma_fecha_devuelve_uno(self):
         d = datetime(2026, 6, 1, 10, 0)
         assert jornadas_periodo(d, d) == 1
-
-
-# ── descuento_aplicable ──────────────────────────────────────────────────
-
-
-class TestDescuentoAplicable:
-    def test_cliente_mayor_que_jornadas(self):
-        assert descuento_aplicable(15.0, 5.0) == 15.0
-
-    def test_jornadas_mayor_que_cliente(self):
-        assert descuento_aplicable(5.0, 15.0) == 15.0
-
-    def test_empate(self):
-        # En empate da lo mismo en monto. El front etiqueta "cliente".
-        assert descuento_aplicable(10.0, 10.0) == 10.0
-
-    def test_ambos_cero(self):
-        assert descuento_aplicable(0, 0) == 0.0
-
-    def test_none_se_trata_como_cero(self):
-        assert descuento_aplicable(None, 5.0) == 5.0
-        assert descuento_aplicable(5.0, None) == 5.0
-        assert descuento_aplicable(None, None) == 0.0
-
-    def test_negativos_se_clampan_a_cero(self):
-        # Defensivo: nunca permitir descuento "que aumenta el precio".
-        assert descuento_aplicable(-10.0, 5.0) == 5.0
-
-    def test_mayores_a_100_se_topan(self):
-        # Un descuento > 100% daría neto/total NEGATIVO → se topa en 100.
-        assert descuento_aplicable(150.0, 5.0) == 100.0
-        assert descuento_aplicable(5.0, 200.0) == 100.0
-        assert descuento_aplicable(100.0, 0) == 100.0
 
 
 # ── es_responsable_inscripto ─────────────────────────────────────────────
@@ -290,3 +256,61 @@ class TestCobroModo:
             descuento_cliente_pct=10.0,
         )
         assert r["neto"] == 45000
+
+
+# ── Combos no acumulables con el descuento global (Fase C-3, #1219) ───────
+
+
+class TestCombosNoAcumulables:
+    def test_combo_no_recibe_el_descuento_global(self):
+        # Equipo simple: 10.000 × 1 jornada = 10.000 (descontable).
+        # Combo: 20.000 × 1 jornada = 20.000 (YA trae su descuento de
+        # componente horneado en el precio — no se le vuelve a aplicar el
+        # 10% de cliente encima).
+        # bruto = 30.000; descuento = 10% de 10.000 (solo el simple) = 1.000.
+        r = calcular_total(
+            items=[
+                {"equipo_id": 1, "cantidad": 1, "precio_jornada": 10000, "es_combo": False},
+                {"equipo_id": 2, "cantidad": 1, "precio_jornada": 20000, "es_combo": True},
+            ],
+            jornadas=1,
+            descuento_cliente_pct=10.0,
+        )
+        assert r["bruto"] == 30000
+        assert r["descuento_monto"] == 1000
+        assert r["neto"] == 29000
+
+    def test_es_combo_ausente_se_trata_como_no_combo(self):
+        # Sin `es_combo` en el dict (default de ItemPrecio, total=False):
+        # comportamiento IDÉNTICO a antes de C-3 — participa del descuento.
+        r = calcular_total(
+            items=[{"equipo_id": 1, "cantidad": 1, "precio_jornada": 10000}],
+            jornadas=1,
+            descuento_cliente_pct=10.0,
+        )
+        assert r["neto"] == 9000
+
+    def test_todo_combos_no_hay_descuento_aunque_haya_pct(self):
+        r = calcular_total(
+            items=[{"equipo_id": 2, "cantidad": 1, "precio_jornada": 20000, "es_combo": True}],
+            jornadas=1,
+            descuento_cliente_pct=50.0,
+        )
+        assert r["descuento_monto"] == 0
+        assert r["neto"] == 20000
+
+    def test_override_manual_monto_se_capea_al_bruto_descontable_no_al_total(self):
+        # Bruto descontable (solo el simple) = 10.000; combo = 20.000, exento.
+        # Un override manual de $50.000 no puede comerse el combo — se capea
+        # a los 10.000 descontables.
+        r = calcular_total(
+            items=[
+                {"equipo_id": 1, "cantidad": 1, "precio_jornada": 10000, "es_combo": False},
+                {"equipo_id": 2, "cantidad": 1, "precio_jornada": 20000, "es_combo": True},
+            ],
+            jornadas=1,
+            descuento_manual_tipo="monto",
+            descuento_manual_monto=50000,
+        )
+        assert r["descuento_monto"] == 10000  # capeado, no 30.000
+        assert r["neto"] == 20000  # el combo queda intacto

@@ -1,0 +1,218 @@
+"""Embudo de alias de valor contra Postgres REAL (#1163 Fases 2-3).
+
+Cubre lo que test_specs_value_aliases_model.py no puede sin DB:
+1. _sync_value_aliases escribe filas, es idempotente (ON CONFLICT), y no
+   escribe nada en dry_run.
+2. mapear_valor resuelve: value ya canónico (con distinto casing/acentos/
+   guiones), alias conocido, y None cuando no matchea nada.
+3. (Fase 3) persistir_specs — el choke-point real, el mismo que llama
+   PUT /admin/equipos/{id}/specs — usa el embudo para tipo=enum: guardar
+   "FF" persiste "Full-frame", y dos equipos que tipearon distinto (uno
+   "FF", otro "Full-frame") terminan con el mismo value guardado — que es
+   lo que hace que el motor de compat (matchea por igualdad exacta) los
+   vea compatibles.
+
+OPT-IN y SEGURO POR DEFECTO (mismo gating que los otros *_db.py): se saltea
+salvo RESERVAS_DB_TEST=1 + DATABASE_URL con 'test' en el nombre. Ids altos
+(categoría ancla) + limpieza vía CASCADE.
+"""
+import os
+from urllib.parse import urlparse
+
+import pytest
+
+from services.specs.commands.persist import persistir_specs
+from services.specs.commands.seed import _sync_value_aliases, _upsert_spec_definition
+from services.specs.normalize.value_funnel import mapear_valor
+from services.specs.registry.models import SpecDef
+
+_OPT_IN = os.getenv("RESERVAS_DB_TEST") == "1"
+_DB_URL = os.getenv("DATABASE_URL", "")
+_DB_NAME = urlparse(_DB_URL).path.lstrip("/") if _DB_URL else ""
+
+
+def _looks_like_test_db() -> bool:
+    return bool(_DB_NAME) and "test" in _DB_NAME.lower()
+
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not _OPT_IN,
+        reason="opt-in: setear RESERVAS_DB_TEST=1 + DATABASE_URL a una base de prueba",
+    ),
+    pytest.mark.skipif(
+        _OPT_IN and not _looks_like_test_db(),
+        reason=f"DATABASE_URL ({_DB_NAME!r}) no parece base de test — abortado por seguridad",
+    ),
+]
+
+# Categoría ancla de id fijo alto — spec_definitions/spec_value_aliases cuelgan
+# de acá por FK CASCADE, así que borrar la categoría limpia todo.
+C_ANCLA = 9_400_201
+EQ_TIPEO_FF, EQ_TIPEO_CANONICO = 9_400_301, 9_400_302
+
+
+def _limpiar(conn):
+    conn.execute("DELETE FROM equipos WHERE id IN (%s, %s)", (EQ_TIPEO_FF, EQ_TIPEO_CANONICO))
+    conn.execute("DELETE FROM categorias WHERE id = %s", (C_ANCLA,))
+
+
+@pytest.fixture
+def spec_def_id():
+    from database import get_db, init_db
+
+    init_db()
+    conn = get_db()
+    try:
+        _limpiar(conn)
+        conn.execute(
+            "INSERT INTO categorias (id, nombre) VALUES (%s, %s)",
+            (C_ANCLA, "ZZ-EmbudoTest-test"),
+        )
+        spec = SpecDef(
+            key="formato", label="Formato", tipo="enum",
+            enum_options=["Full-frame", "Super 35"],
+            value_aliases={
+                "Full-frame": ["FF", "full frame", "cuadro completo"],
+                "Super 35": ["S35"],
+            },
+        )
+        sid = _upsert_spec_definition(conn, spec, C_ANCLA, dry_run=False)
+        _sync_value_aliases(conn, sid, spec, dry_run=False)
+        conn.commit()
+    finally:
+        conn.close()
+    yield sid
+    conn = get_db()
+    try:
+        _limpiar(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+class TestSyncValueAliases:
+    def test_escribe_las_filas_declaradas(self, spec_def_id):
+        from database import get_db
+
+        with get_db() as conn:
+            rows = conn.execute(
+                "SELECT alias, valor_canonico FROM spec_value_aliases "
+                "WHERE spec_def_id = %s ORDER BY alias",
+                (spec_def_id,),
+            ).fetchall()
+        aliases = {r["alias"]: r["valor_canonico"] for r in rows}
+        assert aliases == {
+            "FF": "Full-frame",
+            "full frame": "Full-frame",
+            "cuadro completo": "Full-frame",
+            "S35": "Super 35",
+        }
+
+    def test_idempotente_no_duplica(self, spec_def_id):
+        from database import get_db
+
+        spec = SpecDef(
+            key="formato", label="Formato", tipo="enum",
+            enum_options=["Full-frame", "Super 35"],
+            value_aliases={"Full-frame": ["FF", "full frame", "cuadro completo"], "Super 35": ["S35"]},
+        )
+        with get_db() as conn:
+            _sync_value_aliases(conn, spec_def_id, spec, dry_run=False)
+            conn.commit()
+            total = conn.execute(
+                "SELECT COUNT(*) AS c FROM spec_value_aliases WHERE spec_def_id = %s",
+                (spec_def_id,),
+            ).fetchone()
+        assert total["c"] == 4
+
+    def test_dry_run_no_escribe(self, spec_def_id):
+        from database import get_db
+
+        spec = SpecDef(key="otro", label="Otro", tipo="enum", enum_options=["A"], value_aliases={"A": ["a1"]})
+        with get_db() as conn:
+            n = _sync_value_aliases(conn, spec_def_id, spec, dry_run=True)
+            existe = conn.execute(
+                "SELECT 1 FROM spec_value_aliases WHERE alias = 'a1'"
+            ).fetchone()
+        assert n == 0
+        assert existe is None
+
+
+class TestMapearValor:
+    @pytest.mark.parametrize("raw,esperado", [
+        ("Full-frame", "Full-frame"),
+        ("full-frame", "Full-frame"),
+        ("FULL FRAME", "Full-frame"),
+        ("FF", "Full-frame"),
+        ("ff", "Full-frame"),
+        ("Full Frame", "Full-frame"),
+        ("cuadro completo", "Full-frame"),
+        ("S35", "Super 35"),
+        ("APS-C", None),
+        ("", None),
+    ])
+    def test_casos(self, spec_def_id, raw, esperado):
+        from database import get_db
+
+        with get_db() as conn:
+            assert mapear_valor(conn, spec_def_id, raw) == esperado
+
+    def test_spec_def_id_inexistente_no_explota(self, spec_def_id):
+        from database import get_db
+
+        with get_db() as conn:
+            assert mapear_valor(conn, 999_999_999, "FF") is None
+
+
+class TestPersistirSpecsConElEmbudo:
+    """Fase 3: el choke-point real (el mismo que llama la ruta HTTP) usa el
+    embudo — no solo mapear_valor en aislamiento."""
+
+    def test_ff_se_persiste_como_full_frame(self, spec_def_id):
+        from database import get_db
+
+        with get_db() as conn:
+            conn.execute("INSERT INTO equipos (id, nombre, cantidad) VALUES (%s, %s, 1)", (EQ_TIPEO_FF, "eq-ff-test"))
+            sd = conn.execute(
+                "SELECT id, label, tipo, enum_options, unidad FROM spec_definitions WHERE id = %s",
+                (spec_def_id,),
+            ).fetchone()
+            result = persistir_specs(conn, EQ_TIPEO_FF, {str(spec_def_id): "FF"}, {spec_def_id: dict(sd)})
+            conn.commit()
+
+            assert result == {"persisted": 1, "discarded": []}
+            row = conn.execute(
+                "SELECT value FROM equipo_specs WHERE equipo_id = %s AND spec_def_id = %s",
+                (EQ_TIPEO_FF, spec_def_id),
+            ).fetchone()
+            assert row["value"] == "Full-frame"
+
+    def test_dos_equipos_con_distinto_tipeo_quedan_compatibles(self, spec_def_id):
+        """El motor de compat matchea por igualdad EXACTA de value — este es
+        el caso concreto que el embudo arregla: antes 'FF' y 'Full-frame'
+        guardaban distinto y la compat nunca los veía como iguales."""
+        from database import get_db
+
+        with get_db() as conn:
+            conn.execute(
+                "INSERT INTO equipos (id, nombre, cantidad) VALUES (%s, %s, 1), (%s, %s, 1)",
+                (EQ_TIPEO_FF, "eq-ff-test", EQ_TIPEO_CANONICO, "eq-canonico-test"),
+            )
+            sd = conn.execute(
+                "SELECT id, label, tipo, enum_options, unidad FROM spec_definitions WHERE id = %s",
+                (spec_def_id,),
+            ).fetchone()
+            defs_by_id = {spec_def_id: dict(sd)}
+
+            persistir_specs(conn, EQ_TIPEO_FF, {str(spec_def_id): "FF"}, defs_by_id)
+            persistir_specs(conn, EQ_TIPEO_CANONICO, {str(spec_def_id): "Full-frame"}, defs_by_id)
+            conn.commit()
+
+            valores = conn.execute(
+                "SELECT DISTINCT value FROM equipo_specs WHERE equipo_id IN (%s, %s) AND spec_def_id = %s",
+                (EQ_TIPEO_FF, EQ_TIPEO_CANONICO, spec_def_id),
+            ).fetchall()
+            assert len(valores) == 1
+            assert valores[0]["value"] == "Full-frame"

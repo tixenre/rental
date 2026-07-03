@@ -26,10 +26,13 @@ import {
   type Spec,
   type PorCategoriaResponse,
 } from "@/components/admin/specs/SpecsConsolidadasHelpers";
+import { SpecsNoReconocidos } from "@/components/admin/specs/SpecsNoReconocidos";
 
 export const Route = createLazyFileRoute("/admin/specs/")({
   component: SpecsConsolidadasPage,
 });
+
+const TAB_NO_RECONOCIDOS = "no-reconocidos";
 
 function SpecsConsolidadasPage() {
   useDocumentTitle("Specs · Back Office");
@@ -86,12 +89,16 @@ function SpecsConsolidadasPage() {
                   </Badge>
                 </TabsTrigger>
               ))}
+              <TabsTrigger value={TAB_NO_RECONOCIDOS}>No reconocidos</TabsTrigger>
             </TabsList>
             {categorias.map((cat) => (
               <TabsContent key={cat.id} value={String(cat.id)} className="mt-4">
                 <CategoriaPanel categoria={cat} onSelectSpec={(s) => setSelectedSpec(s)} />
               </TabsContent>
             ))}
+            <TabsContent value={TAB_NO_RECONOCIDOS} className="mt-4">
+              <SpecsNoReconocidos />
+            </TabsContent>
           </Tabs>
         )}
 

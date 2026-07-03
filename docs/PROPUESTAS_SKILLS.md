@@ -24,11 +24,13 @@ usar MCP cuando `gh` es más directo y ya funciona; primer uso real del skill lo
   ↳ 2026-06-29 · corroboración (retro de iniciativa) · una sesión en la **web/nube** confirma la otra
     mitad: acá `gh` **no** está disponible y hay que caer a `mcp__github__*` sí o sí → la verdad es
     **dependiente del entorno**, lo que valida el wording **condicional** por sobre cualquier absoluto.
+  ✅ aplicada — cierre de gobernanza 2026-06-30 (wording condicional en `pendientes/SKILL.md`)
 
 2026-06-29 · mantenimiento · La lista "**nunca se borra**" de motores únicos (sección 2, "Respetar la MEMORIA":
 `backend/{reservas,reportes,busqueda,services/branding}/`) quedó atrás de la familia: **omite `contabilidad`
 (2026-06-07) y `services/contenido` (2026-06-29)**. Proponer agregarlos · Por qué: lo cazó el barrido de
 cross-refs del **retro de iniciativa**; una lista incompleta podría no frenar el borrado de un módulo vivo.
+✅ aplicada — cierre de gobernanza 2026-06-30 (`mantenimiento/SKILL.md`)
 
 2026-06-25 · gobernanza · Agregar un check de **"staleness por divergencia" de los manuales de sistema**
 (`docs/SISTEMA_*.md`, convención _2026-06-25 — Manuales técnicos por sistema_): detectar si un manual no se
@@ -36,8 +38,10 @@ tocó mientras su motor (los paths que referencia) cambió N veces en git → pr
 de gobernanza. **Detecta + propone, no mantiene solo** (el supervisor por cambio + quien toca el código siguen
 siendo el mantenimiento real). · Por qué: hoy los manuales los vigila el supervisor (por cambio) + `check-docs`
 (links/estructura), pero **nada detecta el desfase de CONTENIDO**. Un check periódico sería la red de seguridad
-que cierra el círculo. **Prematuro con 1 solo manual (fotos)** — activar cuando haya varios (ver el issue de
-relevamiento de manuales).
+que cierra el círculo. ~~Prematuro con 1 solo manual (fotos)~~ — al cierre 2026-06-30 ya hay **9 manuales**
+(`ARCA, AUTH, CARRITO, CHECKOUT, CONTENIDO, FACTURACION, FOTOS, IDENTITY, SPECS`) → la condición de diferido
+ya no aplica.
+✅ aplicada — cierre de gobernanza 2026-06-30 (check agregado al método de `gobernanza/SKILL.md` §2)
 
 2026-06-30 · calidad-tests · Caso testigo: un test que compara fechas contra `now_ar()` (hora de Argentina, la
 convención del repo) debe construir sus fechas con `now_ar().date()`, **NO** con `datetime.date.today()` (UTC en
@@ -49,6 +53,7 @@ prueba. Patrón repetible en cualquier test de fechas (now_ar es la convención 
     tests: `tablero.mes_actual()`, `movimientos._mes_de_fecha` y `pagos.py` usaban `date.today()` (UTC) donde debía
     ir `now_ar()`. Se corrigieron en #1136 (vía `services.fechas.mes_actual_ar`). El gotcha **se generaliza**: "el
     ahora/hoy del repo es `now_ar()`, nunca `date.today()`" — vale para prod y tests. Patrón repetido → señal fuerte.
+  ✅ aplicada — cierre de gobernanza 2026-06-30 (caso testigo 3d en `calidad-tests/SKILL.md`)
 
 2026-06-30 · mantenimiento · Método: para decidir **qué consolidar en un módulo fuente-única** (y qué dejar en su
 motor), despachar un **workflow de lectores paralelos** que clasifiquen cada uso por categoría —
@@ -57,6 +62,7 @@ solo los CANDIDATO se mueven; el dominio de cada motor se queda. · Por qué: en
 este barrido (4 lectores sobre reservas/precios/alquileres/portal/jobs/reportes/contabilidad/auth/ical/pdf) cazó
 los candidatos reales (ventana de modificación, horarios) y **descartó con fundamento** los falsos (buffer→reservas,
 jornadas→precios) — evitó mover lógica de dominio por "parece fecha". Repetible para cualquier consolidación grande.
+✅ aplicada — cierre de gobernanza 2026-06-30 (método sumado a "Más allá del código muerto" en `mantenimiento/SKILL.md`)
 
 2026-06-30 · mantenimiento · Gotcha de verify al **cambiar el contrato de props de un componente compartido**:
 (a) el `tsc` local con **cache incremental** puede dar OK falso tras un merge (no rechequea todo) → correr fresco
@@ -65,6 +71,8 @@ jornadas→precios) — evitó mover lógica de dominio por "parece fecha". Repe
 Por qué: en #1136 un 3er call-site de `CartDrawerView` (`catalogo-organismos.tsx`) llegó de `dev` después del merge
 → `tsc` local pasó (cache) pero el CI del PR falló; costó 2 vueltas de CI. Pasó **dos veces** en la misma sesión
 (dev se movió 3×). Sumar a la disciplina de "verificar antes de cantar verde".
+✅ aplicada — cierre de gobernanza 2026-06-30 (gotcha en `mantenimiento/SKILL.md` Frente E + puntero en
+`pulido-frontend/SKILL.md` §4 VERIFICAR, porque también aplica fuera de splits)
 
 2026-06-30 · design-system · Caso testigo (autoría de specimens de la vitrina): un componente de
 producción afinado para su contenedor real —`content-visibility` + `aspect-ratio` + intrinsic-size
@@ -78,3 +86,4 @@ ancho); lo cazó el **dueño visualmente**, no los checks estáticos (tsc/eslint
 y la ruta `/admin/diseño` es admin-gated → no se renderiza local). Fix `f465a18d`: espejar
 `categoria.$slug.tsx` (`grid-cols-2→md:4` + cap de ancho). Repetible para cualquier futuro specimen de
 un componente container-coupled.
+✅ aplicada — cierre de gobernanza 2026-06-30 (caso testigo 3d en `design-system/SKILL.md`)

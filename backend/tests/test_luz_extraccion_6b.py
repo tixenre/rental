@@ -161,7 +161,7 @@ def test_parse_lux_emitido_en_map_luz_specs():
 
 def test_coerce_rango_miles_range():
     """`2,500-7,500` (separador de miles) → [2500, 7500], no [2.5, 7.5]."""
-    from services.spec_coerce import _coerce_rango
+    from services.specs.commands.coerce import _coerce_rango
 
     result = json.loads(_coerce_rango("2,500-7,500"))
     assert result == [2500, 7500]
@@ -169,7 +169,7 @@ def test_coerce_rango_miles_range():
 
 def test_coerce_rango_miles_simple():
     """`2,500K` (separador de miles) → [2500], no [2.5]."""
-    from services.spec_coerce import _coerce_rango
+    from services.specs.commands.coerce import _coerce_rango
 
     # La K la strip el coerce_rango, el resultado es [2500]
     result = json.loads(_coerce_rango("2,500K"))
@@ -178,7 +178,7 @@ def test_coerce_rango_miles_simple():
 
 def test_coerce_rango_decimal_coma_no_contaminada():
     """`1,5` (decimal europeo, 1 cifra tras coma) → [1.5], sin tocar."""
-    from services.spec_coerce import _coerce_rango
+    from services.specs.commands.coerce import _coerce_rango
 
     result = json.loads(_coerce_rango("1,5"))
     assert result == [1.5]
@@ -187,7 +187,7 @@ def test_coerce_rango_decimal_coma_no_contaminada():
 def test_coerce_rango_temperatura_pipeline():
     """Pipeline completo: '2,500 to 7,500K' → _parse_temperatura → _coerce_rango → [2500, 7500]."""
     from iluminacion_parser import _parse_temperatura
-    from services.spec_coerce import _coerce_rango
+    from services.specs.commands.coerce import _coerce_rango
 
     secciones = _secciones_from([("Color Temperature", "2,500 to 7,500K")])
     temperatura_str = _parse_temperatura(secciones)
@@ -198,7 +198,7 @@ def test_coerce_rango_temperatura_pipeline():
 
 def test_coerce_number_miles():
     """`11,600` → 11600, no 11.6."""
-    from services.spec_coerce import _coerce_number
+    from services.specs.commands.coerce import _coerce_number
 
     assert _coerce_number("11,600 Lux") == "11600"
 
@@ -262,7 +262,7 @@ def test_color_modes_rgb():
 
 
 def _registry_iluminacion_keys() -> set[str]:
-    from specs import REGISTRY
+    from services.specs import REGISTRY
 
     cat = REGISTRY.get("Iluminación")
     assert cat is not None, "Categoría 'Iluminación' no encontrada en REGISTRY"

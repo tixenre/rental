@@ -15,10 +15,12 @@ from pydantic import BaseModel
 
 from database import get_db
 from auth.guards import require_admin
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
 from reportes.liquidacion import liquidar
 from reportes.reconciliacion import reconciliar
 from reportes.cierres import (
     cerrar_mes,
+    liquidar_rango,
     mes_de_rango,
     reabrir_mes,
     snapshot_de,
@@ -67,17 +69,23 @@ def _liquidacion_csv(data: dict) -> str:
 
 
 def _data_liquidacion(conn, desde: str, hasta: str) -> dict:
-    """Carga la liquidación de un rango con la lógica de cierre (#721): si el rango
-    es un mes calendario cerrado, sirve la FOTO inmutable; si no, calcula en vivo.
-    Fuente única usada por el endpoint JSON/CSV, el PDF y el envío por mail."""
+    """Carga la liquidación de un rango con la lógica de cierre (#721, #1209): si
+    el rango es EXACTAMENTE un mes calendario cerrado, sirve su FOTO inmutable
+    directa. Si es un rango de VARIOS meses (ej. "Mes a mes"/el total anual),
+    delega en `liquidar_rango`, que usa la foto de cada mes cerrado que el rango
+    cubre y calcula en vivo el resto — así un mes cerrado nunca muestra un número
+    distinto entre la tarjeta del mes y la vista multi-mes/anual. Fuente única
+    usada por el endpoint JSON/CSV, el PDF y el envío por mail."""
     mes = mes_de_rango(desde, hasta)
-    snap = snapshot_de(conn, mes) if mes else None
-    if snap is not None:
-        data = snap
-    else:
-        data = liquidar(conn, desde, hasta)
-        if mes:
+    if mes:
+        snap = snapshot_de(conn, mes)
+        if snap is not None:
+            data = snap
+        else:
+            data = liquidar(conn, desde, hasta)
             data["cerrado"] = False
+    else:
+        data = liquidar_rango(conn, desde, hasta)
     if mes:
         data["mes"] = mes
     data["desde"] = desde
@@ -185,6 +193,7 @@ class EnviarReporteBody(BaseModel):
 
 
 @router.post("/admin/reportes/liquidacion/enviar-mail")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 async def enviar_reporte_mail(request: Request, body: EnviarReporteBody):
     """Genera el PDF del reporte del período y lo manda adjunto a cada
     destinatario. Guarda la lista para prefillar la próxima vez."""
@@ -270,6 +279,7 @@ def _validar_mes_http(mes: str) -> None:
 
 
 @router.post("/admin/reportes/cierres/{mes}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def cerrar_mes_liquidacion(request: Request, mes: str):
     """Cierra un mes: congela la foto inmutable del reporte (números + modelo).
     Idempotente: re-cerrar recalcula la foto con los datos actuales (#721)."""
@@ -280,6 +290,7 @@ def cerrar_mes_liquidacion(request: Request, mes: str):
 
 
 @router.delete("/admin/reportes/cierres/{mes}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
 def reabrir_mes_liquidacion(request: Request, mes: str):
     """Reabre un mes cerrado: borra la foto → el reporte vuelve a calcularse en
     vivo (para corregir; después se vuelve a cerrar) (#721)."""

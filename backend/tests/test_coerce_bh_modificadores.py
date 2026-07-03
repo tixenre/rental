@@ -13,7 +13,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-from services.spec_coerce import _coerce_bool, _coerce_enum
+from services.specs.commands.coerce import _coerce_bool, _coerce_enum
 
 
 # ── _coerce_bool: patrones B&H ────────────────────────────────────────────────
@@ -92,37 +92,37 @@ def _build_alias_index(specs: list) -> dict:
 
 
 def test_alias_item_type_resuelve_modificador_subtipo():
-    from specs.categorias.modificadores import CAT
+    from services.specs.registry.catalogo.modificadores import CAT
     idx = _build_alias_index(CAT.specs)
     assert idx.get("item type") == "modificador_subtipo"
 
 
 def test_alias_accepts_grids_resuelve_incluye_grid():
-    from specs.categorias.modificadores import CAT
+    from services.specs.registry.catalogo.modificadores import CAT
     idx = _build_alias_index(CAT.specs)
     assert idx.get("accepts grids") == "incluye_grid"
 
 
 def test_alias_interior_baffle_resuelve_incluye_difusor():
-    from specs.categorias.modificadores import CAT
+    from services.specs.registry.catalogo.modificadores import CAT
     idx = _build_alias_index(CAT.specs)
     assert idx.get("interior baffle") == "incluye_difusor"
 
 
 def test_alias_quick_open_type_resuelve_plegable():
-    from specs.categorias.modificadores import CAT
+    from services.specs.registry.catalogo.modificadores import CAT
     idx = _build_alias_index(CAT.specs)
     assert idx.get("quick open type") == "plegable"
 
 
 def test_alias_light_loss_gain_resuelve_light_loss_stops():
-    from specs.categorias.modificadores import CAT
+    from services.specs.registry.catalogo.modificadores import CAT
     idx = _build_alias_index(CAT.specs)
     assert idx.get("light loss/gain") == "light_loss_stops"
 
 
 def test_alias_light_compatibility_resuelve_montura_luz():
-    from specs.shared.lighting import montura_luz
+    from services.specs.registry.shared.lighting import montura_luz
     spec = montura_luz()
     aliases_lower = [a.lower() for a in spec.aliases]
     assert "light compatibility" in aliases_lower

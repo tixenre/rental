@@ -7,10 +7,9 @@ la DB.
 Política:
 - Upsert por clave natural. Insertar si no existe, actualizar si existe.
 - Campos del modelo siempre pisan (la fuente de verdad es el JSON).
-- M2M (`equipo_categorias`, `equipo_etiquetas`): siempre inserta del JSON
-  con `ON CONFLICT DO UPDATE` para mantener `orden`/`origen`. Si una fila
-  está en la DB pero no en el JSON, se preserva (es custom local).
-  El borrado de no-listadas se hace solo con `prune=True`.
+- M2M (`equipo_categorias`): `asignar_categorias` siempre reemplaza el set
+  completo del equipo por el del JSON (no es incremental, no preserva
+  asignaciones custom que no estén en el JSON).
 
 `dry-run` NO es responsabilidad de los importers — siempre escriben. El
 orchestrator (orchestrator.import_all) es quien envuelve el batch en un
@@ -25,6 +24,7 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
+from services.categorias import crear_si_no_existe, asignar_padre_si_no_tiene, asignar_categorias
 from . import schema
 from .natural_keys import KeyResolver
 
@@ -90,38 +90,20 @@ def import_categorias(
     items = _validate_rows(rows, schema.Categoria, "categorias")
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
 
-    # Pase 1: insertar las categorías que FALTEN. NO se sobreescriben las
-    # existentes — el catálogo es web-managed; el arranque solo bootstrapea lo
-    # que no está. Así las ediciones (nombre/prioridad/visible/grupo/parent)
-    # hechas en la web persisten entre deploys.
     pending: list[schema.Categoria] = []
     for c in items:
-        cur = conn.execute(
-            """
-            INSERT INTO categorias (nombre, prioridad, parent_id, visible,
-                                    grupo_visual, nombre_publico_template)
-            VALUES (%s, %s, NULL, %s, %s, %s)
-            ON CONFLICT (nombre) DO NOTHING
-            RETURNING id
-            """,
-            (
-                c.nombre,
-                c.prioridad,
-                c.visible,
-                c.grupo_visual,
-                c.nombre_publico_template,
-            ),
+        _, was_inserted = crear_si_no_existe(
+            conn, c.nombre, prioridad=c.prioridad,
+            visible=c.visible, grupo_visual=c.grupo_visual,
+            nombre_publico_template=c.nombre_publico_template,
         )
-        row = cur.fetchone()
-        if row:
+        if was_inserted:
             stats["inserted"] += 1
         else:
             stats["skipped"] += 1
         if c.parent_path:
             pending.append(c)
 
-    # Pase 2: setear parent_id SOLO de las que no tienen parent (recién
-    # insertadas). No pisa el árbol que armaste en la web.
     resolver.refresh_categorias()
     for c in pending:
         parent_id = resolver.categoria_id(c.parent_path)
@@ -130,39 +112,7 @@ def import_categorias(
                 f"categorias: '{c.nombre}' referencia parent_path='{c.parent_path}' "
                 f"que no existe (debe estar en el mismo JSON)"
             )
-        conn.execute(
-            "UPDATE categorias SET parent_id = %s WHERE nombre = %s AND parent_id IS NULL",
-            (parent_id, c.nombre),
-        )
-    return stats
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# etiquetas
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def import_etiquetas(
-    conn, rows: list[dict], resolver: KeyResolver
-) -> dict[str, int]:
-    items = _validate_rows(rows, schema.Etiqueta, "etiquetas")
-    stats = {"inserted": 0, "updated": 0, "skipped": 0}
-    for e in items:
-        cur = conn.execute(
-            """
-            INSERT INTO etiquetas (nombre, prioridad)
-            VALUES (%s, %s)
-            ON CONFLICT (nombre) DO UPDATE SET prioridad = EXCLUDED.prioridad
-            RETURNING (xmax = 0) AS inserted
-            """,
-            (e.nombre, e.prioridad),
-        )
-        row = cur.fetchone()
-        if row and row["inserted"]:
-            stats["inserted"] += 1
-        else:
-            stats["updated"] += 1
-    resolver.refresh_etiquetas()
+        asignar_padre_si_no_tiene(conn, c.nombre, parent_id)
     return stats
 
 
@@ -357,7 +307,7 @@ def import_categoria_spec_templates(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# equipos (con M2M categorias/etiquetas)
+# equipos (con M2M categorias)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -365,14 +315,9 @@ def import_equipos(
     conn,
     rows: list[dict],
     resolver: KeyResolver,
-    prune_m2m: bool = False,
 ) -> dict[str, int]:
-    """Upsert de equipos por slug + sync de M2M categorias/etiquetas.
-
-    Args:
-        prune_m2m: si True, borra las relaciones M2M existentes que no
-            estén en el JSON. Default False (preserva custom).
-    """
+    """Upsert de equipos por slug + sync de M2M categorias (siempre
+    reemplaza — asignar_categorias no es incremental)."""
     items = _validate_rows(rows, schema.Equipo, "equipos")
     stats = {"inserted": 0, "updated": 0, "skipped": 0}
 
@@ -445,59 +390,15 @@ def import_equipos(
             resolver._equipos[eq.slug] = equipo_id
 
         # ── M2M: categorias ──────────────────────────────────────────────
-        if prune_m2m:
-            conn.execute(
-                "DELETE FROM equipo_categorias WHERE equipo_id = %s", (equipo_id,)
-            )
+        cat_ids = []
         for cat_ref in eq.categorias:
             cat_id = resolver.categoria_id(cat_ref.nombre)
             if cat_id is None:
                 raise ImportError_(
                     f"equipos[{eq.slug}].categorias: '{cat_ref.nombre}' no existe"
                 )
-            conn.execute(
-                """
-                INSERT INTO equipo_categorias (equipo_id, categoria_id, orden)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (equipo_id, categoria_id) DO UPDATE SET
-                    orden = EXCLUDED.orden
-                """,
-                (equipo_id, cat_id, cat_ref.orden),
-            )
-
-        # ── M2M: etiquetas ───────────────────────────────────────────────
-        if prune_m2m:
-            conn.execute(
-                "DELETE FROM equipo_etiquetas WHERE equipo_id = %s", (equipo_id,)
-            )
-        for et_ref in eq.etiquetas:
-            et_id = resolver.etiqueta_id(et_ref.nombre)
-            if et_id is None:
-                # Auto-crear etiqueta si no existe (más permisivo)
-                conn.execute(
-                    """
-                    INSERT INTO etiquetas (nombre, prioridad)
-                    VALUES (%s, 100)
-                    ON CONFLICT (nombre) DO NOTHING
-                    """,
-                    (et_ref.nombre,),
-                )
-                resolver.refresh_etiquetas()
-                et_id = resolver.etiqueta_id(et_ref.nombre)
-                if et_id is None:
-                    raise ImportError_(
-                        f"equipos[{eq.slug}].etiquetas: no se pudo crear '{et_ref.nombre}'"
-                    )
-            conn.execute(
-                """
-                INSERT INTO equipo_etiquetas (equipo_id, etiqueta_id, origen, orden)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (equipo_id, etiqueta_id) DO UPDATE SET
-                    origen = EXCLUDED.origen,
-                    orden = EXCLUDED.orden
-                """,
-                (equipo_id, et_id, et_ref.origen, et_ref.orden),
-            )
+            cat_ids.append(cat_id)
+        asignar_categorias(conn, equipo_id, cat_ids)
     return stats
 
 
@@ -759,17 +660,22 @@ def import_alquileres(
                 (alq_id, equipo_id, it.cantidad, it.precio_jornada, it.subtotal),
             )
 
-        # Pagos: replace. Idem.
+        # Pagos: replace. Idem. `anulado`+auditoría viajan tal cual (#1184/
+        # #1209) — un pago anulado (soft-delete) NO debe reinsertarse activo
+        # con el default de la columna.
         conn.execute(
             "DELETE FROM alquiler_pagos WHERE pedido_id = %s", (alq_id,)
         )
         for p in a.pagos:
             conn.execute(
                 """
-                INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO alquiler_pagos
+                    (pedido_id, monto, concepto, fecha,
+                     anulado, anulado_por, anulado_at, anulado_motivo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (alq_id, p.monto, p.concepto, p.fecha),
+                (alq_id, p.monto, p.concepto, p.fecha,
+                 p.anulado, p.anulado_por, p.anulado_at, p.anulado_motivo),
             )
 
     resolver.refresh_alquileres()
@@ -980,7 +886,6 @@ def import_descuentos_jornada(
 IMPORTERS = {
     "marcas": import_marcas,
     "categorias": import_categorias,
-    "etiquetas": import_etiquetas,
     "spec_definitions": import_spec_definitions,
     "categoria_spec_templates": import_categoria_spec_templates,
     "equipos": import_equipos,

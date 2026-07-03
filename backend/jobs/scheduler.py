@@ -29,6 +29,7 @@ import logging
 import os
 import threading
 import time
+from datetime import timedelta
 
 from database import now_ar
 from jobs.recordatorios_config import resolve
@@ -36,6 +37,11 @@ from jobs.recordatorios_config import resolve
 logger = logging.getLogger(__name__)
 
 _CHECK_EVERY_S = 600  # 10 min: granularidad del sondeo
+
+# Recheck de verificaciones Didit abandonadas: por tiempo transcurrido (no por
+# fecha calendario como los otros dos jobs) — la ventana de abandono se mide en
+# minutos, no en días, así que un corte a medianoche no aplica.
+_RECHECK_DIDIT_EVERY = timedelta(minutes=30)
 
 
 def _hard_disabled() -> bool:
@@ -49,9 +55,13 @@ def _loop() -> None:
     # este módulo, y rompe cualquier ciclo de importación al arrancar.
     from jobs.recordatorios import enviar_recordatorios_retiro
     from jobs.cleanup_livianas import purgar_cuentas_livianas_stale
+    from jobs.reconciliacion import chequear_reconciliacion_y_alertar
+    from jobs.recheck_didit_pendientes import recheck_verificaciones_pendientes
 
-    ultima_fecha = None      # recordatorios de retiro
-    ultima_limpieza = None   # cleanup de cuentas livianas (independiente)
+    ultima_fecha = None       # recordatorios de retiro
+    ultima_limpieza = None    # cleanup de cuentas livianas (independiente)
+    ultima_reconciliacion = None  # alerta de reconciliación de plata (independiente)
+    ultimo_recheck_didit = None  # recheck de verificaciones pendientes (por intervalo, no por día)
     while True:
         ahora = now_ar()
         try:
@@ -74,6 +84,25 @@ def _loop() -> None:
                 purgar_cuentas_livianas_stale()
         except Exception:
             logger.exception("Falló el cleanup de cuentas livianas")
+        try:
+            # Alerta proactiva de reconciliación de plata (#1184 Fase 2): 1×/día,
+            # independiente de los otros dos. La variable "última fecha" YA acota
+            # a 1 mail/día aunque el problema persista — no hace falta otro rate
+            # limit (mismo criterio que los jobs anteriores).
+            if ahora.date() != ultima_reconciliacion:
+                ultima_reconciliacion = ahora.date()
+                chequear_reconciliacion_y_alertar()
+        except Exception:
+            logger.exception("Falló la alerta de reconciliación de plata")
+        try:
+            # Recheck de verificaciones Didit abandonadas: cada _RECHECK_DIDIT_EVERY,
+            # independiente de los demás. Resuelve al cliente que no vuelve a la web
+            # sin esperar a que un admin lo note (ver docstring del job).
+            if ultimo_recheck_didit is None or (ahora - ultimo_recheck_didit) >= _RECHECK_DIDIT_EVERY:
+                ultimo_recheck_didit = ahora
+                recheck_verificaciones_pendientes()
+        except Exception:
+            logger.exception("Falló el recheck de verificaciones Didit pendientes")
         time.sleep(_CHECK_EVERY_S)
 
 

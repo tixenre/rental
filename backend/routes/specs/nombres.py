@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from database import get_db, row_to_dict, MARCA_SUBQUERY
 from services.clasificador_heuristico import clasificar_lote
+from services.categorias import asignar_categorias, equipos_sin_categoria, listar_arbol_admin, sql_filtro_categoria
 from services.nombre_service import (
     actualizar_nombres_de,
     calcular_nombres_para,
@@ -128,7 +129,7 @@ def clasificar_bulk(request: Request, payload: dict = None):
             params.extend(int(i) for i in equipo_ids)
         elif solo_sin:
             where.append(
-                "NOT EXISTS (SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id)"
+                sql_filtro_categoria("e").removeprefix(" AND ")
             )
 
         clause = "WHERE " + " AND ".join(where)
@@ -146,18 +147,17 @@ def clasificar_bulk(request: Request, payload: dict = None):
 
         # Resolver los ids de las categorías sugeridas (raíz y sub) para
         # que el frontend pueda renderear directamente.
-        cat_rows = conn.execute(
-            "SELECT id, nombre, parent_id, "
-            "       (SELECT nombre FROM categorias WHERE id = c.parent_id) AS parent_nombre "
-            "FROM categorias c"
-        ).fetchall()
+        all_cats = listar_arbol_admin(conn)
+        name_by_id = {c["id"]: c["nombre"] for c in all_cats}
         by_name_raiz: dict[str, int] = {}
         by_name_sub: dict[tuple[str, str], int] = {}
-        for c in cat_rows:
+        for c in all_cats:
             if c["parent_id"] is None:
                 by_name_raiz[c["nombre"]] = c["id"]
             else:
-                by_name_sub[(c["parent_nombre"], c["nombre"])] = c["id"]
+                parent_name = name_by_id.get(c["parent_id"])
+                if parent_name:
+                    by_name_sub[(parent_name, c["nombre"])] = c["id"]
 
         foto_by_id = {r["id"]: r["foto_url"] for r in rows}
         for s in sugerencias:
@@ -205,17 +205,7 @@ def aplicar_clasificacion(payload: AplicarClasificacionInput, request: Request):
                     errores.append({"equipo_id": asig.get("equipo_id"), "error": "ids inválidos"})
                     continue
 
-                conn.execute("DELETE FROM equipo_categorias WHERE equipo_id = %s", (eq_id,))
-                for orden, cat_id in enumerate(cat_ids):
-                    conn.execute(
-                        "INSERT INTO equipo_categorias (equipo_id, categoria_id, orden) "
-                        "VALUES (%s, %s, %s) ON CONFLICT (equipo_id, categoria_id) DO NOTHING",
-                        (eq_id, cat_id, orden),
-                    )
-                try:
-                    actualizar_nombres_de(conn, eq_id, commit=False)
-                except Exception:
-                    pass
+                asignar_categorias(conn, eq_id, cat_ids)
                 aplicados.append(eq_id)
 
             conn.commit()
@@ -234,12 +224,7 @@ def listar_sin_categoria(request: Request):
     """Cuenta los equipos sin ninguna categoría asignada (para badge nav)."""
     _require_admin(request)
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) AS cnt FROM equipos e "
-            "WHERE e.es_recurso_interno = FALSE "
-            "AND NOT EXISTS (SELECT 1 FROM equipo_categorias ec WHERE ec.equipo_id = e.id)"
-        ).fetchone()
-        return {"total": row["cnt"]}
+        return {"total": equipos_sin_categoria(conn)}
 
 
 # ── Aprobar / overridear nombre público ─────────────────────────────────

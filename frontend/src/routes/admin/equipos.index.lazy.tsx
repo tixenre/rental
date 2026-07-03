@@ -77,7 +77,6 @@ export const Route = createLazyFileRoute("/admin/equipos/")({
 // en la URL: shareable, sobreviven refresh, back button funciona.
 type EquiposSearch = {
   q?: string;
-  etiqueta?: string;
   /** Nombre de categoría raíz (matchea descendientes vía CTE recursiva). */
   categoria?: string;
   /** Nombre exacto de marca. */
@@ -97,7 +96,6 @@ function EquiposPage() {
   const navigate = useNavigate();
 
   const q = search.q ?? "";
-  const etiqueta = search.etiqueta ?? "";
   const categoria = search.categoria ?? "";
   const marca = search.marca ?? "";
   const soloIncompletos = search.solo_incompletos ?? false;
@@ -110,7 +108,6 @@ function EquiposPage() {
         const next: EquiposSearch = { ...(prev as EquiposSearch), ...updates };
         // Strip falsy values para mantener la URL limpia.
         if (!next.q) delete next.q;
-        if (!next.etiqueta) delete next.etiqueta;
         if (!next.categoria) delete next.categoria;
         if (!next.marca) delete next.marca;
         if (!next.solo_incompletos) delete next.solo_incompletos;
@@ -123,7 +120,6 @@ function EquiposPage() {
   }
 
   const setQ = (v: string) => updateFilters({ q: v });
-  const setEtiqueta = (v: string) => updateFilters({ etiqueta: v });
   const setCategoria = (v: string) => updateFilters({ categoria: v });
   const setMarca = (v: string) => updateFilters({ marca: v });
   const setSoloIncompletos = (v: boolean | ((prev: boolean) => boolean)) =>
@@ -138,20 +134,13 @@ function EquiposPage() {
   const [openDashboard, setOpenDashboard] = useState(false);
   const [openComboBuilder, setOpenComboBuilder] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [tab, setTab] = useState<"todos" | "combos" | "destacados" | "nuevos" | "sin-foto">(
-    "todos",
-  );
+  const [tab, setTab] = useState<"todos" | "combos" | "sin-foto">("todos");
 
   const equiposQ = useQuery({
-    queryKey: [
-      "admin",
-      "equipos",
-      { q, etiqueta, categoria, marca, soloIncompletos, vistaPapelera, falta },
-    ],
+    queryKey: ["admin", "equipos", { q, categoria, marca, soloIncompletos, vistaPapelera, falta }],
     queryFn: () =>
       adminApi.listEquipos({
         q: q || undefined,
-        etiqueta: etiqueta || undefined,
         categoria: categoria || undefined,
         marca: marca || undefined,
         solo_incompletos: soloIncompletos || undefined,
@@ -162,33 +151,28 @@ function EquiposPage() {
   const kpisQ = useQuery({
     queryKey: ["admin", "equipos", "kpis"],
     queryFn: () => adminApi.equiposKpis(),
-    staleTime: 60_000,
-  });
-  const etiquetasQ = useQuery({
-    queryKey: ["admin", "etiquetas"],
-    queryFn: () => adminApi.listEtiquetas(),
+    staleTime: 0,
   });
   // Categorías para el selector de bulk "set categoría" (issue #231).
   const categoriasQ = useQuery({
     queryKey: ["admin", "categorias"],
     queryFn: () => adminApi.listCategorias(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
   const marcasQ = useQuery({
     queryKey: ["admin", "marcas-list"],
     queryFn: () => adminApi.adminListMarcas(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
   // Banner de calidad de inventario: equipos sin serie. Issue #91.
   const sinSerieQ = useQuery({
     queryKey: ["admin", "equipos-sin-serie"],
     queryFn: () => adminApi.getEquiposSinSerie(),
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["admin", "equipos"] });
-    qc.invalidateQueries({ queryKey: ["admin", "etiquetas"] });
     // También refrescamos el catálogo público (useEquipos / useCategorias)
     // para que la ficha y la foto recién aplicadas aparezcan sin recargar.
     qc.invalidateQueries({ queryKey: ["equipos"] });
@@ -197,7 +181,7 @@ function EquiposPage() {
 
   // El form maneja TODO el ciclo de guardado (foto, ficha, ficha extendida,
   // categorías) y también el toast final + cierre del dialog. Acá sólo
-  // hacemos el create/update + tags y refrescamos las queries — sin toast
+  // hacemos el create/update y refrescamos las queries — sin toast
   // ni close (esos los emite el form recién cuando todo el flow terminó,
   // así evitamos que el dialog se cierre mientras todavía hay requests
   // en vuelo, y que aparezcan errores parciales después del cierre).
@@ -274,10 +258,6 @@ function EquiposPage() {
   const allItems = equiposQ.data?.items ?? [];
   const total = equiposQ.data?.total ?? 0;
 
-  // Sub-tabs del handoff: filtros rápidos sobre la lista ya cargada.
-  const esDestacado = (eq: Equipo) =>
-    (eq.etiquetas ?? []).some((t) => t.toLowerCase() === "destacado");
-  const esNuevo = (eq: Equipo) => (eq.etiquetas ?? []).some((t) => t.toLowerCase() === "nuevo");
   // Los combos son "otra cosa" (sin stock propio, precio derivado de componentes):
   // viven en su propio tab. El resto de los tabs operan sobre el inventario FÍSICO
   // (equipos + kits), sin combos.
@@ -286,25 +266,15 @@ function EquiposPage() {
   const tabCounts = {
     todos: fisicos.length,
     combos: allItems.filter(esCombo).length,
-    destacados: fisicos.filter(esDestacado).length,
-    nuevos: fisicos.filter(esNuevo).length,
     "sin-foto": fisicos.filter((e) => !e.foto_url).length,
   };
   const items =
     tab === "combos"
       ? allItems.filter(esCombo)
-      : tab === "destacados"
-        ? fisicos.filter(esDestacado)
-        : tab === "nuevos"
-          ? fisicos.filter(esNuevo)
-          : tab === "sin-foto"
-            ? fisicos.filter((e) => !e.foto_url)
-            : fisicos;
+      : tab === "sin-foto"
+        ? fisicos.filter((e) => !e.foto_url)
+        : fisicos;
 
-  const etiquetasOpts = useMemo(
-    () => (etiquetasQ.data ?? []).filter((e) => (e.total ?? 0) > 0),
-    [etiquetasQ.data],
-  );
   /** Categorías raíz para el dropdown (no incluye hijos). El backend acepta
    *  el nombre de la raíz y matchea descendientes vía CTE recursiva. */
   const categoriasOpts = useMemo(
@@ -416,22 +386,6 @@ function EquiposPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select
-            value={etiqueta || "__all"}
-            onValueChange={(v) => setEtiqueta(v === "__all" ? "" : v)}
-          >
-            <SelectTrigger className="md:w-44">
-              <SelectValue placeholder="Todas las etiquetas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all">Todas las etiquetas</SelectItem>
-              {etiquetasOpts.map((e) => (
-                <SelectItem key={e.nombre} value={e.nombre}>
-                  {e.nombre} {e.total ? `(${e.total})` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Button
             type="button"
             variant={soloIncompletos ? "default" : "outline"}
@@ -458,7 +412,7 @@ function EquiposPage() {
               "Papelera"
             )}
           </Button>
-          {(q || etiqueta || categoria || marca || soloIncompletos || falta) && (
+          {(q || categoria || marca || soloIncompletos || falta) && (
             <Button
               type="button"
               variant="ghost"
@@ -466,7 +420,6 @@ function EquiposPage() {
               onClick={() =>
                 updateFilters({
                   q: "",
-                  etiqueta: "",
                   categoria: "",
                   marca: "",
                   solo_incompletos: false,
@@ -562,8 +515,7 @@ function EquiposPage() {
               ☐ Pendientes
             </Button>
             {/* Set categoría (#231): asigna categoría a los seleccionados.
-              Reemplaza las categorías existentes (backend hace DELETE + INSERT
-              + regenerate_auto_tags). */}
+              Reemplaza las categorías existentes (backend hace DELETE + INSERT). */}
             <Select
               value=""
               onValueChange={(v) => {
@@ -600,7 +552,7 @@ function EquiposPage() {
                 const ok = permanent
                   ? await confirm({
                       title: `¿Eliminar permanentemente ${n} equipo${plural}?`,
-                      description: `Esta acción no se puede deshacer y borra ficha, kit, categorías y etiquetas asociadas.`,
+                      description: `Esta acción no se puede deshacer y borra ficha, kit y categorías asociadas.`,
                       danger: true,
                       confirmLabel: "Eliminar",
                     })
@@ -639,8 +591,6 @@ function EquiposPage() {
             [
               ["todos", "Todos"],
               ["combos", "Combos"],
-              ["destacados", "Destacados"],
-              ["nuevos", "Nuevos"],
               ["sin-foto", "Sin foto"],
             ] as const
           ).map(([id, label]) => (
@@ -684,22 +634,18 @@ function EquiposPage() {
                 >
                   % día
                 </TableHead>
-                <TableHead className="hidden md:table-cell">Etiquetas</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 && !equiposQ.isLoading && (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                     Sin equipos.{" "}
-                    {(q || etiqueta) && (
+                    {q && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setQ("");
-                          setEtiqueta("");
-                        }}
+                        onClick={() => setQ("")}
                         className="underline hover:text-ink"
                       >
                         Limpiar filtros
@@ -740,16 +686,6 @@ function EquiposPage() {
                     )}
                     <div className="flex items-center gap-1.5 font-medium text-ink leading-tight">
                       <span>{eq.nombre}</span>
-                      {esNuevo(eq) && (
-                        <span className="text-2xs font-bold uppercase tracking-wide bg-ink text-amber px-1.5 py-0.5 rounded shrink-0">
-                          Nuevo
-                        </span>
-                      )}
-                      {esDestacado(eq) && (
-                        <span className="text-ink shrink-0" title="Destacado">
-                          ★
-                        </span>
-                      )}
                       {!eq.ficha_completa && (
                         <span
                           className="inline-flex shrink-0"
@@ -806,20 +742,6 @@ function EquiposPage() {
                       equipo={eq}
                       onSaved={() => qc.invalidateQueries({ queryKey: ["admin", "equipos"] })}
                     />
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="flex flex-wrap gap-1 max-w-[180px]">
-                      {(eq.etiquetas ?? []).slice(0, 2).map((t) => (
-                        <Pill key={t} className="hairline bg-surface text-ink whitespace-nowrap">
-                          {t}
-                        </Pill>
-                      ))}
-                      {(eq.etiquetas ?? []).length > 2 && (
-                        <span className="text-2xs text-muted-foreground">
-                          +{(eq.etiquetas ?? []).length - 2}
-                        </span>
-                      )}
-                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     {/* Mobile: un botón → ActionMenu */}

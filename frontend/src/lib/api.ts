@@ -98,7 +98,6 @@ export type BackendEquipo = {
   estado: string;
   visible_catalogo: number;
   relevancia_manual?: number;
-  etiquetas: string[];
   kit: Array<{
     componente_id: number;
     nombre: string;
@@ -176,24 +175,6 @@ export function apiGetDiasBloqueados(items: string, desde: string, hasta: string
     desde,
     hasta,
   });
-}
-
-export type DescuentoJornada = { id: number; jornadas: number; pct: number };
-
-export function interpolarDescuento(puntos: DescuentoJornada[], jornadas: number): number {
-  if (!puntos.length) return 0;
-  const sorted = [...puntos].sort((a, b) => a.jornadas - b.jornadas);
-  if (jornadas <= sorted[0].jornadas) return sorted[0].pct;
-  if (jornadas >= sorted[sorted.length - 1].jornadas) return sorted[sorted.length - 1].pct;
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const { jornadas: j0, pct: p0 } = sorted[i];
-    const { jornadas: j1, pct: p1 } = sorted[i + 1];
-    if (jornadas >= j0 && jornadas <= j1) {
-      const t = (jornadas - j0) / (j1 - j0);
-      return Math.round((p0 + t * (p1 - p0)) * 10) / 10;
-    }
-  }
-  return 0;
 }
 
 export function apiGetMarcs() {

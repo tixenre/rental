@@ -124,7 +124,7 @@ Receta (lee el secreto del entorno — falla ruidoso si no está, en vez de mand
 un placeholder):
 
 ```bash
-B=https://rambla-rental-dev.up.railway.app
+B=https://dev-rambla.up.railway.app
 : "${STAGING_LOGIN_SECRET:?seteá STAGING_LOGIN_SECRET en el entorno (no en el repo)}"
 # 1) login admin → guarda la cookie firmada
 curl -s -c jar.txt -H 'Content-Type: application/json' \
