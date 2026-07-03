@@ -517,6 +517,21 @@ def _pedido_email_context(pedido: dict) -> dict:
         sub = it.get("subtotal")
         sub_html = escape(_fmt_ars(sub)) if sub is not None else None
         filas += _eb.item_row(nombre, cant, sub_html)
+
+    # Fila de descuento (mismo criterio bruto→descuento→neto que el
+    # Presupuesto, `pdf_templates._pedido_html`): las líneas de arriba
+    # muestran el bruto por ítem y el "Total" del mail es el NETO (con
+    # descuento por jornadas ya aplicado, el caso común en cualquier
+    # alquiler de varios días) — sin esta fila el cliente veía un ítem en
+    # $X y un total menor sin ninguna aclaración de por qué.
+    descuento = int(pedido.get("descuento_monto") or 0)
+    if descuento > 0:
+        desc_pct = float(pedido.get("descuento_pct") or 0)
+        label = "Descuento" + (f" ({desc_pct:g}%)" if desc_pct else "")
+        filas += _eb.discount_row(
+            escape(label), escape(f"− {_fmt_ars(descuento)}")
+        )
+
     items_html = _eb.items_table(filas)
 
     # Jornadas: si el pedido ya viene enriquecido (`_enriquecer_pedido_con_total`)
