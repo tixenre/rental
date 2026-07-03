@@ -206,8 +206,10 @@ def test_get_persona_bloqueada_por_regla_de_negocio_levanta_con_motivo():
     (ej. RG 3990-E, sin adhesión a Domicilio Fiscal Electrónico) — la
     respuesta viene SIN datosGenerales pero CON errorConstancia poblado
     (manual "WS_SR_constancia_inscripcion" §5.3). Antes esto se leía igual
-    que "el CUIT no existe"; ahora levanta con el motivo real de AFIP."""
+    que "el CUIT no existe"; ahora levanta ArcaBusinessError con el motivo
+    real de AFIP y sus mensajes estructurados en `.errores`."""
     from arca_fe.padron import PadronClient
+    from arca_fe.errores import ArcaBusinessError
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
     persona = MagicMock(
@@ -232,8 +234,12 @@ def test_get_persona_bloqueada_por_regla_de_negocio_levanta_con_motivo():
         mock_service.getPersona.return_value = resp
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(RuntimeError, match="domicilio fiscal electrónico"):
+        with pytest.raises(
+            ArcaBusinessError, match="domicilio fiscal electrónico"
+        ) as ei:
             client.get_persona("23373891029")
+
+    assert ei.value.errores == ((None, err.error),)
 
 
 def test_get_persona_sin_datosgenerales_ni_error_sigue_devolviendo_none():
@@ -270,10 +276,11 @@ def test_get_persona_fault_levanta_con_el_texto_de_afip():
     "no se encuentran datos"/"sin resultados", tratándolos como silencio
     limpio (None) — eso escondía motivos reales indistinguibles entre sí (un
     CUIT real bloqueado por WSAA/relación/cert se leía IGUAL que un CUIT
-    inexistente). Ahora CUALQUIER Fault levanta RuntimeError con el texto de
-    AFIP tal cual, sin heurística de por medio."""
+    inexistente). Ahora CUALQUIER Fault levanta ArcaResponseError con el texto
+    de AFIP tal cual (en el mensaje y en `.raw`), sin heurística de por medio."""
     import zeep.exceptions
     from arca_fe.padron import PadronClient
+    from arca_fe.errores import ArcaResponseError
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
 
@@ -284,13 +291,16 @@ def test_get_persona_fault_levanta_con_el_texto_de_afip():
         )
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(RuntimeError, match="No se encuentran datos"):
+        with pytest.raises(ArcaResponseError, match="No se encuentran datos") as ei:
             client.get_persona("20999999999")
+
+    assert "No se encuentran datos" in ei.value.raw
 
 
 def test_get_persona_fault_desconocido_tambien_levanta_con_su_texto():
     import zeep.exceptions
     from arca_fe.padron import PadronClient
+    from arca_fe.errores import ArcaResponseError
 
     client = PadronClient("awshomo.afip.gov.ar", 20123456789, "tok", "sig")
 
@@ -301,7 +311,7 @@ def test_get_persona_fault_desconocido_tambien_levanta_con_su_texto():
         )
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(RuntimeError, match="coe.alreadyAuthenticated"):
+        with pytest.raises(ArcaResponseError, match="coe.alreadyAuthenticated"):
             client.get_persona("20999999999")
 
 

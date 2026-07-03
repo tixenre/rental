@@ -3,6 +3,7 @@
 Genera un certificado auto-firmado on-the-fly para poder probar firmar_tra()
 sin necesitar el cert de ARCA (que es secreto y está en ENV).
 """
+
 from __future__ import annotations
 
 import base64
@@ -87,7 +88,9 @@ def test_tra_tiempos_razonables():
     assert exp_time.utcoffset() == timedelta(hours=-3)
     # genTime = 10 min antes de `ahora`; expTime = ahora + TTL configurado
     assert gen_time.astimezone(timezone.utc) == ahora - timedelta(minutes=10)
-    assert exp_time.astimezone(timezone.utc) == ahora + timedelta(seconds=_TRA_TTL_SECONDS)
+    assert exp_time.astimezone(timezone.utc) == ahora + timedelta(
+        seconds=_TRA_TTL_SECONDS
+    )
 
 
 def test_tra_unique_id_en_rango():
@@ -186,12 +189,15 @@ def test_parsear_respuesta_wsaa_ok():
 
 def test_parsear_respuesta_wsaa_sin_token_lanza():
     from arca_fe.wsaa import _parsear_login_response
+    from arca_fe.errores import ArcaResponseError
 
     bad_xml = """<loginTicketResponse version="1.0">
   <credentials><sign>OK</sign></credentials>
 </loginTicketResponse>"""
-    with pytest.raises(ValueError, match="token/sign"):
+    with pytest.raises(ArcaResponseError, match="token/sign") as ei:
         _parsear_login_response(bad_xml)
+    # el XML crudo queda en .raw para diagnóstico
+    assert "loginTicketResponse" in ei.value.raw
 
 
 def test_wsaa_url_normaliza_endpoint():

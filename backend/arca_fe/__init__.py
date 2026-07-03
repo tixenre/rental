@@ -36,6 +36,13 @@ from .qr import armar_qr
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert
 from .wsfe import WsfeClient
 from .padron import PadronClient, PersonaArca
+from .errores import (
+    ArcaError,
+    ArcaAuthError,
+    ArcaNetworkError,
+    ArcaResponseError,
+    ArcaBusinessError,
+)
 
 __all__ = [
     "__version__",
@@ -69,4 +76,10 @@ __all__ = [
     # cliente de padrón (Constancia de Inscripción, ws_sr_constancia_inscripcion)
     "PadronClient",
     "PersonaArca",
+    # taxonomía de errores (todo lo que el motor levanta hereda de ArcaError)
+    "ArcaError",
+    "ArcaAuthError",
+    "ArcaNetworkError",
+    "ArcaResponseError",
+    "ArcaBusinessError",
 ]
