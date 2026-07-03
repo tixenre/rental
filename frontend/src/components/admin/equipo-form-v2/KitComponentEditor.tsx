@@ -30,84 +30,13 @@ import { Input } from "@/design-system/ui/input";
 import { Label } from "@/design-system/ui/label";
 import { Button } from "@/design-system/ui/button";
 import { Badge } from "@/design-system/ui/badge";
+import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 
 import { adminApi, type Equipo, type KitComponente } from "@/lib/admin/api";
 
 type Mode = "kit" | "combo";
 
 type UpdatePatch = { cantidad?: number; descuento_pct?: number | null; esencial?: boolean };
-
-/**
- * Input numérico con borrador local — no dispara `onCommit` en cada tecla.
- *
- * Los campos de cantidad/descuento estaban atados directo al valor
- * autoritativo (`items[]`, dueño del padre) y disparaban un PUT+reload
- * completo por CADA tecla, que ponía el input en `disabled` mientras
- * esperaba la respuesta. Efecto: apenas tipeabas, el campo se bloqueaba a
- * mitad de edición y —peor— el próximo render lo pisaba con el valor
- * confirmado por el server, así que nunca se podía dejar vacío para
- * escribir de cero (arrancando en "0", tipear "5" daba "05": el "0" nunca
- * llegaba a borrarse antes de que el valor volviera a pisarlo). Ahora se
- * edita LIBRE en un string local; solo confirma (y recién ahí dispara la
- * llamada) al salir del campo o con Enter. Si el valor no cambió, no pega
- * a la red. `value`/`focused` en deps: re-sincroniza desde afuera (otro
- * componente cambió el mismo ítem) pero SOLO cuando el campo no está en
- * foco — no pisa una edición en curso.
- */
-function DraftNumberInput({
-  value,
-  onCommit,
-  min,
-  max,
-  className,
-  disabled,
-  ariaLabel,
-}: {
-  value: number;
-  onCommit: (v: number) => void;
-  min: number;
-  max?: number;
-  className?: string;
-  disabled?: boolean;
-  ariaLabel?: string;
-}) {
-  const [draft, setDraft] = useState(String(value));
-  const [focused, setFocused] = useState(false);
-
-  useEffect(() => {
-    if (!focused) setDraft(String(value));
-  }, [value, focused]);
-
-  const commit = () => {
-    const parsed = parseFloat(draft.replace(",", "."));
-    const clamped = Number.isFinite(parsed)
-      ? Math.max(min, max != null ? Math.min(max, parsed) : parsed)
-      : value;
-    setDraft(String(clamped));
-    if (clamped !== value) onCommit(clamped);
-  };
-
-  return (
-    <Input
-      type="number"
-      min={min}
-      max={max}
-      value={draft}
-      className={className}
-      disabled={disabled}
-      aria-label={ariaLabel}
-      onFocus={() => setFocused(true)}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        setFocused(false);
-        commit();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-    />
-  );
-}
 
 const MODE_CONFIG = {
   kit: {

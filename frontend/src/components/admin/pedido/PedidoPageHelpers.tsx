@@ -7,6 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/design-system/ui/button";
 import { IconButton } from "@/design-system/ui/icon-button";
 import { Input } from "@/design-system/ui/input";
+import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 import { QtyInput } from "@/design-system/ui/qty-input";
 import { cn } from "@/lib/utils";
 import { adminApi } from "@/lib/admin/api";
@@ -174,12 +175,11 @@ export function ItemRow({
 
         {/* Precio editable por jornada */}
         <div className="flex items-center gap-1">
-          <Input
-            type="number"
+          <DraftNumberInput
             min={0}
             value={it.precio_jornada}
-            aria-label="Precio por jornada"
-            onChange={(e) => updateItem(it.uid, { precio_jornada: parseInt(e.target.value) || 0 })}
+            ariaLabel="Precio por jornada"
+            onCommit={(v) => updateItem(it.uid, { precio_jornada: v })}
             className="h-9 w-24 text-sm"
           />
           {esLibre ? (

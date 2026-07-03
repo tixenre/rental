@@ -10,6 +10,7 @@ import { Spinner } from "@/design-system/ui/spinner";
 import { toast } from "sonner";
 
 import { Input } from "@/design-system/ui/input";
+import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 import { Button } from "@/design-system/ui/button";
 import { Label } from "@/design-system/ui/label";
 import { uploadFileToBucket } from "@/lib/equipment/photos";
@@ -174,13 +175,12 @@ function ContenidoItemRow({
       />
 
       {/* Cantidad */}
-      <Input
-        type="number"
+      <DraftNumberInput
         min={1}
         value={item.cantidad}
-        onChange={(e) => onChangeCantidad(Math.max(1, parseInt(e.target.value || "1", 10)))}
+        onCommit={onChangeCantidad}
         className="w-16 h-8 text-center text-sm"
-        aria-label="Cantidad"
+        ariaLabel="Cantidad"
       />
 
       <Button

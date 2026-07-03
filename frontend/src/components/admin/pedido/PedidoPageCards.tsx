@@ -21,6 +21,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { DraftNumberInput } from "@/design-system/ui/draft-number-input";
 import { Label } from "@/design-system/ui/label";
 import { Badge } from "@/design-system/ui/badge";
 import { Pill } from "@/design-system/ui/Pill";
@@ -163,13 +164,11 @@ export function ItemsCard({
                   >
                     <Minus className="h-3 w-3" />
                   </Button>
-                  <Input
-                    type="number"
+                  <DraftNumberInput
                     min={1}
                     value={it.cantidad}
-                    onChange={(e) =>
-                      updateItem(it.uid, { cantidad: parseInt(e.target.value) || 1 })
-                    }
+                    onCommit={(v) => updateItem(it.uid, { cantidad: v })}
+                    ariaLabel="Cantidad"
                     className={cn(
                       "h-9 w-10 text-center text-sm p-0 sm:h-7",
                       overstock && "border-destructive text-destructive",
@@ -190,13 +189,11 @@ export function ItemsCard({
                       {fmtArs(it.precio_jornada)}
                     </div>
                   ) : (
-                    <Input
-                      type="number"
+                    <DraftNumberInput
                       min={0}
                       value={it.precio_jornada}
-                      onChange={(e) =>
-                        updateItem(it.uid, { precio_jornada: parseInt(e.target.value) || 0 })
-                      }
+                      onCommit={(v) => updateItem(it.uid, { precio_jornada: v })}
+                      ariaLabel="Precio por jornada"
                       className="h-9 w-24 text-sm text-base sm:text-sm sm:h-7"
                     />
                   )}
@@ -296,18 +293,13 @@ export function TotalesCard({
         ) : (
           <div className="flex items-center justify-between gap-3">
             <span className="text-muted-foreground">Descuento %</span>
-            <Input
-              type="number"
+            <DraftNumberInput
               min={0}
               max={100}
               step="0.5"
               value={descuentoPct}
-              onChange={(e) => {
-                // Clamp 0–100: el atributo max no impide tipear >100, y el
-                // backend rechaza >100 con 422. Clampeamos en la UI.
-                const v = parseFloat(e.target.value) || 0;
-                setDescuentoPct(Math.min(100, Math.max(0, v)));
-              }}
+              onCommit={setDescuentoPct}
+              ariaLabel="Descuento %"
               className="h-7 w-20 text-right text-sm"
             />
           </div>
