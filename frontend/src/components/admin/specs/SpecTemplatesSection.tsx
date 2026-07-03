@@ -135,7 +135,7 @@ export function SpecTemplatesSection({
     queryKey: ["admin", "spec-templates-orphans", catId],
     queryFn: () => adminApi.listOrphanSpecs(catId!),
     enabled: catId != null,
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   const deleteMut = useMutation({

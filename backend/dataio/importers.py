@@ -660,17 +660,22 @@ def import_alquileres(
                 (alq_id, equipo_id, it.cantidad, it.precio_jornada, it.subtotal),
             )
 
-        # Pagos: replace. Idem.
+        # Pagos: replace. Idem. `anulado`+auditoría viajan tal cual (#1184/
+        # #1209) — un pago anulado (soft-delete) NO debe reinsertarse activo
+        # con el default de la columna.
         conn.execute(
             "DELETE FROM alquiler_pagos WHERE pedido_id = %s", (alq_id,)
         )
         for p in a.pagos:
             conn.execute(
                 """
-                INSERT INTO alquiler_pagos (pedido_id, monto, concepto, fecha)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO alquiler_pagos
+                    (pedido_id, monto, concepto, fecha,
+                     anulado, anulado_por, anulado_at, anulado_motivo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (alq_id, p.monto, p.concepto, p.fecha),
+                (alq_id, p.monto, p.concepto, p.fecha,
+                 p.anulado, p.anulado_por, p.anulado_at, p.anulado_motivo),
             )
 
     resolver.refresh_alquileres()

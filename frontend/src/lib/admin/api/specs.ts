@@ -2,6 +2,7 @@ import { authedFetch, authedJson, authedPostJson } from "@/lib/authedFetch";
 import type {
   CompatibleEquipo,
   CompatibleOverall,
+  NoReconocidoGrupo,
   OrphanSpec,
   SpecDefinition,
   SpecDefinitionInput,
@@ -153,6 +154,16 @@ export const specsMethods = {
         body: JSON.stringify({ specs }),
       },
     ),
+  /** Re-corre la extracción sobre el HTML YA guardado del equipo, sin
+   *  resubir el archivo (#1203) — mismo shape que subir el HTML de nuevo.
+   *  404 si el equipo no tiene HTML fuente guardado. */
+  reExtractSpecs: (id: number) =>
+    authedJson<{
+      html_source_url: string;
+      specs?: { label: string; value: string; spec_key?: string }[];
+      unmatched?: { label: string; value: string }[];
+      categoria_sugerida?: string | null;
+    }>(`/api/admin/equipos/${id}/re-extract-specs`, { method: "POST" }),
 
   // ── Observatorio de specs (relevamiento de scrapes reales) ─────────
   recomputeObservatorio: () =>
@@ -290,6 +301,20 @@ export const specsMethods = {
     const res = await authedFetch(`/api/admin/spec-templates/${templateId}`, { method: "DELETE" });
     if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
   },
+
+  // ── Panel de specs no reconocidas (#1203) ───────────────────────────
+  /** Specs sin match agrupadas por (categoría, label) — qué equipos las
+   *  encontraron, valores de ejemplo. Une el productor CLI offline
+   *  (agregado, equipos=[]) con el upload en vivo (uno por equipo). */
+  listarNoReconocidos: () =>
+    authedJson<{ items: NoReconocidoGrupo[] }>("/api/admin/specs/no-reconocidos"),
+  /** Cierra en bloque las propuestas subyacentes de un grupo (bookkeeping —
+   *  el spec/alias real se agrega al registry a mano y se re-siembra). */
+  resolverNoReconocidos: (propuestaIds: number[], accion: "aplicado" | "descartado") =>
+    authedPostJson<{ resueltas: number }>("/api/admin/specs/no-reconocidos/resolver", {
+      propuesta_ids: propuestaIds,
+      accion,
+    }),
 
   // ── Compatibilidades ───────────────────────────────────────────────
   listarCompatibilidades: (id: number) =>

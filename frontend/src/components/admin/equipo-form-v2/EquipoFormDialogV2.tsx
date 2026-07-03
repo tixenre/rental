@@ -122,8 +122,8 @@ export function EquipoFormDialogV2({
   const isEdit = !!initial;
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const { rate: usdRate } = useUsdRate();
-  const roiDefault = useRoiPctDefault();
+  const { rate: usdRate } = useUsdRate({ staleTime: 0 });
+  const roiDefault = useRoiPctDefault({ staleTime: 0 });
 
   // "Aplicar" (guardar sin cerrar) vs "Guardar" (cerrar al terminar). El
   // botón Aplicar setea este ref a false antes de disparar el submit; en el
@@ -193,10 +193,25 @@ export function EquipoFormDialogV2({
       setNombrePublico(override);
       setNombrePublicoAuto(false);
     } else {
-      setNombrePublico("");
+      // Sin override explícito: sembramos con el nombre EFECTIVO ya calculado
+      // (equipos.nombre_publico) en vez de dejar el campo vacío. Sin esto, un
+      // equipo cuyo nombre viene del ficha-template legado (texto YA
+      // renderizado, sin placeholders — una foto vieja, no un molde vivo)
+      // mostraba el campo en blanco mientras ese texto congelado seguía
+      // siendo lo que ve el catálogo público: el admin no tenía forma de
+      // verlo ni de saber que estaba ahí (bug real, encontrado en vivo —
+      // equipo con specs editadas cuyo nombre nunca reaccionaba).
+      // Si hay molde de categoría real, el efecto de auto-gen de abajo pisa
+      // esto enseguida con el valor recién calculado (sin flicker: corre
+      // antes de que el usuario interactúe). Si NO hay molde, este valor se
+      // queda — y el próximo Guardar lo persiste como override real
+      // (mismo criterio que "tipear apaga el auto-gen"), autocurando el
+      // dato congelado equipo por equipo con el uso normal, sin necesitar
+      // una migración aparte.
+      setNombrePublico(initial?.nombre_publico?.trim() || "");
       setNombrePublicoAuto(true);
     }
-  }, [initial?.id, initial?.nombre_publico_override]);
+  }, [initial?.id, initial?.nombre_publico_override, initial?.nombre_publico]);
 
   // Specs traídos del HTML upload: se guardan en una lista separada para
   // que el usuario los apruebe uno por uno (vs los specs actuales).
@@ -204,6 +219,7 @@ export function EquipoFormDialogV2({
 
   // ── HTML source ────────────────────────────────────────────────────
   const [uploadingHtml, setUploadingHtml] = useState(false);
+  const [reExtracting, setReExtracting] = useState(false);
   const [htmlSourceUrl, setHtmlSourceUrl] = useState(initial?.html_source_url ?? null);
   useEffect(() => {
     setHtmlSourceUrl(initial?.html_source_url ?? null);
@@ -239,18 +255,38 @@ export function EquipoFormDialogV2({
   }, [watchedTipo, form]);
 
   // ── Manual override del precio/día ─────────────────────────────────
+  // `precioJornadaManual` arrancaba SIEMPRE en `false`, sin sembrarse del
+  // flag real `initial.precio_jornada_manual` — abrir un equipo que YA
+  // tenía el precio fijado a mano disparaba igual el auto-cálculo de acá
+  // abajo apenas `usdRate`/`roi_pct` estaban disponibles (que es casi
+  // inmediato), pisando en silencio el precio manual con el de fórmula.
+  // Confirmado en vivo: el label decía "(auto)" para un equipo marcado
+  // manual en la base.
   const [precioJornadaManual, setPrecioUnidadManual] = useState(false);
+  useEffect(() => {
+    setPrecioUnidadManual(initial?.precio_jornada_manual ?? false);
+  }, [initial?.id, initial?.precio_jornada_manual]);
   const watchedUsd = form.watch("precio_usd");
   const watchedRoi = form.watch("roi_pct");
   useEffect(() => {
     if (precioJornadaManual) return;
+    // Chequeo directo a `initial.precio_jornada_manual` (no solo al estado
+    // derivado `precioJornadaManual`): cuando `initial` llega async, el
+    // efecto que lo siembra y este pueden correr en el MISMO commit — un
+    // `setPrecioUnidadManual(true)` recién encolado en el otro efecto no se
+    // refleja todavía en la clausura de ESTE efecto en el mismo pase (React
+    // no re-lee estado recién encolado entre efectos del mismo commit).
+    // Sin este chequeo, un equipo con precio manual en la base igual se
+    // pisaba apenas abría el form — confirmado en vivo (mismo patrón de
+    // carrera que el override de nombre público, más arriba).
+    if (initial?.precio_jornada_manual) return;
     const calc = calcularPrecioJornada(
       watchedUsd ? Number(watchedUsd) : null,
       usdRate,
       watchedRoi ? Number(watchedRoi) : null,
     );
     if (calc !== null) form.setValue("precio_jornada", calc, { shouldDirty: true });
-  }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form]);
+  }, [watchedUsd, watchedRoi, usdRate, precioJornadaManual, form, initial?.precio_jornada_manual]);
 
   // ── Cargar ficha cuando estamos editando ──────────────────────────
   // Ficha legacy = solo descripción, notas, nombre público template y
@@ -316,7 +352,7 @@ export function EquipoFormDialogV2({
     enabled: !!initial?.id && open,
   });
   useEffect(() => {
-    if (!initial) {
+    if (!initial?.id) {
       setSpecs([]);
       return;
     }
@@ -324,17 +360,37 @@ export function EquipoFormDialogV2({
     if (!data) return;
     // Mapear { spec_def_id → value } a Spec[]. El id de cada Spec es
     // `spec-${spec_def_id}` para poder mapear de vuelta al guardar
-    // (putEquipoSpecs). El label se resuelve contra el template EN VIVO de la
-    // categoría seleccionada en el efecto de re-etiquetado de abajo; acá
-    // arrancamos con un fallback hasta que el template cargue.
+    // (putEquipoSpecs). El label sale de `data.template` — el MISMO response
+    // ya trae el template resuelto (WITH RECURSIVE por categorías del
+    // equipo), así que no hace falta esperar a la query/efecto de
+    // re-etiquetado de abajo (ese sigue existiendo para cuando el admin
+    // cambia la categoría de specs EN VIVO dentro del form — acá cubrimos
+    // el arranque). Antes sembraba con un fallback numérico ("spec 45")
+    // hasta que el re-etiquetado corría; en esa ventana cualquier
+    // consumidor que matchea specs por label (el preview de nombre público
+    // auto-generado, ej.) no encontraba el spec y el placeholder quedaba
+    // vacío — confirmado en vivo.
+    const labelById = new Map(data.template.map((t) => [t.spec_def_id, t.label]));
     const next: Spec[] = [];
     for (const [defIdStr, value] of Object.entries(data.specs)) {
       const v = value == null ? "" : String(value);
       if (!v.trim()) continue;
-      next.push({ id: `spec-${defIdStr}`, label: `spec ${defIdStr}`, value: v });
+      const label = labelById.get(Number(defIdStr)) ?? `spec ${defIdStr}`;
+      next.push({ id: `spec-${defIdStr}`, label, value: v });
     }
     setSpecs(next);
-  }, [equipoSpecsQ.data, initial]);
+    // `initial?.id` (no `initial` entero) a propósito: Aplicar/Guardar
+    // invalida `["admin","equipo",id]` (route padre), que refetchea el
+    // equipo y le da a `initial` una referencia NUEVA — con `initial`
+    // completo en deps este efecto volvía a correr sobre el MISMO
+    // `equipoSpecsQ.data` (nadie invalida `["admin","equipo-specs",id]`
+    // en el save) y pisaba specs recién guardadas con la foto vieja
+    // pre-edición: tipear algo en Ficha técnica + Aplicar/Guardar
+    // revertía el campo a lo que tenía antes de tipear, aunque el POST
+    // ya había persistido el valor nuevo (confirmado en vivo + DB). Solo
+    // re-sembrar cuando cambia el EQUIPO (o entre vacío↔con-equipo), no
+    // en cada refetch incidental de otros campos del mismo equipo.
+  }, [equipoSpecsQ.data, initial?.id]);
 
   // ── Categorías ─────────────────────────────────────────────────────
   const catsQ = useQuery({
@@ -641,8 +697,67 @@ export function EquipoFormDialogV2({
   };
 
   // ════════════════════════════════════════════════════════════════════
-  // HTML source — sube el archivo, persiste en R2 y extrae specs
+  // HTML source — sube el archivo, persiste en R2 y extrae specs. También
+  // usado por re-extract (#1203): mismo resultado, sin volver a subir el
+  // archivo — comparten `_aplicarSpecsExtraidos` (aplica al template o
+  // manda a revisión), no hay 2 formas de procesar el mismo resultado.
   // ════════════════════════════════════════════════════════════════════
+  const _aplicarSpecsExtraidos = (
+    specsExtraidos: { label: string; value: string; spec_key?: string }[],
+    tituloSinSpecs: string,
+  ) => {
+    const propuestos: Spec[] = withIds(specsExtraidos ?? []);
+    if (propuestos.length === 0) {
+      toast.success(tituloSinSpecs, { description: "No se extrajeron specs del archivo" });
+      return;
+    }
+    const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+    const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
+    for (const t of templateItems ?? []) {
+      if (t.spec_key) tmplByKey.set(t.spec_key, t);
+      if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
+    }
+    const findTmpl = (p: Spec) =>
+      (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
+      tmplByLabel.get(p.label.trim().toLowerCase());
+
+    const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
+    const requierenRevision = propuestos.filter((p) => !findTmpl(p));
+
+    if (autoAplicables.length > 0) {
+      setSpecs((prev) => {
+        const next = [...prev];
+        for (const p of autoAplicables) {
+          const tmpl = findTmpl(p)!;
+          const targetId = `spec-${tmpl.spec_def_id}`;
+          const idx = next.findIndex(
+            (x) =>
+              x.id === targetId ||
+              x.id === `tmpl-${tmpl.spec_def_id}` ||
+              sameLabel(x.label, tmpl.label),
+          );
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], value: p.value };
+          } else {
+            next.push({
+              id: targetId,
+              label: tmpl.label,
+              value: p.value,
+              spec_key: p.spec_key,
+            });
+          }
+        }
+        return next;
+      });
+    }
+    if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
+
+    const parts: string[] = [];
+    if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
+    if (requierenRevision.length) parts.push(`${requierenRevision.length} pendientes de revisar`);
+    toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
+  };
+
   const handleHtmlUpload = async (file: File) => {
     if (!initial?.id) return;
     setUploadingHtml(true);
@@ -654,62 +769,24 @@ export function EquipoFormDialogV2({
         specs?: { label: string; value: string; spec_key?: string }[];
       }>(`/api/admin/equipos/${initial.id}/upload-html-source`, { method: "POST", body: fd });
       setHtmlSourceUrl(r.html_source_url);
-
-      const propuestos: Spec[] = withIds(r.specs ?? []);
-      if (propuestos.length > 0) {
-        const tmplByKey = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        const tmplByLabel = new Map<string, import("@/lib/admin/api").SpecTemplate>();
-        for (const t of templateItems ?? []) {
-          if (t.spec_key) tmplByKey.set(t.spec_key, t);
-          if (t.label?.trim()) tmplByLabel.set(t.label.trim().toLowerCase(), t);
-        }
-        const findTmpl = (p: Spec) =>
-          (p.spec_key ? tmplByKey.get(p.spec_key) : undefined) ??
-          tmplByLabel.get(p.label.trim().toLowerCase());
-
-        const autoAplicables = propuestos.filter((p) => !!findTmpl(p));
-        const requierenRevision = propuestos.filter((p) => !findTmpl(p));
-
-        if (autoAplicables.length > 0) {
-          setSpecs((prev) => {
-            const next = [...prev];
-            for (const p of autoAplicables) {
-              const tmpl = findTmpl(p)!;
-              const targetId = `spec-${tmpl.spec_def_id}`;
-              const idx = next.findIndex(
-                (x) =>
-                  x.id === targetId ||
-                  x.id === `tmpl-${tmpl.spec_def_id}` ||
-                  sameLabel(x.label, tmpl.label),
-              );
-              if (idx >= 0) {
-                next[idx] = { ...next[idx], value: p.value };
-              } else {
-                next.push({
-                  id: targetId,
-                  label: tmpl.label,
-                  value: p.value,
-                  spec_key: p.spec_key,
-                });
-              }
-            }
-            return next;
-          });
-        }
-        if (requierenRevision.length > 0) setSpecsPropuestos(requierenRevision);
-
-        const parts: string[] = [];
-        if (autoAplicables.length) parts.push(`${autoAplicables.length} aplicados al template`);
-        if (requierenRevision.length)
-          parts.push(`${requierenRevision.length} pendientes de revisar`);
-        toast.success("HTML procesado", { description: parts.join(" · ") || "specs extraídos" });
-      } else {
-        toast.success("HTML guardado", { description: "No se extrajeron specs del archivo" });
-      }
+      _aplicarSpecsExtraidos(r.specs ?? [], "HTML guardado");
     } catch (e) {
       toast.error(`Error al subir HTML: ${e instanceof Error ? e.message : ""}`);
     } finally {
       setUploadingHtml(false);
+    }
+  };
+
+  const handleReExtractSpecs = async () => {
+    if (!initial?.id) return;
+    setReExtracting(true);
+    try {
+      const r = await adminApi.reExtractSpecs(initial.id);
+      _aplicarSpecsExtraidos(r.specs ?? [], "HTML re-procesado");
+    } catch (e) {
+      toast.error(`Error al re-extraer specs: ${e instanceof Error ? e.message : ""}`);
+    } finally {
+      setReExtracting(false);
     }
   };
 
@@ -796,6 +873,12 @@ export function EquipoFormDialogV2({
         foto_url: fotoUrlInicial,
         fecha_compra: rest.fecha_compra || null,
         precio_jornada: rest.precio_jornada ?? null,
+        // Explícito para saltear la heurística de inferencia del backend
+        // (que asume "manual" si llega precio_jornada SIN roi_pct) — este
+        // form manda roi_pct SIEMPRE junto con precio_jornada, así que esa
+        // heurística sola nunca detectaría un precio recién tipeado a mano
+        // acá; el toggle local YA sabe la verdad, se la pasamos directo.
+        precio_jornada_manual: precioJornadaManual,
         precio_usd: rest.precio_usd ?? null,
         roi_pct: rest.roi_pct ?? null,
         valor_reposicion: rest.valor_reposicion ?? null,
@@ -930,6 +1013,17 @@ export function EquipoFormDialogV2({
         return;
       }
 
+      // Invalidar las queries PÚBLICAS (catálogo + ficha de equipo) — el save
+      // arriba ya invalida lo admin (vía saveMut.onSettled del route padre),
+      // pero nombre público/specs/categorías se escriben acá con llamadas
+      // directas que ese onSettled no cubre. Sin esto, el catálogo público
+      // sigue mostrando el dato viejo hasta que su staleTime (30-60s) vence
+      // solo — "tarda en reproducirse" no era timing raro, era que nadie le
+      // avisaba. Prefix-match: no hace falta el slug/rango de fechas exacto.
+      void qc.invalidateQueries({ queryKey: ["equipos"] });
+      void qc.invalidateQueries({ queryKey: ["equipo"] });
+      void qc.invalidateQueries({ queryKey: ["categorias"] });
+
       if (fallidos.length > 0) {
         toast.warning(isEdit ? "Equipo actualizado con avisos" : "Equipo creado con avisos", {
           description: `Falló: ${fallidos.join(" · ")}`,
@@ -1026,7 +1120,19 @@ export function EquipoFormDialogV2({
   // ════════════════════════════════════════════════════════════════════
   // Render
   // ════════════════════════════════════════════════════════════════════
-  const fotoActual = pendingFilePreview || form.watch("foto_url");
+  // `form.watch("foto_url")` es el valor SEMBRADO UNA VEZ al montar
+  // (react-hook-form `defaultValues`, no reactivo). En EDIT mode, subir una
+  // foto nueva o cambiar cuál es la principal en la galería actualiza
+  // `gallery.fotos` (React Query, correctamente sincronizado con el backend)
+  // pero nunca toca ese valor sembrado — la miniatura de la galería se veía
+  // bien, pero el preview grande del costado seguía mostrando la foto vieja
+  // hasta cerrar y reabrir el form. La galería es la fuente viva; `foto_url`
+  // del form queda de fallback para CREATE mode (ahí `gallery.fotos` está
+  // siempre vacío — la query es `enabled: !!initial?.id`, y en create no hay
+  // id todavía) y para el raro caso de un equipo en EDIT sin fotos en la
+  // galería.
+  const fotoGaleriaActual = gallery.fotos.find((f) => f.es_principal)?.url;
+  const fotoActual = pendingFilePreview || fotoGaleriaActual || form.watch("foto_url");
 
   // ── Confirmación al cerrar con cambios sin guardar (#232) ──────────
   // Detectamos cambios desde 4 fuentes: form fields (react-hook-form),
@@ -1136,9 +1242,27 @@ export function EquipoFormDialogV2({
                 )}
               </Button>
               {htmlSourceUrl && (
-                <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
-                  <FileCode className="h-3 w-3" /> HTML guardado
-                </span>
+                <>
+                  <span className="flex items-center gap-1 text-xs text-verde-ink font-medium">
+                    <FileCode className="h-3 w-3" /> HTML guardado
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleReExtractSpecs()}
+                    disabled={reExtracting || uploadingHtml}
+                    title="Re-corre la extracción sobre el HTML ya guardado, sin resubirlo — útil después de agregar un spec nuevo al registry"
+                  >
+                    {reExtracting ? (
+                      <>
+                        <Spinner size="xs" className="mr-1" /> Buscando…
+                      </>
+                    ) : (
+                      "Buscar valores actualizados"
+                    )}
+                  </Button>
+                </>
               )}
             </>
           )}
@@ -1262,7 +1386,13 @@ export function EquipoFormDialogV2({
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {photoCands.map((u) => {
                 const isPicking = pickingPhotoUrl === u;
-                const isSelected = form.watch("foto_url") === u;
+                // `fotoActual` (no `form.watch("foto_url")` crudo): en EDIT
+                // mode, elegir un candidato sube directo a la galería sin
+                // tocar el campo del form (mismo bug ya arreglado en el
+                // preview grande del costado) — comparar contra el mismo
+                // valor derivado mantiene el aro de "seleccionada" correcto
+                // en los dos modos.
+                const isSelected = fotoActual === u;
                 return (
                   <button
                     key={u}

@@ -15,6 +15,8 @@ from __future__ import annotations
 from services.specs import encolar_propuesta, listar_propuestas_pendientes
 from services.specs_ingesta.queries.resolver import normalize_label
 
+_ORIGEN_LIVE = "specs_ingesta.live"
+
 
 def proponer_desde_unmatched(
     conn,
@@ -73,6 +75,62 @@ def proponer_desde_unmatched(
             },
             origen=origen,
             confianza=min(1.0, entry["count"] / 10),
+        )
+        ids.append(propuesta_id)
+    return ids
+
+
+def proponer_desde_equipo(
+    conn,
+    equipo_id: int,
+    categoria: str | None,
+    unmatched: list[dict],
+    *,
+    origen: str = _ORIGEN_LIVE,
+) -> list[int]:
+    """Segundo productor de Canal C (#1203): el upload en vivo de UN equipo,
+    SIN umbral — a diferencia de `proponer_desde_unmatched` (agregado, ≥3
+    HTMLs de un batch offline), acá cada par sin match de ESTE equipo se
+    encola directo, atribuido a `equipo_id`. Con pocos equipos el umbral de
+    3 casi nunca dispara; el panel admin agrupa por label al mostrar (ver
+    `services.specs.listar_no_reconocidos_agrupados`), así que no hace falta
+    esperar repetición para no perder señal.
+
+    Dedup: si ESTE equipo ya tiene una propuesta pendiente para el mismo
+    label normalizado, no duplica (re-subir el mismo HTML dos veces no
+    infla la cola). Sin `categoria` (detección falló) no propone nada —
+    no hay dónde clasificar la propuesta.
+
+    Devuelve los ids de las propuestas nuevas encoladas."""
+    if not categoria or not unmatched:
+        return []
+
+    ya_pendientes = {
+        p["payload"].get("label_normalizado")
+        for p in listar_propuestas_pendientes(conn)
+        if p["tipo"] == "spec_nueva" and p.get("equipo_id") == equipo_id
+    }
+
+    vistos: set[str] = set()
+    ids: list[int] = []
+    for pair in unmatched:
+        key = normalize_label(pair["label"])
+        if key in vistos or key in ya_pendientes:
+            continue
+        vistos.add(key)
+        propuesta_id = encolar_propuesta(
+            conn,
+            tipo="spec_nueva",
+            payload={
+                "categoria": categoria,
+                "label": pair["label"],
+                "label_normalizado": key,
+                "count": 1,
+                "ejemplos": [pair["value"]],
+            },
+            origen=origen,
+            confianza=None,
+            equipo_id=equipo_id,
         )
         ids.append(propuesta_id)
     return ids

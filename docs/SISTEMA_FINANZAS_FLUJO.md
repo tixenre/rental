@@ -141,13 +141,25 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
    `precio_jornada × cantidad × jornadas` desde cero, sin `cobro_modo`. Ahora `_pedido_html`/
    `_sum_bruto` usan el helper `_bruto_item_pdf` (mismo criterio que `bruto_linea`). Candado:
    `test_pdf_helpers.py::TestBrutoItemPdf` + el source-scan de arriba.
-3. **`routes/facturacion.py` (`enviar_mail_factura`)** — consulta `c.owner_email`, columna que **no
-   existe** en `clientes` (vive en otra tabla). Rompe con `UndefinedColumn` cada vez que un admin usa
-   "enviar factura por mail". Sin test que lo cubra. Fix trivial: `c.owner_email` → `c.email`.
-4. **`reportes/liquidacion.py::filas_atribucion`** — si `suma_items = 0` pero `monto_total > 0` (ítems
-   con subtotal 0, ej. 100% descuento a nivel ítem), el prorrateo da `NULL` → se trata como 0 → la
-   plata de ese pedido **desaparece en silencio** del reporte de liquidación, sin que ningún chequeo
-   de reconciliación lo detecte. Edge case raro, pero real.
+3. ~~**`routes/facturacion.py` (`enviar_mail_factura`)**~~ — **RESUELTO (Fase 4).** Consultaba
+   `c.owner_email`, columna que no existe en `clientes` (vive en otra tabla) — rompía con
+   `UndefinedColumn` cada vez que un admin usaba "enviar factura por mail". Fix: `c.owner_email` →
+   `c.email`. **Segundo bug encontrado detrás del primero**: `Attachment(..., content_type=...)` — el
+   kwarg real del dataclass es `mimetype` (confirmado contra los otros 3 usos de `Attachment` en el
+   repo) — nunca se había ejecutado esa línea porque el query de email crasheaba antes. Sin el primer
+   fix, el segundo bug seguía dejando la función completamente rota. Candado:
+   `test_facturacion_routes.py::test_enviar_mail_factura_no_rompe_con_undefined_column` +
+   `test_enviar_mail_factura_400_si_sin_email`.
+4. ~~**`reportes/liquidacion.py::filas_atribucion`**~~ — **RESUELTO (Fase 5, #1184).** Si
+   `suma_items = 0` pero `monto_total > 0` (ítems con subtotal 0, ej. 100% descuento a nivel ítem), el
+   prorrateo daba `NULL` (vía `NULLIF`) → se trataba como 0 → la plata de ese pedido **desaparecía en
+   silencio** del reporte de liquidación, sin que ningún chequeo de reconciliación lo detectara. Fix:
+   `CASE WHEN t.suma_items = 0 THEN al.monto_total / t.cant_items ELSE ... END` — reparte el
+   `monto_total` en **partes iguales** entre los ítems del pedido (no hay base real de prorrateo
+   cuando todos los subtotales son 0; repartir parejo es el fallback más neutral, no arbitrario hacia
+   un dueño). Candado: `test_reportes_liquidacion_db.py::test_suma_items_cero_no_pierde_plata`
+   (Postgres real, un pedido con 2 ítems subtotal 0 confirma que el total del reporte sigue incluyendo
+   su `monto_total` completo).
 5. **Front — reimplementaba el cálculo de línea en vez de leer lo que ya calculó el backend** (viola
    "el front no calcula plata", 2026-06-29):
    - ~~`PedidoPageCards.tsx` vs `PedidoPageHelpers.tsx` (editor admin)~~ — **RESUELTO (Fase 1)**:
@@ -174,9 +186,14 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
    cliente — **y dado que #1181 tampoco se mergeó, el editor ADMIN también sigue expuesto hoy**.
 
 ### Robustez / concurrencia (mismo patrón ya arreglado en `contabilidad`, sin mitigar acá)
-8. **`reportes/cierres.py::cerrar_mes`** — sin `pg_advisory_xact_lock` contra escrituras concurrentes
-   de `alquiler_pagos` del mismo mes. Mismo tipo de carrera que se cerró en `contabilidad` (2026-07-02)
-   — acá solo hay detección reactiva (`mes_cerrado_desactualizado`), no un candado preventivo.
+8. ✅ **RESUELTO (Fase 3, #1184).** `reportes/cierres.py::cerrar_mes`/`reabrir_mes` — no tenían
+   `pg_advisory_xact_lock` (mismo tipo de carrera ya cerrada en `contabilidad`, 2026-07-02). Fix:
+   `_lock_mes(conn, mes)` (mismo parseo `'YYYY-MM'`→`YYYYMM`, namespace **propio**
+   `_ADVISORY_NS_REPORTES_MES = 5390421` — NO comparte namespace con `_ADVISORY_NS_CONTAB_MES` a
+   propósito, son cierres independientes sobre invariantes distintos) al inicio de ambas funciones.
+   Candado: `test_reportes_cierres_db.py::test_lock_serializa_cerrar_mes_concurrente` (Postgres real,
+   dos conexiones + `threading.Event` — confirma que una segunda conexión que intenta `cerrar_mes` del
+   mismo mes queda bloqueada hasta que la primera libera el lock, no corren en paralelo).
 9. ✅ **RESUELTO (Fase 2, #1184).** Reconciliación 100% manual — el riesgo de gobernanza más directo:
    nada avisaba proactivamente si algo se desincronizaba. Fix: `services/finanzas_flujo/reconciliacion.py::estado`
    (une los dos `reconciliar()`) + `jobs/reconciliacion.py::chequear_reconciliacion_y_alertar` corrido
@@ -184,8 +201,10 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
    además el chequeo `desglose_divergente` (ver arriba) — la red genérica que hubiera cazado #405 sola.
 
 ### Seguridad / limpieza (bajo impacto, documentado para no perderlo)
-10. `routes/reportes.py` — sin `@limiter.limit` en los endpoints de escritura (cerrar/reabrir mes,
-    enviar mail) — mismo gap ya cerrado en `contabilidad.py`/`pagos.py`.
+10. ✅ **RESUELTO (Fase 6, #1184).** `routes/reportes.py` — sin `@limiter.limit` en los endpoints de
+    escritura (cerrar/reabrir mes, enviar mail) — mismo gap ya cerrado en `contabilidad.py`/`pagos.py`.
+    Fix: `@limiter.limit(ADMIN_WRITE_LIMIT)` en `enviar_reporte_mail`, `cerrar_mes_liquidacion`,
+    `reabrir_mes_liquidacion`.
 11. `/api/cotizar`, rama de línea personalizada (`equipo_id=None`) — no chequea `es_admin` en ese
     punto específico del código (aunque los endpoints que sí persisten ya exigen `require_admin` por
     fuera). Bajo riesgo real hoy; vale la pena que quede explícito si se toca ese código.

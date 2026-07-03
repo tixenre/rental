@@ -91,6 +91,7 @@ function FieldRow({ field }: { field: FieldDef }) {
   const q = useQuery({
     queryKey: ["settings", field.key],
     queryFn: () => fetchSetting(field.key),
+    staleTime: 0,
   });
   const [value, setValue] = useState("");
   useEffect(() => {

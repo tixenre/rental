@@ -14,6 +14,11 @@ from fastapi.responses import Response
 
 from database import get_db
 from auth.guards import require_admin
+from rate_limit import limiter, ADMIN_WRITE_LIMIT
+# Reusado tal cual de routes/contabilidad.py (misma auditoría 2026-07-02, #1184/#1209):
+# traduce UniqueViolation/NumericValueOutOfRange a 400 limpio en vez de que el
+# handler global exponga el mensaje interno de Postgres.
+from routes.contabilidad import map_pg_errors
 
 router = APIRouter()
 
@@ -56,6 +61,8 @@ def listar_emisores(request: Request):
 
 
 @router.post("/admin/emisores-arca", status_code=201)
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def crear_emisor(request: Request, body: dict):
     """Crea un nuevo emisor. No incluye cert/clave (se suben aparte)."""
     require_admin(request)
@@ -96,6 +103,8 @@ def crear_emisor(request: Request, body: dict):
 
 
 @router.put("/admin/emisores-arca/{emisor_id}")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def actualizar_emisor(emisor_id: int, request: Request, body: dict):
     """Actualiza datos del emisor (nombre, CUIT, pto_vta, condicion_iva, activo, notas)."""
     require_admin(request)
@@ -125,6 +134,8 @@ def actualizar_emisor(emisor_id: int, request: Request, body: dict):
 
 
 @router.post("/admin/emisores-arca/{emisor_id}/cert")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def cargar_cert(emisor_id: int, request: Request, body: dict):
     """Sube y cifra el certificado + clave privada PEM del emisor.
 
@@ -163,6 +174,8 @@ def cargar_cert(emisor_id: int, request: Request, body: dict):
 
 
 @router.delete("/admin/emisores-arca/{emisor_id}", status_code=204)
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def desactivar_emisor(emisor_id: int, request: Request):
     """Marca el emisor como inactivo (soft-delete). Las facturas existentes no se tocan."""
     require_admin(request)
@@ -178,6 +191,8 @@ def desactivar_emisor(emisor_id: int, request: Request):
 
 
 @router.post("/alquileres/{pedido_id}/facturar")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def facturar_pedido(pedido_id: int, request: Request):
     """Emite (o devuelve la vigente) la factura electrónica para el pedido.
 
@@ -205,6 +220,8 @@ def facturar_pedido(pedido_id: int, request: Request):
 
 
 @router.post("/facturas/{factura_id}/nota-credito")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+@map_pg_errors
 def nota_credito(factura_id: int, request: Request):
     """Emite una Nota de Crédito que anula la factura indicada. Idempotente."""
     require_admin(request)
@@ -344,6 +361,10 @@ async def descargar_pdf_factura(
 
 
 @router.post("/facturas/{factura_id}/enviar-mail")
+@limiter.limit(ADMIN_WRITE_LIMIT)
+# Sin @map_pg_errors: es async y el decorator no le hace `await` a la corrutina
+# (mismo motivo por el que `subir_comprobante`, también async, en contabilidad.py
+# no lo lleva) — no hay escritura propensa a UniqueViolation acá de todos modos.
 async def enviar_mail_factura(factura_id: int, request: Request):
     """Envía el PDF de la factura (renderizado on-demand) al email del cliente del pedido."""
     require_admin(request)
@@ -356,7 +377,7 @@ async def enviar_mail_factura(factura_id: int, request: Request):
         # Email del cliente: está en el pedido
         row = conn.execute(
             """
-            SELECT c.owner_email, c.nombre, c.apellido
+            SELECT c.email, c.nombre, c.apellido
             FROM alquileres a
             JOIN clientes c ON c.id = a.cliente_id
             WHERE a.id = %s
@@ -364,10 +385,10 @@ async def enviar_mail_factura(factura_id: int, request: Request):
             (factura.pedido_id,),
         ).fetchone()
 
-    if not row or not row["owner_email"]:
+    if not row or not row["email"]:
         raise HTTPException(400, "El pedido no tiene cliente con email asociado")
 
-    email_cliente = row["owner_email"]
+    email_cliente = row["email"]
     nombre_cliente = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip() or email_cliente
 
     from pdf import _render_pdf
@@ -400,7 +421,7 @@ Total: ${factura.imp_total:,.2f}</p>
         subject=subject,
         body_html=body_html,
         text=text,
-        attachments=[Attachment(filename=filename, content=pdf_bytes, content_type="application/pdf")],
+        attachments=[Attachment(filename=filename, content=pdf_bytes, mimetype="application/pdf")],
         alquiler_id=factura.pedido_id,
         log_key="factura_arca",
     )
