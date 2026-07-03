@@ -150,7 +150,7 @@ function CartDrawerDemo() {
         needsLogin={false}
         onLogin={noop}
         onRegister={noop}
-        needsVerif={false}
+        verifEstado={null}
         iniciandoVerif={false}
         onVerificar={noop}
         clienteSession={{ nombre: "Estudio Demo" }}
