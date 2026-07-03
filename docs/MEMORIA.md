@@ -728,6 +728,20 @@ módulo quedan para PRs siguientes, mismo patrón. El supervisor marca un consum
 el desglose de un pedido en vez de llamar a `finanzas_flujo.pedido.desglose_de_pedido`, o un `service` que
 importe de un `route`.
 
+### 2026-07-03 — dataio export/import perdía `anulado` de `alquiler_pagos`: un pago anulado revivía activo tras backup/restore
+
+El exportador/importador de `dataio` (`exporters.py`/`importers.py`, distinto del `pg_dump` que se usa
+para clonar staging) no incluía `anulado`/`anulado_por`/`anulado_at`/`anulado_motivo` del pago —
+un pago **anulado** (soft-delete, auditoría de `contabilidad` 2026-07-02) **revivía activo** tras un
+ciclo `dataio export`→`dataio import` (backup/restore o clonado de ambiente): el `INSERT` del import lo
+reinsertaba con el default de la columna (`anulado=FALSE`), inflando `monto_pagado`/cajas/liquidación sin
+dejar rastro. Fix: las 4 columnas viajan tal cual en `AlquilerPagoRef` (`dataio/schema.py`); el `SELECT`
+del export las trae y el `INSERT` del import ya no las defaultea. Regresión (Postgres real, opt-in):
+`test_dataio_pagos_anulado_roundtrip_db.py` — verificado que falla contra el código viejo y pasa con el
+fix. `movimientos` (contabilidad, también tiene `anulado`) no está exportado por `dataio` hoy — no hay
+nada más que arreglar en este alcance. El supervisor marca una entidad nueva de `dataio` que toque una
+tabla con soft-delete (`anulado`/`eliminado_at`) sin exportar/importar esas columnas.
+
 ### 2026-07-03 — El pipeline de carritos activos (dashboard admin) incluye el precio derivado de un combo
 
 `_enrich_items` (`services/carrito/activos.py`, alimenta `monto_estimado`/`pipeline_ars` de
