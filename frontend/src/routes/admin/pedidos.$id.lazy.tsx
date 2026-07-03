@@ -278,6 +278,12 @@ function PedidoEditorPage() {
   // Totales vivos desde useCotizacion
   const totales = cotizacionQ.data;
   const total = totales.total;
+  // Estado del recálculo en vivo: mientras recalcula (debounce + fetch) o si
+  // falló (ej. 429 del rate-limit), NO presentamos el número viejo como
+  // definitivo — lo marcamos. Evita el bug del desglose congelado que mostraba
+  // un descuento stale en silencio.
+  const recalculando = cotizacionQ.isFetching;
+  const cotizarError = cotizacionQ.isError;
   const pagadoMonto = p.monto_pagado ?? 0;
   const restante = Math.max(0, total - pagadoMonto);
   // Cobrado por encima del total actual: pasa si se bajó el precio (ítem/desc)
@@ -689,7 +695,9 @@ function PedidoEditorPage() {
 
           {/* Desglose — vivo via useCotizacion */}
           <RailSection label="Desglose">
-            <div className="space-y-1 text-sm">
+            {/* Si el recálculo falló (ej. 429 del rate-limit), el número mostrado
+                es viejo → lo atenuamos para no presentarlo como definitivo. */}
+            <div className={`space-y-1 text-sm ${cotizarError ? "opacity-40" : ""}`}>
               <BdRow
                 l={`Bruto · ${jornadas} jornada${jornadas !== 1 ? "s" : ""}`}
                 v={fmtArs(totales.subtotal)}
@@ -709,6 +717,13 @@ function PedidoEditorPage() {
               <div className="border-t hairline my-1" />
               <BdRow l="Total" v={fmtArs(total)} strong />
             </div>
+            {cotizarError ? (
+              <div className="mt-1 text-xs text-destructive">
+                No se pudo recalcular el total — reintentando…
+              </div>
+            ) : recalculando ? (
+              <div className="mt-1 text-xs text-muted-foreground">Actualizando…</div>
+            ) : null}
             <FieldLabel label="Descuento manual" className="mt-3 max-w-[140px]">
               <div className="relative">
                 <Input

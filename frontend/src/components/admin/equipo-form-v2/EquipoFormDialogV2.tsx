@@ -332,7 +332,7 @@ export function EquipoFormDialogV2({
     enabled: !!initial?.id && open,
   });
   useEffect(() => {
-    if (!initial) {
+    if (!initial?.id) {
       setSpecs([]);
       return;
     }
@@ -359,7 +359,18 @@ export function EquipoFormDialogV2({
       next.push({ id: `spec-${defIdStr}`, label, value: v });
     }
     setSpecs(next);
-  }, [equipoSpecsQ.data, initial]);
+    // `initial?.id` (no `initial` entero) a propósito: Aplicar/Guardar
+    // invalida `["admin","equipo",id]` (route padre), que refetchea el
+    // equipo y le da a `initial` una referencia NUEVA — con `initial`
+    // completo en deps este efecto volvía a correr sobre el MISMO
+    // `equipoSpecsQ.data` (nadie invalida `["admin","equipo-specs",id]`
+    // en el save) y pisaba specs recién guardadas con la foto vieja
+    // pre-edición: tipear algo en Ficha técnica + Aplicar/Guardar
+    // revertía el campo a lo que tenía antes de tipear, aunque el POST
+    // ya había persistido el valor nuevo (confirmado en vivo + DB). Solo
+    // re-sembrar cuando cambia el EQUIPO (o entre vacío↔con-equipo), no
+    // en cada refetch incidental de otros campos del mismo equipo.
+  }, [equipoSpecsQ.data, initial?.id]);
 
   // ── Categorías ─────────────────────────────────────────────────────
   const catsQ = useQuery({

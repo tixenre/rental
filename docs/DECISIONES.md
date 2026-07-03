@@ -2213,6 +2213,54 @@ cancel-in-progress` ya cancela corridas viejas.
   limpios en los archivos tocados. Rama aislada `feature/finanzas-flujo-fase1` (PR sin mergear, hoja de
   ruta); tracking #1184 (Fase 3, continúa tras la auditoría cruzada de plata).
 
+### 2026-07-03 — `routes/estadisticas.py`: las agregaciones leen `monto_total`, no reconstruyen el descuento (#1209)
+
+- **Contexto.** Uno de los 14 hallazgos de la auditoría cruzada de plata (2026-07-02, severidad media):
+  `routes/estadisticas.py` tenía ~6 queries que, en vez de leer `alquileres.monto_total` (el neto ya
+  correcto, persistido por `_recalcular_total_pedido` con el descuento GANADOR aplicado), reconstruían el
+  ingreso a mano con `subtotal * (1 - COALESCE(descuento_pct, 0) / 100.0)`. `descuento_pct` en la tabla
+  `alquileres` **solo guarda el descuento de CLIENTE** — nunca el de JORNADAS, aunque este último haya sido
+  el ganador (`services/precios.descuento_aplicable = max(descuento_cliente_pct, descuento_jornadas_pct)`,
+  no la suma). En un alquiler de varios días con 0% de descuento de cliente pero un % por jornadas (el caso
+  común), la reconstrucción devolvía el BRUTO en vez del NETO realmente cobrado.
+- **Escenario de falla concreto** (el que motivó el fix): 1 equipo a $10.000/día × 7 jornadas, cliente 0%
+  propio + 10% por jornadas (ganador) → se cobra $63.000 real (en `monto_total`), pero
+  `70.000 × (1 - 0/100) = $70.000` — **$7.000 de más**, que escala con cada alquiler multi-día del
+  histórico. Y en la MISMA pantalla, "Top clientes"/"Clientes recurrentes" ya usaban `p.monto_total`
+  directo (correcto) — dos números del mismo pedido no cuadraban entre sí.
+- **Por qué no alcanza con leer `monto_total` en todos lados por igual.** Es una columna a nivel PEDIDO,
+  no por ítem. Las agregaciones a nivel pedido (`totales`, `por_mes`, `mejor_peor_mes`) pueden leerlo
+  directo — pero había que sacar el `JOIN alquiler_items` que tenían (si no, `monto_total` se multiplica
+  por cada línea del pedido). Las agregaciones a nivel ÍTEM (`top_equipos`, agrupado por equipo; `por_dueno`,
+  agrupado por `equipos.dueno`) necesitan saber "cuánto aportó cada línea" de un pedido con potencialmente
+  varios equipos de dueños distintos — ahí no alcanza con el número del pedido entero. Solución: **prorratear**
+  `monto_total` según la participación de cada línea en el `subtotal` (bruto) del pedido — el MISMO patrón ya
+  usado y confiable en `reportes/liquidacion.py::filas_atribucion` (`SALDADO_CTE` + prorrateo por subtotal),
+  ahora factorizado en un fragmento SQL compartido `_PRORRATEO_CTE` (misma técnica de composición por
+  f-string que `SALDADO_CTE`) para no repetir la CTE en `top_equipos` y `por_dueno`.
+- **`mejor_peor_mes` de paso simplificado.** Las 4 subqueries (mejor mes/total, peor mes/total) repetían la
+  misma fórmula rota 4 veces; se consolidaron en una única CTE `por_mes_full` (con `monto_total`, sin join a
+  ítems) referenciada 4 veces — menos código Y arregla el bug de una sola vez. Mismo universo que antes
+  (todo el histórico, sin el `LIMIT 24` que sí tiene `por_mes`).
+- **Universo de pedidos preservado.** Al sacar el `JOIN alquiler_items` de `totales`/`por_mes`/`mejor_peor`
+  no cambia qué pedidos cuentan: todo pedido en estado `confirmado`/`finalizado`/`retirado` tiene ≥1 ítem
+  por invariante de creación (`if not data.items and data.estado != "borrador"` en
+  `routes/alquileres/core.py`), así que el join solo estaba ahí por la fórmula rota, no como filtro real.
+- **NO se reconstruye el descuento en ningún camino** — ni con `descuento_pct` solo (el bug), ni con
+  `GREATEST(descuento_pct, descuento_jornadas_pct)` (tentador pero redundante: `monto_total` YA tiene el
+  número correcto, calcularlo de nuevo es la misma clase de bug con otra fórmula). `monto_total` es la
+  fuente única del neto, se lee o se prorratea, nunca se recalcula.
+  Consecuencia: cambio SQL-only en `backend/routes/estadisticas.py`, sin tocar el motor de precios ni el
+  esquema.
+- **Regresión:** `backend/tests/test_estadisticas_db.py` (Postgres real, opt-in `RESERVAS_DB_TEST=1`) —
+  reproduce el escenario (descuento por jornadas ganador + descuento de cliente en 0%) y verifica que
+  `totales`/`por_mes`/`top_equipos`/`por_dueno` devuelven el NETO (`monto_total`), no el bruto reconstruido;
+  se confirmó que el test FALLA contra la fórmula vieja (revertido temporalmente) antes de mergear el fix.
+  No había tests previos de `estadisticas.py` que asumieran la fórmula rota.
+- El supervisor marca cualquier query nueva de estadísticas/reportes que reconstruya
+  `subtotal * (1 - descuento_pct/100)` (o cualquier variante que recalcule el descuento) en vez de leer
+  `alquileres.monto_total` directo o prorrateado.
+
 ### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
 
 - **Contexto.** Issue #1209 ("Iniciativa: 9 hallazgos de la auditoría del régimen de plata") — auditoría

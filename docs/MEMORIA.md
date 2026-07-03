@@ -728,6 +728,21 @@ módulo quedan para PRs siguientes, mismo patrón. El supervisor marca un consum
 el desglose de un pedido en vez de llamar a `finanzas_flujo.pedido.desglose_de_pedido`, o un `service` que
 importe de un `route`.
 
+### 2026-07-03 — `routes/estadisticas.py`: las agregaciones leen `monto_total`, no reconstruyen el descuento (#1209)
+
+Las queries del dashboard de Estadísticas (totales/por_mes/top_equipos/por_dueno/mejor_peor_mes)
+reconstruían el ingreso con `subtotal * (1 - descuento_pct/100)` — que solo mira el descuento de
+CLIENTE, ignorando el de JORNADAS cuando era el GANADOR (`descuento_aplicable = max()`, el caso común en
+alquileres multi-día): sobreestimaba el ingreso y no cuadraba con "Top clientes"/"Clientes recurrentes"
+de la MISMA pantalla (que ya usaban `monto_total` bien). Fix: a nivel PEDIDO (totales/por_mes/mejor_peor)
+lee `monto_total` directo, sin join a `alquiler_items` (evita multiplicarlo por línea); a nivel ÍTEM
+(top_equipos/por_dueno) lo prorratea por participación en `subtotal` — mismo patrón que
+`reportes/liquidacion.py::filas_atribucion` (fragmento SQL compartido `_PRORRATEO_CTE`). **NO se
+reconstruye el descuento en ningún caso** — `monto_total` es la fuente única del neto. El supervisor
+marca cualquier query nueva de estadísticas/reportes que recalcule `descuento_pct * subtotal` en vez de
+leer `monto_total`. Regresión: `test_estadisticas_db.py` (Postgres real; pedido con descuento por
+jornadas ganador y descuento de cliente en 0%).
+
 ### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
 
 Con descuento (el caso común: cualquier alquiler de varios días tiene descuento automático por jornadas),
