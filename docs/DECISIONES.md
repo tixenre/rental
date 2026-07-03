@@ -2153,6 +2153,48 @@ cancel-in-progress` ya cancela corridas viejas.
   plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
   reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.
 
+### 2026-07-03 — dataio export/import perdía `anulado` de `alquiler_pagos`: un pago anulado revivía activo tras backup/restore
+
+- **Contexto.** La auditoría de bordes de `contabilidad/` (2026-07-02) le agregó soft-delete a
+  `alquiler_pagos` (`anulado`/`anulado_por`/`anulado_at`/`anulado_motivo`) y actualizó las 7 queries
+  "vivas" del sistema para filtrar `NOT anulado`. Quedó afuera de esa pasada `backend/dataio/` — el
+  exportador/importador de backup/restore/clonado (distinto del `pg_dump` que se usa normalmente para
+  clonar staging), que sigue siendo el camino que usa el dueño para bajar un backup completo o migrar
+  datos entre ambientes. Encontrado por auditoría dirigida sobre `dataio/exporters.py` (#1209), no por
+  la auditoría cruzada de plata del 2026-07-02 (que no llegó a cubrir `dataio`).
+- **Bug.** `export_alquileres` (`dataio/exporters.py`) exportaba el pago embebido con solo
+  `monto`/`concepto`/`fecha` — sin `anulado` ni sus columnas de auditoría. `import_alquileres`
+  (`dataio/importers.py`) sigue la política REPLACE para pagos (`DELETE FROM alquiler_pagos WHERE
+  pedido_id = %s` + re-`INSERT` de lo que traiga el JSON) — con el `INSERT` sin esas columnas, Postgres
+  aplicaba el **default de la columna**, `anulado=FALSE`. Escenario de falla concreto: un pago de
+  $100.000 cargado por error se anula (con motivo, actor y timestamp); se corre `dataio export`
+  (backup) y después `dataio import` (restore, o clonado a otro ambiente); el pago **vuelve a la vida
+  como activo** — `monto_pagado` del pedido sube $100.000 de la nada, la caja del socio destinatario
+  sube, la liquidación lo cuenta como saldado. La anulación desaparece sin dejar rastro y sin que nadie
+  lo pida.
+- **Fix.** `AlquilerPagoRef` (`dataio/schema.py`) suma `anulado: bool = False` +
+  `anulado_por`/`anulado_at`/`anulado_motivo` (opcionales, default `False`/`None` — no rompe JSONs viejos
+  ya exportados sin esas claves; `extra="forbid"` de `_Base` no afecta porque son campos nuevos CON
+  default, no extra). El `SELECT` de `export_alquileres` suma las 4 columnas (`COALESCE(anulado, FALSE)`
+  por si alguna fila legacy quedó con `NULL`); el `INSERT` de `import_alquileres` las reinserta tal cual,
+  sin defaultear. Deliberadamente **no** se tocó ninguna otra columna del pago (`destinatario`/`metodo`/
+  `created_by` siguen sin exportar) — fuera del alcance de este fix, que es específicamente sobre las
+  columnas de soft-delete. Se revisó si el mismo patrón (tabla con soft-delete tocada incompleta por
+  `dataio`) aparecía en otro lado: `movimientos` (contabilidad, también tiene `anulado`) **no está en
+  `EXPORTERS`/`IMPORTERS`** — `dataio` no exporta contabilidad hoy, así que no había nada más que
+  arreglar en este alcance.
+- **Consecuencias.** `test_dataio_pagos_anulado_roundtrip_db.py` (Postgres real, opt-in vía
+  `RESERVAS_DB_TEST=1`) cubre: (1) el export incluye `anulado`+auditoría del pago; (2) round-trip
+  completo export→(se borra el pago, simulando un ambiente fresco donde el backup se restaura)→import→
+  el pago vuelve anulado, no activo. Verificado **empíricamente** que el test caza el bug: revertidos
+  temporalmente los 3 archivos del fix (`git stash`), corridos los 2 tests nuevos → ambos fallan con el
+  síntoma exacto (`KeyError: 'anulado'` en el export; `assert False is True` en el roundtrip); restaurado
+  el fix → ambos pasan. Suite completa (2548 tests) + los otros `*_db.py` de dataio existentes
+  (`test_dataio_roundtrip_db.py`, `test_dataio_export_readonly_db.py`) siguen en verde — no se rompió
+  ningún round-trip existente. `pyflakes` limpio en los 3 archivos tocados + el test nuevo. El
+  supervisor marca una entidad nueva de `dataio` que toque una tabla con soft-delete
+  (`anulado`/`eliminado_at`) sin exportar/importar esas columnas.
+
 ### 2026-07-03 — El pipeline de carritos activos (dashboard admin) incluye el precio derivado de un combo
 
 - **Contexto.** Uno de los 14 hallazgos priorizados de la auditoría cruzada de plata (issue #1209, severidad
