@@ -63,6 +63,34 @@ class _FakeConn:
         pass
 
 
+class _FakeRow(dict):
+    """Simula una fila de psycopg (acceso por índice de columna)."""
+
+
+class _FakeConnConEmail:
+    """Como `_FakeConn` pero con `execute` para el SELECT de email del cliente
+    (regresión: `enviar_mail_factura` consultaba `c.owner_email`, columna que no
+    existe en `clientes` — rompía con UndefinedColumn siempre. Ver `c.email`)."""
+
+    def __init__(self, row=None):
+        self._row = row
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+    def execute(self, _sql, _params=None):
+        row = self._row
+
+        class _R:
+            def fetchone(self_inner):
+                return row
+
+        return _R()
+
+
 # ── Guard de admin a nivel HTTP (rutea + gatea, sin DB) ─────────────────────
 
 
@@ -205,6 +233,66 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
     assert resp.body == b"%PDF-FAKE%"
     assert "attachment" in resp.headers["content-disposition"]
     assert "Factura-C-00002-00000001.pdf" in resp.headers["content-disposition"]
+
+
+# ── enviar_mail_factura: la columna real es c.email, no c.owner_email ───────
+
+
+def test_enviar_mail_factura_no_rompe_con_undefined_column(monkeypatch):
+    """Regresión: consultaba `c.owner_email` (columna inexistente en `clientes`,
+    vive en otra tabla) — rompía SIEMPRE con UndefinedColumn. Ahora usa `c.email`."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr(
+        "routes.facturacion.get_db",
+        lambda: _FakeConnConEmail(_FakeRow(email="cliente@example.com", nombre="Ana", apellido="Gómez")),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_by_id", lambda factura_id, conn: _fake_factura()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+    monkeypatch.setattr(
+        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+    )
+
+    async def _fake_render_pdf(html, **_):
+        return b"%PDF-FAKE%"
+
+    monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
+
+    sent = {}
+
+    def _fake_send_raw_email(**kwargs):
+        sent.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr("services.email.send_raw_email", _fake_send_raw_email)
+
+    resp = asyncio.run(facturacion_routes.enviar_mail_factura(1, _fake_request()))
+    assert resp == {"ok": True, "to": "cliente@example.com"}
+    assert sent.get("to") == "cliente@example.com"
+
+
+def test_enviar_mail_factura_400_si_sin_email(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr(
+        "routes.facturacion.get_db",
+        lambda: _FakeConnConEmail(_FakeRow(email=None, nombre="Ana", apellido="Gómez")),
+    )
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_by_id", lambda factura_id, conn: _fake_factura()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+    monkeypatch.setattr(
+        "services.facturacion.pdf.factura_html", lambda factura, pedido, **_: "<html></html>"
+    )
+
+    with pytest.raises(HTTPException) as ei:
+        asyncio.run(facturacion_routes.enviar_mail_factura(1, _fake_request()))
+    assert ei.value.status_code == 400
 
 
 # ── Rate limit + mapeo de errores en escrituras de facturación (#1209) ─────
