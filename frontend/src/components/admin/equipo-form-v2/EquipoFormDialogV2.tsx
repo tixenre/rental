@@ -1094,7 +1094,19 @@ export function EquipoFormDialogV2({
   // ════════════════════════════════════════════════════════════════════
   // Render
   // ════════════════════════════════════════════════════════════════════
-  const fotoActual = pendingFilePreview || form.watch("foto_url");
+  // `form.watch("foto_url")` es el valor SEMBRADO UNA VEZ al montar
+  // (react-hook-form `defaultValues`, no reactivo). En EDIT mode, subir una
+  // foto nueva o cambiar cuál es la principal en la galería actualiza
+  // `gallery.fotos` (React Query, correctamente sincronizado con el backend)
+  // pero nunca toca ese valor sembrado — la miniatura de la galería se veía
+  // bien, pero el preview grande del costado seguía mostrando la foto vieja
+  // hasta cerrar y reabrir el form. La galería es la fuente viva; `foto_url`
+  // del form queda de fallback para CREATE mode (ahí `gallery.fotos` está
+  // siempre vacío — la query es `enabled: !!initial?.id`, y en create no hay
+  // id todavía) y para el raro caso de un equipo en EDIT sin fotos en la
+  // galería.
+  const fotoGaleriaActual = gallery.fotos.find((f) => f.es_principal)?.url;
+  const fotoActual = pendingFilePreview || fotoGaleriaActual || form.watch("foto_url");
 
   // ── Confirmación al cerrar con cambios sin guardar (#232) ──────────
   // Detectamos cambios desde 4 fuentes: form fields (react-hook-form),
