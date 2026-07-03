@@ -2152,3 +2152,68 @@ cancel-in-progress` ya cancela corridas viejas.
   de `contabilidad/`: primero el mapa completo, después la rama de fixes). El supervisor marca un motor de
   plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o un PR de fix de plata
   reportado como shippeado en `MEMORIA.md` sin verificar el merge real a `dev`/`main` primero.
+
+### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
+
+- **Contexto.** Issue #1209 ("Iniciativa: 9 hallazgos de la auditoría del régimen de plata") — auditoría
+  multi-agente (52 agentes: 9 finders + verificación adversarial en 2 pasadas) sobre `dev` + los 5 PRs de
+  fixes ya aplicados (#1203-1207), a pedido del dueño ("que no calcule mal, que sea seguro... no haber
+  dobles sumas ni nada"). Veredicto general de esa auditoría: el núcleo (precio → cotización →
+  `monto_total` congelado → pagos → liquidación → contabilidad) está bien construido —
+  `cotizado == cobrado` blindado por construcción—; los 9 hallazgos están en superficies de
+  **display/derivación** que recalculan en vez de leer la fuente única. Esta entrada cierra 2 de los 9
+  (M5 + L1, agrupados porque comparten exactamente el mismo criterio de fix — "Convención" del issue: M5+L1
+  van en un solo PR).
+- **M5 (medio) — Factura.** `services/facturacion/pdf.py::_conceptos` mostraba, para cada línea, el
+  BRUTO (`it["subtotal"]`, sin descuento) y un campo `bonif` (`% Bonif.` en la grilla clásica AFIP/ARCA)
+  **hardcodeado en `"0,00"`**. El "Importe Neto Gravado"/"Importe Total" declarado (`factura.imp_neto`)
+  sí tenía el descuento aplicado (viene de `pedido["monto_total"]`, neto persistido). Con 2 ítems de $500
+  (=$1.000 bruto) + 10% de descuento → `imp_neto`=$900: la Factura mostraba dos líneas de $500 (suman
+  $1.000) y un total de $900, sin ninguna línea de -$100 que explicara la diferencia — el comprobante no
+  cerraba consigo mismo. Como el descuento por jornadas es automático en cualquier alquiler de varios
+  días, esto afectaba al caso común, no a un edge case.
+- **Investigación previa al fix — ¿el `%Bonif.` es un campo real de AFIP/ARCA?** Se revisó `arca_fe/`
+  (el módulo que arma el `ComprobanteRequest` y llama al WSFE real): no hay ningún concepto de
+  bonificación por línea en la llamada SOAP — `construir_comprobante` manda un `importe_neto` plano para
+  todo el comprobante, sin desglose por ítem. La columna "% Bonif." es puramente del LAYOUT del PDF (una
+  réplica visual del formato clásico impreso AFIP/ARCA, que sí trae esa columna en su grilla de 7
+  columnas: Código · Producto · Cantidad · U. Medida · Precio Unit. · **% Bonif.** · Subtotal) — no
+  restringe nada del lado fiscal real. Conclusión: repartir el descuento por línea (llenando esa columna
+  ya presente en el layout, en vez de agregar una fila global aparte) es la opción MÁS fiel al formato
+  real, porque el layout ya tiene el lugar pensado para eso — no una improvisación.
+- **Fix.** `_conceptos` reparte el descuento total proporcionalmente al bruto de cada línea, con el
+  remanente de redondeo absorbido en la ÚLTIMA línea (evita que la suma quede a centavos de distancia del
+  total declarado por acumulación de redondeos independientes por línea). El total a repartir se calcula
+  como `bruto_de_las_líneas − factura.imp_neto` (no `pedido["bruto"] − pedido["descuento_monto"]`, que son
+  campos en VIVO) — así el desglose cierra también al mostrar una Nota de Crédito, cuyos importes vienen
+  frozen del comprobante original y pueden no coincidir con el pedido si este cambió después de facturar
+  (mismo principio que ya usa `construir_comprobante_nc`, que tampoco recalcula del pedido en vivo). Cada
+  línea ahora expone: `bonif` = "% Bonif." real de esa línea, `subtotalFmt`/`importeStr` = el NETO
+  post-bonif (antes era el bruto). Las 3 piezas de layout (clásica, celular, formal) comparten
+  `_conceptos` → las 3 quedan arregladas con un solo cambio. El Presupuesto (que ya reconciliaba bien, y
+  cuya decisión de IVA-aparte es intencional, 2026-06-06) **no se toca**.
+- **L1 (bajo) — Mail de "pedido creado".** Mismo problema en
+  `routes/alquileres/core.py::_pedido_email_context`: las filas de la tabla de ítems del mail (helper
+  `services/email/branding.py::item_row`) mostraban `it["subtotal"]` (bruto), y el `{{ total }}` del
+  template (`services/email/default_templates.py`) es `pedido["monto_total"]` (neto) — sin ningún
+  renglón intermedio. Ejemplo real: 1 cámara a $10.000/día × 3 jornadas = $30.000 en la línea del ítem,
+  "Total: $27.000" (10% de descuento) abajo, sin aclaración.
+- **Fix.** Se agregó el helper único `discount_row()` a `services/email/branding.py` (mismo patrón visual
+  que `item_row`/`items_table`, ya existentes — reusa `HAIRLINE`/`MUTED`, no inventa estilos nuevos).
+  `_pedido_email_context` arma la fila con `pedido["descuento_monto"]`/`pedido["descuento_pct"]` (ya
+  enriquecidos por `_enriquecer_pedido_con_total` antes de que se llame esta función, confirmado en
+  `create_pedido`/`_get_alquiler_detail`) y la inserta en `items_html`, entre las líneas y donde el
+  template imprime el `Total` — **sin tocar los 7 templates de mail sembrados en la DB** (el fix vive
+  100% en el builder de contexto, ninguna migración de copy necesaria). Mismo signo "−" (U+2212, no un
+  guion ASCII) que ya usa `pdf_templates._pedido_html` para el Presupuesto, por consistencia visual.
+- **Tests.** `tests/test_facturacion_pdf.py` (nuevo): reconciliación exacta bruto→bonif→neto con el
+  ejemplo de 2 ítems de $500 + 10%, el ejemplo real de la cámara del mail, un caso de 3 líneas con brutos
+  que no dividen limpio (verifica que el remanente de redondeo cierra exacto, no una aproximación), y 2
+  regresiones (sin descuento no cambia nada; el fallback sin ítems persistidos sigue igual).
+  `tests/test_pedido_email_context.py`: 2 casos nuevos (con descuento aparece la fila con el % y el monto
+  correctos; sin descuento no aparece ninguna fila espuria).
+- **Consecuencias.** Quedan 7 de los 9 hallazgos de #1209 sin tocar en esta pasada (M1-M4, M6, L2, L3) —
+  cada uno es su propia rama + PR scoped, por diseño del issue ("PR como hoja de ruta", 2026-06-27); no se
+  cierra el tracking #1209 (issue madre, sigue con 7 pendientes). El supervisor marca una línea de factura
+  o de mail que vuelva a mostrar el bruto sin reconciliar contra el total declarado, o un
+  `bonif`/`% Bonif.` hardcodeado reintroducido.
