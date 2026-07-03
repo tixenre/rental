@@ -49,9 +49,11 @@ def _loop() -> None:
     # este módulo, y rompe cualquier ciclo de importación al arrancar.
     from jobs.recordatorios import enviar_recordatorios_retiro
     from jobs.cleanup_livianas import purgar_cuentas_livianas_stale
+    from jobs.reconciliacion import chequear_reconciliacion_y_alertar
 
     ultima_fecha = None      # recordatorios de retiro
     ultima_limpieza = None   # cleanup de cuentas livianas (independiente)
+    ultima_reconciliacion = None  # alerta de reconciliación de plata (independiente)
     while True:
         ahora = now_ar()
         try:
@@ -74,6 +76,16 @@ def _loop() -> None:
                 purgar_cuentas_livianas_stale()
         except Exception:
             logger.exception("Falló el cleanup de cuentas livianas")
+        try:
+            # Alerta proactiva de reconciliación de plata (#1184 Fase 2): 1×/día,
+            # independiente de los otros dos. La variable "última fecha" YA acota
+            # a 1 mail/día aunque el problema persista — no hace falta otro rate
+            # limit (mismo criterio que los jobs anteriores).
+            if ahora.date() != ultima_reconciliacion:
+                ultima_reconciliacion = ahora.date()
+                chequear_reconciliacion_y_alertar()
+        except Exception:
+            logger.exception("Falló la alerta de reconciliación de plata")
         time.sleep(_CHECK_EVERY_S)
 
 

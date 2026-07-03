@@ -15,6 +15,7 @@ sobre ids altos (>= 9_400_000) y limpia al terminar.
 """
 import json
 import os
+import threading
 from urllib.parse import urlparse
 
 import pytest
@@ -191,6 +192,63 @@ def test_reconciliacion_caza_pedido_editado_en_mes_cerrado(setup):
         assert rec2["ok"] is False
     finally:
         conn.close()
+
+
+def test_lock_serializa_cerrar_mes_concurrente(setup):
+    """Fase 3 (#1184): verifica que `_lock_mes` (pg_advisory_xact_lock) realmente
+    serializa contra Postgres real — no solo en teoría. Una conexión toma el lock
+    de MES y lo retiene; una segunda conexión que intenta `cerrar_mes` del MISMO
+    mes debe quedar bloqueada hasta que la primera libere (commit), en vez de
+    correr en paralelo."""
+    import time
+
+    from database import get_db
+    from reportes.cierres import _lock_mes, cerrar_mes
+
+    orden: list[str] = []
+    lock_tomado = threading.Event()
+    liberar_lock = threading.Event()
+    errores: dict[str, Exception] = {}
+
+    def _tomar_lock_y_esperar():
+        conn = get_db()
+        try:
+            _lock_mes(conn, MES)
+            orden.append("A_tomo_lock")
+            lock_tomado.set()
+            liberar_lock.wait(timeout=5)
+            conn.commit()  # libera el advisory lock xact-scoped
+            orden.append("A_libero_lock")
+        except Exception as e:  # noqa: BLE001 — se re-lanza al hilo principal
+            errores["A"] = e
+        finally:
+            conn.close()
+
+    def _cerrar_mes_bloqueado():
+        lock_tomado.wait(timeout=5)
+        conn = get_db()
+        try:
+            cerrar_mes(conn, MES, "b")
+            orden.append("B_cerro_mes")
+        except Exception as e:  # noqa: BLE001
+            errores["B"] = e
+        finally:
+            conn.close()
+
+    ta = threading.Thread(target=_tomar_lock_y_esperar)
+    tb = threading.Thread(target=_cerrar_mes_bloqueado)
+    ta.start()
+    lock_tomado.wait(timeout=5)
+    tb.start()
+    time.sleep(0.3)  # B debería seguir esperando el lock en este punto.
+    assert "B_cerro_mes" not in orden, "B no debería poder cerrar_mes mientras A retiene el lock"
+    liberar_lock.set()
+    ta.join(timeout=5)
+    tb.join(timeout=5)
+
+    assert not ta.is_alive() and not tb.is_alive(), "deadlock: algún hilo no terminó"
+    assert not errores, f"errores en los hilos: {errores}"
+    assert orden == ["A_tomo_lock", "A_libero_lock", "B_cerro_mes"], orden
 
 
 def test_liquidar_rango_multimes_respeta_mes_cerrado(setup):

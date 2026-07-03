@@ -77,18 +77,25 @@ debe depender de un route).
   Deriva de `monto_total`/`iva_monto` ya persistidos; la Nota de Crédito usa el snapshot de la
   factura ORIGINAL (no el pedido en vivo), para no quedar descuadrada ante ARCA si el precio cambió.
 
-## El semáforo de reconciliación (dos capas, ambas 100% manuales)
+## El semáforo de reconciliación (dos capas + alerta proactiva)
 
 - `reportes/reconciliacion.py::reconciliar` — `GET /admin/reportes/reconciliacion` (pagados-sin-
-  ledger, `monto_pagado` divergente, sobrepagados).
+  ledger, `monto_pagado` divergente, sobrepagados, mes cerrado desactualizado, dueños no canónicos,
+  **desglose de pedido divergente** — Fase 2, ver abajo).
 - `contabilidad/queries/reconciliacion.py::reconciliar` — `GET /admin/contabilidad/reconciliacion`
   (saldos negativos, movimientos a cuenta inactiva, pagos sin cobrador válido) — **hereda** el de
   arriba, no lo duplica.
-
-**Ninguno de los dos corre solo.** `backend/jobs/scheduler.py` (el único scheduler in-process del
-repo) solo corre `enviar_recordatorios_retiro` y `purgar_cuentas_livianas_stale` — nada de
-reconciliación. No hay badge/contador en el dashboard admin. Es la pieza de gobernanza que hoy
-**falta** — ver Hallazgos.
+- **`services/finanzas_flujo/reconciliacion.py::estado`** (Fase 2, #1184) — la fachada que une los
+  dos en un solo `ok`. Primer consumidor: **`jobs/reconciliacion.py::chequear_reconciliacion_y_alertar`**,
+  corrido 1×/día desde `jobs/scheduler.py` (mismo thread in-process que ya corre
+  `enviar_recordatorios_retiro`/`purgar_cuentas_livianas_stale`) — si `ok=False`, manda un mail resumen
+  a `settings.admin_emails`. **Ya no es 100% manual**: el dueño se entera sin tener que abrir el
+  dashboard. El job solo avisa, no repara nada.
+- **Chequeo nuevo (Fase 2):** `desglose_divergente` en `reportes/reconciliacion.py` — compara
+  `alquileres.monto_total` persistido contra el desglose recalculado con el precio de línea YA
+  PERSISTIDO de cada ítem (vía `finanzas_flujo.pedido.desglose_de_pedido`, NO el de catálogo). Es la
+  red genérica que hubiera cazado el patrón del bug #405 sin depender de que el dueño notara un
+  reporte puntual.
 
 ## Candados (tests que fijan la garantía)
 
@@ -99,6 +106,13 @@ reconciliación. No hay badge/contador en el dashboard admin. Es la pieza de gob
 - `backend/tests/test_reportes_cierres_db.py` — cierre de la liquidación.
 - `backend/tests/test_finanzas_flujo_pedido.py` — desglose de pedido, cobro_modo-aware (Fase 1).
 - `backend/tests/test_finanzas_flujo_source_scan.py` — PDF y facturación pasan por la fachada.
+- `backend/tests/test_finanzas_flujo_reconciliacion.py` — el semáforo unificado (`estado`) delega bien
+  en los dos `reconciliar()` (Fase 2).
+- `backend/tests/test_jobs_reconciliacion.py` — el job de alerta manda mail solo cuando `ok=False`, a
+  cada admin, y nunca propaga un fallo de envío (Fase 2).
+- `backend/tests/test_reportes_liquidacion_db.py::test_reconciliacion_caza_desglose_divergente_del_pedido`
+  — el chequeo `desglose_divergente` caza un `monto_total` que no coincide con el desglose recalculado
+  del precio de línea persistido (Fase 2).
 - Facturación: candados propios en `docs/SISTEMA_FACTURACION.md`.
 
 ## Hallazgos de la auditoría cruzada (2026-07-02) — estado: por priorizar con el dueño
@@ -136,10 +150,16 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
    fix, el segundo bug seguía dejando la función completamente rota. Candado:
    `test_facturacion_routes.py::test_enviar_mail_factura_no_rompe_con_undefined_column` +
    `test_enviar_mail_factura_400_si_sin_email`.
-4. **`reportes/liquidacion.py::filas_atribucion`** — si `suma_items = 0` pero `monto_total > 0` (ítems
-   con subtotal 0, ej. 100% descuento a nivel ítem), el prorrateo da `NULL` → se trata como 0 → la
-   plata de ese pedido **desaparece en silencio** del reporte de liquidación, sin que ningún chequeo
-   de reconciliación lo detecte. Edge case raro, pero real.
+4. ~~**`reportes/liquidacion.py::filas_atribucion`**~~ — **RESUELTO (Fase 5, #1184).** Si
+   `suma_items = 0` pero `monto_total > 0` (ítems con subtotal 0, ej. 100% descuento a nivel ítem), el
+   prorrateo daba `NULL` (vía `NULLIF`) → se trataba como 0 → la plata de ese pedido **desaparecía en
+   silencio** del reporte de liquidación, sin que ningún chequeo de reconciliación lo detectara. Fix:
+   `CASE WHEN t.suma_items = 0 THEN al.monto_total / t.cant_items ELSE ... END` — reparte el
+   `monto_total` en **partes iguales** entre los ítems del pedido (no hay base real de prorrateo
+   cuando todos los subtotales son 0; repartir parejo es el fallback más neutral, no arbitrario hacia
+   un dueño). Candado: `test_reportes_liquidacion_db.py::test_suma_items_cero_no_pierde_plata`
+   (Postgres real, un pedido con 2 ítems subtotal 0 confirma que el total del reporte sigue incluyendo
+   su `monto_total` completo).
 5. **Front — reimplementaba el cálculo de línea en vez de leer lo que ya calculó el backend** (viola
    "el front no calcula plata", 2026-06-29):
    - ~~`PedidoPageCards.tsx` vs `PedidoPageHelpers.tsx` (editor admin)~~ — **RESUELTO (Fase 1)**:
@@ -166,15 +186,25 @@ máxima: mergear #1181 antes que cualquier otra cosa de esta lista.
    cliente — **y dado que #1181 tampoco se mergeó, el editor ADMIN también sigue expuesto hoy**.
 
 ### Robustez / concurrencia (mismo patrón ya arreglado en `contabilidad`, sin mitigar acá)
-8. **`reportes/cierres.py::cerrar_mes`** — sin `pg_advisory_xact_lock` contra escrituras concurrentes
-   de `alquiler_pagos` del mismo mes. Mismo tipo de carrera que se cerró en `contabilidad` (2026-07-02)
-   — acá solo hay detección reactiva (`mes_cerrado_desactualizado`), no un candado preventivo.
-9. **Reconciliación 100% manual** (ver arriba) — el riesgo de gobernanza más directo: nada avisa
-   proactivamente si algo se desincroniza.
+8. ✅ **RESUELTO (Fase 3, #1184).** `reportes/cierres.py::cerrar_mes`/`reabrir_mes` — no tenían
+   `pg_advisory_xact_lock` (mismo tipo de carrera ya cerrada en `contabilidad`, 2026-07-02). Fix:
+   `_lock_mes(conn, mes)` (mismo parseo `'YYYY-MM'`→`YYYYMM`, namespace **propio**
+   `_ADVISORY_NS_REPORTES_MES = 5390421` — NO comparte namespace con `_ADVISORY_NS_CONTAB_MES` a
+   propósito, son cierres independientes sobre invariantes distintos) al inicio de ambas funciones.
+   Candado: `test_reportes_cierres_db.py::test_lock_serializa_cerrar_mes_concurrente` (Postgres real,
+   dos conexiones + `threading.Event` — confirma que una segunda conexión que intenta `cerrar_mes` del
+   mismo mes queda bloqueada hasta que la primera libera el lock, no corren en paralelo).
+9. ✅ **RESUELTO (Fase 2, #1184).** Reconciliación 100% manual — el riesgo de gobernanza más directo:
+   nada avisaba proactivamente si algo se desincronizaba. Fix: `services/finanzas_flujo/reconciliacion.py::estado`
+   (une los dos `reconciliar()`) + `jobs/reconciliacion.py::chequear_reconciliacion_y_alertar` corrido
+   1×/día desde el scheduler in-process — manda mail a `settings.admin_emails` si `ok=False`. Suma
+   además el chequeo `desglose_divergente` (ver arriba) — la red genérica que hubiera cazado #405 sola.
 
 ### Seguridad / limpieza (bajo impacto, documentado para no perderlo)
-10. `routes/reportes.py` — sin `@limiter.limit` en los endpoints de escritura (cerrar/reabrir mes,
-    enviar mail) — mismo gap ya cerrado en `contabilidad.py`/`pagos.py`.
+10. ✅ **RESUELTO (Fase 6, #1184).** `routes/reportes.py` — sin `@limiter.limit` en los endpoints de
+    escritura (cerrar/reabrir mes, enviar mail) — mismo gap ya cerrado en `contabilidad.py`/`pagos.py`.
+    Fix: `@limiter.limit(ADMIN_WRITE_LIMIT)` en `enviar_reporte_mail`, `cerrar_mes_liquidacion`,
+    `reabrir_mes_liquidacion`.
 11. `/api/cotizar`, rama de línea personalizada (`equipo_id=None`) — no chequea `es_admin` en ese
     punto específico del código (aunque los endpoints que sí persisten ya exigen `require_admin` por
     fuera). Bajo riesgo real hoy; vale la pena que quede explícito si se toca ese código.

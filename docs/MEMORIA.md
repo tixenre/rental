@@ -704,6 +704,31 @@ en el dashboard admin — es el gap de gobernanza más directo detrás del miedo
 supervisor marca un motor de plata nuevo sin entrada en la tabla "fuente única" de `SISTEMA_PLATA.md`, o
 un PR de fix de plata reportado como shippeado sin confirmar merge real a `dev`/`main`.
 
+### 2026-07-02 — `reportes/liquidacion.py::filas_atribucion` perdía plata en silencio con `suma_items = 0`
+
+Fase 5 de la hoja de ruta de plata (#1184). Cuando todos los ítems de un pedido tenían `subtotal = 0`
+(ej. 100% de descuento a nivel ítem) pero `monto_total > 0`, el prorrateo (`monto_total * subtotal /
+NULLIF(suma_items, 0)`) daba `NULL` → se trataba como 0 → esa plata **desaparecía en silencio** del
+reporte de liquidación, sin que ningún chequeo de reconciliación lo cazara. Fix: cuando `suma_items = 0`,
+se reparte el `monto_total` en **partes iguales** entre los ítems del pedido (no hay base real de
+prorrateo cuando todos los subtotales son 0 — repartir parejo es el fallback neutral, no arbitrario
+hacia un dueño). Candado: `test_reportes_liquidacion_db.py::test_suma_items_cero_no_pierde_plata`
+(Postgres real). El supervisor marca cualquier prorrateo de plata con `NULLIF`/división que pueda dar
+`NULL`/0 sin un fallback explícito que garantice que el total nunca se pierde.
+
+### 2026-07-02 — Fase 3+6: lock de concurrencia en `reportes/cierres.py` + rate limit en `routes/reportes.py`
+
+Últimas dos fases de la hoja de ruta de plata (#1184; hallazgos #8/#10 de la auditoría cruzada).
+`cerrar_mes`/`reabrir_mes` ganan `_lock_mes(conn, mes)` (`pg_advisory_xact_lock`, mismo patrón que
+`contabilidad/commands/movimientos.py`) con namespace **propio** `_ADVISORY_NS_REPORTES_MES = 5390421`
+— NO comparte namespace con `_ADVISORY_NS_CONTAB_MES` (5390420) a propósito: son cierres independientes
+sobre invariantes distintos (reparto/comisiones vs. cajas/movimientos), compartir namespace bloquearía
+sin necesidad un cierre por el otro. Candado: `test_reportes_cierres_db.py::test_lock_serializa_cerrar_mes_concurrente`
+(Postgres real, dos conexiones + `threading.Event` — confirma que la segunda conexión queda bloqueada
+hasta que la primera libera el lock). `routes/reportes.py` gana `@limiter.limit(ADMIN_WRITE_LIMIT)` en
+los 3 endpoints de escritura (`enviar_reporte_mail`, `cerrar_mes_liquidacion`, `reabrir_mes_liquidacion`)
+— mismo gap ya cerrado en `contabilidad.py`/`pagos.py`.
+
 ### 2026-07-02 — `enviar_mail_factura` roto por 2 bugs encadenados (columna inexistente + kwarg inexistente)
 
 Fase 4 de la hoja de ruta de plata. `routes/facturacion.py::enviar_mail_factura` consultaba
@@ -755,6 +780,25 @@ que `pdf_templates.py` usa el helper y que `services/facturacion/engine.py` impo
 módulo quedan para PRs siguientes, mismo patrón. El supervisor marca un consumidor nuevo que reimplemente
 el desglose de un pedido en vez de llamar a `finanzas_flujo.pedido.desglose_de_pedido`, o un `service` que
 importe de un `route`.
+
+### 2026-07-02 — Fase 2 (última): reconciliación proactiva — mail al dueño + chequeo `desglose_divergente`
+
+Cierra la hoja de ruta de plata (#1184). El semáforo de reconciliación pasa de **100% manual** a
+**proactivo**: `services/finanzas_flujo/reconciliacion.py::estado(conn)` une los dos `reconciliar()`
+existentes (`reportes.reconciliacion` + `contabilidad.queries.reconciliacion`, que ya anidaba al
+primero) en un solo `ok`, sin reimplementar ningún chequeo. Nuevo job **`jobs/reconciliacion.py::chequear_reconciliacion_y_alertar`**,
+corrido 1×/día desde el mismo thread in-process del scheduler (junto a
+`enviar_recordatorios_retiro`/`purgar_cuentas_livianas_stale`, cero costo de infra nuevo): si `ok=False`,
+manda un mail resumen a cada `settings.admin_emails` vía `send_raw_email` — nunca propaga un fallo de
+envío ni tumba el scheduler. Nuevo chequeo **`desglose_divergente`** en `reportes/reconciliacion.py`:
+compara `alquileres.monto_total` persistido contra el desglose recalculado con el precio de línea YA
+PERSISTIDO de cada ítem (vía `finanzas_flujo.pedido.desglose_de_pedido`, no el de catálogo) — la red
+genérica que hubiera cazado el patrón del bug #405 sola, sin depender de que el dueño notara un reporte
+puntual. Candados: `test_finanzas_flujo_reconciliacion.py` (la fachada une bien los dos semáforos),
+`test_jobs_reconciliacion.py` (el job manda mail solo cuando corresponde, a cada admin, nunca propaga),
+`test_reportes_liquidacion_db.py::test_reconciliacion_caza_desglose_divergente_del_pedido` (Postgres
+real). El supervisor marca: un chequeo de reconciliación nuevo fuera de la fachada `finanzas_flujo`, o
+un job que repare en vez de solo avisar (el job es de alerta, no de reparación automática).
 
 ### 2026-07-03 — `routes/estadisticas.py`: las agregaciones leen `monto_total`, no reconstruyen el descuento (#1209)
 
