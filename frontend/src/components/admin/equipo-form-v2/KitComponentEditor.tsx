@@ -37,6 +37,78 @@ type Mode = "kit" | "combo";
 
 type UpdatePatch = { cantidad?: number; descuento_pct?: number | null; esencial?: boolean };
 
+/**
+ * Input numérico con borrador local — no dispara `onCommit` en cada tecla.
+ *
+ * Los campos de cantidad/descuento estaban atados directo al valor
+ * autoritativo (`items[]`, dueño del padre) y disparaban un PUT+reload
+ * completo por CADA tecla, que ponía el input en `disabled` mientras
+ * esperaba la respuesta. Efecto: apenas tipeabas, el campo se bloqueaba a
+ * mitad de edición y —peor— el próximo render lo pisaba con el valor
+ * confirmado por el server, así que nunca se podía dejar vacío para
+ * escribir de cero (arrancando en "0", tipear "5" daba "05": el "0" nunca
+ * llegaba a borrarse antes de que el valor volviera a pisarlo). Ahora se
+ * edita LIBRE en un string local; solo confirma (y recién ahí dispara la
+ * llamada) al salir del campo o con Enter. Si el valor no cambió, no pega
+ * a la red. `value`/`focused` en deps: re-sincroniza desde afuera (otro
+ * componente cambió el mismo ítem) pero SOLO cuando el campo no está en
+ * foco — no pisa una edición en curso.
+ */
+function DraftNumberInput({
+  value,
+  onCommit,
+  min,
+  max,
+  className,
+  disabled,
+  ariaLabel,
+}: {
+  value: number;
+  onCommit: (v: number) => void;
+  min: number;
+  max?: number;
+  className?: string;
+  disabled?: boolean;
+  ariaLabel?: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setDraft(String(value));
+  }, [value, focused]);
+
+  const commit = () => {
+    const parsed = parseFloat(draft.replace(",", "."));
+    const clamped = Number.isFinite(parsed)
+      ? Math.max(min, max != null ? Math.min(max, parsed) : parsed)
+      : value;
+    setDraft(String(clamped));
+    if (clamped !== value) onCommit(clamped);
+  };
+
+  return (
+    <Input
+      type="number"
+      min={min}
+      max={max}
+      value={draft}
+      className={className}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      onFocus={() => setFocused(true)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        setFocused(false);
+        commit();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+    />
+  );
+}
+
 const MODE_CONFIG = {
   kit: {
     errorPrefix: "Kit",
@@ -342,16 +414,12 @@ function SortableItem({
           {item.marca && <div className="text-xs text-muted-foreground">{item.marca}</div>}
         </div>
 
-        <Input
-          type="number"
-          min={1}
+        <DraftNumberInput
           value={item.cantidad}
+          min={1}
           className="w-16 h-8 text-center"
-          onChange={(e) =>
-            onUpdate(item.componente_id, {
-              cantidad: Math.max(1, parseInt(e.target.value || "1", 10)),
-            })
-          }
+          ariaLabel="Cantidad"
+          onCommit={(v) => onUpdate(item.componente_id, { cantidad: v })}
           disabled={busy === item.componente_id}
         />
         <Button
@@ -418,16 +486,12 @@ function SortableItem({
       <div className="flex items-center gap-2 pl-6">
         <div className="flex items-center gap-1">
           <span className="text-xs text-muted-foreground w-14">Cant.</span>
-          <Input
-            type="number"
-            min={1}
+          <DraftNumberInput
             value={item.cantidad}
+            min={1}
             className="w-16 h-7 text-center text-sm"
-            onChange={(e) =>
-              onUpdate(item.componente_id, {
-                cantidad: Math.max(1, parseInt(e.target.value || "1", 10)),
-              })
-            }
+            ariaLabel="Cantidad"
+            onCommit={(v) => onUpdate(item.componente_id, { cantidad: v })}
             disabled={busy === item.componente_id}
           />
         </div>
@@ -435,18 +499,13 @@ function SortableItem({
         <div className="flex items-center gap-1">
           <span className="text-xs text-muted-foreground w-16">Descuento</span>
           <div className="flex items-center gap-0.5">
-            <Input
-              type="number"
+            <DraftNumberInput
+              value={descuento}
               min={0}
               max={100}
-              step={1}
-              value={descuento}
               className="w-16 h-7 text-center text-sm"
-              onChange={(e) =>
-                onUpdate(item.componente_id, {
-                  descuento_pct: Math.max(0, Math.min(100, parseFloat(e.target.value || "0"))),
-                })
-              }
+              ariaLabel="Descuento"
+              onCommit={(v) => onUpdate(item.componente_id, { descuento_pct: v })}
               disabled={busy === item.componente_id}
             />
             <span className="text-xs text-muted-foreground">%</span>
