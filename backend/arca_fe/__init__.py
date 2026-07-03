@@ -13,7 +13,7 @@ el CONTRATO público — un cambio incompatible sube MAJOR. Un test de portabili
 verifica que el core nunca importe `backend.*`.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .modelos import (
     CondicionIva,
@@ -30,6 +30,9 @@ from .modelos import (
     CbteAsoc,
     ComprobanteRequest,
     CaeResult,
+    ItemIva,
+    Tributo,
+    Opcional,
 )
 from .comprobante import tipo_comprobante, calcular_importes, armar_fecae
 from .qr import armar_qr
@@ -61,6 +64,9 @@ __all__ = [
     "CbteAsoc",
     "ComprobanteRequest",
     "CaeResult",
+    "ItemIva",
+    "Tributo",
+    "Opcional",
     # lógica fiscal
     "tipo_comprobante",
     "calcular_importes",
