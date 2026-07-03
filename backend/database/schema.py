@@ -2167,9 +2167,9 @@ def _init_db_schema(conn):
             doc_nro                 TEXT NOT NULL,
             condicion_iva_receptor  INTEGER NOT NULL,
             concepto                INTEGER NOT NULL,
-            imp_neto                INTEGER NOT NULL,
-            imp_iva                 INTEGER NOT NULL DEFAULT 0,
-            imp_total               INTEGER NOT NULL,
+            imp_neto                NUMERIC(12,2) NOT NULL,
+            imp_iva                 NUMERIC(12,2) NOT NULL DEFAULT 0,
+            imp_total               NUMERIC(12,2) NOT NULL,
             moneda                  TEXT NOT NULL DEFAULT 'PES',
             cliente_cuit            TEXT,
             razon_social            TEXT,
@@ -2191,6 +2191,24 @@ def _init_db_schema(conn):
     """)
     conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_facturas_pedido ON facturas (pedido_id)
+    """)
+    # imp_neto/imp_iva/imp_total INTEGER → NUMERIC(12,2) (bug #1209): el CAE/QR de
+    # ARCA autorizan el importe EXACTO al centavo; truncarlo a entero acá dejaba el
+    # PDF impreso por debajo de lo que el comprobante fiscal autorizó. Idempotente
+    # (no-op si ya está migrado); también en migración h3i4j5k6l7m8.
+    conn.execute("""
+        DO $$
+        BEGIN
+            IF (SELECT data_type FROM information_schema.columns
+                WHERE table_name = 'facturas' AND column_name = 'imp_neto') = 'integer' THEN
+                ALTER TABLE facturas ALTER COLUMN imp_neto TYPE NUMERIC(12,2)
+                    USING imp_neto::NUMERIC(12,2);
+                ALTER TABLE facturas ALTER COLUMN imp_iva TYPE NUMERIC(12,2)
+                    USING imp_iva::NUMERIC(12,2);
+                ALTER TABLE facturas ALTER COLUMN imp_total TYPE NUMERIC(12,2)
+                    USING imp_total::NUMERIC(12,2);
+            END IF;
+        END $$;
     """)
 
     conn.execute("""

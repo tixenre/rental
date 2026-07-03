@@ -144,7 +144,7 @@ Test de regresión: `backend/tests/test_facturacion_gating.py`.
 | `doc_tipo` / `doc_nro` | INTEGER / TEXT | CUIT del receptor |
 | `condicion_iva_receptor` | INTEGER | 1=RI, 4=Ex, 5=CF, 6=MT |
 | `concepto` | INTEGER | 1=Productos, 2=Servicios, 3=Ambos |
-| `imp_neto` / `imp_iva` / `imp_total` | INTEGER | **Pesos enteros ARS** (sin centavos) |
+| `imp_neto` / `imp_iva` / `imp_total` | NUMERIC(12,2) | Decimal exacto al centavo — igual al valor enviado a ARCA/QR (bug #1209) |
 | `moneda` | TEXT | Siempre `'PES'` |
 | `cliente_cuit` / `razon_social` | TEXT | Snapshot del receptor |
 | `qr_payload` | TEXT | URL AFIP-QR embebida en el PDF |
@@ -197,6 +197,7 @@ Las tres tablas del sistema están en ambas capas, conforme a la regla _2026-06-
 - `a2b3c4d5e6f7_facturas_arca.py` — tablas `facturas` y `afip_ta`
 - `b1c2d3e4f5a6_emisores_arca.py` — tabla `emisores_arca`
 - `c2d3e4f5a6b7_merge_facturacion_heads.py` — merge de los dos heads anteriores
+- `h3i4j5k6l7m8_facturas_centavos_numeric.py` — `imp_neto`/`imp_iva`/`imp_total` INTEGER → NUMERIC(12,2) (bug #1209)
 
 ---
 
@@ -254,7 +255,12 @@ Importar de ahí; no recrear variantes.
 2. **Gating default-deny** → homologación si hay duda; producción solo con `is_production`.
 3. **Credenciales en `emisores_arca`** cifradas con Fernet (`ARCA_MASTER_KEY` en Railway ENV) → nunca en `app_settings` (GET público + clon de staging).
 4. **No tocar el core de reservas** → `emitir_factura` hace SELECTs de lectura, sin locks del motor.
-5. **Plata en enteros ARS** → `int(round(float(importes[...])))`, sin centavos.
+5. **Plata al centavo exacto, NUNCA enteros ARS** → `imp_neto`/`imp_iva`/`imp_total` persisten el mismo
+   `Decimal` que ya se le mandó a ARCA (`calcular_importes`) y se codificó en el QR fiscal (`armar_qr`).
+   Esta tabla es la ÚNICA excepción a la convención de "enteros ARS" de la plata interna
+   (`backend/contabilidad/`, 2026-06-07): es un documento fiscal, no plata interna — redondear acá
+   dejaba el comprobante impreso por debajo de lo que el CAE/QR autorizaron ante ARCA (bug #1209).
 6. **Emisor resuelto por `emisor_para`** → fuente única; no duplicar la regla RI→pablo.
 
-El supervisor marca cualquier violación de estas reglas. Tracking: issue #1139.
+El supervisor marca cualquier violación de estas reglas, incluida la reintroducción de un
+`int(round(...))` sobre `imp_neto`/`imp_iva`/`imp_total`. Tracking: issue #1139, #1209.
