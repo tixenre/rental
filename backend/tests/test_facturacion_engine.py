@@ -103,7 +103,7 @@ def _fake_pedido() -> dict:
         "cliente_perfil_impuestos": "consumidor_final",
         "cliente_cuit": None,
         "cliente_dni": "42289220",
-        "cliente_nombre": "Ignacio Beramendi",
+        "cliente_nombre": "Juan Pérez",
         "fecha_desde": "2026-06-30",
         "fecha_hasta": "2026-07-01",
         "items": [],

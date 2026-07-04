@@ -11,6 +11,7 @@ import { TableSkeleton, ListSkeleton, CardGridSkeleton } from "@/components/admi
 import { EmptyState } from "@/design-system/composites/EmptyState";
 import { ErrorState } from "@/components/admin/ErrorState";
 import { QueryState } from "@/components/admin/QueryState";
+import { Chequeos, type Chequeo } from "@/design-system/composites/Chequeos";
 
 type Demo = { items: number[] };
 
@@ -124,6 +125,36 @@ export const statesSection: CatalogSection = {
           </Panel>
         </div>
       ),
+    },
+    {
+      name: "Chequeos",
+      files: ["design-system/composites/Chequeos.tsx"],
+      blurb:
+        "Lista de validaciones con 3 estados: ok (verde), falla bloqueante (X roja), falla no-bloqueante (triángulo ámbar). Mismo shape que devuelve el backend de facturación (previsualizar_factura/diagnosticar_emisor).",
+      render: () => {
+        const items: Chequeo[] = [
+          { check: "cert", ok: true, bloqueante: true, mensaje: "Certificado cargado y vigente" },
+          {
+            check: "domicilio",
+            ok: false,
+            bloqueante: false,
+            mensaje: "Sin domicilio configurado — se omite del PDF",
+          },
+          {
+            check: "cuit",
+            ok: false,
+            bloqueante: true,
+            mensaje: "CUIT del emisor inválido — no se puede facturar",
+          },
+        ];
+        return (
+          <Panel label="Chequeos">
+            <div className="p-3">
+              <Chequeos items={items} />
+            </div>
+          </Panel>
+        );
+      },
     },
   ],
 };

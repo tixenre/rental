@@ -110,11 +110,22 @@ def _doc_response(
     return None  # caller sigue con PDF
 
 
-async def _doc_response_or_pdf(html_str: str, pdf_filename: str, format: str, page_size=None):
+async def _doc_response_or_pdf(
+    html_str: str, pdf_filename: str, format: str, page_size=None, cert_pair=None
+):
+    """`cert_pair` (cert_pem, key_pem) es opcional: solo la factura ARCA lo pasa — los otros 4
+    documentos (remito/contrato/albarán/packing-list) no llevan CAE/QR fiscal y no se firman."""
     preview = _doc_response(html_str, pdf_filename, format)
     if preview is not None:
         return preview
     pdf_bytes = await _render_pdf(html_str, page_size=page_size)
+    if cert_pair is not None:
+        import asyncio
+
+        from arca_fe import asegurar_pdf
+
+        cert_pem, key_pem = cert_pair
+        pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     from fastapi.responses import Response
     return Response(
         content=pdf_bytes,
@@ -184,16 +195,16 @@ async def cliente_pedido_packing_list(id: int, request: Request, format: str = "
 @router.get("/api/cliente/pedidos/{id}/factura.pdf")
 @router.get("/api/cliente/pedidos/{id}/factura")
 async def cliente_pedido_factura(
-    id: int, request: Request, format: str = "pdf", layout: str = "celular"
+    id: int, request: Request, format: str = "pdf", layout: str = "simplificada"
 ):
     """Factura ARCA del pedido. A diferencia de remito/contrato/albarán, no
     depende del estado del pedido sino de si la factura ya fue emitida —
     aparece como documento recién ahí, no antes (y desaparece si se anula).
-    `layout`: 'celular' (default de Rambla, compacta 4:5) · 'clasica' (réplica
-    oficial AFIP/ARCA, A4) · 'formal'."""
+    `layout`: 'simplificada' (default de Rambla, compacta 4:5, mínimo 1080×1350) · 'oficial'
+    (réplica AFIP/ARCA, A4) · 'detallada' (A4, con el detalle completo)."""
     session = require_cliente(request)
-    if layout not in ("clasica", "celular", "formal"):
-        layout = "celular"
+    from arca_fe.render import normalizar_layout
+    layout = normalizar_layout(layout)
     with get_db() as conn:
         row = conn.execute(
             "SELECT id FROM alquileres WHERE id = %s AND cliente_id = %s",
@@ -208,15 +219,27 @@ async def cliente_pedido_factura(
             raise HTTPException(404, "Todavía no hay factura para este pedido.")
 
         from services.facturacion.engine import _get_pedido
-        from services.facturacion.pdf import factura_html, factura_filename, page_size_for_layout
+        from services.facturacion.comprobante_render import factura_html, factura_filename
+        from arca_fe.render import tamano_pagina_layout
         pedido_data = _get_pedido(conn, id)
         try:
             html_str = factura_html(factura, pedido_data, layout=layout)
-        except RuntimeError as e:
+        except (ValueError, RuntimeError) as e:
+            # ValueError: ComprobanteFiscal incompleto (falta CAE/número/vencimiento/QR).
+            # RuntimeError: catálogo ARCA nunca refrescado (services.facturacion.catalogos).
             raise HTTPException(503, str(e))
+
+        # A diferencia de remito/contrato/albarán/packing-list (sin CAE/QR fiscal), la factura sí
+        # se firma/protege — mismo tratamiento que el canal admin (`descargar_pdf_factura`), antes
+        # esta asimetría dejaba el PDF del portal cliente sin proteger.
+        cert_pair = None
+        if format != "html":
+            from services.facturacion.signing_cert import get_or_create_signing_cert
+            cert_pair = get_or_create_signing_cert(conn)
 
     return await _doc_response_or_pdf(
         html_str, factura_filename(factura, layout=layout), format,
-        page_size=page_size_for_layout(layout),
+        page_size=tamano_pagina_layout(layout),
+        cert_pair=cert_pair,
     )
 

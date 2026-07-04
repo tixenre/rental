@@ -33,7 +33,11 @@ from .errores import ArcaAuthError, ArcaNetworkError, ArcaResponseError
 
 _logger = logging.getLogger(__name__)
 
-_WSAA_SERVICE = "wsfe"
+WSFE_WSAA_SERVICIO = "wsfe"
+"""El `servicio` WSAA para facturación (WSFEv1) — pasalo a `construir_tra`/`login_con_cert` en vez
+de hardcodear `"wsfe"` a mano (mismo motivo que `arca_fe.padron.WSAA_SERVICIO`: un id de servicio
+mal escrito rompe la autenticación en silencio contra AFIP, no da un error claro)."""
+
 _TRA_TTL_SECONDS = 12 * 3600  # 12 h — AFIP rechaza expirationTime > 24 h
 
 
@@ -43,7 +47,7 @@ _TRA_TTL_SECONDS = 12 * 3600  # 12 h — AFIP rechaza expirationTime > 24 h
 
 
 def construir_tra(
-    servicio: str = _WSAA_SERVICE,
+    servicio: str = WSFE_WSAA_SERVICIO,
     *,
     ahora: Optional[datetime] = None,
     ttl: int = _TRA_TTL_SECONDS,

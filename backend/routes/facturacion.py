@@ -76,6 +76,25 @@ def estado_facturacion(request: Request):
     }
 
 
+@router.get("/admin/facturacion/layouts")
+def listar_layouts_factura(request: Request):
+    """Layouts disponibles para renderizar una factura (`arca_fe.LAYOUTS_INFO`), con
+    nombre/descripción/advertencia para que el front arme un selector real — nunca hardcodear ese
+    copy en el frontend, es la misma fuente que usa `renderizar_comprobante_html` puertas adentro."""
+    require_admin(request)
+    from arca_fe import LAYOUTS_INFO
+
+    return [
+        {
+            "id": info.id,
+            "nombre": info.nombre,
+            "descripcion": info.descripcion,
+            "advertencia": info.advertencia,
+        }
+        for info in LAYOUTS_INFO
+    ]
+
+
 @router.post("/admin/arca/catalogos/refrescar")
 def refrescar_catalogos_arca(request: Request):
     """Actualiza los catálogos de ARCA (doc_tipo/concepto/condición IVA
@@ -528,12 +547,12 @@ def listar_facturas(
 _DOC_NO_CACHE = {"Cache-Control": "no-store, max-age=0"}
 
 
-def _factura_html_o_404(factura_id: int, conn, layout: str = "celular"):
+def _factura_html_o_404(factura_id: int, conn, layout: str = "simplificada"):
     """Carga la factura + renderiza su HTML al vuelo. La factura no cambia una
     vez emitida, así que no hace falta guardar el PDF: regenerar da lo mismo."""
     from services.facturacion.repo import get_by_id
     from services.facturacion.engine import _get_pedido
-    from services.facturacion.pdf import factura_html
+    from services.facturacion.comprobante_render import factura_html
 
     factura = get_by_id(factura_id, conn)
     if factura is None:
@@ -544,41 +563,62 @@ def _factura_html_o_404(factura_id: int, conn, layout: str = "celular"):
     pedido = _get_pedido(conn, factura.pedido_id)
     try:
         html_str = factura_html(factura, pedido, layout=layout)
-    except RuntimeError as e:
+    except (ValueError, RuntimeError) as e:
+        # ValueError: ComprobanteFiscal incompleto (falta CAE/número/vencimiento/QR).
+        # RuntimeError: catálogo ARCA nunca refrescado (services.facturacion.catalogos).
         raise HTTPException(503, str(e))
     return factura, html_str
 
 
 @router.get("/facturas/{factura_id}/pdf")
 async def descargar_pdf_factura(
-    factura_id: int, request: Request, format: str = "pdf", layout: str = "celular"
+    factura_id: int, request: Request, format: str = "pdf", layout: str = "simplificada"
 ):
-    """PDF de una factura, renderizado on-demand. `format=html` devuelve el preview
-    (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py).
-    `layout`: 'celular' (default de Rambla — compacta 4:5) · 'clasica' (réplica
-    oficial AFIP/ARCA, A4) · 'formal' (A4, identidad de la celular)."""
+    """PDF (o imagen) de una factura, renderizado on-demand. `format=html` devuelve el preview
+    rápido (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py);
+    `format=imagen` devuelve un PNG del mismo layout — artefacto liviano de "compartir rápido"
+    (ej. por WhatsApp), NO firmado/protegido como el PDF, no reemplaza al documento certificado.
+    `layout`: 'simplificada' (default de Rambla — compacta 4:5, mínimo 1080×1350, NO admite
+    desglose de cantidad/precio unitario) · 'oficial' (réplica AFIP/ARCA, A4) · 'detallada' (A4,
+    identidad de la simplificada, con el detalle completo). Ver `GET /admin/facturacion/layouts`
+    (`arca_fe.LAYOUTS_INFO`) para la descripción completa de cada uno."""
     require_admin(request)
 
-    if layout not in ("clasica", "celular", "formal"):
-        layout = "celular"
+    from arca_fe.render import normalizar_layout
+    layout = normalizar_layout(layout)
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
-        if format == "html":
+        if format in ("html", "imagen"):
             cert_pem = key_pem = None
         else:
-            from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+            from services.facturacion.signing_cert import get_or_create_signing_cert
             cert_pem, key_pem = get_or_create_signing_cert(conn)
 
     if format == "html":
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
 
+    from arca_fe.render import tamano_pagina_layout
+    from services.facturacion.comprobante_render import factura_filename
+
+    if format == "imagen":
+        from pdf import _render_imagen
+        try:
+            img_bytes = await _render_imagen(html_str, page_size=tamano_pagina_layout(layout))
+        except Exception as e:
+            raise HTTPException(503, f"No se pudo generar la imagen: {e}")
+        nombre = factura_filename(factura, layout=layout).replace(".pdf", ".png")
+        return Response(
+            content=img_bytes,
+            media_type="image/png",
+            headers={"Content-Disposition": f'attachment; filename="{nombre}"', **_DOC_NO_CACHE},
+        )
+
     from pdf import _render_pdf
-    from services.facturacion.pdf import factura_filename, page_size_for_layout
-    from services.facturacion.pdf_seguridad import asegurar_pdf
+    from arca_fe import asegurar_pdf
     try:
-        pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
+        pdf_bytes = await _render_pdf(html_str, page_size=tamano_pagina_layout(layout))
         # asegurar_pdf firma con pyhanko, cuyo sign_pdf sync internamente hace
         # asyncio.run() — explota si se llama directo desde acá (ya estamos
         # dentro del loop de FastAPI). to_thread lo corre en un thread aparte,
@@ -607,15 +647,18 @@ async def descargar_pdf_factura(
 # Sin @map_pg_errors: es async y el decorator no le hace `await` a la corrutina
 # (mismo motivo por el que `subir_comprobante`, también async, en contabilidad.py
 # no lo lleva) — no hay escritura propensa a UniqueViolation acá de todos modos.
-async def enviar_mail_factura(factura_id: int, request: Request):
+async def enviar_mail_factura(factura_id: int, request: Request, layout: str = "simplificada"):
     """Envía el PDF de la factura (renderizado on-demand) al email del cliente del pedido."""
     require_admin(request)
 
+    from arca_fe.render import normalizar_layout
+    layout = normalizar_layout(layout)
+
     from services.email import send_raw_email, Attachment
-    from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+    from services.facturacion.signing_cert import get_or_create_signing_cert
 
     with get_db() as conn:
-        factura, html_str = _factura_html_o_404(factura_id, conn)
+        factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
         cert_pem, key_pem = get_or_create_signing_cert(conn)
 
         # Email del cliente: está en el pedido
@@ -636,18 +679,21 @@ async def enviar_mail_factura(factura_id: int, request: Request):
     nombre_cliente = f"{row['nombre'] or ''} {row['apellido'] or ''}".strip() or email_cliente
 
     from pdf import _render_pdf
-    from services.facturacion.pdf import factura_filename
-    from services.facturacion.pdf_seguridad import asegurar_pdf
+    from arca_fe import asegurar_pdf
+    from arca_fe.render import tamano_pagina_layout
+    from services.facturacion.comprobante_render import factura_filename
     try:
-        pdf_bytes = await _render_pdf(html_str)
+        pdf_bytes = await _render_pdf(html_str, page_size=tamano_pagina_layout(layout))
         pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF para el mail: {e}")
 
-    cbte_tipo_letra = {1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C"}.get(
-        factura.cbte_tipo, "X"
-    )
-    filename = factura_filename(factura)
+    from arca_fe import letra_comprobante
+    try:
+        cbte_tipo_letra = letra_comprobante(factura.cbte_tipo)
+    except ValueError:
+        cbte_tipo_letra = "X"
+    filename = factura_filename(factura, layout=layout)
 
     nro = f"{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}"
     subject = f"Tu factura {cbte_tipo_letra} Nº {nro} — Rambla Rental"

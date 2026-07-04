@@ -1,88 +1,55 @@
-"""services.facturacion.pdf — templates HTML de la factura electrónica ARCA.
+"""arca_fe.render — arma el HTML de comprobantes fiscales (Factura A/B/C, Nota de Crédito).
+PORTABLE. (Se llama `render`, no `pdf`: este módulo nunca generó bytes de PDF — solo HTML; el
+nombre viejo databa de cuando la librería sí lo hacía. Convertir a PDF es responsabilidad del
+consumidor, ver más abajo.)
 
-Tres piezas, un mismo contexto (`_build_ctx`): **clásica** (réplica fiel del
-comprobante oficial AFIP/ARCA, A4 imprimible — la que reemplaza al PDF fiscal
-"de las dudas"), **celular** (comprobante vertical compacto pensado para
-compartir por WhatsApp) y **formal** (A4 con la identidad visual de la
-celular, alternativa prolija a la clásica). Autocontenidas (fonts + logo ARCA
-inline en base64/SVG) listas para Playwright → PDF.
+Tres layouts, un mismo contexto interno (`_build_ctx`) — cada uno con su `LayoutInfo` (`id`,
+`nombre`, `descripcion`, `advertencia`) en `LAYOUTS_INFO`, para que el consumidor arme un selector
+real con esas mismas descripciones en vez de inventar copy propio:
 
-Diseño: handoff "Facturas Rambla" (Claude Design), alta fidelidad — colores,
-tipografías, tamaños y espaciados son finales, replicados 1:1.
+- **`oficial`**: réplica fiel del comprobante oficial AFIP/ARCA, A4 imprimible. Detalle completo
+  por ítem (cantidad, unidad de medida, precio unitario, bonificación).
+- **`detallada`**: A4 con identidad visual moderna, mismo nivel de detalle que `oficial` — una
+  alternativa prolija, no un resumen.
+- **`simplificada`**: comprobante vertical compacto 4:5, pensado para compartir (WhatsApp/redes) —
+  el default. **No es "la versión para celular" de las otras dos** — es un tipo de comprobante
+  distinto: cada ítem se resume a descripción + importe, SIN cantidad/precio unitario/bonificación.
+  **Esto se hace cumplir en código, no es solo una advertencia**: si algún ítem necesita mostrar
+  cantidad != 1, bonificación, unidad de medida no estándar o detalle adicional,
+  `renderizar_comprobante_html` levanta `ValueError` en vez de generar un comprobante que esconde
+  esa información — para esos casos usar `oficial` o `detallada` (`_validar_apto_para_simplificada`).
+
+Los tres son agnósticos de marca: usan el logo oficial de ARCA (la agencia, no el emisor) y
+muestran todo lo que AFIP exige (CAE, QR fiscal RG4892, discriminación de IVA, leyenda de
+Transparencia Fiscal al Consumidor Ley 27.743) — nunca dependen de un tema/branding para ser
+válidos.
+
+Este módulo devuelve HTML (string), no PDF — no carga la dependencia de un motor de render
+(Playwright/Chromium). Convertir a PDF, firmarlo/protegerlo (`arca_fe.seguridad.asegurar_pdf`) y
+decidir el canal de entrega (descarga, mail, portal) es responsabilidad del consumidor.
 """
 from __future__ import annotations
 
 import html as _html
 import os
+from dataclasses import dataclass
 from datetime import date
 from functools import lru_cache
 
-# ---------------------------------------------------------------------------
-# Letra + "es nota de crédito" del comprobante — esto NO es una traducción de
-# ARCA que podamos pedirle mal (como pasaba con el padrón): es el ESQUEMA de
-# numeración de `FEParamGetTiposCbte`, fijo desde que existe WSFEv1 (1/3=A,
-# 6/8=B, 11/13=C — el mismo id que ya usa `arca_fe.modelos.CbteTipo` para
-# armar el pedido de CAE). Pedirle esto a ARCA en cada render sería consultar
-# un catálogo para reconstruir un esquema que el propio código ya necesita
-# saber de antemano para EMITIR el comprobante — al revés de doc_tipo/
-# concepto/condición IVA, que son prosa que sí podemos traer tal cual.
-# ---------------------------------------------------------------------------
-
-_CBTE_TIPO_LABEL: dict[int, str] = {
-    1: "A", 3: "A", 6: "B", 8: "B", 11: "C", 13: "C",
-}
-_CBTE_TIPO_NOTA: dict[int, bool] = {
-    3: True, 8: True, 13: True,
-}
-
-# Doc tipo / concepto / condición IVA receptor: las ETIQUETAS salen de ARCA
-# (`FEParamGetTiposDoc`/`FEParamGetTiposConcepto`/`FEParamGetCondicionIvaReceptor`,
-# cacheadas — ver `services.facturacion.catalogos`), no de una traducción
-# escrita a mano acá. Si el catálogo nunca se refrescó, `_catalogo` falla
-# fuerte (RuntimeError → 503) en vez de mostrar un texto inventado.
-
-
-def _catalogo(fn, id_) -> str:
-    from database import get_db
-
-    conn = get_db()
-    try:
-        return fn(id_, conn)
-    finally:
-        conn.close()
-
-
-# Alícuotas de IVA — MISMA fuente que la que arma el pedido de CAE
-# (`arca_fe.modelos.IVA_0/10_5/21/27`, id del WS FEParamGetTiposIva ya
-# verificado para la emisión real). Nunca un segundo listado separado: si se
-# agrega una alícuota nueva, se agrega ahí y acá lo hereda solo.
-def _alicuotas_iva_pct() -> tuple[float, ...]:
-    from arca_fe.modelos import IVA_0, IVA_10_5, IVA_21, IVA_27
-
-    return tuple(float(a.pct) for a in (IVA_0, IVA_10_5, IVA_21, IVA_27))
-
-
-def _iva_pct_label(imp_neto, imp_iva) -> str:
-    """% de IVA a mostrar, DERIVADO de los importes reales de la factura (no
-    un valor fijo) — necesario para no asumir 21% en un motor que otro
-    negocio pueda usar con otra alícuota."""
-    if not imp_neto:
-        return "21%"
-    pct_crudo = float(imp_iva) / float(imp_neto) * 100
-    pct = min(_alicuotas_iva_pct(), key=lambda p: abs(p - pct_crudo))
-    texto = f"{pct:.1f}".rstrip("0").rstrip(".").replace(".", ",")
-    return f"{texto}%"
-
-# `condicion_iva` del EMISOR es un string propio de `emisores_arca`
-# (_CONDICIONES_VALIDAS en emisores_repo.py) — vocabulario NUESTRO (no de
-# ARCA), tabla distinta a la del receptor (códigos numéricos de ARCA,
-# `label_condicion_iva_receptor` en `services.facturacion.catalogos`).
-_EMISOR_COND_IVA_LABEL: dict[str, str] = {
-    "responsable_inscripto": "IVA Responsable Inscripto",
-    "monotributo": "Responsable Monotributo",
-    "exento": "IVA Exento",
-}
-
+from .modelos import (
+    IVA_0,
+    IVA_10_5,
+    IVA_21,
+    IVA_27,
+    CbteTipo,
+    ComprobanteFiscal,
+    DocTipo,
+    Receptor,
+    es_nota_credito,
+    letra_comprobante,
+)
+from .qr import qr_svg
+from .validadores import formatear_cuit
 
 # ---------------------------------------------------------------------------
 # Helpers de formato
@@ -90,8 +57,7 @@ _EMISOR_COND_IVA_LABEL: dict[str, str] = {
 
 
 def _money(n) -> str:
-    """'$ 217.800,00' — 2 decimales (estándar AFIP; el comprobante fiscal
-    reproduce el formato oficial, a diferencia del Presupuesto prefiscal)."""
+    """'$ 217.800,00' — 2 decimales (estándar AFIP)."""
     return "$ " + _plain(n)
 
 
@@ -118,72 +84,73 @@ def _e(s) -> str:
     return _html.escape(str(s or ""))
 
 
-_EMISOR_ROW_CAMPOS = ("razon_social", "cuit", "condicion_iva", "domicilio", "iibb", "inicio_actividades")
+def _alicuotas_iva_pct() -> tuple[float, ...]:
+    return tuple(float(a.pct) for a in (IVA_0, IVA_10_5, IVA_21, IVA_27))
 
 
-def _emisor_row(nombre: str) -> dict:
-    """Lee los datos legales del emisor desde `emisores_arca` — administrables
-    desde el back-office, NUNCA hardcodeados por nombre (un emisor nuevo
-    heredaba en silencio los datos de "santini" antes de este fix)."""
-    try:
-        from database import get_db
-        conn = get_db()
+def _iva_pct_label(imp_neto, imp_iva) -> str:
+    """% de IVA a mostrar, DERIVADO de los importes reales de la factura (no un valor fijo)."""
+    if not imp_neto:
+        return "21%"
+    pct_crudo = float(imp_iva) / float(imp_neto) * 100
+    pct = min(_alicuotas_iva_pct(), key=lambda p: abs(p - pct_crudo))
+    texto = f"{pct:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{texto}%"
+
+
+def _receptor_doc_nro_fmt(receptor: Receptor) -> str:
+    """CUIT/CUIL con guiones (`XX-XXXXXXXX-X`); DNI/Consumidor Final tal cual (no son un CUIT de
+    11 dígitos, formatear_cuit no aplica)."""
+    if receptor.doc_tipo in (DocTipo.CUIT, DocTipo.CUIL):
         try:
-            row = conn.execute(
-                "SELECT razon_social, cuit, condicion_iva, domicilio, iibb, inicio_actividades "
-                "FROM emisores_arca WHERE nombre = %s",
-                (nombre,),
-            ).fetchone()
-        finally:
-            conn.close()
-        if row:
-            return {campo: row[campo] or "" for campo in _EMISOR_ROW_CAMPOS}
-    except Exception:
-        pass
-    return {campo: "" for campo in _EMISOR_ROW_CAMPOS}
+            return formatear_cuit(receptor.doc_nro)
+        except ValueError:
+            return str(receptor.doc_nro)
+    if receptor.doc_tipo == DocTipo.CONSUMIDOR_FINAL and not receptor.doc_nro:
+        return "—"
+    return str(receptor.doc_nro)
+
+
+def _emisor_cuit_fmt(raw: str) -> str:
+    """CUIT del emisor con guiones si normaliza bien; el crudo (o "—") si no — el emisor viene de
+    una consulta de configuración aparte que puede estar incompleta/desactualizada, nunca debe
+    romper el render de una factura ya emitida."""
+    if not raw:
+        return "—"
+    try:
+        return formatear_cuit(raw)
+    except ValueError:
+        return raw
+
+
+def _transparencia_fiscal_lines(f: dict) -> tuple[str, str, str]:
+    """Texto de la leyenda de Transparencia Fiscal al Consumidor (Ley 27.743 / RG 5614), con los
+    importes REALES de la factura — nunca hardcodeados."""
+    return (
+        "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)",
+        f"IVA Contenido: {f['tot']['ivaStr']}",
+        f"Otros Impuestos Nacionales Indirectos: {f['tot']['otrosStr']}",
+    )
+
+
+def _qr_img(url: str, size: int) -> str:
+    """SVG inline (vectorial — no se pixela en ningún zoom), envuelto en un link clickeable al
+    mismo `url` que codifica el QR — quien no pueda escanearlo puede abrir el link a mano y
+    verificar el comprobante igual. Nunca atrapa errores: si `segno` no puede generarlo, el caller
+    tiene que fallar fuerte, no entregar un comprobante con un hueco donde debería ir el QR exigido
+    por RG4892."""
+    svg = qr_svg(url, size)
+    svg = svg.replace("<svg ", '<svg style="display:block" ', 1)
+    return f'<a href="{_e(url)}" style="display:block;">{svg}</a>'
 
 
 # ---------------------------------------------------------------------------
-# Fuentes (TT Commons + JetBrains Mono, vendoreadas — mismas que usa la web)
-# y logo ARCA (SVG inline, `fill=currentColor` para teñir por contexto).
-# Playwright renderiza con base `about:blank`: todo va embebido, nada de
-# `<img src="archivo-relativo">`.
+# Logo ARCA (SVG inline, `fill=currentColor` para teñir por contexto) — agnóstico de marca: es el
+# isologo oficial de la AGENCIA (ex-AFIP), no del emisor. Playwright renderiza con base
+# `about:blank`: todo va embebido, nada de `<img src="archivo-relativo">`.
 # ---------------------------------------------------------------------------
-
-_FONTS_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "frontend", "public", "fonts", "woff2"
-)
-_FONT_FILES = [
-    ("tt-commons-400.woff2", "TT Commons", 400),
-    ("tt-commons-500.woff2", "TT Commons", 500),
-    ("tt-commons-600.woff2", "TT Commons", 600),
-    ("tt-commons-700.woff2", "TT Commons", 700),
-    ("tt-commons-800.woff2", "TT Commons", 800),
-    ("jetbrains-mono-400.woff2", "JetBrains Mono", 400),
-    ("jetbrains-mono-500.woff2", "JetBrains Mono", 500),
-]
 
 _ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
-
-
-@lru_cache(maxsize=1)
-def _fonts_css() -> str:
-    import base64
-
-    faces = []
-    for fname, family, weight in _FONT_FILES:
-        path = os.path.join(_FONTS_DIR, fname)
-        try:
-            with open(path, "rb") as fh:
-                b64 = base64.b64encode(fh.read()).decode("ascii")
-        except OSError:
-            continue
-        faces.append(
-            f"@font-face{{font-family:'{family}';font-weight:{weight};"
-            f"font-style:normal;font-display:swap;"
-            f"src:url(data:font/woff2;base64,{b64}) format('woff2')}}"
-        )
-    return "<style>" + "".join(faces) + "</style>"
 
 
 @lru_cache(maxsize=1)
@@ -193,7 +160,6 @@ def _arca_logo_svg() -> str:
             svg = fh.read()
     except OSError:
         return ""
-    # Descartar el prolog XML (ruido dentro de un doc HTML) y teñir por CSS.
     svg = svg.split("?>", 1)[-1].strip() if svg.lstrip().startswith("<?xml") else svg
     if "<svg " in svg and "fill=" not in svg.split(">", 1)[0]:
         svg = svg.replace("<svg ", '<svg fill="currentColor" ', 1)
@@ -210,177 +176,131 @@ def _arca_logo(width: int) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Contexto único (mismo dato para las 3 piezas)
+# Layout "simplificada" — tamaño de página fijo 4:5, mínimo 1080×1350
+# ---------------------------------------------------------------------------
+
+# La simplificada es una TARJETA de esquinas redondeadas flotando sobre un fondo (no un rectángulo
+# a página completa) — el ancho de página incluye el margen visible alrededor de la tarjeta en los
+# 4 lados. Proporción 4:5 FIJA (identidad visual): header/CAE/info/emisor-receptor arriba y
+# QR/total/leyendas abajo quedan anclados en su lugar; lo único que se ajusta con la cantidad de
+# conceptos es el espacio del medio — la tarjeta en sí nunca cambia de alto.
+#
+# El diseño (fuentes/paddings/radios de acá abajo) está afinado en unidades "nativas" (tarjeta de
+# 640px) — no se re-tocan a mano para exportar más grande. En cambio, `.page` en el HTML de más
+# abajo declara ESTE tamaño nativo pero le suma `zoom:{_SIMPLIFICADA_ZOOM}`: Chromium reescala TODO
+# el árbol (fuentes, radios, el QR, todo) proporcionalmente antes de imprimir/capturar, así el
+# export siempre sale al tamaño mínimo pedido (1080×1350, equivalente a un post vertical de
+# Instagram) sin que el diseño interno tenga que conocer ese número.
+_SIMPLIFICADA_DISENO_ANCHO = 640
+_SIMPLIFICADA_DISENO_MARGEN = 24
+_SIMPLIFICADA_FONDO = "#f4f2ef"
+_SIMPLIFICADA_DISENO_PAGE_ANCHO = _SIMPLIFICADA_DISENO_ANCHO + 2 * _SIMPLIFICADA_DISENO_MARGEN
+_SIMPLIFICADA_DISENO_PAGE_ALTO = round(_SIMPLIFICADA_DISENO_PAGE_ANCHO * 5 / 4)  # ancho:alto = 4:5
+_SIMPLIFICADA_DISENO_CARD_ALTO = _SIMPLIFICADA_DISENO_PAGE_ALTO - 2 * _SIMPLIFICADA_DISENO_MARGEN
+
+# Tamaño MÍNIMO de export pedido por el dueño (equivalente a un post vertical de Instagram) — 4:5
+# exacto (1080:1350). Es lo que se le pide a Playwright como página/viewport; el `zoom` de arriba
+# hace que el diseño nativo (afinado en 640px) llene exactamente este tamaño.
+SIMPLIFICADA_PAGE_WIDTH = 1080
+SIMPLIFICADA_PAGE_HEIGHT = 1350
+_SIMPLIFICADA_ZOOM = SIMPLIFICADA_PAGE_WIDTH / _SIMPLIFICADA_DISENO_PAGE_ANCHO
+
+
+def tamano_pagina_layout(layout: str) -> tuple[int, int | None] | None:
+    """Tamaño de página para convertir el HTML a PDF/imagen (ej. `page.pdf(...)`/
+    `page.screenshot(...)` de Playwright). `None` → A4 (default, `oficial`/`detallada`). Un tuple →
+    tamaño propio en píxeles (`simplificada`: 1080×1350, proporción 4:5 fija)."""
+    return (
+        (SIMPLIFICADA_PAGE_WIDTH, SIMPLIFICADA_PAGE_HEIGHT) if layout == "simplificada" else None
+    )
+
+
+def nombre_fiscal_comprobante(cbte_tipo: CbteTipo, pto_vta: int, numero: int) -> str:
+    """'A-00003-00000042' — letra + punto de venta + número, formato fiscal puro. Sin prefijo de
+    negocio ("Factura"/"Nota de Crédito") ni extensión de archivo — eso es una decisión de
+    presentación del caller (ver `es_nota_credito` para decidir el prefijo)."""
+    return f"{letra_comprobante(cbte_tipo)}-{pto_vta:05d}-{numero:08d}"
+
+
+# ---------------------------------------------------------------------------
+# Contexto único (mismo dato para los 3 layouts)
 # ---------------------------------------------------------------------------
 
 
-def factura_filename(factura, *, layout: str = "celular") -> str:
-    """Nombre de archivo canónico del PDF de una factura/NC (admin + portal cliente).
-
-    Sin sufijo para el layout DEFAULT de Rambla (celular, 4:5); los demás
-    layouts (pedidos explícitamente) llevan su nombre como sufijo."""
-    letra = _CBTE_TIPO_LABEL.get(factura.cbte_tipo, "X")
-    prefijo = "NC" if _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False) else "Factura"
-    sufijo = "" if layout == "celular" else f"-{layout}"
-    return f"{prefijo}-{letra}-{factura.pto_vta:05d}-{factura.cbte_nro or 0:08d}{sufijo}.pdf"
-
-
-# Default de Rambla: el concepto facturado es una sola línea "Rambla #N" (el
-# número del pedido), sin desglose por equipo ni texto adicional — decisión
-# de negocio, no un requisito de ARCA (WSFE solo pide los importes agregados;
-# el desglose por ítem es puramente de presentación). El nombre es
-# configurable (`FACTURACION_CONCEPTO_MARCA`) para que otro negocio que reuse
-# este motor pueda poner el suyo en vez de "Rambla".
-CONCEPTO_MARCA = os.getenv("FACTURACION_CONCEPTO_MARCA", "Rambla")
-
-
-def _conceptos(pedido: dict, factura) -> list[dict]:
-    """Ítem único del comprobante: `"{CONCEPTO_MARCA} #{numero_pedido}"`, sin
-    desglose por equipo — ver `CONCEPTO_MARCA`."""
-    numero = pedido.get("numero_pedido") or pedido.get("id", "")
-    desc = f"{CONCEPTO_MARCA} #{numero}"
-    return [{
-        "codigo": "001", "desc": desc, "detalle": "",
-        "cant": "1,00", "uMedida": "unidad", "bonif": "0,00",
-        "precioUnitFmt": _plain(factura.imp_neto), "subtotalFmt": _plain(factura.imp_neto),
-        "importeStr": _money(factura.imp_neto),
-    }]
-
-
-def _validar_datos_arca(factura) -> None:
-    """El comprobante NUNCA sale incompleto: si a una factura 'emitida' le
-    falta CAE/número/vencimiento/QR es un bug de datos, no un detalle visual
-    — mejor un 503 explícito que un PDF que parece válido y no lo es."""
-    faltantes = [
-        campo for campo, val in (
-            ("cae", factura.cae),
-            ("cbte_nro", factura.cbte_nro),
-            ("cae_vto", factura.cae_vto),
-            ("qr_payload", factura.qr_payload),
-        )
-        if not val
+def _conceptos_ctx(items) -> list[dict]:
+    return [
+        {
+            "codigo": it.codigo,
+            "desc": it.descripcion,
+            "detalle": it.detalle,
+            "cant": _plain(it.cantidad),
+            "uMedida": it.unidad_medida,
+            "bonif": _plain(it.bonificacion_pct),
+            "precioUnitFmt": _plain(it.precio_unitario),
+            "subtotalFmt": _plain(it.subtotal),
+            "importeStr": _money(it.subtotal),
+        }
+        for it in items
     ]
-    if faltantes:
-        raise RuntimeError(
-            f"Factura {factura.id} está 'emitida' pero le faltan datos de ARCA "
-            f"({', '.join(faltantes)}) — no se puede generar un comprobante válido."
-        )
 
 
-def _build_ctx(factura, pedido: dict) -> dict:
-    from services.facturacion.catalogos import (
-        label_concepto,
-        label_condicion_iva_receptor,
-        label_doc_tipo,
-    )
+def _build_ctx(datos: ComprobanteFiscal) -> dict:
+    letra = letra_comprobante(datos.cbte_tipo)
+    es_nc = es_nota_credito(datos.cbte_tipo)
+    cod = f"{int(datos.cbte_tipo):02d}"
 
-    _validar_datos_arca(factura)
-
-    em_row = _emisor_row(factura.emisor)
-    em_cond_label = _EMISOR_COND_IVA_LABEL.get(em_row["condicion_iva"], "—")
-
-    letra = _CBTE_TIPO_LABEL.get(factura.cbte_tipo, "C")
-    es_nc = _CBTE_TIPO_NOTA.get(factura.cbte_tipo, False)
-    cod = f"{factura.cbte_tipo:02d}"
-
-    doc_label = _catalogo(label_doc_tipo, factura.doc_tipo)
-    doc_nro = factura.cliente_cuit or factura.doc_nro or "—"
-    # CUIT/CUIL con guiones si vienen en crudo (11 dígitos).
-    if doc_nro and doc_nro.isdigit() and len(doc_nro) == 11:
-        doc_nro = f"{doc_nro[:2]}-{doc_nro[2:10]}-{doc_nro[10:]}"
-
-    total_pedido = pedido.get("monto_total")
-    pagado = pedido.get("monto_pagado") or 0
-    venta = "Contado" if total_pedido is None or pagado >= total_pedido else "Cuenta corriente"
-
-    fecha_desde = _fdate(pedido.get("fecha_desde"))
-    fecha_hasta = _fdate(pedido.get("fecha_hasta"))
-    # No hay campo de vencimiento comercial propio en el pedido: por default
-    # de negocio (alquiler se abona antes/al inicio) se usa la fecha de inicio.
-    vto_pago = fecha_desde
-
-    mostrar_iva = letra in ("A", "B") and factura.imp_iva > 0
-    concepto_label = _catalogo(label_concepto, factura.concepto)
-    # Ley 27.743 / RG 5614: leyenda de Transparencia Fiscal al Consumidor,
-    # obligatoria en toda venta/locación/prestación A CONSUMIDOR FINAL — en
-    # este motor eso son las Facturas B/C (la A es RI-a-RI, no consumidor
-    # final por definición, así que queda fuera del alcance de la norma).
+    mostrar_iva = letra in ("A", "B") and datos.importe_iva > 0
+    # Ley 27.743 / RG 5614: leyenda de Transparencia Fiscal al Consumidor, obligatoria en toda
+    # venta/locación/prestación A CONSUMIDOR FINAL — acá eso son las Facturas B/C (la A es
+    # RI-a-RI, no consumidor final por definición, fuera del alcance de la norma).
     transparencia_fiscal = letra in ("B", "C")
 
     return {
-        "letra": letra, "cod": cod, "es_nc": es_nc, "concepto": concepto_label,
+        "letra": letra, "cod": cod, "es_nc": es_nc, "concepto": datos.concepto_label,
         "titulo": ("NOTA DE CRÉDITO " if es_nc else "FACTURA ") + letra,
         "emisor": {
-            "razonSocial": em_row["razon_social"] or "—",
-            "cuit": em_row["cuit"] or "—",
-            "cond": em_cond_label,
-            "dom": em_row["domicilio"] or "—",
-            "iibb": em_row["iibb"],
-            "inicio": em_row["inicio_actividades"],
-            "ptoVta": f"{factura.pto_vta:05d}",
+            "razonSocial": datos.emisor_razon_social or "—",
+            "cuit": _emisor_cuit_fmt(datos.emisor_cuit),
+            "cond": datos.emisor_condicion_iva_label,
+            "dom": datos.emisor_domicilio or "—",
+            "iibb": datos.emisor_iibb,
+            "inicio": _fdate(datos.emisor_inicio_actividades),
+            "ptoVta": f"{datos.pto_vta:05d}",
         },
-        "comp": {
-            "nro": f"{factura.cbte_nro or 0:08d}",
-            "fecha": _fdate(factura.fecha_emision),
+        "comp": {"nro": f"{datos.numero:08d}", "fecha": _fdate(datos.fecha_emision)},
+        "periodo": {
+            "desde": _fdate(datos.periodo_desde),
+            "hasta": _fdate(datos.periodo_hasta),
+            "vto": _fdate(datos.vencimiento_pago),
         },
-        "periodo": {"desde": fecha_desde, "hasta": fecha_hasta, "vto": vto_pago},
         "receptor": {
-            "nombre": factura.razon_social or pedido.get("cliente_nombre") or "—",
-            "docLabel": doc_label,
-            "docNro": doc_nro,
-            "cond": _catalogo(label_condicion_iva_receptor, factura.condicion_iva_receptor),
-            # `factura.domicilio` queda FIJO al emitir (verificado contra el
-            # padrón de ARCA) — a diferencia de antes, que se leía en vivo de
-            # la ficha del cliente en cada reimpresión y podía "cambiar"
-            # retroactivamente. Facturas emitidas antes de esta columna
-            # (NULL) caen al valor en vivo de siempre (backward-compatible).
-            "dom": factura.domicilio or pedido.get("cliente_domicilio_fiscal") or "—",
-            "venta": venta,
+            "nombre": datos.receptor_nombre or "—",
+            "docLabel": datos.doc_tipo_label,
+            "docNro": _receptor_doc_nro_fmt(datos.receptor),
+            "cond": datos.condicion_iva_receptor_label,
+            "dom": datos.receptor_domicilio or "—",
+            "venta": datos.condicion_venta,
         },
-        "conceptos": _conceptos(pedido, factura),
+        "conceptos": _conceptos_ctx(datos.items),
         "tot": {
             "discrimina": mostrar_iva,
             "transparencia": transparencia_fiscal,
-            "netoStr": _money(factura.imp_neto), "ivaStr": _money(factura.imp_iva),
-            "subStr": _money(factura.imp_neto), "otrosStr": _money(0),
-            "totalStr": _money(factura.imp_total),
-            "ivaPct": _iva_pct_label(factura.imp_neto, factura.imp_iva),
+            "netoStr": _money(datos.importe_neto), "ivaStr": _money(datos.importe_iva),
+            "subStr": _money(datos.importe_neto), "otrosStr": _money(datos.importe_otros_tributos),
+            "totalStr": _money(datos.importe_total),
+            "ivaPct": _iva_pct_label(datos.importe_neto, datos.importe_iva),
         },
-        "cae": {"nro": factura.cae, "vto": _fdate(factura.cae_vto)},
-        "qr": {"url": factura.qr_payload},
+        "cae": {"nro": datos.cae, "vto": _fdate(datos.cae_vto)},
+        "qr": {"url": datos.qr_url},
     }
 
 
-def _transparencia_fiscal_lines(f: dict) -> tuple[str, str, str]:
-    """Texto de la leyenda de Transparencia Fiscal al Consumidor (Ley 27.743 /
-    RG 5614), con los importes REALES de la factura — nunca hardcodeados.
-    `otrosStr` es el mismo total de "otros tributos" que ya existe en el
-    comprobante (hoy siempre $0 para Rambla: no hay impuestos internos ni
-    tributos municipales en el rubro); un tenant que sí los tenga cargaría
-    ese mismo campo (`ImpTrib`) y esta leyenda lo reflejaría sin cambios."""
-    return (
-        "Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)",
-        f"IVA Contenido: {f['tot']['ivaStr']}",
-        f"Otros Impuestos Nacionales Indirectos: {f['tot']['otrosStr']}",
-    )
-
-
-def _qr_img(url: str, size: int) -> str:
-    """SVG inline (vectorial — sin resolución nativa fija, no se pixela en
-    ningún zoom). Nunca atrapa errores: si `segno` no puede generarlo, el
-    caller (`factura_html`) tiene que fallar fuerte, no entregar un
-    comprobante con un hueco donde debería ir el QR exigido por RG4892."""
-    from arca_fe.qr import _build_qr_svg
-    svg = _build_qr_svg(url, size)
-    return svg.replace("<svg ", '<svg style="display:block" ', 1)
-
-
 # ---------------------------------------------------------------------------
-# 1a — Clásica A4 (réplica fiel del comprobante oficial AFIP/ARCA)
+# 1a — Oficial, A4 (réplica fiel del comprobante oficial AFIP/ARCA)
 # ---------------------------------------------------------------------------
 
 
-def _factura_clasica_html(f: dict) -> str:
+def _factura_oficial_html(f: dict, fonts_css: str) -> str:
     qr_block = _qr_img(f["qr"]["url"], 112)
 
     iibb_line = (
@@ -521,11 +441,11 @@ def _factura_clasica_html(f: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 1b — Celular (comprobante vertical compacto, para compartir por WhatsApp)
+# 1b — Simplificada (comprobante vertical compacto, para compartir por WhatsApp)
 # ---------------------------------------------------------------------------
 
 
-def _factura_mobile_html(f: dict) -> str:
+def _factura_simplificada_html(f: dict, fonts_css: str) -> str:
     tipo_txt = "Nota de crédito" if f["es_nc"] else "Factura"
 
     qr_block = _qr_img(f["qr"]["url"], 165)
@@ -643,22 +563,24 @@ def _factura_mobile_html(f: dict) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
-{_fonts_css()}
+{fonts_css}
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
-  html,body {{ height:100%; background:{_MOBILE_PAGE_BG}; }}
+  html,body {{ height:100%; background:{_SIMPLIFICADA_FONDO}; }}
   body {{ min-height:100vh; display:flex; align-items:center; justify-content:center;
           font-family:'TT Commons',ui-sans-serif,sans-serif; color:#16202b; }}
-  /* `.page` conserva su tamaño NATURAL en px (Playwright renderiza el PDF a
-     una página de exactamente este tamaño — ahí 100vh/100vw igualan el
-     tamaño natural y el scale() da 1, sin cambiar el PDF) y el `transform:
-     scale()` la ajusta al viewport SOLO cuando se ve como preview
-     (`format=html`) en una ventana de otro tamaño — llena el alto/ancho
-     disponible sin perder la proporción 4:5. */
-  .page {{ flex:none; width:{MOBILE_PAGE_WIDTH}px; height:{MOBILE_PAGE_HEIGHT}px;
-           padding:{_MOBILE_CARD_MARGIN}px;
-           transform:scale(min(calc(100vh / {MOBILE_PAGE_HEIGHT}px), calc(100vw / {MOBILE_PAGE_WIDTH}px))); }}
-  .card {{ width:{_MOBILE_CARD_WIDTH}px; height:{_MOBILE_CARD_HEIGHT}px; display:flex; flex-direction:column;
+  /* El diseño está afinado en unidades NATIVAS (tarjeta de {_SIMPLIFICADA_DISENO_ANCHO}px) — acá
+     `.page` declara ese tamaño nativo y le suma `zoom:{_SIMPLIFICADA_ZOOM}`, que Chromium aplica a
+     TODO el árbol (fuentes, radios, el QR) antes de imprimir/capturar: el resultado siempre sale a
+     {SIMPLIFICADA_PAGE_WIDTH}×{SIMPLIFICADA_PAGE_HEIGHT} (el mínimo pedido), sin re-tocar un solo
+     valor de fuente/padding de acá abajo. El `transform: scale()` es un mecanismo APARTE: ajusta la
+     tarjeta YA ampliada al viewport SOLO cuando se ve como preview en una ventana de otro tamaño
+     (ahí 100vh/100vw igualan el tamaño de export exacto y el scale da 1, sin afectar el PDF/imagen
+     final) — llena el alto/ancho disponible sin perder la proporción 4:5. */
+  .page {{ flex:none; width:{_SIMPLIFICADA_DISENO_PAGE_ANCHO}px; height:{_SIMPLIFICADA_DISENO_PAGE_ALTO}px;
+           padding:{_SIMPLIFICADA_DISENO_MARGEN}px; zoom:{_SIMPLIFICADA_ZOOM};
+           transform:scale(min(calc(100vh / {SIMPLIFICADA_PAGE_HEIGHT}px), calc(100vw / {SIMPLIFICADA_PAGE_WIDTH}px))); }}
+  .card {{ width:{_SIMPLIFICADA_DISENO_ANCHO}px; height:{_SIMPLIFICADA_DISENO_CARD_ALTO}px; display:flex; flex-direction:column;
            background:#fff; border-radius:28px; border:1px solid #ecebe8;
            box-shadow:0 1px 3px rgba(22,32,43,0.06); overflow:hidden; }}
 </style>
@@ -669,11 +591,11 @@ def _factura_mobile_html(f: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 1c — A4 formal (identidad de la mobile, alternativa a la clásica)
+# 1c — Detallada, A4 (identidad visual de la simplificada, alternativa a la oficial)
 # ---------------------------------------------------------------------------
 
 
-def _factura_formal_html(f: dict) -> str:
+def _factura_detallada_html(f: dict, fonts_css: str) -> str:
     tipo_banner = "Nota de crédito electrónica · Original" if f["es_nc"] else "Factura electrónica · Original"
 
     qr_block = _qr_img(f["qr"]["url"], 150)
@@ -789,7 +711,7 @@ def _factura_formal_html(f: dict) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
-{_fonts_css()}
+{fonts_css}
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
   html,body {{ background:#fff; }}
@@ -807,42 +729,134 @@ def _factura_formal_html(f: dict) -> str:
 # ---------------------------------------------------------------------------
 
 _LAYOUTS = {
-    "clasica": _factura_clasica_html,
-    "celular": _factura_mobile_html,
-    "formal": _factura_formal_html,
+    "oficial": _factura_oficial_html,
+    "detallada": _factura_detallada_html,
+    "simplificada": _factura_simplificada_html,
 }
 
-# La celular es una TARJETA de esquinas redondeadas flotando sobre un fondo
-# (no un rectángulo a página completa) — el ancho de página incluye el
-# margen visible alrededor de la tarjeta en los 4 lados. Proporción 4:5 FIJA
-# (identidad visual): header/CAE/info/emisor-receptor arriba y QR/total/
-# leyendas abajo quedan anclados en su lugar; lo único que se ajusta con la
-# cantidad de conceptos es el espacio del medio (`flex:1` en la sección de
-# conceptos) — la tarjeta en sí nunca cambia de alto.
-_MOBILE_CARD_WIDTH = 640
-_MOBILE_CARD_MARGIN = 24
-_MOBILE_PAGE_BG = "#f4f2ef"
-MOBILE_PAGE_WIDTH = _MOBILE_CARD_WIDTH + 2 * _MOBILE_CARD_MARGIN
-MOBILE_PAGE_HEIGHT = round(MOBILE_PAGE_WIDTH * 5 / 4)  # ancho:alto = 4:5
-_MOBILE_CARD_HEIGHT = MOBILE_PAGE_HEIGHT - 2 * _MOBILE_CARD_MARGIN
+
+@dataclass(frozen=True)
+class LayoutInfo:
+    """Metadata de un layout, pensada para que el consumidor arme un selector real (dropdown,
+    radio group) con estas mismas `nombre`/`descripcion` — en vez de inventar copy propio que
+    puede desalinearse de lo que el layout realmente renderiza.
+
+    `id`: el valor que se le pasa a `renderizar_comprobante_html(layout=...)`.
+    `nombre`: label corto para mostrar al usuario.
+    `descripcion`: qué es y para qué sirve, en 1-2 oraciones.
+    `advertencia`: cuándo NO usarlo — vacío si no aplica a este layout."""
+
+    id: str
+    nombre: str
+    descripcion: str
+    advertencia: str = ""
 
 
-def page_size_for_layout(layout: str) -> tuple[int, int | None] | None:
-    """Tamaño de página para `pdf._render_pdf(html, page_size=...)`.
-    None → A4 (default, clásica/formal). Un tuple → tamaño propio (celular,
-    4:5 fijo — ver `_MOBILE_CARD_HEIGHT`)."""
-    return (MOBILE_PAGE_WIDTH, MOBILE_PAGE_HEIGHT) if layout == "celular" else None
+# Orden: los dos de detalle completo primero, la simplificada al final — no es "la opción fácil
+# por default", es un formato de comprobante distinto con una limitación real (ver advertencia).
+LAYOUTS_INFO: tuple[LayoutInfo, ...] = (
+    LayoutInfo(
+        id="oficial",
+        nombre="Oficial (réplica AFIP/ARCA)",
+        descripcion=(
+            "Reproduce el formulario oficial de ARCA. Formato A4, con el detalle completo de "
+            "cada ítem: cantidad, unidad de medida, precio unitario y bonificación."
+        ),
+    ),
+    LayoutInfo(
+        id="detallada",
+        nombre="Detallada",
+        descripcion=(
+            "Formato A4 con diseño propio. Mismo nivel de detalle que la Oficial (cantidad, "
+            "precio unitario, bonificación) por ítem, con una presentación visual distinta."
+        ),
+    ),
+    LayoutInfo(
+        id="simplificada",
+        nombre="Simplificada (para compartir)",
+        descripcion=(
+            f"Formato compacto, proporción 4:5 ({SIMPLIFICADA_PAGE_WIDTH}×{SIMPLIFICADA_PAGE_HEIGHT} "
+            "mínimo) pensado para compartir por WhatsApp o redes. Resume cada ítem a su "
+            "descripción e importe, SIN cantidad, precio unitario ni bonificación."
+        ),
+        advertencia=(
+            "No es 'la versión para celular' de las otras dos — es un formato de comprobante "
+            "distinto, pensado para operaciones simples. Un ítem con cantidad != 1, bonificación, "
+            "unidad de medida no estándar o detalle adicional NO se puede renderizar en este "
+            "formato — la librería lo rechaza (ValueError), no queda a criterio del usuario: "
+            "elegí Oficial o Detallada para esos comprobantes."
+        ),
+    ),
+)
+
+LAYOUTS_VALIDOS: tuple[str, ...] = tuple(info.id for info in LAYOUTS_INFO)
 
 
-def factura_html(factura, pedido: dict, layout: str = "celular") -> str:
-    """Genera el HTML completo de la factura (Factura A/B/C o Nota de Crédito).
+def _validar_apto_para_simplificada(items) -> None:
+    """La `simplificada` resume cada ítem a descripción+importe — NO muestra `cantidad`, `precio_unitario`,
+    `bonificacion_pct` ni `detalle`. Antes esto era solo una advertencia en `LAYOUTS_INFO` (texto que el
+    consumidor podía ignorar); ahora se hace cumplir en código: si algún ítem tiene información en esos
+    campos que se perdería al ocultarlos, `renderizar_comprobante_html` RECHAZA con `ValueError` en vez de
+    generar un comprobante que esconde datos reales — obliga a elegir `oficial`/`detallada` para esa
+    operación en particular. Un ítem "apto" es cantidad=1, sin bonificación, sin `detalle` adicional y con
+    la unidad de medida default ('unidad') — lo mínimo que puede resumirse sin perder nada real."""
+    problematicos = [
+        it for it in items
+        if it.cantidad != 1 or it.bonificacion_pct != 0 or it.detalle or it.unidad_medida != "unidad"
+    ]
+    if problematicos:
+        descripciones = ", ".join(f"'{it.descripcion}'" for it in problematicos)
+        raise ValueError(
+            "El layout 'simplificada' no admite ítems con cantidad != 1, bonificación, unidad de "
+            "medida no estándar o detalle adicional — esa información se perdería al no mostrar "
+            f"cantidad/precio unitario/detalle. Ítem(s) afectado(s): {descripciones}. "
+            "Usá el layout 'oficial' o 'detallada' para este comprobante."
+        )
 
-    `factura` es una instancia de `services.facturacion.repo.Factura`.
-    `pedido` viene de `services.facturacion.engine._get_pedido` (items + cliente
-    enriquecidos). `layout`: 'celular' (default de Rambla, compacta 4:5) ·
-    'clasica' (réplica oficial AFIP/ARCA, A4) · 'formal' (A4, identidad de la
-    celular).
-    """
-    builder = _LAYOUTS.get(layout, _factura_mobile_html)
-    ctx = _build_ctx(factura, pedido)
-    return builder(ctx)
+
+def normalizar_layout(layout: str) -> str:
+    """Valida un `layout` pedido por el caller contra los soportados (`LAYOUTS_VALIDOS`:
+    `"oficial"`/`"detallada"`/`"simplificada"`, ver `LAYOUTS_INFO`) — desconocido o vacío cae a
+    `"simplificada"`. Es el mismo fallback silencioso que ya aplicaba `renderizar_comprobante_html`
+    puertas adentro; exponerlo deja que el caller lo aplique UNA vez y reuse el resultado ya
+    normalizado en todo lo demás que dependa del mismo `layout` en la misma request (nombre de
+    archivo, tamaño de página del PDF) — sin repetir el chequeo `if layout not in (...)` en cada
+    punto de uso."""
+    return layout if layout in _LAYOUTS else "simplificada"
+
+
+def renderizar_comprobante_html(
+    datos: ComprobanteFiscal,
+    *,
+    layout: str = "simplificada",
+    fonts_css: str = "",
+) -> str:
+    """Genera el HTML completo de un comprobante (Factura A/B/C o Nota de Crédito) — preview
+    rápido para mirarlo (sin pasar por un motor de PDF) o insumo para convertir a PDF/imagen.
+
+    `datos`: el comprobante ya emitido, con CAE/QR/importes resueltos (`ComprobanteFiscal` valida
+    en su construcción que no falte nada imprescindible — acá no se vuelve a chequear).
+    `layout`: `"simplificada"` (default — vertical compacto 4:5, pensado para compartir; NO admite
+    desglose de cantidad/precio unitario, ver `LAYOUTS_INFO`), `"oficial"` (réplica A4 del
+    formulario oficial AFIP/ARCA) o `"detallada"` (A4, misma identidad visual que la simplificada
+    pero con el detalle completo). Un valor desconocido cae a `"simplificada"` — usar
+    `LAYOUTS_INFO` para mostrarle al usuario nombre/descripción/advertencia de cada opción antes de
+    que elija, en vez de hardcodear copy propio.
+    `fonts_css`: bloque `<style>@font-face{...}</style>` ya armado, para tipografías propias del
+    caller (la oficial no lo usa — solo detallada/simplificada). Sin este parámetro (default
+    `""`), el HTML sigue siendo válido: cae a los fallbacks de sistema ya declarados en el CSS — la
+    marca nunca es requisito de validez fiscal.
+
+    Devuelve el HTML como string; no convierte a PDF (eso es responsabilidad del caller, junto con
+    `arca_fe.seguridad.asegurar_pdf` si hace falta el documento certificado).
+
+    `ValueError` si el layout resuelto es `"simplificada"` y algún ítem de `datos.items` no es lo
+    bastante simple para resumirse sin perder información (ver `_validar_apto_para_simplificada`)
+    — NO es solo la `advertencia` de `LAYOUTS_INFO`, se hace cumplir acá: elegir `oficial` o
+    `detallada` para ese comprobante en particular, no atajarse con la simplificada."""
+    layout_resuelto = normalizar_layout(layout)
+    if layout_resuelto == "simplificada":
+        _validar_apto_para_simplificada(datos.items)
+    builder = _LAYOUTS[layout_resuelto]
+    ctx = _build_ctx(datos)
+    return builder(ctx, fonts_css)

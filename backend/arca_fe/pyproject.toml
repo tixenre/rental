@@ -1,6 +1,6 @@
 [project]
 name = "arca-fe"
-version = "0.3.0"
+version = "0.0.0"
 description = "Motor portable de facturación electrónica ARCA (ex-AFIP) — WSFEv1 + WSAA + padrón, sin dependencias de ningún framework."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -13,6 +13,9 @@ dependencies = [
     "requests",
     "httpx",
     "cryptography",
+    "pyhanko",
+    "pyhanko-certvalidator",
+    "asn1crypto",
 ]
 
 # `segno` (renderizar el QR fiscal como SVG, `arca_fe.qr._build_qr_svg`) es un import
@@ -33,3 +36,8 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = [".."]
 include = ["arca_fe*"]
+
+# El logo oficial de ARCA (agnóstico de marca, usado por `arca_fe.render`) — asset propio
+# del paquete, empaquetado como cualquier ícono de una librería instalable.
+[tool.setuptools.package-data]
+arca_fe = ["assets/*.svg"]

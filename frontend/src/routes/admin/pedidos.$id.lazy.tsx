@@ -25,7 +25,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Copy,
-  Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -54,6 +53,13 @@ import { Switch } from "@/design-system/ui/switch";
 import { MoneyInput } from "@/design-system/ui/money-input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Skeleton } from "@/design-system/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/design-system/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1055,6 +1061,16 @@ function FacturacionRailSection({
     queryFn: () => facturacionApi.listFacturasPedido(pedidoId),
   });
 
+  // Layouts disponibles (nombre/descripción/advertencia) — estáticos en la práctica, cache larga.
+  const layoutsQ = useQuery({
+    queryKey: ["admin", "facturacion", "layouts"],
+    queryFn: () => facturacionApi.getLayouts(),
+    staleTime: Infinity,
+  });
+  const layouts = layoutsQ.data ?? [];
+  const [layout, setLayout] = useState<string>("simplificada");
+  const layoutInfo = layouts.find((l) => l.id === layout);
+
   const [showPreview, setShowPreview] = useState(false);
 
   const preview = useMutation({
@@ -1082,7 +1098,7 @@ function FacturacionRailSection({
   });
 
   const enviarMail = useMutation({
-    mutationFn: (facturaId: number) => facturacionApi.enviarMailFactura(facturaId),
+    mutationFn: (facturaId: number) => facturacionApi.enviarMailFactura(facturaId, layout),
     onSuccess: (data) => toast.success(`Factura enviada a ${data.to}`),
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1151,41 +1167,58 @@ function FacturacionRailSection({
           )}
 
           {principal.estado === "emitida" && (
-            <div className="flex flex-wrap gap-1.5">
-              <a
-                href={`/api/facturas/${principal.id}/pdf?format=html`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
-              >
-                <Eye className="h-3 w-3" /> Ver
-              </a>
-              <a
-                href={`/api/facturas/${principal.id}/pdf`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
-              >
-                <Download className="h-3 w-3" /> Descargar PDF
-              </a>
-              <a
-                href={`/api/facturas/${principal.id}/pdf?layout=celular`}
-                target="_blank"
-                rel="noreferrer"
-                title="Versión compacta para compartir por WhatsApp"
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
-              >
-                <Smartphone className="h-3 w-3" /> Para WhatsApp
-              </a>
-              <button
-                type="button"
-                onClick={() => enviarMail.mutate(principal.id)}
-                disabled={enviarMail.isPending}
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 disabled:opacity-50"
-              >
-                <Mail className="h-3 w-3" />
-                {enviarMail.isPending ? "Enviando…" : "Enviar por mail"}
-              </button>
+            <div className="space-y-1.5">
+              <Select value={layout} onValueChange={setLayout}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Formato" />
+                </SelectTrigger>
+                <SelectContent>
+                  {layouts.map((l) => (
+                    <SelectItem key={l.id} value={l.id} title={l.descripcion}>
+                      {l.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {layoutInfo?.descripcion && (
+                <p className="text-2xs text-muted-foreground leading-snug">
+                  {layoutInfo.descripcion}
+                </p>
+              )}
+              {layoutInfo?.advertencia && (
+                // eslint-disable-next-line no-restricted-syntax -- amber: paleta categórica de advertencia (Tier 3)
+                <p className="text-2xs text-amber-700 leading-snug flex items-start gap-1">
+                  <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+                  {layoutInfo.advertencia}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                <a
+                  href={`/api/facturas/${principal.id}/pdf?format=html&layout=${layout}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
+                >
+                  <Eye className="h-3 w-3" /> Ver
+                </a>
+                <a
+                  href={`/api/facturas/${principal.id}/pdf?layout=${layout}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30"
+                >
+                  <Download className="h-3 w-3" /> Descargar PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={() => enviarMail.mutate(principal.id)}
+                  disabled={enviarMail.isPending}
+                  className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 disabled:opacity-50"
+                >
+                  <Mail className="h-3 w-3" />
+                  {enviarMail.isPending ? "Enviando…" : "Enviar por mail"}
+                </button>
+              </div>
             </div>
           )}
 

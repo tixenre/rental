@@ -232,7 +232,7 @@ class WsfeClient:
 
         if resultado == "A":
             cae = result_obj.CAE
-            cae_vto = _parse_fecha(result_obj.CAEFchVto)
+            cae_vto = parse_fecha_arca(result_obj.CAEFchVto)
             numero = int(result_obj.CbteDesde)
 
         if hasattr(result_obj, "Observaciones") and result_obj.Observaciones:
@@ -480,7 +480,15 @@ class WsfeClient:
 # ---------------------------------------------------------------------------
 
 
-def _parse_fecha(s: Any) -> Optional[date]:
+def parse_fecha_arca(s: Any) -> Optional[date]:
+    """Parsea una fecha en el formato que devuelve WSFEv1 (`YYYYMMDD` sin separadores, ej.
+    `CAEFchVto`/`CbteFch`) o ISO (`YYYY-MM-DD`) — pública porque un adapter que reconstruye datos
+    de una respuesta cruda de ARCA (ej. al recuperar un comprobante por idempotencia) necesita el
+    mismo parseo, no debería reimplementarlo ni importar un símbolo privado de este módulo.
+
+    `None` si `s` es `None`/vacío (ausente es legítimo, no un error) o si el formato es inesperado
+    (se loguea un warning — una fecha de AFIP con formato raro es señal de que algo cambió del
+    otro lado, pero no amerita romper todo el parseo de la respuesta)."""
     if s is None:
         return None
     raw = str(s).strip()
