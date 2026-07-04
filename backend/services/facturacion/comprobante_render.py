@@ -29,6 +29,13 @@ _EMISOR_COND_IVA_LABEL: dict[str, str] = {
 }
 
 
+def emisor_condicion_iva_label(condicion_iva: str) -> str:
+    """Label de la condición IVA del EMISOR para mostrar (ej. en el preview de "Confirmar
+    factura", `services.facturacion.engine.previsualizar_factura`) — mismo texto que va impreso
+    en la factura ya emitida. Único punto público sobre `_EMISOR_COND_IVA_LABEL`."""
+    return _EMISOR_COND_IVA_LABEL.get(condicion_iva, "—")
+
+
 _EMISOR_ROW_CAMPOS = ("razon_social", "cuit", "condicion_iva", "domicilio", "iibb", "inicio_actividades")
 
 

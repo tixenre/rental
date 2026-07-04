@@ -1314,8 +1314,22 @@ function FacturacionRailSection({
                 </span>
               </div>
               <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Concepto</span>
+                <span>{preview.data.comprobante.concepto}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Condición de venta</span>
+                <span>{preview.data.comprobante.condicion_venta}</span>
+              </div>
+              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Emisor</span>
-                <span>{preview.data.emisor.nombre}</span>
+                <span className="text-right">
+                  {preview.data.emisor.nombre}
+                  <span className="text-muted-foreground">
+                    {" "}
+                    ({preview.data.emisor.condicion_iva_label})
+                  </span>
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Receptor</span>
@@ -1329,6 +1343,12 @@ function FacturacionRailSection({
                   )}
                 </span>
               </div>
+              {preview.data.receptor.doc_tipo !== "CONSUMIDOR_FINAL" && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Condición IVA</span>
+                  <span>{preview.data.receptor.condicion_iva_label}</span>
+                </div>
+              )}
               {preview.data.receptor.doc_tipo !== "CONSUMIDOR_FINAL" && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Domicilio</span>

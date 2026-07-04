@@ -351,17 +351,47 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     except ValueError:
         letra = "?"
 
+    # Labels de lo que va IMPRESO en la factura real (Concepto/condición IVA) — mismos catálogos
+    # que usa el render (`comprobante_render.py::_armar_comprobante_fiscal`), para que el preview
+    # muestre EXACTAMENTE lo que va a decir el comprobante, no una aproximación. El "condición de
+    # venta" (Contado/Cuenta corriente) es el mismo criterio de negocio que ya usa el render —
+    # ver comprobante_render.py línea ~150 (no un cálculo nuevo, mismo default de Rambla).
+    #
+    # `catalogos.label_*` levanta `RuntimeError` si nadie corrió "Actualizar catálogos ARCA"
+    # todavía — el preview es de solo lectura y nunca debería romperse por un catálogo no
+    # sincronizado, así que cae al label ESTÁTICO de `arca_fe` (el mismo texto oficial de AFIP,
+    # sin depender de la sincronización) en vez de propagar el error.
+    import arca_fe
+    from services.facturacion.catalogos import label_concepto, label_condicion_iva_receptor
+    from services.facturacion.comprobante_render import emisor_condicion_iva_label
+
+    try:
+        concepto_label = label_concepto(int(req.concepto), conn)
+    except RuntimeError:
+        concepto_label = arca_fe.label_concepto(req.concepto)
+    try:
+        condicion_iva_receptor_label = label_condicion_iva_receptor(
+            int(req.receptor.condicion_iva), conn
+        )
+    except RuntimeError:
+        condicion_iva_receptor_label = arca_fe.label_condicion_iva(req.receptor.condicion_iva)
+    total_pedido = pedido.get("monto_total")
+    pagado = pedido.get("monto_pagado") or 0
+    condicion_venta = "Contado" if total_pedido is None or pagado >= total_pedido else "Cuenta corriente"
+
     return {
         "ambiente": cred.ambiente,
         "emisor": {
             "nombre": nombre_emisor,
             "cuit": cred.cuit,
             "condicion_iva": cred.condicion_iva,
+            "condicion_iva_label": emisor_condicion_iva_label(cred.condicion_iva),
         },
         "receptor": {
             "doc_tipo": req.receptor.doc_tipo.name,
             "doc_nro": str(req.receptor.doc_nro),
             "condicion_iva": req.receptor.condicion_iva.name.lower(),
+            "condicion_iva_label": condicion_iva_receptor_label,
             "razon_social": pedido.get("cliente_razon_social")
             or pedido.get("cliente_nombre")
             or "",
@@ -372,6 +402,8 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
             "tipo_nro": int(cbte_tipo),
             "numero_a_emitir": numero_a_emitir,
             "pto_vta": emisor_obj.punto_venta,
+            "concepto": concepto_label,
+            "condicion_venta": condicion_venta,
         },
         "importes": {
             "neto": float(importes["neto"]),

@@ -381,11 +381,21 @@ function EmisorFormModal({
   // entera), ese campo queda vacío/read-only — nunca un input editable. Cada
   // uno resuelto se puede desbloquear con "editar" por si AFIP tiene un dato
   // mal cargado.
+  // Arranca en `true` para lo que el emisor YA tiene guardado (no depende de
+  // correr una búsqueda en esta sesión) — si no, "Editar" (que ya no
+  // re-busca solo, ver el efecto de abajo) mostraba estos 3 campos como
+  // "—" (VacioAfip) aunque el dato estuviera guardado y cargado en
+  // `razonSocial`/`condicion`/`domicilio`, porque el componente de solo-
+  // lectura (`ReadOnlyAfip`) solo se muestra cuando `afip.<campo>` es true.
   const [afip, setAfip] = useState<{
     razon_social: boolean;
     domicilio: boolean;
     condicion_iva: boolean;
-  }>({ razon_social: false, domicilio: false, condicion_iva: false });
+  }>({
+    razon_social: !!emisor?.razon_social,
+    domicilio: !!emisor?.domicilio,
+    condicion_iva: !!emisor?.condicion_iva,
+  });
 
   // 3 campos nuevos + impuestos — puramente informativos (no se persisten,
   // no tienen "editar": no hay nada que corregir a mano).
