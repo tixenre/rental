@@ -838,6 +838,13 @@ reales. Un pedido `confirmado` puede tener saldo pendiente y aun así suma su `m
 la semántica esperada, no un bug. El supervisor marca una tarjeta/query de Estadísticas que mezcle
 `monto_pagado` (cobrado) con las agregaciones existentes (devengado) sin distinguirlas explícitamente.
 
+**Refinado el mismo día: SOLO `estado='finalizado'`, no `confirmado`/`retirado`.** Las 7 agregaciones
+(`totales`/`por_mes`/`top_equipos`/`top_clientes`/`por_dueno`/`clientes_recurrentes`/`mejor_peor_mes`,
+compartidas con la sección "Resumen general" del PDF de Reportes) filtran únicamente pedidos cerrados —
+negocio `confirmado`/`retirado` (que todavía puede cambiar) queda afuera. Regresión:
+`test_estadisticas_excluye_confirmado_y_retirado` (Postgres real). El supervisor marca cualquier query
+de Estadísticas que vuelva a incluir `confirmado`/`retirado` en el `WHERE`.
+
 ### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
 
 Con descuento (el caso común: cualquier alquiler de varios días tiene descuento automático por jornadas),

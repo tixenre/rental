@@ -483,7 +483,7 @@ def _resumen_general_html(stats: dict) -> str:
     cards = (
         '<div class="rep-stat-card"><div class="rep-stat-label">Facturado neto</div>'
         f'<div class="rep-stat-num">{fmt(total_ars)}</div>'
-        '<div class="rep-stat-sub">ingreso confirmado</div></div>'
+        '<div class="rep-stat-sub">ingreso finalizado</div></div>'
         '<div class="rep-stat-card"><div class="rep-stat-label">Pedidos</div>'
         f'<div class="rep-stat-num">{total_pedidos}</div>'
         f'<div class="rep-stat-sub">{fmt(promedio)} promedio</div></div>'
@@ -570,8 +570,7 @@ def _resumen_general_html(stats: dict) -> str:
         '<section class="rep-section rep-section--stats">'
         '<div class="rep-sec-head"><h2 class="rep-h2">Resumen general</h2>'
         f'<span class="rep-sec-eyebrow">{periodo_eyebrow}</span></div>'
-        '<p class="rep-sub">Contexto · histórico de pedidos confirmados, '
-        'retirados y finalizados.</p>'
+        '<p class="rep-sub">Contexto · histórico de pedidos finalizados.</p>'
         f'<div class="rep-stat-grid">{cards}</div>'
         '<div class="rep-h3-row"><h3 class="rep-h3">Ingresos por dueño</h3>'
         f'<span class="rep-h3-meta">neto · {fmt(suma_dueno)}</span></div>'

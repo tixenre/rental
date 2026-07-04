@@ -2542,6 +2542,19 @@ cancel-in-progress` ya cancela corridas viejas.
   solo deja escrito el criterio para que no se re-litigue. Si a futuro se quisiera un "cobrado real"
   (`monto_pagado`), sería una tarjeta/métrica NUEVA y explícitamente rotulada, no un reemplazo de
   "Facturado total".
+- **Refinado el mismo día — solo `finalizado`.** Tras la adenda de arriba, el dueño precisó más: "solo de
+  finalizados, eso son las estadísticas, solo de pedidos finalizados y devengados" — Estadísticas no debe
+  contar negocio `confirmado`/`retirado` (todavía puede cancelarse o modificarse), solo pedidos YA
+  cerrados. **Esta vez sí hubo cambio de código:** las 7 queries de `compute_estadisticas`
+  (`backend/routes/estadisticas.py`) pasan de `WHERE p.estado IN ('confirmado', 'finalizado', 'retirado')`
+  a `WHERE p.estado = 'finalizado'` — mismo criterio en las 7, sin excepciones (la función es fuente única
+  compartida con la sección "Resumen general" del PDF de Reportes, `backend/pdf.py::_resumen_general_html`,
+  que también ajustó sus 2 textos: "ingreso confirmado" → "ingreso finalizado"; "histórico de pedidos
+  confirmados, retirados y finalizados" → "histórico de pedidos finalizados"). El invariante "todo pedido
+  en este filtro tiene ≥1 ítem" se preserva (`finalizado` es subconjunto del set viejo). Regresión nueva:
+  `test_estadisticas_excluye_confirmado_y_retirado` (Postgres real) — inserta un pedido `confirmado` y uno
+  `retirado` con montos no-cero y verifica que NO mueven `totales`/`top_equipos`/`por_dueno`. Suite
+  completa verde (2769 tests) tras el cambio.
 
 ### 2026-07-03 — Factura y mail de "pedido creado": línea de bonificación/descuento visible (M5+L1, #1209)
 
