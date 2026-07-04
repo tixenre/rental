@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { authedFetch } from "./authedFetch";
+import { queryClient } from "./queryClient";
 
 export type PerfilImpuestos =
   | "consumidor_final"
@@ -128,4 +129,11 @@ export function useClienteSession(): { data: ClienteSession; loading: boolean } 
 export function invalidateClienteSession() {
   cached = undefined;
   pending = null;
+  // El perfil fiscal recién cambió (editar perfil, verificar CUIT con ARCA) —
+  // toda cotización en cache puede tener el "+ IVA"/total viejo: `/api/cotizar`
+  // resuelve `con_iva` según el perfil ACTUAL del cliente autenticado (no lo
+  // manda el front, #617), así que el queryKey de `useCotizacion` (items/fechas)
+  // no cambia solo porque el perfil cambió — sin esto, el Total del checkout
+  // quedaba stale si el cliente verificaba su CUIT en el mismo modal.
+  void queryClient.invalidateQueries({ queryKey: ["cotizar"] });
 }
