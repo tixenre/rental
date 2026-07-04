@@ -49,6 +49,7 @@ import { cn } from "@/lib/utils";
 
 import { Button } from "@/design-system/ui/button";
 import { Input } from "@/design-system/ui/input";
+import { Switch } from "@/design-system/ui/switch";
 import { MoneyInput } from "@/design-system/ui/money-input";
 import { Textarea } from "@/design-system/ui/textarea";
 import { Skeleton } from "@/design-system/ui/skeleton";
@@ -168,6 +169,7 @@ function PedidoEditorPage() {
     descuentoPct: draft.datos?.descuento_pct ?? null,
     descuentoTipo: draft.datos?.descuento_manual_tipo ?? null,
     descuentoMonto: draft.datos?.descuento_manual_monto ?? null,
+    descuentoManualActivo: draft.datos?.descuento_manual_activo ?? null,
   });
 
   // Modales
@@ -716,7 +718,9 @@ function PedidoEditorPage() {
                 selector a "%" solo. Con 2+ controles adentro, un <label> no
                 es seguro; FieldLabel sigue bien para los campos de un solo input. */}
             <div className="block mt-3">
-              <span className="block t-eyebrow mb-1">Descuento manual (0 = automático)</span>
+              <span className="block t-eyebrow mb-1">
+                Descuento manual (0 = automático, salvo "Forzar" activado)
+              </span>
               <div className="flex items-center gap-2">
                 <SegmentedControl
                   value={datos.descuento_manual_tipo}
@@ -783,6 +787,19 @@ function PedidoEditorPage() {
                   </div>
                 )}
               </div>
+              {/* Fase C-4 (#1231): `0` es el sentinel de "sin override" — sin
+                  esto, no hay forma de forzar "quiero 0% en ESTE pedido
+                  puntual" cuando cliente/jornadas ganarían por fallback (ej.
+                  un `descuento_cliente_pct` congelado que ya no corresponde). */}
+              <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Switch
+                  checked={datos.descuento_manual_activo}
+                  onCheckedChange={(v) =>
+                    setDatos((d) => d && { ...d, descuento_manual_activo: v })
+                  }
+                />
+                Forzar este valor (permite 0% aunque cliente/jornadas tengan descuento)
+              </label>
             </div>
           </RailSection>
 

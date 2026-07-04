@@ -1386,6 +1386,12 @@ def _init_db_schema(conn):
             END IF;
         END $$;
     """)
+    # Fase C-4 (#1231): fuerza el override manual a ganar OUTRIGHT aunque su
+    # valor sea 0 — sin esto, `descuento_pct=0`/`descuento_manual_monto=0` es
+    # indistinguible de "sin override" y no hay forma de expresar "quiero 0%
+    # en ESTE pedido puntual" cuando cliente/jornadas ganarían por fallback
+    # (ver `descuentos/queries/decision.py::resolver_descuento_pedido`).
+    conn.execute("ALTER TABLE alquileres ADD COLUMN IF NOT EXISTS descuento_manual_activo BOOLEAN NOT NULL DEFAULT FALSE")
 
     # email infra (migración a4e8c2b9d710)
     conn.execute("""

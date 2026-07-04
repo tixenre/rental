@@ -417,6 +417,10 @@ class PedidoDatos(BaseModel):
     # "monto" (usa `descuento_manual_monto`, pesos fijos).
     descuento_manual_tipo:  Optional[str]   = None
     descuento_manual_monto: Optional[float] = None
+    # Fase C-4 (#1231): fuerza el override manual a ganar OUTRIGHT aunque su
+    # valor sea 0 — única forma de forzar "0% en ESTE pedido puntual" cuando
+    # cliente/jornadas ganarían por fallback. Ver `descuentos/queries/decision.py`.
+    descuento_manual_activo: Optional[bool] = None
 
     @field_validator("fecha_desde", "fecha_hasta")
     @classmethod
@@ -800,17 +804,30 @@ def _recalcular_total_pedido(conn, id: int) -> None:
     Fuente ÚNICA del recálculo "desde lo que hay en la base": subtotales por
     línea, `descuento_jornadas_pct` (derivado de las jornadas) y `monto_total`
     (neto). Lee los ítems, las fechas y el `descuento_pct` del propio pedido —
-    no recibe nada de afuera. No toca stock ni estado.
+    no recibe nada de afuera. No toca stock.
 
     Jerarquía de descuento (Fase C-1, #1219): `alquileres.descuento_pct` es el
-    override MANUAL del pedido (0 = sin override) — el descuento del cliente
-    se lee EN VIVO acá (`obtener_descuento_cliente`), nunca se asume snapshoteado
-    en la fila. Ver `resolver_descuento_pedido`.
+    override MANUAL del pedido (0 = sin override). El descuento de
+    cliente/jornadas se lee EN VIVO **solo mientras el pedido sigue en
+    `presupuesto`** (así el builder sigue al cliente en vivo, comportamiento
+    de siempre); una vez que pasa a `confirmado`/`retirado`/etc. se REUSA el
+    snapshot ya persistido en la fila — se sigue recalculando `monto_total`
+    (los ítems SÍ se pueden corregir post-confirmado) pero con el % YA
+    CONGELADO, nunca uno recién leído de `clientes`/`descuentos_jornada`.
+
+    Bug real (encontrado auditando un pedido con un descuento "que no
+    existía"): antes de este guard, CUALQUIER guardado del pedido —aunque
+    fuera una nota, no algo relacionado al descuento— disparaba esta función,
+    que releía `obtener_descuento_cliente` en vivo y pisaba el snapshot
+    congelado sin mirar el estado. Eso viola "plata congelada" (MEMORIA
+    2026-06-06): un pedido ya confirmado/retirado podía cambiar de total solo
+    porque alguien tocó cualquier otro campo del formulario admin.
 
     Lo usan `_apply_pedido_datos` (editar fechas/cliente/descuento) y la
     edición de ítems. `propagar_descuento_a_presupuestos` también dispara esto
-    cuando cambia el descuento de un cliente (nada que "propagar" al override
-    manual — se lee en vivo).
+    cuando cambia el descuento de un cliente — pero solo alcanza presupuestos
+    (columna `estado='presupuesto'` en su propio WHERE), así que el guard de
+    acá nunca lo bloquea a él.
     """
     p = conn.execute("SELECT * FROM alquileres WHERE id=%s", (id,)).fetchone()
     if not p:
@@ -831,8 +848,12 @@ def _recalcular_total_pedido(conn, id: int) -> None:
             jornadas,
         )
         conn.execute("UPDATE alquiler_items SET subtotal=%s WHERE id=%s", (sub, it["id"]))
-    descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
-    descuento_cliente_pct = obtener_descuento_cliente(conn, p["cliente_id"])
+    if p["estado"] == "presupuesto":
+        descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
+        descuento_cliente_pct = obtener_descuento_cliente(conn, p["cliente_id"])
+    else:
+        descuento_jornadas_pct = p["descuento_jornadas_pct"] or 0
+        descuento_cliente_pct = p["descuento_cliente_pct"] or 0
     # `es_combo` (Fase C-3, #1219): resuelve qué líneas quedan afuera del
     # descuento global de cliente/jornadas/manual — ya traen el suyo propio.
     tipos = tipos_equipo_batch(conn, [it["equipo_id"] for it in items if it["equipo_id"]])
@@ -849,6 +870,7 @@ def _recalcular_total_pedido(conn, id: int) -> None:
         descuento_manual_pct=p["descuento_pct"] or 0,
         descuento_manual_tipo=p["descuento_manual_tipo"] or "pct",
         descuento_manual_monto=p["descuento_manual_monto"] or 0,
+        descuento_manual_activo=bool(p["descuento_manual_activo"]),
         perfil_impuestos=None,  # persiste NETO; IVA es derivado al mostrar.
     )
     # `descuento_cliente_pct` se persiste como SNAPSHOT (igual que jornadas) —
@@ -960,6 +982,7 @@ def _apply_pedido_datos(conn, id: int, data: "PedidoDatos", es_admin: bool = Fal
         or "descuento_pct" in payload
         or "descuento_manual_tipo" in payload
         or "descuento_manual_monto" in payload
+        or "descuento_manual_activo" in payload
         or cliente_cambio
     ):
         _recalcular_total_pedido(conn, id)
@@ -1036,8 +1059,17 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
     # como hacen las otras 2 sedes. Antes solo se aplicaba el del cliente →
     # editar ítems perdía el descuento por jornadas (#500). Acá se calcula
     # desde los ítems en memoria (los que estamos por insertar), no desde la base.
-    descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
-    descuento_cliente_pct = obtener_descuento_cliente(conn, p["cliente_id"])
+    #
+    # Mismo guard que `_recalcular_total_pedido`: una vez que el pedido pasa de
+    # `presupuesto`, el % de cliente/jornadas queda CONGELADO (se reusa el
+    # snapshot ya persistido) — editar ítems de un pedido confirmado no debe
+    # poder cambiar el % de descuento, solo el bruto/monto que ese % multiplica.
+    if p["estado"] == "presupuesto":
+        descuento_jornadas_pct = obtener_descuento_jornadas(conn, jornadas)
+        descuento_cliente_pct = obtener_descuento_cliente(conn, p["cliente_id"])
+    else:
+        descuento_jornadas_pct = p["descuento_jornadas_pct"] or 0
+        descuento_cliente_pct = p["descuento_cliente_pct"] or 0
     total_desglose = calcular_total(
         items=lineas,  # incluye cobro_modo por línea (líneas 'fijo' no × jornadas)
         jornadas=jornadas,
@@ -1046,6 +1078,7 @@ def _apply_pedido_items(conn, id: int, items: list["PedidoItem"]) -> dict:
         descuento_manual_pct=p["descuento_pct"] or 0,
         descuento_manual_tipo=p["descuento_manual_tipo"] or "pct",
         descuento_manual_monto=p["descuento_manual_monto"] or 0,
+        descuento_manual_activo=bool(p["descuento_manual_activo"]),
         perfil_impuestos=None,  # persiste NETO; IVA derivado al mostrar.
     )
     monto_total = total_desglose["neto"]
