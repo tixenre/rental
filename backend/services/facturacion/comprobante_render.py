@@ -29,35 +29,23 @@ _EMISOR_COND_IVA_LABEL: dict[str, str] = {
 }
 
 
-def _catalogo(fn, id_) -> str:
-    from database import get_db
-
-    conn = get_db()
-    try:
-        return fn(id_, conn)
-    finally:
-        conn.close()
-
-
 _EMISOR_ROW_CAMPOS = ("razon_social", "cuit", "condicion_iva", "domicilio", "iibb", "inicio_actividades")
 
 
-def _emisor_row(nombre: str) -> dict:
+def _emisor_row(nombre: str, conn) -> dict:
     """Lee los datos legales del emisor desde `emisores_arca` — administrables desde el
     back-office, NUNCA hardcodeados por nombre (un emisor nuevo heredaba en silencio los datos de
     "santini" antes de este fix). Si la fila no existe (emisor mal configurado/renombrado), cae a
-    todo vacío — `arca_fe.pdf` degrada esos campos a "—", nunca rompe el render."""
+    todo vacío — `arca_fe.pdf` degrada esos campos a "—", nunca rompe el render.
+
+    Reusa `conn` (no abre su propia conexión) — `_armar_comprobante_fiscal` la comparte con los 3
+    lookups de catálogo, una sola conexión por render en vez de 4."""
     try:
-        from database import get_db
-        conn = get_db()
-        try:
-            row = conn.execute(
-                "SELECT razon_social, cuit, condicion_iva, domicilio, iibb, inicio_actividades "
-                "FROM emisores_arca WHERE nombre = %s",
-                (nombre,),
-            ).fetchone()
-        finally:
-            conn.close()
+        row = conn.execute(
+            "SELECT razon_social, cuit, condicion_iva, domicilio, iibb, inicio_actividades "
+            "FROM emisores_arca WHERE nombre = %s",
+            (nombre,),
+        ).fetchone()
         if row:
             return {campo: row[campo] or "" for campo in _EMISOR_ROW_CAMPOS}
     except Exception:
@@ -128,20 +116,27 @@ def _conceptos(pedido: dict, factura) -> tuple[ItemFactura, ...]:
 
 
 def _armar_comprobante_fiscal(factura, pedido: dict) -> "arca_fe.ComprobanteFiscal":
-    """Resuelve lo que `arca_fe` no puede resolver solo: labels de catálogo (vía `conn`, propio de
-    cada lookup — ver `_catalogo`) y datos de negocio del emisor/pedido."""
+    """Resuelve lo que `arca_fe` no puede resolver solo: labels de catálogo y datos de negocio del
+    emisor/pedido. Una sola conexión para los 4 lookups (emisor + 3 catálogos) — antes cada uno
+    abría/cerraba la suya (4 round-trips de conexión por render, sin ninguna razón para no
+    compartirla dentro de la misma función síncrona)."""
+    from database import get_db
     from services.facturacion.catalogos import (
         label_concepto,
         label_condicion_iva_receptor,
         label_doc_tipo,
     )
 
-    em_row = _emisor_row(factura.emisor)
-    em_cond_label = _EMISOR_COND_IVA_LABEL.get(em_row["condicion_iva"], "—")
+    conn = get_db()
+    try:
+        em_row = _emisor_row(factura.emisor, conn)
+        doc_label = label_doc_tipo(factura.doc_tipo, conn)
+        concepto_label = label_concepto(factura.concepto, conn)
+        cond_iva_receptor_label = label_condicion_iva_receptor(factura.condicion_iva_receptor, conn)
+    finally:
+        conn.close()
 
-    doc_label = _catalogo(label_doc_tipo, factura.doc_tipo)
-    concepto_label = _catalogo(label_concepto, factura.concepto)
-    cond_iva_receptor_label = _catalogo(label_condicion_iva_receptor, factura.condicion_iva_receptor)
+    em_cond_label = _EMISOR_COND_IVA_LABEL.get(em_row["condicion_iva"], "—")
 
     doc_nro_raw = factura.cliente_cuit or factura.doc_nro or "0"
 

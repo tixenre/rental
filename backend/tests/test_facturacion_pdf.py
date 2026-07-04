@@ -99,7 +99,7 @@ def _pedido(**overrides) -> dict:
 def test_emisor_desconocido_usa_sus_propios_datos_no_los_de_otro(monkeypatch):
     monkeypatch.setattr(
         "services.facturacion.comprobante_render._emisor_row",
-        lambda nombre: {
+        lambda nombre, conn: {
             "razon_social": "Empresa XYZ SRL",
             "cuit": "30-71234567-8",
             "condicion_iva": "exento",
