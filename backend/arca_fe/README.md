@@ -107,6 +107,22 @@ cert_pem, key_pem = generar_cert_autofirmado("Mi Empresa — Comprobantes")  # g
 pdf_protegido = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
 ```
 
+## Previsualizar cómo se ve un comprobante (sin CAE real)
+
+`arca_fe.ejemplos.generar_galeria_html()` arma una página HTML con varios comprobantes de muestra
+(Factura A/B/C, Nota de Crédito, en distintos layouts) usando datos 100% ficticios — sin red, sin
+CAE real. Sirve para ver rápido "así se ve" antes de integrar la librería, o como referencia visual
+del equipo:
+
+```bash
+python -m arca_fe.ejemplos > /tmp/muestras.html   # abrir en un browser
+```
+
+No es parte de la superficie fiscal (no está en `__all__`) — es una utilidad de desarrollo/
+documentación. Los datos de ejemplo (razón social, CUIT, nombre del receptor) son deliberadamente
+genéricos ("Empresa de Ejemplo SRL", CUIT de patrón repetido con dígito verificador válido pero sin
+asociar a nadie) — nunca reemplazarlos por datos de una persona o empresa real.
+
 ## Excepciones
 
 Todo lo que el motor levanta hereda de `ArcaError` — `except ArcaError` atrapa cualquier falla:

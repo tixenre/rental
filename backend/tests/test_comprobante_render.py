@@ -82,7 +82,7 @@ def _factura(**overrides) -> Factura:
 
 def _pedido(**overrides) -> dict:
     base = dict(
-        id=422, numero_pedido="422", cliente_nombre="Ignacio Beramendi",
+        id=422, numero_pedido="422", cliente_nombre="Juan Pérez",
         cliente_domicilio_fiscal=None, fecha_desde="2026-06-30",
         fecha_hasta="2026-07-01", cantidad_jornadas=1,
         monto_total=5700, monto_pagado=5700, items=[],

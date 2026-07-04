@@ -43,7 +43,7 @@ def _comprobante(**overrides) -> ComprobanteFiscal:
         emisor_cuit="20123456786",
         emisor_razon_social="Rambla SRL",
         receptor=_RECEPTOR_CF,
-        receptor_nombre="Ignacio Beramendi",
+        receptor_nombre="Juan Pérez",
         concepto_label="Servicios",
         doc_tipo_label="DNI",
         condicion_iva_receptor_label="Consumidor Final",
@@ -302,14 +302,51 @@ _ITEM_CON_DETALLE = ItemFactura(
     cantidad=Decimal("2"), unidad_medida="caja", subtotal=Decimal("9"),
 )
 
+_ITEM_SIMPLE = ItemFactura(
+    codigo="001", descripcion="Servicio de alquiler", precio_unitario=Decimal("9"),
+    subtotal=Decimal("9"),
+)
 
-def test_simplificada_no_muestra_cantidad_ni_precio_unitario_ni_unidad():
-    html = renderizar_comprobante_html(
-        _comprobante(items=(_ITEM_CON_DETALLE,)), layout="simplificada"
+
+def test_simplificada_rechaza_item_que_perderia_informacion():
+    """`simplificada` no puede mostrar cantidad/precio unitario/bonificación/detalle — un ítem
+    que los necesita (cantidad != 1, acá) se rechaza en vez de renderizarse con esa información
+    escondida. No es solo una advertencia de `LAYOUTS_INFO`: la librería lo hace cumplir."""
+    with pytest.raises(ValueError, match="no admite ítems"):
+        renderizar_comprobante_html(_comprobante(items=(_ITEM_CON_DETALLE,)), layout="simplificada")
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"cantidad": Decimal("2")},
+        {"bonificacion_pct": Decimal("10")},
+        {"detalle": "Serie 12345"},
+        {"unidad_medida": "caja"},
+    ],
+)
+def test_simplificada_rechaza_cada_campo_que_perderia_informacion_por_separado(overrides):
+    item = ItemFactura(
+        codigo="001", descripcion="Ítem", precio_unitario=Decimal("9"), subtotal=Decimal("9"),
+        **overrides,
     )
-    assert "Cámara Sony FX3" in html
-    assert "caja" not in html  # unidad de medida
-    assert "4,50" not in html  # precio unitario
+    with pytest.raises(ValueError, match="no admite ítems"):
+        renderizar_comprobante_html(_comprobante(items=(item,)), layout="simplificada")
+
+
+def test_simplificada_acepta_item_simple_sin_romper():
+    """Cantidad=1, sin bonificación, sin detalle adicional, unidad default: no se pierde nada al
+    resumirlo — la simplificada lo renderiza sin problema."""
+    html = renderizar_comprobante_html(_comprobante(items=(_ITEM_SIMPLE,)), layout="simplificada")
+    assert "Servicio de alquiler" in html
+
+
+def test_oficial_y_detallada_no_rechazan_items_con_detalle():
+    """`oficial`/`detallada` SÍ muestran cantidad/precio unitario/bonificación/detalle — no tienen
+    la limitación de `simplificada`, así que no rechazan estos ítems."""
+    for layout in ("oficial", "detallada"):
+        html = renderizar_comprobante_html(_comprobante(items=(_ITEM_CON_DETALLE,)), layout=layout)
+        assert "Cámara Sony FX3" in html
 
 
 def test_oficial_muestra_cantidad_precio_unitario_y_unidad():

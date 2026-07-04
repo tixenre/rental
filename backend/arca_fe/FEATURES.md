@@ -70,11 +70,14 @@ con la herramienta que uses, o mostrarlo directo como preview) en **tres formato
 su nombre y descripción listos para mostrarle a quien elige (`LAYOUTS_INFO`, para armar un
 selector real sin inventar copy propio): **Oficial** (réplica del formulario de ARCA, A4, con el
 detalle completo de cada ítem), **Detallada** (A4 con diseño propio, mismo nivel de detalle) y
-**Simplificada** (formato vertical compacto, pensado para compartir por WhatsApp o redes —
-**resume cada ítem a descripción e importe, sin cantidad ni precio unitario**: no sirve para una
-operación con varios productos que necesite ese desglose, para eso están las otras dos). Incluye
-el QR fiscal oficial (el mismo que cualquiera puede escanear para verificar el comprobante contra
-ARCA) y podés inyectarle tu propia tipografía de marca sin tocar el layout.
+**Simplificada** (formato vertical compacto, mínimo 1080×1350 — pensado para compartir por
+WhatsApp o redes — **resume cada ítem a descripción e importe, sin cantidad ni precio unitario**:
+si una operación tiene varios productos o cantidades que necesitan ese desglose, la librería
+**rechaza** generarla en este formato en vez de mostrar un comprobante incompleto — para eso están
+Oficial o Detallada). Incluye el QR fiscal oficial (el mismo que cualquiera puede escanear para
+verificar el comprobante contra ARCA) y podés inyectarle tu propia tipografía de marca sin tocar
+el layout. ¿Querés ver cómo se ven antes de integrar la librería? `arca_fe.ejemplos` genera una
+galería HTML de muestra con datos ficticios (`python -m arca_fe.ejemplos`).
 
 ## Documento protegido — no un PDF cualquiera
 

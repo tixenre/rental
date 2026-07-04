@@ -16,7 +16,7 @@ probada en producción — bajo SemVer, `0.x` señala justamente que puede rompe
 compatibilidad entre versiones menores, la misma libertad que se usó acá.
 """
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 from .modelos import (
     CondicionIva,

@@ -14,8 +14,10 @@ real con esas mismas descripciones en vez de inventar copy propio:
 - **`simplificada`**: comprobante vertical compacto 4:5, pensado para compartir (WhatsApp/redes) —
   el default. **No es "la versión para celular" de las otras dos** — es un tipo de comprobante
   distinto: cada ítem se resume a descripción + importe, SIN cantidad/precio unitario/bonificación.
-  No sirve si la operación necesita mostrar cantidades, precios unitarios o varios productos con su
-  detalle — para eso usar `oficial` o `detallada` (ver la `advertencia` en `LAYOUTS_INFO`).
+  **Esto se hace cumplir en código, no es solo una advertencia**: si algún ítem necesita mostrar
+  cantidad != 1, bonificación, unidad de medida no estándar o detalle adicional,
+  `renderizar_comprobante_html` levanta `ValueError` en vez de generar un comprobante que esconde
+  esa información — para esos casos usar `oficial` o `detallada` (`_validar_apto_para_simplificada`).
 
 Los tres son agnósticos de marca: usan el logo oficial de ARCA (la agencia, no el emisor) y
 muestran todo lo que AFIP exige (CAE, QR fiscal RG4892, discriminación de IVA, leyenda de
@@ -779,14 +781,37 @@ LAYOUTS_INFO: tuple[LayoutInfo, ...] = (
         ),
         advertencia=(
             "No es 'la versión para celular' de las otras dos — es un formato de comprobante "
-            "distinto, pensado para operaciones simples. No la uses si necesitás mostrar "
-            "cantidades, precios unitarios, bonificaciones o el detalle de varios productos: "
-            "elegí Oficial o Detallada."
+            "distinto, pensado para operaciones simples. Un ítem con cantidad != 1, bonificación, "
+            "unidad de medida no estándar o detalle adicional NO se puede renderizar en este "
+            "formato — la librería lo rechaza (ValueError), no queda a criterio del usuario: "
+            "elegí Oficial o Detallada para esos comprobantes."
         ),
     ),
 )
 
 LAYOUTS_VALIDOS: tuple[str, ...] = tuple(info.id for info in LAYOUTS_INFO)
+
+
+def _validar_apto_para_simplificada(items) -> None:
+    """La `simplificada` resume cada ítem a descripción+importe — NO muestra `cantidad`, `precio_unitario`,
+    `bonificacion_pct` ni `detalle`. Antes esto era solo una advertencia en `LAYOUTS_INFO` (texto que el
+    consumidor podía ignorar); ahora se hace cumplir en código: si algún ítem tiene información en esos
+    campos que se perdería al ocultarlos, `renderizar_comprobante_html` RECHAZA con `ValueError` en vez de
+    generar un comprobante que esconde datos reales — obliga a elegir `oficial`/`detallada` para esa
+    operación en particular. Un ítem "apto" es cantidad=1, sin bonificación, sin `detalle` adicional y con
+    la unidad de medida default ('unidad') — lo mínimo que puede resumirse sin perder nada real."""
+    problematicos = [
+        it for it in items
+        if it.cantidad != 1 or it.bonificacion_pct != 0 or it.detalle or it.unidad_medida != "unidad"
+    ]
+    if problematicos:
+        descripciones = ", ".join(f"'{it.descripcion}'" for it in problematicos)
+        raise ValueError(
+            "El layout 'simplificada' no admite ítems con cantidad != 1, bonificación, unidad de "
+            "medida no estándar o detalle adicional — esa información se perdería al no mostrar "
+            f"cantidad/precio unitario/detalle. Ítem(s) afectado(s): {descripciones}. "
+            "Usá el layout 'oficial' o 'detallada' para este comprobante."
+        )
 
 
 def normalizar_layout(layout: str) -> str:
@@ -823,7 +848,15 @@ def renderizar_comprobante_html(
     marca nunca es requisito de validez fiscal.
 
     Devuelve el HTML como string; no convierte a PDF (eso es responsabilidad del caller, junto con
-    `arca_fe.seguridad.asegurar_pdf` si hace falta el documento certificado)."""
-    builder = _LAYOUTS[normalizar_layout(layout)]
+    `arca_fe.seguridad.asegurar_pdf` si hace falta el documento certificado).
+
+    `ValueError` si el layout resuelto es `"simplificada"` y algún ítem de `datos.items` no es lo
+    bastante simple para resumirse sin perder información (ver `_validar_apto_para_simplificada`)
+    — NO es solo la `advertencia` de `LAYOUTS_INFO`, se hace cumplir acá: elegir `oficial` o
+    `detallada` para ese comprobante en particular, no atajarse con la simplificada."""
+    layout_resuelto = normalizar_layout(layout)
+    if layout_resuelto == "simplificada":
+        _validar_apto_para_simplificada(datos.items)
+    builder = _LAYOUTS[layout_resuelto]
     ctx = _build_ctx(datos)
     return builder(ctx, fonts_css)
