@@ -245,6 +245,38 @@ async def _render_pdf(html: str, *, page_size: tuple[int, int | None] | None = N
     return pdf_bytes
 
 
+async def _render_imagen(
+    html: str, *, page_size: tuple[int, int | None] | None = None, formato: str = "png"
+) -> bytes:
+    """Screenshot del HTML (Playwright `page.screenshot`) — misma infraestructura que
+    `_render_pdf` (mismo browser compartido), para compartir un layout como imagen en vez de PDF
+    (ej. el layout "celular" de una factura, pensado para WhatsApp — una imagen se ve inline en el
+    chat, un PDF aparece como ícono de archivo). Disponible para cualquier layout, no solo
+    "celular": mismo contrato de `page_size` que `_render_pdf` — sin especificar, usa el ancho A4
+    (794px) con el alto real del contenido; con `page_size` (width_px, height_px|None), fuerza ese
+    tamaño (celular: 4:5 fijo). `formato`: "png" (default, sin pérdida) o "jpeg".
+
+    Es un artefacto de nivel "compartir rápido" (como el preview HTML) — no pasa por
+    `arca_fe.asegurar_pdf` (esa firma es específica de PDF), no reemplaza al documento
+    certificado."""
+    browser = await _get_browser()
+    page = await browser.new_page()
+    try:
+        await page.set_content(html, wait_until="networkidle")
+        if page_size:
+            width_px, height_px = page_size
+            if height_px is None:
+                height_px = await page.evaluate("document.body.scrollHeight")
+        else:
+            width_px = 794
+            height_px = await page.evaluate("document.body.scrollHeight") or 1123
+        await page.set_viewport_size({"width": width_px, "height": height_px})
+        img_bytes = await page.screenshot(type=formato)
+    finally:
+        await page.close()
+    return img_bytes
+
+
 # ── Reporte de liquidación (#88) ──────────────────────────────────────────────
 # Espeja el patrón de los documentos de pedido: un builder de HTML branded que
 # `_render_pdf` convierte a PDF A4. La data de liquidación viene del motor

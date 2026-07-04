@@ -385,6 +385,40 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
     assert "Factura-C-00002-00000001.pdf" in resp.headers["content-disposition"]
 
 
+def test_descargar_pdf_format_imagen_devuelve_png_sin_firmar(monkeypatch):
+    """`format=imagen` es un artefacto liviano (compartir rápido) — no pasa por
+    `get_or_create_signing_cert`/`asegurar_pdf`, a diferencia del PDF."""
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.repo.get_by_id", lambda factura_id, conn: _fake_factura()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.engine._get_pedido", lambda conn, pedido_id: {"id": pedido_id}
+    )
+    monkeypatch.setattr(
+        "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
+    )
+
+    async def _fake_render_imagen(html, **_):
+        return b"%PNG-FAKE%"
+
+    monkeypatch.setattr("pdf._render_imagen", _fake_render_imagen)
+
+    def _boom(conn):
+        raise AssertionError("format=imagen no debería pedir el certificado de firma")
+
+    monkeypatch.setattr("services.facturacion.pdf_seguridad.get_or_create_signing_cert", _boom)
+
+    resp = asyncio.run(
+        facturacion_routes.descargar_pdf_factura(1, _fake_request(), format="imagen")
+    )
+    assert resp.status_code == 200
+    assert resp.body == b"%PNG-FAKE%"
+    assert resp.media_type == "image/png"
+    assert "Factura-C-00002-00000001.png" in resp.headers["content-disposition"]
+
+
 # ── enviar_mail_factura: la columna real es c.email, no c.owner_email ───────
 
 

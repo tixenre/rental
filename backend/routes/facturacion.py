@@ -555,10 +555,12 @@ def _factura_html_o_404(factura_id: int, conn, layout: str = "celular"):
 async def descargar_pdf_factura(
     factura_id: int, request: Request, format: str = "pdf", layout: str = "celular"
 ):
-    """PDF de una factura, renderizado on-demand. `format=html` devuelve el preview
-    (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py).
-    `layout`: 'celular' (default de Rambla — compacta 4:5) · 'clasica' (réplica
-    oficial AFIP/ARCA, A4) · 'formal' (A4, identidad de la celular)."""
+    """PDF (o imagen) de una factura, renderizado on-demand. `format=html` devuelve el preview
+    rápido (mismo patrón que Contrato/Presupuesto/Albarán en routes/alquileres/documentos.py);
+    `format=imagen` devuelve un PNG del mismo layout — artefacto liviano de "compartir rápido"
+    (ej. por WhatsApp), NO firmado/protegido como el PDF, no reemplaza al documento certificado.
+    `layout`: 'celular' (default de Rambla — compacta 4:5) · 'clasica' (réplica oficial AFIP/ARCA,
+    A4) · 'formal' (A4, identidad de la celular)."""
     require_admin(request)
 
     if layout not in ("clasica", "celular", "formal"):
@@ -566,7 +568,7 @@ async def descargar_pdf_factura(
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)
-        if format == "html":
+        if format in ("html", "imagen"):
             cert_pem = key_pem = None
         else:
             from services.facturacion.pdf_seguridad import get_or_create_signing_cert
@@ -576,10 +578,24 @@ async def descargar_pdf_factura(
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
 
-    from pdf import _render_pdf
-    from arca_fe import asegurar_pdf
     from arca_fe.pdf import page_size_for_layout
     from services.facturacion.comprobante_render import factura_filename
+
+    if format == "imagen":
+        from pdf import _render_imagen
+        try:
+            img_bytes = await _render_imagen(html_str, page_size=page_size_for_layout(layout))
+        except Exception as e:
+            raise HTTPException(503, f"No se pudo generar la imagen: {e}")
+        nombre = factura_filename(factura, layout=layout).replace(".pdf", ".png")
+        return Response(
+            content=img_bytes,
+            media_type="image/png",
+            headers={"Content-Disposition": f'attachment; filename="{nombre}"', **_DOC_NO_CACHE},
+        )
+
+    from pdf import _render_pdf
+    from arca_fe import asegurar_pdf
     try:
         pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
         # asegurar_pdf firma con pyhanko, cuyo sign_pdf sync internamente hace
