@@ -13,6 +13,9 @@ dependencies = [
     "requests",
     "httpx",
     "cryptography",
+    "pyhanko",
+    "pyhanko-certvalidator",
+    "asn1crypto",
 ]
 
 # `segno` (renderizar el QR fiscal como SVG, `arca_fe.qr._build_qr_svg`) es un import
