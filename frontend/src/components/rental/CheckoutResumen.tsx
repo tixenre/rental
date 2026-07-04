@@ -8,7 +8,7 @@ import { Button } from "@/design-system/ui/button";
 import { Spinner } from "@/design-system/ui/spinner";
 import { formatARS } from "@/lib/format";
 import { descuentoLabel, type DescuentoOrigen } from "@/lib/cotizacion";
-import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
+import { PERFIL_IMPUESTOS_LABEL, facturaTipoLabel, type PerfilImpuestos } from "@/lib/iva";
 import { useBusinessContact } from "@/hooks/useBusinessContact";
 import { aceptarTyc, validarCheckout, type FaltanItem } from "@/lib/checkout";
 import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
@@ -280,6 +280,9 @@ export function CheckoutResumen({
               </div>
               <div className="text-sm font-semibold text-ink">
                 {PERFIL_IMPUESTOS_LABEL[perfilImpuestos]}
+              </div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                Te facturamos: {facturaTipoLabel(perfilImpuestos)}
               </div>
             </div>
           )}

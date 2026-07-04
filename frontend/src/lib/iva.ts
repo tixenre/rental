@@ -28,6 +28,13 @@ export function aplicaIva(perfil: PerfilImpuestos | null | undefined): boolean {
   return perfil === "responsable_inscripto";
 }
 
+/** Qué tipo de comprobante espera recibir el cliente, a nivel informativo —
+ *  la determinación real (que también depende de la condición del emisor)
+ *  la hace `services/facturacion/engine.py::tipo_comprobante` al emitir. */
+export function facturaTipoLabel(perfil: PerfilImpuestos | null | undefined): string {
+  return aplicaIva(perfil) ? "Factura A" : "Factura B";
+}
+
 // ── Hook de sesión cliente (lightweight, una sola llamada compartida) ────
 
 type ClienteSession = {
