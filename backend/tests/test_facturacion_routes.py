@@ -264,6 +264,36 @@ def test_preview_factura_arca_business_error_es_422(monkeypatch):
     assert "RG 3990-E" in ei.value.detail
 
 
+# ── preview_factura_html: mismo layout que la factura real, sin emitir ──────
+
+
+def test_preview_factura_html_devuelve_html(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.engine.previsualizar_factura_html",
+        lambda pedido_id, conn, layout="simplificada": f"<html>factura {layout}</html>",
+    )
+
+    resp = facturacion_routes.preview_factura_html(1, _fake_request())
+    assert resp.status_code == 200
+    assert b"factura simplificada" in resp.body
+
+
+def test_preview_factura_html_value_error_es_400(monkeypatch):
+    monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
+    monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
+    monkeypatch.setattr(
+        "services.facturacion.engine.previsualizar_factura_html",
+        lambda pedido_id, conn, layout="simplificada": (_ for _ in ()).throw(
+            ValueError("CUIT inválido")
+        ),
+    )
+    with pytest.raises(HTTPException) as ei:
+        facturacion_routes.preview_factura_html(1, _fake_request())
+    assert ei.value.status_code == 400
+
+
 def test_nota_credito_value_error_es_400(monkeypatch):
     monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
     monkeypatch.setattr(
