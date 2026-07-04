@@ -108,6 +108,7 @@ def _fake_pedido_neto_impar() -> dict:
     """Neto=$1001 (no múltiplo de 100) + receptor RI → IVA 21% da $210,21."""
     return {
         "id": 42,
+        "cliente_id": 42,
         "estado": "confirmado",
         "monto_total": 1001,
         "iva_monto": 210,  # ya viene aproximado en el pedido; el motor recalcula exacto
@@ -144,6 +145,17 @@ def test_emitir_factura_persiste_centavos_exactos_no_trunca(monkeypatch):
     monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
     monkeypatch.setattr(engine, "WsfeClient", lambda **kw: wsfe)
     monkeypatch.setattr(engine, "get_factura_vigente", lambda pedido_id, conn: None)
+
+    from arca_fe.padron import PersonaArca
+
+    monkeypatch.setattr(
+        engine,
+        "verificar_y_actualizar_receptor",
+        lambda cuit, cliente_id, conn: PersonaArca(
+            cuit=cuit, razon_social="Cliente RI SA", nombre="", apellido="",
+            domicilio="", condicion_iva="responsable_inscripto", estado_clave="ACTIVO",
+        ),
+    )
     monkeypatch.setattr(engine, "insert_factura", _fake_insert_factura)
     monkeypatch.setattr(engine, "update_cae", _fake_update_cae)
     monkeypatch.setattr(engine, "update_error", lambda *a, **kw: None)
