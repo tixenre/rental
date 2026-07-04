@@ -50,14 +50,15 @@ def test_sin_emisor_activo_con_cert_levanta_con_motivo(monkeypatch):
         resolver_persona("20301234567", conn=object())
 
 
-def test_afip_sin_datos_ni_motivo_levanta_nombrando_el_emisor_autenticador(monkeypatch):
-    """Caso real de prod: un CUIT activo, con Constancia de Inscripción
-    vigente confirmada en el propio portal de AFIP, seguía devolviendo "sin
-    datos" acá — la causa más probable es que el CUIT del EMISOR
-    AUTENTICADOR (no el buscado) no tenga la relación de este servicio
-    delegada. El mensaje ahora nombra ESE emisor/CUIT para que se pueda
-    verificar del lado correcto en vez de asumir que el CUIT buscado es el
-    problema."""
+def test_afip_sin_datos_levanta_nombrando_el_emisor_y_el_ambiente(monkeypatch):
+    """Caso real de prod: un CUIT que AFIP no devuelve. `get_persona` YA NO
+    devuelve None — levanta ArcaResponseError/ArcaBusinessError con el motivo
+    real. resolver_persona lo captura y arma un RuntimeError que nombra el
+    emisor autenticador probado, su motivo, y EL AMBIENTE en que consultó
+    (clave: homologación solo conoce CUIT de prueba, así que un 'sin datos' ahí
+    es el ambiente, no un problema del CUIT)."""
+    from arca_fe.errores import ArcaResponseError
+
     monkeypatch.setattr(
         "services.facturacion.emisores_repo.list_emisores",
         lambda conn: [_emisor(nombre="pablo")],
@@ -75,11 +76,17 @@ def test_afip_sin_datos_ni_motivo_levanta_nombrando_el_emisor_autenticador(monke
         lambda emisor, conn, servicio=None: ("tok", "sign"),
     )
     monkeypatch.setattr(
-        "arca_fe.padron.PadronClient.get_persona", lambda self, cuit: None
+        "arca_fe.padron.PadronClient.get_persona",
+        lambda self, cuit: (_ for _ in ()).throw(
+            ArcaResponseError("AFIP no devolvió 'personaReturn'", raw="<crudo>")
+        ),
     )
 
-    with pytest.raises(RuntimeError, match="pablo.*20300000000"):
+    with pytest.raises(RuntimeError, match="pablo.*20300000000") as ei:
         resolver_persona("23373891029", conn=object())
+
+    assert "AMBIENTE" in str(ei.value)
+    assert "personaReturn" in str(ei.value)
 
 
 def test_usa_el_unico_emisor_activo_con_cert(monkeypatch):
@@ -150,15 +157,21 @@ def test_reintenta_con_el_siguiente_emisor_si_el_primero_no_tiene_la_relacion(
         lambda emisor, conn, servicio=None: ("tok", "sign"),
     )
 
+    from arca_fe.errores import ArcaResponseError
+
     class _FakePersona:
         razon_social = "Empresa XYZ"
 
     def _get_persona(self, cuit):
         # El emisor autenticador usado en esta consulta viaja en `self` vía
         # el `cuit_representada` con el que se construyó el PadronClient —
-        # acá lo simulamos con un contador global simple.
+        # acá lo simulamos con un contador global simple. El primer emisor no
+        # tiene la relación → `get_persona` levanta (ya no devuelve None); el
+        # segundo la resuelve.
         _get_persona.calls += 1
-        return None if _get_persona.calls == 1 else _FakePersona()
+        if _get_persona.calls == 1:
+            raise ArcaResponseError("sin personaReturn", raw="x")
+        return _FakePersona()
 
     _get_persona.calls = 0
     monkeypatch.setattr("arca_fe.padron.PadronClient.get_persona", _get_persona)
@@ -188,13 +201,12 @@ def test_falla_real_levanta_runtime_error_con_motivo(monkeypatch):
         resolver_persona("30712345678", conn=object())
 
 
-def test_bloqueo_de_negocio_de_afip_se_propaga_sin_doble_envoltorio(monkeypatch):
+def test_bloqueo_de_negocio_de_afip_se_propaga_con_el_texto_real(monkeypatch):
     """`get_persona` levanta ArcaBusinessError con el mensaje de negocio de
     AFIP en texto plano (ej. bloqueo por Domicilio Fiscal Electrónico, RG
-    3990-E). resolver_persona (el adapter) lo APLANA a RuntimeError —su
-    convención, que el route mapea a 503— preservando el mensaje tal cual,
-    sin el genérico "No se pudo consultar el padrón con el emisor...", que le
-    restaría legibilidad al mensaje que el admin tiene que leer."""
+    3990-E). resolver_persona lo captura y lo surfacea DENTRO del RuntimeError
+    final (con el emisor + ambiente como contexto), preservando el texto de
+    AFIP tal cual — que es el que el admin tiene que leer para actuar."""
     from arca_fe.errores import ArcaBusinessError
 
     monkeypatch.setattr(
@@ -223,4 +235,41 @@ def test_bloqueo_de_negocio_de_afip_se_propaga_sin_doble_envoltorio(monkeypatch)
     )
 
     with pytest.raises(RuntimeError, match=mensaje_afip):
+        resolver_persona("23373891029", conn=object())
+
+
+@pytest.mark.parametrize(
+    "prod,esperado",
+    [(True, "PRODUCCIÓN"), (False, "HOMOLOGACIÓN")],
+)
+def test_mensaje_final_incluye_el_ambiente_en_que_consulto(monkeypatch, prod, esperado):
+    """Cuando ningún emisor resuelve, el RuntimeError dice EN QUÉ AMBIENTE se
+    consultó — el diagnóstico #1: si es homologación, cualquier CUIT real da
+    'no existe' y no es un bug de datos."""
+    from config import settings as app_settings
+    from arca_fe.errores import ArcaResponseError
+
+    monkeypatch.setattr(type(app_settings), "is_production", property(lambda self: prod))
+    monkeypatch.setattr(
+        "services.facturacion.emisores_repo.list_emisores",
+        lambda conn: [_emisor(nombre="pablo")],
+    )
+
+    class _FakeCred:
+        ambiente = "produccion" if prod else "homologacion"
+        cuit = 20300000000
+
+    monkeypatch.setattr(
+        "services.facturacion.config.credenciales", lambda emisor, conn: _FakeCred()
+    )
+    monkeypatch.setattr(
+        "services.facturacion.wsaa_cache.get_ta",
+        lambda emisor, conn, servicio=None: ("tok", "sign"),
+    )
+    monkeypatch.setattr(
+        "arca_fe.padron.PadronClient.get_persona",
+        lambda self, cuit: (_ for _ in ()).throw(ArcaResponseError("x", raw="y")),
+    )
+
+    with pytest.raises(RuntimeError, match=esperado):
         resolver_persona("23373891029", conn=object())
