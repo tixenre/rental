@@ -168,14 +168,19 @@ confirma (queda en el portal del cliente + se manda por mail). El front (`lib/ch
 en un iframe sandboxed dentro de un modal, sin salir del checkout (mismo patrón que
 `FacturacionModal`/`TerminosModal`).
 
-**Robustez del armado en memoria** (edge cases cubiertos, con candado en
+**Robustez del armado en memoria** (edge cases reales, con candado en
 `test_checkout_contrato_preview_db.py`): la lectura de `items_json` reusa
-`services.carrito.desde_items_json` + `.get("cantidad", 1)` — no indexa
-`["cantidad"]` directo, así que un ítem de carrito con forma vieja/incompleta
-no tira 503; el SELECT de `equipos` filtra `eliminado_at IS NULL`, así que un
-equipo borrado del catálogo que quedó referenciado en un carrito viejo no se
-cuela en el preview; el timestamp "Emitido" usa `now_ar()` (no
-`datetime.now()` crudo, que en la nube corre en UTC).
+`services.carrito.desde_items_json` (resuelve lista-ya-deserializada vs.
+string JSON — no reimplementa esa ambigüedad); el SELECT de `equipos` filtra
+`eliminado_at IS NULL`, porque un carrito no se purga ni se re-valida solo
+(sin heartbeat nuevo, puede seguir apuntando a un equipo que se borró del
+catálogo después) — sin el filtro, ese equipo se colaba en el preview con
+nombre/serie/valor de reposición; el timestamp "Emitido" usa `now_ar()` (no
+`datetime.now()` crudo, que en la nube corre en UTC). **NO** hay fallback para
+un ítem sin `cantidad`: el único escritor de `items_json`
+(`services.carrito.activos.heartbeat_upsert`) la recibe de un modelo Pydantic
+que la exige (`CartItem.cantidad: int`, sin default) — no existe, ni existió,
+una forma que la omita.
 
 ## UI del resumen (`CheckoutResumen.tsx`)
 

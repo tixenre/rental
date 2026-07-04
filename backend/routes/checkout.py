@@ -144,12 +144,11 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
             if carrito is None:
                 raise HTTPException(404, "No encontramos tu carrito.")
 
-            # `desde_items_json` (services/carrito, fuente única) tolera items
-            # con forma incompleta — a diferencia de indexar ["cantidad"]
-            # directo, no revienta si un ítem viejo del carrito quedó sin esa
-            # clave.
+            # `desde_items_json` (services/carrito, fuente única) resuelve la
+            # ambigüedad lista-ya-deserializada vs. string JSON — mismo patrón
+            # usado en carritos.py/compartir.py/listas.py, no reimplementado acá.
             cantidad_por_id = {
-                int(it["equipo_id"]): int(it.get("cantidad") or 1)
+                int(it["equipo_id"]): int(it["cantidad"])
                 for it in desde_items_json(carrito.get("items_json"))
                 if it.get("equipo_id")
             }
