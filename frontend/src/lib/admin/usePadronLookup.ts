@@ -9,7 +9,7 @@
  * dos campos separados (cliente); uno con un solo campo de identidad
  * (emisor, siempre una identidad de negocio) usa `razon_social`.
  */
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { facturacionApi } from "@/lib/admin/api";
 
@@ -33,7 +33,14 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
   // engañoso acá).
   const [motivo, setMotivo] = useState<string | null>(null);
 
-  const buscar = async (cuit: string) => {
+  // `onFound` es un arrow inline en el caller → se recrea en cada render. Se
+  // guarda en un ref (siempre fresco) para que `buscar` pueda ser ESTABLE
+  // (useCallback []): así un useEffect de auto-búsqueda puede depender de
+  // `buscar` sin re-dispararse en cada render.
+  const onFoundRef = useRef(onFound);
+  onFoundRef.current = onFound;
+
+  const buscar = useCallback(async (cuit: string) => {
     const digits = cuit.replace(/\D/g, "");
     if (digits.length !== 11) return;
     setBuscando(true);
@@ -43,7 +50,7 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
     try {
       const result = await facturacionApi.consultarPadron(digits);
       if (result.encontrado) {
-        onFound({
+        onFoundRef.current({
           razon_social: result.razon_social,
           nombre: result.nombre,
           apellido: result.apellido,
@@ -66,7 +73,7 @@ export function usePadronLookup(onFound: (datos: PadronDatos) => void) {
     } finally {
       setBuscando(false);
     }
-  };
+  }, []);
 
   return { buscar, buscando, noEncontrado, inactivo, motivo };
 }
