@@ -15,8 +15,6 @@ POST /api/checkout/contrato-preview
 Ver `docs/SISTEMA_CHECKOUT.md` para el flujo completo y el contrato de respuesta.
 """
 
-import datetime
-import json
 import logging
 import uuid as _uuid
 
@@ -25,11 +23,12 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from auth.stepup import has_recent_stepup
-from database import get_db, row_to_dict, MARCA_SUBQUERY
+from database import get_db, now_ar, row_to_dict, MARCA_SUBQUERY
 from identity import nombre_validado, direccion_validada
 from identity.contacts import email_comunicacion, telefono_contacto
 from pdf import _contrato_html
 from routes.cliente_portal import require_cliente
+from services.carrito import desde_items_json
 from services.checkout import registrar_aceptacion, validar_checkout
 from services.checkout.validar import _leer_carrito
 from services.contenido import contenido_de_batch
@@ -145,11 +144,14 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
             if carrito is None:
                 raise HTTPException(404, "No encontramos tu carrito.")
 
-            raw_json = carrito.get("items_json") or []
-            if isinstance(raw_json, str):
-                raw_json = json.loads(raw_json)
+            # `desde_items_json` (services/carrito, fuente única) tolera items
+            # con forma incompleta — a diferencia de indexar ["cantidad"]
+            # directo, no revienta si un ítem viejo del carrito quedó sin esa
+            # clave.
             cantidad_por_id = {
-                r["equipo_id"]: r["cantidad"] for r in raw_json if r.get("equipo_id")
+                int(it["equipo_id"]): int(it.get("cantidad") or 1)
+                for it in desde_items_json(carrito.get("items_json"))
+                if it.get("equipo_id")
             }
             eq_ids = list(cantidad_por_id.keys())
             if not eq_ids:
@@ -159,7 +161,8 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
             rows = conn.execute(
                 f"""SELECT id AS equipo_id, nombre, {MARCA_SUBQUERY}, modelo, serie,
                            valor_reposicion, nombre_publico, nombre_publico_largo
-                    FROM equipos e WHERE id IN ({ph})""",
+                    FROM equipos e
+                    WHERE id IN ({ph}) AND eliminado_at IS NULL""",
                 tuple(eq_ids),
             ).fetchall()
             componentes = contenido_de_batch(conn, eq_ids)
@@ -184,7 +187,7 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
                 "estado": "presupuesto",
                 "fecha_desde": carrito.get("fecha_desde"),
                 "fecha_hasta": carrito.get("fecha_hasta"),
-                "emitido": datetime.datetime.now(),
+                "emitido": now_ar(),
                 "items": items,
                 "cliente_nombre": nombre_validado(c)
                 or f"{c.get('nombre', '')} {c.get('apellido', '')}".strip(),

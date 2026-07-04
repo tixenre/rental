@@ -42,8 +42,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 CLIENTE_ID = 9_340_001
 EQ_ID = 9_340_101
+EQ_ID_BORRADO = 9_340_102
 SESSION_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 SESSION_ID_VACIO = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeef"
+SESSION_ID_SIN_CANTIDAD = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeef0"
+SESSION_ID_CON_BORRADO = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeef1"
 
 _COOKIE = f"session={signer.dumps({'email': 'contrato-preview-db@test.com', 'role': 'cliente', 'cliente_id': CLIENTE_ID, 'jti': 'contrato-preview-cli'})}"
 
@@ -61,10 +64,11 @@ def carrito_con_equipo():
 
     init_db()
     conn = get_db()
+    _sesiones = (SESSION_ID, SESSION_ID_VACIO, SESSION_ID_SIN_CANTIDAD, SESSION_ID_CON_BORRADO)
     try:
-        conn.execute("DELETE FROM carritos_activos WHERE session_id IN (%s, %s)", (SESSION_ID, SESSION_ID_VACIO))
+        conn.execute("DELETE FROM carritos_activos WHERE session_id = ANY(%s)", (list(_sesiones),))
         conn.execute("DELETE FROM clientes WHERE id = %s", (CLIENTE_ID,))
-        conn.execute("DELETE FROM equipos WHERE id = %s", (EQ_ID,))
+        conn.execute("DELETE FROM equipos WHERE id IN (%s, %s)", (EQ_ID, EQ_ID_BORRADO))
         conn.execute(
             """INSERT INTO clientes (id, nombre, apellido, email)
                VALUES (%s, %s, %s, %s)""",
@@ -74,6 +78,14 @@ def carrito_con_equipo():
             "INSERT INTO equipos (id, nombre, cantidad, precio_jornada, visible_catalogo) "
             "VALUES (%s, 'Cámara contrato-preview-test', 5, 1000, 1)",
             (EQ_ID,),
+        )
+        # Equipo soft-deleted (eliminado_at seteado) — no debería colarse en el
+        # preview aunque siga referenciado en un carrito viejo (#carrito viejo
+        # que nunca se refrescó tras borrar el equipo del catálogo).
+        conn.execute(
+            "INSERT INTO equipos (id, nombre, cantidad, precio_jornada, visible_catalogo, eliminado_at) "
+            "VALUES (%s, 'Cámara borrada contrato-preview-test', 5, 1000, 1, now())",
+            (EQ_ID_BORRADO,),
         )
         conn.execute(
             """INSERT INTO carritos_activos (session_id, cliente_id, items_json, fecha_desde, fecha_hasta)
@@ -85,12 +97,28 @@ def carrito_con_equipo():
                VALUES (%s, %s, '[]', CURRENT_DATE + 1, CURRENT_DATE + 3)""",
             (SESSION_ID_VACIO, CLIENTE_ID),
         )
+        # Ítem sin "cantidad" (forma vieja/incompleta) — no debería tirar 503.
+        conn.execute(
+            """INSERT INTO carritos_activos (session_id, cliente_id, items_json, fecha_desde, fecha_hasta)
+               VALUES (%s, %s, %s, CURRENT_DATE + 1, CURRENT_DATE + 3)""",
+            (SESSION_ID_SIN_CANTIDAD, CLIENTE_ID, f'[{{"equipo_id": {EQ_ID}}}]'),
+        )
+        # Carrito con un ítem borrado + uno vigente — el preview debe mostrar
+        # solo el vigente, sin romper.
+        conn.execute(
+            """INSERT INTO carritos_activos (session_id, cliente_id, items_json, fecha_desde, fecha_hasta)
+               VALUES (%s, %s, %s, CURRENT_DATE + 1, CURRENT_DATE + 3)""",
+            (
+                SESSION_ID_CON_BORRADO, CLIENTE_ID,
+                f'[{{"equipo_id": {EQ_ID}, "cantidad": 1}}, {{"equipo_id": {EQ_ID_BORRADO}, "cantidad": 1}}]',
+            ),
+        )
         conn.commit()
         yield
     finally:
-        conn.execute("DELETE FROM carritos_activos WHERE session_id IN (%s, %s)", (SESSION_ID, SESSION_ID_VACIO))
+        conn.execute("DELETE FROM carritos_activos WHERE session_id = ANY(%s)", (list(_sesiones),))
         conn.execute("DELETE FROM clientes WHERE id = %s", (CLIENTE_ID,))
-        conn.execute("DELETE FROM equipos WHERE id = %s", (EQ_ID,))
+        conn.execute("DELETE FROM equipos WHERE id IN (%s, %s)", (EQ_ID, EQ_ID_BORRADO))
         conn.commit()
         conn.close()
 
@@ -139,3 +167,30 @@ def test_contrato_preview_session_id_invalido_400(carrito_con_equipo):
         headers={"Cookie": _COOKIE},
     )
     assert res.status_code == 400
+
+
+def test_contrato_preview_item_sin_cantidad_no_500ea(carrito_con_equipo):
+    """Un ítem de `items_json` sin la clave "cantidad" (forma vieja/incompleta)
+    no debe tirar 503 — `desde_items_json` + `.get("cantidad", 1)` lo toleran
+    con el default 1, en vez de reventar con un KeyError."""
+    res = client.post(
+        "/api/checkout/contrato-preview",
+        json={"session_id": SESSION_ID_SIN_CANTIDAD},
+        headers={"Cookie": _COOKIE},
+    )
+    assert res.status_code == 200
+    assert "Cámara contrato-preview-test" in res.text
+
+
+def test_contrato_preview_excluye_equipo_soft_deleted(carrito_con_equipo):
+    """Un equipo con `eliminado_at` seteado (borrado del catálogo) no debe
+    aparecer en el preview aunque siga referenciado en un carrito viejo que
+    nunca se refrescó — el resto del carrito se muestra igual."""
+    res = client.post(
+        "/api/checkout/contrato-preview",
+        json={"session_id": SESSION_ID_CON_BORRADO},
+        headers={"Cookie": _COOKIE},
+    )
+    assert res.status_code == 200
+    assert "Cámara contrato-preview-test" in res.text
+    assert "Cámara borrada contrato-preview-test" not in res.text

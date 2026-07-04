@@ -168,6 +168,15 @@ confirma (queda en el portal del cliente + se manda por mail). El front (`lib/ch
 en un iframe sandboxed dentro de un modal, sin salir del checkout (mismo patrón que
 `FacturacionModal`/`TerminosModal`).
 
+**Robustez del armado en memoria** (edge cases cubiertos, con candado en
+`test_checkout_contrato_preview_db.py`): la lectura de `items_json` reusa
+`services.carrito.desde_items_json` + `.get("cantidad", 1)` — no indexa
+`["cantidad"]` directo, así que un ítem de carrito con forma vieja/incompleta
+no tira 503; el SELECT de `equipos` filtra `eliminado_at IS NULL`, así que un
+equipo borrado del catálogo que quedó referenciado en un carrito viejo no se
+cuela en el preview; el timestamp "Emitido" usa `now_ar()` (no
+`datetime.now()` crudo, que en la nube corre en UTC).
+
 ## UI del resumen (`CheckoutResumen.tsx`)
 
 Es el paso entre "Revisar pedido" (carrito) y la creación real del pedido — fuente
