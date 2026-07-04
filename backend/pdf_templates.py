@@ -722,7 +722,12 @@ _CLAUSULAS = [
 ]
 
 
-def _contrato_html(pedido):
+def _contrato_html(pedido, mostrar_locador=True):
+    """`mostrar_locador=False` omite el bloque de datos del Locador (Rambla) —
+    son fijos/institucionales, no cambian por pedido, así que no aportan nada
+    en el PREVIEW del checkout (`routes/checkout.py::checkout_contrato_preview`):
+    ahí lo que importa es que el cliente pueda leer las cláusulas. El contrato
+    REAL (de un pedido ya creado) sigue mostrándolo siempre (default True)."""
     items = pedido.get("items", [])
     j = _jornadas(pedido)
     rows, i = [], 1
@@ -755,6 +760,9 @@ def _contrato_html(pedido):
         )
     fecha_long = _fmt_date_long(pedido.get("emitido") or datetime.now())
     clausulas = "".join(f'<p class="clausula"><b>{html.escape(t)}.</b> {b}</p>' for t, b in _CLAUSULAS)
+    # Sin Locador, el bloque de Locatario (y su firma) ocupan la fila entera
+    # en vez de quedar a media grilla con un hueco vacío al lado.
+    _full_col_attrs = "" if mostrar_locador else ' style="grid-column:1/-1"'
 
     body = (
         # estado=True (default, ya no se suprime): el pedido puede seguir en
@@ -767,12 +775,16 @@ def _contrato_html(pedido):
           f'<div class="meta-val">{_fmt_date_dow(pedido.get("fecha_desde"))} al {_fmt_date_dow(pedido.get("fecha_hasta"))}</div></div>'
           '<div class="meta-block"><div class="meta-label">Duración</div>'
           f'<div class="meta-val">{j} jornada{"s" if j != 1 else ""}</div></div></div>'
-        + '<div class="partes"><div class="parte"><div class="parte-head">Locador</div>'
-          f'<div class="parte-row"><div class="parte-k">Nombre</div><div class="parte-v">{html.escape(OWNER_NOMBRE)}</div></div>'
-          f'<div class="parte-row"><div class="parte-k">CUIL</div><div class="parte-v">{html.escape(OWNER_CUIL)}</div></div>'
-          f'<div class="parte-row"><div class="parte-k">Domicilio</div><div class="parte-v">{html.escape(OWNER_DIRECCION)}</div></div>'
-          f'<div class="parte-row"><div class="parte-k">Contacto</div><div class="parte-v">{html.escape(OWNER_TELEFONO)} · {html.escape(OWNER_EMAIL)}</div></div></div>'
-          '<div class="parte"><div class="parte-head">Locatario</div>'
+        + '<div class="partes">'
+        + (
+            '<div class="parte"><div class="parte-head">Locador</div>'
+            f'<div class="parte-row"><div class="parte-k">Nombre</div><div class="parte-v">{html.escape(OWNER_NOMBRE)}</div></div>'
+            f'<div class="parte-row"><div class="parte-k">CUIL</div><div class="parte-v">{html.escape(OWNER_CUIL)}</div></div>'
+            f'<div class="parte-row"><div class="parte-k">Domicilio</div><div class="parte-v">{html.escape(OWNER_DIRECCION)}</div></div>'
+            f'<div class="parte-row"><div class="parte-k">Contacto</div><div class="parte-v">{html.escape(OWNER_TELEFONO)} · {html.escape(OWNER_EMAIL)}</div></div></div>'
+            if mostrar_locador else ""
+          )
+        + f'<div class="parte"{_full_col_attrs}><div class="parte-head">Locatario</div>'
           f'<div class="parte-row"><div class="parte-k">Nombre</div><div class="parte-v">{html.escape(pedido.get("cliente_nombre") or "—")}</div></div>'
           f'<div class="parte-row"><div class="parte-k">Domicilio</div><div class="parte-v">{html.escape(pedido.get("cliente_direccion") or "—")}</div></div>'
           f'<div class="parte-row"><div class="parte-k">Contacto</div><div class="parte-v">{html.escape(pedido.get("cliente_telefono") or "—")} · {html.escape(pedido.get("cliente_email") or "—")}</div></div>'
@@ -785,8 +797,12 @@ def _contrato_html(pedido):
         + f'<p class="clausula-intro">{_CLAUSULAS_INTRO}</p>'
         + f'<div class="clausulas">{clausulas}</div>'
         + '<div class="firmas">'
-          f'<div class="firma"><div class="rol">Firma Locatario</div><div class="name">{html.escape(pedido.get("cliente_nombre") or "—")}</div><div class="sub">Aclaración / DNI</div></div>'
-          f'<div class="firma"><div class="rol">Firma Locador</div><div class="name">{html.escape(OWNER_NOMBRE)}</div><div class="sub">Aclaración / DNI</div></div></div>'
+          f'<div class="firma"{_full_col_attrs}><div class="rol">Firma Locatario</div><div class="name">{html.escape(pedido.get("cliente_nombre") or "—")}</div><div class="sub">Aclaración / DNI</div></div>'
+        + (
+            f'<div class="firma"><div class="rol">Firma Locador</div><div class="name">{html.escape(OWNER_NOMBRE)}</div><div class="sub">Aclaración / DNI</div></div>'
+            if mostrar_locador else ""
+          )
+        + "</div>"
         + f'<div style="text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:28px;letter-spacing:.04em">Emitido en Mar del Plata, {fecha_long}</div>'
         + _footer()
     )

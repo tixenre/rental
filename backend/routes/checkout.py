@@ -196,7 +196,10 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
                 "cliente_razon_social": c.get("razon_social"),
             }
 
-            html_str = _marcar_como_simulacion(_contrato_html(pedido))
+            # mostrar_locador=False: los datos del Locador (Rambla) son fijos/
+            # institucionales, no aportan nada en un preview — lo que importa
+            # es que el cliente pueda leer las cláusulas.
+            html_str = _marcar_como_simulacion(_contrato_html(pedido, mostrar_locador=False))
     except HTTPException:
         raise
     except Exception:

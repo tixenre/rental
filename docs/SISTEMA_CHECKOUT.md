@@ -151,9 +151,14 @@ Los comentarios `TODO (#NNNN)` marcan exactamente dónde.
 `POST /api/checkout/contrato-preview` (`routes/checkout.py::checkout_contrato_preview`)
 arma un `pedido` equivalente **en memoria** desde el carrito de la sesión (mismo
 `_leer_carrito` que usa el portero + `equipos`/`contenido_de_batch`/`clientes`) y llama
-al **mismo `_contrato_html`** (`pdf_templates.py`) que genera el contrato real de un
-pedido ya creado — no persiste nada, no crea el pedido. Deja que el cliente **lea el
-contrato antes de confirmar** (sienta base para la firma digital de #1098 Fase 5).
+al **mismo `_contrato_html`** (`pdf_templates.py`), con **`mostrar_locador=False`** —
+omite el bloque de datos institucionales de Rambla (nombre/CUIL/domicilio/contacto,
+fijos, no cambian por pedido) y la firma del Locador: en un preview lo que importa es
+que el cliente pueda leer las **cláusulas**, no la ficha del Locador. El contrato REAL
+(de un pedido ya creado) sigue llamando a `_contrato_html(pedido)` sin el flag —
+default `True`, los sigue mostrando siempre. No persiste nada, no crea el pedido. Deja
+que el cliente **lea el contrato antes de confirmar** (sienta base para la firma
+digital de #1098 Fase 5).
 
 El HTML vuelve marcado como **SIMULACIÓN** (`_marcar_como_simulacion`: banner fijo +
 marca de agua diagonal) — el documento definitivo recién existe cuando el pedido se
