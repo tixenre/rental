@@ -173,20 +173,24 @@ def diagnosticar_emisor(emisor_id: int, conn) -> dict:
             (e for e in resultado["excluidos"] if e["nro"] == emisor.pto_vta), None
         )
         pto_vta_ok = emisor.pto_vta in habilitados
+        if pto_vta_ok:
+            mensaje_pto_vta = f"Punto de venta {emisor.pto_vta} habilitado para factura electrónica"
+        elif excluido is None:
+            mensaje_pto_vta = f"Punto de venta {emisor.pto_vta} no aparece entre los de AFIP"
+        else:
+            # `raw_emision_tipo` solo viene con motivo "no_electronico" — se
+            # muestra el valor CRUDO que devolvió ARCA (ver puntos_venta.py):
+            # mismo criterio que el bug real de `FchBaja="NULL"`, no hay forma
+            # de confirmar un quirk nuevo sin ver el dato tal cual.
+            raw = excluido.get("raw_emision_tipo")
+            detalle = f'{excluido["motivo"]}, EmisionTipo="{raw}"' if raw is not None else excluido["motivo"]
+            mensaje_pto_vta = f"Punto de venta {emisor.pto_vta} excluido en AFIP ({detalle})"
         chequeos.append(
             {
                 "check": "punto_venta_habilitado",
                 "ok": pto_vta_ok,
                 "bloqueante": True,
-                "mensaje": (
-                    f"Punto de venta {emisor.pto_vta} habilitado para factura electrónica"
-                    if pto_vta_ok
-                    else (
-                        f"Punto de venta {emisor.pto_vta} excluido en AFIP ({excluido['motivo']})"
-                        if excluido
-                        else f"Punto de venta {emisor.pto_vta} no aparece entre los de AFIP"
-                    )
-                ),
+                "mensaje": mensaje_pto_vta,
             }
         )
 

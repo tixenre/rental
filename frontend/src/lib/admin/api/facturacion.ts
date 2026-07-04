@@ -157,7 +157,11 @@ export const facturacionApi = {
   consultarPuntosVenta: (id: number) =>
     authedJson<{
       puntos_venta: { nro: number }[];
-      excluidos: { nro: number; motivo: "bloqueado" | "dado_de_baja" | "no_electronico" }[];
+      excluidos: {
+        nro: number;
+        motivo: "bloqueado" | "dado_de_baja" | "no_electronico";
+        raw_emision_tipo?: string | null;
+      }[];
     }>(`/api/admin/emisores-arca/${id}/puntos-venta`),
   // Metadata del cert cargado (subject/serie/vigencia) — para comparar contra
   // el "Computador Fiscal" delegado en el Administrador de Relaciones de ARCA.
