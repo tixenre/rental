@@ -184,6 +184,13 @@ export function CartDrawer({
       "¡Hola! Necesito un alquiler con urgencia (dentro del plazo mínimo de antelación). ¿Me pueden ayudar?",
   });
 
+  // Al cerrar el carrito (X, Esc, click afuera) volvemos al paso "carrito" —
+  // si no, reabrirlo dejaba al usuario mismo paso en el que lo cerró (ej. el
+  // resumen), en vez de arrancar de nuevo desde la lista de ítems.
+  useEffect(() => {
+    if (!drawerOpen) setStep("carrito");
+  }, [drawerOpen]);
+
   // Lock scroll del body + guardar foco al abrir, restaurar al cerrar
   useEffect(() => {
     if (!drawerOpen) return;
