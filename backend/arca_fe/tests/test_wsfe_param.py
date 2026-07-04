@@ -7,10 +7,27 @@ de respuestas CAE (éxito y rechazo) con objetos mock en vez de llamadas SOAP re
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+def _fake_comprobante():
+    """`ComprobanteRequest` mínimo y VÁLIDO (CUITs con dígito verificador real) — desde que
+    `solicitar_cae` arma el payload internamente (ya no acepta el dict crudo), estos tests de
+    parseo de respuesta necesitan un comprobante real para llegar a la llamada SOAP mockeada."""
+    from arca_fe import (
+        IVA_21, CondicionIva, ComprobanteRequest, Concepto, DocTipo, Emisor, Receptor,
+    )
+
+    emisor = Emisor(cuit=20301234563, punto_venta=3, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
+    receptor = Receptor(doc_tipo=DocTipo.CUIT, doc_nro=20301234563, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
+    return ComprobanteRequest(
+        emisor=emisor, receptor=receptor, concepto=Concepto.PRODUCTOS,
+        importe_neto=Decimal("1000.00"), alicuota=IVA_21, fecha=date(2024, 1, 15),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +158,7 @@ def test_solicitar_cae_aprobado():
         mock_service.FECAESolicitar.return_value = mock_resp
         mock_client_fn.return_value.service = mock_service
 
-        result = client.solicitar_cae({})
+        result = client.solicitar_cae(_fake_comprobante(), 1)
 
     assert result.resultado == "A"
     assert result.cae == "12345678901234"
@@ -164,7 +181,7 @@ def test_solicitar_cae_rechazado():
         mock_service.FECAESolicitar.return_value = mock_resp
         mock_client_fn.return_value.service = mock_service
 
-        result = client.solicitar_cae({})
+        result = client.solicitar_cae(_fake_comprobante(), 1)
 
     assert result.resultado == "R"
     assert result.cae is None
@@ -191,7 +208,7 @@ def test_solicitar_cae_con_observaciones():
         mock_service.FECAESolicitar.return_value = mock_resp
         mock_client_fn.return_value.service = mock_service
 
-        result = client.solicitar_cae({})
+        result = client.solicitar_cae(_fake_comprobante(), 1)
 
     assert result.resultado == "A"
     assert result.cae == "99887766554433"
@@ -225,7 +242,7 @@ def test_solicitar_cae_sin_fedetresp_pero_con_errors_levanta_business():
         mock_client_fn.return_value.service = mock_service
 
         with pytest.raises(ArcaBusinessError, match="600") as ei:
-            client.solicitar_cae({})
+            client.solicitar_cae(_fake_comprobante(), 1)
 
     assert ei.value.codigo == 600
 
@@ -246,7 +263,7 @@ def test_solicitar_cae_sin_fedetresp_ni_errors_levanta_response():
         mock_client_fn.return_value.service = mock_service
 
         with pytest.raises(ArcaResponseError, match="respuesta inesperada"):
-            client.solicitar_cae({})
+            client.solicitar_cae(_fake_comprobante(), 1)
 
 
 def test_ultimo_autorizado_mock():
@@ -335,11 +352,105 @@ def test_get_client_usa_el_endpoint_tal_cual_y_lo_cachea(monkeypatch):
 
     monkeypatch.setattr(wsfe.zeep, "Client", _FakeZeepClient)
 
-    cliente1 = wsfe._get_client("https://ejemplo-cualquiera.test/wsdl")
-    cliente2 = wsfe._get_client("https://ejemplo-cualquiera.test/wsdl")
+    cliente1 = wsfe._get_client("https://ejemplo-cualquiera.test/wsdl", 30.0)
+    cliente2 = wsfe._get_client("https://ejemplo-cualquiera.test/wsdl", 30.0)
 
     assert calls == ["https://ejemplo-cualquiera.test/wsdl"]
     assert cliente1 is cliente2
+
+
+def test_get_client_no_colisiona_entre_timeouts_distintos(monkeypatch):
+    """Dos instancias con distinto `timeout` al mismo endpoint cachean clientes
+    zeep SEPARADOS — no colisionan en la clave del cache."""
+    from arca_fe import wsfe
+
+    monkeypatch.setattr(wsfe, "_CLIENT_CACHE", {})
+    calls = []
+
+    class _FakeZeepClient:
+        def __init__(self, wsdl, transport=None):
+            calls.append(wsdl)
+
+    monkeypatch.setattr(wsfe.zeep, "Client", _FakeZeepClient)
+
+    cliente_30 = wsfe._get_client("https://ejemplo.test/wsdl", 30.0)
+    cliente_45 = wsfe._get_client("https://ejemplo.test/wsdl", 45.0)
+
+    assert cliente_30 is not cliente_45
+    assert len(calls) == 2
+
+
+def test_wsfe_clear_cache_limpia_de_verdad(monkeypatch):
+    from arca_fe import wsfe
+
+    monkeypatch.setattr(wsfe, "_CLIENT_CACHE", {})
+    monkeypatch.setattr(wsfe.zeep, "Client", lambda wsdl, transport=None: object())
+
+    wsfe._get_client("https://ejemplo.test/wsdl", 30.0)
+    assert wsfe._CLIENT_CACHE
+
+    wsfe.clear_cache()
+
+    assert wsfe._CLIENT_CACHE == {}
+
+
+def test_wsfe_client_timeout_configurable_por_instancia():
+    """`WsfeClient.timeout` es configurable por instancia (default 30.0) — dos
+    clientes al mismo endpoint pero con distinto timeout no colisionan."""
+    from arca_fe.wsfe import WsfeClient
+
+    client_default = WsfeClient("wswhomo.afip.gov.ar", 20301234563, "tok", "sig")
+    client_custom = WsfeClient("wswhomo.afip.gov.ar", 20301234563, "tok", "sig", timeout=45.0)
+
+    assert client_default.timeout == 30.0
+    assert client_custom.timeout == 45.0
+
+
+# ---------------------------------------------------------------------------
+# solicitar_cae_lote — facturación por lote (gap 9), sin red
+# ---------------------------------------------------------------------------
+
+
+def test_solicitar_cae_lote_devuelve_resultados_en_orden_con_aprobacion_parcial():
+    """AFIP puede aprobar unos y rechazar otros dentro del mismo lote — cada
+    `CaeResult` refleja el resultado INDIVIDUAL de su ítem, en el mismo orden
+    que los comprobantes pasados."""
+    from arca_fe import (
+        IVA_21, CondicionIva, ComprobanteRequest, Concepto, DocTipo, Emisor, Receptor,
+    )
+    from arca_fe.wsfe import WsfeClient
+
+    emisor = Emisor(cuit=20301234563, punto_venta=3, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
+    receptor = Receptor(doc_tipo=DocTipo.CUIT, doc_nro=20301234563, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
+    comprobantes = [
+        ComprobanteRequest(
+            emisor=emisor, receptor=receptor, concepto=Concepto.PRODUCTOS,
+            importe_neto=Decimal(m), alicuota=IVA_21, fecha=date(2024, 1, 15),
+        )
+        for m in ("1000.00", "2000.00")
+    ]
+
+    det_aprobado = _make_det("A", cae="11111111111111", cae_vto="20241215", cbte_desde=10)
+    det_rechazado = _make_det("R", errs=[(10060, "rechazado")], cbte_desde=11)
+    resp = MagicMock(spec=["FeDetResp", "Errors"])
+    resp.FeDetResp = MagicMock(spec=["FECAEDetResponse"])
+    resp.FeDetResp.FECAEDetResponse = [det_aprobado, det_rechazado]
+    resp.Errors = None
+
+    client = WsfeClient("wswhomo.afip.gov.ar", 20301234563, "tok", "sig")
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.FECAESolicitar.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        resultados = client.solicitar_cae_lote(comprobantes, 10)
+
+    assert len(resultados) == 2
+    assert resultados[0].resultado == "A"
+    assert resultados[0].cae == "11111111111111"
+    assert resultados[1].resultado == "R"
+    assert resultados[1].cae is None
+    assert "10060" in resultados[1].errores[0]
 
 
 # ── param_*: serialize_object tiene que quedar con target_cls=dict, NUNCA

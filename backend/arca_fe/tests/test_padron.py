@@ -565,11 +565,54 @@ def test_get_client_usa_el_endpoint_tal_cual_y_lo_cachea(monkeypatch):
 
     monkeypatch.setattr(padron.zeep, "Client", _FakeZeepClient)
 
-    cliente1 = padron._get_client("https://ejemplo-cualquiera.test/wsdl")
-    cliente2 = padron._get_client("https://ejemplo-cualquiera.test/wsdl")
+    cliente1 = padron._get_client("https://ejemplo-cualquiera.test/wsdl", 20.0)
+    cliente2 = padron._get_client("https://ejemplo-cualquiera.test/wsdl", 20.0)
 
     assert calls == ["https://ejemplo-cualquiera.test/wsdl"]
     assert cliente1 is cliente2
+
+
+def test_get_client_no_colisiona_entre_timeouts_distintos(monkeypatch):
+    from arca_fe import padron
+
+    monkeypatch.setattr(padron, "_CLIENT_CACHE", {})
+    calls = []
+
+    class _FakeZeepClient:
+        def __init__(self, wsdl, transport=None):
+            calls.append(wsdl)
+
+    monkeypatch.setattr(padron.zeep, "Client", _FakeZeepClient)
+
+    cliente_20 = padron._get_client("https://ejemplo.test/wsdl", 20.0)
+    cliente_40 = padron._get_client("https://ejemplo.test/wsdl", 40.0)
+
+    assert cliente_20 is not cliente_40
+    assert len(calls) == 2
+
+
+def test_padron_clear_cache_limpia_de_verdad(monkeypatch):
+    from arca_fe import padron
+
+    monkeypatch.setattr(padron, "_CLIENT_CACHE", {})
+    monkeypatch.setattr(padron.zeep, "Client", lambda wsdl, transport=None: object())
+
+    padron._get_client("https://ejemplo.test/wsdl", 20.0)
+    assert padron._CLIENT_CACHE
+
+    padron.clear_cache()
+
+    assert padron._CLIENT_CACHE == {}
+
+
+def test_padron_client_timeout_configurable_por_instancia():
+    from arca_fe.padron import PadronClient
+
+    client_default = PadronClient("wswhomo.afip.gov.ar", 20301234563, "tok", "sig")
+    client_custom = PadronClient("wswhomo.afip.gov.ar", 20301234563, "tok", "sig", timeout=40.0)
+
+    assert client_default.timeout == 20.0
+    assert client_custom.timeout == 40.0
 
 
 # ── Regresión #personaReturn: la respuesta cruda del WSDL real ──────────────
