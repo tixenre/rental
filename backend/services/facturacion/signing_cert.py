@@ -1,4 +1,4 @@
-"""services.facturacion.pdf_seguridad — persistencia del certificado de firma de PDFs.
+"""services.facturacion.signing_cert — persistencia del certificado de firma de PDFs.
 
 La generación del par (certificado, clave) y la protección del PDF en sí (permisos + firma PAdES)
 viven en `arca_fe.generar_cert_autofirmado`/`arca_fe.asegurar_pdf` — puras, sin IO. Este módulo

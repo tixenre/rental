@@ -234,7 +234,7 @@ async def cliente_pedido_factura(
         # esta asimetría dejaba el PDF del portal cliente sin proteger.
         cert_pair = None
         if format != "html":
-            from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+            from services.facturacion.signing_cert import get_or_create_signing_cert
             cert_pair = get_or_create_signing_cert(conn)
 
     return await _doc_response_or_pdf(

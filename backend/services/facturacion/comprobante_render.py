@@ -140,6 +140,11 @@ def _armar_comprobante_fiscal(factura, pedido: dict) -> "arca_fe.ComprobanteFisc
 
     doc_nro_raw = factura.cliente_cuit or factura.doc_nro or "0"
 
+    # `venta`/`vencimiento_pago` son default de NEGOCIO de Rambla (alquiler cobrado antes/al
+    # inicio), no un requisito de ARCA — igual que `CONCEPTO_MARCA` arriba, otro negocio que reuse
+    # este adapter puede resolverlos distinto (ej. venta a plazo real con vencimiento propio del
+    # pedido) sin tocar `arca_fe` (`ComprobanteFiscal.condicion_venta`/`vencimiento_pago` son
+    # strings/fechas libres, no un enum cerrado).
     total_pedido = pedido.get("monto_total")
     pagado = pedido.get("monto_pagado") or 0
     venta = "Contado" if total_pedido is None or pagado >= total_pedido else "Cuenta corriente"

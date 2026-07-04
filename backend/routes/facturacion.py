@@ -571,7 +571,7 @@ async def descargar_pdf_factura(
         if format in ("html", "imagen"):
             cert_pem = key_pem = None
         else:
-            from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+            from services.facturacion.signing_cert import get_or_create_signing_cert
             cert_pem, key_pem = get_or_create_signing_cert(conn)
 
     if format == "html":
@@ -634,7 +634,7 @@ async def enviar_mail_factura(factura_id: int, request: Request, layout: str = "
     layout = normalizar_layout(layout)
 
     from services.email import send_raw_email, Attachment
-    from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+    from services.facturacion.signing_cert import get_or_create_signing_cert
 
     with get_db() as conn:
         factura, html_str = _factura_html_o_404(factura_id, conn, layout=layout)

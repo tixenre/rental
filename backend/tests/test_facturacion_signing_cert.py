@@ -1,4 +1,4 @@
-"""Tests de services.facturacion.pdf_seguridad — persistencia del certificado de firma de PDFs.
+"""Tests de services.facturacion.signing_cert — persistencia del certificado de firma de PDFs.
 
 La generación del par (certificado, clave) y la protección del PDF en sí (permisos + firma PAdES)
 ya están cubiertas en `arca_fe/tests/test_seguridad.py` (puras, sin Postgres) — acá solo se prueba
@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from cryptography.fernet import Fernet
 
-from services.facturacion.pdf_seguridad import get_or_create_signing_cert
+from services.facturacion.signing_cert import get_or_create_signing_cert
 
 pytestmark = pytest.mark.unit
 

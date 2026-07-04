@@ -370,7 +370,7 @@ def test_descargar_pdf_format_pdf_default_es_attachment(monkeypatch):
 
     monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (b"cert", b"key"),
     )
     monkeypatch.setattr(
@@ -408,7 +408,7 @@ def test_descargar_pdf_format_imagen_devuelve_png_sin_firmar(monkeypatch):
     def _boom(conn):
         raise AssertionError("format=imagen no debería pedir el certificado de firma")
 
-    monkeypatch.setattr("services.facturacion.pdf_seguridad.get_or_create_signing_cert", _boom)
+    monkeypatch.setattr("services.facturacion.signing_cert.get_or_create_signing_cert", _boom)
 
     resp = asyncio.run(
         facturacion_routes.descargar_pdf_factura(1, _fake_request(), format="imagen")
@@ -440,7 +440,7 @@ def test_enviar_mail_factura_no_rompe_con_undefined_column(monkeypatch):
         "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (b"cert", b"key"),
     )
     monkeypatch.setattr(
@@ -482,7 +482,7 @@ def test_enviar_mail_factura_400_si_sin_email(monkeypatch):
         "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (b"cert", b"key"),
     )
 
@@ -597,7 +597,7 @@ def test_descargar_pdf_firma_real_no_explota_dentro_de_un_loop_corriendo(monkeyp
     cert_pem, key_pem = _generar_cert_autofirmado("test")
     monkeypatch.setattr("pdf._render_pdf", _fake_render_pdf)
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (cert_pem, key_pem),
     )
 

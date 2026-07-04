@@ -1,7 +1,7 @@
 """Tests de arca_fe.seguridad — protección del PDF (permisos + firma PAdES + metadatos + sello de
 tiempo). Sin red real (fake de TSA para el fail-open), sin Postgres. Usa un PDF mínimo generado con
 PyMuPDF (no hace falta Playwright para estos tests) — portado de
-`backend/tests/test_facturacion_pdf_seguridad.py`, usando `generar_cert_autofirmado` directo en
+`backend/tests/test_facturacion_signing_cert.py`, usando `generar_cert_autofirmado` directo en
 vez de `get_or_create_signing_cert` (esa persistencia es responsabilidad del adapter, no de
 `arca_fe`)."""
 from __future__ import annotations

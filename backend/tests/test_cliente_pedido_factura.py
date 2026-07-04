@@ -167,7 +167,7 @@ def test_factura_format_pdf_default_devuelve_inline(monkeypatch):
         "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (b"cert", b"key"),
     )
     monkeypatch.setattr(
@@ -208,7 +208,7 @@ def test_factura_pdf_queda_firmada_igual_que_en_el_admin(monkeypatch):
         "services.facturacion.comprobante_render.factura_html", lambda factura, pedido, **_: "<html></html>"
     )
     monkeypatch.setattr(
-        "services.facturacion.pdf_seguridad.get_or_create_signing_cert",
+        "services.facturacion.signing_cert.get_or_create_signing_cert",
         lambda conn: (b"cert", b"key"),
     )
 
@@ -256,7 +256,7 @@ def test_factura_format_html_no_pide_certificado(monkeypatch):
     def _boom(conn):
         raise AssertionError("no debería pedir el certificado para un preview HTML")
 
-    monkeypatch.setattr("services.facturacion.pdf_seguridad.get_or_create_signing_cert", _boom)
+    monkeypatch.setattr("services.facturacion.signing_cert.get_or_create_signing_cert", _boom)
 
     resp = asyncio.run(
         documentos_routes.cliente_pedido_factura(422, _fake_request(), format="html")
