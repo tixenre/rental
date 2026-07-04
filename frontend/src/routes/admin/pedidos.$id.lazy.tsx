@@ -1384,6 +1384,17 @@ function FacturacionRailSection({
 
           {preview.data && <Chequeos items={preview.data.chequeos} />}
 
+          {preview.data && (
+            <a
+              href={`/api/alquileres/${pedidoId}/facturar/preview-html?layout=${layout}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border hairline text-xs text-muted-foreground hover:text-ink hover:border-ink/30 w-fit"
+            >
+              <Eye className="h-3 w-3" /> Ver factura completa (borrador, sin CAE)
+            </a>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
