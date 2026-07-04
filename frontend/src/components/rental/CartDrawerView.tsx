@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
@@ -26,6 +27,16 @@ import { GuardarComoListaButton } from "./GuardarComoListaButton";
 import { CompartirComposicionButton } from "./CompartirComposicionButton";
 import { RentalDateModal } from "./RentalDateModal";
 import { CheckoutResumen } from "./CheckoutResumen";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/design-system/ui/alert-dialog";
 
 /** Forma mínima de la sesión del cliente que usa el panel (nombre + presencia). */
 type ClienteSessionLike = { nombre?: string | null } | null | undefined;
@@ -152,6 +163,11 @@ export function CartDrawerView({
   clienteSession: ClienteSessionLike;
   onClear: () => void;
 }) {
+  // Confirmación de "Vaciar pedido" — un accidental antes vaciaba el carrito
+  // directo (sin deshacer posible). Estado puramente de UI, no necesita subir
+  // al container.
+  const [askVaciar, setAskVaciar] = useState(false);
+
   return (
     <AnimatePresence>
       {drawerOpen && (
@@ -622,7 +638,7 @@ export function CartDrawerView({
                         </>
                       )}
                       <button
-                        onClick={onClear}
+                        onClick={() => setAskVaciar(true)}
                         className="transition hover:text-destructive focus:outline-none focus-visible:underline"
                       >
                         Vaciar pedido
@@ -636,6 +652,22 @@ export function CartDrawerView({
 
           {/* Modal de fechas — montado fuera del drawer para que se vea encima */}
           <RentalDateModal open={dateModalOpen} onOpenChange={onDateModalChange} />
+
+          {/* Confirmación de "Vaciar pedido" — accidental antes borraba directo, sin deshacer. */}
+          <AlertDialog open={askVaciar} onOpenChange={setAskVaciar}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Vaciar el pedido</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Vas a sacar todos los equipos de tu pedido. Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Volver</AlertDialogCancel>
+                <AlertDialogAction onClick={onClear}>Vaciar pedido</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </AnimatePresence>
