@@ -7,12 +7,11 @@ from decimal import Decimal
 
 import pytest
 
-from arca_fe import CbteTipo, CondicionIva, DocTipo, Emisor, Receptor
+from arca_fe import CbteTipo, CondicionIva, DocTipo, Receptor
 from arca_fe.modelos import ComprobanteFiscal, ItemFactura, es_nota_credito, letra_comprobante
 
 pytestmark = pytest.mark.unit
 
-_EMISOR = Emisor(cuit=20123456786, punto_venta=1, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
 _RECEPTOR = Receptor(
     doc_tipo=DocTipo.CUIT, doc_nro=27111222334, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO
 )
@@ -27,7 +26,7 @@ def _comprobante(**overrides) -> ComprobanteFiscal:
         cae="71234567890123",
         cae_vto=date(2026, 7, 11),
         qr_url="https://www.afip.gob.ar/fe/qr/?p=abc123",
-        emisor=_EMISOR,
+        emisor_cuit="20123456786",
         emisor_razon_social="Rambla SRL",
         receptor=_RECEPTOR,
         receptor_nombre="Juan Pérez",

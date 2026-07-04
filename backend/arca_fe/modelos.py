@@ -380,12 +380,17 @@ class ComprobanteFiscal:
     `ComprobanteRequest` (el pedido, antes del CAE) y de `CaeResult` (resultado transitorio de la
     llamada SOAP) — este es el registro persistido/completo.
 
-    Reusa `Emisor`/`Receptor` para lo estrictamente fiscal (CUIT, punto de venta, condición IVA,
-    doc.tipo/doc.nro). Los campos `*_label` (concepto/doc.tipo/condición IVA) vienen de catálogos
-    de AFIP que dependen de una consulta viva o un cache propio del caller — `arca_fe` no los
-    resuelve solo, los recibe ya resueltos como texto. Igual con razón social/domicilio de emisor y
-    receptor: son datos de negocio que no viven en `Emisor`/`Receptor` (esos son minimalistas,
-    solo lo fiscal).
+    Reusa `Receptor` para lo estrictamente fiscal del receptor (doc.tipo/doc.nro, condición IVA) —
+    ese dato viene de la MISMA `ComprobanteRequest` ya validada con la que se pidió el CAE, así que
+    reconstruirlo acá con la clase estricta es seguro (ya pasó esa validación una vez). El CUIT del
+    EMISOR en cambio se recibe como `emisor_cuit: str` plano, no como `Emisor` — viene de una
+    consulta de configuración APARTE (nombre del emisor → fila en la base del caller), que puede
+    fallar o estar incompleta independientemente de la validez del comprobante ya emitido (un
+    emisor renombrado/desconfigurado después de facturar no debería romper el render de una
+    factura vieja — degrada a "—", no ValueError). Los campos `*_label` (concepto/doc.tipo/
+    condición IVA) vienen de catálogos de AFIP que dependen de una consulta viva o un cache propio
+    del caller — `arca_fe` no los resuelve solo, los recibe ya resueltos como texto. Igual con razón
+    social/domicilio del emisor: son datos de negocio, no fiscales.
 
     `ValueError` en la construcción si falta `cae`/`numero`/`cae_vto`/`qr_url` — un comprobante sin
     esos 4 datos no se puede renderizar como válido, se rechaza antes de intentarlo (reemplaza el
@@ -400,8 +405,6 @@ class ComprobanteFiscal:
     cae_vto: date
     qr_url: str
 
-    emisor: Emisor
-    emisor_razon_social: str
     receptor: Receptor
     receptor_nombre: str
 
@@ -417,6 +420,8 @@ class ComprobanteFiscal:
     importe_total: Decimal = Decimal("0")
     importe_otros_tributos: Decimal = Decimal("0")
 
+    emisor_cuit: str = ""
+    emisor_razon_social: str = ""
     emisor_domicilio: str = ""
     emisor_iibb: str = ""
     emisor_inicio_actividades: Optional[date] = None

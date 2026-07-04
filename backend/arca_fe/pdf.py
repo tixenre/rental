@@ -94,6 +94,18 @@ def _receptor_doc_nro_fmt(receptor: Receptor) -> str:
     return str(receptor.doc_nro)
 
 
+def _emisor_cuit_fmt(raw: str) -> str:
+    """CUIT del emisor con guiones si normaliza bien; el crudo (o "—") si no — el emisor viene de
+    una consulta de configuración aparte que puede estar incompleta/desactualizada, nunca debe
+    romper el render de una factura ya emitida."""
+    if not raw:
+        return "—"
+    try:
+        return formatear_cuit(raw)
+    except ValueError:
+        return raw
+
+
 def _transparencia_fiscal_lines(f: dict) -> tuple[str, str, str]:
     """Texto de la leyenda de Transparencia Fiscal al Consumidor (Ley 27.743 / RG 5614), con los
     importes REALES de la factura — nunca hardcodeados."""
@@ -215,7 +227,7 @@ def _build_ctx(datos: ComprobanteFiscal) -> dict:
         "titulo": ("NOTA DE CRÉDITO " if es_nc else "FACTURA ") + letra,
         "emisor": {
             "razonSocial": datos.emisor_razon_social or "—",
-            "cuit": formatear_cuit(datos.emisor.cuit),
+            "cuit": _emisor_cuit_fmt(datos.emisor_cuit),
             "cond": datos.emisor_condicion_iva_label,
             "dom": datos.emisor_domicilio or "—",
             "iibb": datos.emisor_iibb,

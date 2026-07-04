@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import pytest
 
-from arca_fe import CbteTipo, CondicionIva, DocTipo, Emisor, Receptor
+from arca_fe import CbteTipo, CondicionIva, DocTipo, Receptor
 from arca_fe.modelos import ComprobanteFiscal, ItemFactura
 from arca_fe.pdf import (
     _iva_pct_label,
@@ -19,7 +19,6 @@ from arca_fe.pdf import (
 
 pytestmark = pytest.mark.unit
 
-_EMISOR = Emisor(cuit=20123456786, punto_venta=2, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
 _RECEPTOR_CF = Receptor(doc_tipo=DocTipo.DNI, doc_nro=42289220, condicion_iva=CondicionIva.CONSUMIDOR_FINAL)
 _RECEPTOR_RI = Receptor(doc_tipo=DocTipo.CUIT, doc_nro=27111222334, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
 
@@ -38,7 +37,7 @@ def _comprobante(**overrides) -> ComprobanteFiscal:
         cae="86261839900000",
         cae_vto=date(2026, 7, 15),
         qr_url="https://www.afip.gob.ar/fe/qr/?p=xyz",
-        emisor=_EMISOR,
+        emisor_cuit="20123456786",
         emisor_razon_social="Rambla SRL",
         receptor=_RECEPTOR_CF,
         receptor_nombre="Ignacio Beramendi",
@@ -217,6 +216,24 @@ def test_emisor_con_domicilio_se_muestra():
         _comprobante(emisor_domicilio="Ruta 88 km 12, Mar del Plata"), layout="clasica"
     )
     assert "Ruta 88 km 12" in html
+
+
+def test_emisor_sin_cuit_configurado_no_rompe_muestra_guion():
+    """El CUIT del emisor viene de una consulta de configuración APARTE (no de la
+    ComprobanteFiscal ya validada) — un emisor mal configurado o renombrado después de emitir NO
+    debe romper el render de una factura vieja, solo mostrar '—'."""
+    html = renderizar_comprobante_html(_comprobante(emisor_cuit=""), layout="clasica")
+    assert "CUIT:</span> —" in html
+
+
+def test_emisor_con_cuit_valido_se_formatea_con_guiones():
+    html = renderizar_comprobante_html(_comprobante(emisor_cuit="20123456786"), layout="clasica")
+    assert "20-12345678-6" in html
+
+
+def test_emisor_con_cuit_malformado_muestra_crudo_no_rompe():
+    html = renderizar_comprobante_html(_comprobante(emisor_cuit="no-es-un-cuit"), layout="clasica")
+    assert "no-es-un-cuit" in html
 
 
 # ── QR: si falla la generación, propaga el error (no un hueco donde debería
