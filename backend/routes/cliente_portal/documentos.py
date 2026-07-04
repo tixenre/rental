@@ -220,7 +220,7 @@ async def cliente_pedido_factura(
 
         from services.facturacion.engine import _get_pedido
         from services.facturacion.comprobante_render import factura_html, factura_filename
-        from arca_fe.pdf import page_size_for_layout
+        from arca_fe.pdf import tamano_pagina_layout
         pedido_data = _get_pedido(conn, id)
         try:
             html_str = factura_html(factura, pedido_data, layout=layout)
@@ -239,7 +239,7 @@ async def cliente_pedido_factura(
 
     return await _doc_response_or_pdf(
         html_str, factura_filename(factura, layout=layout), format,
-        page_size=page_size_for_layout(layout),
+        page_size=tamano_pagina_layout(layout),
         cert_pair=cert_pair,
     )
 

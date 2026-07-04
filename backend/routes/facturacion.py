@@ -578,13 +578,13 @@ async def descargar_pdf_factura(
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=html_str, headers=_DOC_NO_CACHE)
 
-    from arca_fe.pdf import page_size_for_layout
+    from arca_fe.pdf import tamano_pagina_layout
     from services.facturacion.comprobante_render import factura_filename
 
     if format == "imagen":
         from pdf import _render_imagen
         try:
-            img_bytes = await _render_imagen(html_str, page_size=page_size_for_layout(layout))
+            img_bytes = await _render_imagen(html_str, page_size=tamano_pagina_layout(layout))
         except Exception as e:
             raise HTTPException(503, f"No se pudo generar la imagen: {e}")
         nombre = factura_filename(factura, layout=layout).replace(".pdf", ".png")
@@ -597,7 +597,7 @@ async def descargar_pdf_factura(
     from pdf import _render_pdf
     from arca_fe import asegurar_pdf
     try:
-        pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
+        pdf_bytes = await _render_pdf(html_str, page_size=tamano_pagina_layout(layout))
         # asegurar_pdf firma con pyhanko, cuyo sign_pdf sync internamente hace
         # asyncio.run() — explota si se llama directo desde acá (ya estamos
         # dentro del loop de FastAPI). to_thread lo corre en un thread aparte,
@@ -659,10 +659,10 @@ async def enviar_mail_factura(factura_id: int, request: Request, layout: str = "
 
     from pdf import _render_pdf
     from arca_fe import asegurar_pdf
-    from arca_fe.pdf import page_size_for_layout
+    from arca_fe.pdf import tamano_pagina_layout
     from services.facturacion.comprobante_render import factura_filename
     try:
-        pdf_bytes = await _render_pdf(html_str, page_size=page_size_for_layout(layout))
+        pdf_bytes = await _render_pdf(html_str, page_size=tamano_pagina_layout(layout))
         pdf_bytes = await asyncio.to_thread(asegurar_pdf, pdf_bytes, cert_pem, key_pem)
     except Exception as e:
         raise HTTPException(503, f"No se pudo generar el PDF para el mail: {e}")

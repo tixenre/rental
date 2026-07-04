@@ -13,7 +13,7 @@ from arca_fe.modelos import ComprobanteFiscal, ItemFactura
 from arca_fe.pdf import (
     _iva_pct_label,
     nombre_fiscal_comprobante,
-    page_size_for_layout,
+    tamano_pagina_layout,
     renderizar_comprobante_html,
 )
 
@@ -86,9 +86,9 @@ def test_layout_desconocido_cae_al_default_celular():
 
 
 def test_page_size_solo_celular_tiene_tamano_propio_4x5_fijo():
-    assert page_size_for_layout("clasica") is None
-    assert page_size_for_layout("formal") is None
-    assert page_size_for_layout("celular") == (688, 860)
+    assert tamano_pagina_layout("clasica") is None
+    assert tamano_pagina_layout("formal") is None
+    assert tamano_pagina_layout("celular") == (688, 860)
 
 
 # ── QR clickeable — el link real de verificación, no la home de ARCA ───────

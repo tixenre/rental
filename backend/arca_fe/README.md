@@ -33,7 +33,7 @@ from arca_fe import (
 
 # 1. Armar el request (sin red — puro).
 emisor = Emisor(cuit="20-30123456-3", punto_venta=3, condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
-receptor = Receptor(doc_tipo=DocTipo.CUIT, doc_nro="20-30987654-2", condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
+receptor = Receptor(doc_tipo=DocTipo.CUIT, doc_nro="27-11122233-4", condicion_iva=CondicionIva.RESPONSABLE_INSCRIPTO)
 comprobante = ComprobanteRequest(
     emisor=emisor, receptor=receptor, concepto=Concepto.SERVICIOS,
     importe_neto=Decimal("1000.00"), alicuota=IVA_21, fecha=date.today(),
@@ -56,6 +56,48 @@ print(resultado.cae, resultado.cae_vto)
 Nota: `Emisor.cuit`/`Receptor.doc_nro` toleran CUIT con o sin guiones ("20-30123456-3" y
 "20301234563" son equivalentes) — se normalizan y se valida el dígito verificador al construir el
 objeto; un CUIT mal formado levanta `ValueError` ahí mismo, no tres pasos después contra AFIP.
+
+## Quickstart — parte 2: del CAE al comprobante renderizado
+
+Sigue directo del bloque anterior (`comprobante`, `tipo_comprobante(comprobante)`, `resultado`
+ya calculados):
+
+```python
+from arca_fe import (
+    tipo_comprobante, calcular_importes, armar_qr, comprobante_fiscal_desde,
+    renderizar_comprobante_html, asegurar_pdf, generar_cert_autofirmado,
+)
+
+cbte_tipo = tipo_comprobante(comprobante)
+importes = calcular_importes(comprobante)  # {"neto": ..., "iva": ..., "total": ...}
+
+# 4. Armar el QR fiscal (RG4892) — con el CAE YA autorizado.
+qr_url = armar_qr(
+    cuit_emisor=emisor.cuit, pto_vta=emisor.punto_venta, cbte_tipo=int(cbte_tipo),
+    nro_cmp=resultado.numero, importe_total=importes["total"],
+    doc_tipo_rec=int(receptor.doc_tipo), doc_nro_rec=receptor.doc_nro,
+    cae=resultado.cae, fecha=comprobante.fecha,
+)
+
+# 5. Armar el ComprobanteFiscal — reduce el copy manual: pto_vta/receptor salen de `comprobante`,
+#    cae/cae_vto/numero salen de `resultado`. Los *_label son opcionales (caen a los defaults
+#    ESTRUCTURALES de label_concepto/label_doc_tipo/label_condicion_iva si no los pasás).
+datos = comprobante_fiscal_desde(
+    comprobante, cbte_tipo, resultado, qr_url,
+    importes["neto"], importes["iva"], importes["total"], comprobante.fecha,
+    emisor_razon_social="Mi Empresa SRL", emisor_cuit="20-30123456-3",
+    receptor_nombre="Cliente SA",
+)
+
+# 6. Renderizar el HTML (preview rápido — string, NO un PDF; ver nota abajo).
+html = renderizar_comprobante_html(datos, layout="celular")
+
+# 7. Convertir a PDF y protegerlo — arca_fe NO hace el paso HTML→PDF (ver "Qué NO cubre" abajo).
+#    Acá con un motor cualquiera (ej. Playwright); el ejemplo asume que ya tenés los bytes del PDF.
+pdf_bytes: bytes = mi_motor_de_pdf(html)  # ej. Playwright: page.pdf(...)
+cert_pem, key_pem = generar_cert_autofirmado("Mi Empresa — Comprobantes")  # generar UNA vez, persistir
+pdf_protegido = asegurar_pdf(pdf_bytes, cert_pem, key_pem)
+```
 
 ## Excepciones
 
@@ -85,6 +127,10 @@ Errores de INPUT del programador (CUIT mal formado, enum inválido) son `ValueEr
   de varios comprobantes CONSECUTIVOS (mismo emisor/pto_vta/cbte_tipo) en una sola llamada SOAP
   (hasta 250 por lote). Devuelve un `CaeResult` por comprobante, en orden — AFIP puede aprobar unos
   y rechazar otros dentro del mismo lote.
+- **Limpiar el caché de clientes SOAP**: `WsfeClient`/`PadronClient` cachean el cliente `zeep` por
+  `(endpoint, timeout)` — para forzar una reconexión (ej. tests, o si cambió el WSDL) usá
+  `arca_fe.wsfe_clear_cache()` / `arca_fe.padron_clear_cache()` (no hay un `clear_cache` genérico —
+  cada cliente tiene el suyo, con el prefijo del módulo).
 
 ## Trámites de AFIP necesarios para usar esto
 
@@ -114,3 +160,8 @@ directorio `arca_fe/` completo a otro proyecto Python y funciona igual (verifica
 - Vigencia de catálogos vivos de AFIP (¿este código de moneda/tributo existe HOY?) — la librería
   valida FORMATO (forma fija del campo) pero no vigencia; para eso, consultar
   `WsfeClient.param_tipos_monedas()`/`param_tipos_tributos()`/etc. en vivo.
+- **Convertir el HTML del comprobante a PDF** — `renderizar_comprobante_html` devuelve HTML
+  (string), no bytes de PDF; convertirlo requiere un motor de render externo (ej.
+  Playwright/Chromium, WeasyPrint) que esta librería NO trae como dependencia — así se mantiene
+  liviana para quien solo necesita el HTML (ej. un preview rápido o un mail). Ver el paso 7 del
+  Quickstart — parte 2, arriba.

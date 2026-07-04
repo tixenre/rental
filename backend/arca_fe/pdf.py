@@ -175,7 +175,7 @@ MOBILE_PAGE_HEIGHT = round(MOBILE_PAGE_WIDTH * 5 / 4)  # ancho:alto = 4:5
 _MOBILE_CARD_HEIGHT = MOBILE_PAGE_HEIGHT - 2 * _MOBILE_CARD_MARGIN
 
 
-def page_size_for_layout(layout: str) -> tuple[int, int | None] | None:
+def tamano_pagina_layout(layout: str) -> tuple[int, int | None] | None:
     """Tamaño de página para convertir el HTML a PDF/imagen (ej. `page.pdf(...)`/
     `page.screenshot(...)` de Playwright). `None` → A4 (default, clásica/formal). Un tuple →
     tamaño propio en píxeles (celular, proporción 4:5 fija)."""

@@ -47,7 +47,7 @@ from .modelos import (
 )
 from .comprobante import tipo_comprobante, calcular_importes, armar_fecae, armar_fecae_lote
 from .qr import armar_qr, qr_svg
-from .pdf import renderizar_comprobante_html, nombre_fiscal_comprobante, page_size_for_layout
+from .pdf import renderizar_comprobante_html, nombre_fiscal_comprobante, tamano_pagina_layout
 from .seguridad import generar_cert_autofirmado, asegurar_pdf
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert, WSFE_WSAA_SERVICIO
 from .wsfe import WsfeClient, clear_cache as wsfe_clear_cache
@@ -113,7 +113,7 @@ __all__ = [
     # render de comprobantes (HTML de los 3 layouts + protección del PDF)
     "renderizar_comprobante_html",
     "nombre_fiscal_comprobante",
-    "page_size_for_layout",
+    "tamano_pagina_layout",
     "generar_cert_autofirmado",
     "asegurar_pdf",
     # auth WSAA
