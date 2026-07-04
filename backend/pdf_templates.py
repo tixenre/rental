@@ -454,7 +454,12 @@ def _ref(pedido):
     return f"#{pedido.get('id', '—')}"
 
 
-def _membrete(pedido, doc_type, num, fecha, estado=True):
+def _membrete(pedido, doc_type, num, fecha, estado=True, wordmark_liviano=False):
+    """`wordmark_liviano=True` (el preview del checkout) salta `_active_wordmark()`
+    — que abre su propia conexión a DB para leer el SVG custom del admin — y
+    muestra el nombre en texto plano: es una simulación, no hace falta el
+    isologo real ni la consulta extra. El resto de los documentos (default
+    `False`) lo sigue mostrando siempre."""
     badge = ""
     if estado and pedido.get("estado") in _ESTADOS:
         color, soft = _ESTADOS[pedido["estado"]]
@@ -463,9 +468,14 @@ def _membrete(pedido, doc_type, num, fecha, estado=True):
                  f'border:1px solid color-mix(in oklch,{color} 28%,transparent)">'
                  f'<span class="dot" style="background:{color}"></span>{label}</span>')
     badge_row = f'<div class="mb-badge-row">{badge}</div>' if badge else ""
+    marca = (
+        '<span style="font-weight:800;font-size:22px;letter-spacing:-.02em">Rambla</span>'
+        if wordmark_liviano
+        else _active_wordmark()
+    )
     return (
         '<header class="membrete"><div class="mb-top">'
-        f'<div class="mb-brand"><span class="mb-wordmark">{_active_wordmark()}</span></div>'
+        f'<div class="mb-brand"><span class="mb-wordmark">{marca}</span></div>'
         '<div class="mb-doc"><div class="mb-eyebrow">Documento</div>'
         f'<div class="mb-type">{html.escape(doc_type)}</div>'
         f'<div class="mb-num">N° {html.escape(num)}</div>'
@@ -474,10 +484,13 @@ def _membrete(pedido, doc_type, num, fecha, estado=True):
     )
 
 
-def _footer():
+def _footer(direccion=None, telefono=None):
+    """`direccion`/`telefono` opcionales — el preview del checkout
+    (`_contrato_html(..., locador_override=...)`) los pisa con datos de
+    muestra; el resto de los documentos (default `None`) usa los reales."""
     return (
         '<footer class="doc-footer"><span class="fb">Rambla Rental</span>'
-        f'<span>{html.escape(OWNER_DIRECCION)} · {html.escape(OWNER_TELEFONO)}</span>'
+        f'<span>{html.escape(direccion or OWNER_DIRECCION)} · {html.escape(telefono or OWNER_TELEFONO)}</span>'
         f'<span>{html.escape(OWNER_WEB)}</span></footer>'
     )
 
@@ -497,12 +510,25 @@ def _cliente_block(pedido):
     return "".join(out)
 
 
-def _document(body):
-    head = (
-        '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+def _document(body, fonts_ligeras=False):
+    """`fonts_ligeras=True` omite las fuentes de marca embebidas (TT Commons/
+    Champ Black en base64, ~1.2MB — necesarias para que Playwright las
+    renderice sin depender de la red al generar el PDF real) y el link a
+    Google Fonts. Sin esto, `checkout_contrato_preview` (el PREVIEW que corre
+    en el browser real del cliente, no en Playwright) tardaba 10s+ en pintar
+    el iframe — el string base64 es lento de parsear/pintar inline, no un
+    problema de red. `--font-sans`/`--font-mono` (`_DOC_CSS`) ya caen a
+    `ui-sans-serif`/`ui-monospace` del sistema — aceptable en una SIMULACIÓN
+    marcada como tal; el PDF real (`_render_pdf`, Playwright) sigue
+    embebiendo todo, sin cambios."""
+    fonts_head = "" if fonts_ligeras else (
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
-        + _fonts_css() + "<style>" + _DOC_CSS + "</style></head><body>"
+        + _fonts_css()
+    )
+    head = (
+        '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+        + fonts_head + "<style>" + _DOC_CSS + "</style></head><body>"
     )
     return head + '<article class="paper">' + body + "</article></body></html>"
 
@@ -722,7 +748,30 @@ _CLAUSULAS = [
 ]
 
 
-def _contrato_html(pedido):
+def _contrato_html(pedido, mostrar_locador=True, fonts_ligeras=False, locador_override=None):
+    """`mostrar_locador=False` omite el bloque de datos del Locador (Rambla) —
+    son fijos/institucionales, no cambian por pedido, así que no aportan nada
+    en el PREVIEW del checkout (`routes/checkout.py::checkout_contrato_preview`):
+    ahí lo que importa es que el cliente pueda leer las cláusulas. El contrato
+    REAL (de un pedido ya creado) sigue mostrándolo siempre (default True).
+
+    `fonts_ligeras=True` (ver `_document` + `_membrete`) salta las fuentes de
+    marca embebidas y el isologo (SVG + su lectura a DB) — el mismo PREVIEW,
+    liviano para pintar en el browser real del cliente en vez de en
+    Playwright: es una simulación, no hace falta el vestido completo.
+
+    `locador_override` (dict opcional con `nombre`/`cuil`/`direccion`/
+    `telefono`/`email`) reemplaza los `OWNER_*` reales en el bloque de datos
+    del Locador y en su firma — mismo criterio que `_CLIENTE_DE_MUESTRA`
+    (`routes/checkout.py`): el preview del checkout es un documento "de
+    mentira" de punta a punta, ninguna de las dos partes lleva datos reales.
+    `None` (default) usa los `OWNER_*` reales — el contrato REAL no cambia."""
+    loc_nombre = (locador_override or {}).get("nombre") or OWNER_NOMBRE
+    loc_cuil = (locador_override or {}).get("cuil") or OWNER_CUIL
+    loc_direccion = (locador_override or {}).get("direccion") or OWNER_DIRECCION
+    loc_telefono = (locador_override or {}).get("telefono") or OWNER_TELEFONO
+    loc_email = (locador_override or {}).get("email") or OWNER_EMAIL
+
     items = pedido.get("items", [])
     j = _jornadas(pedido)
     rows, i = [], 1
@@ -755,24 +804,38 @@ def _contrato_html(pedido):
         )
     fecha_long = _fmt_date_long(pedido.get("emitido") or datetime.now())
     clausulas = "".join(f'<p class="clausula"><b>{html.escape(t)}.</b> {b}</p>' for t, b in _CLAUSULAS)
+    if locador_override:
+        # La cláusula "Jurisdicción" (`_CLAUSULAS`, lista módulo-level) hornea
+        # `OWNER_DIRECCION` en su texto al importar — no está parametrizada
+        # por-llamada. Con `locador_override` puesto, ese domicilio también
+        # tiene que ser de mentira: se reemplaza el texto real por el de
+        # muestra en vez de reescribir `_CLAUSULAS` como función.
+        clausulas = clausulas.replace(html.escape(OWNER_DIRECCION), html.escape(loc_direccion))
+    # Sin Locador, el bloque de Locatario (y su firma) ocupan la fila entera
+    # en vez de quedar a media grilla con un hueco vacío al lado.
+    _full_col_attrs = "" if mostrar_locador else ' style="grid-column:1/-1"'
 
     body = (
         # estado=True (default, ya no se suprime): el pedido puede seguir en
         # "Presupuesto" (todavía modificable, sin confirmar) cuando el cliente
         # ya puede leer/descargar el contrato — el badge de estado es el
         # disclaimer de que todavía no es definitivo.
-        _membrete(pedido, "Contrato", _ref(pedido), fecha_long)
+        _membrete(pedido, "Contrato", _ref(pedido), fecha_long, wordmark_liviano=fonts_ligeras)
         + '<div class="meta">'
           '<div class="meta-block"><div class="meta-label">Período de locación</div>'
           f'<div class="meta-val">{_fmt_date_dow(pedido.get("fecha_desde"))} al {_fmt_date_dow(pedido.get("fecha_hasta"))}</div></div>'
           '<div class="meta-block"><div class="meta-label">Duración</div>'
           f'<div class="meta-val">{j} jornada{"s" if j != 1 else ""}</div></div></div>'
-        + '<div class="partes"><div class="parte"><div class="parte-head">Locador</div>'
-          f'<div class="parte-row"><div class="parte-k">Nombre</div><div class="parte-v">{html.escape(OWNER_NOMBRE)}</div></div>'
-          f'<div class="parte-row"><div class="parte-k">CUIL</div><div class="parte-v">{html.escape(OWNER_CUIL)}</div></div>'
-          f'<div class="parte-row"><div class="parte-k">Domicilio</div><div class="parte-v">{html.escape(OWNER_DIRECCION)}</div></div>'
-          f'<div class="parte-row"><div class="parte-k">Contacto</div><div class="parte-v">{html.escape(OWNER_TELEFONO)} · {html.escape(OWNER_EMAIL)}</div></div></div>'
-          '<div class="parte"><div class="parte-head">Locatario</div>'
+        + '<div class="partes">'
+        + (
+            '<div class="parte"><div class="parte-head">Locador</div>'
+            f'<div class="parte-row"><div class="parte-k">Nombre</div><div class="parte-v">{html.escape(loc_nombre)}</div></div>'
+            f'<div class="parte-row"><div class="parte-k">CUIL</div><div class="parte-v">{html.escape(loc_cuil)}</div></div>'
+            f'<div class="parte-row"><div class="parte-k">Domicilio</div><div class="parte-v">{html.escape(loc_direccion)}</div></div>'
+            f'<div class="parte-row"><div class="parte-k">Contacto</div><div class="parte-v">{html.escape(loc_telefono)} · {html.escape(loc_email)}</div></div></div>'
+            if mostrar_locador else ""
+          )
+        + f'<div class="parte"{_full_col_attrs}><div class="parte-head">Locatario</div>'
           f'<div class="parte-row"><div class="parte-k">Nombre</div><div class="parte-v">{html.escape(pedido.get("cliente_nombre") or "—")}</div></div>'
           f'<div class="parte-row"><div class="parte-k">Domicilio</div><div class="parte-v">{html.escape(pedido.get("cliente_direccion") or "—")}</div></div>'
           f'<div class="parte-row"><div class="parte-k">Contacto</div><div class="parte-v">{html.escape(pedido.get("cliente_telefono") or "—")} · {html.escape(pedido.get("cliente_email") or "—")}</div></div>'
@@ -785,12 +848,16 @@ def _contrato_html(pedido):
         + f'<p class="clausula-intro">{_CLAUSULAS_INTRO}</p>'
         + f'<div class="clausulas">{clausulas}</div>'
         + '<div class="firmas">'
-          f'<div class="firma"><div class="rol">Firma Locatario</div><div class="name">{html.escape(pedido.get("cliente_nombre") or "—")}</div><div class="sub">Aclaración / DNI</div></div>'
-          f'<div class="firma"><div class="rol">Firma Locador</div><div class="name">{html.escape(OWNER_NOMBRE)}</div><div class="sub">Aclaración / DNI</div></div></div>'
+          f'<div class="firma"{_full_col_attrs}><div class="rol">Firma Locatario</div><div class="name">{html.escape(pedido.get("cliente_nombre") or "—")}</div><div class="sub">Aclaración / DNI</div></div>'
+        + (
+            f'<div class="firma"><div class="rol">Firma Locador</div><div class="name">{html.escape(loc_nombre)}</div><div class="sub">Aclaración / DNI</div></div>'
+            if mostrar_locador else ""
+          )
+        + "</div>"
         + f'<div style="text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:28px;letter-spacing:.04em">Emitido en Mar del Plata, {fecha_long}</div>'
-        + _footer()
+        + _footer(loc_direccion, loc_telefono)
     )
-    return _document(body)
+    return _document(body, fonts_ligeras=fonts_ligeras)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

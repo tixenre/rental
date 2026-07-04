@@ -300,6 +300,10 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
 
     with get_db() as conn:
         verificado = cliente_verificado(conn, cliente_id)
+        row_cuit = conn.execute(
+            "SELECT cuit FROM clientes WHERE id = %s", (cliente_id,)
+        ).fetchone()
+    cuit_actual = (row_cuit["cuit"] if row_cuit else None) or ""
 
     # Campos bloqueados post-verificación: solo los que certifica RENAPER.
     _BLOQUEADOS = ("nombre", "apellido", "direccion")
@@ -340,6 +344,20 @@ def cliente_update_me(data: PerfilUpdate, request: Request):
         p = data.perfil_impuestos.strip()
         if p not in ("consumidor_final", "responsable_inscripto", "monotributo", "exento"):
             raise HTTPException(400, "Perfil impositivo inválido")
+        if p != "consumidor_final":
+            # Responsable Inscripto/Monotributo/Exento no existen sin CUIT en Argentina — sin
+            # este chequeo, el cliente podía guardar cualquiera de estos perfiles desde el
+            # <select> del portal SIN pasar nunca por "Verificar" contra ARCA (bug real: una
+            # factura salió con el perfil guardado pero domicilio vacío, sin confirmar). El CUIT
+            # puede venir de ESTE mismo request (recién tipeado) o ya estar guardado.
+            cuit_nuevo = data.cuit if data.cuit is not None else cuit_actual
+            cuit_norm = (cuit_nuevo or "").replace("-", "").strip()
+            if not (cuit_norm.isdigit() and len(cuit_norm) == 11):
+                raise HTTPException(
+                    400,
+                    "Para facturar como Responsable Inscripto, Monotributo o Exento necesitás "
+                    "un CUIT verificado — usá 'Verificar' con tu CUIT antes de guardar este perfil.",
+                )
         sets.append("perfil_impuestos = %s"); vals.append(p)
     if data.razon_social is not None:
         sets.append("razon_social = %s"); vals.append(data.razon_social.strip() or None)

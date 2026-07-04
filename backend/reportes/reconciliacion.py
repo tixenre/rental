@@ -28,7 +28,8 @@ def _pedidos_para_desglose(conn) -> list[dict]:
     rows = conn.execute(
         f"""
         SELECT a.id, a.fecha_desde, a.fecha_hasta, a.monto_total,
-               a.descuento_pct, a.descuento_jornadas_pct, a.cliente_id
+               a.descuento_pct, a.descuento_jornadas_pct, a.cliente_id,
+               a.descuento_cliente_pct, a.descuento_manual_tipo, a.descuento_manual_monto
         FROM alquileres a
         WHERE a.estado <> 'cancelado'
           AND a.monto_total > 0
@@ -42,8 +43,11 @@ def _pedidos_para_desglose(conn) -> list[dict]:
     ids = tuple(p["id"] for p in pedidos)
     placeholders = ", ".join("%s" for _ in ids)
     items_rows = conn.execute(
-        f"""SELECT pedido_id, equipo_id, cantidad, precio_jornada, cobro_modo
-            FROM alquiler_items WHERE pedido_id IN ({placeholders})""",
+        f"""SELECT pi.pedido_id, pi.equipo_id, pi.cantidad, pi.precio_jornada, pi.cobro_modo,
+                   e.tipo AS equipo_tipo
+            FROM alquiler_items pi
+            LEFT JOIN equipos e ON e.id = pi.equipo_id
+            WHERE pi.pedido_id IN ({placeholders})""",
         ids,
     ).fetchall()
     items_por_pedido: dict[int, list[dict]] = {}

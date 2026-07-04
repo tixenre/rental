@@ -15,6 +15,16 @@ descubrir recién al pedir el primer CAE que estaba mal.
 from __future__ import annotations
 
 
+def _tiene_fecha_de_baja(fch_baja) -> bool:
+    """`FchBaja` en la respuesta REAL de `FEParamGetPtosVenta` (no la del WSDL/manual) viene como
+    la STRING LITERAL `"NULL"` — no `None`, no el elemento ausente — cuando el punto de venta NO
+    está dado de baja (quirk conocido del lado de ARCA). Sin este chequeo, `if p.get("FchBaja")`
+    trataba ese `"NULL"` como una fecha real → TODO punto de venta salía "dado de baja" sin
+    importar su estado verdadero (bug real: un punto de venta activo, usado para emitir una
+    factura con éxito, aparecía excluido acá)."""
+    return bool(fch_baja) and str(fch_baja).strip().upper() != "NULL"
+
+
 def consultar_puntos_venta(nombre_emisor: str, conn) -> dict:
     """Puntos de venta de `nombre_emisor`, separados en habilitados para
     facturación electrónica y excluidos (con motivo).
@@ -46,7 +56,7 @@ def consultar_puntos_venta(nombre_emisor: str, conn) -> dict:
     for p in puntos:
         if p.get("Bloqueado") == "S":
             excluidos.append({"nro": p["Nro"], "motivo": "bloqueado"})
-        elif p.get("FchBaja"):
+        elif _tiene_fecha_de_baja(p.get("FchBaja")):
             excluidos.append({"nro": p["Nro"], "motivo": "dado_de_baja"})
         elif p.get("EmisionTipo") != "CAE":
             excluidos.append({"nro": p["Nro"], "motivo": "no_electronico"})

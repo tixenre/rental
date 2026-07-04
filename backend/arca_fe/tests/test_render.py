@@ -4,6 +4,7 @@ construyendo `ComprobanteFiscal` directo en vez de mockear `database.get_db`/cat
 falta, todo llega resuelto)."""
 from __future__ import annotations
 
+import re
 from datetime import date
 from decimal import Decimal
 
@@ -104,6 +105,18 @@ def test_page_size_solo_simplificada_tiene_tamano_propio_4x5_minimo_1080x1350():
 def test_qr_queda_envuelto_en_link_clickeable(layout):
     html = renderizar_comprobante_html(_comprobante(), layout=layout)
     assert '<a href="https://www.afip.gob.ar/fe/qr/?p=xyz"' in html
+
+
+@pytest.mark.parametrize("layout", ["oficial", "simplificada", "detallada"])
+def test_texto_www_arca_gob_ar_tambien_es_link_al_qr(layout):
+    """El texto visible sigue diciendo 'www.arca.gob.ar' (lo que espera ver el usuario) pero el
+    link real apunta a la URL de verificación puntual de ESTE comprobante (la misma que codifica
+    el QR) — no a la home genérica de ARCA."""
+    html = renderizar_comprobante_html(_comprobante(), layout=layout)
+    assert '<a href="https://www.afip.gob.ar/fe/qr/?p=xyz"' in html
+    assert re.search(
+        r'<a href="https://www\.afip\.gob\.ar/fe/qr/\?p=xyz"[^>]*>www\.arca\.gob\.ar</a>', html
+    )
 
 
 # ── fonts_css: opcional, la marca nunca es requisito de validez ────────────

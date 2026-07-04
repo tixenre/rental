@@ -316,6 +316,68 @@ def test_reconciliacion_caza_desglose_divergente_del_pedido():
             conn.close()
 
 
+def test_reconciliacion_no_marca_falso_positivo_con_descuento_de_cliente():
+    """Bug encontrado en staging (2026-07-04): `_pedidos_para_desglose` no
+    seleccionaba `descuento_cliente_pct`/`descuento_manual_tipo`/
+    `descuento_manual_monto` de `alquileres`, ni `equipos.tipo` en el join de
+    ítems — así que `desglose_de_pedido` los recomputaba con 0/None y marcaba
+    DIVERGENTE cualquier pedido cuyo único descuento fuera el del CLIENTE (el
+    caso más común), aunque `monto_total` estuviera perfectamente calculado.
+    Reproduce el caso real: 1 ítem $50.000, 25% de descuento de cliente,
+    `monto_total` = 37.500 (correcto) — antes del fix esto se marcaba
+    divergente (recomputaba sin el 25% → esperaba 50.000)."""
+    from database import get_db, init_db
+    from reportes.reconciliacion import reconciliar
+
+    E_OK = 9_300_903
+    P_OK = 9_300_904
+
+    def _limpiar_local(conn):
+        conn.execute("DELETE FROM alquiler_items WHERE pedido_id = %s", (P_OK,))
+        conn.execute("DELETE FROM alquileres WHERE id = %s", (P_OK,))
+        conn.execute("DELETE FROM equipos WHERE id = %s", (E_OK,))
+
+    init_db()
+    conn = get_db()
+    try:
+        _limpiar_local(conn)
+        conn.execute(
+            "INSERT INTO equipos (id, nombre, cantidad, dueno) VALUES (%s,%s,%s,%s)",
+            (E_OK, "Equipo descuento cliente OK", 5, "Rambla"),
+        )
+        conn.execute(
+            """INSERT INTO alquileres (id, cliente_nombre, estado, fecha_desde, fecha_hasta,
+                                       monto_total, monto_pagado, descuento_pct,
+                                       descuento_cliente_pct)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (P_OK, "Cliente con descuento propio", "finalizado",
+             "2026-06-05T08:00:00", "2026-06-05T20:00:00", 37500, 37500, 0, 25.0),
+        )
+        conn.execute(
+            """INSERT INTO alquiler_items (pedido_id, equipo_id, cantidad, precio_jornada, cobro_modo)
+               VALUES (%s,%s,%s,%s,%s)""",
+            (P_OK, E_OK, 1, 50000, "jornada"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    try:
+        conn = get_db()
+        try:
+            rec = reconciliar(conn)
+        finally:
+            conn.close()
+        assert P_OK not in rec["desglose_divergente"]["ids"], rec["desglose_divergente"]
+    finally:
+        conn = get_db()
+        try:
+            _limpiar_local(conn)
+            conn.commit()
+        finally:
+            conn.close()
+
+
 def test_suma_items_cero_no_pierde_plata():
     """Fase 5 (#1184): P_SUBTOTAL_CERO tiene AMBOS ítems con subtotal 0 (ej. 100%
     de descuento a nivel ítem) pero monto_total=30000. Antes, `NULLIF(suma_items, 0)`
