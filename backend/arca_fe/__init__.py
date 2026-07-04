@@ -16,7 +16,7 @@ probada en producción — bajo SemVer, `0.x` señala justamente que puede rompe
 compatibilidad entre versiones menores, la misma libertad que se usó acá.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from .modelos import (
     CondicionIva,
@@ -36,9 +36,15 @@ from .modelos import (
     ItemIva,
     Tributo,
     Opcional,
+    ComprobanteFiscal,
+    ItemFactura,
+    letra_comprobante,
+    es_nota_credito,
 )
 from .comprobante import tipo_comprobante, calcular_importes, armar_fecae, armar_fecae_lote
 from .qr import armar_qr
+from .pdf import renderizar_comprobante_html, nombre_fiscal_comprobante, page_size_for_layout
+from .seguridad import generar_cert_autofirmado, asegurar_pdf
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert
 from .wsfe import WsfeClient, clear_cache as wsfe_clear_cache
 from .padron import (
@@ -80,12 +86,22 @@ __all__ = [
     "ItemIva",
     "Tributo",
     "Opcional",
+    "ComprobanteFiscal",
+    "ItemFactura",
+    "letra_comprobante",
+    "es_nota_credito",
     # lógica fiscal
     "tipo_comprobante",
     "calcular_importes",
     "armar_fecae",
     "armar_fecae_lote",
     "armar_qr",
+    # render de comprobantes (HTML de los 3 layouts + protección del PDF)
+    "renderizar_comprobante_html",
+    "nombre_fiscal_comprobante",
+    "page_size_for_layout",
+    "generar_cert_autofirmado",
+    "asegurar_pdf",
     # auth WSAA
     "construir_tra",
     "firmar_tra",
