@@ -92,6 +92,9 @@ type IndexSearch = {
   /** Reabrir el drawer del carrito al volver de un desvío de auth (login,
    *  registro o verificación de identidad). Usado con `?openCarrito=1`. */
   openCarrito?: boolean;
+  /** Junto a `openCarrito`: reabrir directo en el paso de resumen (no en la
+   *  lista de ítems) — ver `RESUME_STEP_PARAM` en CheckoutResumen.tsx. */
+  carritoPaso?: "resumen";
 };
 
 async function fetchOgImage(): Promise<string> {
@@ -115,6 +118,7 @@ export const Route = createFileRoute("/rental")({
       view: v === "grid" || v === "list" ? v : undefined,
       cat: typeof c === "string" && c.trim() ? c.trim() : undefined,
       openCarrito: search.openCarrito === "1" || search.openCarrito === true ? true : undefined,
+      carritoPaso: search.carritoPaso === "resumen" ? "resumen" : undefined,
     };
   },
   loader: async ({ context }) => {
@@ -372,6 +376,7 @@ function Index() {
         search: (prev) => {
           const next = { ...prev };
           delete (next as Record<string, unknown>).openCarrito;
+          delete (next as Record<string, unknown>).carritoPaso;
           return next;
         },
         replace: true,
@@ -811,7 +816,11 @@ function Index() {
       </Suspense>
 
       <Suspense>
-        <CartDrawer allEquipos={allEquipos} getDisponible={getDisponible} />
+        <CartDrawer
+          allEquipos={allEquipos}
+          getDisponible={getDisponible}
+          resumeStep={search.carritoPaso}
+        />
       </Suspense>
     </PublicLayout>
   );

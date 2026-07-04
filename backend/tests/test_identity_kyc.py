@@ -129,3 +129,64 @@ def test_actualizar_estado_idempotente(monkeypatch):
     _patch(monkeypatch, rec)
     assert kyc.actualizar_estado(cliente_id=1, session_id="sess-1", estado="en_revision") is True
     assert not _sql(rec, "UPDATE clientes")  # ya estaba registrado → no-op
+
+
+class _ConnHistorial:
+    """Simula un cliente cuyo puntero vigente (`didit_session_id`) ya avanzó a
+    `puntero_actual` (por un reintento), pero `sesiones_conocidas` (creadas para
+    este cliente, ver `kyc.registrar_evento(..., "iniciado", ...)`) incluye otras
+    sesiones — entre ellas la que Didit terminó aprobando."""
+
+    def __init__(self, puntero_actual, sesiones_conocidas=()):
+        self.puntero_actual = puntero_actual
+        self.sesiones_conocidas = set(sesiones_conocidas)
+        self.calls = []
+
+    def execute(self, sql, params=()):
+        norm = " ".join(sql.split())
+        self.calls.append((norm, tuple(params)))
+        if "SELECT didit_session_id FROM clientes" in norm:
+            return _Cur({"didit_session_id": self.puntero_actual})
+        if "SELECT 1 FROM kyc_events WHERE cliente_id" in norm:
+            # params = (cliente_id, session_id)
+            return _Cur({"?column?": 1} if params[1] in self.sesiones_conocidas else None)
+        if "SELECT 1 FROM kyc_events WHERE session_id" in norm:
+            return _Cur(None)  # _ya_registrado: todavía no se procesó ningún evento
+        return _Cur(None)
+
+    @contextmanager
+    def transaction(self):
+        yield self
+
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
+
+
+def test_aprobar_sesion_historica_no_vigente_mueve_puntero(monkeypatch):
+    """Regresión del bug real: el cliente reintentó la verificación (el puntero
+    avanzó a 'session-2'), pero Didit termina aprobando 'session-1' —el intento
+    que en verdad completó—. Antes de este fix, `aprobar` comparaba SOLO contra
+    el puntero vigente y descartaba la aprobación en silencio (nunca se marcaba
+    `dni_validado_at`, aunque Didit mostrara "Approved"). Ahora debe aplicarse y
+    mover el puntero a la sesión aprobada."""
+    conn = _ConnHistorial(puntero_actual="session-2", sesiones_conocidas={"session-1", "session-2"})
+    monkeypatch.setattr("identity.kyc.get_db", lambda: conn)
+    datos = DatosRenaper(dni="12345678", cuil="20123456786", nombre_completo="Juan Pérez")
+    assert kyc.aprobar(cliente_id=1, session_id="session-1", datos=datos) is True
+    upd = [c for c in conn.calls if "UPDATE clientes SET" in c[0] and "didit_session_id" in c[0]]
+    assert upd, "debe escribir dni_validado_at pese a no ser la sesión vigente"
+    assert upd[0][1][0] == "session-1"  # el puntero se mueve a la sesión aprobada
+
+
+def test_aprobar_sesion_ajena_se_rechaza(monkeypatch):
+    """Anti-forgery preservado: una sesión que NUNCA se creó para este cliente
+    (ni es el puntero vigente ni tiene evento en su historial) se sigue
+    rechazando, aunque exista para OTRO cliente."""
+    conn = _ConnHistorial(puntero_actual="session-2", sesiones_conocidas={"session-2"})
+    monkeypatch.setattr("identity.kyc.get_db", lambda: conn)
+    datos = DatosRenaper(dni="12345678", cuil="20123456786")
+    assert kyc.aprobar(cliente_id=1, session_id="session-ajena", datos=datos) is False
+    assert not [c for c in conn.calls if "UPDATE clientes SET" in c[0]]

@@ -16,7 +16,6 @@ import {
   Check,
   Plus,
 } from "lucide-react";
-import { Spinner } from "@/design-system/ui/spinner";
 import { BottomSheet } from "@/components/mobile/BottomSheet";
 import { Button } from "@/design-system/ui/button";
 import { useNavigate } from "@tanstack/react-router";
@@ -29,12 +28,8 @@ import { StepperPill } from "@/components/rental/equipment/shared/StepperPill";
 import { PriceBlock } from "@/components/rental/equipment/shared/PriceBlock";
 import { FavButton } from "@/components/rental/equipment/shared/FavButton";
 import { ShareButton } from "@/components/rental/equipment/shared/ShareButton";
-import { createOrder, OrderVerificationError } from "@/lib/orders";
-import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
-import {
-  VerificacionRequeridaPanel,
-  type VerificacionPanelEstado,
-} from "@/components/rental/VerificacionRequeridaPanel";
+import { createOrder } from "@/lib/orders";
+import { CheckoutResumen } from "@/components/rental/CheckoutResumen";
 import { HERO_TAGLINES_DEFAULT, parseHeroTaglines } from "@/lib/hero-taglines";
 import { useHeroPhotos, heroImgProps } from "@/lib/studio/hero-photos";
 import { whatsappLink, normalizePhone } from "@/lib/whatsapp";
@@ -309,11 +304,15 @@ interface CartSheetProps {
   onOpenDateSheet: () => void;
   equipos: Equipment[];
   cartItems: Record<string, number>;
+  sessionId: string;
   jornadas: number;
   fechaDesde: Date | null;
   fechaHasta: Date | null;
   horaDesde: string;
   horaHasta: string;
+  /** Si el sheet se reabre volviendo de un desvío (Didit) con
+   *  `?carritoPaso=resumen`, entra directo al paso de resumen. */
+  resumeStep?: "resumen";
 }
 
 const WA_PHONE = BUSINESS_PHONE;
@@ -323,18 +322,19 @@ export function CartSheet({
   onOpenDateSheet,
   equipos,
   cartItems,
+  sessionId,
   jornadas,
   fechaDesde,
   fechaHasta,
   horaDesde,
   horaHasta,
+  resumeStep,
 }: CartSheetProps) {
   const navigate = useNavigate();
   const [solicitado, setSolicitado] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [verifEstado, setVerifEstado] = useState<VerificacionPanelEstado | null>(null);
-  const [verifMotivo, setVerifMotivo] = useState<string | null>(null);
-  const [iniciandoVerif, setIniciandoVerif] = useState(false);
+  const [step, setStep] = useState<"carrito" | "resumen">(
+    resumeStep === "resumen" ? "resumen" : "carrito",
+  );
 
   const entries = Object.entries(cartItems)
     .map(([id, qty]) => ({ eq: equipos.find((e) => e.id === id)!, qty }))
@@ -355,22 +355,16 @@ export function CartSheet({
   }).data;
   const { subtotal, descuentoPct, descuentoOrigen, descuentoMonto, totalNeto, conIva } = totales;
 
-  async function handleSubmit() {
+  // "Solicitar rental": solo lo que el portero de checkout NO puede chequear
+  // (fechas, sesión de cliente) — identidad/T&C/firma los resuelve el paso de
+  // resumen (`CheckoutResumen`) preguntándole al backend. Espeja CartDrawer.tsx.
+  function handleIrAResumen() {
     if (entries.length === 0) return;
     if (!fechaDesde || !fechaHasta) {
       toast.error("Elegí las fechas del rental antes de solicitar.");
       return;
     }
-    setSubmitting(true);
-    setVerifEstado(null);
-    setVerifMotivo(null);
-
-    // Pre-check de cuenta (fuente única en verificacion.ts). Sin sesión →
-    // toast con link a login; logueado pero sin DNI validado → panel de
-    // verificación (distingue no-verificado / en-revision / rechazado); en vez
-    // del 401/403 críptico.
-    const { estado, motivo } = await chequearEstadoVerificacion();
-    if (estado === "no-logueado") {
+    if (!clienteSession) {
       toast.error("Debés iniciar sesión para solicitar un rental.", {
         duration: 5000,
         action: {
@@ -378,53 +372,31 @@ export function CartSheet({
           onClick: () => navigate({ to: "/cliente/login", search: { from: "carrito" } }),
         },
       });
-      setSubmitting(false);
       return;
     }
-    if (estado === "error") {
-      toast.error("Sin conexión. Verificá tu internet.", { duration: 4000 });
-      setSubmitting(false);
-      return;
-    }
-    if (estado === "no-verificado" || estado === "en-revision" || estado === "rechazado") {
-      setVerifEstado(estado);
-      setVerifMotivo(motivo ?? null);
-      setSubmitting(false);
-      return;
-    }
-    // "logueado-verificado" → sigue al createOrder
+    setStep("resumen");
+  }
 
-    try {
-      await createOrder({
-        status: "solicitado",
-        startDate: fechaDesde,
-        endDate: fechaHasta,
-        startTime: horaDesde,
-        endTime: horaHasta,
-        days: jornadas,
-        resolvedItems: entries.map(({ eq, qty }) => ({
-          id: eq.id,
-          name: eq.name,
-          brand: eq.brand,
-          category: eq.category,
-          qty,
-          pricePerDay: eq.pricePerDay,
-          backendId: eq._backendId,
-        })),
-      });
-      setSolicitado(true);
-    } catch (err: unknown) {
-      // Backstop: si el backend rechaza por identidad (403), mostramos el panel
-      // de verificación en vez del toast genérico.
-      if (err instanceof OrderVerificationError) {
-        setVerifEstado("no-verificado");
-        return;
-      }
-      const msg = err instanceof Error ? err.message : "Error al enviar el pedido";
-      toast.error(msg, { duration: 6000 });
-    } finally {
-      setSubmitting(false);
-    }
+  async function handleCrearPedido(sessionConfirmed: boolean) {
+    await createOrder({
+      status: "solicitado",
+      startDate: fechaDesde ?? undefined,
+      endDate: fechaHasta ?? undefined,
+      startTime: horaDesde,
+      endTime: horaHasta,
+      days: jornadas,
+      sessionConfirmed,
+      resolvedItems: entries.map(({ eq, qty }) => ({
+        id: eq.id,
+        name: eq.name,
+        brand: eq.brand,
+        category: eq.category,
+        qty,
+        pricePerDay: eq.pricePerDay,
+        backendId: eq._backendId,
+      })),
+    });
+    setSolicitado(true);
   }
 
   const waMessage = [
@@ -538,157 +510,171 @@ export function CartSheet({
           </div>
         )}
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarWidth: "none" }}>
-          {/* Items */}
-          {entries.map(({ eq, qty }) => {
-            // Precio/total desde el backend (FASE 3); placeholder transitorio
-            // (precio catálogo) solo hasta que llega la cotización.
-            const linea = lineaPorEquipo(totales, eq._backendId ?? Number(eq.id));
-            return (
-              <CartItem
-                key={eq.id}
-                eq={eq}
-                qty={qty}
-                fechaDesde={fechaDesde}
-                jornadas={jornadas}
-                precioJornada={linea?.precioJornada ?? eq.pricePerDay}
-                periodTotal={linea?.bruto ?? eq.pricePerDay * qty * totales.jornadas}
-              />
-            );
-          })}
+        {/* Scrollable body / paso de resumen */}
+        {step === "resumen" && !solicitado ? (
+          <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarWidth: "none" }}>
+            <CheckoutResumen
+              sessionId={sessionId}
+              startDate={fechaDesde ?? undefined}
+              endDate={fechaHasta ?? undefined}
+              startTime={horaDesde}
+              endTime={horaHasta}
+              d={jornadas}
+              itemCount={entries.reduce((acc, { qty }) => acc + qty, 0)}
+              subtotalTotal={subtotal}
+              descuentoPct={descuentoPct}
+              descuentoOrigen={descuentoOrigen}
+              descuentoMonto={descuentoMonto}
+              totalNeto={totalNeto}
+              conIva={conIva}
+              clienteNombre={clienteSession?.nombre}
+              onBack={() => setStep("carrito")}
+              onCrearPedido={handleCrearPedido}
+            />
+          </div>
+        ) : (
+          <>
+            <div
+              className="flex-1 overflow-y-auto flex flex-col"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {/* Items */}
+              {entries.map(({ eq, qty }) => {
+                // Precio/total desde el backend (FASE 3); placeholder transitorio
+                // (precio catálogo) solo hasta que llega la cotización.
+                const linea = lineaPorEquipo(totales, eq._backendId ?? Number(eq.id));
+                return (
+                  <CartItem
+                    key={eq.id}
+                    eq={eq}
+                    qty={qty}
+                    fechaDesde={fechaDesde}
+                    jornadas={jornadas}
+                    precioJornada={linea?.precioJornada ?? eq.pricePerDay}
+                    periodTotal={linea?.bruto ?? eq.pricePerDay * qty * totales.jornadas}
+                  />
+                );
+              })}
 
-          {/* Totals — auto margin pushes to bottom when few items */}
-          <div className="border-t border-hairline mt-auto">
-            <div className="flex flex-col gap-2 px-5 py-3.5">
-              <div className="flex justify-between items-baseline">
-                <span className="font-sans text-sm text-muted-foreground">
-                  {hayFechas
-                    ? `Subtotal · ${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`
-                    : "Subtotal · por jornada"}
-                </span>
-                <span className="font-mono text-sm font-semibold text-ink tabular-nums">
-                  {formatARS(subtotal)}
-                </span>
-              </div>
-
-              {descuentoPct > 0 && (
-                <div className="flex items-center justify-between py-1">
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    {descuentoLabel(descuentoOrigen, jornadas, clienteSession?.nombre)}
-                    <span
-                      className={cn(
-                        "inline-flex items-center px-1.5 py-px rounded-full font-mono text-xs font-bold",
-                        descuentoOrigen === "cliente"
-                          ? "bg-verde/10 text-verde-ink"
-                          : "bg-azul/10 text-azul",
-                      )}
-                    >
-                      −{descuentoPct}%
+              {/* Totals — auto margin pushes to bottom when few items */}
+              <div className="border-t border-hairline mt-auto">
+                <div className="flex flex-col gap-2 px-5 py-3.5">
+                  <div className="flex justify-between items-baseline">
+                    <span className="font-sans text-sm text-muted-foreground">
+                      {hayFechas
+                        ? `Subtotal · ${jornadas} ${jornadas === 1 ? "jornada" : "jornadas"}`
+                        : "Subtotal · por jornada"}
+                    </span>
+                    <span className="font-mono text-sm font-semibold text-ink tabular-nums">
+                      {formatARS(subtotal)}
                     </span>
                   </div>
-                  <span className="font-mono text-sm font-semibold text-verde-ink tabular-nums">
-                    −{formatARS(descuentoMonto)}
-                  </span>
-                </div>
-              )}
 
-              <div className="flex justify-between items-baseline opacity-45">
-                <span className="font-sans text-sm text-muted-foreground">
-                  Depósito de seguridad
-                </span>
-                <span className="font-mono text-sm text-muted-foreground">A definir</span>
-              </div>
-
-              <div className="flex justify-between items-baseline pt-2 border-t border-hairline mt-1">
-                <span className="font-sans text-15 font-bold text-ink">
-                  {hayFechas ? "Total" : "Estimado / jornada"}
-                </span>
-                <span
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: 24,
-                    fontWeight: 900,
-                    color: "var(--ink)",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {formatARS(totalNeto)}
-                  {conIva && (
-                    <span className="font-sans text-sm font-normal text-muted-foreground">
-                      {" "}
-                      + IVA
-                    </span>
+                  {descuentoPct > 0 && (
+                    <div className="flex items-center justify-between py-1">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        {descuentoLabel(descuentoOrigen, jornadas, clienteSession?.nombre)}
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-1.5 py-px rounded-full font-mono text-xs font-bold",
+                            descuentoOrigen === "cliente"
+                              ? "bg-verde/10 text-verde-ink"
+                              : "bg-azul/10 text-azul",
+                          )}
+                        >
+                          −{descuentoPct}%
+                        </span>
+                      </div>
+                      <span className="font-mono text-sm font-semibold text-verde-ink tabular-nums">
+                        −{formatARS(descuentoMonto)}
+                      </span>
+                    </div>
                   )}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Footer */}
-        <div className="px-5 pt-3 border-t border-hairline shrink-0" style={{ paddingBottom: 20 }}>
-          {solicitado ? (
-            <div className="flex flex-col gap-2.5">
-              <div
-                className="px-4 py-3 rounded-[var(--radius-lg)] border"
-                style={{
-                  background: "var(--amber-soft)",
-                  borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)",
-                }}
-              >
-                <div className="font-sans text-sm font-bold text-ink mb-0.5">
-                  ¡Listo! Rental solicitado.
-                </div>
-                <div className="font-sans text-xs text-muted-foreground leading-relaxed">
-                  Lo revisamos manualmente y te confirmamos a la brevedad.
+                  <div className="flex justify-between items-baseline opacity-45">
+                    <span className="font-sans text-sm text-muted-foreground">
+                      Depósito de seguridad
+                    </span>
+                    <span className="font-mono text-sm text-muted-foreground">A definir</span>
+                  </div>
+
+                  <div className="flex justify-between items-baseline pt-2 border-t border-hairline mt-1">
+                    <span className="font-sans text-15 font-bold text-ink">
+                      {hayFechas ? "Total" : "Estimado / jornada"}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-display)",
+                        fontSize: 24,
+                        fontWeight: 900,
+                        color: "var(--ink)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {formatARS(totalNeto)}
+                      {conIva && (
+                        <span className="font-sans text-sm font-normal text-muted-foreground">
+                          {" "}
+                          + IVA
+                        </span>
+                      )}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <a
-                href={waHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-3 rounded-full border-[1.5px] border-hairline bg-transparent text-ink font-sans text-sm font-semibold flex items-center justify-center gap-2 hover:border-ink hover:bg-muted transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-                  <path
-                    d="M12 0C5.373 0 0 5.373 0 12c0 2.122.558 4.112 1.528 5.836L.057 23.857a.5.5 0 00.609.61l6.098-1.458A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.722.89.921-3.618-.234-.373A9.818 9.818 0 1112 21.818z"
-                    fillRule="evenodd"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Consultanos por WhatsApp
-              </a>
             </div>
-          ) : verifEstado ? (
-            <VerificacionRequeridaPanel
-              estado={verifEstado}
-              motivo={verifMotivo}
-              iniciando={iniciandoVerif}
-              onVerificar={async () => {
-                setIniciandoVerif(true);
-                try {
-                  await iniciarVerificacionIdentidad("/?openCarrito=1");
-                } catch {
-                  /* el helper ya hizo toast */
-                } finally {
-                  setIniciandoVerif(false);
-                }
-              }}
-            />
-          ) : (
-            <Button
-              variant="primary"
-              shape="pill"
-              className="w-full h-auto py-3.5 font-sans text-15 font-bold disabled:cursor-not-allowed"
-              onClick={handleSubmit}
-              disabled={submitting}
+
+            {/* Footer */}
+            <div
+              className="px-5 pt-3 border-t border-hairline shrink-0"
+              style={{ paddingBottom: 20 }}
             >
-              {submitting ? <Spinner size="md" className="mx-auto" /> : "Solicitar rental"}
-            </Button>
-          )}
-        </div>
+              {solicitado ? (
+                <div className="flex flex-col gap-2.5">
+                  <div
+                    className="px-4 py-3 rounded-[var(--radius-lg)] border"
+                    style={{
+                      background: "var(--amber-soft)",
+                      borderColor: "color-mix(in oklch, var(--amber) 40%, transparent)",
+                    }}
+                  >
+                    <div className="font-sans text-sm font-bold text-ink mb-0.5">
+                      ¡Listo! Rental solicitado.
+                    </div>
+                    <div className="font-sans text-xs text-muted-foreground leading-relaxed">
+                      Lo revisamos manualmente y te confirmamos a la brevedad.
+                    </div>
+                  </div>
+                  <a
+                    href={waHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 rounded-full border-[1.5px] border-hairline bg-transparent text-ink font-sans text-sm font-semibold flex items-center justify-center gap-2 hover:border-ink hover:bg-muted transition-colors"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                      <path
+                        d="M12 0C5.373 0 0 5.373 0 12c0 2.122.558 4.112 1.528 5.836L.057 23.857a.5.5 0 00.609.61l6.098-1.458A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.368l-.36-.214-3.722.89.921-3.618-.234-.373A9.818 9.818 0 1112 21.818z"
+                        fillRule="evenodd"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Consultanos por WhatsApp
+                  </a>
+                </div>
+              ) : (
+                <Button
+                  variant="primary"
+                  shape="pill"
+                  className="w-full h-auto py-3.5 font-sans text-15 font-bold disabled:cursor-not-allowed"
+                  onClick={handleIrAResumen}
+                >
+                  Solicitar rental
+                </Button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </>
   );
