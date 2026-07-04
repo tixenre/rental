@@ -18,7 +18,7 @@ type CheckoutStep = "carrito" | "resumen" | "exito";
 /** Cuánto se muestra la pantalla de éxito antes de redirigir al portal —
  *  tiempo para que se lea "Pedido #X enviado" sin que se pise con el toast
  *  de siempre (que coincidía con la navegación al portal). */
-const EXITO_REDIRECT_MS = 2500;
+const EXITO_REDIRECT_MS = 5000;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
