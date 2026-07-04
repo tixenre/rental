@@ -41,7 +41,14 @@ from .comprobante import tipo_comprobante, calcular_importes, armar_fecae, armar
 from .qr import armar_qr
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert
 from .wsfe import WsfeClient, clear_cache as wsfe_clear_cache
-from .padron import PadronClient, PersonaArca, Impuesto, Actividad, clear_cache as padron_clear_cache
+from .padron import (
+    PadronClient,
+    PersonaArca,
+    Impuesto,
+    Actividad,
+    WSAA_SERVICIO,
+    clear_cache as padron_clear_cache,
+)
 from .validadores import normalizar_cuit, cuit_valido, formatear_cuit
 from .retry import with_retry
 from .asyncio_support import solicitar_cae_async, get_persona_async, login_async
@@ -92,6 +99,7 @@ __all__ = [
     "PersonaArca",
     "Impuesto",
     "Actividad",
+    "WSAA_SERVICIO",
     "padron_clear_cache",
     # CUIT: normalizar/validar/formatear
     "normalizar_cuit",

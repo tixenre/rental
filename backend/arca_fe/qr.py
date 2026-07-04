@@ -27,13 +27,29 @@ def armar_qr(
     ctz: int = 1,
     ver: int = 1,
 ) -> str:
-    """Genera la URL del QR fiscal según RG4892.
+    """Genera la URL del QR fiscal según RG4892 — el que AFIP exige imprimir en todo comprobante
+    electrónico, para que cualquiera pueda validarlo escaneándolo desde el celular.
 
-    El payload JSON se codifica en base64 (estándar, con padding) y se agrega
-    como parámetro `p` de la URL canónica de AFIP/ARCA.
+    `cuit_emisor`: CUIT (sin guiones) del emisor del comprobante.
+    `pto_vta`/`cbte_tipo`/`nro_cmp`: mismos valores que se usaron para pedir el CAE
+    (`FeCabReq.PtoVta`/`CbteTipo`, `FECAEDetRequest.CbteDesde`).
+    `importe_total`: el `ImpTotal` YA AUTORIZADO por AFIP (el de `calcular_importes`/`CaeResult`,
+    no un valor recalculado aparte — el QR tiene que decir exactamente lo que AFIP autorizó).
+    `doc_tipo_rec`/`doc_nro_rec`: `DocTipo`/`doc_nro` del receptor (mismos códigos que
+    `Receptor` — acá como `int` crudo, no el enum, porque este módulo no depende de `modelos.py`).
+    `cae`: el CAE recibido de AFIP (string numérico).
+    `fecha`: fecha del comprobante (`CbteFch`).
+    `moneda`: código `MonId` (default `"PES"`, el caso común).
+    `ctz`: cotización (`MonCotiz`) — default 1 (pesos). OJO: el parámetro está tipado `int`; una
+    cotización real de moneda extranjera (ej. USD, casi siempre con decimales) se truncaría acá
+    — este caso no está cubierto todavía, solo el de Rambla (siempre pesos, ctz=1).
+    `ver`: versión del esquema del QR (RG4892 v1, no cambió desde que se publicó la norma).
 
-    Retorna la URL completa lista para incrustar como QR o como data-uri en el PDF.
-    """
+    El payload JSON se codifica en base64 (estándar, con padding) y se agrega como parámetro `p`
+    de la URL canónica de AFIP/ARCA.
+
+    Retorna la URL completa lista para incrustar como QR (ver `_build_qr_svg` para renderizarla
+    como SVG inline) o como data-uri en el PDF."""
     payload = {
         "ver": ver,
         "fecha": fecha.strftime("%Y-%m-%d"),

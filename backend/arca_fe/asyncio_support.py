@@ -27,7 +27,14 @@ async def solicitar_cae_async(
 
 
 async def get_persona_async(client: "PadronClient", cuit: str) -> "PersonaArca":
-    """Wrapper cooperativo de `PadronClient.get_persona`."""
+    """Wrapper cooperativo de `PadronClient.get_persona` — corre la llamada SOAP bloqueante en
+    un thread aparte, no bloquea el event loop del consumidor.
+
+    `client`: instancia ya construida de `PadronClient`.
+    `cuit`: CUIT a consultar (con o sin guiones — mismo comportamiento que `get_persona`).
+
+    Devuelve la `PersonaArca` resuelta; levanta lo mismo que `get_persona` (`ArcaBusinessError`/
+    `ArcaResponseError`/`ArcaAuthError`/`ArcaNetworkError`)."""
     return await asyncio.to_thread(client.get_persona, cuit)
 
 
