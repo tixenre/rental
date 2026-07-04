@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Trash2,
   MessageCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -49,6 +50,7 @@ export function CartDrawerView({
   onClose,
   onExplore,
   step,
+  pedidoEnviado,
   sessionId,
   onVolverAlCarrito,
   onCrearPedido,
@@ -104,8 +106,11 @@ export function CartDrawerView({
   onClose: () => void;
   onExplore: () => void;
   /** "carrito" = lista de ítems (default); "resumen" = paso de revisión/confirmación
-   *  (`CheckoutResumen`, backend-driven vía el portero de checkout). */
-  step: "carrito" | "resumen";
+   *  (`CheckoutResumen`, backend-driven vía el portero de checkout); "exito" =
+   *  pantalla post-creación, unos segundos antes de redirigir al portal. */
+  step: "carrito" | "resumen" | "exito";
+  /** Presente solo en el paso "exito" — número de pedido para el mensaje. */
+  pedidoEnviado: { id: number; numeroPedido: string } | null;
   sessionId: string;
   onVolverAlCarrito: () => void;
   onCrearPedido: (sessionConfirmed: boolean) => Promise<void>;
@@ -229,7 +234,19 @@ export function CartDrawerView({
             )}
 
             {/* Contenido */}
-            {step === "resumen" ? (
+            {step === "exito" && pedidoEnviado ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+                <div className="grid h-16 w-16 place-items-center rounded-full bg-verde/15">
+                  <CheckCircle2 className="h-9 w-9 text-verde-ink" />
+                </div>
+                <h3 className="font-display text-2xl text-ink">
+                  Pedido #{pedidoEnviado.numeroPedido} enviado
+                </h3>
+                <p className="max-w-xs text-sm text-muted-foreground">
+                  Te llevamos a tu portal para seguir el estado y los próximos pasos…
+                </p>
+              </div>
+            ) : step === "resumen" ? (
               <CheckoutResumen
                 sessionId={sessionId}
                 startDate={startDate}

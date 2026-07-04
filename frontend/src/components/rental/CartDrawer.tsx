@@ -13,7 +13,12 @@ import { useBusinessPhone } from "@/lib/business";
 import { whatsappLink } from "@/lib/whatsapp";
 import { CartDrawerView } from "./CartDrawerView";
 
-type CheckoutStep = "carrito" | "resumen";
+type CheckoutStep = "carrito" | "resumen" | "exito";
+
+/** Cuánto se muestra la pantalla de éxito antes de redirigir al portal —
+ *  tiempo para que se lea "Pedido #X enviado" sin que se pise con el toast
+ *  de siempre (que coincidía con la navegación al portal). */
+const EXITO_REDIRECT_MS = 2500;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -60,6 +65,9 @@ export function CartDrawer({
 
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>("carrito");
+  const [pedidoEnviado, setPedidoEnviado] = useState<{ id: number; numeroPedido: string } | null>(
+    null,
+  );
   const [needsLogin, setNeedsLogin] = useState(false);
   const [notas, setNotas] = useState("");
   const [showNotas, setShowNotas] = useState(false);
@@ -124,6 +132,25 @@ export function CartDrawer({
       setStep("resumen");
     }
   }, [drawerOpen, resumeStep]);
+
+  // Pantalla de éxito (paso "exito"): se muestra unos segundos y RECIÉN
+  // después redirige al portal — antes el toast de éxito se pisaba con la
+  // navegación (pasaban casi al mismo tiempo).
+  useEffect(() => {
+    if (!pedidoEnviado) return;
+    const id = pedidoEnviado.id;
+    const t = setTimeout(() => {
+      clear();
+      setShowNotas(false);
+      setNotas("");
+      setDrawerOpen(false);
+      setStep("carrito");
+      setPedidoEnviado(null);
+      navigate({ to: "/cliente/portal", search: { nuevo: id } });
+    }, EXITO_REDIRECT_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clear/navigate/setDrawerOpen son estables; solo debe re-armar el timer cuando cambia pedidoEnviado
+  }, [pedidoEnviado]);
 
   // Total calculado por el BACKEND (fuente única, /api/cotizar). El front no
   // reimplementa la fórmula: manda ítems + fechas y muestra el desglose. #617.
@@ -262,16 +289,10 @@ export function CartDrawer({
         backendId: it._backendId,
       })),
     });
-    clear();
-    setShowNotas(false);
-    setNotas("");
-    setStep("carrito");
-    setDrawerOpen(false);
-    toast.success(`Pedido #${order.numero_pedido} enviado`, {
-      description: "Te llevamos a tu portal para seguir el estado y los próximos pasos.",
-      duration: 6000,
-    });
-    navigate({ to: "/cliente/portal", search: { nuevo: Number(order.id) } });
+    // La pantalla de éxito (paso "exito") se encarga de limpiar/cerrar/redirigir
+    // después de EXITO_REDIRECT_MS (ver el efecto de arriba).
+    setStep("exito");
+    setPedidoEnviado({ id: Number(order.id), numeroPedido: order.numero_pedido });
   }
 
   function goToLogin() {
@@ -294,6 +315,7 @@ export function CartDrawer({
       onClose={() => setDrawerOpen(false)}
       onExplore={() => setDrawerOpen(false, "bottom")}
       step={step}
+      pedidoEnviado={pedidoEnviado}
       startDate={startDate}
       endDate={endDate}
       startTime={startTime}
