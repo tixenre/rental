@@ -38,7 +38,7 @@ from .comprobante import tipo_comprobante, calcular_importes, armar_fecae
 from .qr import armar_qr
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert
 from .wsfe import WsfeClient
-from .padron import PadronClient, PersonaArca
+from .padron import PadronClient, PersonaArca, Impuesto, Actividad
 from .errores import (
     ArcaError,
     ArcaAuthError,
@@ -82,6 +82,8 @@ __all__ = [
     # cliente de padrón (Constancia de Inscripción, ws_sr_constancia_inscripcion)
     "PadronClient",
     "PersonaArca",
+    "Impuesto",
+    "Actividad",
     # taxonomía de errores (todo lo que el motor levanta hereda de ArcaError)
     "ArcaError",
     "ArcaAuthError",

@@ -579,6 +579,15 @@ def test_consultar_padron_encontrado(monkeypatch):
     monkeypatch.setattr("routes.facturacion.require_admin", lambda request: None)
     monkeypatch.setattr("routes.facturacion.get_db", lambda: _FakeConn())
 
+    class _Impuesto:
+        id_impuesto = 30
+        descripcion = "IVA"
+        estado = "AC"
+        periodo = 202001
+
+    class _Actividad:
+        descripcion = "Servicios de consultores en informática"
+
     class _Persona:
         razon_social = "Empresa XYZ SRL"
         nombre = ""
@@ -586,6 +595,10 @@ def test_consultar_padron_encontrado(monkeypatch):
         domicilio = "Ruta 88 km 12"
         condicion_iva = "responsable_inscripto"
         estado_clave = "ACTIVO"
+        tipo_persona = "JURIDICA"
+        categoria_monotributo = ""
+        actividades = (_Actividad(),)
+        impuestos = (_Impuesto(),)
 
     monkeypatch.setattr(
         "services.facturacion.padron.resolver_persona",
@@ -601,6 +614,12 @@ def test_consultar_padron_encontrado(monkeypatch):
         "domicilio": "Ruta 88 km 12",
         "condicion_iva": "responsable_inscripto",
         "estado_clave": "ACTIVO",
+        "tipo_persona": "JURIDICA",
+        "categoria_monotributo": "",
+        "actividades": ["Servicios de consultores en informática"],
+        "impuestos": [
+            {"id_impuesto": 30, "descripcion": "IVA", "estado": "AC", "periodo": 202001}
+        ],
     }
 
 

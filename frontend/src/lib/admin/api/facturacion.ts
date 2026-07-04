@@ -72,6 +72,10 @@ export type PadronResult =
       domicilio: string;
       condicion_iva: string;
       estado_clave: string;
+      tipo_persona: string;
+      categoria_monotributo: string;
+      actividades: string[];
+      impuestos: { id_impuesto: number; descripcion: string; estado: string; periodo: number }[];
     }
   // `motivo` presente = no pudimos ni completar la consulta (WSAA/relación/
   // cert/red) — distinto de "ARCA no tiene datos para este CUIT" (sin motivo).

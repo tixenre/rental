@@ -115,6 +115,32 @@ def _get_client(endpoint: str) -> zeep.Client:
     return _CLIENT_CACHE[ep]
 
 
+@dataclass(frozen=True)
+class Impuesto:
+    """Un impuesto/régimen en el que el CUIT está inscripto ante AFIP — nodo
+    `impuesto` de `datosMonotributo`/`datosRegimenGeneral` (manual oficial
+    "WS_SR_constancia_inscripcion" v3.7). `id_impuesto`: 30 = IVA Responsable
+    Inscripto, 32 = IVA Exento (ver `_ID_IMPUESTO_RI`/`_ID_IMPUESTO_EXENTO`,
+    ya usados para derivar `condicion_iva`) — el resto son otros impuestos
+    (Ganancias, Bienes Personales, etc.), tal cual los reporta AFIP."""
+
+    id_impuesto: int
+    descripcion: str
+    estado: str  # texto de AFIP tal cual (ej. "AC" activo / "BA" baja)
+    periodo: int  # AAAAMM del alta/último movimiento
+
+
+@dataclass(frozen=True)
+class Actividad:
+    """Una actividad económica declarada ante AFIP — nodo `actividad`
+    (clasificador CLAE), bajo `datosMonotributo`/`datosRegimenGeneral`."""
+
+    id_actividad: int
+    descripcion: str
+    periodo: int
+    orden: int  # 1 = actividad principal
+
+
 @dataclass
 class PersonaArca:
     """Datos resueltos del padrón para autocompletar un formulario.
@@ -137,6 +163,14 @@ class PersonaArca:
     estado_clave: str  # 'ACTIVO' | 'INACTIVO' | '' — señal de calidad de dato,
     # no bloqueante: un CUIT dado de baja en AFIP es motivo de aviso al
     # usuario, no un error del autocompletado en sí.
+    tipo_persona: str = ""  # 'FISICA' | 'JURIDICA' | '' — tal cual AFIP lo da
+    categoria_monotributo: str = ""  # descripción de la categoría (A, B, C…);
+    # "" si no es monotributista (RI no tiene categoría).
+    actividades: tuple[Actividad, ...] = ()  # CLAE declarados (principal primero)
+    impuestos: tuple[Impuesto, ...] = ()  # todos los impuestos/regímenes que
+    # AFIP reporta — de acá se deriva `condicion_iva`, pero se expone también
+    # tal cual para diagnóstico (ver si la relación de IVA está realmente
+    # activa en AFIP, no solo inferirlo).
 
 
 @dataclass
@@ -305,6 +339,7 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
     apellido = ""
     domicilio = ""
     estado_clave = ""
+    tipo_persona = ""
     if dg is not None:
         razon_social = str(getattr(dg, "razonSocial", "") or "")
         if not razon_social:
@@ -313,6 +348,7 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
             razon_social = f"{nombre} {apellido}".strip()
 
         estado_clave = str(getattr(dg, "estadoClave", "") or "")
+        tipo_persona = str(getattr(dg, "tipoPersona", "") or "")
 
         dom = getattr(dg, "domicilioFiscal", None)
         if dom is not None:
@@ -323,22 +359,32 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
             ]
             domicilio = ", ".join(p for p in partes if p)
 
+    dm = getattr(persona, "datosMonotributo", None)
+    dr = getattr(persona, "datosRegimenGeneral", None)
+
     # Orden de chequeo — mismo criterio que pyafipws (referencia de facto):
     # exento se chequea ANTES que RI (un mismo padrón podría traer ambos
     # ids en teoría; exento es la condición más específica).
     condicion_iva = ""
-    if getattr(persona, "datosMonotributo", None) is not None:
+    if dm is not None:
         condicion_iva = "monotributo"
     else:
-        dr = getattr(persona, "datosRegimenGeneral", None)
-        impuestos = getattr(dr, "impuesto", None) if dr is not None else None
+        impuestos_dr = getattr(dr, "impuesto", None) if dr is not None else None
         ids = (
-            {getattr(i, "idImpuesto", None) for i in impuestos} if impuestos else set()
+            {getattr(i, "idImpuesto", None) for i in impuestos_dr}
+            if impuestos_dr
+            else set()
         )
         if _ID_IMPUESTO_EXENTO in ids:
             condicion_iva = "exento"
         elif _ID_IMPUESTO_RI in ids:
             condicion_iva = "responsable_inscripto"
+
+    categoria_monotributo = ""
+    if dm is not None:
+        cat = getattr(dm, "categoriaMonotributo", None)
+        if cat is not None:
+            categoria_monotributo = str(getattr(cat, "descripcionCategoria", "") or "")
 
     return PersonaArca(
         cuit=cuit,
@@ -348,4 +394,56 @@ def _parsear_persona(cuit: str, persona: Any) -> PersonaArca:
         domicilio=domicilio,
         condicion_iva=condicion_iva,
         estado_clave=estado_clave,
+        tipo_persona=tipo_persona,
+        categoria_monotributo=categoria_monotributo,
+        actividades=_mapear_actividades(dm, dr),
+        impuestos=_mapear_impuestos(dm, dr),
+    )
+
+
+def _mapear_actividades(dm: Any, dr: Any) -> tuple[Actividad, ...]:
+    """Junta las actividades económicas declaradas — `datosMonotributo.actividad[]`
+    + `datosMonotributo.actividadMonotributista` (nodo singular, no lista) +
+    `datosRegimenGeneral.actividad[]` — lo que esté poblado. Ordenadas por
+    `orden` (1 = principal)."""
+    crudas: list[Any] = []
+    if dm is not None:
+        crudas.extend(getattr(dm, "actividad", None) or ())
+        unica = getattr(dm, "actividadMonotributista", None)
+        if unica is not None:
+            crudas.append(unica)
+    if dr is not None:
+        crudas.extend(getattr(dr, "actividad", None) or ())
+
+    actividades = tuple(
+        Actividad(
+            id_actividad=int(getattr(a, "idActividad", 0) or 0),
+            descripcion=str(getattr(a, "descripcionActividad", "") or ""),
+            periodo=int(getattr(a, "periodo", 0) or 0),
+            orden=int(getattr(a, "orden", 0) or 0),
+        )
+        for a in crudas
+    )
+    return tuple(sorted(actividades, key=lambda a: a.orden or 999))
+
+
+def _mapear_impuestos(dm: Any, dr: Any) -> tuple[Impuesto, ...]:
+    """Junta los impuestos/regímenes inscriptos — `datosMonotributo.impuesto[]`
+    + `datosRegimenGeneral.impuesto[]` — tal cual AFIP los reporta (con
+    estado activo/baja), para diagnóstico más allá de la `condicion_iva`
+    derivada."""
+    crudos: list[Any] = []
+    if dm is not None:
+        crudos.extend(getattr(dm, "impuesto", None) or ())
+    if dr is not None:
+        crudos.extend(getattr(dr, "impuesto", None) or ())
+
+    return tuple(
+        Impuesto(
+            id_impuesto=int(getattr(i, "idImpuesto", 0) or 0),
+            descripcion=str(getattr(i, "descripcionImpuesto", "") or ""),
+            estado=str(getattr(i, "estadoImpuesto", "") or ""),
+            periodo=int(getattr(i, "periodo", 0) or 0),
+        )
+        for i in crudos
     )
