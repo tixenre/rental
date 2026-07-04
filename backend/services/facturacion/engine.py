@@ -252,12 +252,30 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     try:
         req = construir_comprobante(pedido, emisor_obj, emisor_obj.condicion_iva, fecha=hoy)
     except ValueError as exc:
-        # `Receptor.__post_init__` (arca_fe, gap 10 de la iniciativa de robustecimiento) ahora
-        # valida el CUIT del receptor en la CONSTRUCCIÓN — un CUIT con el dígito verificador mal
-        # formado ya no llega a armar un `ComprobanteRequest` completo. El preview NO puede
-        # crashear por esto (a diferencia de `emitir_factura`, que si puede propagar la excepción):
-        # se arma el mismo chequeo bloqueante `cuit_receptor` que existía cuando esta validación
-        # corría más tarde (dentro de `_chequeos_previos`), en vez de dejar subir el ValueError.
+        # `ComprobanteRequest`/`Receptor.__post_init__` (arca_fe, iniciativa de robustecimiento)
+        # ahora validan en la CONSTRUCCIÓN misma — no solo el CUIT del receptor, también fechas de
+        # servicio faltantes, punto_venta fuera de rango, importes negativos, etc. (todo lo que
+        # antes recién fallaba al armar el payload SOAP). El preview NO puede crashear por ninguno
+        # de estos casos (a diferencia de `emitir_factura`, que sí puede propagar la excepción):
+        # se distingue el motivo real en vez de etiquetar TODO como "CUIT del receptor inválido"
+        # (rotularía mal, por ejemplo, un `punto_venta` mal configurado del emisor).
+        motivo = str(exc)
+        es_cuit = "Receptor.doc_nro" in motivo or "CUIT" in motivo
+        chequeo = (
+            {
+                "check": "cuit_receptor",
+                "ok": False,
+                "bloqueante": True,
+                "mensaje": f"CUIT del receptor ({pedido.get('cliente_cuit')}) inválido: {motivo}",
+            }
+            if es_cuit
+            else {
+                "check": "comprobante_invalido",
+                "ok": False,
+                "bloqueante": True,
+                "mensaje": f"No se pudo armar el comprobante: {motivo}",
+            }
+        )
         return {
             "ambiente": cred.ambiente,
             "emisor": {
@@ -269,16 +287,7 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
             "comprobante": None,
             "importes": None,
             "fechas": None,
-            "chequeos": [
-                {
-                    "check": "cuit_receptor",
-                    "ok": False,
-                    "bloqueante": True,
-                    "mensaje": (
-                        f"CUIT del receptor ({pedido.get('cliente_cuit')}) inválido: {exc}"
-                    ),
-                }
-            ],
+            "chequeos": [chequeo],
             "listo": False,
         }
     cbte_tipo = tipo_comprobante(req)

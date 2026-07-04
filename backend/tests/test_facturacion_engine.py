@@ -487,6 +487,35 @@ def test_preview_chequeo_cuit_invalido_bloquea(monkeypatch):
     assert result["listo"] is False
 
 
+def test_preview_error_de_construccion_no_relacionado_a_cuit_no_se_rotula_mal(monkeypatch):
+    """Un ValueError de `construir_comprobante` que NO es sobre el CUIT (ej.
+    `punto_venta` del emisor fuera de rango) tiene que dar el chequeo genérico
+    `comprobante_invalido`, NO `cuit_receptor` — rotularlo mal manda a
+    cualquiera que debuguee esto a buscar el problema en el lugar equivocado."""
+    pedido_ri = {**_fake_pedido(), "cliente_perfil_impuestos": "responsable_inscripto"}
+    cred_pto_venta_invalido = CredARCA(
+        emisor_id=1, emisor="santini", condicion_iva="monotributo",
+        ambiente="homologacion", cuit=20300000003, punto_venta=0,  # fuera de rango (1-9999)
+        cert_pem=b"x", key_pem=b"x",
+        endpoint_wsaa="https://wsaahomo.afip.gov.ar/ws/services/LoginCms",
+        endpoint_wsfe="https://wswhomo.afip.gov.ar/wsfev1/service.asmx?WSDL",
+    )
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: cred_pto_venta_invalido)
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["listo"] is False
+    checks = {c["check"] for c in result["chequeos"]}
+    assert "comprobante_invalido" in checks
+    assert "cuit_receptor" not in checks
+    chequeo = next(c for c in result["chequeos"] if c["check"] == "comprobante_invalido")
+    assert "punto_venta" in chequeo["mensaje"]
+
+
 def test_preview_chequeo_ri_sin_cuit_valido_avisa_pero_no_bloquea(monkeypatch):
     """RI sin CUIT cae a Consumidor Final (comportamiento ya existente) — el
     preview lo muestra como advertencia, no como bloqueo (igual se puede
