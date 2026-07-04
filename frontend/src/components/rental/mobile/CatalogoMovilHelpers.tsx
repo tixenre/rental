@@ -533,13 +533,10 @@ export function CartSheet({
               totalNeto={totalNeto}
               conIva={conIva}
               clienteNombre={clienteSession?.nombre}
-              apellido={clienteSession?.apellido}
-              email={clienteSession?.email}
-              telefono={clienteSession?.telefono}
-              direccion={clienteSession?.direccion}
-              nombreRenaper={clienteSession?.nombre_renaper}
-              apellidoRenaper={clienteSession?.apellido_renaper}
-              direccionRenaper={clienteSession?.direccion_renaper}
+              nombreLegal={clienteSession?.nombreLegal}
+              emailComunicacion={clienteSession?.emailComunicacion}
+              telefonoContacto={clienteSession?.telefonoContacto}
+              direccionLegal={clienteSession?.direccionLegal}
               perfilImpuestos={clienteSession?.perfil_impuestos}
               onBack={() => setStep("carrito")}
               onCrearPedido={handleCrearPedido}

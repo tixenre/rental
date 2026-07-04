@@ -15,7 +15,9 @@ from itsdangerous import BadSignature, SignatureExpired
 
 from database import get_db, row_to_dict
 from auth.session import signer, _make_session_response
+from identity import nombre_validado, direccion_validada
 from identity.anchor import cuil_valido
+from identity.contacts import email_comunicacion, telefono_contacto
 from services.precios import es_responsable_inscripto
 from rate_limit import limiter
 from routes.cliente_portal.core import router, require_cliente, cliente_verificado
@@ -199,7 +201,20 @@ def cliente_me(request: Request):
         ).fetchone()
         if not row:
             raise HTTPException(404, "Cliente no encontrado")
-        return row_to_dict(row)
+        d = row_to_dict(row)
+        # Vista resuelta para DISPLAY (checkout/portal/donde haga falta mostrar
+        # "quién es" sin reimplementar la regla): mismo criterio que ya usan
+        # contrato/remito — RENAPER si está verificado, si no el dato base
+        # (`nombre_validado`/`direccion_validada`, identity/__init__.py) — y el
+        # contacto CANÓNICO (`email_comunicacion`/`telefono_contacto`,
+        # identity/contacts.py: el teléfono verificado por Didit puede diferir
+        # del autodeclarado). Los campos base de arriba siguen intactos para
+        # los forms de edición (Contacto/Facturación) — esto es aditivo.
+        d["nombre_legal"] = nombre_validado(d) or f"{d.get('nombre', '')} {d.get('apellido', '')}".strip()
+        d["direccion_legal"] = direccion_validada(d) or d.get("direccion")
+        d["email_comunicacion"] = email_comunicacion(conn, cliente_id)
+        d["telefono_contacto"] = telefono_contacto(conn, cliente_id)
+        return d
 
 
 class PerfilUpdate(BaseModel):

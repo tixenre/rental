@@ -47,15 +47,15 @@ type ClienteSession = {
   /** Descuento personalizado del cliente (atención manual del admin a
    * buenos clientes, 0..100). Lo lee el carrito; no es público. */
   descuento: number | null;
-  /** Datos de contacto/identidad — el resumen del checkout ("Tus datos") los
-   *  muestra; el nombre/dirección "legal" (RENAPER si está verificado) se
-   *  resuelve con `nombreClienteLegal`/`direccionClienteLegal` (lib/cliente-nombre). */
-  apellido: string | null;
-  telefono: string | null;
-  direccion: string | null;
-  nombre_renaper: string | null;
-  apellido_renaper: string | null;
-  direccion_renaper: string | null;
+  /** Vista de identidad/contacto YA RESUELTA por el backend — mismo criterio
+   *  que contrato/remito (RENAPER si está verificado, si no el dato base;
+   *  teléfono verificado por Didit si existe, si no el autodeclarado; ver
+   *  `identity/__init__.py` + `identity/contacts.py`). El resumen del
+   *  checkout ("Tus datos") los muestra tal cual — no reimplementa la regla. */
+  nombreLegal: string | null;
+  direccionLegal: string | null;
+  emailComunicacion: string | null;
+  telefonoContacto: string | null;
 } | null;
 
 let cached: ClienteSession | undefined; // undefined = no fetched yet
@@ -77,12 +77,10 @@ async function fetchClienteSession(): Promise<ClienteSession> {
       nombre: _str(data.nombre),
       perfil_impuestos: (data.perfil_impuestos ?? null) as PerfilImpuestos | null,
       descuento: typeof data.descuento === "number" ? data.descuento : null,
-      apellido: _str(data.apellido),
-      telefono: _str(data.telefono),
-      direccion: _str(data.direccion),
-      nombre_renaper: _str(data.nombre_renaper),
-      apellido_renaper: _str(data.apellido_renaper),
-      direccion_renaper: _str(data.direccion_renaper),
+      nombreLegal: _str(data.nombre_legal),
+      direccionLegal: _str(data.direccion_legal),
+      emailComunicacion: _str(data.email_comunicacion),
+      telefonoContacto: _str(data.telefono_contacto),
     };
   } catch {
     return null;

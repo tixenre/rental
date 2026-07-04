@@ -11,6 +11,13 @@ tienen que poder actualizarse siempre.
 También candado del checksum de CUIT/CUIL (mod-11, `identity.anchor.cuil_valido`)
 que se sumó al mismo endpoint — un CUIT mal formado se rechaza con 400.
 
+Y candado de la vista RESUELTA (`nombre_legal`/`direccion_legal`/
+`email_comunicacion`/`telefono_contacto`) que `GET /api/cliente/me` suma para
+que el checkout (y cualquier otro consumidor) muestre "quién es" sin
+reimplementar la regla RENAPER-si-verificado ni la de contacto canónico —
+son la misma fuente que ya usan contrato/remito (`identity/__init__.py`,
+`identity/contacts.py`), no una tercera copia en el front.
+
 Contra Postgres real: `cliente_verificado` hace un SELECT directo a
 `clientes.dni_validado_at`. OPT-IN y SEGURO POR DEFECTO (mismo gating que
 los demás *_db.py): se saltea salvo RESERVAS_DB_TEST=1 + DATABASE_URL con
@@ -137,3 +144,91 @@ class TestFacturacionEditablePostVerificacion:
         r = _patch(client, {"cuit": ""})
         assert r.status_code == 200, r.text
         assert r.json()["cuit"] is None
+
+
+CLIENTE_ID_DISPLAY = 9_330_002
+_COOKIE_DISPLAY = f"session={signer.dumps({'email': 'display-db@test.com', 'role': 'cliente', 'cliente_id': CLIENTE_ID_DISPLAY, 'jti': 'display-cli'})}"
+
+
+@pytest.fixture
+def cliente_no_verificado_fixture():
+    from database import get_db, init_db
+
+    init_db()
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM clientes WHERE id = %s", (CLIENTE_ID_DISPLAY,))
+        conn.execute(
+            """INSERT INTO clientes (id, nombre, apellido, email, telefono, direccion)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (CLIENTE_ID_DISPLAY, "Ana Base", "Gómez Base", "display-db@test.com",
+             "1111-0000", "Calle Base 1"),
+        )
+        conn.commit()
+        yield conn
+    finally:
+        conn.execute("DELETE FROM clientes WHERE id = %s", (CLIENTE_ID_DISPLAY,))
+        conn.commit()
+        conn.close()
+
+
+@pytest.fixture
+def cliente_verificado_datos_distintos_fixture():
+    """Base != RENAPER (para que la preferencia sea observable) + un teléfono
+    verificado por Didit distinto al autodeclarado."""
+    from database import get_db, init_db
+
+    init_db()
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM clientes WHERE id = %s", (CLIENTE_ID_DISPLAY,))
+        conn.execute(
+            """INSERT INTO clientes
+               (id, nombre, apellido, email, telefono, direccion,
+                dni_validado_at, nombre_renaper, apellido_renaper, direccion_renaper)
+               VALUES (%s, %s, %s, %s, %s, %s, now(), %s, %s, %s)""",
+            (CLIENTE_ID_DISPLAY, "Ana Base", "Gómez Base", "display-db@test.com",
+             "1111-0000", "Calle Base 1",
+             "Ana Legal", "Gómez Legal", "Calle Legal 99"),
+        )
+        conn.execute(
+            """INSERT INTO verified_contacts (cliente_id, kind, value, source, verified_at)
+               VALUES (%s, 'phone', '+5492235559999', 'didit', now())""",
+            (CLIENTE_ID_DISPLAY,),
+        )
+        conn.commit()
+        yield conn
+    finally:
+        conn.execute("DELETE FROM clientes WHERE id = %s", (CLIENTE_ID_DISPLAY,))
+        conn.commit()
+        conn.close()
+
+
+class TestVistaResueltaParaDisplay:
+    def test_no_verificado_cae_al_dato_base(self, cliente_no_verificado_fixture):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = client.get("/api/cliente/me", headers={"Cookie": _COOKIE_DISPLAY})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["nombre_legal"] == "Ana Base Gómez Base"
+        assert body["direccion_legal"] == "Calle Base 1"
+        assert body["telefono_contacto"] == "1111-0000"
+        assert body["email_comunicacion"] == "display-db@test.com"
+
+    def test_verificado_prefiere_renaper_y_contacto_verificado(
+        self, cliente_verificado_datos_distintos_fixture,
+    ):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(main.app)
+        r = client.get("/api/cliente/me", headers={"Cookie": _COOKIE_DISPLAY})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["nombre_legal"] == "Ana Legal Gómez Legal"
+        assert body["direccion_legal"] == "Calle Legal 99"
+        # El teléfono verificado por Didit gana al autodeclarado.
+        assert body["telefono_contacto"] == "+5492235559999"
+        # El mail de Google (base, disponible desde el alta) sigue siendo el preferido.
+        assert body["email_comunicacion"] == "display-db@test.com"
