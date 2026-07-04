@@ -427,6 +427,30 @@ def preview_factura(pedido_id: int, request: Request):
         raise HTTPException(503, str(e))
 
 
+@router.get("/alquileres/{pedido_id}/facturar/preview-html")
+def preview_factura_html(pedido_id: int, request: Request, layout: str = "simplificada"):
+    """Renderiza la factura COMPLETA (mismo layout/plantilla real) ANTES de emitir — pedido del
+    dueño para ver el documento entero, no solo el resumen de chequeos. CAE/QR son placeholder
+    ("(pendiente)"): esto es el mismo nivel "preview rápido" que ya expone `arca_fe` (HTML crudo,
+    informal), NUNCA el documento certificado — no pide ningún CAE real."""
+    require_admin(request)
+
+    try:
+        from services.facturacion.engine import previsualizar_factura_html
+        with get_db() as conn:
+            html = previsualizar_factura_html(pedido_id, conn, layout=layout)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except ArcaError as e:
+        raise HTTPException(_status_for_arca_error(e), str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+    from fastapi.responses import HTMLResponse
+
+    return HTMLResponse(content=html, headers=_DOC_NO_CACHE)
+
+
 # ---------------------------------------------------------------------------
 # POST /alquileres/{id}/facturar
 # ---------------------------------------------------------------------------

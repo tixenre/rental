@@ -108,16 +108,18 @@ def _fonts_css() -> str:
 CONCEPTO_MARCA = os.getenv("FACTURACION_CONCEPTO_MARCA", "Rambla")
 
 
-def _conceptos(pedido: dict, factura) -> tuple[ItemFactura, ...]:
+def _conceptos(pedido: dict, imp_neto) -> tuple[ItemFactura, ...]:
     """Ítem único del comprobante: `"{CONCEPTO_MARCA} #{numero_pedido}"`, sin desglose por equipo
-    — ver `CONCEPTO_MARCA`."""
+    — ver `CONCEPTO_MARCA`. Recibe `imp_neto` directo (no el objeto `Factura` completo) para que
+    también lo pueda usar un preview PRE-emisión (`engine.previsualizar_factura_html`), que
+    todavía no tiene una fila `Factura` persistida."""
     numero = pedido.get("numero_pedido") or pedido.get("id", "")
     return (
         ItemFactura(
             codigo="001",
             descripcion=f"{CONCEPTO_MARCA} #{numero}",
-            precio_unitario=factura.imp_neto,
-            subtotal=factura.imp_neto,
+            precio_unitario=imp_neto,
+            subtotal=imp_neto,
         ),
     )
 
@@ -178,7 +180,7 @@ def _armar_comprobante_fiscal(factura, pedido: dict) -> "arca_fe.ComprobanteFisc
         doc_tipo_label=doc_label,
         condicion_iva_receptor_label=cond_iva_receptor_label,
         emisor_condicion_iva_label=em_cond_label,
-        items=_conceptos(pedido, factura),
+        items=_conceptos(pedido, factura.imp_neto),
         importe_neto=factura.imp_neto,
         importe_iva=factura.imp_iva,
         importe_total=factura.imp_total,

@@ -939,3 +939,41 @@ def test_preview_receptor_usa_domicilio_de_afip_si_no_esta_guardado(monkeypatch)
 
     assert result["receptor"]["domicilio"] == "Domicilio Ficticio 456"
     assert not any(c["check"] == "receptor_verificado_afip" for c in result["chequeos"])
+
+
+# ── previsualizar_factura_html: mismo layout que la factura real, SIN CAE ──
+
+
+def test_preview_html_renderiza_el_mismo_layout_con_cae_pendiente(monkeypatch):
+    """Pedido del dueño: ver la factura COMPLETA (mismo layout/plantilla real) antes de
+    emitir, no solo el resumen de chequeos — sin pedirle nada más a ARCA. CAE/QR son
+    placeholder ("(pendiente)") porque todavía no existen."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    _patch_preview_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "now_ar", lambda: datetime(2026, 7, 15))
+
+    html = engine.previsualizar_factura_html(1, conn=_FakeConn())
+
+    assert "<html" in html.lower() or "<!doctype" in html.lower()
+    assert "(pendiente)" in html  # CAE placeholder, no inventa un CAE real
+    assert "Juan Pérez" in html  # nombre del receptor, del pedido de prueba
+    assert "BORRADOR" in html  # banner imposible de confundir con un comprobante real
+
+
+def test_preview_html_propaga_error_de_comprobante_invalido(monkeypatch):
+    """Si `construir_comprobante` falla (ej. CUIT inválido), no hay nada que renderizar — a
+    diferencia del preview de chequeos (que sí puede mostrar el error como fila), acá se
+    propaga la excepción tal cual."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": "20301234560",  # dígito verificador incorrecto
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    with pytest.raises(ValueError):
+        engine.previsualizar_factura_html(1, conn=_FakeConn())

@@ -244,7 +244,7 @@ def _chequeos_previos(
     return chequeos, domicilio_afip
 
 
-def previsualizar_factura(pedido_id: int, conn) -> dict:
+def previsualizar_factura(pedido_id: int, conn, *, _incluir_raw: bool = False) -> dict:
     """Arma el `ComprobanteRequest`, calcula sus importes, y consulta a ARCA
     el próximo número de comprobante — SIN pedir CAE.
 
@@ -308,6 +308,11 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
                 "mensaje": f"No se pudo armar el comprobante: {motivo}",
             }
         )
+        if _incluir_raw:
+            # `previsualizar_factura_html` no puede renderizar nada sin un `req` válido — a
+            # diferencia del preview de chequeos (que sí puede mostrar el error como una fila
+            # más), acá no hay nada que pintar, así que se propaga tal cual.
+            raise
         return {
             "ambiente": cred.ambiente,
             "emisor": {
@@ -379,7 +384,7 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     pagado = pedido.get("monto_pagado") or 0
     condicion_venta = "Contado" if total_pedido is None or pagado >= total_pedido else "Cuenta corriente"
 
-    return {
+    resultado = {
         "ambiente": cred.ambiente,
         "emisor": {
             "nombre": nombre_emisor,
@@ -423,6 +428,88 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
         "chequeos": chequeos,
         "listo": listo,
     }
+    if _incluir_raw:
+        # Solo para uso interno de `previsualizar_factura_html` — nunca sale por la API pública
+        # (el route de chequeos no lo pide). Evita reconstruir `req`/`emisor_obj`/`importes`
+        # (que ya implican una llamada real a ARCA) una segunda vez para el render HTML.
+        resultado["_raw"] = {
+            "pedido": pedido,
+            "req": req,
+            "emisor_obj": emisor_obj,
+            "importes": importes,
+            "cbte_tipo": cbte_tipo,
+            "numero_a_emitir": numero_a_emitir,
+            "nombre_emisor": nombre_emisor,
+            "fecha_emision": hoy,
+        }
+    return resultado
+
+
+def previsualizar_factura_html(pedido_id: int, conn, layout: str = "simplificada") -> str:
+    """Renderiza el HTML del comprobante ANTES de emitir — mismo layout/plantilla que la factura
+    real (`arca_fe.renderizar_comprobante_html`), para que el admin vea el documento completo
+    (no solo el resumen de chequeos) antes de comprometerse a pedir un CAE real.
+
+    CAE/Vto./QR son PLACEHOLDER ("(pendiente)") porque todavía no existen — nada de esto se pide
+    a ARCA más allá de lo que ya hace `previsualizar_factura` (número de comprobante de solo
+    lectura). Es el mismo nivel "preview rápido" que ya expone `arca_fe` — HTML crudo, informal,
+    NUNCA el documento certificado (eso sigue siendo exclusivo de `asegurar_pdf` tras emitir de
+    verdad, con la firma PAdES real).
+
+    Raises:
+        ValueError: pedido en estado inválido, o el comprobante no se pudo armar.
+        arca_fe.ArcaError / RuntimeError: igual que `previsualizar_factura`.
+    """
+    import arca_fe
+    from services.facturacion.comprobante_render import _conceptos, _emisor_row, _fonts_css
+
+    preview = previsualizar_factura(pedido_id, conn, _incluir_raw=True)
+    raw = preview["_raw"]
+    pedido, req, importes = raw["pedido"], raw["req"], raw["importes"]
+
+    em_row = _emisor_row(raw["nombre_emisor"], conn)
+
+    datos = arca_fe.ComprobanteFiscal(
+        cbte_tipo=raw["cbte_tipo"],
+        pto_vta=raw["emisor_obj"].punto_venta,
+        numero=raw["numero_a_emitir"],
+        fecha_emision=raw["fecha_emision"],
+        cae="(pendiente)",
+        cae_vto=raw["fecha_emision"],
+        qr_url="https://www.arca.gob.ar/fe/qr/",
+        emisor_razon_social=em_row["razon_social"] or "—",
+        receptor=req.receptor,
+        receptor_nombre=preview["receptor"]["razon_social"] or "—",
+        concepto_label=preview["comprobante"]["concepto"],
+        doc_tipo_label=arca_fe.label_doc_tipo(req.receptor.doc_tipo),
+        condicion_iva_receptor_label=preview["receptor"]["condicion_iva_label"],
+        emisor_condicion_iva_label=preview["emisor"]["condicion_iva_label"],
+        items=_conceptos(pedido, importes["neto"]),
+        importe_neto=importes["neto"],
+        importe_iva=importes["iva"],
+        importe_total=importes["total"],
+        emisor_cuit=em_row["cuit"] or str(raw["emisor_obj"].cuit),
+        emisor_domicilio=em_row["domicilio"],
+        emisor_iibb=em_row["iibb"],
+        emisor_inicio_actividades=em_row["inicio_actividades"] or None,
+        receptor_domicilio=preview["receptor"]["domicilio"] or "—",
+        condicion_venta=preview["comprobante"]["condicion_venta"],
+        periodo_desde=req.fecha_serv_desde,
+        periodo_hasta=req.fecha_serv_hasta,
+        vencimiento_pago=req.fecha_vto_pago,
+    )
+    html = arca_fe.renderizar_comprobante_html(datos, layout=layout, fonts_css=_fonts_css())
+    # Banner de "BORRADOR" imposible de confundir con un comprobante real (CAE/QR placeholder no
+    # alcanza solo — esto es lo primero que se ve al abrir la pestaña, no algo que haya que leer
+    # con atención para notar). Los 3 layouts arrancan el body igual (`<body>` sin atributos, ver
+    # arca_fe/render.py) — reemplazo simple, sin tocar la librería portable (esto es una decisión
+    # de UX de Rambla, no algo que arca_fe deba saber).
+    _banner = (
+        '<div style="position:sticky;top:0;z-index:999;background:#111;color:#fff;'
+        'font:700 13px/1.4 monospace;text-align:center;padding:8px 12px;letter-spacing:.05em;">'
+        "BORRADOR — sin emitir, CAE/QR no son reales, no tiene validez fiscal</div>"
+    )
+    return html.replace("<body>", f"<body>{_banner}", 1)
 
 
 # ---------------------------------------------------------------------------
