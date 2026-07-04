@@ -613,22 +613,25 @@ export function CartDrawerView({
                     />
                   )}
 
-                  {/* Utilitarias de baja frecuencia, agrupadas en una sola fila —
-                      "Vaciar" (destructiva) lejos del CTA principal para evitar
-                      un click accidental. */}
+                  {/* Utilitarias de baja frecuencia, agrupadas y centradas como
+                      UN solo grupo (no en los extremos — en un drawer ancho
+                      quedaban huérfanas, cada una perdida en su esquina). */}
                   {list.length > 0 && (
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                       {!showNotas && (
-                        <button
-                          onClick={onShowNotas}
-                          className="text-muted-foreground transition hover:text-ink focus:outline-none focus-visible:underline"
-                        >
-                          Agregar una nota
-                        </button>
+                        <>
+                          <button
+                            onClick={onShowNotas}
+                            className="transition hover:text-ink focus:outline-none focus-visible:underline"
+                          >
+                            Agregar una nota
+                          </button>
+                          <span aria-hidden="true">·</span>
+                        </>
                       )}
                       <button
                         onClick={onClear}
-                        className="ml-auto text-muted-foreground transition hover:text-destructive focus:outline-none focus-visible:underline"
+                        className="transition hover:text-destructive focus:outline-none focus-visible:underline"
                       >
                         Vaciar pedido
                       </button>
