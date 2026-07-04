@@ -175,6 +175,28 @@ def _chequeos_previos(
         }
     )
 
+    # Mismo chequeo que `emitir_factura` hace de bloqueante real (Responsable
+    # Inscripto/Monotributo/Exento no existen sin CUIT en Argentina) — acá en
+    # el preview para que el admin lo vea ANTES de gastar un comprobante real
+    # intentando emitir, en vez de que la emisión falle recién al confirmar.
+    cuit_ok_para_perfil = req.receptor.doc_tipo == DocTipo.CUIT and cuil_valido(
+        str(req.receptor.doc_nro)
+    )
+    perfil_exige_cuit = perfil_receptor and perfil_receptor != "consumidor_final"
+    chequeos.append(
+        {
+            "check": "perfil_exige_cuit_verificado",
+            "ok": not perfil_exige_cuit or cuit_ok_para_perfil,
+            "bloqueante": True,
+            "mensaje": (
+                f"El cliente tiene perfil impositivo '{perfil_receptor}' pero sin un CUIT "
+                "verificado — pedile que verifique su CUIT en el portal antes de facturar"
+                if perfil_exige_cuit and not cuit_ok_para_perfil
+                else "Perfil impositivo con CUIT verificado"
+            ),
+        }
+    )
+
     # total == neto + iva (arca_fe.comprobante.calcular_importes) y el IVA nunca
     # cambia el signo, así que chequear el total (la cifra que ve el admin) o
     # el neto da lo mismo matemáticamente — se muestra el total para no meter
@@ -333,6 +355,7 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
             "razon_social": pedido.get("cliente_razon_social")
             or pedido.get("cliente_nombre")
             or "",
+            "domicilio": pedido.get("cliente_domicilio_fiscal") or "",
         },
         "comprobante": {
             "letra": letra,
@@ -412,6 +435,7 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
         # confirmar. De paso corrige razón social/domicilio/perfil de
         # impuestos del cliente si difieren de lo que AFIP dice.
         cuit_receptor = (pedido.get("cliente_cuit") or "").replace("-", "").strip()
+        perfil_previo = (pedido.get("cliente_perfil_impuestos") or "").strip().lower()
         if cuit_receptor.isdigit() and len(cuit_receptor) == 11:
             persona = verificar_y_actualizar_receptor(
                 cuit_receptor, pedido["cliente_id"], conn
@@ -423,6 +447,20 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
                 persona.domicilio or pedido.get("cliente_domicilio_fiscal")
             )
             pedido["cliente_perfil_impuestos"] = persona.condicion_iva
+        elif perfil_previo and perfil_previo != "consumidor_final":
+            # Bug real encontrado en prod: un cliente puede guardar 'monotributo'/
+            # 'responsable_inscripto'/'exento' en el portal (routes/cliente_portal/
+            # cuenta.py::cliente_update_me) SIN pasar por la verificación de ARCA —
+            # ninguno de esos perfiles existe legalmente sin CUIT en Argentina. Sin
+            # este chequeo, la factura salía con el perfil/domicilio viejo o vacío,
+            # sin confirmar contra ARCA (el gate de arriba solo corre si hay un
+            # CUIT de 11 dígitos — acá NO lo hay, así que antes se facturaba igual).
+            raise ValueError(
+                f"El cliente tiene perfil impositivo '{perfil_previo}' guardado pero sin un CUIT "
+                "verificado contra ARCA — Responsable Inscripto/Monotributo/Exento no existen sin "
+                "CUIT. Pedile que verifique su CUIT en el portal (Datos de facturación) antes de "
+                "facturar, o corregilo a mano en la ficha del cliente."
+            )
 
         perfil_receptor = (pedido.get("cliente_perfil_impuestos") or "").strip().lower()
         nombre_emisor = emisor_para(perfil_receptor, conn)

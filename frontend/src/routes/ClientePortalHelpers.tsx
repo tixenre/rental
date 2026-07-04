@@ -565,6 +565,13 @@ export function FacturacionForm({
   // cumplir de verdad en PATCH /api/cliente/me — esto no reemplaza esa
   // validación, solo evita el viaje al servidor con un número mal tipeado).
   const cuitOk = form.cuit.trim() === "" || cuitValido(form.cuit);
+  // Responsable Inscripto/Monotributo/Exento no existen sin CUIT en Argentina — el backend
+  // rechaza guardar cualquiera de estos perfiles sin un CUIT válido (bug real: un cliente
+  // guardó 'monotributo' sin nunca verificar su CUIT, la factura salió sin domicilio). Mismo
+  // chequeo acá para avisar ANTES del viaje al servidor, no reemplaza la validación real.
+  const requiereCuit = form.perfil_impuestos !== "consumidor_final";
+  const tieneCuitValido = form.cuit.trim() !== "" && cuitValido(form.cuit);
+  const faltaCuitParaElPerfil = requiereCuit && !tieneCuitValido;
 
   // Verificación contra el padrón de ARCA: el cliente solo confirma el CUIT
   // — si ARCA lo encuentra, condición IVA/razón social/domicilio quedan
@@ -631,7 +638,7 @@ export function FacturacionForm({
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (saving || !cuitOk) return;
+    if (saving || !cuitOk || faltaCuitParaElPerfil) return;
     setSaving(true);
     try {
       await patchPerfil(perfil, onPerfilChange, form, { invalidate: true });
@@ -720,13 +727,22 @@ export function FacturacionForm({
             </select>
           </Field>
 
-          {/* Datos para Factura A — sólo visibles si el cliente es RI */}
-          {form.perfil_impuestos === "responsable_inscripto" && (
+          {faltaCuitParaElPerfil && (
+            <p className="text-xs text-destructive">
+              Responsable Inscripto, Monotributo y Exento necesitan un CUIT verificado — cargá tu
+              CUIT arriba y apretá &quot;Verificar&quot; antes de guardar.
+            </p>
+          )}
+
+          {/* Datos fiscales adicionales — visibles para cualquier perfil que no sea Consumidor
+              Final (antes solo se mostraban para Responsable Inscripto; Monotributo/Exento
+              también necesitan poder cargar domicilio a mano si la verificación con ARCA falla). */}
+          {requiereCuit && (
             <div className="space-y-3 rounded-md border border-dashed hairline bg-amber-soft/40 p-4">
               <div className="text-xs font-semibold uppercase tracking-wider text-ink">
-                Datos para Factura A
+                Datos fiscales
               </div>
-              <Field label="Razón social" hint="Nombre legal de tu empresa">
+              <Field label="Razón social" hint="Nombre legal (o tu nombre, si sos monotributista)">
                 <input
                   type="text"
                   value={form.razon_social}
@@ -762,7 +778,7 @@ export function FacturacionForm({
         </Field>
       )}
 
-      <SaveButton saving={saving} disabled={!cuitOk} />
+      <SaveButton saving={saving} disabled={!cuitOk || faltaCuitParaElPerfil} />
     </form>
   );
 }

@@ -516,10 +516,12 @@ def test_preview_error_de_construccion_no_relacionado_a_cuit_no_se_rotula_mal(mo
     assert "punto_venta" in chequeo["mensaje"]
 
 
-def test_preview_chequeo_ri_sin_cuit_valido_avisa_pero_no_bloquea(monkeypatch):
-    """RI sin CUIT cae a Consumidor Final (comportamiento ya existente) — el
-    preview lo muestra como advertencia, no como bloqueo (igual se puede
-    emitir, solo que como C/B en vez de A)."""
+def test_preview_chequeo_ri_sin_cuit_valido_bloquea(monkeypatch):
+    """RI/Monotributo/Exento sin CUIT no existen en Argentina — el preview
+    tiene que BLOQUEAR (mismo chequeo duro que `emitir_factura`), no dejar
+    pasar con solo una advertencia. Antes de este chequeo, este caso caía a
+    Consumidor Final en silencio; ahora se corta ACÁ (preview), antes de
+    gastar un comprobante real, en vez de fallar recién al confirmar."""
     pedido_ri_sin_cuit = {**_fake_pedido(), "cliente_perfil_impuestos": "responsable_inscripto"}
     monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri_sin_cuit)
     monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
@@ -530,8 +532,14 @@ def test_preview_chequeo_ri_sin_cuit_valido_avisa_pero_no_bloquea(monkeypatch):
     result = engine.previsualizar_factura(1, conn=_FakeConn())
 
     perfil_check = next(c for c in result["chequeos"] if c["check"] == "perfil_fiscal_receptor")
-    assert perfil_check["ok"] is False
-    assert result["listo"] is True, "es una advertencia, no un bloqueo"
+    assert perfil_check["ok"] is False  # sigue avisando el "cae a C/B" además del bloqueo
+
+    cuit_verificado_check = next(
+        c for c in result["chequeos"] if c["check"] == "perfil_exige_cuit_verificado"
+    )
+    assert cuit_verificado_check["ok"] is False
+    assert cuit_verificado_check["bloqueante"] is True
+    assert result["listo"] is False, "sin CUIT verificado no debería poder confirmarse la factura"
 
 
 def test_preview_chequeo_importe_cero_bloquea(monkeypatch):
@@ -731,6 +739,37 @@ def test_emitir_factura_receptor_sin_cuit_no_consulta_afip(monkeypatch):
     engine.emitir_factura(1)  # no debe levantar nada
 
 
+def test_emitir_factura_perfil_no_final_sin_cuit_bloquea(monkeypatch):
+    """Regresión de bug real en producción: un cliente con `perfil_impuestos='monotributo'`
+    guardado (posible desde el portal SIN pasar nunca por 'Verificar' contra ARCA — ver
+    routes/cliente_portal/cuenta.py::cliente_update_me) pero SIN CUIT — Responsable Inscripto/
+    Monotributo/Exento no existen sin CUIT en Argentina. Antes de este fix, `emitir_factura`
+    facturaba igual (el gate de verificación solo corre si HAY un CUIT de 11 dígitos), saliendo
+    con el perfil/domicilio viejo o vacío, sin confirmar contra ARCA."""
+    pedido_sin_cuit = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "monotributo",
+        "cliente_cuit": None,
+    }
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    calls = _patch_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_sin_cuit)
+
+    def _fake_verificar(cuit, cliente_id, conn):
+        raise AssertionError("no debería llamar al padrón sin un CUIT válido")
+
+    monkeypatch.setattr(engine, "verificar_y_actualizar_receptor", _fake_verificar)
+    insert_llamado = []
+    monkeypatch.setattr(
+        engine, "insert_factura", lambda **kw: insert_llamado.append(kw) or 99
+    )
+
+    with pytest.raises(ValueError, match="monotributo"):
+        engine.emitir_factura(1)
+
+    assert insert_llamado == []
+
+
 def test_preview_chequeo_receptor_afip_bloquea_sin_romper(monkeypatch):
     """CUIT con dígito verificador OK pero que AFIP rechaza (o no responde)
     — el preview lo muestra como chequeo BLOQUEANTE, sin romper el preview
@@ -779,3 +818,60 @@ def test_preview_chequeo_receptor_afip_no_aparece_si_todo_bien(monkeypatch):
     result = engine.previsualizar_factura(1, conn=_FakeConn())
 
     assert not any(c["check"] == "receptor_verificado_afip" for c in result["chequeos"])
+
+
+def test_preview_perfil_con_cuit_verificado_no_bloquea(monkeypatch):
+    """Contracara de `test_preview_chequeo_ri_sin_cuit_valido_bloquea`: con un
+    CUIT válido presente, `perfil_exige_cuit_verificado` no bloquea (el chequeo
+    de AFIP de verdad — `receptor_verificado_afip` — es el que confirma que ese
+    CUIT existe de verdad, ver el test anterior)."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+    monkeypatch.setattr(engine, "resolver_persona", lambda cuit, conn: _persona_afip())
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    check = next(c for c in result["chequeos"] if c["check"] == "perfil_exige_cuit_verificado")
+    assert check["ok"] is True
+
+
+def test_preview_receptor_incluye_domicilio_fiscal(monkeypatch):
+    """El preview tiene que mostrar el domicilio ANTES de confirmar — si no
+    está, el admin lo tiene que ver acá, no descubrirlo en la factura ya
+    emitida (bug real: una factura salió con el domicilio vacío)."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": _CUIT_VALIDO,
+        "cliente_domicilio_fiscal": "Calle Ficticia 123",
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+    monkeypatch.setattr(engine, "resolver_persona", lambda cuit, conn: _persona_afip())
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["receptor"]["domicilio"] == "Calle Ficticia 123"
+
+
+def test_preview_receptor_domicilio_vacio_si_falta(monkeypatch):
+    """Sin domicilio guardado, el preview manda `""` (nunca `None` ni la
+    clave ausente) — el front distingue "vacío" de "sin confirmar" sin tener
+    que chequear `undefined`."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    _patch_preview_common(monkeypatch, wsfe)
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["receptor"]["domicilio"] == ""
