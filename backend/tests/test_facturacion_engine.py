@@ -455,6 +455,40 @@ def test_preview_consulta_ultimo_autorizado_pero_nunca_pide_cae(monkeypatch):
     assert wsfe.consultar_calls == [], "consultar() es de la idempotencia de emitir_factura, no del preview"
 
 
+def test_preview_incluye_concepto_condicion_iva_y_condicion_venta(monkeypatch):
+    """El preview muestra lo mismo que va impreso en la factura real: Concepto, condición IVA
+    del emisor y del receptor, y condición de venta (Contado/Cuenta corriente) — pedido a
+    pedirlo el dueño, para no tener que adivinar/descubrir esos datos recién en el PDF ya
+    emitido. Sin catálogos de ARCA sincronizados (`_FakeConn` no tiene ninguno cargado), cae al
+    label ESTÁTICO de `arca_fe` — nunca rompe el preview por un catálogo no actualizado."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    _patch_preview_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "now_ar", lambda: datetime(2026, 7, 15))
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["comprobante"]["concepto"]  # label no vacío (fallback estático)
+    assert result["comprobante"]["condicion_venta"] in ("Contado", "Cuenta corriente")
+    assert result["emisor"]["condicion_iva_label"] == "Responsable Monotributo"
+    assert result["receptor"]["condicion_iva_label"]
+
+
+def test_preview_condicion_venta_cuenta_corriente_si_no_esta_todo_pagado(monkeypatch):
+    """Mismo criterio de negocio que ya usa el render de la factura emitida
+    (`comprobante_render.py`): si lo pagado no cubre el total, es "Cuenta corriente"."""
+    pedido_con_saldo = {**_fake_pedido(), "monto_total": 10000, "monto_pagado": 3000}
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_con_saldo)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: wsfe)
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["comprobante"]["condicion_venta"] == "Cuenta corriente"
+
+
 def test_preview_chequeos_ok_caso_normal(monkeypatch):
     wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
     _patch_preview_common(monkeypatch, wsfe)
