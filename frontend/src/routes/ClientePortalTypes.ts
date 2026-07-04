@@ -80,6 +80,7 @@ export type Pedido = {
     contrato: boolean;
     albaran: boolean;
     factura: boolean;
+    "packing-list": boolean;
   };
   bruto?: number;
   descuento_monto?: number;
@@ -92,7 +93,7 @@ export type Pedido = {
 };
 
 export type PortalTab = "pedidos" | "listas" | "notificaciones" | "perfil";
-export type DocTipo = "remito" | "contrato" | "albaran" | "factura";
+export type DocTipo = "remito" | "contrato" | "albaran" | "factura" | "packing-list";
 export type Filtro = "todos" | "activos" | "historial";
 
 // ── Constantes compartidas con el componente principal ───────────────────────
@@ -101,7 +102,7 @@ export const ACTIVE_STATES = new Set(["borrador", "presupuesto", "confirmado", "
 export const HIST_STATES = new Set(["devuelto", "finalizado", "cancelado"]);
 export const MODIFICABLE_STATES = new Set(["presupuesto", "confirmado"]);
 
-export const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran", "factura"];
+export const DOC_NOTIFICABLE: DocTipo[] = ["contrato", "albaran", "factura", "packing-list"];
 
 export const TAB_OPTIONS: { value: Filtro; label: string }[] = [
   { value: "todos", label: "Todos" },

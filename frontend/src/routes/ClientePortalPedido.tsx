@@ -76,15 +76,17 @@ import type { Pedido, DocTipo } from "./ClientePortalTypes";
 const DOC_LABEL: Record<DocTipo, string> = {
   remito: "Remito",
   contrato: "Contrato",
-  albaran: "Certificado de seguro",
+  albaran: "Detalle de seguro",
   factura: "Factura",
+  "packing-list": "Checklist de retiro",
 };
 const DOC_DESCRIPTION: Partial<Record<DocTipo, string>> = {
   contrato: "Es el documento de alquiler firmado entre vos y nosotros.",
   albaran: "Te sirve para tener constancia ante tu aseguradora.",
   factura: "Tu factura electrónica, ya autorizada por ARCA.",
+  "packing-list": "El detalle de equipos para controlar al retirar y al devolver.",
 };
-const DOC_ICONS: Record<"remito" | "contrato" | "albaran" | "factura", string> = {
+const DOC_ICONS: Record<DocTipo, string> = {
   remito:
     "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
   contrato: "M9 11l3 3 8-8 M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11",
@@ -92,6 +94,8 @@ const DOC_ICONS: Record<"remito" | "contrato" | "albaran" | "factura", string> =
     "M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z",
   factura:
     "M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z M8 7h8 M8 11h8 M8 15h5",
+  "packing-list":
+    "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2 M9 5a2 2 0 012-2h2a2 2 0 012 2 M9 5a2 2 0 002 2h2a2 2 0 002-2 M9 14l2 2 4-4",
 };
 
 // ── Timeline constants (solo usadas aquí) ────────────────────────────────────
@@ -778,7 +782,11 @@ export function PedidoCard({
 
           {/* ── Side (derecha): documentos → totales → pagos → notas ── */}
           <aside className="[grid-area:side] flex flex-col gap-4 min-w-0">
-            {(docs.remito || docs.contrato || docs.albaran || docs.factura) && (
+            {(docs.remito ||
+              docs.contrato ||
+              docs.albaran ||
+              docs.factura ||
+              docs["packing-list"]) && (
               <section
                 className="rounded-md border px-3 py-3"
                 style={{
@@ -807,8 +815,17 @@ export function PedidoCard({
                       pedidoId={pedido.id}
                       numero={numero}
                       tipo="albaran"
-                      label="Certificado de seguro"
+                      label="Detalle de seguro"
                       description={DOC_DESCRIPTION.albaran}
+                    />
+                  )}
+                  {docs["packing-list"] && (
+                    <DocActions
+                      pedidoId={pedido.id}
+                      numero={numero}
+                      tipo="packing-list"
+                      label="Checklist de retiro"
+                      description={DOC_DESCRIPTION["packing-list"]}
                     />
                   )}
                   {docs.factura && (
@@ -1004,7 +1021,7 @@ function DocActions({
 }: {
   pedidoId: number;
   numero: string;
-  tipo: "remito" | "contrato" | "albaran" | "factura";
+  tipo: DocTipo;
   label: string;
   description?: string;
 }) {
@@ -1129,7 +1146,7 @@ function DocPreviewModal({
       onClose={onClose}
       className="z-50 bg-black/60 flex items-stretch sm:items-center justify-center sm:p-6"
     >
-      <div className="bg-background w-full sm:max-w-4xl sm:max-h-[90vh] h-full sm:h-auto flex flex-col sm:rounded-lg overflow-hidden shadow-xl">
+      <div className="bg-background w-full sm:max-w-4xl h-full sm:h-[90vh] flex flex-col sm:rounded-lg overflow-hidden shadow-xl">
         <header className="flex items-center justify-between gap-2 border-b hairline px-3 sm:px-4 py-3 shrink-0">
           <h2 className="font-display text-base text-ink truncate min-w-0">{title}</h2>
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">

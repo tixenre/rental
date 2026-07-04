@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, AlertCircle, ShieldCheck } from "lucide-react";
+import { ArrowLeft, AlertCircle, AlertTriangle, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -8,6 +8,8 @@ import { Button } from "@/design-system/ui/button";
 import { Spinner } from "@/design-system/ui/spinner";
 import { formatARS } from "@/lib/format";
 import { descuentoLabel, type DescuentoOrigen } from "@/lib/cotizacion";
+import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
+import { CONTACT } from "@/data/contact";
 import { aceptarTyc, validarCheckout, type FaltanItem } from "@/lib/checkout";
 import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
 import { firmarConPasskey, listPasskeys, passkeyErrorMessage } from "@/lib/passkey";
@@ -64,6 +66,9 @@ export function CheckoutResumen({
   totalNeto,
   conIva,
   clienteNombre,
+  perfilImpuestos,
+  cuit,
+  razonSocial,
   onBack,
   onCrearPedido,
 }: {
@@ -73,8 +78,9 @@ export function CheckoutResumen({
   startTime: string;
   endTime: string;
   d: number;
-  /** Composición del pedido — se muestra compacta arriba del total, para que
-   *  confirmar no sea "a ciegas": vas a saber QUÉ pedís, no solo cuánto sale. */
+  /** Composición del pedido — solo se usa para el contador del subtotal (no se
+   *  vuelve a listar ítem por ítem: esa vista completa ya está en el carrito,
+   *  un paso atrás — repetirla acá era ruido, no confirmación). */
   items: ResumenItem[];
   subtotalTotal: number;
   descuentoPct: number;
@@ -83,6 +89,11 @@ export function CheckoutResumen({
   totalNeto: number;
   conIva: boolean;
   clienteNombre?: string | null;
+  /** Perfil fiscal — solo se muestra (con link a "Modificar" en el perfil);
+   *  no se edita desde acá. */
+  perfilImpuestos?: PerfilImpuestos | null;
+  cuit?: string | null;
+  razonSocial?: string | null;
   onBack: () => void;
   /** Crea el pedido de verdad (createOrder) — cada superficie decide qué pasa
    *  después (desktop: toast + redirect al portal; mobile: banner inline). Si
@@ -231,28 +242,26 @@ export function CheckoutResumen({
             ) : (
               <div className="text-sm text-muted-foreground">Sin fechas seleccionadas</div>
             )}
-          </div>
 
-          {items.length > 0 && (
-            <div className="rounded-lg border hairline bg-surface p-3">
-              <div className="mb-1.5 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
-                Tu pedido
+            {/* Detalle del retiro — dónde y en qué horario, en la misma tarjeta
+              de fechas (no una tarjeta aparte): el pedido en sí ya se ve
+              completo un paso atrás, en el carrito. */}
+            <div className="mt-2 space-y-0.5 border-t hairline pt-2 text-xs text-muted-foreground">
+              <div>
+                Retirás en {CONTACT.address.line2 || CONTACT.address.city}
+                {" — "}
+                <a
+                  href={CONTACT.address.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-ink"
+                >
+                  ver mapa
+                </a>
               </div>
-              <ul className="space-y-1">
-                {items.map((it) => (
-                  <li key={it.id} className="flex items-baseline justify-between gap-3 text-sm">
-                    <span className="min-w-0 truncate">
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {it.cantidad}×{" "}
-                      </span>
-                      {it.marca && <span className="text-muted-foreground">{it.marca} </span>}
-                      {it.nombre}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div>{CONTACT.hours.map((h) => `${h.days} ${h.hours}`).join(" · ")}</div>
             </div>
-          )}
+          </div>
 
           <div className="space-y-2 rounded-lg border hairline bg-surface p-3">
             <div className="flex items-center justify-between text-sm">
@@ -294,6 +303,52 @@ export function CheckoutResumen({
               <div className="text-sm font-semibold text-ink">{clienteNombre}</div>
             </div>
           )}
+
+          {perfilImpuestos && (
+            <div className="rounded-lg border hairline bg-surface p-3">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+                  Facturación
+                </span>
+                <a
+                  href="/cliente/portal?tab=perfil"
+                  className="shrink-0 text-2xs text-muted-foreground underline underline-offset-2 hover:text-ink"
+                >
+                  Modificar
+                </a>
+              </div>
+              <div className="text-sm font-semibold text-ink">
+                {PERFIL_IMPUESTOS_LABEL[perfilImpuestos]}
+                {razonSocial && (
+                  <span className="font-normal text-muted-foreground"> · {razonSocial}</span>
+                )}
+              </div>
+              {cuit && <div className="mt-0.5 text-xs text-muted-foreground">CUIT {cuit}</div>}
+            </div>
+          )}
+
+          {/* Disclaimer de responsabilidad/seguro — tiene que leerse, no pasar
+            desapercibido como texto chico: un ítem más del resumen, con el
+            rojo suave del DS (mismo token que los alerts de error) para que
+            llame la atención sin gritar tanto como un error real. */}
+          <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <p className="text-xs leading-relaxed text-destructive">
+              A partir del retiro, sos responsable por daños evitables, pérdida o robo del equipo —
+              te recomendamos contratar un seguro propio para tus producciones. Encontrás el Detalle
+              de seguro en la sección de documentos de tu perfil apenas hacés el pedido (es
+              provisorio hasta que lo confirmemos). Al confirmar aceptás nuestros{" "}
+              <a
+                href="/terminos"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-ink"
+              >
+                Términos y Condiciones
+              </a>
+              .
+            </p>
+          </div>
 
           {cargando && (
             <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
@@ -383,23 +438,6 @@ export function CheckoutResumen({
             </span>
           )}
         </Button>
-        {puedeConfirmar && (
-          <p className="mt-3 text-center text-xs leading-relaxed text-muted-foreground">
-            A partir del retiro, sos responsable por daños evitables, pérdida o robo del equipo — te
-            recomendamos contratar un seguro propio para tus producciones. Encontrás el Certificado
-            de seguro en la sección de documentos de tu perfil apenas hacés el pedido (es provisorio
-            hasta que lo confirmemos). Al confirmar aceptás nuestros{" "}
-            <a
-              href="/terminos"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-ink"
-            >
-              Términos y Condiciones
-            </a>
-            .
-          </p>
-        )}
       </div>
     </div>
   );

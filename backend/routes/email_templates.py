@@ -47,7 +47,7 @@ _PREVIEW_CONTEXT: dict[str, Any] = {
     # Sample para que el preview muestre la nota del admin y la lista de
     # adjuntos cuando el mail se manda desde el modal de envío al cliente.
     "mensaje_admin": "¡Gracias por elegirnos! Te esperamos el jueves a las 10.",
-    "docs_adjuntos": ["Contrato", "Cotización", "Certificado de seguro"],
+    "docs_adjuntos": ["Contrato", "Remito", "Detalle de seguro"],
     "notas": "Necesito un trípode extra.",
     "items_html": _PREVIEW_ITEMS_HTML,
     "items_text": "- Sony FX3 × 1\n- RØDE NTG × 2",

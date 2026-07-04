@@ -217,6 +217,7 @@ export type DocumentosDisponibles = {
   remito: boolean;
   contrato: boolean;
   albaran: boolean;
+  "packing-list": boolean;
 };
 
 export type DocumentoTipo = keyof DocumentosDisponibles;
@@ -224,13 +225,15 @@ export type DocumentoTipo = keyof DocumentosDisponibles;
 export const DOCUMENTO_LABEL: Record<DocumentoTipo, string> = {
   remito: "Remito",
   contrato: "Contrato",
-  albaran: "Certificado de seguro",
+  albaran: "Detalle de seguro",
+  "packing-list": "Checklist de retiro",
 };
 
 export const DOCUMENTO_HINT: Record<DocumentoTipo, string> = {
   remito: "Disponible apenas se solicita el pedido",
   contrato: "Disponible apenas se solicita el pedido",
   albaran: "Disponible apenas se solicita el pedido",
+  "packing-list": "Disponible apenas se solicita el pedido",
 };
 
 export async function getOrder(id: string) {
@@ -244,6 +247,7 @@ export async function getOrder(id: string) {
       remito: !!docs.remito,
       contrato: !!docs.contrato,
       albaran: !!docs.albaran,
+      "packing-list": !!docs["packing-list"],
     } as DocumentosDisponibles,
   };
 }

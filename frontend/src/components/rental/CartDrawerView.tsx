@@ -27,6 +27,7 @@ import { GuardarComoListaButton } from "./GuardarComoListaButton";
 import { CompartirComposicionButton } from "./CompartirComposicionButton";
 import { RentalDateModal } from "./RentalDateModal";
 import { CheckoutResumen } from "./CheckoutResumen";
+import type { PerfilImpuestos } from "@/lib/iva";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,8 +39,17 @@ import {
   AlertDialogTitle,
 } from "@/design-system/ui/alert-dialog";
 
-/** Forma mínima de la sesión del cliente que usa el panel (nombre + presencia). */
-type ClienteSessionLike = { nombre?: string | null } | null | undefined;
+/** Forma mínima de la sesión del cliente que usa el panel: nombre + presencia +
+ *  perfil fiscal (para la tarjeta "Facturación" del resumen). */
+type ClienteSessionLike =
+  | {
+      nombre?: string | null;
+      perfil_impuestos?: PerfilImpuestos | null;
+      cuit?: string | null;
+      razon_social?: string | null;
+    }
+  | null
+  | undefined;
 
 /**
  * CartDrawerView — el SHELL presentacional del drawer del carrito (checkout).
@@ -283,6 +293,9 @@ export function CartDrawerView({
                 totalNeto={totalNeto}
                 conIva={conIva}
                 clienteNombre={clienteSession?.nombre}
+                perfilImpuestos={clienteSession?.perfil_impuestos}
+                cuit={clienteSession?.cuit}
+                razonSocial={clienteSession?.razon_social}
                 onBack={onVolverAlCarrito}
                 onCrearPedido={onCrearPedido}
               />

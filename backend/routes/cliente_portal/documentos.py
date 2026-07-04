@@ -1,6 +1,7 @@
 """Documentos PDF del cliente (#501 — extraído del god-module `routes/cliente_portal.py`).
 
-Remito / contrato / albarán del pedido del cliente (preview HTML embebible + PDF).
+Remito / contrato / detalle de seguro / checklist de retiro del pedido del cliente
+(preview HTML embebible + PDF).
 Registra sus rutas en el router compartido del paquete `routes.cliente_portal`.
 Los helpers/constantes compartidos (`require_cliente`, `_proyectar`,
 `_documentos_disponibles`, `_ITEM_CAMPOS_DOC`, `_COMP_CAMPOS_DOC`) viven en `core`.
@@ -10,7 +11,10 @@ from fastapi.responses import Response
 
 from database import get_db, row_to_dict
 from identity import direccion_validada, nombre_validado
-from pdf import _pedido_html, _albaran_html, _contrato_html, _render_pdf, _pedido_filename
+from pdf import (
+    _pedido_html, _albaran_html, _contrato_html, _packing_list_html,
+    _render_pdf, _pedido_filename,
+)
 from routes.cliente_portal.core import (
     router, require_cliente, _proyectar, _documentos_disponibles,
     _ITEM_CAMPOS_DOC, _COMP_CAMPOS_DOC,
@@ -150,14 +154,30 @@ async def cliente_pedido_contrato(id: int, request: Request, format: str = "pdf"
 @router.get("/api/cliente/pedidos/{id}/albaran.pdf")
 @router.get("/api/cliente/pedidos/{id}/albaran")
 async def cliente_pedido_albaran(id: int, request: Request, format: str = "pdf"):
-    """Albarán del pedido. format=pdf (default) o html (preview)."""
+    """Detalle de seguro del pedido. format=pdf (default) o html (preview)."""
     session = require_cliente(request)
     with get_db() as conn:
         pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
     if not _documentos_disponibles(pedido.get("estado", ""))["albaran"]:
-        raise HTTPException(403, "El certificado de seguro no está disponible para este pedido.")
+        raise HTTPException(403, "El detalle de seguro no está disponible para este pedido.")
     return await _doc_response_or_pdf(
         _albaran_html(pedido), _pedido_filename(pedido, doc="albaran"), format
+    )
+
+
+@router.get("/api/cliente/pedidos/{id}/packing-list.pdf")
+@router.get("/api/cliente/pedidos/{id}/packing-list")
+async def cliente_pedido_packing_list(id: int, request: Request, format: str = "pdf"):
+    """Checklist de retiro del pedido. format=pdf (default) o html (preview)."""
+    session = require_cliente(request)
+    with get_db() as conn:
+        pedido = _load_pedido_para_pdf(conn, id, session["cliente_id"])
+        from routes.alquileres.documentos import _agrupar_items_por_categoria
+        pedido["grupos"] = _agrupar_items_por_categoria(conn, pedido["items"])
+    if not _documentos_disponibles(pedido.get("estado", ""))["packing-list"]:
+        raise HTTPException(403, "El checklist de retiro no está disponible para este pedido.")
+    return await _doc_response_or_pdf(
+        _packing_list_html(pedido), _pedido_filename(pedido, doc="packing-list"), format
     )
 
 

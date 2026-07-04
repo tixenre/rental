@@ -49,9 +49,9 @@ export const DOCS_PEDIDO: {
   Icon: LucideIcon;
 }[] = [
   { kind: "contrato", label: "Contrato", Icon: FileSignature },
-  { kind: "pdf", label: "Presupuesto", Icon: FileText },
-  { kind: "albaran", label: "Certificado de seguro", Icon: Truck },
-  { kind: "packing-list", label: "Packing List", Icon: ClipboardList },
+  { kind: "pdf", label: "Remito", Icon: FileText },
+  { kind: "albaran", label: "Detalle de seguro", Icon: Truck },
+  { kind: "packing-list", label: "Checklist de retiro", Icon: ClipboardList },
 ];
 
 export function EnviarDocsDialog({
