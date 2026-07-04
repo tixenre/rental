@@ -75,14 +75,6 @@ export function LiquidacionReporte() {
   });
   const recon = reconQ.data;
 
-  // El mismo HTML que se manda por mail (misma queryKey que `EnviarReporteDialog`
-  // para compartir caché) — 2026-07-04: vive siempre visible en la página, no
-  // solo detrás del diálogo de "Enviar por mail".
-  const reporteQ = useQuery({
-    queryKey: ["admin", "reporte-preview", mesDesde, mesHasta],
-    queryFn: () => adminApi.liquidacionPreviewHtml(mesDesde, mesHasta),
-  });
-
   // Cierre del mes (#721). `mesKey` = el mes que se está viendo ('YYYY-MM').
   const mesKey = `${y}-${pad(m + 1)}`;
   const cerrado = mes?.cerrado === true;
@@ -383,27 +375,6 @@ export function LiquidacionReporte() {
           )}
         </div>
       </div>
-
-      <Section
-        title="Reporte del mes"
-        subtitle="El mismo documento que se manda por mail — así lo que ves es exactamente lo que se envía."
-      >
-        {reporteQ.isLoading ? (
-          <div className="p-8 text-sm text-muted-foreground text-center">Generando reporte…</div>
-        ) : reporteQ.error ? (
-          <div className="p-8 text-sm text-destructive text-center">
-            No se pudo generar el reporte.
-          </div>
-        ) : (
-          <div className="rounded-md border hairline overflow-hidden bg-white">
-            <iframe
-              title="Reporte de liquidación"
-              srcDoc={reporteQ.data ?? ""}
-              className="w-full h-[40rem] border-0"
-            />
-          </div>
-        )}
-      </Section>
     </div>
   );
 }

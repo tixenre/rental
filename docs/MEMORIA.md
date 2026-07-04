@@ -927,20 +927,25 @@ calcular_total` sigue siendo el motor de TOTALES (IVA/combos), solo importa la d
 supervisor marca lógica de "quién gana el descuento" reimplementada fuera de `descuentos/queries/decision.py`.
 Cómo → `backend/descuentos/CLAUDE.md`; tracking → issue #1219.
 
-### 2026-07-04 — Liquidación: el reporte que se manda por mail vive también en la vista + detalle de pedidos por dueño
+### 2026-07-04 — Liquidación: los segmentos del export viven NATIVOS en la web (no un iframe) + detalle de pedidos por dueño
 
-A pedido del dueño ("que lo que se manda sea lo mismo que se ve"): la pantalla `/admin/contabilidad/liquidacion`
-embebe ahora el mismo HTML que se manda por mail (`adminApi.liquidacionPreviewHtml`, mismo `queryKey` que el
-diálogo "Enviar por mail" para compartir caché) en una sección "Reporte del mes" **siempre visible**, no solo
-detrás del diálogo — no puede divergir porque es literalmente el mismo documento. Además, `backend/reportes/
+A pedido del dueño: el contenido del reporte que se manda por mail/PDF (`pdf.py::_liquidacion_html`) tiene que
+poder verse en la web **como componentes nativos del DS**, no como un documento embebido — primer intento
+(iframe con `srcDoc` del HTML branded) **descartado explícitamente por el dueño**: "quiero que eso que pusiste
+sea el export, en la web que aparezcan los segmentos nativamente". `/admin/contabilidad/liquidacion` ya tenía
+la mayoría de esos segmentos como componentes nativos (`Kpi` para "A cobrar por beneficiario", `Section` para
+"Detalle por dueño") — **no se agregó ningún iframe**; el export/PDF sigue siendo el documento que se manda
+por mail (vía `EnviarReporteDialog`, que sí muestra su propio preview del adjunto — eso es legítimo: previsualiza
+el archivo real antes de enviarlo, no una vista permanente de página). Además, `backend/reportes/
 liquidacion.py::agregar`/`combinar_meses` agregan **`pedidos_detalle`** por dueño (# de pedido, cliente, fecha
-de saldado, monto que ESE pedido aportó a ESE dueño) — **además** de `equipos` (no en su lugar), en ambos
-lugares: el "Resumen por dueño" de la vista web y la tabla "Pedidos" del PDF/mail (`pdf.py::_liquidacion_html`).
-Un pedido con equipos de 2 dueños distintos aporta un monto DISTINTO a cada uno en su propio `pedidos_detalle`.
-Campo **opcional** en el tipo (`LiquidacionDueno.pedidos_detalle?`) — las fotos de meses ya cerrados antes de
-este cambio no lo tienen (JSON congelado), cae a lista vacía sin romper. El supervisor marca un consumidor
-nuevo de `por_dueno` que reimplemente el detalle de pedidos en vez de leer `pedidos_detalle`, o el reporte
-embebido divergiendo del `_liquidacion_html` real (dos fuentes de la misma "Detalle por dueño").
+de saldado, monto que ESE pedido aportó a ESE dueño) — **además** de `equipos` (no en su lugar), como un
+`RankList` nativo más en la misma `Section` de "Resumen por dueño", y también en la tabla "Pedidos" del
+PDF/mail (misma fuente de datos, `_liquidacion_html`, presentaciones distintas). Un pedido con equipos de 2
+dueños distintos aporta un monto DISTINTO a cada uno en su propio `pedidos_detalle`. Campo **opcional** en el
+tipo (`LiquidacionDueno.pedidos_detalle?`) — las fotos de meses ya cerrados antes de este cambio no lo tienen
+(JSON congelado), cae a lista vacía sin romper. El supervisor marca: un consumidor nuevo de `por_dueno` que
+reimplemente el detalle de pedidos en vez de leer `pedidos_detalle`, o un iframe/embed de `_liquidacion_html`
+reintroducido en una pantalla que no sea el preview de "Enviar por mail".
 
 ---
 

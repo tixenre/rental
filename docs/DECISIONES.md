@@ -2835,7 +2835,7 @@ cancel-in-progress` ya cancela corridas viejas.
   edición de cliente fallaba en runtime) — pusheado directo a `dev` (commit `5eb5e18`), con test de
   regresión.
 
-### 2026-07-04 — Liquidación: el reporte que se manda por mail vive también en la vista + detalle de pedidos por dueño
+### 2026-07-04 — Liquidación: los segmentos del export viven NATIVOS en la web (no un iframe) + detalle de pedidos por dueño
 
 - **Contexto.** El dueño, mirando la pantalla `/admin/contabilidad/liquidacion` (Junio de 2026, mes ya
   cerrado), pidió dos cosas: (1) "viste que hacemos un reporte y lo mandamos por mail, ¿podemos tenerlo en
@@ -2879,3 +2879,14 @@ cancel-in-progress` ya cancela corridas viejas.
   Suite completa (2775 unit + toda la integración salvo `test_catalogo_motor_shape.py`, que ya fallaba igual
   sin este cambio por depender de datos reales de catálogo ausentes en una DB de test vacía) verde. `tsc`/
   `eslint`/`prettier`/`ruff` limpios.
+- **Corrección — el iframe se descartó, mismo día.** El primer intento del punto (1) (ver bullet "Decisión —
+  reporte embebido" arriba) fue literal: un iframe con `srcDoc` del HTML branded de `_liquidacion_html`,
+  siempre visible en una sección "Reporte del mes". El dueño lo vio en staging y corrigió: "embebiste el
+  reporte, yo quiero que eso que pusiste sea el export, en la web que aparezcan los segmentos nativamente" —
+  la lectura correcta de "que viva en la web" era que el CONTENIDO (los segmentos: beneficiarios, detalle por
+  dueño con equipos+pedidos) esté disponible como componentes nativos del DS, no que el documento de
+  exportación se incruste como un iframe ajeno dentro de la SPA. Se sacó la sección "Reporte del mes" y la
+  query `reporteQ` — el resto (KPIs de beneficiarios, `Section` de "Resumen por dueño" con `RankList` de
+  equipos + pedidos) YA cumplía el pedido nativamente, sin cambios adicionales. El preview de
+  `EnviarReporteDialog` (el iframe que sí queda) es un caso distinto y correcto: previsualiza el adjunto real
+  antes de mandarlo, no una vista permanente de página.
