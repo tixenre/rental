@@ -947,6 +947,20 @@ tipo (`LiquidacionDueno.pedidos_detalle?`) — las fotos de meses ya cerrados an
 reimplemente el detalle de pedidos en vez de leer `pedidos_detalle`, o un iframe/embed de `_liquidacion_html`
 reintroducido en una pantalla que no sea el preview de "Enviar por mail".
 
+### 2026-07-04 — `reconciliacion.py::_pedidos_para_desglose` daba falsos positivos con descuento de cliente
+
+El chequeo `desglose_divergente` (2026-07-02) recalculaba el desglose con `finanzas_flujo.pedido.
+desglose_de_pedido` pero su propia query (`_pedidos_para_desglose`) no traía `descuento_cliente_pct`/
+`descuento_manual_tipo`/`descuento_manual_monto` de `alquileres` ni `equipos.tipo` en el join de ítems —
+`desglose_de_pedido` los recomputaba con 0/None, así que **cualquier pedido cuyo único descuento fuera el
+del CLIENTE** (el caso más común) se marcaba divergente aunque `monto_total` estuviera perfectamente
+calculado. Encontrado en staging (pedido real #393, 25% descuento de cliente). Fix: sumar esas 3 columnas
+al SELECT de pedidos + `LEFT JOIN equipos` para `equipo_tipo` en el de ítems. El supervisor marca cualquier
+recompute de desglose para reconciliación/auditoría que arme el dict del pedido con un SELECT parcial en
+vez de todas las columnas que `desglose_de_pedido`/`calcular_total` necesitan. Regresión:
+`test_reconciliacion_no_marca_falso_positivo_con_descuento_de_cliente` (Postgres real; confirmado que
+falla contra el código viejo).
+
 ---
 
 ## Preferencias (cómo quiero que se hagan las cosas)

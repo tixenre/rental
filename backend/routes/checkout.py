@@ -15,8 +15,6 @@ POST /api/checkout/contrato-preview
 Ver `docs/SISTEMA_CHECKOUT.md` para el flujo completo y el contrato de respuesta.
 """
 
-import datetime
-import json
 import logging
 import uuid as _uuid
 
@@ -25,17 +23,51 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from auth.stepup import has_recent_stepup
-from database import get_db, row_to_dict, MARCA_SUBQUERY
-from identity import nombre_validado, direccion_validada
-from identity.contacts import email_comunicacion, telefono_contacto
+from database import get_db, now_ar, row_to_dict, MARCA_SUBQUERY
 from pdf import _contrato_html
 from routes.cliente_portal import require_cliente
+from services.carrito import desde_items_json
 from services.checkout import registrar_aceptacion, validar_checkout
 from services.checkout.validar import _leer_carrito
 from services.contenido import contenido_de_batch
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["checkout"])
+
+# Datos de muestra para el preview del contrato (`checkout_contrato_preview`):
+# es una SIMULACIÓN que queda en el DOM del browser del cliente — no hace
+# falta (ni conviene) exponer su nombre/dirección/contacto/CUIT reales ahí.
+# El único dato real del cliente es el perfil fiscal (decide si aparece el
+# bloque de Responsable Inscripto — no es dato personal sensible).
+_CLIENTE_DE_MUESTRA = {
+    "cliente_nombre": "Juan Pérez",
+    "cliente_direccion": "Av. Colón 1234, Mar del Plata",
+    "cliente_telefono": "223 555-0100",
+    "cliente_email": "cliente@ejemplo.com",
+    "cliente_cuit": "20-12345678-9",
+    "cliente_razon_social": "Empresa de Ejemplo S.R.L.",
+}
+
+# Mismo criterio para el Locador: es todo de mentira de punta a punta, así
+# que los datos institucionales reales de Rambla (`OWNER_*` en pdf_templates)
+# tampoco hace falta mostrarlos en la simulación — `_contrato_html(...,
+# locador_override=...)` los reemplaza en el bloque de datos, la firma y la
+# cláusula de Jurisdicción (único lugar donde el domicilio real quedaba
+# horneado aparte).
+_LOCADOR_DE_MUESTRA = {
+    "nombre": "Rambla Rental de Muestra S.R.L.",
+    "cuil": "30-12345678-9",
+    "direccion": "Av. de Muestra 100, Mar del Plata",
+    "telefono": "223 555-0200",
+    "email": "contacto@ejemplo.com",
+}
+
+
+def _serie_y_valor_de_muestra(idx: int) -> tuple[str, int]:
+    """Serie + valor de reposición ficticios para el preview del contrato —
+    mismo criterio que `_CLIENTE_DE_MUESTRA`: no hace falta mostrar el
+    inventario real (números de serie, valores) en una simulación."""
+    return f"EJEMPLO-{idx:04d}", 100_000
 
 
 class CheckoutValidarIn(BaseModel):
@@ -145,11 +177,13 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
             if carrito is None:
                 raise HTTPException(404, "No encontramos tu carrito.")
 
-            raw_json = carrito.get("items_json") or []
-            if isinstance(raw_json, str):
-                raw_json = json.loads(raw_json)
+            # `desde_items_json` (services/carrito, fuente única) resuelve la
+            # ambigüedad lista-ya-deserializada vs. string JSON — mismo patrón
+            # usado en carritos.py/compartir.py/listas.py, no reimplementado acá.
             cantidad_por_id = {
-                r["equipo_id"]: r["cantidad"] for r in raw_json if r.get("equipo_id")
+                int(it["equipo_id"]): int(it["cantidad"])
+                for it in desde_items_json(carrito.get("items_json"))
+                if it.get("equipo_id")
             }
             eq_ids = list(cantidad_por_id.keys())
             if not eq_ids:
@@ -159,44 +193,59 @@ def checkout_contrato_preview(data: ContratoPreviewIn, request: Request):
             rows = conn.execute(
                 f"""SELECT id AS equipo_id, nombre, {MARCA_SUBQUERY}, modelo, serie,
                            valor_reposicion, nombre_publico, nombre_publico_largo
-                    FROM equipos e WHERE id IN ({ph})""",
+                    FROM equipos e
+                    WHERE id IN ({ph}) AND eliminado_at IS NULL""",
                 tuple(eq_ids),
             ).fetchall()
             componentes = contenido_de_batch(conn, eq_ids)
             items = []
-            for r in rows:
+            for idx, r in enumerate(rows, start=1):
                 eq = row_to_dict(r)
                 eq["cantidad"] = cantidad_por_id.get(eq["equipo_id"], 1)
-                eq["componentes"] = componentes.get(eq["equipo_id"], [])
+                eq["serie"], eq["valor_reposicion"] = _serie_y_valor_de_muestra(idx)
+                eq["componentes"] = [
+                    {**comp, **dict(zip(("serie", "valor_reposicion"), _serie_y_valor_de_muestra(j)))}
+                    for j, comp in enumerate(componentes.get(eq["equipo_id"], []), start=idx * 100)
+                ]
                 items.append(eq)
 
+            # Solo se necesita el perfil fiscal (decide si el bloque de
+            # Responsable Inscripto aparece en el documento) — el resto de
+            # los datos del cliente van con placeholders (ver abajo).
             cli = conn.execute(
-                """SELECT nombre, apellido, direccion, cuit, perfil_impuestos,
-                          razon_social, nombre_renaper, apellido_renaper,
-                          direccion_renaper
-                   FROM clientes WHERE id = %s""",
-                (cliente_id,),
+                "SELECT perfil_impuestos FROM clientes WHERE id = %s", (cliente_id,),
             ).fetchone()
-            c = row_to_dict(cli) if cli else {}
+            perfil_impuestos = row_to_dict(cli).get("perfil_impuestos") if cli else None
 
             pedido = {
                 "id": "preview",
                 "estado": "presupuesto",
                 "fecha_desde": carrito.get("fecha_desde"),
                 "fecha_hasta": carrito.get("fecha_hasta"),
-                "emitido": datetime.datetime.now(),
+                "emitido": now_ar(),
                 "items": items,
-                "cliente_nombre": nombre_validado(c)
-                or f"{c.get('nombre', '')} {c.get('apellido', '')}".strip(),
-                "cliente_email": email_comunicacion(conn, cliente_id),
-                "cliente_telefono": telefono_contacto(conn, cliente_id),
-                "cliente_direccion": direccion_validada(c) or c.get("direccion"),
-                "cliente_cuit": c.get("cuit"),
-                "cliente_perfil_impuestos": c.get("perfil_impuestos"),
-                "cliente_razon_social": c.get("razon_social"),
+                # Datos del cliente ficticios a propósito: es una SIMULACIÓN
+                # de muestra, no hace falta (ni conviene) exponer el nombre/
+                # dirección/contacto/CUIT reales del cliente logueado en un
+                # documento "no válido" que queda en el DOM del browser. Lo
+                # único real es el perfil fiscal (decide si aparece el bloque
+                # de Responsable Inscripto, no es dato personal sensible).
+                **_CLIENTE_DE_MUESTRA,
+                "cliente_perfil_impuestos": perfil_impuestos,
             }
 
-            html_str = _marcar_como_simulacion(_contrato_html(pedido))
+            # mostrar_locador=True (default): con las dos partes ya con datos
+            # de muestra, mostrar ambas hace que el preview se lea como el
+            # contrato real completo. locador_override=_LOCADOR_DE_MUESTRA:
+            # los datos institucionales de Rambla tampoco son necesarios en
+            # una simulación — mismo criterio que el Locatario.
+            # fonts_ligeras=True: esto lo pinta el browser real del cliente
+            # (no Playwright) — sin esto, el iframe tardaba 10s+ en parsear
+            # ~1.2MB de fuentes de marca embebidas en base64 (ver
+            # docs/SISTEMA_CHECKOUT.md).
+            html_str = _marcar_como_simulacion(
+                _contrato_html(pedido, fonts_ligeras=True, locador_override=_LOCADOR_DE_MUESTRA)
+            )
     except HTTPException:
         raise
     except Exception:

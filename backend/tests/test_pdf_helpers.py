@@ -200,3 +200,126 @@ class TestAbsImageUrl:
     def test_relativa_sin_base_devuelve_vacio(self, monkeypatch):
         monkeypatch.delenv("FRONTEND_BASE_URL", raising=False)
         assert _abs_image_url("/uploads/foo.jpg") == ""
+
+
+class TestContratoHtmlMostrarLocador:
+    """`_contrato_html(pedido, mostrar_locador=False)` — usado por el preview
+    del checkout (`routes/checkout.py::checkout_contrato_preview`): al
+    cliente le importa leer las cláusulas, no los datos institucionales de
+    Rambla (fijos, no cambian por pedido). Default `True` no cambia — el
+    contrato REAL (de un pedido ya creado) los sigue mostrando siempre."""
+
+    def _pedido(self):
+        return {
+            "id": "preview",
+            "estado": "presupuesto",
+            "fecha_desde": "2026-07-10",
+            "fecha_hasta": "2026-07-12",
+            "emitido": None,
+            "items": [
+                {
+                    "nombre": "Cámara test",
+                    "cantidad": 1,
+                    "serie": "ABC123",
+                    "valor_reposicion": 100000,
+                    "componentes": [],
+                }
+            ],
+            "cliente_nombre": "Ana Gómez",
+            "cliente_email": "ana@test.com",
+            "cliente_telefono": "2235551234",
+            "cliente_direccion": "Calle Falsa 123",
+            "cliente_cuit": None,
+            "cliente_perfil_impuestos": "consumidor_final",
+            "cliente_razon_social": None,
+        }
+
+    def test_default_muestra_locador(self):
+        from pdf_templates import OWNER_CUIL, OWNER_NOMBRE, _contrato_html
+
+        html_str = _contrato_html(self._pedido())
+        assert OWNER_NOMBRE in html_str
+        assert OWNER_CUIL in html_str
+        assert "Firma Locador" in html_str
+
+    def test_mostrar_locador_false_omite_datos_institucionales(self):
+        from pdf_templates import OWNER_CUIL, OWNER_NOMBRE, _contrato_html
+
+        html_str = _contrato_html(self._pedido(), mostrar_locador=False)
+        assert OWNER_NOMBRE not in html_str
+        assert OWNER_CUIL not in html_str
+        assert "Firma Locador" not in html_str
+        # Lo que sí importa sigue: cláusulas, equipo, locatario.
+        assert "Primero" in html_str
+        assert "Cámara test" in html_str
+        assert "Ana Gómez" in html_str
+
+    def test_fonts_ligeras_saca_las_fuentes_embebidas(self):
+        """`fonts_ligeras=True` (el preview del checkout, pintado por el browser
+        real del cliente — no por Playwright) saca el @font-face en base64
+        (~1.2MB, causaba 10s+ para pintar el iframe) y el link a Google Fonts.
+        El contenido (cláusulas/equipo/cliente) tiene que seguir intacto."""
+        from pdf_templates import _contrato_html
+
+        pesado = _contrato_html(self._pedido(), mostrar_locador=False)
+        liviano = _contrato_html(self._pedido(), mostrar_locador=False, fonts_ligeras=True)
+
+        assert "@font-face" not in liviano
+        assert "fonts.googleapis.com" not in liviano
+        assert "@font-face" in pesado  # default sigue embebiendo (Playwright/PDF real)
+        assert len(liviano) < len(pesado) / 10  # reducción drástica, no cosmética
+
+        for esperado in ("Primero", "Cámara test", "Ana Gómez"):
+            assert esperado in liviano
+
+    def test_fonts_ligeras_saca_tambien_el_wordmark_svg(self):
+        """`fonts_ligeras=True` es "documento de muestra nomás" — sin el isologo
+        SVG (ni la lectura a `app_settings.wordmark_svg` que eso implica).
+        Cae a texto plano "Rambla"."""
+        from pdf_templates import _contrato_html
+
+        liviano = _contrato_html(self._pedido(), mostrar_locador=False, fonts_ligeras=True)
+        pesado = _contrato_html(self._pedido(), mostrar_locador=False)
+
+        assert "<svg" not in liviano
+        assert "<svg" in pesado
+
+    def test_fonts_ligeras_default_no_cambia_el_pdf_real(self):
+        """El contrato REAL (de un pedido ya creado, generado por Playwright vía
+        `_render_pdf`) sigue embebiendo las fuentes siempre — default `False`."""
+        from pdf_templates import _contrato_html
+
+        html_str = _contrato_html(self._pedido())
+        assert "@font-face" in html_str
+        assert "fonts.googleapis.com" in html_str
+
+    def test_locador_override_reemplaza_datos_reales(self):
+        """`locador_override` (usado por el preview del checkout) reemplaza los
+        `OWNER_*` reales en el bloque de datos, la firma Y la cláusula de
+        Jurisdicción (que hornea el domicilio real aparte, en `_CLAUSULAS`)."""
+        from pdf_templates import OWNER_CUIL, OWNER_DIRECCION, OWNER_NOMBRE, _contrato_html
+
+        override = {
+            "nombre": "Locador de Muestra S.R.L.",
+            "cuil": "30-00000000-0",
+            "direccion": "Calle Falsa 123, Muestra",
+            "telefono": "223 000-0000",
+            "email": "muestra@ejemplo.com",
+        }
+        html_str = _contrato_html(self._pedido(), locador_override=override)
+
+        assert OWNER_NOMBRE not in html_str
+        assert OWNER_CUIL not in html_str
+        assert OWNER_DIRECCION not in html_str  # incluye la cláusula de Jurisdicción
+        assert override["nombre"] in html_str
+        assert override["cuil"] in html_str
+        assert override["direccion"] in html_str
+        assert "Firma Locador" in html_str  # el bloque se sigue mostrando, con datos falsos
+
+    def test_locador_override_none_no_cambia_el_contrato_real(self):
+        """Sin override (default `None`), el contrato REAL sigue mostrando los
+        datos institucionales reales — no hay regresión para el documento válido."""
+        from pdf_templates import OWNER_NOMBRE, _contrato_html
+
+        html_str = _contrato_html(self._pedido(), locador_override=None)
+        assert OWNER_NOMBRE in html_str

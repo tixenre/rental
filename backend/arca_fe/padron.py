@@ -78,8 +78,6 @@ _TIMEOUT_SECONDS = 20.0  # default de `PadronClient.timeout` — configurable po
 
 _log = logging.getLogger(__name__)
 
-_log = logging.getLogger(__name__)
-
 # idImpuesto en datosRegimenGeneral.impuesto (padrón A5) — verificado contra
 # pyafipws (referencia de facto del ecosistema): 30 = IVA Responsable
 # Inscripto, 32 = IVA Exento. Ojo: el código viejo tenía esto AL REVÉS

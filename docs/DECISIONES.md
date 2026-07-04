@@ -2890,3 +2890,41 @@ cancel-in-progress` ya cancela corridas viejas.
   equipos + pedidos) YA cumplía el pedido nativamente, sin cambios adicionales. El preview de
   `EnviarReporteDialog` (el iframe que sí queda) es un caso distinto y correcto: previsualiza el adjunto real
   antes de mandarlo, no una vista permanente de página.
+
+### 2026-07-04 — `reconciliacion.py::_pedidos_para_desglose` daba falsos positivos con descuento de cliente
+
+- **Contexto.** Mientras se verificaba en staging que el fix de Estadísticas/Liquidación de esta sesión
+  estaba andando, apareció una discrepancia enorme en `/admin/contabilidad/liquidacion` para Junio 2026:
+  la foto congelada del 3 de julio mostraba $1.625.484/12 pedidos, pero el cálculo en vivo (el mes ya no
+  figuraba cerrado) daba $65.200/1 pedido. Investigado con `staging-login` (secreto provisto por el
+  dueño en el chat) contra la Liquidación real, los pedidos reales de junio y la reconciliación —
+  confirmado que **no era un bug de esta sesión**: de 6 pedidos con `fecha_desde` en junio, solo 1 (#395)
+  está pagado al 100% hoy; los otros 11 pedidos de la foto vieja ya no están en esa forma en la base
+  (lectura más probable: eran datos de prueba de alguna auditoría, limpiados después — convención del
+  repo, no un incidente).
+- **Hallazgo colateral real.** Al revisar la reconciliación de paso, apareció `desglose_divergente` con
+  el pedido #393 (25% de descuento de CLIENTE, sin descuento de jornadas ni manual). Investigado:
+  `GET /api/alquileres/393` (que sí arma el dict completo del pedido) daba `monto_neto == monto_total`
+  perfecto — pero `reconciliar()` lo marcaba divergente. La causa: `_pedidos_para_desglose` arma un dict
+  de pedido PARCIAL para pasarle a `finanzas_flujo.pedido.desglose_de_pedido` — le faltaban
+  `descuento_cliente_pct`, `descuento_manual_tipo`, `descuento_manual_monto` (columnas de `alquileres`) y
+  `equipo_tipo` en el join de ítems (para `es_combo`). `desglose_de_pedido` no explota con esas claves
+  ausentes — usa `.get(...)` con default 0/None — así que silenciosamente recalculaba SIN el descuento de
+  cliente, obtenía el BRUTO, y lo comparaba contra el `monto_total` (que sí tiene el descuento aplicado)
+  → falso positivo en cualquier pedido cuyo único descuento fuera el del cliente, que es el caso más común
+  del sistema.
+- **Por qué no lo cazó el test existente.** `test_reconciliacion_caza_desglose_divergente_del_pedido`
+  (2026-07-02) usa un pedido con TODOS los descuentos en 0% — un verdadero positivo (drift real de
+  `monto_total`) se ve idéntico a este falso positivo cuando ninguno de los campos faltantes importa.
+  Ningún test cubría el caso "el pedido usa legítimamente descuento de cliente Y está bien calculado".
+- **Fix.** `_pedidos_para_desglose` suma las 3 columnas faltantes al SELECT de `alquileres` y hace
+  `LEFT JOIN equipos e ON e.id = pi.equipo_id` con `e.tipo AS equipo_tipo` en el de `alquiler_items` —
+  mismo patrón ya usado en `routes/alquileres/core.py::_get_alquiler_items`. Cero cambio en
+  `desglose_de_pedido` (sigue siendo la fuente única del cálculo); el bug era 100% del lado de qué
+  columnas se le pasaban.
+- **Consecuencias.** Regresión nueva `test_reconciliacion_no_marca_falso_positivo_con_descuento_de_cliente`
+  (Postgres real; confirmado que falla contra el código viejo, reproduce el 25%/$50.000→$37.500 real).
+  Suite completa (2780 unit + integración de reportes/liquidación/cierres) verde. El supervisor marca
+  cualquier recompute de plata para auditoría/reconciliación que arme el dict del pedido con un SELECT
+  parcial en vez de pasar por el mismo armado completo que usa el resto del sistema (`_get_alquiler_items`/
+  `_enriquecer_pedido_con_total`).
