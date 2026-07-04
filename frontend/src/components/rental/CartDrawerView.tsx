@@ -40,9 +40,20 @@ import {
 } from "@/design-system/ui/alert-dialog";
 
 /** Forma mínima de la sesión del cliente que usa el panel: nombre + presencia +
- *  perfil fiscal (para la tarjeta "Facturación" del resumen). */
+ *  perfil fiscal (tarjeta "Facturación") + contacto/identidad (tarjeta "Tus
+ *  datos" del resumen). */
 type ClienteSessionLike =
-  | { nombre?: string | null; perfil_impuestos?: PerfilImpuestos | null }
+  | {
+      nombre?: string | null;
+      apellido?: string | null;
+      email?: string | null;
+      telefono?: string | null;
+      direccion?: string | null;
+      nombre_renaper?: string | null;
+      apellido_renaper?: string | null;
+      direccion_renaper?: string | null;
+      perfil_impuestos?: PerfilImpuestos | null;
+    }
   | null
   | undefined;
 
@@ -288,6 +299,13 @@ export function CartDrawerView({
                 totalNeto={totalNeto}
                 conIva={conIva}
                 clienteNombre={clienteSession?.nombre}
+                apellido={clienteSession?.apellido}
+                email={clienteSession?.email}
+                telefono={clienteSession?.telefono}
+                direccion={clienteSession?.direccion}
+                nombreRenaper={clienteSession?.nombre_renaper}
+                apellidoRenaper={clienteSession?.apellido_renaper}
+                direccionRenaper={clienteSession?.direccion_renaper}
                 perfilImpuestos={clienteSession?.perfil_impuestos}
                 onBack={onVolverAlCarrito}
                 onCrearPedido={onCrearPedido}

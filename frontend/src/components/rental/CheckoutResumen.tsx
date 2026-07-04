@@ -9,6 +9,7 @@ import { Spinner } from "@/design-system/ui/spinner";
 import { formatARS } from "@/lib/format";
 import { descuentoLabel, type DescuentoOrigen } from "@/lib/cotizacion";
 import { PERFIL_IMPUESTOS_LABEL, facturaTipoLabel, type PerfilImpuestos } from "@/lib/iva";
+import { nombreClienteLegal, direccionClienteLegal } from "@/lib/cliente-nombre";
 import { useBusinessContact } from "@/hooks/useBusinessContact";
 import { aceptarTyc, validarCheckout, type FaltanItem } from "@/lib/checkout";
 import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
@@ -67,6 +68,13 @@ export function CheckoutResumen({
   totalNeto,
   conIva,
   clienteNombre,
+  apellido,
+  email,
+  telefono,
+  direccion,
+  nombreRenaper,
+  apellidoRenaper,
+  direccionRenaper,
   perfilImpuestos,
   onBack,
   onCrearPedido,
@@ -87,7 +95,17 @@ export function CheckoutResumen({
   descuentoMonto: number;
   totalNeto: number;
   conIva: boolean;
+  /** Nombre de pila (casual) — se usa para "Descuento para X"; el nombre
+   *  completo mostrado en "Tus datos" se resuelve aparte (RENAPER si está
+   *  verificado, con `nombre`/`apellido` como fallback). */
   clienteNombre?: string | null;
+  apellido?: string | null;
+  email?: string | null;
+  telefono?: string | null;
+  direccion?: string | null;
+  nombreRenaper?: string | null;
+  apellidoRenaper?: string | null;
+  direccionRenaper?: string | null;
   /** Perfil fiscal — el valor inicial (el editable en vivo vía
    *  `FacturacionModal` vive en estado local, sembrado con este prop). */
   perfilImpuestos?: PerfilImpuestos | null;
@@ -214,6 +232,19 @@ export function CheckoutResumen({
   // que valga la pena mostrar mientras el pedido puede no prosperar.
   const mostrarFacturacion = !cargando && !faltaIdentidad && !!perfilImpuestosLive;
 
+  // "Tus datos" — lo básico y fundamental de un checkout (nombre completo,
+  // contacto, dirección), resuelto UNA vez acá. El nombre/dirección "legal"
+  // prefieren RENAPER si la identidad está verificada (misma regla que
+  // `identity/__init__.py::nombre_validado`/`direccion_validada`); el CUIT
+  // no se repite acá — ya vive en la tarjeta de Facturación, de abajo.
+  const nombreLegal = nombreClienteLegal({
+    nombre: clienteNombre,
+    apellido,
+    nombre_renaper: nombreRenaper,
+    apellido_renaper: apellidoRenaper,
+  });
+  const direccionLegal = direccionClienteLegal({ direccion, direccion_renaper: direccionRenaper });
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Área scrolleable — el footer con el botón de confirmar vive AFUERA
@@ -259,11 +290,16 @@ export function CheckoutResumen({
           </div>
 
           {clienteNombre && (
-            <div className="rounded-lg border hairline bg-surface p-3">
-              <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+            <div className="space-y-0.5 rounded-lg border hairline bg-surface p-3">
+              <div className="mb-0.5 font-mono text-2xs uppercase tracking-widest text-muted-foreground">
                 Tus datos
               </div>
-              <div className="text-sm font-semibold text-ink">{clienteNombre}</div>
+              <div className="text-sm font-semibold text-ink">{nombreLegal}</div>
+              {email && <div className="text-sm text-muted-foreground">{email}</div>}
+              {telefono && <div className="text-sm text-muted-foreground">{telefono}</div>}
+              {direccionLegal && (
+                <div className="text-sm text-muted-foreground">{direccionLegal}</div>
+              )}
             </div>
           )}
 

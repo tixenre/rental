@@ -47,11 +47,24 @@ type ClienteSession = {
   /** Descuento personalizado del cliente (atención manual del admin a
    * buenos clientes, 0..100). Lo lee el carrito; no es público. */
   descuento: number | null;
+  /** Datos de contacto/identidad — el resumen del checkout ("Tus datos") los
+   *  muestra; el nombre/dirección "legal" (RENAPER si está verificado) se
+   *  resuelve con `nombreClienteLegal`/`direccionClienteLegal` (lib/cliente-nombre). */
+  apellido: string | null;
+  telefono: string | null;
+  direccion: string | null;
+  nombre_renaper: string | null;
+  apellido_renaper: string | null;
+  direccion_renaper: string | null;
 } | null;
 
 let cached: ClienteSession | undefined; // undefined = no fetched yet
 let pending: Promise<ClienteSession> | null = null;
 const subscribers = new Set<(s: ClienteSession) => void>();
+
+function _str(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
 
 async function fetchClienteSession(): Promise<ClienteSession> {
   try {
@@ -61,9 +74,15 @@ async function fetchClienteSession(): Promise<ClienteSession> {
     return {
       id: data.id,
       email: data.email,
-      nombre: typeof data.nombre === "string" ? data.nombre : null,
+      nombre: _str(data.nombre),
       perfil_impuestos: (data.perfil_impuestos ?? null) as PerfilImpuestos | null,
       descuento: typeof data.descuento === "number" ? data.descuento : null,
+      apellido: _str(data.apellido),
+      telefono: _str(data.telefono),
+      direccion: _str(data.direccion),
+      nombre_renaper: _str(data.nombre_renaper),
+      apellido_renaper: _str(data.apellido_renaper),
+      direccion_renaper: _str(data.direccion_renaper),
     };
   } catch {
     return null;
