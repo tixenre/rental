@@ -9,7 +9,7 @@ import { Spinner } from "@/design-system/ui/spinner";
 import { formatARS } from "@/lib/format";
 import { descuentoLabel, type DescuentoOrigen } from "@/lib/cotizacion";
 import { PERFIL_IMPUESTOS_LABEL, type PerfilImpuestos } from "@/lib/iva";
-import { CONTACT } from "@/data/contact";
+import { useBusinessContact } from "@/hooks/useBusinessContact";
 import { aceptarTyc, validarCheckout, type FaltanItem } from "@/lib/checkout";
 import { chequearEstadoVerificacion, iniciarVerificacionIdentidad } from "@/lib/verificacion";
 import { firmarConPasskey, listPasskeys, passkeyErrorMessage } from "@/lib/passkey";
@@ -206,6 +206,12 @@ export function CheckoutResumen({
   const puedeConfirmar =
     !cargando && !errorValidar && !faltaIdentidad && otrosFaltantes.length === 0 && !creando;
 
+  const { address: direccionRetiro } = useBusinessContact();
+  // Facturación solo se muestra una vez que la identidad está confirmada —
+  // antes de eso el perfil fiscal puede ni estar cargado, y no es un dato
+  // que valga la pena mostrar mientras el pedido puede no prosperar.
+  const mostrarFacturacion = !cargando && !faltaIdentidad && !!perfilImpuestos;
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Área scrolleable — el footer con el botón de confirmar vive AFUERA
@@ -243,26 +249,67 @@ export function CheckoutResumen({
               <div className="text-sm text-muted-foreground">Sin fechas seleccionadas</div>
             )}
 
-            {/* Detalle del retiro — dónde y en qué horario, en la misma tarjeta
-              de fechas (no una tarjeta aparte): el pedido en sí ya se ve
-              completo un paso atrás, en el carrito. */}
-            <div className="mt-2 space-y-0.5 border-t hairline pt-2 text-xs text-muted-foreground">
-              <div>
-                Retirás en {CONTACT.address.line2 || CONTACT.address.city}
-                {" — "}
-                <a
-                  href={CONTACT.address.mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-2 hover:text-ink"
-                >
-                  ver mapa
-                </a>
-              </div>
-              <div>{CONTACT.hours.map((h) => `${h.days} ${h.hours}`).join(" · ")}</div>
+            {/* Detalle del retiro — el horario elegido ya está arriba; acá solo
+              dónde retirar (sin link para no sacar al cliente del checkout). */}
+            <div className="mt-2 border-t hairline pt-2 text-xs text-muted-foreground">
+              Retirás en {direccionRetiro}
             </div>
           </div>
 
+          {clienteNombre && (
+            <div className="rounded-lg border hairline bg-surface p-3">
+              <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+                Tus datos
+              </div>
+              <div className="text-sm font-semibold text-ink">{clienteNombre}</div>
+            </div>
+          )}
+
+          {mostrarFacturacion && perfilImpuestos && (
+            <div className="rounded-lg border hairline bg-surface p-3">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
+                  Facturación
+                </span>
+                <a
+                  href="/cliente/portal?tab=perfil"
+                  className="shrink-0 text-2xs text-muted-foreground underline underline-offset-2 hover:text-ink"
+                >
+                  Modificar
+                </a>
+              </div>
+              <div className="text-sm font-semibold text-ink">
+                {PERFIL_IMPUESTOS_LABEL[perfilImpuestos]}
+              </div>
+            </div>
+          )}
+
+          {/* Disclaimer de responsabilidad/seguro — tiene que leerse, no pasar
+            desapercibido: un ítem más del resumen, con el rojo suave del DS
+            (mismo token que los alerts de error) y tamaño de texto normal
+            (no letra chica) para que llame la atención sin gritar tanto como
+            un error real. */}
+          <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <p className="text-sm leading-relaxed text-destructive">
+              A partir del retiro, sos responsable por daños evitables, pérdida o robo del equipo —
+              te recomendamos contratar un seguro propio para tus producciones. Encontrás el Detalle
+              de seguro en la sección de documentos de tu perfil apenas hacés el pedido (es
+              provisorio hasta que lo confirmemos). Al confirmar aceptás nuestros{" "}
+              <a
+                href="/terminos"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-ink"
+              >
+                Términos y Condiciones
+              </a>
+              .
+            </p>
+          </div>
+
+          {/* Total — al final, justo arriba del botón de confirmar (en el
+            footer fijo, inmediatamente debajo de esta tarjeta). */}
           <div className="space-y-2 rounded-lg border hairline bg-surface p-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
@@ -293,61 +340,6 @@ export function CheckoutResumen({
                 )}
               </span>
             </div>
-          </div>
-
-          {clienteNombre && (
-            <div className="rounded-lg border hairline bg-surface p-3">
-              <div className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
-                Tus datos
-              </div>
-              <div className="text-sm font-semibold text-ink">{clienteNombre}</div>
-            </div>
-          )}
-
-          {perfilImpuestos && (
-            <div className="rounded-lg border hairline bg-surface p-3">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <span className="font-mono text-2xs uppercase tracking-widest text-muted-foreground">
-                  Facturación
-                </span>
-                <a
-                  href="/cliente/portal?tab=perfil"
-                  className="shrink-0 text-2xs text-muted-foreground underline underline-offset-2 hover:text-ink"
-                >
-                  Modificar
-                </a>
-              </div>
-              <div className="text-sm font-semibold text-ink">
-                {PERFIL_IMPUESTOS_LABEL[perfilImpuestos]}
-                {razonSocial && (
-                  <span className="font-normal text-muted-foreground"> · {razonSocial}</span>
-                )}
-              </div>
-              {cuit && <div className="mt-0.5 text-xs text-muted-foreground">CUIT {cuit}</div>}
-            </div>
-          )}
-
-          {/* Disclaimer de responsabilidad/seguro — tiene que leerse, no pasar
-            desapercibido como texto chico: un ítem más del resumen, con el
-            rojo suave del DS (mismo token que los alerts de error) para que
-            llame la atención sin gritar tanto como un error real. */}
-          <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-            <p className="text-xs leading-relaxed text-destructive">
-              A partir del retiro, sos responsable por daños evitables, pérdida o robo del equipo —
-              te recomendamos contratar un seguro propio para tus producciones. Encontrás el Detalle
-              de seguro en la sección de documentos de tu perfil apenas hacés el pedido (es
-              provisorio hasta que lo confirmemos). Al confirmar aceptás nuestros{" "}
-              <a
-                href="/terminos"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-ink"
-              >
-                Términos y Condiciones
-              </a>
-              .
-            </p>
           </div>
 
           {cargando && (
