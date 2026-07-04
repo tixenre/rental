@@ -39,6 +39,7 @@ from arca_fe import (
 )
 from services.facturacion.config import credenciales
 from services.facturacion.emisores import emisor_para
+from services.facturacion.padron import resolver_persona, verificar_y_actualizar_receptor
 from services.facturacion.wsaa_cache import get_ta
 from services.facturacion.comprobante_pedido import (
     construir_comprobante,
@@ -103,7 +104,7 @@ def _get_pedido(conn, pedido_id: int) -> dict:
 
 
 def _chequeos_previos(
-    req, perfil_receptor: str, importes: dict, ambiente: str, numero_a_emitir: int
+    req, perfil_receptor: str, importes: dict, ambiente: str, numero_a_emitir: int, conn=None
 ) -> list[dict]:
     """Chequeos fail-not-fast (todos corren, ninguno frena a los demás — mismo
     patrón que `services/checkout/validar.py`). Lo irreversible es "Confirmar
@@ -134,6 +135,28 @@ def _chequeos_previos(
                 ),
             }
         )
+
+        # `emitir_factura` verifica el receptor contra el padrón de ARCA y
+        # bloquea si no puede confirmarlo (ver services.facturacion.padron.
+        # verificar_y_actualizar_receptor) — acá, en el preview, se hace el
+        # MISMO chequeo de solo lectura (`resolver_persona`, sin corregir la
+        # ficha del cliente) para que el admin vea el problema ANTES de
+        # intentar emitir de verdad, en vez de que la emisión real falle sin
+        # aviso previo. Fail-not-fast: si resuelve bien no se agrega nada
+        # (mismo criterio que el resto de los chequeos — solo se lista lo
+        # que hay que atender).
+        if cuit_ok and conn is not None:
+            try:
+                resolver_persona(str(req.receptor.doc_nro), conn)
+            except RuntimeError as exc:
+                chequeos.append(
+                    {
+                        "check": "receptor_verificado_afip",
+                        "ok": False,
+                        "bloqueante": True,
+                        "mensaje": f"AFIP no pudo confirmar este CUIT: {exc}",
+                    }
+                )
 
     ri_degradado = (
         perfil_receptor == "responsable_inscripto"
@@ -247,7 +270,7 @@ def previsualizar_factura(pedido_id: int, conn) -> dict:
     numero_a_emitir = ultimo + 1
 
     chequeos = _chequeos_previos(
-        req, perfil_receptor, importes, cred.ambiente, numero_a_emitir
+        req, perfil_receptor, importes, cred.ambiente, numero_a_emitir, conn=conn
     )
     listo = all(c["ok"] or not c["bloqueante"] for c in chequeos)
 
@@ -305,14 +328,17 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
     Secuencia (orden OBLIGATORIO):
     1. Validar estado del pedido ≥ 'confirmado'
     2. Resolver emisor + datos fiscales del receptor
-    3. Construir ComprobanteRequest
-    4. Advisory lock por (pto_vta, cbte_tipo) — se mantiene hasta el commit
-    5. Idempotencia: si ya hay factura vigente, devolverla
-    6. INSERT estado='pendiente' ANTES de llamar al WS
-    7. FECompConsultar del último número (por si hubo timeout en request anterior)
-    8. FECAESolicitar; persistir CAE+número en TX ATÓMICA
-    9. Error ARCA → estado='error', nunca 500
-    10. PDF en best-effort fuera de la TX fiscal
+    3. Si el receptor tiene CUIT, verificarlo contra el padrón de ARCA —
+       bloquea (RuntimeError) si AFIP no lo confirma; sin lock ni fila
+       escrita todavía, así que no deja nada zombie
+    4. Construir ComprobanteRequest
+    5. Advisory lock por (pto_vta, cbte_tipo) — se mantiene hasta el commit
+    6. Idempotencia: si ya hay factura vigente, devolverla
+    7. INSERT estado='pendiente' ANTES de llamar al WS
+    8. FECompConsultar del último número (por si hubo timeout en request anterior)
+    9. FECAESolicitar; persistir CAE+número en TX ATÓMICA
+    10. Error ARCA → estado='error', nunca 500
+    11. PDF en best-effort fuera de la TX fiscal
     """
     with get_db() as conn:
         pedido = _get_pedido(conn, pedido_id)
@@ -337,6 +363,30 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
                 else CondicionIva.MONOTRIBUTO
             ),
         )
+
+        # Verificar el receptor contra el padrón de ARCA ANTES de construir el
+        # comprobante — sin lock tomado todavía y sin ninguna fila escrita, así
+        # que si AFIP no confirma el CUIT esto es un RuntimeError limpio que
+        # aborta acá (mismo patrón que el ValueError de estado de arriba: nunca
+        # deja una fila 'pendiente' zombie). Solo aplica si el receptor tiene
+        # CUIT — Consumidor Final/DNI no tiene nada que verificar en un padrón
+        # CUIT-céntrico. `verificar_y_actualizar_receptor` (a diferencia del
+        # autocompletado de formularios) SÍ bloquea: la condición IVA del
+        # receptor se le manda a AFIP en el CAE (RG5616), no se factura con un
+        # dato sin confirmar. De paso corrige razón social/domicilio/perfil de
+        # impuestos del cliente si difieren de lo que AFIP dice.
+        cuit_receptor = (pedido.get("cliente_cuit") or "").replace("-", "").strip()
+        if cuit_receptor.isdigit() and len(cuit_receptor) == 11:
+            persona = verificar_y_actualizar_receptor(
+                cuit_receptor, pedido["cliente_id"], conn
+            )
+            pedido["cliente_razon_social"] = (
+                persona.razon_social or pedido.get("cliente_razon_social")
+            )
+            pedido["cliente_domicilio_fiscal"] = (
+                persona.domicilio or pedido.get("cliente_domicilio_fiscal")
+            )
+            pedido["cliente_perfil_impuestos"] = persona.condicion_iva
 
         hoy = now_ar().date()
         req = construir_comprobante(
@@ -394,6 +444,9 @@ def emitir_factura(pedido_id: int, *, emitido_por: Optional[str] = None) -> Fact
                 moneda="PES",
                 cliente_cuit=cuit_rec or None,
                 razon_social=razon_social or None,
+                # Ya viene verificado contra el padrón de ARCA (paso 3, arriba)
+                # cuando el receptor tiene CUIT — queda FIJO en la factura.
+                domicilio=pedido.get("cliente_domicilio_fiscal") or None,
                 raw_request={
                     "cbte_tipo": int(cbte_tipo),
                     "concepto": int(req.concepto),
@@ -604,6 +657,9 @@ def emitir_nota_credito(
             moneda="PES",
             cliente_cuit=original.cliente_cuit,
             razon_social=original.razon_social,
+            # La NC hereda el domicilio ya congelado de la original — no se
+            # re-verifica contra el padrón (consistencia original↔NC).
+            domicilio=original.domicilio,
             raw_request={"nota_credito_de": factura_id, "cbte_tipo": int(cbte_tipo_nc)},
             created_by=emitido_por,
         )

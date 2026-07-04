@@ -218,7 +218,7 @@ def _fake_original_factura() -> Factura:
         cliente_cuit=None, razon_social=None, qr_payload=None, pdf_key=None,
         estado="emitida", nota_credito_de=None, raw_request=None,
         raw_response=None, errores=None, fecha_emision=None,
-        created_at=None, created_by=None,
+        created_at=None, created_by=None, domicilio="Falsa 123, CABA",
     )
 
 
@@ -276,6 +276,35 @@ def test_emitir_nota_credito_revierte_anulacion_si_arca_rechaza(monkeypatch):
 
     assert "update_cae" not in order
     assert order[-1] == "revertir", "ARCA rechazó → la anulación se tiene que revertir"
+
+
+def test_emitir_nota_credito_hereda_domicilio_de_la_original_sin_reverificar(monkeypatch):
+    """La NC NO re-verifica contra el padrón — hereda el `domicilio` ya
+    congelado de la factura original (consistencia original↔NC)."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    wsfe.ultimo = 1
+
+    captured_insert = {}
+
+    def _fake_insert_factura(**kw):
+        captured_insert.update(kw)
+        return 200
+
+    monkeypatch.setattr(engine, "get_db", lambda: _FakeConn())
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: _fake_pedido())
+    monkeypatch.setattr(engine, "get_by_id", lambda factura_id, conn: _fake_original_factura())
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: wsfe)
+    monkeypatch.setattr(engine, "marcar_anulada", lambda factura_id, conn: None)
+    monkeypatch.setattr(engine, "insert_factura", _fake_insert_factura)
+    monkeypatch.setattr(engine, "update_cae", lambda *a, **kw: None)
+    monkeypatch.setattr(engine, "update_error", lambda *a, **kw: None)
+    monkeypatch.setattr(engine, "revertir_anulacion", lambda *a, **kw: None)
+
+    engine.emitir_nota_credito(14)
+
+    assert captured_insert["domicilio"] == "Falsa 123, CABA"
 
 
 def test_construir_comprobante_nc_usa_snapshot_no_pedido_en_vivo():
@@ -530,3 +559,154 @@ def test_preview_arca_business_error_se_propaga_sin_envolver(monkeypatch):
 
     with pytest.raises(ArcaBusinessError, match="600"):
         engine.previsualizar_factura(1, conn=_FakeConn())
+
+
+# ── Receptor verificado contra el padrón de ARCA (emitir_factura bloquea;
+# el preview solo avisa) ─────────────────────────────────────────────────────
+
+_CUIT_VALIDO = "20301234563"  # dígito verificador correcto (verificado con cuil_valido)
+
+
+def _persona_afip(razon_social="Empresa Real SA", domicilio="Calle Real 1", condicion_iva="responsable_inscripto"):
+    from arca_fe.padron import PersonaArca
+
+    return PersonaArca(
+        cuit=_CUIT_VALIDO,
+        razon_social=razon_social,
+        nombre="",
+        apellido="",
+        domicilio=domicilio,
+        condicion_iva=condicion_iva,
+        estado_clave="ACTIVO",
+    )
+
+
+def test_emitir_factura_receptor_con_cuit_se_verifica_y_sobreescribe(monkeypatch):
+    """Receptor con CUIT: `verificar_y_actualizar_receptor` se llama y sus
+    datos (razón social/domicilio/condición IVA) sobreescriben lo que tenía
+    el pedido ANTES de construir el comprobante — la factura sale con lo que
+    dice AFIP, no con el dato interno viejo."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    wsfe.ultimo = 0
+    wsfe.consultar_resp = None
+
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_id": 7,
+        "cliente_perfil_impuestos": "monotributo",  # dato interno VIEJO
+        "cliente_cuit": _CUIT_VALIDO,
+        "cliente_razon_social": "Nombre Viejo Mal Escrito",
+    }
+    calls = _patch_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+
+    verificaciones = []
+
+    def _fake_verificar(cuit, cliente_id, conn):
+        verificaciones.append((cuit, cliente_id))
+        return _persona_afip()
+
+    monkeypatch.setattr(engine, "verificar_y_actualizar_receptor", _fake_verificar)
+    monkeypatch.setattr(
+        engine, "insert_factura", lambda **kw: (calls.setdefault("insert_factura", kw), 99)[1]
+    )
+
+    engine.emitir_factura(1)
+
+    assert verificaciones == [(_CUIT_VALIDO, 7)]
+    ins = calls["insert_factura"]
+    assert ins["razon_social"] == "Empresa Real SA"
+    # condicion_iva='responsable_inscripto' de AFIP → CondicionIva.RESPONSABLE_INSCRIPTO (=1)
+    assert ins["condicion_iva_receptor"] == 1
+
+
+def test_emitir_factura_receptor_no_verificado_bloquea_sin_insertar(monkeypatch):
+    """Si AFIP no puede confirmar el CUIT del receptor, `emitir_factura`
+    propaga el RuntimeError SIN llegar nunca a `insert_factura` — no queda
+    ninguna fila 'pendiente' zombie."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_id": 7,
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    calls = _patch_common(monkeypatch, wsfe)
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+
+    def _fake_verificar(cuit, cliente_id, conn):
+        raise RuntimeError("AFIP no pudo traer el padrón del CUIT — sistema caído")
+
+    monkeypatch.setattr(engine, "verificar_y_actualizar_receptor", _fake_verificar)
+    insert_llamado = []
+    monkeypatch.setattr(
+        engine, "insert_factura", lambda **kw: insert_llamado.append(kw) or 99
+    )
+
+    with pytest.raises(RuntimeError, match="sistema caído"):
+        engine.emitir_factura(1)
+
+    assert insert_llamado == []
+
+
+def test_emitir_factura_receptor_sin_cuit_no_consulta_afip(monkeypatch):
+    """Consumidor Final / DNI: no hay CUIT que verificar en un padrón
+    CUIT-céntrico — `verificar_y_actualizar_receptor` NUNCA se llama."""
+    wsfe = _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s")
+    calls = _patch_common(monkeypatch, wsfe)  # _fake_pedido() ya tiene cliente_cuit=None
+
+    def _fake_verificar(cuit, cliente_id, conn):
+        raise AssertionError("no debería consultarse el padrón sin CUIT")
+
+    monkeypatch.setattr(engine, "verificar_y_actualizar_receptor", _fake_verificar)
+
+    engine.emitir_factura(1)  # no debe levantar nada
+
+
+def test_preview_chequeo_receptor_afip_bloquea_sin_romper(monkeypatch):
+    """CUIT con dígito verificador OK pero que AFIP rechaza (o no responde)
+    — el preview lo muestra como chequeo BLOQUEANTE, sin romper el preview
+    en sí (fail-not-fast, mismo criterio que el resto de los chequeos)."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+
+    def _fake_resolver(cuit, conn):
+        raise RuntimeError("AFIP no pudo traer el padrón del CUIT — no existe persona")
+
+    monkeypatch.setattr(engine, "resolver_persona", _fake_resolver)
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    afip_check = next(c for c in result["chequeos"] if c["check"] == "receptor_verificado_afip")
+    assert afip_check["ok"] is False
+    assert afip_check["bloqueante"] is True
+    assert "no existe persona" in afip_check["mensaje"]
+    assert result["listo"] is False
+
+
+def test_preview_chequeo_receptor_afip_no_aparece_si_todo_bien(monkeypatch):
+    """Si AFIP confirma el CUIT sin problemas, no se agrega ningún chequeo
+    extra — mismo criterio que el resto: solo se lista lo que hay que
+    atender."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": _CUIT_VALIDO,
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+    monkeypatch.setattr(engine, "resolver_persona", lambda cuit, conn: _persona_afip())
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert not any(c["check"] == "receptor_verificado_afip" for c in result["chequeos"])

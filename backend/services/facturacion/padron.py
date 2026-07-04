@@ -26,6 +26,15 @@ tener la relación 'Consulta de constancia de inscripción' delegada en ARCA
 probar uno solo: `resolver_persona` reintenta con cada emisor activo con cert,
 en orden, hasta que uno devuelva persona; recién si TODOS fallan levanta el
 RuntimeError nombrando a cada uno con su motivo real y el ambiente.
+
+**`verificar_y_actualizar_receptor` SÍ participa del flujo de emisión** (la
+excepción a lo de arriba): a diferencia del autocompletado de formularios
+(best-effort, nunca bloquea), `engine.py::emitir_factura` la usa para
+verificar al RECEPTOR de una factura contra el padrón — ahí SÍ bloquea la
+emisión si AFIP no puede confirmar el CUIT, porque la condición IVA del
+receptor se le manda a AFIP (RG5616) y no se puede facturar con un dato sin
+confirmar. Reusa `resolver_persona` (misma consulta, mismo motivo tipado);
+solo cambia qué hace el caller con la excepción.
 """
 
 from __future__ import annotations
@@ -113,4 +122,70 @@ def resolver_persona(cuit_buscado: str, conn) -> PersonaArca:
         f"No se pudo traer el padrón del CUIT {cuit_buscado} — consultado en "
         f"AMBIENTE {ambiente.upper()}. Motivo de AFIP por cada emisor "
         f"autenticador probado: {' | '.join(intentos)}. {guia}"
+    )
+
+
+# Columnas de FACTURACIÓN del cliente que este módulo puede corregir con lo
+# que confirma AFIP — nunca las `*_renaper` (esas las escribe el flujo de
+# Didit/KYC, dominio aparte; ver MEMORIA "Cuentas livianas").
+_CAMPOS_FACTURACION_CORREGIBLES = ("razon_social", "domicilio_fiscal", "perfil_impuestos")
+
+
+def verificar_y_actualizar_receptor(cuit_receptor: str, cliente_id: int, conn) -> PersonaArca:
+    """Verifica el RECEPTOR de una factura contra el padrón de ARCA — a
+    diferencia de `resolver_persona` en el autocompletado de formularios,
+    ACÁ SÍ bloquea: si AFIP no puede confirmar el CUIT, la excepción de
+    `resolver_persona` se deja pasar tal cual (no se atrapa) — el caller
+    (`emitir_factura`) no factura con un CUIT que AFIP no verificó.
+
+    Si AFIP confirma la persona pero no puede clasificar su condición IVA
+    (raro, pero posible — ver `PersonaArca.condicion_iva == ''`), también
+    bloquea con RuntimeError: ese dato SÍ se le manda a AFIP en el CAE
+    (`CondicionIVAReceptorId`, RG5616), no hay valor "por defecto" seguro
+    para mandar sin confirmar.
+
+    Corrige en el mismo movimiento (misma transacción que el caller) los
+    campos de FACTURACIÓN del cliente que difieran de lo que AFIP dice
+    (`razón social`/`domicilio_fiscal`/`perfil_impuestos`) — nunca los
+    campos `*_renaper` (Didit/KYC, dominio aparte)."""
+    persona = resolver_persona(cuit_receptor, conn)
+    if not persona.condicion_iva:
+        raise RuntimeError(
+            f"AFIP no pudo clasificar la condición IVA del CUIT {cuit_receptor} "
+            "— no se puede facturar sin esa clasificación confirmada."
+        )
+    _corregir_datos_facturacion_cliente(cliente_id, persona, conn)
+    return persona
+
+
+def _corregir_datos_facturacion_cliente(cliente_id: int, persona: PersonaArca, conn) -> None:
+    """UPDATE dinámico — solo toca las columnas de `_CAMPOS_FACTURACION_CORREGIBLES`
+    que AFIP trae pobladas y que difieren de lo ya guardado (mismo patrón de
+    "solo lo que cambió" que `emisores_repo.update_emisor`)."""
+    row = conn.execute(
+        "SELECT razon_social, domicilio_fiscal, perfil_impuestos FROM clientes WHERE id = %s",
+        (cliente_id,),
+    ).fetchone()
+    if row is None:
+        return
+
+    nuevo = {
+        "razon_social": persona.razon_social,
+        "domicilio_fiscal": persona.domicilio,
+        "perfil_impuestos": persona.condicion_iva,
+    }
+    cambios = {
+        campo: valor
+        for campo, valor in nuevo.items()
+        if campo in _CAMPOS_FACTURACION_CORREGIBLES
+        and valor
+        and valor != (row[campo] or "")
+    }
+    if not cambios:
+        return
+
+    set_clause = ", ".join(f"{campo} = %s" for campo in cambios)
+    conn.execute(
+        f"UPDATE clientes SET {set_clause} WHERE id = %s",
+        (*cambios.values(), cliente_id),
     )
