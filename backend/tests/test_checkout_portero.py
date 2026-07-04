@@ -25,6 +25,7 @@ from services.checkout.validar import (
     _check_bloqueo,
     _check_antelacion,
     _date_str,
+    _leer_carrito,
     validar_checkout,
     faltan_firma_tyc,
 )
@@ -441,6 +442,19 @@ def test_validar_checkout_carrito_no_encontrado():
     assert result["listo"] is False
     assert len(result["faltan"]) == 1
     assert result["faltan"][0]["check"] == "carrito"
+
+
+def test_leer_carrito_no_filtra_por_confirmado():
+    """Regresión: un cliente que ya armó UN pedido reusa el mismo `session_id`
+    (persiste en localStorage) para el próximo — esa fila queda `confirmado=TRUE`
+    (funnel del admin), pero el heartbeat le sigue refrescando items/fechas. Si
+    `_leer_carrito` volviera a filtrar por `NOT confirmado`, el portero rompería
+    con "No encontramos tu carrito" en cualquier segundo pedido de la sesión."""
+    conn = _conn_all_ok()
+    carrito = _leer_carrito(conn, session_id="abc", cliente_id=1)
+    assert carrito is not None
+    sql_carrito = [sql for sql, _ in conn.executed if "carritos_activos" in sql][0]
+    assert "confirmado" not in sql_carrito
 
 
 # ── validar_checkout: all checks fail (fail-not-fast) ─────────────────────────

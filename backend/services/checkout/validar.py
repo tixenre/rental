@@ -147,11 +147,19 @@ def faltan_firma_tyc(conn, cliente_id: int, firma_ok: bool) -> list[dict]:
 
 def _leer_carrito(conn, session_id: str, cliente_id: int) -> dict | None:
     """Carrito activo del cliente (owner-scoped: session_id + cliente_id).
-    Devuelve None si no existe o ya fue confirmado."""
+    Devuelve None si el `session_id` no existe para este cliente.
+
+    NO filtra por `confirmado`: el `session_id` del cart-store se persiste en
+    localStorage y sobrevive a un pedido ya creado (`marcar_confirmado` lo deja
+    en `confirmado=TRUE` para el funnel de conversión del admin) — si el mismo
+    cliente arma OTRO pedido en la misma pestaña, el heartbeat sigue
+    refrescando `items_json`/fechas de esa fila igual, así que sigue siendo el
+    estado vigente del carrito. Filtrar acá rompía el portero con "No
+    encontramos tu carrito" para cualquier segundo pedido en la misma sesión."""
     row = conn.execute(
         """SELECT items_json, fecha_desde, fecha_hasta, hora_desde, hora_hasta
            FROM carritos_activos
-           WHERE session_id = %s AND cliente_id = %s AND NOT confirmado""",
+           WHERE session_id = %s AND cliente_id = %s""",
         (session_id, cliente_id),
     ).fetchone()
     if row is None:
