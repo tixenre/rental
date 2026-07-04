@@ -78,15 +78,18 @@ def test_afip_sin_datos_levanta_nombrando_el_emisor_y_el_ambiente(monkeypatch):
     monkeypatch.setattr(
         "arca_fe.padron.PadronClient.get_persona",
         lambda self, cuit: (_ for _ in ()).throw(
-            ArcaResponseError("AFIP no devolvió 'personaReturn'", raw="<crudo>")
+            ArcaResponseError("AFIP no devolvió datos de persona", raw="<XML-CRUDO>")
         ),
     )
 
     with pytest.raises(RuntimeError, match="pablo.*20300000000") as ei:
         resolver_persona("23373891029", conn=object())
 
-    assert "AMBIENTE" in str(ei.value)
-    assert "personaReturn" in str(ei.value)
+    msg = str(ei.value)
+    assert "AMBIENTE" in msg
+    # el motivo real de AFIP + su respuesta cruda quedan en el mensaje
+    assert "AFIP no devolvió datos de persona" in msg
+    assert "<XML-CRUDO>" in msg
 
 
 def test_usa_el_unico_emisor_activo_con_cert(monkeypatch):

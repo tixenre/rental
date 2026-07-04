@@ -203,7 +203,7 @@ def test_get_persona_sin_personaReturn_levanta_response_error_con_crudo():
         mock_service.getPersona.return_value = resp
         mock_client_fn.return_value.service = mock_service
 
-        with pytest.raises(ArcaResponseError, match="personaReturn") as ei:
+        with pytest.raises(ArcaResponseError, match="datos de persona") as ei:
             client.get_persona("20999999999")
 
     assert ei.value.raw
@@ -492,6 +492,40 @@ def test_lee_personaReturn_de_una_respuesta_con_la_forma_real_del_wsdl():
         persona = client.get_persona("23373891029")
 
     assert persona is not None
+    assert persona.razon_social == "Rambla SRL"
+    assert persona.estado_clave == "ACTIVO"
+
+
+def test_get_persona_respuesta_desenvuelta_sin_wrapper():
+    """Si el cliente SOAP DESENVUELVE el retorno (resp ES la persona, con
+    `datosGenerales` directo y SIN `.personaReturn`), igual se parsea — no se
+    depende solo de `.personaReturn`, que contra la respuesta real de AFIP en
+    prod venía vacío."""
+    from arca_fe.padron import PadronClient
+
+    resp = SimpleNamespace(
+        datosGenerales=SimpleNamespace(
+            razonSocial="Rambla SRL",
+            nombre="",
+            apellido="",
+            estadoClave="ACTIVO",
+            domicilioFiscal=None,
+        ),
+        datosMonotributo=None,
+        datosRegimenGeneral=None,
+        errorConstancia=None,
+        errorMonotributo=None,
+        errorRegimenGeneral=None,
+    )
+    client = PadronClient("https://x", 20300000000, "t", "s")
+
+    with patch.object(client, "_client") as mock_client_fn:
+        mock_service = MagicMock()
+        mock_service.getPersona.return_value = resp
+        mock_client_fn.return_value.service = mock_service
+
+        persona = client.get_persona("30712345678")
+
     assert persona.razon_social == "Rambla SRL"
     assert persona.estado_clave == "ACTIVO"
 
