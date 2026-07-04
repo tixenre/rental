@@ -10,10 +10,13 @@ extraiga a un paquete pip propio, este directorio se levanta tal cual.
 
 Versionado: SemVer en `__version__`. La superficie exportada acá (`__all__`) es
 el CONTRATO público — un cambio incompatible sube MAJOR. Un test de portabilidad
-verifica que el core nunca importe `backend.*`.
+verifica que el core nunca importe `backend.*`. Se queda deliberadamente en
+`0.x` (no `1.0.0`) hasta que la librería esté completamente implementada y
+probada en producción — bajo SemVer, `0.x` señala justamente que puede romper
+compatibilidad entre versiones menores, la misma libertad que se usó acá.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .modelos import (
     CondicionIva,
@@ -34,11 +37,14 @@ from .modelos import (
     Tributo,
     Opcional,
 )
-from .comprobante import tipo_comprobante, calcular_importes, armar_fecae
+from .comprobante import tipo_comprobante, calcular_importes, armar_fecae, armar_fecae_lote
 from .qr import armar_qr
 from .wsaa import construir_tra, firmar_tra, login, login_con_cert
-from .wsfe import WsfeClient
-from .padron import PadronClient, PersonaArca, Impuesto, Actividad
+from .wsfe import WsfeClient, clear_cache as wsfe_clear_cache
+from .padron import PadronClient, PersonaArca, Impuesto, Actividad, clear_cache as padron_clear_cache
+from .validadores import normalizar_cuit, cuit_valido, formatear_cuit
+from .retry import with_retry
+from .asyncio_support import solicitar_cae_async, get_persona_async, login_async
 from .errores import (
     ArcaError,
     ArcaAuthError,
@@ -71,6 +77,7 @@ __all__ = [
     "tipo_comprobante",
     "calcular_importes",
     "armar_fecae",
+    "armar_fecae_lote",
     "armar_qr",
     # auth WSAA
     "construir_tra",
@@ -79,11 +86,23 @@ __all__ = [
     "login_con_cert",
     # cliente WSFEv1
     "WsfeClient",
+    "wsfe_clear_cache",
     # cliente de padrón (Constancia de Inscripción, ws_sr_constancia_inscripcion)
     "PadronClient",
     "PersonaArca",
     "Impuesto",
     "Actividad",
+    "padron_clear_cache",
+    # CUIT: normalizar/validar/formatear
+    "normalizar_cuit",
+    "cuit_valido",
+    "formatear_cuit",
+    # retry/backoff opcional
+    "with_retry",
+    # facade async (asyncio.to_thread — ver docstring del módulo)
+    "solicitar_cae_async",
+    "get_persona_async",
+    "login_async",
     # taxonomía de errores (todo lo que el motor levanta hereda de ArcaError)
     "ArcaError",
     "ArcaAuthError",
