@@ -241,9 +241,9 @@ export function CartDrawer({
     return () => document.removeEventListener("keydown", onKey);
   }, [drawerOpen, setDrawerOpen]);
 
-  // "Confirmar solicitud" (paso carrito): solo lo que el portero NO puede
-  // chequear (fechas, sesión de cliente) — el resto (identidad/T&C/firma/etc.)
-  // lo resuelve el paso de resumen preguntándole al backend (`CheckoutResumen`).
+  // "Revisar pedido" (paso carrito): solo lo que el portero NO puede chequear
+  // (fechas, sesión de cliente) — el resto (identidad/T&C/firma/etc.) lo
+  // resuelve el paso de resumen preguntándole al backend (`CheckoutResumen`).
   function handleIrAResumen() {
     if (list.length === 0) return;
 

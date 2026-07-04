@@ -519,7 +519,7 @@ export function CartDrawerView({
                     disabled={list.length === 0 || hayNoDisponible || dentroDeLeadTime}
                     onClick={onSubmit}
                   >
-                    Confirmar solicitud
+                    Revisar pedido
                   </Button>
 
                   {/* Lead-time (#1126): el retiro cae dentro de la ventana de antelación
@@ -599,9 +599,11 @@ export function CartDrawerView({
                     </div>
                   )}
 
-                  {/* Guardar como lista — solo logueado (las listas son server-only). */}
-                  {clienteSession && list.length > 0 && (
-                    <GuardarComoListaButton
+                  {/* Compartir — público: anda logueado o anónimo (la puerta /api/public/compartir
+                    no pide sesión), así un gaffer le pasa el carrito a un productor sin cuenta. */}
+                  {list.length > 0 && (
+                    <CompartirComposicionButton
+                      label="Compartir pedido"
                       items={list.map(({ it, qty }) => ({
                         equipo_id: it._backendId ?? Number(it.id),
                         cantidad: qty,
@@ -609,11 +611,9 @@ export function CartDrawerView({
                     />
                   )}
 
-                  {/* Compartir — público: anda logueado o anónimo (la puerta /api/public/compartir
-                    no pide sesión), así un gaffer le pasa el carrito a un productor sin cuenta. */}
-                  {list.length > 0 && (
-                    <CompartirComposicionButton
-                      label="Compartir pedido"
+                  {/* Guardar como lista — solo logueado (las listas son server-only). */}
+                  {clienteSession && list.length > 0 && (
+                    <GuardarComoListaButton
                       items={list.map(({ it, qty }) => ({
                         equipo_id: it._backendId ?? Number(it.id),
                         cantidad: qty,

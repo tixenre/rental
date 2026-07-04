@@ -23,7 +23,7 @@ export const RESUME_STEP_PARAM = "carritoPaso";
 export const RESUME_STEP_VALUE = "resumen";
 
 /**
- * CheckoutResumen — el paso de revisión entre "Confirmar solicitud" (carrito) y
+ * CheckoutResumen — el paso de revisión entre "Revisar pedido" (carrito) y
  * la creación real del pedido. NO hardcodea el orden de las validaciones: le
  * pregunta al backend (`validar_checkout`, el portero de `services/checkout/`)
  * qué falta (`{listo, faltan}`). Un solo botón "Confirmar" resuelve T&C y firma
