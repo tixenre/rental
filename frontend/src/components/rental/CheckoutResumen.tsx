@@ -387,7 +387,7 @@ export function CheckoutResumen({
           <p className="mt-3 text-center text-xs text-muted-foreground leading-tight">
             Al confirmar aceptás nuestros{" "}
             <a
-              href="/tyc"
+              href="/terminos"
               target="_blank"
               rel="noopener noreferrer"
               className="underline underline-offset-2 hover:text-ink"
