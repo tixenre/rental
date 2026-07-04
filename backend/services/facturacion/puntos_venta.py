@@ -42,8 +42,11 @@ def consultar_puntos_venta(nombre_emisor: str, conn) -> dict:
     """Puntos de venta de `nombre_emisor`, separados en habilitados para
     facturación electrónica y excluidos (con motivo).
 
-    Devuelve `{"habilitados": [{"nro": ...}], "excluidos": [{"nro": ...,
+    Devuelve `{"habilitados": [{"nro": ..., "emision_tipo": ...}], "excluidos": [{"nro": ...,
     "motivo": "bloqueado" | "dado_de_baja" | "no_electronico", "raw_emision_tipo": ...}]}`.
+    `emision_tipo` en los habilitados es el mismo valor crudo de ARCA (ej. `"CAE - Monotributo"`)
+    — sirve para que el front distinga puntos de venta cuando hay más de uno habilitado (ARCA no
+    expone por WSFE el "Nombre de Fantasía" que sí se ve en su portal web).
     Antes esto descartaba los no-habilitados en silencio — si ARCA devolvía puntos pero
     todos bloqueados, se veía el mismo "no hay nada" que si ARCA no tenía
     NINGÚN punto creado; son causas distintas (desbloquear vs. crear uno
@@ -86,6 +89,6 @@ def consultar_puntos_venta(nombre_emisor: str, conn) -> dict:
                 }
             )
         else:
-            habilitados.append({"nro": p["Nro"]})
+            habilitados.append({"nro": p["Nro"], "emision_tipo": p.get("EmisionTipo")})
 
     return {"habilitados": habilitados, "excluidos": excluidos}

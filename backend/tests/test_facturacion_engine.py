@@ -875,3 +875,33 @@ def test_preview_receptor_domicilio_vacio_si_falta(monkeypatch):
     result = engine.previsualizar_factura(1, conn=_FakeConn())
 
     assert result["receptor"]["domicilio"] == ""
+
+
+def test_preview_receptor_usa_domicilio_de_afip_si_no_esta_guardado(monkeypatch):
+    """Bug real reportado por el dueño: el preview mostraba "sin confirmar" pese a que el
+    chequeo `receptor_verificado_afip` (llama a `resolver_persona`, de solo lectura) ya había
+    confirmado el CUIT contra ARCA con éxito — se descartaba el domicilio que esa misma
+    respuesta traía, en vez de usarlo, porque `cliente_domicilio_fiscal` todavía no estaba
+    persistido (recién se persiste al EMITIR de verdad, no en el preview). El preview ahora
+    usa el domicilio de ARCA como fallback cuando no hay uno ya guardado."""
+    pedido_ri = {
+        **_fake_pedido(),
+        "cliente_perfil_impuestos": "responsable_inscripto",
+        "cliente_cuit": _CUIT_VALIDO,
+        "cliente_domicilio_fiscal": None,
+    }
+    monkeypatch.setattr(engine, "_get_pedido", lambda conn, pedido_id: pedido_ri)
+    monkeypatch.setattr(engine, "emisor_para", lambda perfil, conn: "santini")
+    monkeypatch.setattr(engine, "credenciales", lambda nombre, conn: _fake_cred())
+    monkeypatch.setattr(engine, "get_ta", lambda emisor, conn: ("tok", "sign"))
+    monkeypatch.setattr(engine, "WsfeClient", lambda **kw: _FakeWsfe(endpoint="x", cuit=1, token="t", sign="s"))
+    monkeypatch.setattr(
+        engine,
+        "resolver_persona",
+        lambda cuit, conn: _persona_afip(domicilio="Domicilio Ficticio 456"),
+    )
+
+    result = engine.previsualizar_factura(1, conn=_FakeConn())
+
+    assert result["receptor"]["domicilio"] == "Domicilio Ficticio 456"
+    assert not any(c["check"] == "receptor_verificado_afip" for c in result["chequeos"])

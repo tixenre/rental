@@ -412,10 +412,14 @@ function EmisorFormModal({
 
   // Auto-búsqueda: apenas el CUIT tiene 11 dígitos se consulta AFIP solo
   // (debounce para no disparar en cada tecla). En "Editar" el CUIT ya viene
-  // cargado → se refresca desde AFIP al abrir. `buscarAfip` es estable
-  // (useCallback en el hook), así el efecto no se re-dispara en cada render.
+  // cargado y ya está confirmado — no hace falta re-consultar AFIP solo por
+  // abrir el modal; el ref arranca con esos dígitos para que el efecto se
+  // quede callado hasta que el usuario CAMBIE el CUIT de verdad. En "Nuevo
+  // emisor" arranca vacío, así que se dispara apenas se completan 11 dígitos.
+  // `buscarAfip` es estable (useCallback en el hook), así el efecto no se
+  // re-dispara en cada render.
   const buscarAfip = padron.buscar;
-  const ultimoBuscadoRef = useRef<string>("");
+  const ultimoBuscadoRef = useRef<string>(emisor?.cuit?.replace(/\D/g, "") ?? "");
   useEffect(() => {
     const digits = cuit.replace(/\D/g, "");
     if (digits.length !== 11 || digits === ultimoBuscadoRef.current) return;
